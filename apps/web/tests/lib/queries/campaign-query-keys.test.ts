@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
+import { queryKeys } from '@/lib/queries';
 
 describe('campaign query keys', () => {
   it('includes a stable overview key', () => {

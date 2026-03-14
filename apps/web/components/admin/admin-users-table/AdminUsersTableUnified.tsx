@@ -37,8 +37,7 @@ import {
 } from '@/lib/admin/csv-configs/users';
 import type { AdminUserRow } from '@/lib/admin/users';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { useAdminUsersInfiniteQuery } from '@/lib/queries/admin-infinite';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import type { AdminUsersTableProps } from './types';
 import {

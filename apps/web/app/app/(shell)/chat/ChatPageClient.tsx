@@ -23,7 +23,7 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { useDashboardSocialLinksQuery } from '@/lib/queries/useDashboardSocialLinksQuery';
+import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 
 interface ChatPageClientProps {

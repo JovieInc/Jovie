@@ -3,12 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { ALL_PLATFORMS } from '@/constants/platforms';
-import { useProfileMutation } from '@/lib/queries';
 import {
   useDashboardSocialLinksQuery,
+  useDspMatchesQuery,
+  useProfileMutation,
   useSaveSocialLinksMutation,
-} from '@/lib/queries/useDashboardSocialLinksQuery';
-import { useDspMatchesQuery } from '@/lib/queries/useDspMatchesQuery';
+} from '@/lib/queries';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import type { Artist, CreatorProfile } from '@/types/db';
 import { convertCreatorProfileToArtist } from '@/types/db';

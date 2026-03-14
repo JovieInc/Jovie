@@ -27,7 +27,14 @@ vi.mock('@tanstack/react-query', () => ({
   useQueryClient: useQueryClientMock,
 }));
 
-import { queryKeys } from '@/lib/queries/keys';
+import {
+  queryKeys,
+  useNotificationStatusQuery,
+  useSubscribeNotificationsMutation,
+  useUnsubscribeNotificationsMutation,
+  useUpdateContentPreferencesMutation,
+  useVerifyEmailOtpMutation,
+} from '@/lib/queries';
 
 function getLastMutationOptions() {
   const lastCall = useMutationMock.mock.calls.at(-1);
@@ -35,14 +42,6 @@ function getLastMutationOptions() {
 
   return lastCall?.[0];
 }
-
-import {
-  useNotificationStatusQuery,
-  useSubscribeNotificationsMutation,
-  useUnsubscribeNotificationsMutation,
-  useUpdateContentPreferencesMutation,
-  useVerifyEmailOtpMutation,
-} from '@/lib/queries/useNotificationStatusQuery';
 
 describe('useNotificationStatusQuery', () => {
   beforeEach(() => {

@@ -7,7 +7,7 @@ import { DashboardRefreshButton } from '@/components/dashboard/molecules/Dashboa
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { usePlanGate } from '@/lib/queries/usePlanGate';
+import { usePlanGate } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
 import { RangeToggle } from './RangeToggle';
 import { useDashboardAnalyticsState } from './useDashboardAnalytics';

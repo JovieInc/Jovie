@@ -2,10 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type {
-  CheckoutResponse,
-  PortalResponse,
-} from '@/lib/queries/useBillingMutations';
+import type { CheckoutResponse, PortalResponse } from '@/lib/queries';
 
 // ---- hoisted mocks ----
 const { mockFetchWithTimeout, mockCaptureError, mockHandleMutationError } =
@@ -44,7 +41,7 @@ import {
   useCancelSubscriptionMutation,
   useCheckoutMutation,
   usePortalMutation,
-} from '@/lib/queries/useBillingMutations';
+} from '@/lib/queries';
 
 // ---- shared test infrastructure ----
 

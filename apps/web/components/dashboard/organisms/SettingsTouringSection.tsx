@@ -40,8 +40,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { queryKeys } from '@/lib/queries/keys';
-import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
+import { queryKeys, useBandsintownConnectionQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const BANDSINTOWN_ACCENT = '#00B4B3';

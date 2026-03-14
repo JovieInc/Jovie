@@ -15,7 +15,7 @@ import {
   DrawerSurfaceCard,
   StatTile,
 } from '@/components/molecules/drawer';
-import { useDashboardAnalyticsQuery } from '@/lib/queries/useDashboardAnalyticsQuery';
+import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
 

@@ -19,7 +19,7 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { useContactsQuery } from '@/lib/queries/useContactsQuery';
+import { useContactsQuery } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 interface SettingsContactsSectionProps {

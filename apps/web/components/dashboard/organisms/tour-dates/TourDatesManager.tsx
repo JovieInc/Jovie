@@ -14,7 +14,7 @@ import {
   useDeleteTourDateMutation,
   useDisconnectBandsintownMutation,
   useSyncFromBandsintownMutation,
-} from '@/lib/queries/useTourDateMutations';
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { TourDateSidebar } from './TourDateSidebar';
 import { TourDatesEmptyState } from './TourDatesEmptyState';

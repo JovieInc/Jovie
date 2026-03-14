@@ -7,7 +7,7 @@ import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsSta
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { useAnalyticsFilterMutation } from '@/lib/queries/useSettingsMutation';
+import { useAnalyticsFilterMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 export interface SettingsAnalyticsSectionProps {

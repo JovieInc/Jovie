@@ -7,10 +7,12 @@ import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import type { AppleMusicArtistResult } from '@/lib/queries/useAppleMusicArtistSearchQuery';
-import { useAppleMusicArtistSearchQuery } from '@/lib/queries/useAppleMusicArtistSearchQuery';
-import type { SpotifyArtistResult } from '@/lib/queries/useArtistSearchQuery';
-import { useArtistSearchQuery } from '@/lib/queries/useArtistSearchQuery';
+import {
+  type AppleMusicArtistResult,
+  type SpotifyArtistResult,
+  useAppleMusicArtistSearchQuery,
+  useArtistSearchQuery,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { getInitials } from '@/lib/utils/initials';
 

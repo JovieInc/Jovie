@@ -17,10 +17,7 @@ import { useCallback, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import {
-  useDeleteAccountMutation,
-  useExportDataMutation,
-} from '@/lib/queries/useAccountMutations';
+import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
 export function DataPrivacySection() {
   const router = useRouter();
