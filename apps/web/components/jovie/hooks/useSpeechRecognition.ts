@@ -80,8 +80,7 @@ export function useSpeechRecognition({
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onTranscriptRef = useRef(onTranscript);
-  const browserWindow =
-    globalThis.window === undefined ? undefined : globalThis.window;
+  const browserWindow = globalThis.window ?? undefined;
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
