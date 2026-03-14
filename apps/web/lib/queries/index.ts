@@ -130,6 +130,13 @@ export {
 export { useArtworkDownloadMutation } from './useArtworkDownloadMutation';
 // Bandsintown connection status
 export { useBandsintownConnectionQuery } from './useBandsintownConnectionQuery';
+// Batch ingest mutation (admin)
+export {
+  type BatchIngestApiResponse,
+  type BatchIngestInput,
+  type BatchResult,
+  useBatchIngestMutation,
+} from './useBatchIngestMutation';
 export {
   type BillingHistoryEntry,
   useBillingHistoryQuery,
@@ -354,3 +361,10 @@ export {
   type WaitlistSubmitInput,
   type WaitlistSubmitResponse,
 } from './useWaitlistMutations';
+// Waitlist settings query and mutation (admin)
+export {
+  useWaitlistSettingsMutation,
+  useWaitlistSettingsQuery,
+  type WaitlistSettingsResponse,
+  type WaitlistSettingsUpdateInput,
+} from './useWaitlistSettingsQuery';

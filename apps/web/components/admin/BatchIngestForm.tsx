@@ -10,26 +10,12 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
-import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  type BatchIngestApiResponse,
+  useBatchIngestMutation,
+} from '@/lib/queries/useBatchIngestMutation';
 import { cn } from '@/lib/utils';
 import { parseBatchUrls } from './batch-url-utils';
-
-interface BatchResult {
-  input: string;
-  status: 'success' | 'skipped' | 'error';
-  reason?: string;
-  username?: string;
-}
-
-interface BatchIngestApiResponse {
-  results: BatchResult[];
-  summary: {
-    total: number;
-    success: number;
-    skipped: number;
-    error: number;
-  };
-}
 
 interface BatchIngestFormProps {
   readonly onComplete?: () => void;
@@ -58,9 +44,14 @@ export function BatchIngestForm({
 }: Readonly<BatchIngestFormProps>) {
   const [value, setValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<BatchIngestApiResponse | null>(null);
-  const notifications = useNotifications();
+
+  const { mutateAsync, isPending } = useBatchIngestMutation({
+    onSuccess: data => {
+      setResult(data);
+      onComplete?.();
+    },
+  });
 
   const parsedCount = useMemo(() => parseBatchUrls(value).length, [value]);
 
@@ -73,47 +64,8 @@ export function BatchIngestForm({
 
   const handleSubmit = async () => {
     const urls = parseBatchUrls(value);
-
-    if (urls.length === 0) {
-      notifications.error('Paste at least one URL to import.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await fetch('/api/admin/batch-ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ urls }),
-      });
-
-      const payload = (await response.json()) as BatchIngestApiResponse & {
-        error?: string;
-        details?: string;
-      };
-
-      if (!response.ok) {
-        notifications.error(
-          payload.details ?? payload.error ?? 'Batch ingest failed.'
-        );
-        return;
-      }
-
-      setResult(payload);
-      notifications.success(
-        `Batch complete: ${payload.summary.success} created, ${payload.summary.skipped} skipped, ${payload.summary.error} errors.`
-      );
-      onComplete?.();
-    } catch (error) {
-      notifications.error(
-        error instanceof Error ? error.message : 'Failed to ingest URLs.'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (urls.length === 0) return;
+    await mutateAsync({ urls });
   };
 
   let summaryText: string | null;
@@ -168,10 +120,10 @@ https://www.instagram.com/artistname, https://artist-website.com'
               type='button'
               size='sm'
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isPending}
               className='w-full sm:w-auto'
             >
-              {isSubmitting ? 'Ingesting\u2026' : 'Run batch import'}
+              {isPending ? 'Ingesting\u2026' : 'Run batch import'}
             </Button>
           </div>
 
@@ -219,7 +171,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
                           {config.label}
                         </span>{' '}
                         {item.input}
-                        {item.username ? ` → @${item.username}` : ''}
+                        {item.username ? ` \u2192 @${item.username}` : ''}
                         {item.reason ? ` (${item.reason})` : ''}
                       </span>
                     </li>
