@@ -3,11 +3,12 @@
 /**
  * Handle Validation Hook
  *
- * Simple debounced fetch for handle availability checking.
- * No TanStack Pacer — just a plain setTimeout + AbortController.
+ * Validates handle format client-side and checks availability via
+ * useHandleAvailabilityQuery (TanStack Query) with debounced input.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHandleAvailabilityQuery } from '@/lib/queries/useHandleAvailabilityQuery';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -21,22 +22,15 @@ export interface HandleValidationResult {
 /** Debounce before hitting the API */
 const DEBOUNCE_MS = 400;
 
-/** Abort fetch if it takes longer than this */
-const FETCH_TIMEOUT_MS = 5_000;
-
 /**
  * Hook for validating handle format and availability.
  *
- * Uses a plain debounced fetch with AbortController — no complex
- * retry/cache machinery that can get stuck.
+ * Uses TanStack Query (useHandleAvailabilityQuery) for the API call,
+ * with a debounced input value to avoid excessive requests while typing.
  */
 export function useHandleValidation(handle: string): HandleValidationResult {
-  const [available, setAvailable] = useState<boolean | null>(null);
-  const [availError, setAvailError] = useState<string | null>(null);
-  const [checking, setChecking] = useState(false);
-
+  const [debouncedHandle, setDebouncedHandle] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
 
   // Client-side handle validation
   const handleError = useMemo(() => {
@@ -50,101 +44,59 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  const cancel = useCallback(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-    abortRef.current?.abort();
-    abortRef.current = null;
-    setChecking(false);
-  }, []);
-
-  // Trigger availability check when handle changes
+  // Debounce the handle value before sending to the query
   useEffect(() => {
-    // Reset state
-    setAvailError(null);
-
-    // Clear any pending check
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    abortRef.current?.abort();
 
-    // Nothing to check
+    // Reset debounced handle if input is invalid or empty
     if (!handle || handleError) {
-      setAvailable(null);
-      setChecking(false);
+      setDebouncedHandle('');
       return;
     }
 
-    // Show checking state immediately (before debounce fires)
-    setChecking(true);
-    setAvailable(null);
-
-    // Debounce the actual API call
-    debounceRef.current = setTimeout(async () => {
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      // Timeout the fetch
-      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-      try {
-        const res = await fetch(
-          `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
-          { signal: controller.signal }
-        );
-
-        clearTimeout(timeoutId);
-
-        // Aborted while waiting
-        if (controller.signal.aborted) return;
-
-        const json = await res
-          .json()
-          .catch(() => ({ available: false, error: 'Parse error' }));
-
-        if (!res.ok) {
-          setAvailable(null);
-          setAvailError(json?.error || 'Error checking availability');
-          setChecking(false);
-          return;
-        }
-
-        setAvailable(Boolean(json?.available));
-        setAvailError(null);
-        setChecking(false);
-      } catch (err: unknown) {
-        clearTimeout(timeoutId);
-
-        // Aborts happen from user typing (effect cleanup) or fetch timeout.
-        // Either way, reset checking so the UI doesn't get stuck.
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          setChecking(false);
-          return;
-        }
-
-        setAvailable(null);
-        setAvailError('Network error — try again');
-        setChecking(false);
-      }
+    debounceRef.current = setTimeout(() => {
+      setDebouncedHandle(handle);
     }, DEBOUNCE_MS);
 
-    // Cleanup on unmount or handle change
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      abortRef.current?.abort();
     };
   }, [handle, handleError]);
 
+  const isValidHandle = Boolean(handle) && !handleError;
+
+  const { data, isFetching, isError } = useHandleAvailabilityQuery({
+    handle: debouncedHandle || null,
+    enabled: isValidHandle && debouncedHandle.length >= 3,
+  });
+
+  const cancel = useCallback(() => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    setDebouncedHandle('');
+  }, []);
+
+  // Determine checking state: either debounce is pending or query is fetching
+  const isDebouncing = isValidHandle && handle !== debouncedHandle;
+  const checkingAvail = isDebouncing || isFetching;
+
+  // Determine availability and error from query result
+  const available = data?.available ?? null;
+  const availError = isError
+    ? 'Network error \u2014 try again'
+    : (data?.error ?? null);
+
   return {
     handleError,
-    checkingAvail: checking,
+    checkingAvail,
     available,
     availError,
     cancel,

@@ -2,7 +2,7 @@ import type { ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_SURFACE_CARD_CLASSNAME =
-  'rounded-[9px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+  'rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0)';
 
 export interface DrawerSurfaceCardProps {
   readonly children: ReactNode;

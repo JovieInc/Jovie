@@ -111,15 +111,26 @@ function getFetchErrorMessage(response: Response): string {
 
 /**
  * Custom error class for fetch failures with status code.
+ *
+ * This is the canonical FetchError used across the app. It supports both
+ * raw Response objects (from fetchWithTimeout) and string bodies (from dedupedFetch).
  */
 export class FetchError extends Error {
+  public readonly response?: Response;
+  public readonly body?: string;
+
   constructor(
     message: string,
     public readonly status: number,
-    public readonly response?: Response
+    responseOrBody?: Response | string
   ) {
     super(message);
     this.name = 'FetchError';
+    if (typeof responseOrBody === 'string') {
+      this.body = responseOrBody;
+    } else {
+      this.response = responseOrBody;
+    }
   }
 
   /**

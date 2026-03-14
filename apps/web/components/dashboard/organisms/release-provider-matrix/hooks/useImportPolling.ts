@@ -1,5 +1,6 @@
 'use client';
 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getSpotifyImportStatus,
@@ -34,17 +35,41 @@ function sortReleases(releases: ReleaseViewModel[]): ReleaseViewModel[] {
   });
 }
 
+/** Combined result from both server actions. */
+interface ImportPollResult {
+  status: 'idle' | 'importing' | 'complete' | 'failed';
+  releaseCount: number;
+  releases: ReleaseViewModel[];
+  serverCount: number;
+}
+
+async function fetchImportPoll(): Promise<ImportPollResult> {
+  const [statusResult, releasesResult] = await Promise.all([
+    getSpotifyImportStatus(),
+    pollReleasesCount(),
+  ]);
+
+  return {
+    status: statusResult.status,
+    releaseCount: statusResult.releaseCount,
+    releases: releasesResult.releases,
+    serverCount: releasesResult.count,
+  };
+}
+
 export function useImportPolling({
   enabled,
   onReleasesUpdate,
   onImportComplete,
 }: UseImportPollingParams) {
   const [importedCount, setImportedCount] = useState(0);
-  const isPollingRef = useRef(false);
   const onReleasesUpdateRef = useRef(onReleasesUpdate);
   const onImportCompleteRef = useRef(onImportComplete);
   // Accumulate releases across polls so rows never disappear
   const seenReleasesRef = useRef(new Map<string, ReleaseViewModel>());
+  // Track whether import completed so we stop polling
+  const [isComplete, setIsComplete] = useState(false);
+  const queryClient = useQueryClient();
 
   onReleasesUpdateRef.current = onReleasesUpdate;
   onImportCompleteRef.current = onImportComplete;
@@ -66,53 +91,47 @@ export function useImportPolling({
     []
   );
 
-  const poll = useCallback(async () => {
-    if (isPollingRef.current) return;
-    isPollingRef.current = true;
-
-    try {
-      const [statusResult, releasesResult] = await Promise.all([
-        getSpotifyImportStatus(),
-        pollReleasesCount(),
-      ]);
-
-      if (releasesResult.count > 0) {
-        mergeAndEmit(releasesResult.releases, releasesResult.count);
-      }
-
-      if (
-        statusResult.status === 'complete' ||
-        statusResult.status === 'failed'
-      ) {
-        // One final fetch to ensure we have all releases
-        if (statusResult.status === 'complete') {
-          const final = await pollReleasesCount();
-          mergeAndEmit(final.releases, final.count);
-        }
-        onImportCompleteRef.current();
-      }
-    } catch {
-      // Polling errors are non-fatal; next tick will retry
-    } finally {
-      isPollingRef.current = false;
-    }
-  }, [mergeAndEmit]);
-
+  // Reset when a new import starts
   useEffect(() => {
-    if (!enabled) {
-      return;
+    if (enabled) {
+      seenReleasesRef.current.clear();
+      setImportedCount(0);
+      setIsComplete(false);
+      // Remove stale poll data from previous imports
+      queryClient.removeQueries({ queryKey: ['import-polling'] });
+    }
+  }, [enabled, queryClient]);
+
+  const isPolling = enabled && !isComplete;
+
+  const { data } = useQuery({
+    queryKey: ['import-polling'],
+    queryFn: fetchImportPoll,
+    enabled: isPolling,
+    refetchInterval: isPolling ? POLL_INTERVAL_MS : false,
+    // Don't cache stale import data across navigations
+    gcTime: 0,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  // Process poll results whenever query data changes
+  useEffect(() => {
+    if (!data || !isPolling) return;
+
+    if (data.releases.length > 0) {
+      mergeAndEmit(data.releases, data.serverCount);
     }
 
-    // Reset seen releases when a new import starts
-    seenReleasesRef.current.clear();
-    setImportedCount(0);
-
-    const id = setInterval(poll, POLL_INTERVAL_MS);
-    // Immediately poll on mount
-    poll();
-
-    return () => clearInterval(id);
-  }, [enabled, poll]);
+    if (data.status === 'complete' || data.status === 'failed') {
+      if (data.status === 'complete') {
+        // Final merge with latest data
+        mergeAndEmit(data.releases, data.serverCount);
+      }
+      setIsComplete(true);
+      onImportCompleteRef.current();
+    }
+  }, [data, isPolling, mergeAndEmit]);
 
   return { importedCount };
 }

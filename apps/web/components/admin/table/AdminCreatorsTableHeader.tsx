@@ -44,7 +44,7 @@ export function AdminCreatorsTableHeader({
   headerActions,
 }: Readonly<AdminCreatorsTableHeaderProps>) {
   const headerCellClass = cn(
-    'sticky z-20 border-b border-(--linear-border-subtle) px-4 py-3 text-left',
+    'sticky z-20 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-2.5 text-left',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
   );
 
@@ -55,7 +55,7 @@ export function AdminCreatorsTableHeader({
 
   return (
     <thead className='text-left text-(--linear-text-secondary)'>
-      <tr className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
+      <tr className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
         <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
           <Checkbox
             aria-label='Select all creators'

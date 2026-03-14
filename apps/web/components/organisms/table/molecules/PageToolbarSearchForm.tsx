@@ -40,139 +40,192 @@ export interface PageToolbarSearchFormProps {
   readonly tooltipLabel?: string;
 }
 
-export function PageToolbarSearchForm({
-  action,
+function HiddenInputFields({
+  inputs,
+  searchParamName,
   searchValue,
-  onSearchValueChange,
-  placeholder,
-  ariaLabel,
-  submitAriaLabel,
-  clearHref,
-  clearAriaLabel = 'Clear search',
-  onClearAction,
-  onApply,
-  applyLabel = 'Apply',
-  hiddenInputs = [],
-  searchParamName = 'q',
-  className,
-  fieldClassName,
-  submitIcon,
-  clearIcon,
-  compact = false,
-  tooltipLabel,
-}: Readonly<PageToolbarSearchFormProps>) {
-  const [isOpen, setIsOpen] = useState(false);
+  isRouteSearch,
+}: {
+  readonly inputs: readonly HiddenInput[];
+  readonly searchParamName: string;
+  readonly searchValue: string;
+  readonly isRouteSearch: boolean;
+}) {
+  return (
+    <>
+      {isRouteSearch
+        ? inputs.map(input =>
+            input.value == null ? null : (
+              <input
+                key={input.name}
+                type='hidden'
+                name={input.name}
+                value={String(input.value)}
+              />
+            )
+          )
+        : null}
+      {isRouteSearch ? (
+        <input type='hidden' name={searchParamName} value={searchValue} />
+      ) : null}
+    </>
+  );
+}
+
+function CompactSearchForm(
+  props: Readonly<PageToolbarSearchFormProps> & {
+    readonly isOpen: boolean;
+    readonly onOpenChange: (open: boolean) => void;
+  }
+) {
+  const {
+    action,
+    searchValue,
+    onSearchValueChange,
+    placeholder,
+    ariaLabel,
+    submitAriaLabel,
+    clearHref,
+    clearAriaLabel = 'Clear search',
+    onClearAction,
+    onApply,
+    applyLabel = 'Apply',
+    hiddenInputs = [],
+    searchParamName = 'q',
+    submitIcon,
+    tooltipLabel,
+    isOpen,
+    onOpenChange,
+  } = props;
+
   const isRouteSearch = Boolean(action);
+  const triggerLabel = tooltipLabel ?? 'Search';
+  const showClearAction = isRouteSearch
+    ? Boolean(clearHref && searchValue)
+    : searchValue.length > 0;
+
+  const handleLocalClear = () => {
+    onSearchValueChange('');
+    onClearAction?.();
+  };
+
+  return (
+    <Popover open={isOpen} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          aria-label={submitAriaLabel}
+          aria-pressed={isOpen}
+          className={cn(
+            PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+            PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
+            (isOpen || searchValue.length > 0) &&
+              PAGE_TOOLBAR_ACTION_ACTIVE_CLASS
+          )}
+        >
+          {submitIcon}
+          <span className='sr-only'>{triggerLabel}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align='end' className='w-[320px] p-0'>
+        <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
+          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            {triggerLabel}
+          </span>
+          <AppIconButton
+            type='button'
+            ariaLabel={`Close ${triggerLabel.toLowerCase()} panel`}
+            className='border-transparent bg-transparent'
+            onClick={() => onOpenChange(false)}
+          >
+            <X className='h-3.5 w-3.5' />
+          </AppIconButton>
+        </div>
+        <form
+          action={action}
+          method={isRouteSearch ? 'get' : undefined}
+          className='flex flex-col gap-3 p-3'
+          onSubmit={event => {
+            if (!isRouteSearch) {
+              event.preventDefault();
+              onApply?.();
+            }
+            onOpenChange(false);
+          }}
+        >
+          <HiddenInputFields
+            inputs={hiddenInputs}
+            searchParamName={searchParamName}
+            searchValue={searchValue}
+            isRouteSearch={isRouteSearch}
+          />
+          <AppSearchField
+            value={searchValue}
+            onChange={onSearchValueChange}
+            placeholder={placeholder}
+            ariaLabel={ariaLabel}
+            autoFocus
+            onEscape={() => onOpenChange(false)}
+            className='w-full'
+            inputClassName='text-[13px]'
+          />
+          <div className='flex items-center justify-end gap-2'>
+            {showClearAction ? (
+              isRouteSearch ? (
+                <Button variant='ghost' size='sm' asChild>
+                  <Link href={clearHref!} onClick={() => onOpenChange(false)}>
+                    Clear
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  aria-label={clearAriaLabel}
+                  onClick={handleLocalClear}
+                >
+                  Clear
+                </Button>
+              )
+            ) : null}
+            <Button type='submit' variant='secondary' size='sm'>
+              {applyLabel}
+            </Button>
+          </div>
+        </form>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function PageToolbarSearchForm(
+  props: Readonly<PageToolbarSearchFormProps>
+) {
+  const {
+    action,
+    searchValue,
+    onSearchValueChange,
+    placeholder,
+    ariaLabel,
+    submitAriaLabel,
+    clearHref,
+    clearAriaLabel = 'Clear search',
+    hiddenInputs = [],
+    searchParamName = 'q',
+    className,
+    fieldClassName,
+    submitIcon,
+    clearIcon,
+    compact = false,
+  } = props;
+  const [isOpen, setIsOpen] = useState(false);
 
   if (compact) {
-    const triggerLabel = tooltipLabel ?? 'Search';
-    const showClearAction = isRouteSearch
-      ? Boolean(clearHref && searchValue)
-      : searchValue.length > 0;
-
-    const handleLocalClear = () => {
-      onSearchValueChange('');
-      onClearAction?.();
-    };
-
     return (
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            type='button'
-            variant='ghost'
-            size='sm'
-            aria-label={submitAriaLabel}
-            aria-pressed={isOpen}
-            className={cn(
-              PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
-              (isOpen || searchValue.length > 0) &&
-                PAGE_TOOLBAR_ACTION_ACTIVE_CLASS
-            )}
-          >
-            {submitIcon}
-            <span className='sr-only'>{triggerLabel}</span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align='end' className='w-[320px] p-0'>
-          <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
-            <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
-              {triggerLabel}
-            </span>
-            <AppIconButton
-              type='button'
-              ariaLabel={`Close ${triggerLabel.toLowerCase()} panel`}
-              className='border-transparent bg-transparent'
-              onClick={() => setIsOpen(false)}
-            >
-              <X className='h-3.5 w-3.5' />
-            </AppIconButton>
-          </div>
-          <form
-            action={action}
-            method={isRouteSearch ? 'get' : undefined}
-            className='flex flex-col gap-3 p-3'
-            onSubmit={event => {
-              if (!isRouteSearch) {
-                event.preventDefault();
-                onApply?.();
-              }
-              setIsOpen(false);
-            }}
-          >
-            {isRouteSearch
-              ? hiddenInputs.map(input =>
-                  input.value === undefined || input.value === null ? null : (
-                    <input
-                      key={input.name}
-                      type='hidden'
-                      name={input.name}
-                      value={String(input.value)}
-                    />
-                  )
-                )
-              : null}
-            {isRouteSearch ? (
-              <input type='hidden' name={searchParamName} value={searchValue} />
-            ) : null}
-            <AppSearchField
-              value={searchValue}
-              onChange={onSearchValueChange}
-              placeholder={placeholder}
-              ariaLabel={ariaLabel}
-              autoFocus
-              onEscape={() => setIsOpen(false)}
-              className='w-full'
-              inputClassName='text-[13px]'
-            />
-            <div className='flex items-center justify-end gap-2'>
-              {showClearAction ? (
-                isRouteSearch ? (
-                  <Button variant='ghost' size='sm' asChild>
-                    <Link href={clearHref!} onClick={() => setIsOpen(false)}>
-                      Clear
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button
-                    type='button'
-                    variant='ghost'
-                    size='sm'
-                    aria-label={clearAriaLabel}
-                    onClick={handleLocalClear}
-                  >
-                    Clear
-                  </Button>
-                )
-              ) : null}
-              <Button type='submit' variant='secondary' size='sm'>
-                {applyLabel}
-              </Button>
-            </div>
-          </form>
-        </PopoverContent>
-      </Popover>
+      <CompactSearchForm {...props} isOpen={isOpen} onOpenChange={setIsOpen} />
     );
   }
 
@@ -186,7 +239,7 @@ export function PageToolbarSearchForm({
       )}
     >
       {hiddenInputs.map(input =>
-        input.value === undefined || input.value === null ? null : (
+        input.value == null ? null : (
           <input
             key={input.name}
             type='hidden'

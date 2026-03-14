@@ -99,7 +99,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                     {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
                   </Button>
                 ) : null}
-                {!isPrimary ? (
+                {isPrimary ? null : (
                   <Button
                     variant='ghost'
                     size='sm'
@@ -109,7 +109,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                   >
                     {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
                   </Button>
-                ) : null}
+                )}
               </div>
             </ContentSurfaceCard>
           );
