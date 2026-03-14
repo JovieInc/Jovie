@@ -106,7 +106,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [, setAmArtistName] = useState(appleMusicArtistName);
+  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
@@ -560,10 +560,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
-    const selectedSidebarData = editingRelease
-      ? experienceAdapter?.sidebarDataByReleaseId?.[editingRelease.id]
-      : undefined;
-
     if (isTrackSidebarOpen) {
       return (
         <Suspense
@@ -585,84 +581,83 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </Suspense>
       );
     }
-    if (isReleaseSidebarOpen) {
-      return (
-        <Suspense
-          fallback={
-            <DrawerLoadingSkeleton
-              ariaLabel='Loading release details'
-              width={SIDEBAR_WIDTH}
-              showTabs
-              contentRows={6}
-            />
-          }
-        >
-          <ReleaseSidebar
-            release={editingRelease}
-            mode='admin'
-            isOpen={isReleaseSidebarOpen}
-            providerConfig={providerConfig}
-            artistName={artistName}
-            onClose={closeEditor}
-            onRefresh={
-              editingRelease
-                ? () =>
-                    experienceAdapter?.onRefreshRelease
-                      ? experienceAdapter.onRefreshRelease(editingRelease.id)
-                      : handleRefreshRelease(editingRelease.id)
-                : undefined
-            }
-            isRefreshing={refreshingReleaseId === editingRelease?.id}
-            onAddDspLink={experienceAdapter?.onAddDspLink ?? handleAddUrl}
-            onRescanIsrc={
-              editingRelease
-                ? () =>
-                    experienceAdapter?.onRescanIsrc
-                      ? experienceAdapter.onRescanIsrc(editingRelease.id)
-                      : handleRescanIsrc(editingRelease.id)
-                : undefined
-            }
-            isRescanningIsrc={isRescanningIsrc}
-            onArtworkUpload={
-              experienceAdapter?.onArtworkUpload ?? handleArtworkUpload
-            }
-            onArtworkRevert={
-              experienceAdapter?.onArtworkRevert
-                ? releaseId =>
-                    experienceAdapter.onArtworkRevert?.(
-                      releaseId,
-                      editingRelease ?? null
-                    ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
-                : handleArtworkRevert
-            }
-            onReleaseChange={handleReleaseChange}
-            onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
-            onFormatLyrics={
-              experienceAdapter?.onFormatLyrics
-                ? (releaseId, lyrics) =>
-                    experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
-                    Promise.resolve([])
-                : handleFormatLyrics
-            }
-            isLyricsSaving={isLyricsSaving}
-            isSaving={isSaving}
-            allowDownloads={allowArtworkDownloads}
-            onToggleArtworkDownloads={
-              experienceAdapter?.onToggleArtworkDownloads
-            }
-            readOnly={experienceMode === 'demo' ? false : !canEditSmartLinks}
-            analyticsOverride={selectedSidebarData?.analytics ?? null}
-            tracksOverride={selectedSidebarData?.tracks}
-            onCanvasStatusUpdate={
-              experienceAdapter?.onCanvasStatusUpdate ??
-              handleCanvasStatusUpdate
-            }
-            onTrackClick={handleTrackClickFromRelease}
+    if (!isReleaseSidebarOpen) return null;
+
+    const selectedSidebarData =
+      experienceAdapter?.sidebarDataByReleaseId?.[editingRelease?.id ?? ''];
+
+    const refreshHandler = editingRelease
+      ? () =>
+          (experienceAdapter?.onRefreshRelease ?? handleRefreshRelease)(
+            editingRelease.id
+          )
+      : undefined;
+
+    const rescanHandler = editingRelease
+      ? () =>
+          (experienceAdapter?.onRescanIsrc ?? handleRescanIsrc)(
+            editingRelease.id
+          )
+      : undefined;
+
+    const artworkRevertHandler = experienceAdapter?.onArtworkRevert
+      ? (releaseId: string) =>
+          experienceAdapter.onArtworkRevert?.(
+            releaseId,
+            editingRelease ?? null
+          ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
+      : handleArtworkRevert;
+
+    const formatLyricsHandler = experienceAdapter?.onFormatLyrics
+      ? (releaseId: string, lyrics: string) =>
+          experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
+          Promise.resolve([])
+      : handleFormatLyrics;
+
+    return (
+      <Suspense
+        fallback={
+          <DrawerLoadingSkeleton
+            ariaLabel='Loading release details'
+            width={SIDEBAR_WIDTH}
+            showTabs
+            contentRows={6}
           />
-        </Suspense>
-      );
-    }
-    return null;
+        }
+      >
+        <ReleaseSidebar
+          release={editingRelease}
+          mode='admin'
+          isOpen={isReleaseSidebarOpen}
+          providerConfig={providerConfig}
+          artistName={artistName}
+          onClose={closeEditor}
+          onRefresh={refreshHandler}
+          isRefreshing={refreshingReleaseId === editingRelease?.id}
+          onAddDspLink={experienceAdapter?.onAddDspLink ?? handleAddUrl}
+          onRescanIsrc={rescanHandler}
+          isRescanningIsrc={isRescanningIsrc}
+          onArtworkUpload={
+            experienceAdapter?.onArtworkUpload ?? handleArtworkUpload
+          }
+          onArtworkRevert={artworkRevertHandler}
+          onReleaseChange={handleReleaseChange}
+          onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
+          onFormatLyrics={formatLyricsHandler}
+          isLyricsSaving={isLyricsSaving}
+          isSaving={isSaving}
+          allowDownloads={allowArtworkDownloads}
+          onToggleArtworkDownloads={experienceAdapter?.onToggleArtworkDownloads}
+          readOnly={experienceMode === 'demo' ? false : !canEditSmartLinks}
+          analyticsOverride={selectedSidebarData?.analytics ?? null}
+          tracksOverride={selectedSidebarData?.tracks}
+          onCanvasStatusUpdate={
+            experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
+          }
+          onTrackClick={handleTrackClickFromRelease}
+        />
+      </Suspense>
+    );
   }, [
     isReleaseSidebarOpen,
     isTrackSidebarOpen,
@@ -809,11 +804,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   <DrawerButton
                     tone='primary'
                     disabled={isSyncing}
-                    onClick={
-                      experienceAdapter?.onSync
-                        ? experienceAdapter.onSync
-                        : handleSync
-                    }
+                    onClick={experienceAdapter?.onSync ?? handleSync}
                     className='inline-flex items-center gap-2'
                     data-testid='sync-spotify-empty-state'
                   >

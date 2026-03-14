@@ -4,8 +4,6 @@ import { cn } from '@/lib/utils';
 export interface PageShellProps {
   readonly children: React.ReactNode;
   readonly className?: string;
-  /** If true, removes the outer padding (useful when parent already has padding) */
-  readonly noPadding?: boolean;
 }
 
 /**

@@ -152,7 +152,7 @@ export function SessionManagementCard({
                 </p>
               </div>
 
-              {!isCurrent ? (
+              {isCurrent ? null : (
                 <Button
                   variant='destructive'
                   size='sm'
@@ -162,7 +162,7 @@ export function SessionManagementCard({
                 >
                   {endingSessionId === session.id ? 'Ending…' : 'End session'}
                 </Button>
-              ) : null}
+              )}
             </ContentSurfaceCard>
           );
         })}
