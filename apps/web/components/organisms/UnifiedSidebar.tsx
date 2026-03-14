@@ -236,7 +236,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       className={cn(
         'bg-base',
         '[--sidebar-width:244px]',
-        'transition-[width] duration-normal ease-interactive'
+        'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
       <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
@@ -248,8 +248,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-3'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-2'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
               <DashboardNav />
@@ -260,12 +260,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/40 bg-sidebar/70 pb-3 pt-1.5 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0 border-t border-sidebar-border/70 bg-sidebar/70 backdrop-blur-[2px]'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pt-1'>
-          <span className='text-2xs text-sidebar-muted/85 select-none'>
+        <div className='pl-2 pr-3.5 pb-3 pt-1'>
+          <span className='text-2xs text-sidebar-muted select-none'>
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
             {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
               ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

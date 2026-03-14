@@ -139,7 +139,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: NavItem[]) => (
-      <SidebarMenu className='gap-0.5'>
+      <SidebarMenu className='gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
@@ -158,16 +158,16 @@ export function DashboardNav(_: DashboardNavProps) {
           </SidebarCollapsibleGroup>
         </>
       ) : (
-        <SidebarGroup className='mb-1'>
-          <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-item-icon [font-weight:var(--font-weight-nav)]'>
-            Artist
+        <SidebarGroup className='mb-0.5'>
+          <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-muted [font-weight:var(--font-weight-nav)]'>
+            Workspace
           </SidebarGroupLabel>
-          <SidebarGroupContent className='space-y-0'>
+          <SidebarGroupContent className='space-y-px'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && (
-                  <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                  <div className='my-1 mx-2 border-t border-sidebar-border/70' />
                 )}
                 {renderSection(section.items)}
               </div>
@@ -183,15 +183,15 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section' className='mt-3'>
+        <div data-testid='admin-nav-section' className='mt-2.5'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            <div className='space-y-2'>
+            <div className='space-y-1.5'>
               {adminNavigationSections.map((section, index) => (
                 <div key={section.label} data-admin-section={section.label}>
                   {index > 0 ? (
-                    <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                    <div className='my-1 mx-2 border-t border-sidebar-border/70' />
                   ) : null}
-                  <p className='px-2 pb-1 text-[11px] uppercase tracking-wide text-sidebar-muted group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2 pb-0.5 text-[10px] uppercase tracking-[0.08em] text-sidebar-muted/85 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

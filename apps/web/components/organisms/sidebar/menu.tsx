@@ -41,12 +41,12 @@ const sidebarMenuButtonVariants = cva(
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
     'transition-[background-color,color] duration-0 ease-interactive',
-    // Default text color - muted sidebar tokens matching Linear
-    'text-sidebar-item-foreground',
+    // Default text color — keep non-active rows quiet
+    'text-sidebar-item-icon',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
     'hover:bg-sidebar-accent hover:text-sidebar-foreground',
-    // Active state — Linear: rgba(255,255,255,0.06) bg, brighter text
-    'data-[active=true]:bg-sidebar-accent-active data-[active=true]:text-sidebar-foreground',
+    // Active state — soft emphasis while keeping shell understated
+    'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-item-foreground',
     // Focus state - subtle bg like Linear (no rings)
     'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
@@ -62,10 +62,10 @@ const sidebarMenuButtonVariants = cva(
     '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
     '[&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
-    'hover:[&>svg]:text-sidebar-item-icon',
-    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
-    'data-[active=true]:[&>svg]:text-sidebar-item-icon',
-    'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon',
+    'hover:[&>svg]:text-sidebar-item-foreground',
+    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
+    'data-[active=true]:[&>svg]:text-sidebar-item-foreground',
+    'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
   ].join(' '),
   {
     variants: {
