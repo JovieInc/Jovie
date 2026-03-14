@@ -1,3 +1,5 @@
+import { CONTENT_SURFACE_CARD_CLASSNAME } from '@/components/molecules/ContentSurfaceCard';
+
 /**
  * Dashboard Card System Tokens
  *
@@ -29,7 +31,7 @@ function tw(strings: TemplateStringsArray, ...values: unknown[]): string {
 
 export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
-  base: `bg-surface-1 border border-subtle rounded-xl transition-all ${timing.slow} ${timing.easing}`,
+  base: `${CONTENT_SURFACE_CARD_CLASSNAME} transition-[background-color,border-color,box-shadow,transform] ${timing.slow} ${timing.easing}`,
 
   // Padding variations (8px grid system) - mobile-first responsive
   padding: {
@@ -115,61 +117,47 @@ export const cardTokens = {
   variants: {
     // Default static card - responsive padding
     default: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
-      rounded-xl
-      p-4 sm:p-6
-      shadow-[var(--shadow-sm)]
-      transition-all ${timing.slow} ${timing.easing}
+      bg-(--linear-bg-surface-1)
+      shadow-[0_1px_0_rgba(0,0,0,0.03)]
+      dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
     // Interactive clickable card - full hover effects, responsive padding
     interactive: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
-      rounded-xl
-      p-4 sm:p-6
-      shadow-[var(--shadow-sm)]
+      bg-(--linear-bg-surface-1)
       cursor-pointer
-      transition-all ${timing.normal} ${timing.easing}
-      hover:bg-[var(--color-bg-surface-2)]
-      hover:border-[var(--color-border-default)]
-      hover:shadow-[var(--shadow-lg)]
-      hover:-translate-y-1
+      transition-[background-color,border-color,box-shadow,transform] ${timing.normal} ${timing.easing}
+      hover:bg-(--linear-bg-surface-0)
+      hover:border-(--linear-border-default)
+      hover:shadow-[var(--linear-shadow-card-elevated)]
+      hover:-translate-y-0.5
       active:translate-y-0
-      active:shadow-[var(--shadow-md)]
+      active:shadow-[0_1px_0_rgba(0,0,0,0.03)]
       focus-visible:outline-none
       focus-visible:ring-2
-      focus-visible:ring-[var(--color-accent)]
+      focus-visible:ring-(--linear-border-focus)
       focus-visible:ring-offset-2
     `,
 
     // Settings card - elevated surface, no hover effects (Linear-style)
     settings: tw`
-      bg-[var(--color-bg-surface-2)]
-      border border-[var(--color-border-subtle)]
-      rounded-lg
-      px-4 py-2.5
+      bg-(--linear-bg-surface-1)
+      shadow-[0_1px_0_rgba(0,0,0,0.03)]
+      dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
     // Analytics/metric card - minimal, data-focused
     analytics: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
-      rounded-xl
-      p-5
-      transition-colors ${timing.fast} ${timing.easing}
-      hover:border-[var(--color-border-default)]
+      bg-(--linear-bg-surface-1)
+      transition-[background-color,border-color] ${timing.fast} ${timing.easing}
+      hover:bg-(--linear-bg-surface-0)
+      hover:border-(--linear-border-default)
     `,
 
     // Empty state card - centered content, responsive padding
     'empty-state': tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
-      rounded-xl
-      p-6 sm:p-8
+      bg-(--linear-bg-surface-1)
       text-center
-      shadow-[var(--shadow-sm)]
     `,
 
     // Elevated card - stands out with stronger border, responsive padding
@@ -199,7 +187,6 @@ export const cardTokens = {
       relative
       bg-[var(--color-bg-surface-1)]
       rounded-2xl
-      p-4 sm:p-6
       shadow-[var(--shadow-lg)]
       ring-1
       ring-[var(--color-border-subtle)]

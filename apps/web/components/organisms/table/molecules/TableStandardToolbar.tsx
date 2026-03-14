@@ -84,7 +84,7 @@ export function TableStandardToolbar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 border-b border-subtle bg-surface-1 px-4 py-2.5',
+        'flex items-center justify-between gap-3 border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-4 py-2.5',
         className
       )}
     >
@@ -147,7 +147,7 @@ export function TableStandardToolbar({
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='gap-1'
+            className='h-7 gap-1 rounded-[7px] border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
           >
             <X className='h-4 w-4' />
             Clear

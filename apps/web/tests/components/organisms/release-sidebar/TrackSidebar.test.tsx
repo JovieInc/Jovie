@@ -71,8 +71,6 @@ describe('TrackSidebar', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
 
-    expect(
-      screen.getByText('No platform links available.')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
 });

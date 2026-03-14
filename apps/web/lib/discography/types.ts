@@ -70,6 +70,7 @@ export interface ReleaseViewModel {
   profileId: string;
   id: string;
   title: string;
+  artistNames?: string[];
   releaseDate?: string;
   artworkUrl?: string;
   slug: string;

@@ -82,7 +82,7 @@ export const PopularityIcon = memo(function PopularityIcon({
       </TooltipTrigger>
       <TooltipContent side='top' className='text-[11px]'>
         <span className='font-[510]'>{displayPopularity}</span>
-        <span className='text-secondary-token'>/100 popularity</span>
+        <span className='text-(--linear-text-secondary)'>/100 popularity</span>
       </TooltipContent>
     </Tooltip>
   );

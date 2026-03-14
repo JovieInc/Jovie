@@ -182,6 +182,22 @@ vi.mock(
 );
 
 vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
+  () => ({
+    ImportProgressBanner: ({ visible = true }: { visible?: boolean }) => (
+      <div
+        data-testid='spotify-import-progress-banner'
+        aria-hidden={!visible}
+        style={{
+          visibility: visible ? 'visible' : 'hidden',
+          opacity: visible ? 1 : 0,
+        }}
+      />
+    ),
+  })
+);
+
+vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/hooks/useReleaseTablePreferences',
   () => ({
     useReleaseTablePreferences: () => ({

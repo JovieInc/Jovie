@@ -1,7 +1,9 @@
 'use client';
 
+import { Button } from '@jovie/ui';
+import { Play } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { memo, type ReactNode, useCallback, useMemo } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/components/dashboard/organisms/account-settings';
@@ -30,6 +32,62 @@ interface SettingsPolishedProps {
   readonly isAdmin?: boolean;
 }
 
+interface SettingsSectionConfig {
+  readonly id: string;
+  readonly title: string;
+  readonly description: string;
+  readonly render: () => ReactNode;
+}
+
+interface SettingsSectionGroup {
+  readonly id: string;
+  readonly label: string;
+  readonly sections: ReadonlyArray<SettingsSectionConfig>;
+}
+
+interface SettingsSidebarProps {
+  readonly groups: ReadonlyArray<SettingsSectionGroup>;
+  readonly onRunAll: () => void;
+}
+
+const SettingsSidebar = memo(({ groups, onRunAll }: SettingsSidebarProps) => (
+  <aside className='lg:sticky lg:top-4 lg:h-fit'>
+    <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)] dark:shadow-none'>
+      <Button
+        variant='secondary'
+        size='sm'
+        className='mb-2 w-full justify-start gap-2 rounded-lg'
+        onClick={onRunAll}
+      >
+        <Play className='size-3.5' aria-hidden='true' />
+        Run all
+      </Button>
+      {groups.map(group => (
+        <div key={group.id} className='mb-3 last:mb-0'>
+          <p className='mb-1 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            {group.label}
+          </p>
+          <nav aria-label={`${group.label} settings`}>
+            <ul className='space-y-0.5'>
+              {group.sections.map(section => (
+                <li key={section.id}>
+                  <a
+                    href={`#${section.id}`}
+                    className='flex items-center rounded-lg px-2 py-1.5 text-[13px] text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                  >
+                    {section.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
+      ))}
+    </div>
+  </aside>
+));
+
+SettingsSidebar.displayName = 'SettingsSidebar';
 export function SettingsPolished({
   artist,
   onArtistUpdate,
@@ -68,7 +126,7 @@ export function SettingsPolished({
   );
 
   // -- General (user-level) settings --
-  const userSections = useMemo(
+  const userSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
     () => [
       {
         id: 'account',
@@ -104,7 +162,7 @@ export function SettingsPolished({
   );
 
   // -- Artist-level settings --
-  const artistSections = useMemo(
+  const artistSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
     () => [
       {
         id: 'artist-profile',
@@ -167,7 +225,7 @@ export function SettingsPolished({
   );
 
   // -- Admin-only settings (only visible to admin users) --
-  const adminSections = useMemo(
+  const adminSections = useMemo<ReadonlyArray<SettingsSectionConfig>>(
     () =>
       isAdmin
         ? [
@@ -183,7 +241,44 @@ export function SettingsPolished({
     [isAdmin]
   );
 
-  const allSections = [...userSections, ...artistSections, ...adminSections];
+  const sectionGroups = useMemo<ReadonlyArray<SettingsSectionGroup>>(
+    () => [
+      {
+        id: 'general',
+        label: 'General',
+        sections: userSections,
+      },
+      {
+        id: 'artist',
+        label: 'Artist',
+        sections: artistSections,
+      },
+      ...(adminSections.length > 0
+        ? [
+            {
+              id: 'admin',
+              label: 'Admin',
+              sections: adminSections,
+            },
+          ]
+        : []),
+    ],
+    [adminSections, artistSections, userSections]
+  );
+
+  const allSections = useMemo(
+    () => sectionGroups.flatMap(group => group.sections),
+    [sectionGroups]
+  );
+  const handleRunAll = useCallback(() => {
+    const [firstSection] = allSections;
+    if (!firstSection) {
+      return;
+    }
+
+    const sectionEl = globalThis.document?.getElementById(firstSection.id);
+    sectionEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [allSections]);
 
   // When focusing a single section, show just that section
   if (focusSection) {
@@ -209,58 +304,34 @@ export function SettingsPolished({
     );
   }
 
-  // Full settings view with group headers
+  // Full settings view with Linear-style grouped navigation
   return (
-    <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
-      {/* General settings */}
-      <div className='space-y-6'>
-        <h3 className='text-[13px] font-[510] text-secondary-token'>General</h3>
-        {userSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-            className='mt-6 first:mt-0'
-          >
-            {section.render()}
-          </SettingsSection>
+    <div
+      className='grid gap-8 pb-6 sm:pb-8 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10'
+      data-testid='settings-polished'
+    >
+      <SettingsSidebar groups={sectionGroups} onRunAll={handleRunAll} />
+
+      <div className='space-y-8'>
+        {sectionGroups.map(group => (
+          <div key={group.id} className='space-y-6'>
+            <h3 className='text-[13px] font-[510] text-secondary-token'>
+              {group.label}
+            </h3>
+            {group.sections.map(section => (
+              <SettingsSection
+                key={section.id}
+                id={section.id}
+                title={section.title}
+                description={section.description}
+                className='mt-6 first:mt-0'
+              >
+                {section.render()}
+              </SettingsSection>
+            ))}
+          </div>
         ))}
       </div>
-
-      {/* Artist settings */}
-      <div className='space-y-6'>
-        <h3 className='text-[13px] font-[510] text-secondary-token'>Artist</h3>
-        {artistSections.map(section => (
-          <SettingsSection
-            key={section.id}
-            id={section.id}
-            title={section.title}
-            description={section.description}
-            className='mt-6 first:mt-0'
-          >
-            {section.render()}
-          </SettingsSection>
-        ))}
-      </div>
-
-      {/* Admin settings - only visible to admin users */}
-      {adminSections.length > 0 && (
-        <div className='space-y-6'>
-          <h3 className='text-[13px] font-[510] text-secondary-token'>Admin</h3>
-          {adminSections.map(section => (
-            <SettingsSection
-              key={section.id}
-              id={section.id}
-              title={section.title}
-              description={section.description}
-              className='mt-6 first:mt-0'
-            >
-              {section.render()}
-            </SettingsSection>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -6,8 +6,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { PLATFORM_OPTIONS } from '@/components/dashboard/molecules/universalLinkInput.constants';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ALL_PLATFORMS, PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { ensureContrast, hexToRgb, isBrandDark } from '@/lib/utils/color';
 import { SocialLinkSuggestionRows } from './SocialLinkSuggestionRows';
@@ -272,11 +272,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
 
   if (loading) {
     return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='divide-y divide-subtle'
-      >
+      <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden p-0'>
         {SOCIALS_FORM_LOADING_KEYS.map(key => (
           <div key={key} className='flex items-center gap-3 px-4 py-3'>
             <div className='h-8 w-8 rounded-md skeleton shrink-0' />
@@ -284,7 +280,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             <div className='flex-1 h-9 rounded-lg skeleton' />
           </div>
         ))}
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 
@@ -319,15 +315,11 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
         </div>
       ) : (
         <form onSubmit={handleSubmit} className='space-y-0'>
-          <DashboardCard
-            variant='settings'
-            padding='none'
-            className='divide-y divide-subtle'
-          >
+          <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden p-0'>
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-white/[0.02]'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-(--linear-bg-surface-0)/50'
               >
                 <CommonDropdown
                   variant='dropdown'
@@ -396,7 +388,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
                 </Button>
               </div>
             ))}
-          </DashboardCard>
+          </ContentSurfaceCard>
 
           <div className='flex flex-col gap-2 pt-3 sm:flex-row sm:items-center sm:justify-between'>
             <Button
@@ -421,17 +413,17 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
       )}
 
       {error && (
-        <div className='bg-error-subtle border border-error rounded-lg p-3'>
+        <ContentSurfaceCard className='border-destructive/25 bg-destructive/5 px-3.5 py-3'>
           <p className='text-[13px] text-error'>{error}</p>
-        </div>
+        </ContentSurfaceCard>
       )}
 
       {success && (
-        <div className='bg-success-subtle border border-success rounded-lg p-3'>
+        <ContentSurfaceCard className='border-success/25 bg-success/5 px-3.5 py-3'>
           <p className='text-[13px] text-success'>
             Social links saved successfully!
           </p>
-        </div>
+        </ContentSurfaceCard>
       )}
 
       {(() => {

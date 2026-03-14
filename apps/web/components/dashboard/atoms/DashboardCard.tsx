@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { cardTokens } from '../tokens/card-tokens';
+
+type DashboardCardPadding = 'none' | 'compact' | 'default' | 'large';
 
 interface DashboardCardProps {
   readonly variant?:
@@ -12,12 +14,29 @@ interface DashboardCardProps {
     | 'analytics'
     | 'empty-state'
     | 'onboarding';
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   readonly className?: string;
   readonly onClick?: () => void;
   readonly hover?: boolean;
-  readonly padding?: 'none' | 'compact' | 'default' | 'large';
+  readonly padding?: DashboardCardPadding;
+  readonly id?: string;
+  readonly role?: string;
+  readonly 'data-testid'?: string;
+  readonly 'aria-hidden'?: boolean;
+  readonly 'aria-label'?: string;
 }
+
+const DEFAULT_PADDING_BY_VARIANT: Record<
+  NonNullable<DashboardCardProps['variant']>,
+  DashboardCardPadding
+> = {
+  default: 'default',
+  interactive: 'default',
+  settings: 'none',
+  analytics: 'compact',
+  'empty-state': 'large',
+  onboarding: 'default',
+};
 
 export function DashboardCard({
   variant = 'default',
@@ -25,15 +44,17 @@ export function DashboardCard({
   className,
   onClick,
   hover = true,
-  padding = 'default',
+  padding,
+  ...props
 }: DashboardCardProps) {
   const Component = onClick ? 'button' : 'div';
+  const resolvedPadding = padding ?? DEFAULT_PADDING_BY_VARIANT[variant];
 
   return (
     <Component
       className={cn(
         cardTokens.base,
-        cardTokens.padding[padding],
+        cardTokens.padding[resolvedPadding],
         cardTokens.variants[variant],
         !hover &&
           variant === 'interactive' &&
@@ -42,6 +63,7 @@ export function DashboardCard({
       )}
       onClick={onClick}
       type={onClick ? 'button' : undefined}
+      {...props}
     >
       {children}
     </Component>

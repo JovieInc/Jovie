@@ -1,7 +1,10 @@
+import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
+import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean
@@ -37,6 +40,28 @@ vi.mock('@/components/admin/table/AdminTableShell', () => ({
 vi.mock('@/components/organisms/table', () => ({
   convertContextMenuItems: () => [],
   ExportCSVButton: () => <button type='button'>Export</button>,
+  PAGE_TOOLBAR_END_GROUP_CLASS: 'page-toolbar-end-group',
+  PAGE_TOOLBAR_META_TEXT_CLASS: 'page-toolbar-meta-text',
+  PageToolbar: ({ start, end }: { start: ReactNode; end?: ReactNode }) => (
+    <div>
+      {start}
+      {end}
+    </div>
+  ),
+  PageToolbarActionButton: ({
+    label,
+    ariaLabel,
+  }: {
+    label: ReactNode;
+    ariaLabel: string;
+  }) => (
+    <button type='button' aria-label={ariaLabel}>
+      {label}
+    </button>
+  ),
+  PageToolbarSearchForm: ({ submitAriaLabel }: { submitAriaLabel: string }) => (
+    <button type='submit'>{submitAriaLabel}</button>
+  ),
   TableBulkActionsToolbar: () => null,
   UnifiedTable: () => <div data-testid='desktop-table'>Desktop table</div>,
   useRowSelection: (rowIds: string[]) => mockUseRowSelection(rowIds),
@@ -82,14 +107,20 @@ describe('AdminUsersTableUnified', () => {
     });
 
     render(
-      <AdminUsersTableUnified
-        users={[userRow]}
-        page={1}
-        pageSize={20}
-        total={1}
-        search=''
-        sort='created_desc'
-      />
+      <TooltipProvider>
+        <HeaderActionsProvider>
+          <TableMetaProvider>
+            <AdminUsersTableUnified
+              users={[userRow]}
+              page={1}
+              pageSize={20}
+              total={1}
+              search=''
+              sort='created_desc'
+            />
+          </TableMetaProvider>
+        </HeaderActionsProvider>
+      </TooltipProvider>
     );
 
     expect(screen.getByText('Ari Lane')).toBeInTheDocument();
@@ -115,14 +146,20 @@ describe('AdminUsersTableUnified', () => {
     });
 
     render(
-      <AdminUsersTableUnified
-        users={[userRow]}
-        page={1}
-        pageSize={20}
-        total={1}
-        search=''
-        sort='created_desc'
-      />
+      <TooltipProvider>
+        <HeaderActionsProvider>
+          <TableMetaProvider>
+            <AdminUsersTableUnified
+              users={[userRow]}
+              page={1}
+              pageSize={20}
+              total={1}
+              search=''
+              sort='created_desc'
+            />
+          </TableMetaProvider>
+        </HeaderActionsProvider>
+      </TooltipProvider>
     );
 
     expect(screen.getByTestId('desktop-table')).toBeInTheDocument();

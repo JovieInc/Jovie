@@ -22,17 +22,17 @@ const CONFIDENCE_STYLES: Record<
 > = {
   high: {
     label: 'High',
-    className: 'border-success bg-success-subtle text-success',
+    className: 'border-success/25 bg-success-subtle text-success',
     dotClassName: 'bg-success',
   },
   medium: {
     label: 'Medium',
-    className: 'border-warning bg-warning-subtle text-warning',
+    className: 'border-warning/25 bg-warning-subtle text-warning',
     dotClassName: 'bg-warning',
   },
   low: {
     label: 'Low',
-    className: 'border-error bg-error-subtle text-error',
+    className: 'border-error/25 bg-error-subtle text-error',
     dotClassName: 'bg-error',
   },
 };

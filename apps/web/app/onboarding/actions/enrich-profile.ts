@@ -149,16 +149,19 @@ async function loadSpotifyArtistIfNeeded(
     displayName: string | null;
     avatarLockedByUser: boolean | null;
     avatarUrl: string | null;
+    genres: string[] | null;
+    spotifyFollowers: number | null;
+    spotifyPopularity: number | null;
   },
   musicFetch: MusicFetchArtistResult | null
 ): Promise<Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null> {
-  const needsData =
-    (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
-    (!profile.avatarLockedByUser &&
-      !profile.avatarUrl &&
-      !musicFetch?.image?.url);
+  // Always fetch Spotify artist metadata during onboarding so we can persist
+  // genres/followers/popularity even when MusicFetch already provided
+  // display name or image fields.
+  if (!spotifyArtistId) return null;
 
-  if (!needsData) return null;
+  void profile;
+  void musicFetch;
 
   const [result] = await Promise.allSettled([
     getSpotifyArtistProfile(spotifyArtistId),
@@ -289,6 +292,9 @@ export async function enrichProfileFromDsp(
       avatarUrl: creatorProfiles.avatarUrl,
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
       usernameNormalized: creatorProfiles.usernameNormalized,
       spotifyUrl: creatorProfiles.spotifyUrl,
       spotifyId: creatorProfiles.spotifyId,

@@ -2,7 +2,7 @@
 
 import { CheckCircle, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { captureWarning } from '@/lib/error-tracking';
 
 const COMPLETION_BANNER_STORAGE_KEY =
@@ -37,26 +37,21 @@ export const CompletionBanner = memo(
     }
 
     return (
-      <DashboardCard
-        variant='analytics'
-        hover={false}
-        padding='compact'
-        className='flex items-start gap-3'
-      >
+      <ContentSurfaceCard className='flex items-start gap-3 p-4'>
         <div
-          className='shrink-0 rounded-full border border-subtle bg-surface-2/50 p-2 ring-1 ring-inset ring-white/3 dark:ring-white/5'
+          className='shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-2'
           aria-hidden='true'
         >
           <CheckCircle className='h-5 w-5 text-success' />
         </div>
         <div className='min-w-0 flex-1 space-y-1'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Setup complete
           </p>
-          <p className='text-[14px] font-[590] leading-5 text-primary-token'>
+          <p className='text-[14px] font-[590] leading-5 text-(--linear-text-primary)'>
             Your profile is ready
           </p>
-          <p className='text-[14px] leading-5 text-secondary-token'>
+          <p className='text-[14px] leading-5 text-(--linear-text-secondary)'>
             You&apos;ve completed all the essential setup steps.
           </p>
         </div>
@@ -64,11 +59,11 @@ export const CompletionBanner = memo(
           type='button'
           onClick={handleDismiss}
           aria-label='Dismiss banner'
-          className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-colors hover:bg-surface-2/40 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-interactive focus-visible:ring-offset-2 focus-visible:ring-offset-bg-base'
+          className='shrink-0 rounded-full border border-(--linear-border-subtle) bg-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <X className='h-4 w-4' aria-hidden='true' />
         </button>
-      </DashboardCard>
+      </ContentSurfaceCard>
     );
   }
 );

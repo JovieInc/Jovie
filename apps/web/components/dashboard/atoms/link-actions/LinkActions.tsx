@@ -66,7 +66,7 @@ export const LinkActions = memo(function LinkActions({
           className='opacity-0 group-hover:opacity-70 group-focus-within:opacity-100 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:opacity-100 active:scale-[0.97]'
           aria-label='Drag to reorder'
         >
-          <span className='inline-flex h-7 w-7 items-center justify-center rounded-md bg-surface-2/80 text-secondary-token ring-1 ring-subtle shadow-card'>
+          <span className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-(--linear-border-default) bg-(--linear-bg-surface-2) text-(--linear-text-secondary) shadow-xs'>
             <Icon name='GripVertical' className='h-3.5 w-3.5' />
           </span>
         </button>
@@ -82,9 +82,12 @@ export const LinkActions = memo(function LinkActions({
           aria-haspopup='menu'
           onClick={() => setOpen(!open)}
           onKeyDown={handleKeyDown}
-          className='inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+          className='inline-flex h-8 w-8 items-center justify-center rounded-md transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-(--linear-bg-surface-2) active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
         >
-          <Icon name='MoreVertical' className='h-5 w-5 text-primary-token' />
+          <Icon
+            name='MoreVertical'
+            className='h-5 w-5 text-(--linear-text-primary)'
+          />
         </button>
         <div className='sr-only'>Actions: edit, hide/show, delete</div>
 
@@ -95,7 +98,7 @@ export const LinkActions = memo(function LinkActions({
             role='menu'
             aria-label='Link actions menu'
             tabIndex={-1}
-            className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-subtle bg-surface-1 p-1 text-[13px] shadow-card-elevated focus-visible:outline-none'
+            className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-(--linear-border-default) bg-(--linear-bg-surface-1) p-1 text-[13px] shadow-[0_18px_48px_rgba(0,0,0,0.22)] focus-visible:outline-none'
             onKeyDown={handleKeyDown}
           >
             {menuItems.map((item, index) => (
@@ -121,10 +124,10 @@ export const LinkActions = memo(function LinkActions({
                   }
                 }}
                 className={cn(
-                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-secondary-token hover:text-primary-token hover:bg-surface-2 transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0',
+                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-(--linear-text-secondary) transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0',
                   item.id === 'remove' &&
                     'text-destructive hover:text-destructive/80',
-                  focusedIndex === index && 'bg-surface-2'
+                  focusedIndex === index && 'bg-(--linear-bg-surface-2)'
                 )}
               >
                 <Icon

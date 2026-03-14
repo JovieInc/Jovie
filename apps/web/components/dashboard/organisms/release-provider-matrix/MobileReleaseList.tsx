@@ -8,6 +8,7 @@ import {
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { mobileReleaseTokens } from '@/components/dashboard/tokens';
+import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
@@ -171,6 +172,11 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
   readonly getSmartLinkLockReason?: (releaseId: string) => SmartLinkLockReason;
 }) {
   const year = getReleaseYear(release);
+  const artistLine = formatCompactReleaseArtistLine(
+    release.artistNames,
+    artistName,
+    1
+  );
 
   const typeStyle = getReleaseTypeStyle(release.releaseType);
   const isLocked = isSmartLinkLocked?.(release.id) ?? false;
@@ -215,8 +221,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
             </span>
           </div>
           <div className={mobileReleaseTokens.row.subtitle}>
-            {artistName && <span>{artistName}</span>}
-            {artistName && year && (
+            {artistLine && <span>{artistLine}</span>}
+            {artistLine && year && (
               <span className={mobileReleaseTokens.row.dot}>{' \u00B7 '}</span>
             )}
             {year && <span className='tabular-nums'>{year}</span>}

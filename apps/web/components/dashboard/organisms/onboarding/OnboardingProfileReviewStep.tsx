@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { updateOnboardingProfile } from '@/app/onboarding/actions/update-profile';
 import { AuthButton } from '@/components/auth';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import {
@@ -128,7 +129,7 @@ export function OnboardingProfileReviewStep({
             <button
               type='button'
               onClick={() => avatarRef.current?.click()}
-              className='text-[13px] font-[510] text-accent hover:text-accent/80 transition-colors'
+              className='text-[13px] font-[510] text-(--linear-accent) transition-colors hover:text-(--linear-accent-hover)'
             >
               Upload a profile photo
             </button>
@@ -136,11 +137,11 @@ export function OnboardingProfileReviewStep({
         </div>
 
         {/* Display Name */}
-        <div className='space-y-4 mb-6'>
+        <ContentSurfaceCard className='mb-6 space-y-4 p-4'>
           <div>
             <label
               htmlFor='onboarding-display-name'
-              className='block text-[13px] font-[510] text-secondary-token mb-1.5'
+              className='mb-1.5 block text-[13px] font-[510] text-(--linear-text-secondary)'
             >
               Display name
             </label>
@@ -150,7 +151,7 @@ export function OnboardingProfileReviewStep({
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
               placeholder='Your name'
-              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-[13px] text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent'
+              className='w-full rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2.5 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus:border-(--linear-border-focus) focus:outline-none focus:ring-1 focus:ring-(--linear-border-focus)'
             />
           </div>
 
@@ -158,7 +159,7 @@ export function OnboardingProfileReviewStep({
           <div>
             <label
               htmlFor='onboarding-bio'
-              className='block text-[13px] font-[510] text-secondary-token mb-1.5'
+              className='mb-1.5 block text-[13px] font-[510] text-(--linear-text-secondary)'
             >
               Bio
             </label>
@@ -168,10 +169,10 @@ export function OnboardingProfileReviewStep({
               onChange={e => setBio(e.target.value)}
               placeholder='Tell fans about yourself'
               rows={3}
-              className='w-full rounded-[--radius-lg] border border-subtle bg-surface-0 px-4 py-2.5 text-[13px] text-primary-token placeholder:text-tertiary-token focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent resize-none'
+              className='w-full resize-none rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-4 py-2.5 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus:border-(--linear-border-focus) focus:outline-none focus:ring-1 focus:ring-(--linear-border-focus)'
             />
           </div>
-        </div>
+        </ContentSurfaceCard>
 
         {/* CTA */}
         <div className={FORM_LAYOUT.formInner}>

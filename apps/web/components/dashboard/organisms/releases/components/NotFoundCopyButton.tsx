@@ -2,6 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 export interface NotFoundCopyButtonProps {
@@ -27,13 +28,15 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
   onCopy,
 }: Readonly<NotFoundCopyButtonProps>) {
   return (
-    <button
+    <DrawerButton
       type='button'
+      tone={isCopied ? 'secondary' : 'ghost'}
+      size='sm'
       className={cn(
-        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] transition-colors',
+        'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450]',
         isCopied
-          ? 'bg-success/10 text-success'
-          : 'text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+          ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          : 'text-(--linear-text-tertiary)'
       )}
       onClick={() =>
         void onCopy(smartLinkPath, `${releaseTitle} smart link`, testId)
@@ -42,14 +45,21 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       <Icon
         name={isCopied ? 'Check' : 'Copy'}
         className={cn(
-          'h-3.5 w-3.5 transition-opacity',
-          isCopied ? 'opacity-100' : 'opacity-0 group-hover/btn:opacity-100'
+          'h-3 w-3 transition-opacity',
+          isCopied
+            ? 'opacity-100'
+            : 'opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
         )}
         aria-hidden='true'
       />
-      <span className='line-clamp-1 text-tertiary-token/50'>
+      <span
+        className={cn(
+          'line-clamp-1',
+          isCopied ? 'text-inherit' : 'text-(--linear-text-tertiary)'
+        )}
+      >
         {isCopied ? 'Copied!' : '—'}
       </span>
-    </button>
+    </DrawerButton>
   );
 });

@@ -1,116 +1,77 @@
 'use client';
 
 import { Button, Input, Switch } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Play, Zap } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { type ChangeEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-interface PipelineSettings {
-  enabled: boolean;
-  discoveryEnabled: boolean;
-  autoIngestEnabled: boolean;
-  autoIngestMinFitScore: number;
-  dailyQueryBudget: number;
-  queriesUsedToday: number;
-}
+import {
+  type LeadPipelineSettings,
+  useLeadPipelineSettingsQuery,
+  useRunLeadDiscoveryMutation,
+  useRunLeadQualificationMutation,
+  useUpdateLeadPipelineSettingsMutation,
+} from '@/lib/queries';
+import { queryKeys } from '@/lib/queries/keys';
 
 export function LeadPipelineControls() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [discovering, setDiscovering] = useState(false);
-  const [qualifying, setQualifying] = useState(false);
-  const [settings, setSettings] = useState<PipelineSettings | null>(null);
+  const queryClient = useQueryClient();
+  const [settings, setSettings] = useState<LeadPipelineSettings | null>(null);
+
+  const settingsQuery = useLeadPipelineSettingsQuery();
+  const saveSettingsMutation = useUpdateLeadPipelineSettingsMutation();
+  const discoveryMutation = useRunLeadDiscoveryMutation();
+  const qualificationMutation = useRunLeadQualificationMutation();
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function load() {
-      try {
-        const res = await fetch('/api/admin/leads/settings', {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error('Failed to load settings');
-        const data = (await res.json()) as { settings: PipelineSettings };
-        setSettings(data.settings);
-      } catch {
-        if (!controller.signal.aborted) {
-          toast.error('Failed to load pipeline settings');
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
+    if (settingsQuery.data?.settings) {
+      setSettings(settingsQuery.data.settings);
     }
-
-    void load();
-    return () => controller.abort();
-  }, []);
+  }, [settingsQuery.data]);
 
   async function save() {
     if (!settings) return;
-    setSaving(true);
     try {
-      const res = await fetch('/api/admin/leads/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          enabled: settings.enabled,
-          discoveryEnabled: settings.discoveryEnabled,
-          autoIngestEnabled: settings.autoIngestEnabled,
-          autoIngestMinFitScore: settings.autoIngestMinFitScore,
-          dailyQueryBudget: settings.dailyQueryBudget,
-        }),
-      });
-      if (!res.ok) throw new Error('Save failed');
-      const data = (await res.json()) as { settings: PipelineSettings };
+      const data = await saveSettingsMutation.mutateAsync(settings);
       setSettings(data.settings);
       toast.success('Pipeline settings saved');
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.settings(),
+      });
     } catch {
       toast.error('Failed to save settings');
-    } finally {
-      setSaving(false);
     }
   }
 
   async function triggerDiscovery() {
-    setDiscovering(true);
     try {
-      const res = await fetch('/api/admin/leads/discover', { method: 'POST' });
-      const data = (await res.json()) as {
-        result?: { queriesUsed: number; newLeadsFound: number };
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? 'Discovery failed');
+      const data = await discoveryMutation.mutateAsync();
       toast.success(
-        `Discovery complete: ${data.result?.newLeadsFound ?? 0} new leads from ${data.result?.queriesUsed ?? 0} queries`
+        `Discovery complete: ${data.result.newLeadsFound} new leads from ${data.result.queriesUsed} queries`
       );
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Discovery failed');
-    } finally {
-      setDiscovering(false);
     }
   }
 
   async function triggerQualification() {
-    setQualifying(true);
     try {
-      const res = await fetch('/api/admin/leads/qualify', { method: 'POST' });
-      const data = (await res.json()) as {
-        message?: string;
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? 'Qualification failed');
-      toast.success(data.message ?? 'Qualification complete');
+      const data = await qualificationMutation.mutateAsync();
+      toast.success(data.message);
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Qualification failed'
       );
-    } finally {
-      setQualifying(false);
     }
   }
 
-  if (loading) {
+  if (settingsQuery.isLoading) {
     return (
       <div className='border-b border-subtle px-4 py-4 text-sm text-secondary-token'>
         Loading pipeline settings...
@@ -151,7 +112,7 @@ export function LeadPipelineControls() {
               setSettings(s => (s ? { ...s, enabled: checked } : s))
             }
             aria-label='Toggle pipeline'
-            disabled={saving}
+            disabled={saveSettingsMutation.isPending}
           />
         </div>
 
@@ -168,7 +129,7 @@ export function LeadPipelineControls() {
               setSettings(s => (s ? { ...s, discoveryEnabled: checked } : s))
             }
             aria-label='Toggle discovery'
-            disabled={saving}
+            disabled={saveSettingsMutation.isPending}
           />
         </div>
 
@@ -185,7 +146,7 @@ export function LeadPipelineControls() {
               setSettings(s => (s ? { ...s, autoIngestEnabled: checked } : s))
             }
             aria-label='Toggle auto-ingest'
-            disabled={saving}
+            disabled={saveSettingsMutation.isPending}
           />
         </div>
 
@@ -200,7 +161,7 @@ export function LeadPipelineControls() {
               min={0}
               max={100}
               value={settings.autoIngestMinFitScore}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -212,7 +173,7 @@ export function LeadPipelineControls() {
                 );
               }}
               className='mt-1 w-24'
-              disabled={saving}
+              disabled={saveSettingsMutation.isPending}
             />
           </label>
 
@@ -226,7 +187,7 @@ export function LeadPipelineControls() {
               min={1}
               max={10000}
               value={settings.dailyQueryBudget}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
                 const val = Number.parseInt(e.target.value, 10);
                 setSettings(s =>
                   s
@@ -238,7 +199,7 @@ export function LeadPipelineControls() {
                 );
               }}
               className='mt-1 w-24'
-              disabled={saving}
+              disabled={saveSettingsMutation.isPending}
             />
             <p className='mt-1 text-xs text-secondary-token'>
               Used today: {settings.queriesUsedToday}
@@ -247,8 +208,14 @@ export function LeadPipelineControls() {
         </div>
 
         <div className='flex flex-wrap gap-2 pt-2'>
-          <Button onClick={() => void save()} disabled={saving} size='sm'>
-            {saving && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+          <Button
+            onClick={() => void save()}
+            disabled={saveSettingsMutation.isPending}
+            size='sm'
+          >
+            {saveSettingsMutation.isPending && (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            )}
             Save settings
           </Button>
 
@@ -256,9 +223,9 @@ export function LeadPipelineControls() {
             variant='outline'
             size='sm'
             onClick={() => void triggerDiscovery()}
-            disabled={discovering}
+            disabled={discoveryMutation.isPending}
           >
-            {discovering ? (
+            {discoveryMutation.isPending ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <Play className='mr-2 h-4 w-4' />
@@ -270,9 +237,9 @@ export function LeadPipelineControls() {
             variant='outline'
             size='sm'
             onClick={() => void triggerQualification()}
-            disabled={qualifying}
+            disabled={qualificationMutation.isPending}
           >
-            {qualifying ? (
+            {qualificationMutation.isPending ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <Zap className='mr-2 h-4 w-4' />

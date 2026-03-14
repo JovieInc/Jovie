@@ -29,11 +29,17 @@ export function DashboardHeader({
   className,
 }: DashboardHeaderProps) {
   const currentLabel = breadcrumbs.at(-1)?.label ?? '';
+  const rootLabel =
+    breadcrumbs.length > 1 ? (breadcrumbs[0]?.label ?? 'Jovie') : 'Jovie';
+  const usesSectionTitleLayout = breadcrumbs.length === 1 && !breadcrumbSuffix;
 
   return (
     <header
       data-testid='dashboard-header'
-      className={cn('z-20', showDivider && 'border-b border-subtle', className)}
+      className={cn(
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) supports-[backdrop-filter]:backdrop-blur-md',
+        className
+      )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
@@ -42,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1.5 [&>button]:h-9 [&>button]:w-9 [&>button]:rounded-lg [&>button]:bg-surface-2 [&>button]:border-0 [&>button>svg]:h-4 [&>button>svg]:w-4'>
+            <div className='flex items-center gap-1.5 [&_button]:h-8 [&_button]:rounded-[8px] [&_button]:border [&_button]:border-(--linear-border-subtle) [&_button]:bg-(--linear-bg-surface-0) [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -51,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-12 w-full items-center gap-2 px-5 md:px-6 sm:flex'>
+      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1.5 px-[var(--linear-app-header-padding-x)] sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -64,20 +70,33 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex-1 items-center flex text-[13px]'>
-          {!breadcrumbSuffix && (
+        <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.01em]'>
+          {usesSectionTitleLayout ? (
+            <span className='truncate text-[13.5px] font-[510] tracking-[-0.01em] text-primary-token'>
+              {currentLabel}
+            </span>
+          ) : (
             <>
-              <span className='text-tertiary-token'>Jovie</span>
-              <ChevronRight className='size-3.5 text-quaternary-token mx-0.5' />
-              <span className='font-[510] text-primary-token'>
-                {currentLabel}
+              <span className='shrink-0 text-[12px] text-(--linear-text-tertiary)'>
+                {rootLabel}
               </span>
+              <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+              {breadcrumbSuffix ? (
+                <div className='min-w-0 truncate text-[12.5px] text-(--linear-text-secondary)'>
+                  {breadcrumbSuffix}
+                </div>
+              ) : (
+                <span className='truncate text-[12.5px] font-[510] text-primary-token'>
+                  {currentLabel}
+                </span>
+              )}
             </>
           )}
-          {breadcrumbSuffix}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-2'>{action}</div>
+          <div className='ml-auto flex items-center gap-[var(--linear-app-toolbar-gap)]'>
+            {action}
+          </div>
         ) : null}
       </div>
     </header>

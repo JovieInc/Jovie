@@ -32,7 +32,7 @@ describe('HeaderIconButton', () => {
       </HeaderIconButton>
     );
     const button = screen.getByRole('button', { name: 'Action' });
-    expect(button).toHaveClass('p-1');
+    expect(button).toHaveClass('h-6', 'w-6');
   });
 
   it('applies sm size class', () => {
@@ -42,7 +42,7 @@ describe('HeaderIconButton', () => {
       </HeaderIconButton>
     );
     const button = screen.getByRole('button', { name: 'Action' });
-    expect(button).toHaveClass('p-1.5');
+    expect(button).toHaveClass('h-7', 'w-7');
   });
 
   it('applies md size class by default', () => {
@@ -52,7 +52,7 @@ describe('HeaderIconButton', () => {
       </HeaderIconButton>
     );
     const button = screen.getByRole('button', { name: 'Action' });
-    expect(button).toHaveClass('p-2');
+    expect(button).toHaveClass('h-8', 'w-8');
   });
 
   it('applies custom className', () => {

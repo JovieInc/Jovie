@@ -18,7 +18,7 @@ export function DashboardOverviewMetricsClient({
   const { range, refreshSignal } = useDashboardOverviewControls();
 
   return (
-    <div className='space-y-6 px-3'>
+    <div className='space-y-4'>
       <AnalyticsCards
         profileUrl={profileUrl}
         range={range}

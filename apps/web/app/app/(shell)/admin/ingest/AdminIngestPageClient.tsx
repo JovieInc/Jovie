@@ -1,12 +1,20 @@
 'use client';
 
-import { Card, CardContent, CardHeader } from '@jovie/ui';
-import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleAlert,
+  Clock,
+  History,
+  RefreshCw,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { BatchIngestForm } from '@/components/admin/BatchIngestForm';
 import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { EmptyState } from '@/components/organisms/EmptyState';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +27,7 @@ const EVENT_LABELS: Record<string, { label: string; className: string }> = {
   ARTIST_CLAIM_FAILED: { label: 'Failed', className: 'text-error' },
   ARTIST_CLAIM_ATTEMPT: {
     label: 'Attempted',
-    className: 'text-secondary-token',
+    className: 'text-(--linear-text-secondary)',
   },
   ARTIST_DATA_REFRESH: { label: 'Refreshed', className: 'text-info' },
   ARTIST_DATA_REFRESH_FAILED: {
@@ -38,7 +46,7 @@ function EventIcon({ type }: { readonly type: string }) {
     case 'ARTIST_DATA_REFRESH':
       return <RefreshCw className='size-3.5 text-info' />;
     default:
-      return <Clock className='size-3.5 text-secondary-token' />;
+      return <Clock className='size-3.5 text-(--linear-text-secondary)' />;
   }
 }
 
@@ -71,46 +79,42 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
       <PageContent>
         <div className='space-y-6'>
           {/* Single profile ingest */}
-          <Card>
-            <CardHeader className='pb-2'>
-              <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
-                <div>
-                  <h2 className='text-sm font-medium text-primary-token'>
-                    Single profile ingest
-                  </h2>
-                  <p className='text-xs text-tertiary-token'>
-                    Ingest a creator by URL or Spotify artist name search.
-                  </p>
-                </div>
+          <ContentSurfaceCard>
+            <ContentSectionHeader
+              title='Single profile ingest'
+              subtitle='Ingest a creator by URL or Spotify artist name search.'
+              actions={
                 <IngestProfileDropdown onIngestPending={handleIngestComplete} />
-              </div>
-            </CardHeader>
-          </Card>
+              }
+              className='min-h-0 px-4 py-3'
+              actionsClassName='shrink-0'
+            />
+          </ContentSurfaceCard>
 
           {/* Batch ingest */}
           <BatchIngestForm onComplete={handleIngestComplete} />
 
           {/* Ingest history */}
-          <Card>
-            <CardHeader className='pb-2'>
-              <h2 className='text-sm font-medium text-primary-token'>
-                Recent ingest history
-              </h2>
-              <p className='text-xs text-tertiary-token'>
-                Last {history.length} ingest events from the audit log.
-              </p>
-            </CardHeader>
-            <CardContent>
+          <ContentSurfaceCard className='overflow-hidden'>
+            <ContentSectionHeader
+              title='Recent ingest history'
+              subtitle={`Last ${history.length} ingest events from the audit log.`}
+              className='min-h-0 px-4 py-3'
+            />
+            <div className='px-4 py-3'>
               {history.length === 0 ? (
-                <p className='py-6 text-center text-sm text-secondary-token'>
-                  No ingest events recorded yet.
-                </p>
+                <EmptyState
+                  icon={<History className='size-5' />}
+                  heading='No ingest events yet'
+                  description='Single profile imports and batch ingest runs will appear here.'
+                  className='py-8'
+                />
               ) : (
-                <ul className='max-h-[480px] divide-y divide-subtle overflow-y-auto'>
+                <ul className='max-h-[480px] divide-y divide-(--linear-border-subtle) overflow-y-auto'>
                   {history.map(row => {
                     const config = EVENT_LABELS[row.type] ?? {
                       label: row.type,
-                      className: 'text-secondary-token',
+                      className: 'text-(--linear-text-secondary)',
                     };
                     return (
                       <li
@@ -126,7 +130,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                         >
                           {config.label}
                         </span>
-                        <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
+                        <span className='col-span-2 min-w-0 truncate text-(--linear-text-primary) sm:col-auto sm:flex-1'>
                           {row.handle
                             ? `@${row.handle}`
                             : (row.spotifyId ?? '--')}
@@ -139,7 +143,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                             {row.failureReason}
                           </span>
                         )}
-                        <span className='col-start-3 row-start-1 shrink-0 text-right text-tertiary-token sm:ml-auto'>
+                        <span className='col-start-3 row-start-1 shrink-0 text-right text-(--linear-text-tertiary) sm:ml-auto'>
                           {formatTimeAgo(row.createdAt)}
                         </span>
                       </li>
@@ -147,8 +151,8 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                   })}
                 </ul>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </ContentSurfaceCard>
         </div>
       </PageContent>
     </PageShell>

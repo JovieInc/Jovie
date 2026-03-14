@@ -1,10 +1,13 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button } from '@jovie/ui';
 import { CheckCircle, RefreshCw, Star, Trash2, XCircle } from 'lucide-react';
-import Link from 'next/link';
-import { useState } from 'react';
-import { ExportCSVButton } from '@/components/organisms/table';
+import {
+  ACTION_BAR_BUTTON_CLASS,
+  ActionBar,
+  ActionBarItem,
+  ExportCSVButton,
+} from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
@@ -13,14 +16,9 @@ import {
 import { AdminTableSubheader } from './AdminTableHeader';
 
 export interface AdminCreatorsToolbarProps {
-  readonly basePath: string;
-  readonly search: string;
-  readonly sort: string;
-  readonly pageSize: number;
   readonly from: number;
   readonly to: number;
   readonly total: number;
-  readonly clearHref: string;
   readonly profiles: AdminCreatorProfileRow[];
   readonly selectedIds?: ReadonlySet<string>;
   readonly onBulkVerify?: () => void;
@@ -32,14 +30,9 @@ export interface AdminCreatorsToolbarProps {
 }
 
 export function AdminCreatorsToolbar({
-  basePath,
-  search,
-  sort,
-  pageSize,
   from,
   to,
   total,
-  clearHref,
   profiles,
   selectedIds = new Set(),
   onBulkVerify,
@@ -49,7 +42,6 @@ export function AdminCreatorsToolbar({
   onBulkDelete,
   onClearSelection,
 }: AdminCreatorsToolbarProps) {
-  const [searchTerm, setSearchTerm] = useState(search);
   const selectedCount = selectedIds.size;
   const hasSelection = selectedCount > 0;
 
@@ -136,39 +128,21 @@ export function AdminCreatorsToolbar({
               {total.toLocaleString()} profiles
             </div>
             <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3'>
-              <form
-                action={basePath}
-                method='get'
-                className='relative isolate flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap'
-              >
-                <input type='hidden' name='sort' value={sort} />
-                <input type='hidden' name='pageSize' value={pageSize} />
-                <Input
-                  name='q'
-                  placeholder='Search by handle'
-                  value={searchTerm}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                    setSearchTerm(event.target.value)
-                  }
-                  className='w-full sm:w-[240px]'
-                />
-                <input type='hidden' name='page' value='1' />
-                <Button type='submit' size='sm' variant='secondary'>
-                  Search
-                </Button>
-                {search && search.length > 0 && (
-                  <Button asChild size='sm' variant='ghost'>
-                    <Link href={clearHref}>Clear</Link>
-                  </Button>
-                )}
-              </form>
-              <ExportCSVButton<AdminCreatorProfileRow>
-                getData={() => profiles}
-                columns={creatorsCSVColumns}
-                filename={CREATORS_CSV_FILENAME_PREFIX}
-                disabled={profiles.length === 0}
-                ariaLabel='Export creator profiles to CSV file'
-              />
+              <ActionBar>
+                <ActionBarItem tooltipLabel='Export'>
+                  <ExportCSVButton<AdminCreatorProfileRow>
+                    getData={() => profiles}
+                    columns={creatorsCSVColumns}
+                    filename={CREATORS_CSV_FILENAME_PREFIX}
+                    disabled={profiles.length === 0}
+                    ariaLabel='Export creator profiles to CSV file'
+                    variant='ghost'
+                    size='sm'
+                    className={`${ACTION_BAR_BUTTON_CLASS} [&>span]:sr-only`}
+                    label='Export'
+                  />
+                </ActionBarItem>
+              </ActionBar>
             </div>
           </>
         )}

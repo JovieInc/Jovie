@@ -8,6 +8,7 @@
  */
 
 import { useSession, useUser } from '@clerk/nextjs';
+import { SettingsGroupHeading } from '@/components/dashboard/molecules/SettingsGroupHeading';
 import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/components/dashboard/organisms/SettingsNotificationsSection';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
@@ -25,11 +26,20 @@ function ClerkAccountSections() {
 
   if (!isLoaded || !user || !typedUser) {
     return (
-      <div className='space-y-4 py-3'>
-        <LoadingSkeleton height='h-6' width='w-1/3' />
-        <LoadingSkeleton height='h-4' />
+      <div className='space-y-6 py-3'>
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-4' width='w-20' />
+          <LoadingSkeleton height='h-12' />
+        </div>
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-4' width='w-32' />
+          <LoadingSkeleton height='h-12' />
+        </div>
+        <div className='space-y-3'>
+          <LoadingSkeleton height='h-4' width='w-24' />
+          <LoadingSkeleton height='h-12' />
+        </div>
         <LoadingSkeleton height='h-12' />
-        <LoadingSkeleton height='h-6' width='w-1/2' />
       </div>
     );
   }
@@ -37,21 +47,21 @@ function ClerkAccountSections() {
   return (
     <>
       <div>
-        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3 first:pt-0'>
+        <SettingsGroupHeading className='pb-3 pt-6 first:pt-0'>
           Email
-        </h3>
+        </SettingsGroupHeading>
         <EmailManagementCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
+        <SettingsGroupHeading className='pb-3 pt-6'>
           Connected accounts
-        </h3>
+        </SettingsGroupHeading>
         <ConnectedAccountsCard user={typedUser} />
       </div>
       <div>
-        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
+        <SettingsGroupHeading className='pb-3 pt-6'>
           Sessions
-        </h3>
+        </SettingsGroupHeading>
         <SessionManagementCard
           user={typedUser}
           activeSessionId={activeSession?.id}
@@ -72,15 +82,15 @@ export function AccountSettingsSection({
     <div className='space-y-0' data-testid='account-settings-section'>
       <ClerkAccountSections />
       <div>
-        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
+        <SettingsGroupHeading className='pb-3 pt-6'>
           Appearance
-        </h3>
+        </SettingsGroupHeading>
         <SettingsAppearanceSection />
       </div>
       <div>
-        <h3 className='text-[13px] font-[510] text-secondary-token pt-6 pb-3'>
+        <SettingsGroupHeading className='pb-3 pt-6'>
           Notifications
-        </h3>
+        </SettingsGroupHeading>
         <SettingsNotificationsSection isGrowth={isGrowth} />
       </div>
     </div>

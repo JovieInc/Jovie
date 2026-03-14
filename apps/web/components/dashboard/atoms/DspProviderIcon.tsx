@@ -2,6 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useEffect, useMemo, useState } from 'react';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
 import { cn } from '@/lib/utils';
@@ -42,6 +43,18 @@ const SIZE_CLASSES = {
   lg: 'h-6 w-6',
 };
 
+const DSP_PROVIDER_MAP: Partial<
+  Record<DspProviderId, Exclude<DspProviderId, 'musicbrainz'>>
+> = {
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  deezer: 'deezer',
+  youtube_music: 'youtube_music',
+  tidal: 'tidal',
+  soundcloud: 'soundcloud',
+  amazon_music: 'amazon_music',
+};
+
 /**
  * DspProviderIcon - Displays a DSP provider icon with optional label.
  *
@@ -71,30 +84,28 @@ export function DspProviderIcon({
     [isDark, rawColor]
   );
 
-  // Map DSP provider IDs to SocialIcon platform names
-  const platformMap: Record<DspProviderId, string> = {
-    spotify: 'spotify',
-    apple_music: 'apple_music',
-    deezer: 'deezer',
-    youtube_music: 'youtube',
-    tidal: 'tidal',
-    soundcloud: 'soundcloud',
-    amazon_music: 'amazon',
-    musicbrainz: 'website', // Fallback icon for MusicBrainz
-  };
+  const mappedProvider = DSP_PROVIDER_MAP[provider];
 
   return (
     <span
       className={cn('inline-flex items-center gap-1.5', className)}
       title={label}
     >
-      <span style={{ color }}>
-        <SocialIcon
-          platform={platformMap[provider]}
+      {mappedProvider ? (
+        <ProviderIcon
+          provider={mappedProvider}
           className={SIZE_CLASSES[size]}
           aria-label={label}
         />
-      </span>
+      ) : (
+        <span style={{ color }}>
+          <SocialIcon
+            platform='musicbrainz'
+            className={SIZE_CLASSES[size]}
+            aria-label={label}
+          />
+        </span>
+      )}
       {showLabel && (
         <span className='text-[13px] font-[510] text-secondary-token'>
           {label}

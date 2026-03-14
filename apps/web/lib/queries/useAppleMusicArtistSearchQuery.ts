@@ -7,20 +7,16 @@
  * Mirrors useArtistSearchQuery but targets the Apple Music search API.
  */
 
+import type { AppleMusicArtistResult } from '@/lib/contracts/api';
+
+export type { AppleMusicArtistResult } from '@/lib/contracts/api';
+
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import {
   type ArtistSearchState,
   useUnifiedArtistSearchQuery,
 } from './useUnifiedArtistSearchQuery';
-
-export interface AppleMusicArtistResult {
-  id: string;
-  name: string;
-  url: string;
-  imageUrl?: string;
-  genres?: string[];
-}
 
 export type AppleMusicSearchState = ArtistSearchState;
 

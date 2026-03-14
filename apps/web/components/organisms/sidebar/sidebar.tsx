@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer hidden shrink-0 overflow-hidden text-sidebar-foreground lg:sticky lg:top-0 lg:block'
+            className='group peer hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:block data-[variant=sidebar]:lg:m-2 data-[variant=sidebar]:lg:mr-0'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}
@@ -80,15 +80,23 @@ export const Sidebar = React.forwardRef<
           >
             <div
               className={cn(
-                'duration-normal relative h-svh w-(--sidebar-width) overflow-hidden transition-[width] ease-interactive',
+                'duration-normal relative h-[calc(100svh-1rem)] w-(--sidebar-width) overflow-hidden transition-[width,transform] ease-interactive',
                 'group-data-[collapsible=offcanvas]:w-0',
+                state === 'closed' &&
+                  collapsible === 'offcanvas' &&
+                  side === 'left' &&
+                  '-translate-x-[calc(100%+0.5rem)]',
+                state === 'closed' &&
+                  collapsible === 'offcanvas' &&
+                  side === 'right' &&
+                  'translate-x-[calc(100%+0.5rem)]',
                 'group-data-[side=right]:rotate-180',
                 // Prevent pointer events from leaking into content area during width transition
                 'group-data-[collapsible=icon]:pointer-events-none',
                 variant === 'floating' &&
-                  'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+                  'px-2 py-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
                 variant === 'inset' &&
-                  'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]',
+                  'px-2 py-0 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+1rem+2px)]',
                 variant === 'sidebar' &&
                   'group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
                 className
@@ -97,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-transform duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[18px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-sidebar-border group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

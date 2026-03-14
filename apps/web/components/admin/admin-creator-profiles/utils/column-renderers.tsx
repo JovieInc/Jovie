@@ -1,6 +1,7 @@
 import type { CellContext } from '@tanstack/react-table';
 import { CalendarDays, Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -27,11 +28,11 @@ export function renderAvatarCell({
       isFeatured={profile.isFeatured}
       disableUsernameLink
       usernameActions={
-        <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100'>
-          <button
-            type='button'
-            className='rounded p-0.5 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
+        <span className='flex shrink-0 items-center gap-0.5'>
+          <InlineIconButton
             aria-label={`Copy link for @${profile.username}`}
+            fadeOnParentHover
+            className='[&_svg]:h-3 [&_svg]:w-3'
             onClick={event => {
               event.stopPropagation();
               copyToClipboard(profileUrl).then(ok => {
@@ -44,17 +45,18 @@ export function renderAvatarCell({
             }}
           >
             <Copy className='h-3 w-3' />
-          </button>
-          <a
+          </InlineIconButton>
+          <InlineIconButton
             href={profileUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='rounded p-0.5 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
             aria-label={`Open profile for @${profile.username}`}
+            fadeOnParentHover
+            className='[&_svg]:h-3 [&_svg]:w-3'
             onClick={event => event.stopPropagation()}
           >
             <ExternalLink className='h-3 w-3' />
-          </a>
+          </InlineIconButton>
         </span>
       }
     />
@@ -102,9 +104,9 @@ export function renderCreatedDateCell({
   const createdAt = row.original.createdAt;
 
   return (
-    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-secondary-token'>
+    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-(--linear-text-secondary)'>
       <CalendarDays
-        className='h-3.5 w-3.5 text-tertiary-token'
+        className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
         aria-hidden='true'
       />
       {createdAt

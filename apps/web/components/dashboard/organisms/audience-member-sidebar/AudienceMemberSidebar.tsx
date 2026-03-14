@@ -14,6 +14,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberActions } from './AudienceMemberActions';
+import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
 import type { AudienceMemberSidebarProps } from './types';
@@ -56,7 +57,13 @@ export function AudienceMemberSidebar({
     >
       {member && (
         <>
-          <AudienceMemberDetails member={member} />
+          <DrawerSection title='Properties'>
+            <AudienceMemberDetails member={member} />
+          </DrawerSection>
+
+          <DrawerSection title='Activity'>
+            <AudienceMemberActivityFeed member={member} />
+          </DrawerSection>
 
           <DrawerSection title='Recent actions'>
             <AudienceMemberActions member={member} />

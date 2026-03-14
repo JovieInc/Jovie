@@ -1,9 +1,7 @@
 'use client';
 
 import {
-  Button,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -15,7 +13,13 @@ import { toast } from 'sonner';
 import { createRelease } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerMediaThumb,
+  EntityHeaderCard,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -140,28 +144,33 @@ export function AddReleaseSidebar({
       title='Add Release'
       onClose={handleClose}
       entityHeader={
-        <div className='flex items-center gap-2'>
-          <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-surface-2'>
-            <Icon
-              name='Disc3'
-              className='h-5 w-5 text-tertiary-token'
-              aria-hidden='true'
+        <EntityHeaderCard
+          image={
+            <DrawerMediaThumb
+              src={artworkUrl.trim() || undefined}
+              alt='New release artwork'
+              sizeClassName='h-10 w-10'
+              sizes='40px'
+              fallback={
+                <Icon
+                  name='Disc3'
+                  className='h-5 w-5 text-(--linear-text-tertiary)'
+                  aria-hidden='true'
+                />
+              }
             />
-          </div>
-          <div>
-            <p className='text-sm font-medium text-primary-token'>
-              {title || 'New Release'}
-            </p>
-            <p className='text-xs text-secondary-token'>
-              {RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
-                'Single'}
-            </p>
-          </div>
-        </div>
+          }
+          title={title || 'New Release'}
+          subtitle={
+            RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
+            'Single'
+          }
+          className='gap-2'
+        />
       }
       footer={
-        <Button
-          variant='primary'
+        <DrawerButton
+          tone='primary'
           className='w-full'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
@@ -174,18 +183,11 @@ export function AddReleaseSidebar({
           ) : (
             'Create Release'
           )}
-        </Button>
+        </DrawerButton>
       }
     >
       <div className='space-y-5'>
-        {/* Title */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-title'
-            className='text-xs font-medium text-secondary-token'
-          >
-            Title
-          </Label>
+        <DrawerFormField label='Title' htmlFor='release-title'>
           <Input
             id='release-title'
             value={title}
@@ -193,16 +195,9 @@ export function AddReleaseSidebar({
             placeholder='My New Release'
             autoFocus
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Release Type */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-type'
-            className='text-xs font-medium text-secondary-token'
-          >
-            Release Type
-          </Label>
+        <DrawerFormField label='Release Type' htmlFor='release-type'>
           <Select
             value={releaseType}
             onValueChange={v => setReleaseType(v as ReleaseType)}
@@ -218,32 +213,18 @@ export function AddReleaseSidebar({
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </DrawerFormField>
 
-        {/* Release Date */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='release-date'
-            className='text-xs font-medium text-secondary-token'
-          >
-            Release Date
-          </Label>
+        <DrawerFormField label='Release Date' htmlFor='release-date'>
           <Input
             id='release-date'
             type='date'
             value={releaseDate}
             onChange={e => setReleaseDate(e.target.value)}
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Artwork URL */}
-        <div className='space-y-1.5'>
-          <Label
-            htmlFor='artwork-url'
-            className='text-xs font-medium text-secondary-token'
-          >
-            Artwork URL (optional)
-          </Label>
+        <DrawerFormField label='Artwork URL (optional)' htmlFor='artwork-url'>
           <Input
             id='artwork-url'
             type='url'
@@ -251,21 +232,19 @@ export function AddReleaseSidebar({
             onChange={e => setArtworkUrl(e.target.value)}
             placeholder='https://example.com/artwork.jpg'
           />
-        </div>
+        </DrawerFormField>
 
-        {/* Provider URLs */}
         <div className='space-y-3'>
-          <p className='text-xs font-medium text-secondary-token'>
+          <p className='text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
             Platform Links (optional)
           </p>
           {PROVIDER_FIELDS.map(provider => (
-            <div key={provider.key} className='space-y-1'>
-              <Label
-                htmlFor={`provider-${provider.key}`}
-                className='text-2xs text-tertiary-token'
-              >
-                {provider.label}
-              </Label>
+            <DrawerFormField
+              key={provider.key}
+              label={provider.label}
+              htmlFor={`provider-${provider.key}`}
+              className='space-y-1'
+            >
               <Input
                 id={`provider-${provider.key}`}
                 type='url'
@@ -275,7 +254,7 @@ export function AddReleaseSidebar({
                 }
                 placeholder={provider.placeholder}
               />
-            </div>
+            </DrawerFormField>
           ))}
         </div>
       </div>

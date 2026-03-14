@@ -6,6 +6,8 @@ import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useBrandingSettingsMutation } from '@/lib/queries/useSettingsMutation';
 import type { Artist } from '@/types/db';
 
@@ -51,10 +53,16 @@ export function SettingsBrandingSection({
     <DashboardCard
       variant='settings'
       padding='none'
-      className='divide-y divide-subtle'
+      className='overflow-hidden'
     >
-      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
-      <div className='px-4 py-3'>
+      <ContentSectionHeader
+        title='Branding'
+        subtitle='Control whether Jovie branding appears on your profile page.'
+        className='min-h-0 px-4 py-3'
+        actions={<SettingsStatusPill status={saveStatus} />}
+        actionsClassName='w-auto shrink-0'
+      />
+      <div className='space-y-3 px-4 py-3'>
         <SettingsToggleRow
           title='Hide Jovie Branding'
           description='Remove Jovie branding from your profile page for a fully custom experience.'
@@ -64,16 +72,18 @@ export function SettingsBrandingSection({
           ariaLabel='Hide Jovie branding'
           gated={!isPro}
         />
+        {isPro && hideBranding ? (
+          <ContentSurfaceCard className='flex items-center gap-3 bg-(--linear-bg-surface-0) p-3.5'>
+            <Sparkles
+              className='h-4 w-4 shrink-0 text-emerald-500'
+              aria-hidden
+            />
+            <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
+              Branding is hidden on your profile.
+            </p>
+          </ContentSurfaceCard>
+        ) : null}
       </div>
-
-      {isPro && hideBranding && (
-        <div className='px-4 py-3 flex items-center gap-3'>
-          <Sparkles className='h-4 w-4 text-emerald-500 shrink-0' />
-          <p className='text-[13px] text-emerald-600 dark:text-emerald-400'>
-            Branding is hidden on your profile.
-          </p>
-        </div>
-      )}
     </DashboardCard>
   );
 }

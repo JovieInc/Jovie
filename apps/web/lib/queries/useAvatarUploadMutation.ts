@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { AvatarUploadResponse } from '@/lib/contracts/api';
 import { FetchError, fetchWithTimeoutResponse } from './fetch';
 import { queryKeys } from './keys';
 
@@ -9,17 +10,11 @@ export interface AvatarUploadInput {
   profileId: string;
 }
 
-export interface AvatarUploadResponse {
-  success: boolean;
-  blobUrl: string;
-}
-
 export interface UseAvatarUploadMutationOptions {
   profileId?: string;
   onSuccess?: (blobUrl: string) => void;
   onError?: (error: Error) => void;
 }
-
 /**
  * Mutation function for uploading and updating creator avatar.
  * Performs a two-step operation: upload to blob storage, then update profile.

@@ -33,18 +33,20 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-interactive-hover focus-visible:outline-none focus-visible:bg-interactive-hover'
+      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1.5 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
-      <span className='text-[13px] text-secondary-token'>{label}</span>
+      <span className='text-[13px] text-(--linear-text-secondary)'>
+        {label}
+      </span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
-          checked ? 'bg-primary' : 'bg-surface-3'
+          checked ? 'bg-primary' : 'bg-(--linear-bg-surface-2)'
         )}
       >
         <span
           className={cn(
-            'h-3 w-3 rounded-full bg-white shadow-card transition-transform',
+            'h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
             checked && 'translate-x-3'
           )}
         />
@@ -77,10 +79,10 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-md px-2 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:bg-interactive-hover',
+        'rounded-[7px] border border-transparent px-2 py-0.5 text-[11px] font-[510] transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)',
         isVisible
-          ? 'bg-interactive-active text-secondary-token'
-          : 'text-tertiary-token hover:text-secondary-token hover:bg-interactive-hover'
+          ? 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)'
+          : 'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)'
       )}
     >
       {label}
@@ -140,9 +142,9 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-md border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
     >
-      <Settings2 className='h-3.5 w-3.5' />
+      <Settings2 className='h-4 w-4' />
       Display
     </button>
   );
@@ -152,29 +154,29 @@ export function DisplayMenuDropdown({
       <PopoverTrigger asChild>{trigger ?? defaultTrigger}</PopoverTrigger>
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
-        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
-          <span className='text-[13px] font-[590] text-primary-token'>
+        <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
+          <span className='text-[13px] font-[590] text-(--linear-text-primary)'>
             Display
           </span>
           <PopoverPrimitive.Close
             aria-label='Close'
-            className='rounded-md p-0.5 text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-secondary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+            className='rounded-[7px] border border-transparent p-0.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)'
           >
-            <X className='h-3.5 w-3.5' />
+            <X className='h-4 w-4' />
           </PopoverPrimitive.Close>
         </div>
 
         {/* ── View Mode ──────────────────────────────────────────── */}
         {hasViewModeOptions && (
-          <div className='border-b border-subtle px-3 py-2'>
+          <div className='border-b border-(--linear-border-subtle) px-3 py-2'>
             <fieldset
-              className='relative inline-flex w-full items-center rounded-lg border border-subtle bg-surface-1 p-0.5'
+              className='relative inline-flex w-full items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'
               aria-label='View mode toggle'
             >
               {/* Sliding background indicator */}
               <div
                 className={cn(
-                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded-md bg-surface-2 shadow-card transition-all duration-200 ease-out',
+                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none transition-all duration-200 ease-out',
                   viewMode === 'list' ? 'left-0.5' : 'left-[calc(50%+0.5px)]'
                 )}
                 aria-hidden='true'
@@ -186,13 +188,13 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'list'
-                    ? 'text-primary-token'
-                    : 'text-tertiary-token hover:text-secondary-token'
+                    ? 'text-(--linear-text-primary)'
+                    : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'list'}
                 aria-label='List view'
               >
-                <LayoutList className='h-3.5 w-3.5' />
+                <LayoutList className='h-4 w-4' />
                 <span>List</span>
               </button>
 
@@ -202,13 +204,13 @@ export function DisplayMenuDropdown({
                 className={cn(
                   'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'board'
-                    ? 'text-primary-token'
-                    : 'text-tertiary-token hover:text-secondary-token'
+                    ? 'text-(--linear-text-primary)'
+                    : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary)'
                 )}
                 aria-pressed={viewMode === 'board'}
                 aria-label='Board view'
               >
-                <LayoutGrid className='h-3.5 w-3.5' />
+                <LayoutGrid className='h-4 w-4' />
                 <span>Board</span>
               </button>
             </fieldset>
@@ -217,7 +219,7 @@ export function DisplayMenuDropdown({
 
         {/* ── Grouping Toggle ────────────────────────────────────── */}
         {hasGroupingOption && (
-          <div className='border-b border-subtle px-3 py-1.5'>
+          <div className='border-b border-(--linear-border-subtle) px-3 py-1.5'>
             <ToggleSwitch
               label={groupingLabel}
               checked={groupingEnabled}
@@ -231,10 +233,10 @@ export function DisplayMenuDropdown({
           <div
             className={cn(
               'px-3 py-2',
-              hasDensityOptions && 'border-b border-subtle'
+              hasDensityOptions && 'border-b border-(--linear-border-subtle)'
             )}
           >
-            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               Display properties
             </p>
             <div className='flex flex-wrap gap-1 px-0.5'>
@@ -254,7 +256,7 @@ export function DisplayMenuDropdown({
         {/* ── Density ────────────────────────────────────────────── */}
         {hasDensityOptions && (
           <div className='px-3 py-2'>
-            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               Density
             </p>
             <div className='grid grid-cols-3 gap-1'>
@@ -267,8 +269,8 @@ export function DisplayMenuDropdown({
                   className={cn(
                     'rounded-md px-2 py-1 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
                     density === option.value
-                      ? 'bg-surface-2 text-primary-token border border-subtle'
-                      : 'text-tertiary-token hover:text-secondary-token border border-transparent hover:bg-interactive-hover'
+                      ? 'border border-(--linear-border-subtle) bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+                      : 'border border-transparent text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)'
                   )}
                 >
                   {option.label}

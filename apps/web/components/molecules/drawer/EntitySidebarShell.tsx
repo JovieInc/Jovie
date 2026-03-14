@@ -95,7 +95,7 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full flex-col'>
+      <div className='flex h-full min-h-0 flex-col'>
         {/* Header bar — close is in the overflow dropdown */}
         <DrawerHeader
           title={title}
@@ -113,7 +113,7 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           /* Empty state */
-          <div className='flex-1 overflow-auto px-5 py-5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
             <DrawerEmptyState message={emptyMessage} />
           </div>
         ) : (
@@ -127,7 +127,9 @@ export function EntitySidebarShell({
 
             {/* Tabs */}
             {tabs && (
-              <div className='shrink-0 px-5 py-2.5 [&>*]:w-full'>{tabs}</div>
+              <div className='shrink-0 border-b border-subtle px-5 py-2.5 [&>*]:w-full'>
+                {tabs}
+              </div>
             )}
 
             {/* Scrollable content */}
@@ -136,7 +138,11 @@ export function EntitySidebarShell({
             </div>
 
             {/* Footer */}
-            {footer && <div className='shrink-0 px-5 py-3'>{footer}</div>}
+            {footer && (
+              <div className='shrink-0 border-t border-subtle bg-surface-0 px-5 py-3'>
+                {footer}
+              </div>
+            )}
           </>
         )}
       </div>

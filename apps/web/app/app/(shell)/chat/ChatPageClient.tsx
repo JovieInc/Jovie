@@ -1,6 +1,6 @@
 'use client';
 
-import { SimpleTooltip } from '@jovie/ui';
+import { Button, SimpleTooltip } from '@jovie/ui';
 import { AlertCircle, Check, Copy, RefreshCw } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -15,6 +15,7 @@ import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/Dashbo
 import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
 import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -38,9 +39,8 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='flex items-center gap-1.5 text-[13px] text-tertiary-token'>
-      <span aria-hidden='true'>/</span>
-      <span className='max-w-[200px] truncate'>{title}</span>
+    <span className='block max-w-[240px] truncate font-[510] text-(--linear-text-primary)'>
+      {title}
     </span>
   );
 }
@@ -327,29 +327,32 @@ export function ChatPageClient({
 
     return (
       <div className='flex h-full items-center justify-center'>
-        <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
+        <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
           {isProfileSetupRace ? (
             <LoadingSpinner size='lg' tone='muted' />
           ) : (
-            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
           )}
-          <p className='text-sm text-secondary-token'>{profileMessage}</p>
+          <p className='text-sm text-(--linear-text-secondary)'>
+            {profileMessage}
+          </p>
           {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-tertiary-token'>
+            <p className='text-xs text-(--linear-text-tertiary)'>
               Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
             </p>
           )}
           {!isProfileSetupRace && (
-            <button
-              type='button'
+            <Button
               onClick={() => router.refresh()}
-              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+              variant='secondary'
+              size='sm'
+              className='gap-2'
             >
               <RefreshCw className='h-4 w-4' />
               Retry
-            </button>
+            </Button>
           )}
-        </div>
+        </ContentSurfaceCard>
       </div>
     );
   }
@@ -358,20 +361,21 @@ export function ChatPageClient({
     <ErrorBoundary
       fallback={
         <div className='flex h-full items-center justify-center'>
-          <div className='flex flex-col items-center gap-3 text-center max-w-sm'>
-            <AlertCircle className='h-8 w-8 text-tertiary-token' />
-            <p className='text-sm text-secondary-token'>
+          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
+            <p className='text-sm text-(--linear-text-secondary)'>
               Something went wrong loading chat. Please try again.
             </p>
-            <button
-              type='button'
+            <Button
               onClick={() => router.refresh()}
-              className='flex items-center gap-2 rounded-md bg-surface-2 px-4 py-2 text-sm text-primary-token hover:bg-surface-3 transition-colors'
+              variant='secondary'
+              size='sm'
+              className='gap-2'
             >
               <RefreshCw className='h-4 w-4' />
               Retry
-            </button>
-          </div>
+            </Button>
+          </ContentSurfaceCard>
         </div>
       }
     >

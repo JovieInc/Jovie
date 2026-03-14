@@ -5,6 +5,7 @@ import { useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { UnifiedTable } from '@/components/organisms/table';
+import { TableEmptyState } from '@/components/organisms/table/atoms/TableEmptyState';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -83,7 +84,7 @@ export function ReleaseTable({
   onCopy,
   onEdit,
   columnVisibility,
-  rowHeight = TABLE_ROW_HEIGHTS.STANDARD,
+  rowHeight = TABLE_ROW_HEIGHTS.STANDARD + 4,
   onFocusedRowChange,
   showTracks = false,
   groupByYear = false,
@@ -136,13 +137,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1)';
+          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-150 ease-out';
+          'bg-transparent hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -152,7 +153,14 @@ export function ReleaseTable({
         ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
         : '';
 
-      return ['rounded-md', baseClassName, refreshClassName, flashClassName]
+      return [
+        'rounded-none',
+        'focus-within:shadow-[inset_1px_0_0_0_var(--linear-border-focus)]',
+        'data-[state=selected]:bg-(--linear-row-selected)',
+        baseClassName,
+        refreshClassName,
+        flashClassName,
+      ]
         .filter(Boolean)
         .join(' ');
     },
@@ -210,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 280,
-      minSize: 240,
+      size: 340,
+      minSize: 220,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -306,15 +314,12 @@ export function ReleaseTable({
   if (isMobile) {
     if (releases.length === 0) {
       return (
-        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
-          <Icon name='Disc3' className='h-6 w-6' />
-          <div>
-            <div className='font-[510]'>No releases</div>
-            <div className='text-[11px]'>
-              Your releases will appear here once synced.
-            </div>
-          </div>
-        </div>
+        <TableEmptyState
+          icon={<Icon name='Disc3' className='h-6 w-6' />}
+          title='No releases'
+          description='Your releases will appear here once synced.'
+          className='mx-4 my-4 min-h-[200px]'
+        />
       );
     }
 
@@ -350,20 +355,22 @@ export function ReleaseTable({
       containerClassName='h-full'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
+      skeletonRows={14}
+      skeletonColumnConfig={[
+        { variant: 'release', width: '100%' },
+        { variant: 'meta', width: '236px' },
+      ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}
       renderExpandedContent={showTracks ? renderExpandedContent : undefined}
       getExpandableRowId={getExpandableRowId}
       emptyState={
-        <div className='px-4 py-10 text-center text-[13px] text-secondary-token flex flex-col items-center gap-3'>
-          <Icon name='Disc3' className='h-6 w-6' />
-          <div>
-            <div className='font-[510]'>No releases</div>
-            <div className='text-[11px]'>
-              Your releases will appear here once synced.
-            </div>
-          </div>
-        </div>
+        <TableEmptyState
+          icon={<Icon name='Disc3' className='h-6 w-6' />}
+          title='No releases'
+          description='Your releases will appear here once synced.'
+          className='m-4 min-h-[200px]'
+        />
       }
     />
   );

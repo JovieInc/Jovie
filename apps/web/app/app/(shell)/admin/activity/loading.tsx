@@ -1,3 +1,4 @@
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
@@ -8,19 +9,16 @@ const ADMIN_ACTIVITY_ROW_KEYS = Array.from(
 export function AdminActivitySkeleton() {
   return (
     <div
-      className='h-full overflow-hidden rounded-xl border border-subtle'
+      className='h-full overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface)'
       aria-busy='true'
     >
-      <div className='space-y-2 border-b border-subtle px-6 py-5'>
-        <div className='h-5 w-36 rounded skeleton' />
-        <div className='h-3 w-24 rounded skeleton' />
-      </div>
+      <ContentSectionHeaderSkeleton titleWidth='w-36' descriptionWidth='w-24' />
 
       <div className='px-0 pt-0'>
         <div className='overflow-x-auto'>
           <table className='w-full border-collapse text-sm'>
             <thead className='text-left'>
-              <tr className='border-b border-subtle text-xs uppercase tracking-wide'>
+              <tr className='border-b border-(--linear-border-subtle) text-xs uppercase tracking-wide text-(--linear-text-tertiary)'>
                 <th className='px-4 py-3'>
                   <div className='h-3 w-12 rounded skeleton' />
                 </th>
@@ -39,7 +37,7 @@ export function AdminActivitySkeleton() {
               {ADMIN_ACTIVITY_ROW_KEYS.map(key => (
                 <tr
                   key={key}
-                  className='border-b border-subtle last:border-b-0'
+                  className='border-b border-(--linear-border-subtle) last:border-b-0'
                 >
                   <td className='px-4 py-3'>
                     <div className='h-4 w-20 rounded skeleton' />

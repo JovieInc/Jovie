@@ -58,7 +58,7 @@ export function UniversalLinkInputArtistSearchMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden border border-default bg-surface-1 px-2 py-1 shadow-xs transition-all',
+          'relative flex w-full items-center gap-2 overflow-hidden border border-(--linear-border-default) bg-(--linear-bg-surface-1) px-2 py-1 shadow-xs transition-all',
           'focus-within:ring-2 focus-within:ring-accent',
           showResults ? 'rounded-t-3xl border-b-0' : 'rounded-full',
           disabled && 'opacity-50'
@@ -114,7 +114,7 @@ export function UniversalLinkInputArtistSearchMode({
           <button
             type='button'
             onClick={exitSearchMode}
-            className='flex items-center justify-center w-5 h-5 rounded-full text-tertiary-token hover:text-secondary-token hover:bg-surface-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+            className='flex items-center justify-center w-5 h-5 rounded-full text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
             aria-label='Exit search mode'
           >
             <X className='w-4 h-4' />
@@ -123,7 +123,7 @@ export function UniversalLinkInputArtistSearchMode({
       </div>
 
       {showResults && (
-        <div className='absolute z-50 w-full rounded-b-3xl border-x-2 border-b-2 border-accent bg-surface-1 shadow-card-elevated overflow-hidden'>
+        <div className='absolute z-50 w-full overflow-hidden rounded-b-3xl border-x-2 border-b-2 border-accent bg-(--linear-bg-surface-1) shadow-[0_18px_48px_rgba(0,0,0,0.22)]'>
           {state === 'loading' && results.length === 0 && (
             <div className='p-3 space-y-2'>
               {ARTIST_SEARCH_LOADING_KEYS.map(key => (
@@ -140,7 +140,7 @@ export function UniversalLinkInputArtistSearchMode({
 
           {state === 'empty' && (
             <div className='p-4 text-center'>
-              <p className='text-[13px] text-secondary-token'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
                 No artists found
               </p>
               <button
@@ -218,8 +218,8 @@ export function UniversalLinkInputArtistSearchMode({
                     className={cn(
                       'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left',
                       index === activeResultIndex
-                        ? 'bg-surface-2'
-                        : 'hover:bg-surface-2/50'
+                        ? 'bg-(--linear-bg-surface-2)'
+                        : 'hover:bg-(--linear-bg-surface-2)'
                     )}
                     onClick={() => handleArtistSelect(artist)}
                     onKeyDown={event =>
@@ -229,7 +229,7 @@ export function UniversalLinkInputArtistSearchMode({
                     }
                     onMouseEnter={() => setActiveResultIndex(index)}
                   >
-                    <div className='w-10 h-10 rounded-full bg-surface-3 overflow-hidden shrink-0 relative'>
+                    <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-(--linear-bg-surface-3)'>
                       {artist.imageUrl ? (
                         <Image
                           src={artist.imageUrl}
@@ -243,18 +243,18 @@ export function UniversalLinkInputArtistSearchMode({
                         <div className='w-full h-full flex items-center justify-center'>
                           <SocialIcon
                             platform='spotify'
-                            className='w-5 h-5 text-tertiary-token'
+                            className='h-5 w-5 text-(--linear-text-tertiary)'
                           />
                         </div>
                       )}
                     </div>
 
                     <div className='flex-1 min-w-0'>
-                      <div className='font-[510] text-primary-token truncate'>
+                      <div className='truncate font-[510] text-(--linear-text-primary)'>
                         {artist.name}
                       </div>
                       {artist.followers && (
-                        <div className='text-[13px] text-tertiary-token'>
+                        <div className='text-[13px] text-(--linear-text-tertiary)'>
                           {formatFollowers(artist.followers)}
                         </div>
                       )}

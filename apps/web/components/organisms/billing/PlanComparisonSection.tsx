@@ -1,9 +1,11 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, Separator } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Check, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import type { PricingOption } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -102,18 +104,13 @@ export function PlanComparisonSection({
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1, ease: LINEAR_EASE }}
-      className='space-y-5'
+      className='space-y-4'
     >
-      <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
-        <div>
-          <h2 className='text-xl font-[590] text-primary-token'>
-            Compare Plans
-          </h2>
-          <p className='text-[13px] text-secondary-token'>
-            Choose the plan that fits your needs
-          </p>
-        </div>
-      </div>
+      <ContentSectionHeader
+        title='Compare Plans'
+        subtitle='Choose the plan that fits your needs.'
+        className='min-h-0 px-0 py-0'
+      />
 
       <div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
         {PLAN_KEYS.map(planKey => {
@@ -140,11 +137,12 @@ export function PlanComparisonSection({
           const hasAvailablePrice = planKey === 'free' || Boolean(priceOption);
 
           return (
-            <Card
+            <ContentSurfaceCard
               key={planKey}
               className={cn(
-                'relative flex flex-col transition-shadow duration-200',
-                isCurrentPlan && 'ring-2 ring-[var(--color-accent)] shadow-card'
+                'relative flex flex-col overflow-hidden p-0 transition-[border-color,box-shadow] duration-200',
+                isCurrentPlan &&
+                  'border-(--linear-border-focus) shadow-[0_0_0_1px_var(--linear-border-focus)]'
               )}
             >
               {isCurrentPlan && (
@@ -155,36 +153,33 @@ export function PlanComparisonSection({
                 </div>
               )}
 
-              <CardContent className='flex flex-1 flex-col p-6'>
-                {/* Plan header */}
+              <div className='flex flex-1 flex-col px-4 py-4'>
                 <div>
-                  <h3 className='text-lg font-[590] text-primary-token'>
+                  <h3 className='text-[15px] font-[590] tracking-[-0.018em] text-(--linear-text-primary)'>
                     {planData.name}
                   </h3>
-                  <p className='text-[13px] text-tertiary-token'>
+                  <p className='text-[13px] leading-[18px] text-(--linear-text-tertiary)'>
                     {planData.tagline}
                   </p>
                 </div>
 
-                {/* Price */}
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
-                    <span className='text-[13px] font-[510] text-tertiary-token'>
+                    <span className='text-[13px] font-[510] text-(--linear-text-tertiary)'>
                       Coming soon
                     </span>
                   ) : (
                     <>
-                      <span className='text-3xl font-[590] text-primary-token'>
+                      <span className='text-[28px] font-[620] tracking-[-0.03em] text-(--linear-text-primary)'>
                         {priceDisplay}
                       </span>
-                      <span className='text-[13px] text-secondary-token'>
+                      <span className='text-[13px] text-(--linear-text-secondary)'>
                         {intervalLabel}
                       </span>
                     </>
                   )}
                 </div>
 
-                {/* CTA */}
                 <div className='mt-5'>
                   {renderCtaButton({
                     isCurrentPlan,
@@ -197,8 +192,7 @@ export function PlanComparisonSection({
                   })}
                 </div>
 
-                {/* Feature list */}
-                <Separator className='my-5' />
+                <div className='my-5 h-px bg-(--linear-app-frame-seam)' />
                 <ul className='flex-1 space-y-3'>
                   {planData.features.map(feature => (
                     <li
@@ -206,10 +200,10 @@ export function PlanComparisonSection({
                       className='flex items-start gap-2.5 text-[13px]'
                     >
                       <Check className='mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400' />
-                      <span className='text-secondary-token'>
+                      <span className='text-(--linear-text-secondary)'>
                         {feature.label}
                         {'detail' in feature && feature.detail && (
-                          <span className='ml-1 text-tertiary-token'>
+                          <span className='ml-1 text-(--linear-text-tertiary)'>
                             ({feature.detail})
                           </span>
                         )}
@@ -217,8 +211,8 @@ export function PlanComparisonSection({
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-            </Card>
+              </div>
+            </ContentSurfaceCard>
           );
         })}
       </div>

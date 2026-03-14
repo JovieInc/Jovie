@@ -11,7 +11,6 @@ import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
@@ -55,7 +54,6 @@ export function AdminCreatorProfilesUnified({
   search,
   sort,
   mode: _mode = 'admin',
-  basePath = APP_ROUTES.ADMIN_CREATORS,
 }: Readonly<AdminCreatorProfilesWithSidebarProps>) {
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
@@ -103,7 +101,6 @@ export function AdminCreatorProfilesUnified({
 
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -360,14 +357,9 @@ export function AdminCreatorProfilesUnified({
           }}
           toolbar={
             <AdminCreatorsToolbar
-              basePath={basePath}
-              search={search}
-              sort={sort}
-              pageSize={pageSize}
               from={from}
               to={to}
               total={total}
-              clearHref={clearHref}
               profiles={profilesWithActions}
               selectedIds={selectedIds}
               onBulkVerify={handleBulkVerify}

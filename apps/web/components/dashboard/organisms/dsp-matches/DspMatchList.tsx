@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
 import { DspMatchCard } from '@/components/dashboard/molecules/DspMatchCard';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { DspMatchStatus } from '@/lib/dsp-enrichment/types';
 import {
   useConfirmDspMatchMutation,
@@ -91,11 +92,8 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
 
   if (error) {
     return (
-      <div
-        className={cn(
-          'rounded-lg border border-red-500/30 bg-red-500/10 p-4',
-          className
-        )}
+      <ContentSurfaceCard
+        className={cn('border-red-500/30 bg-red-500/10 p-4', className)}
       >
         <div className='flex items-center gap-2 text-destructive'>
           <Icon name='AlertCircle' className='h-4 w-4' />
@@ -104,54 +102,48 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
         <p className='mt-1 text-xs text-red-600/80 dark:text-red-400/80'>
           {error instanceof Error ? error.message : 'Unknown error'}
         </p>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className={cn('space-y-4', className)}>
+    <div className={cn('space-y-3', className)}>
       {/* Filter Tabs */}
-      <div className='flex items-center gap-1 overflow-x-auto'>
-        {STATUS_FILTERS.map(filter => {
-          const count =
-            filter.value === 'all'
-              ? allMatches.length
-              : (statusCounts[filter.value] ?? 0);
-          const isActive = statusFilter === filter.value;
-
-          return (
-            <button
-              key={filter.value}
-              type='button'
-              onClick={() => setStatusFilter(filter.value)}
-              className={cn(
-                'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-[510] transition-colors',
-                isActive
-                  ? 'bg-primary-token text-on-primary'
-                  : 'bg-surface-2 text-secondary-token hover:bg-surface-3'
-              )}
-            >
-              {filter.label}
-              {count > 0 && (
-                <span
-                  className={cn(
-                    'rounded-full px-1.5 py-0.5 text-[10px]',
-                    isActive ? 'bg-white/20' : 'bg-surface-3'
+      <div className='overflow-x-auto'>
+        <AppSegmentControl
+          value={statusFilter}
+          onValueChange={setStatusFilter}
+          size='sm'
+          options={STATUS_FILTERS.map(filter => {
+            const count =
+              filter.value === 'all'
+                ? allMatches.length
+                : (statusCounts[filter.value] ?? 0);
+            return {
+              value: filter.value,
+              label: (
+                <span className='inline-flex items-center gap-1.5'>
+                  <span>{filter.label}</span>
+                  {count > 0 && (
+                    <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0.5 text-[10px] text-(--linear-text-tertiary)'>
+                      {count}
+                    </span>
                   )}
-                >
-                  {count}
                 </span>
-              )}
-            </button>
-          );
-        })}
+              ),
+            };
+          })}
+          aria-label='Filter DSP matches by status'
+          className='min-w-max'
+          triggerClassName='flex-none'
+        />
       </div>
 
       {/* Loading State */}
       {isLoading && (
         <div className='space-y-3'>
           {[1, 2, 3].map(i => (
-            <div key={i} className='rounded-lg border border-subtle p-4'>
+            <ContentSurfaceCard key={i} className='p-4'>
               <div className='flex items-center gap-3'>
                 <div className='h-10 w-10 rounded-full skeleton' />
                 <div className='flex-1 space-y-2'>
@@ -163,7 +155,7 @@ export function DspMatchList({ profileId, className }: DspMatchListProps) {
                   <div className='h-5 w-12 rounded-full skeleton' />
                 </div>
               </div>
-            </div>
+            </ContentSurfaceCard>
           ))}
         </div>
       )}

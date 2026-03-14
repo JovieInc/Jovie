@@ -1056,12 +1056,15 @@ body {
   font-feature-settings: var(--linear-font-features);
   font-variation-settings: "opsz" var(--linear-font-optical-sizing);
   letter-spacing: var(--linear-tracking-body);
+  backdrop-filter: blur(10px);
+  border-width: 1px;
 }
 
 [data-sonner-toast] [data-title] {
   font-weight: var(--font-weight-medium);
   font-size: var(--text-app);
   line-height: var(--leading-tight);
+  margin-right: 12px;
   color: var(--color-text-primary-token);
 }
 
@@ -1070,7 +1073,7 @@ body {
   font-weight: var(--font-weight-normal);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 [data-sonner-toast] [data-close-button] {

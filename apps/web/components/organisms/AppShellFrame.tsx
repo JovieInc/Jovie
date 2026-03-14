@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='bg-surface-0 lg:border lg:border-strong lg:rounded-sm lg:m-2 lg:ml-0 flex flex-1 min-h-0 overflow-hidden'
+        className='bg-surface-0 lg:border lg:border-strong lg:rounded-[18px] lg:m-2 lg:ml-0 lg:peer-data-[state=open]:ml-2 flex flex-1 min-h-0 overflow-hidden'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>

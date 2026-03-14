@@ -8,10 +8,9 @@ import {
   SelectValue,
 } from '@jovie/ui';
 import { useTheme } from 'next-themes';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 
@@ -22,10 +21,6 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function SettingsAppearanceSection() {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
   const { theme, setTheme } = useTheme();
   const { updateTheme, isPending: isThemePending } = useThemeMutation();
   const { isHighContrast, setHighContrast } = useHighContrast();
@@ -48,41 +43,31 @@ export function SettingsAppearanceSection() {
     THEME_OPTIONS.find(o => o.value === theme)?.label ?? 'System';
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
-      {isLightModeEnabled && (
-        <div className='px-4 py-3 flex items-center justify-between'>
-          <div className='flex-1 min-w-0'>
-            <h3 className='text-[13px] font-[510] text-primary-token'>
-              Interface theme
-            </h3>
-            <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-              Select or customize your interface color scheme
-            </p>
-          </div>
-          <div className='shrink-0'>
-            <Select
-              value={theme ?? 'system'}
-              onValueChange={handleThemeChange}
-              disabled={isThemePending}
-            >
-              <SelectTrigger className='w-[120px] h-8 text-[13px]'>
-                <SelectValue>{currentLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position='item-aligned'>
-                {THEME_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      )}
+    <ContentSurfaceCard className='overflow-hidden divide-y divide-(--linear-border-subtle)'>
+      <ContentSectionHeader
+        title='Interface theme'
+        subtitle='Select or customize your interface color scheme'
+        className='min-h-0 px-4 py-3'
+        actionsClassName='w-auto shrink-0'
+        actions={
+          <Select
+            value={theme ?? 'system'}
+            onValueChange={handleThemeChange}
+            disabled={isThemePending}
+          >
+            <SelectTrigger className='h-8 w-[120px] text-[13px]'>
+              <SelectValue>{currentLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent position='item-aligned'>
+              {THEME_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
 
       <div className='px-4 py-3'>
         <SettingsToggleRow
@@ -94,6 +79,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }
