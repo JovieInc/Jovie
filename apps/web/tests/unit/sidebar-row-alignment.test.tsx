@@ -38,10 +38,10 @@ vi.mock('@/components/organisms/Sidebar', () => ({
 }));
 
 describe('Sidebar row alignment', () => {
-  it('uses px-1.5 for section labels', () => {
+  it('uses px-2 for section labels', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
 
-    expect(screen.getByText('General').className).toContain('px-1.5');
+    expect(screen.getByText('General').className).toContain('px-2');
   });
 
   it('uses px-1.5 for collapsible section headers', () => {
