@@ -29,6 +29,14 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('@/lib/queries/keys', () => ({
   queryKeys: {
+    billing: {
+      all: ['billing'],
+      status: () => ['billing', 'status'],
+    },
+    chat: {
+      all: ['chat'],
+      usage: () => ['chat', 'usage'],
+    },
     dashboard: {
       socialLinks: (id: string) => ['dashboard', 'social-links', id],
     },
