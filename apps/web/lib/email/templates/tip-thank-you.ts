@@ -7,6 +7,7 @@
 
 import { APP_NAME, LEGAL } from '@/constants/app';
 import { BASE_URL, getProfileUrl } from '@/constants/domains';
+import { formatAmount } from '@/lib/utils/format-number';
 import { escapeHtml } from '../utils';
 
 export interface TipThankYouTemplateData {
@@ -32,13 +33,6 @@ export interface TipThankYouTemplateData {
   unsubscribeToken?: string | null;
   /** Profile ID for opt-in CTA */
   profileId: string;
-}
-
-/**
- * Format cents as a dollar string (e.g., 500 -> "$5.00")
- */
-function formatAmount(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 /**

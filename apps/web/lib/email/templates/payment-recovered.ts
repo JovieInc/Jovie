@@ -7,6 +7,7 @@
 
 import { APP_NAME } from '@/constants/app';
 import { getAppUrl } from '@/constants/domains';
+import { formatAmount } from '@/lib/utils/format-number';
 import { escapeHtml } from '../utils';
 
 export interface PaymentRecoveredTemplateData {
@@ -18,16 +19,6 @@ export interface PaymentRecoveredTemplateData {
   currency: string;
   /** Plan name (e.g., 'Pro Monthly') */
   planName: string;
-}
-
-/**
- * Format amount for display
- */
-function formatAmount(amountCents: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: currency.toUpperCase(),
-  }).format(amountCents / 100);
 }
 
 /**

@@ -24,14 +24,14 @@ export const DashboardSettings = memo(function DashboardSettings({
 
   if (!artist) {
     return (
-      <div className='mx-auto max-w-3xl pt-2'>
+      <div className='mx-auto w-full max-w-5xl px-4 pb-8 pt-2 sm:px-6 lg:px-8'>
         <SettingsErrorState message='Unable to load your profile settings. Please refresh the page.' />
       </div>
     );
   }
 
   return (
-    <div className='mx-auto max-w-3xl pt-2'>
+    <div className='mx-auto w-full max-w-5xl px-4 pb-8 pt-2 sm:px-6 lg:px-8'>
       <SettingsPolished
         artist={artist}
         onArtistUpdate={setArtist}
