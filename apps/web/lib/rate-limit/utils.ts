@@ -92,22 +92,5 @@ export function createRateLimitKey(
   return `${prefix}:${identifier}`;
 }
 
-/**
- * Format time remaining for user-friendly error messages
- */
-export function formatTimeRemaining(resetTime: Date | number): string {
-  const resetMs =
-    typeof resetTime === 'number' ? resetTime : resetTime.getTime();
-  const remainingMs = resetMs - Date.now();
-
-  if (remainingMs <= 0) return 'now';
-
-  const seconds = Math.ceil(remainingMs / 1000);
-  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
-
-  const minutes = Math.ceil(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-
-  const hours = Math.ceil(minutes / 60);
-  return `${hours} hour${hours === 1 ? '' : 's'}`;
-}
+// formatTimeRemaining is canonically defined in @/lib/utils/date-formatting
+export { formatTimeRemaining } from '@/lib/utils/date-formatting';

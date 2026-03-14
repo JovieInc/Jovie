@@ -16,7 +16,7 @@ export function PreviewToggleButton() {
         ariaLabel={label}
         pressed={isOpen}
         onClick={toggle}
-        icon={<Icon className='h-4 w-4' aria-hidden='true' />}
+        icon={<Icon className='h-3.5 w-3.5' aria-hidden='true' />}
       />
     </TooltipShortcut>
   );
