@@ -32,13 +32,12 @@ export function buildLinkActions({
     });
   }
 
-  items.push({
-    id: 'toggle',
-    label: isVisible ? 'Hide' : 'Show',
-    onClick: callbacks.onToggle,
-  });
-
   items.push(
+    {
+      id: 'toggle',
+      label: isVisible ? 'Hide' : 'Show',
+      onClick: callbacks.onToggle,
+    },
     { type: 'separator' },
     {
       id: 'remove',
