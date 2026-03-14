@@ -6,87 +6,65 @@ import { ArtistName } from '@/components/atoms/ArtistName';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { Avatar } from '@/components/molecules/Avatar';
 import { Container } from '@/components/site/Container';
-import { HOMEPAGE_CITY_COOKIE, HOMEPAGE_REGION_COOKIE } from '@/constants/app';
 import { PhoneFrame } from './PhoneFrame';
 import {
-  FALLBACK_CITY,
-  FALLBACK_REGION,
-  getModeContent,
-  getTourPersonalization,
   MOCK_ARTIST,
+  MODE_CONTENT,
   PHONE_CONTENT_HEIGHT,
-  type TourPersonalization,
 } from './phone-mode-content';
-
-/* ------------------------------------------------------------------ */
-/*  Mode data                                                          */
-/* ------------------------------------------------------------------ */
 
 interface ModeData {
   id: string;
   headline: string;
-  getDescription: (city: string) => string;
+  description: string;
   slug: string;
+  outcome: string;
 }
 
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Your link, your fans.',
-    getDescription: () =>
-      'New visitors join your list. Returning fans see their most likely next action. The page adapts\u00A0\u2014\u00A0nobody hunts.',
+    headline: 'Capture the fan before they disappear.',
+    description:
+      'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
     slug: '',
+    outcome: 'Grow audience',
   },
   {
     id: 'tour',
-    headline: 'Put the nearest show first.',
-    getDescription: city =>
-      `A fan in ${city} taps your link and sees the nearest show first. Jovie surfaces the closest date and ticket CTA before they bounce.`,
+    headline: 'Show the closest show first.',
+    description:
+      'A fan in Los Angeles should not scroll through 30 cities. Jovie surfaces the nearest date and ticket button first.',
     slug: 'tour',
+    outcome: 'Sell tickets',
   },
   {
     id: 'tip',
-    headline: 'Turn the merch table into revenue.',
-    getDescription: () =>
-      'Fan scans your QR after a set. Jovie opens the fastest tip flow\u00A0\u2014\u00A0not another menu of links.',
+    headline: 'Turn in-person moments into revenue.',
+    description:
+      'When someone scans your QR code after a set, Jovie opens the fastest tip flow instead of another menu of links.',
     slug: 'tip',
+    outcome: 'Earn tips',
   },
   {
     id: 'listen',
-    headline: 'Open the right streaming app.',
-    getDescription: () =>
-      'One tap. Jovie routes them to Spotify, Apple Music, or YouTube Music\u00A0\u2014\u00A0no choice screen.',
+    headline: 'Open the right streaming app instantly.',
+    description:
+      'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.',
     slug: 'listen',
+    outcome: 'Boost streams',
   },
-];
+] as const;
 
-/* Mock artist and phone content imported from phone-mode-content.tsx */
-
-/* ------------------------------------------------------------------ */
-/*  Scroll-driven phone (desktop only)                                 */
-/* ------------------------------------------------------------------ */
-
-function StickyPhone({
-  activeIndex,
-  personalization,
-}: {
-  readonly activeIndex: number;
-  readonly personalization: TourPersonalization;
-}) {
-  const modeContent = useMemo(
-    () => getModeContent(personalization),
-    [personalization]
-  );
+function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
   return (
     <PhoneFrame>
-      {/* Nav bar */}
       <div className='flex items-center justify-end px-4 pt-10 pb-1'>
         <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
           <Bell className='h-4 w-4' />
         </CircleIconButton>
       </div>
 
-      {/* Artist identity */}
       <div className='flex flex-col items-center px-5 pb-2'>
         <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
           <Avatar
@@ -112,7 +90,6 @@ function StickyPhone({
         </div>
       </div>
 
-      {/* Mode dots */}
       <div className='flex items-center justify-center gap-1.5 py-2.5'>
         {MODES.map((mode, i) => (
           <div
@@ -130,7 +107,6 @@ function StickyPhone({
         ))}
       </div>
 
-      {/* Content — crossfade between modes */}
       <div
         className='relative overflow-hidden'
         style={{ height: PHONE_CONTENT_HEIGHT }}
@@ -144,12 +120,11 @@ function StickyPhone({
               pointerEvents: i === activeIndex ? 'auto' : 'none',
             }}
           >
-            {modeContent[mode.id]}
+            {MODE_CONTENT[mode.id]}
           </div>
         ))}
       </div>
 
-      {/* Branding */}
       <div className='pb-3 pt-1 text-center'>
         <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
           Powered by Jovie
@@ -158,10 +133,6 @@ function StickyPhone({
     </PhoneFrame>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Crossfade text block — sizes to tallest child                      */
-/* ------------------------------------------------------------------ */
 
 function CrossfadeBlock({
   activeIndex,
@@ -174,8 +145,7 @@ function CrossfadeBlock({
     <div className='grid'>
       {children.map((child, i) => (
         <div
-          // biome-ignore lint/suspicious/noArrayIndexKey: static array, order never changes
-          key={i} // NOSONAR typescript:S6479
+          key={`${i}-${activeIndex}`}
           aria-hidden={i !== activeIndex}
           className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
           style={{
@@ -190,10 +160,6 @@ function CrossfadeBlock({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Mobile card — static mode card for non-scroll-hijack layout        */
-/* ------------------------------------------------------------------ */
-
 function MobileCard({ mode }: { readonly mode: ModeData }) {
   return (
     <div
@@ -203,11 +169,16 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         border: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      <h3 className='text-lg font-semibold tracking-tight text-[var(--linear-text-primary)]'>
-        {mode.headline}
-      </h3>
+      <div className='flex items-center justify-between gap-3'>
+        <h3 className='text-lg font-semibold tracking-tight text-[var(--linear-text-primary)]'>
+          {mode.headline}
+        </h3>
+        <span className='shrink-0 rounded-full border border-[var(--linear-border-subtle)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--linear-text-secondary)]'>
+          {mode.outcome}
+        </span>
+      </div>
       <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
-        {mode.getDescription(FALLBACK_CITY)}
+        {mode.description}
       </p>
       <div className='mt-4 flex items-center justify-end'>
         <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
@@ -218,30 +189,9 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
   );
 }
 
-function readGeoCookie(name: string): string | null {
-  const cookie = globalThis.document.cookie
-    .split('; ')
-    .find(item => item.startsWith(`${name}=`));
-
-  if (!cookie) return null;
-
-  const [, value = ''] = cookie.split('=');
-  return decodeURIComponent(value);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Main section                                                       */
-/* ------------------------------------------------------------------ */
-
 export function DeeplinksGrid() {
   const sectionRef = useRef<HTMLElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [tourPersonalization, setTourPersonalization] =
-    useState<TourPersonalization>({
-      city: FALLBACK_CITY,
-      region: FALLBACK_REGION,
-      venue: 'Academy LA',
-    });
 
   const handleScroll = useCallback(() => {
     const section = sectionRef.current;
@@ -264,25 +214,20 @@ export function DeeplinksGrid() {
   }, []);
 
   useEffect(() => {
-    const city = readGeoCookie(HOMEPAGE_CITY_COOKIE);
-    const region = readGeoCookie(HOMEPAGE_REGION_COOKIE);
-    setTourPersonalization(getTourPersonalization({ city, region }));
-
     globalThis.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
     return () => globalThis.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  // Pre-build crossfade children so they're stable across renders
   const headlines = useMemo(
     () =>
       MODES.map(mode => (
-        <h2
+        <h3
           key={mode.id}
-          className='marketing-h2-linear text-[var(--linear-text-primary)]'
+          className='text-[2rem] font-semibold leading-tight tracking-[-0.03em] text-[var(--linear-text-primary)]'
         >
           {mode.headline}
-        </h2>
+        </h3>
       )),
     []
   );
@@ -294,22 +239,20 @@ export function DeeplinksGrid() {
           key={mode.id}
           className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'
         >
-          {mode.getDescription(tourPersonalization.city)}
+          {mode.description}
         </p>
       )),
-    [tourPersonalization.city]
+    []
   );
 
   return (
     <>
-      {/* Desktop — scroll-hijack layout (lg+) */}
       <section
         ref={sectionRef}
         className='relative hidden lg:block bg-[var(--linear-bg-page)]'
         style={{ height: `${MODES.length * 75}vh` }}
       >
         <div className='sticky top-0 flex h-dvh items-center justify-center overflow-hidden'>
-          {/* Ambient glow */}
           <div
             aria-hidden='true'
             className='pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2'
@@ -323,7 +266,6 @@ export function DeeplinksGrid() {
           />
 
           <Container size='homepage'>
-            {/* Gradient separator */}
             <div
               aria-hidden='true'
               className='absolute top-0 left-1/2 -translate-x-1/2 h-px w-full max-w-lg'
@@ -335,24 +277,48 @@ export function DeeplinksGrid() {
 
             <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
-                {/* Left — copy */}
                 <div className='flex flex-col gap-6'>
-                  {/* Section label */}
                   <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                    One link, infinite modes
+                    One profile, many conversion paths
                   </span>
 
-                  {/* Dynamic headline */}
+                  <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+                    Jovie changes the CTA based on what the fan wants next.
+                  </h2>
+
                   <CrossfadeBlock activeIndex={activeIndex}>
                     {headlines}
                   </CrossfadeBlock>
 
-                  {/* Dynamic description */}
                   <CrossfadeBlock activeIndex={activeIndex}>
                     {descriptions}
                   </CrossfadeBlock>
 
-                  {/* Progress dots */}
+                  <div className='flex flex-wrap gap-2'>
+                    {MODES.map((mode, i) => (
+                      <span
+                        key={mode.id}
+                        className='rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-300'
+                        style={{
+                          borderColor:
+                            i === activeIndex
+                              ? 'rgba(255,255,255,0.12)'
+                              : 'var(--linear-border-subtle)',
+                          backgroundColor:
+                            i === activeIndex
+                              ? 'rgba(255,255,255,0.08)'
+                              : 'transparent',
+                          color:
+                            i === activeIndex
+                              ? 'var(--linear-text-secondary)'
+                              : 'var(--linear-text-tertiary)',
+                        }}
+                      >
+                        {mode.outcome}
+                      </span>
+                    ))}
+                  </div>
+
                   <div className='flex gap-2'>
                     {MODES.map((mode, i) => (
                       <div
@@ -370,12 +336,8 @@ export function DeeplinksGrid() {
                   </div>
                 </div>
 
-                {/* Center — phone */}
                 <div className='flex flex-col items-center gap-4'>
-                  <StickyPhone
-                    activeIndex={activeIndex}
-                    personalization={tourPersonalization}
-                  />
+                  <StickyPhone activeIndex={activeIndex} />
                   <a
                     href='https://jov.ie/tim'
                     target='_blank'
@@ -387,7 +349,7 @@ export function DeeplinksGrid() {
                       backgroundColor: 'transparent',
                     }}
                   >
-                    See it live — jov.ie/tim
+                    View a Real Page
                     <svg
                       width='14'
                       height='14'
@@ -405,7 +367,6 @@ export function DeeplinksGrid() {
                   </a>
                 </div>
 
-                {/* Right — URL slugs, bold */}
                 <div className='flex flex-col items-end justify-center gap-4'>
                   {MODES.map((mode, i) => (
                     <div
@@ -432,6 +393,9 @@ export function DeeplinksGrid() {
                             'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                         }}
                       >
+                        <span className='mr-2 text-[11px] uppercase tracking-[0.12em] text-[var(--linear-text-quaternary)]'>
+                          {mode.outcome}
+                        </span>
                         jov.ie/tim
                         {mode.slug && (
                           <span
@@ -455,10 +419,8 @@ export function DeeplinksGrid() {
         </div>
       </section>
 
-      {/* Mobile layout — no scroll hijacking, static cards */}
       <section className='lg:hidden section-spacing-linear bg-[var(--linear-bg-page)]'>
         <Container size='homepage'>
-          {/* Gradient separator */}
           <div
             aria-hidden='true'
             className='mb-16 h-px max-w-lg mx-auto'
@@ -469,22 +431,19 @@ export function DeeplinksGrid() {
           />
 
           <div className='mx-auto max-w-[var(--linear-content-max)]'>
-            {/* Section header */}
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
               <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                One link, infinite modes
+                One profile, many conversion paths
               </span>
               <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                One link. Adapts to every fan.
+                Jovie changes the CTA based on what the fan wants next.
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Every visitor sees the right action for the moment — listen,
-                tip, buy tickets, or follow. Your page gets smarter with every
-                tap.
+                Every visitor sees the action most likely to convert in that
+                moment: listen, tip, tour, or subscribe.
               </p>
             </div>
 
-            {/* Mode cards */}
             <div className='grid gap-4 sm:grid-cols-2'>
               {MODES.map(mode => (
                 <MobileCard key={mode.id} mode={mode} />

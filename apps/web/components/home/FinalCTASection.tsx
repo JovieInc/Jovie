@@ -54,15 +54,15 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-white'
           >
-            Give the next fan one clear place to go.
+            Own the next fan who finds your music.
           </h2>
 
           <p
             className='mt-5 max-w-md marketing-lead-linear'
             style={{ color: 'rgba(255,255,255,0.5)' }}
           >
-            Claim your handle, launch your page, and finally own the data other
-            platforms keep from you.
+            Launch a smart artist profile that captures contacts, routes fans to
+            the right action, and keeps your release growth compounding.
           </p>
 
           {/* Form */}
@@ -107,7 +107,7 @@ export function FinalCTASection() {
               <span
                 aria-hidden='true'
                 className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-              />{' '}
+              />
               Live in 60 seconds
             </p>
             <span
