@@ -38,14 +38,15 @@ export function buildLinkActions({
     onClick: callbacks.onToggle,
   });
 
-  items.push({ type: 'separator' });
-
-  items.push({
-    id: 'remove',
-    label: 'Delete',
-    onClick: callbacks.onRemove,
-    destructive: true,
-  });
+  items.push(
+    { type: 'separator' },
+    {
+      id: 'remove',
+      label: 'Delete',
+      onClick: callbacks.onRemove,
+      destructive: true,
+    }
+  );
 
   return items;
 }

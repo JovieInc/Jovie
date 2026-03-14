@@ -7,7 +7,7 @@ import {
   buildContactActions,
 } from './contact-actions';
 
-export type { BuildContactActionsCallbacks as ContactRowActionCallbacks };
+export type { BuildContactActionsCallbacks as ContactRowActionCallbacks } from './contact-actions';
 
 /**
  * @deprecated Use `buildContactActions` directly from `./contact-actions`.

@@ -123,8 +123,8 @@ export function buildReleaseActions({
   }
 
   // ── Metadata copy group ──
-  items.push({ type: 'separator' });
   items.push(
+    { type: 'separator' },
     ...buildCopyMenuItems([
       { id: 'release-id', label: 'Release ID', value: release.id },
       release.lyrics?.trim()
@@ -171,14 +171,16 @@ export function buildReleaseActions({
 
   // ── Destructive group ──
   if (onDelete) {
-    items.push({ type: 'separator' });
-    items.push({
-      id: 'delete',
-      label: 'Delete release',
-      icon: menuIcon('Trash2'),
-      destructive: true,
-      onClick: () => onDelete(release.id),
-    });
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'delete',
+        label: 'Delete release',
+        icon: menuIcon('Trash2'),
+        destructive: true,
+        onClick: () => onDelete(release.id),
+      }
+    );
   }
 
   return items;
