@@ -11,8 +11,6 @@ import { useTheme } from 'next-themes';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 
@@ -23,10 +21,6 @@ const THEME_OPTIONS = [
 ] as const;
 
 export function SettingsAppearanceSection() {
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
   const { theme, setTheme } = useTheme();
   const { updateTheme, isPending: isThemePending } = useThemeMutation();
   const { isHighContrast, setHighContrast } = useHighContrast();
@@ -50,32 +44,30 @@ export function SettingsAppearanceSection() {
 
   return (
     <ContentSurfaceCard className='overflow-hidden divide-y divide-(--linear-border-subtle)'>
-      {isLightModeEnabled && (
-        <ContentSectionHeader
-          title='Interface theme'
-          subtitle='Select or customize your interface color scheme'
-          className='min-h-0 px-4 py-3'
-          actionsClassName='w-auto shrink-0'
-          actions={
-            <Select
-              value={theme ?? 'system'}
-              onValueChange={handleThemeChange}
-              disabled={isThemePending}
-            >
-              <SelectTrigger className='w-[120px] h-8 text-[13px]'>
-                <SelectValue>{currentLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent position='item-aligned'>
-                {THEME_OPTIONS.map(option => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          }
-        />
-      )}
+      <ContentSectionHeader
+        title='Interface theme'
+        subtitle='Select or customize your interface color scheme'
+        className='min-h-0 px-4 py-3'
+        actionsClassName='w-auto shrink-0'
+        actions={
+          <Select
+            value={theme ?? 'system'}
+            onValueChange={handleThemeChange}
+            disabled={isThemePending}
+          >
+            <SelectTrigger className='h-8 w-[120px] text-[13px]'>
+              <SelectValue>{currentLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent position='item-aligned'>
+              {THEME_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      />
 
       <div className='px-4 py-3'>
         <SettingsToggleRow
