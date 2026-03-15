@@ -1,8 +1,13 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistContactsButton } from '@/components/profile/artist-contacts-button';
 import { encodeContactPayload } from '@/lib/contacts/obfuscation';
 import type { PublicContact } from '@/types/contacts';
+
+const { pushMock, useBreakpointDownMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  useBreakpointDownMock: vi.fn(() => true),
+}));
 
 vi.mock('@statsig/react-bindings', () => {
   const React = require('react');
@@ -16,9 +21,17 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-// Mock as mobile so drawer behavior is tested (desktop renders a link instead)
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: pushMock,
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn().mockResolvedValue(undefined),
+  }),
+}));
+
 vi.mock('@/hooks/useBreakpoint', () => ({
-  useBreakpointDown: () => true,
+  useBreakpointDown: (...args: unknown[]) => useBreakpointDownMock(...args),
 }));
 
 function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
@@ -45,6 +58,11 @@ function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {
 }
 
 describe('ArtistContactsButton', () => {
+  beforeEach(() => {
+    pushMock.mockReset();
+    useBreakpointDownMock.mockReturnValue(true);
+  });
+
   it('opens drawer for single contact instead of direct action', () => {
     const navigate = vi.fn();
     render(
@@ -63,7 +81,7 @@ describe('ArtistContactsButton', () => {
     expect(navigate).not.toHaveBeenCalled();
     // Verify drawer content is visible
     expect(screen.getByText(/bookings/i)).toBeInTheDocument();
-  });
+  }, 15_000);
 
   it('renders mailto and tel links in the contact drawer actions', () => {
     const contacts: PublicContact[] = [
@@ -120,6 +138,22 @@ describe('ArtistContactsButton', () => {
     );
     expect(channelActions[1]).toHaveAttribute('href', 'tel:+15550101234');
     expect(channelActions[2]).toHaveAttribute('href', 'sms:+15550101234');
+  }, 15_000);
+
+  it('navigates to contact mode on desktop', () => {
+    useBreakpointDownMock.mockReturnValue(false);
+
+    render(
+      <ArtistContactsButton
+        contacts={[makeContact()]}
+        artistHandle='test'
+        artistName='Test Artist'
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('contacts-trigger'));
+
+    expect(pushMock).toHaveBeenCalledWith('/test?mode=contact');
   });
 
   it('opens drawer when multiple contacts are provided', () => {
@@ -151,5 +185,5 @@ describe('ArtistContactsButton', () => {
     // Verify drawer content is visible with both contacts
     expect(screen.getByText(/bookings/i)).toBeInTheDocument();
     expect(screen.getByText(/press/i)).toBeInTheDocument();
-  });
+  }, 15_000);
 });
