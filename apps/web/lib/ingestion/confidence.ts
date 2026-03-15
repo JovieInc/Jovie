@@ -40,6 +40,7 @@ const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   // MusicFetch authoritative enrichment — links from verified Spotify artist lookup
   // are high-confidence and should be immediately active in the drawer
   musicfetch_artist_lookup: 0.8,
+  // onboarding_enrichment: links from the onboarding Spotify step (same verified Spotify source)
   onboarding_enrichment: 0.8,
 };
 

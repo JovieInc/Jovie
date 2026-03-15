@@ -90,7 +90,7 @@ export async function executeWithTimeout<T>(
 }
 
 /**
- * Dashboard query wrapper with 20s timeout
+ * Dashboard query wrapper with 8s timeout
  */
 export async function dashboardQuery<T>(
   queryFn: () => Promise<T>,
