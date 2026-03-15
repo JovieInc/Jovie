@@ -41,7 +41,7 @@ describe('upsertTrack', () => {
     const uniqueIsrcError = new Error('duplicate key value');
     Object.assign(uniqueIsrcError, {
       code: '23505',
-      constraint: 'discog_tracks_isrc_unique',
+      constraint: 'discog_tracks_release_isrc_unique',
     });
 
     const firstChain = createInsertChain(uniqueIsrcError);
