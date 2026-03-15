@@ -152,7 +152,7 @@ describe('GET /api/admin/leads', () => {
                 offset: vi
                   .fn()
                   .mockRejectedValue(
-                    new Error('column "spotify_popularity" does not exist')
+                    new Error('column "music_tools_detected" does not exist')
                   ),
               })),
             })),
@@ -210,6 +210,7 @@ describe('GET /api/admin/leads', () => {
     expect(response.status).toBe(200);
     expect(data.items[0]).toEqual(
       expect.objectContaining({
+        musicToolsDetected: [],
         spotifyPopularity: null,
         spotifyFollowers: null,
         releaseCount: null,
