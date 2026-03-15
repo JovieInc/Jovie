@@ -8,7 +8,11 @@
       "Bash(gh pr list --state merged --json number,title,headRefName,mergedAt --limit 10)",
       "Bash(gh pr list --state closed --json number,title,headRefName,closedAt --limit 5)",
       "Bash(gh pr view 5310 --json state,title,mergeable,statusCheckRollup,headRefName,url,reviews,isDraft)",
-      "Bash(python3 -c \":*)"
+      "Bash(python3 -c \":*)",
+      "Bash(ls apps/web/drizzle/migrations/006[2-9]*)",
+      "Bash(git add:*)",
+      "Bash(git rm:*)",
+      "Bash(GIT_EDITOR=true git rebase --continue)"
     ]
   }
 }
