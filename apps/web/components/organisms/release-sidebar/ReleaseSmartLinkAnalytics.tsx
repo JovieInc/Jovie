@@ -85,7 +85,7 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[124px] border-t border-(--linear-border-subtle)/75 pt-3'>
+    <div className='min-h-[112px] border-t border-(--linear-border-subtle)/60 pt-2.5'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>

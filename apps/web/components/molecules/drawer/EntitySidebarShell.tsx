@@ -33,6 +33,8 @@ export interface EntitySidebarShellProps {
   readonly entityHeader?: ReactNode;
   /** Tabs slot — SegmentControl rendered below entity header */
   readonly tabs?: ReactNode;
+  /** Optional className override for the tabs wrapper */
+  readonly tabsContainerClassName?: string;
 
   /** Main scrollable content */
   readonly children: ReactNode;
@@ -81,6 +83,7 @@ export function EntitySidebarShell({
   headerActions,
   entityHeader,
   tabs,
+  tabsContainerClassName,
   children,
   footer,
   isEmpty = false,
@@ -121,7 +124,14 @@ export function EntitySidebarShell({
 
           {/* Tabs */}
           {tabs && (
-            <div className='overflow-visible border-t border-subtle/70 px-5 py-2.5 [&>*]:w-full'>
+            <div
+              className={[
+                'overflow-visible border-t border-subtle/70 px-5 py-2.5 [&>*]:w-full',
+                tabsContainerClassName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               {tabs}
             </div>
           )}

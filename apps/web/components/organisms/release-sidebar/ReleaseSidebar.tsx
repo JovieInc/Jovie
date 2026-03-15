@@ -100,8 +100,8 @@ function ReleaseEntityHeader({
   const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
-    <div className='space-y-3'>
-      <div className='flex items-start gap-3.5 rounded-[10px] border border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-0) p-3'>
+    <div className='space-y-2.5'>
+      <div className='flex items-start gap-3 rounded-[10px] border border-(--linear-border-subtle)/60 bg-(--linear-bg-surface-0) px-2.5 py-2.5'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -178,8 +178,8 @@ function ReleaseEntityHeader({
               platformCount={release.providers.length}
             />
           }
-          className='min-w-0 flex-1 gap-1.5'
-          bodyClassName='pt-0.5'
+          className='min-w-0 flex-1 gap-1'
+          bodyClassName='pt-0'
         />
       </div>
 
@@ -471,6 +471,7 @@ export function ReleaseSidebar({
           />
         ) : undefined
       }
+      tabsContainerClassName='border-t border-subtle/60 pt-2 pb-2'
       tabs={
         release && !selectedTrack ? (
           <DrawerTabs
@@ -478,7 +479,7 @@ export function ReleaseSidebar({
             onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             ariaLabel='Release sidebar view'
-            triggerClassName='h-8 px-3 text-[12px] font-[510]'
+            triggerClassName='h-7.5 px-2.5 text-[11.5px] font-[500]'
           />
         ) : undefined
       }
