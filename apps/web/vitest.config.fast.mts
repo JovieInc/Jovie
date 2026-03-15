@@ -20,6 +20,24 @@ dotenv.config({ path: '.env.test' });
 
 // Detect CI environment
 const isCI = process.env.CI === 'true';
+const isChangedRun = process.argv.includes('--changed');
+
+// Changed-suite runs can fan out many short-lived workers on parity branches,
+// which increases startup churn and causes timeout cascades under aggregate load.
+// Keep this mode deterministic by running in a single long-lived fork with
+// slightly higher global timeouts so only genuinely slow tests fail.
+const changedSuiteStabilityConfig = isChangedRun
+  ? {
+      fileParallelism: false,
+      maxWorkers: 1,
+      minWorkers: 1,
+      maxConcurrency: 1,
+      testTimeout: 12_000,
+      hookTimeout: 12_000,
+      teardownTimeout: 12_000,
+      singleFork: true,
+    }
+  : {};
 
 /**
  * Optimized Vitest Configuration for Fast Test Execution
@@ -77,6 +95,8 @@ export default defineConfig({
     testTimeout: 5000,
     hookTimeout: 5000,
     teardownTimeout: 5000,
+
+    ...changedSuiteStabilityConfig,
 
     // Coverage disabled by default for speed (enable with --coverage flag)
     coverage: {

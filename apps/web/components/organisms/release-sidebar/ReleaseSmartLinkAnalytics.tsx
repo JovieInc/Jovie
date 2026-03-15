@@ -85,11 +85,11 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[124px] border-t border-(--linear-border-subtle)/75 pt-3'>
+    <div className='min-h-[100px] border-t border-(--linear-border-subtle)/40 pt-2'>
       <div>
         {showSkeleton && (
           <div className='space-y-2'>
-            <DrawerStatGrid variant='flush' className='px-1'>
+            <DrawerStatGrid variant='flush' className='px-0.5'>
               <div className='space-y-1.5 pr-4'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-5 w-10 rounded skeleton' />
@@ -118,7 +118,7 @@ export function ReleaseSmartLinkAnalytics({
               isSwitching && 'opacity-50'
             )}
           >
-            <DrawerStatGrid variant='flush' className='px-1'>
+            <DrawerStatGrid variant='flush' className='px-0.5'>
               <div className='pr-4'>
                 <StatTile
                   label='Total clicks'
@@ -137,7 +137,7 @@ export function ReleaseSmartLinkAnalytics({
 
             {showEmpty && (
               <DrawerEmptyState
-                className='mt-2 min-h-[40px] px-0'
+                className='mt-1.5 min-h-[36px] px-0'
                 message='Share your smart link to start tracking clicks.'
               />
             )}

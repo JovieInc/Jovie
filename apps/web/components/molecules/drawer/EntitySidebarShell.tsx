@@ -33,6 +33,8 @@ export interface EntitySidebarShellProps {
   readonly entityHeader?: ReactNode;
   /** Tabs slot — SegmentControl rendered below entity header */
   readonly tabs?: ReactNode;
+  /** Optional className override for the tabs wrapper */
+  readonly tabsContainerClassName?: string;
 
   /** Main scrollable content */
   readonly children: ReactNode;
@@ -81,6 +83,7 @@ export function EntitySidebarShell({
   headerActions,
   entityHeader,
   tabs,
+  tabsContainerClassName,
   children,
   footer,
   isEmpty = false,
@@ -96,7 +99,7 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='sticky top-0 z-20 shrink-0 border-b border-subtle/80 bg-surface-0/95 backdrop-blur supports-[backdrop-filter]:bg-surface-0/85'>
+        <div className='sticky top-0 z-20 shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-bg-app)/96 backdrop-blur supports-[backdrop-filter]:bg-(--linear-bg-app)/88'>
           {/* Header bar — close is in the overflow dropdown */}
           <DrawerHeader
             title={title}
@@ -114,14 +117,21 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-5 pt-3 pb-3.5'>
+            <div className='overflow-visible px-[18px] pt-[10px] pb-3'>
               {entityHeader}
             </div>
           )}
 
           {/* Tabs */}
           {tabs && (
-            <div className='overflow-visible border-t border-subtle/70 px-5 py-2.5 [&>*]:w-full'>
+            <div
+              className={[
+                'overflow-visible border-t border-(--linear-border-subtle) px-[18px] py-2 [&>*]:w-full',
+                tabsContainerClassName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               {tabs}
             </div>
           )}
@@ -135,13 +145,13 @@ export function EntitySidebarShell({
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-4.5'>
+            <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-[18px] py-4'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-subtle bg-surface-0 px-5 py-3'>
+              <div className='shrink-0 border-t border-(--linear-border-subtle) bg-(--linear-bg-app) px-[18px] py-3'>
                 {footer}
               </div>
             )}

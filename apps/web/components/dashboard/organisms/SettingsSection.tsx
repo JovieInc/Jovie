@@ -32,9 +32,12 @@ export function SettingsSection({
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn('scroll-mt-4', className)}
+      className={cn(
+        'scroll-mt-4 rounded-[11px] border border-subtle/55 bg-surface-0 px-4 py-4 sm:px-5',
+        className
+      )}
     >
-      <div className={cn('mb-4', headerClassName)}>
+      <div className={cn('mb-3', headerClassName)}>
         <h2
           id={headingId}
           className={cn(

@@ -26,6 +26,7 @@ describe('SocialLinksCell', () => {
       />
     );
 
+    // Summary pill shows count as visible text, full label in title attribute
     expect(screen.getByTitle('2 social links')).toBeInTheDocument();
   });
 
@@ -60,6 +61,7 @@ describe('SocialLinksCell', () => {
       />
     );
 
+    // Summary pill shows count in title attribute
     expect(screen.getByTitle('3 social links')).toBeInTheDocument();
   });
 

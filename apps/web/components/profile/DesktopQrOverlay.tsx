@@ -2,9 +2,9 @@
 
 import { Smartphone, X } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { QRCode } from '@/components/molecules/QRCode';
+import { getQrCodeUrl, QRCode } from '@/components/molecules/QRCode';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 
 interface DesktopQrOverlayProps {
@@ -15,6 +15,17 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   const [mode, setMode] = useState<'hidden' | 'icon' | 'open'>('hidden');
   const [url, setUrl] = useState('');
   const prefersReducedMotion = useReducedMotion();
+  const qrUrl = useMemo(() => {
+    if (!url) return '';
+    return getQrCodeUrl(url, 120);
+  }, [url]);
+
+  useEffect(() => {
+    if (!qrUrl || typeof globalThis.Image !== 'function') return;
+
+    const preloadImage = new globalThis.Image();
+    preloadImage.src = qrUrl;
+  }, [qrUrl]);
 
   useEffect(() => {
     if (typeof globalThis.matchMedia !== 'function') return;
@@ -48,7 +59,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
     }
 
     setMode('icon');
-    setUrl('');
+    setUrl(`${globalThis.location.origin}/${handle}`);
   }, [handle]);
 
   // React to viewport resizes: show on desktop if not dismissed, hide on mobile
@@ -69,7 +80,7 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
       }
 
       setMode('icon');
-      setUrl('');
+      setUrl(`${globalThis.location.origin}/${handle}`);
     };
 
     // Initial sync in case state drifted
@@ -85,8 +96,6 @@ export function DesktopQrOverlay({ handle }: Readonly<DesktopQrOverlayProps>) {
   }, [handle]);
 
   const close = () => {
-    // Clear URL first so the <img> disappears immediately, even during exit animation
-    setUrl('');
     setMode('icon');
   };
 

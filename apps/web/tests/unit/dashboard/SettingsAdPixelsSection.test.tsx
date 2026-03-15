@@ -56,14 +56,7 @@ vi.mock('@jovie/ui', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
-vi.mock('@/lib/queries', () => ({
-  usePixelSettingsMutation: () => ({
-    mutate: vi.fn(),
-    isPending: false,
-  }),
-}));
-
-const { useQueryMock } = vi.hoisted(() => {
+const { usePixelSettingsQueryMock } = vi.hoisted(() => {
   const mockPixelSettings = {
     pixels: {
       facebookPixelId: '1234567890123456',
@@ -82,7 +75,7 @@ const { useQueryMock } = vi.hoisted(() => {
   };
 
   return {
-    useQueryMock: vi.fn(() => ({
+    usePixelSettingsQueryMock: vi.fn(() => ({
       data: mockPixelSettings,
       isLoading: false,
       isError: false,
@@ -91,8 +84,16 @@ const { useQueryMock } = vi.hoisted(() => {
   };
 });
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: useQueryMock,
+vi.mock('@/lib/queries', () => ({
+  usePixelSettingsMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  usePixelSettingsDeleteMutation: () => ({
+    mutate: vi.fn(),
+    isPending: false,
+  }),
+  usePixelSettingsQuery: usePixelSettingsQueryMock,
 }));
 
 describe('SettingsAdPixelsSection', () => {
@@ -115,14 +116,9 @@ describe('SettingsAdPixelsSection', () => {
     expect(getAllByText('Not configured')).toHaveLength(1);
   });
 
-  it('configures query gcTime to allow cache cleanup after inactivity', () => {
+  it('calls usePixelSettingsQuery hook on render', () => {
     fastRender(<SettingsAdPixelsSection isPro />);
 
-    expect(useQueryMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        staleTime: 5 * 60 * 1000,
-        gcTime: 30 * 60 * 1000,
-      })
-    );
+    expect(usePixelSettingsQueryMock).toHaveBeenCalled();
   });
 });

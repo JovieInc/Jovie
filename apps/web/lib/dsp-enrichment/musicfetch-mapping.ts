@@ -13,6 +13,7 @@ export interface MusicFetchProfileFieldState {
   spotifyUrl: string | null;
   spotifyId: string | null;
   bio: string | null;
+  avatarUrl: string | null;
   appleMusicUrl: string | null;
   appleMusicId: string | null;
   youtubeUrl: string | null;
@@ -42,6 +43,20 @@ const DSP_ID_MAPPINGS: Array<{
   },
 ] as const;
 
+function applySpotifyUpdates(
+  updates: Partial<Record<keyof MusicFetchProfileFieldState, string>>,
+  existingProfile: MusicFetchProfileFieldState,
+  spotifyUrl: string,
+  spotifyArtistId?: string | null
+): void {
+  if (!existingProfile.spotifyUrl && spotifyUrl) {
+    updates.spotifyUrl = spotifyUrl;
+  }
+  if (!existingProfile.spotifyId && spotifyArtistId) {
+    updates.spotifyId = spotifyArtistId;
+  }
+}
+
 function applyAppleMusicUpdates(
   updates: Partial<Record<keyof MusicFetchProfileFieldState, string>>,
   existingProfile: MusicFetchProfileFieldState,
@@ -66,13 +81,7 @@ export function mapMusicFetchProfileFields(
     {};
   const services = artistData.services;
 
-  if (!existingProfile.spotifyUrl && spotifyUrl) {
-    updates.spotifyUrl = spotifyUrl;
-  }
-
-  if (!existingProfile.spotifyId && spotifyArtistId) {
-    updates.spotifyId = spotifyArtistId;
-  }
+  applySpotifyUpdates(updates, existingProfile, spotifyUrl, spotifyArtistId);
 
   const appleMusicUrl = services.appleMusic?.url;
   if (appleMusicUrl) {
@@ -93,6 +102,10 @@ export function mapMusicFetchProfileFields(
 
   if (!existingProfile.bio && artistData.bio) {
     updates.bio = artistData.bio;
+  }
+
+  if (!existingProfile.avatarUrl && artistData.image?.url) {
+    updates.avatarUrl = artistData.image.url;
   }
 
   return updates;

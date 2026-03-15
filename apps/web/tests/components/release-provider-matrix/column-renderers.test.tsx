@@ -22,7 +22,7 @@ const baseRelease: ReleaseViewModel = {
   slug: 'skyline-dreams',
   releaseType: 'single',
   isExplicit: false,
-  releaseDate: '2026-01-01',
+  releaseDate: '2026-06-15',
   artworkUrl: undefined,
   totalTracks: 1,
   providers: [],
@@ -48,9 +48,9 @@ describe('createRightMetaCellRenderer', () => {
     );
 
     const wrapper = container.firstElementChild as HTMLElement;
-    expect(wrapper.className).toContain('min-w-[220px]');
+    expect(wrapper.className).toContain('min-w-[252px]');
     expect(wrapper.className).toContain(
-      'grid-cols-[minmax(134px,1fr)_12px_36px]'
+      'grid-cols-[minmax(168px,1fr)_12px_34px]'
     );
     expect(screen.getByText('2026')).toBeInTheDocument();
   });

@@ -6,16 +6,41 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // ---- hoisted mocks ----
 const {
   mockFetchWithTimeout,
+  mockFetchWithTimeoutResponse,
   mockHandleMutationError,
   mockHandleMutationSuccess,
 } = vi.hoisted(() => ({
   mockFetchWithTimeout: vi.fn(),
+  mockFetchWithTimeoutResponse: vi.fn(),
   mockHandleMutationError: vi.fn(),
   mockHandleMutationSuccess: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/fetch', () => ({
   fetchWithTimeout: mockFetchWithTimeout,
+  fetchWithTimeoutResponse: mockFetchWithTimeoutResponse,
+  createMutationFn: vi.fn(),
+  createQueryFn: vi.fn(),
+}));
+
+vi.mock('@/lib/queries/keys', () => ({
+  queryKeys: {
+    billing: {
+      all: ['billing'] as const,
+      status: () => ['billing', 'status'] as const,
+    },
+    chat: {
+      all: ['chat'] as const,
+      conversations: () => ['chat', 'conversations'] as const,
+      conversation: (id: string) => ['chat', 'conversation', id] as const,
+      usage: () => ['chat', 'usage'] as const,
+    },
+    user: {
+      all: ['user'] as const,
+      profile: () => ['user', 'profile'] as const,
+      settings: () => ['user', 'settings'] as const,
+    },
+  },
 }));
 
 vi.mock('@/lib/queries/mutation-utils', () => ({
@@ -216,7 +241,7 @@ describe('useExportDataMutation', () => {
       ok: true,
       blob: vi.fn().mockResolvedValue(fakeBlob),
     };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mockResponse));
+    mockFetchWithTimeoutResponse.mockResolvedValueOnce(mockResponse);
 
     const { result } = renderHook(() => useExportDataMutation(), {
       wrapper: createWrapper(),
@@ -228,8 +253,10 @@ describe('useExportDataMutation', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // Verify fetch was called with the export endpoint
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/account/export');
+    // Verify fetchWithTimeoutResponse was called with the export endpoint
+    expect(mockFetchWithTimeoutResponse).toHaveBeenCalledWith(
+      '/api/account/export'
+    );
 
     // Verify blob download flow
     expect(mockResponse.blob).toHaveBeenCalled();
@@ -244,19 +271,14 @@ describe('useExportDataMutation', () => {
     expect(revokeObjectURLSpy).toHaveBeenCalledWith(
       'blob:http://localhost/fake'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('calls handleMutationSuccess after a successful export', async () => {
     const fakeBlob = new Blob(['{}']);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(fakeBlob),
-      })
-    );
+    mockFetchWithTimeoutResponse.mockResolvedValueOnce({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(fakeBlob),
+    });
 
     const { result } = renderHook(() => useExportDataMutation(), {
       wrapper: createWrapper(),
@@ -272,14 +294,15 @@ describe('useExportDataMutation', () => {
     expect(mockHandleMutationSuccess).toHaveBeenCalledWith(
       'Data export downloaded'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('throws and transitions to error when the fetch response is not ok', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 500 })
+    // fetchWithTimeoutResponse throws FetchError when response is not ok,
+    // but in the component it just calls response.blob() which would fail.
+    // The component doesn't check ok — fetchWithTimeoutResponse itself
+    // throws for non-ok responses. Simulate that behavior.
+    mockFetchWithTimeoutResponse.mockRejectedValueOnce(
+      new Error('Failed to export data')
     );
 
     const { result } = renderHook(() => useExportDataMutation(), {
@@ -295,14 +318,11 @@ describe('useExportDataMutation', () => {
     expect((result.current.error as Error)?.message).toBe(
       'Failed to export data'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('calls handleMutationError with fallback message on failure', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 500 })
+    mockFetchWithTimeoutResponse.mockRejectedValueOnce(
+      new Error('Fetch failed')
     );
 
     const { result } = renderHook(() => useExportDataMutation(), {
@@ -320,14 +340,11 @@ describe('useExportDataMutation', () => {
       expect.any(Error),
       'Failed to export data'
     );
-
-    vi.unstubAllGlobals();
   });
 
   it('handles a network-level fetch rejection gracefully', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    mockFetchWithTimeoutResponse.mockRejectedValueOnce(
+      new TypeError('Failed to fetch')
     );
 
     const { result } = renderHook(() => useExportDataMutation(), {
@@ -342,7 +359,5 @@ describe('useExportDataMutation', () => {
     expect(result.current.error).toBeInstanceOf(TypeError);
 
     expect(mockHandleMutationError).toHaveBeenCalledOnce();
-
-    vi.unstubAllGlobals();
   });
 });

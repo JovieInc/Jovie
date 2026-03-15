@@ -73,7 +73,7 @@ export function AppShellSkeleton() {
       }
       main={
         <div className='mx-auto flex h-full w-full max-w-5xl p-4 sm:p-6'>
-          <div className='w-full space-y-4 rounded-2xl border border-subtle/80 bg-surface-1/40 p-4'>
+          <div className='w-full space-y-4 p-1 sm:p-2'>
             <div className='flex items-center justify-between'>
               <div className='space-y-2'>
                 <div className='skeleton h-6 w-52 rounded-md' />
@@ -82,7 +82,7 @@ export function AppShellSkeleton() {
               <div className='skeleton h-9 w-28 rounded-md' />
             </div>
 
-            <div className='space-y-2 rounded-xl border border-subtle/70 bg-surface-0/60 p-3'>
+            <div className='space-y-2 rounded-xl bg-surface-1/20 p-3'>
               <div className='grid grid-cols-[minmax(0,1.4fr)_110px_68px] gap-3 border-b border-subtle/60 pb-2'>
                 <div className='skeleton h-3 w-24 rounded' />
                 <div className='skeleton h-3 w-16 rounded' />

@@ -1,7 +1,7 @@
 'use client';
 
 import { Mail } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { getProfileModeHref } from '@/components/profile/registry';
@@ -20,6 +20,7 @@ export function ArtistContactsButton({
     useArtistContacts({ contacts, artistHandle, onNavigate });
 
   const isMobile = useBreakpointDown('md');
+  const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   if (!isEnabled) {
@@ -63,11 +64,11 @@ export function ArtistContactsButton({
       ariaLabel='Contacts'
       data-testid='contacts-trigger'
       className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-      asChild
+      onClick={() => {
+        router.push(getProfileModeHref(artistHandle, 'contact'));
+      }}
     >
-      <Link href={getProfileModeHref(artistHandle, 'contact')}>
-        <Mail className='h-4 w-4' aria-hidden='true' />
-      </Link>
+      <Mail className='h-4 w-4' aria-hidden='true' />
     </CircleIconButton>
   );
 }

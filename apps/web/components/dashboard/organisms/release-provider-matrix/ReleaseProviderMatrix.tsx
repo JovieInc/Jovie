@@ -32,7 +32,6 @@ import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkele
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -81,6 +80,8 @@ const SpotifyConnectDialog = lazy(() =>
   }))
 );
 
+const RELEASE_DETAIL_PANEL_WIDTH = 388;
+
 export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   releases,
   providerConfig,
@@ -105,7 +106,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
@@ -375,7 +376,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         });
         if (result.success) {
           setIsAmConnected(true);
-          setAmArtistName(result.artistName);
           toast.success(result.message);
         } else {
           toast.error(result.message);
@@ -392,9 +392,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   const handleMatchStatusChange = useCallback(
-    (connected: boolean, name: string | null) => {
+    (connected: boolean, _name: string | null) => {
       setIsAmConnected(connected);
-      setAmArtistName(name);
     },
     []
   );
@@ -487,7 +486,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setTableMeta({
       rowCount: rows.length,
       toggle: rows.length > 0 ? toggle : null,
-      rightPanelWidth: isSidebarOpen ? SIDEBAR_WIDTH : 0,
+      rightPanelWidth: isSidebarOpen ? RELEASE_DETAIL_PANEL_WIDTH : 0,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
   }, [
@@ -507,7 +506,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex min-w-0 items-center gap-[var(--linear-app-toolbar-gap)]'>
+      <div className='flex min-w-0 items-center gap-1.5'>
         <DashboardHeaderActionGroup className='min-w-0 flex-1'>
           <HeaderSearchAction
             searchValue={searchQuery}
@@ -521,6 +520,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
             }
             tooltipLabel='Search'
+            className='h-7 text-[12px] text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
           />
           {canCreateManualReleases ? (
             <DashboardHeaderActionButton
@@ -532,6 +532,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               label='New Release'
               iconOnly
               tooltipLabel='New Release'
+              className='h-7 w-7 text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
             />
           ) : null}
         </DashboardHeaderActionGroup>
@@ -540,6 +541,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
+            className='h-7 w-7 text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
           />
         </div>
       </div>
@@ -602,7 +604,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           fallback={
             <DrawerLoadingSkeleton
               ariaLabel='Loading track details'
-              width={SIDEBAR_WIDTH}
+              width={RELEASE_DETAIL_PANEL_WIDTH}
               showTabs={false}
               contentRows={5}
             />
@@ -611,6 +613,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           <TrackSidebar
             track={editingTrack}
             isOpen={isTrackSidebarOpen}
+            width={RELEASE_DETAIL_PANEL_WIDTH}
             onClose={closeTrackDrawer}
             onBackToRelease={handleBackToReleaseFromTrack}
           />
@@ -627,7 +630,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         fallback={
           <DrawerLoadingSkeleton
             ariaLabel='Loading release details'
-            width={SIDEBAR_WIDTH}
+            width={RELEASE_DETAIL_PANEL_WIDTH}
             showTabs
             contentRows={6}
           />
@@ -637,6 +640,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
           release={editingRelease}
           mode='admin'
           isOpen={isReleaseSidebarOpen}
+          width={RELEASE_DETAIL_PANEL_WIDTH}
           providerConfig={providerConfig}
           artistName={artistName}
           onClose={closeEditor}
@@ -878,7 +882,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             addReleaseOpen ? (
               <DrawerLoadingSkeleton
                 ariaLabel='Loading add release form'
-                width={SIDEBAR_WIDTH}
+                width={RELEASE_DETAIL_PANEL_WIDTH}
                 showTabs={false}
                 contentRows={6}
               />

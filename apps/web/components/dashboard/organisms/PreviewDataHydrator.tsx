@@ -22,6 +22,14 @@ function convertSocialLinksToPreviewLinks(
       title: link.displayText || link.platform,
       url: link.url,
       platform: link.platform,
+      platformType:
+        (link.platformType as
+          | 'social'
+          | 'dsp'
+          | 'earnings'
+          | 'custom'
+          | 'websites'
+          | undefined) ?? undefined,
       isVisible: link.isActive !== false,
     }));
 }

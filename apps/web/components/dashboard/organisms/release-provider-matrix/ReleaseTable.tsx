@@ -137,10 +137,10 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_78%,transparent)] shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_48%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_52%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_80%,var(--linear-bg-surface-0))]';
       } else {
         baseClassName =
           'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_75%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
@@ -155,7 +155,7 @@ export function ReleaseTable({
 
       return [
         'rounded-none',
-        'focus-within:shadow-[inset_1px_0_0_0_var(--linear-border-focus)]',
+        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_26%,transparent)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 320,
-      minSize: 208,
+      size: 356,
+      minSize: 240,
       meta: { className: 'hidden sm:table-cell' },
     });
 
@@ -358,7 +358,7 @@ export function ReleaseTable({
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '236px' },
+        { variant: 'meta', width: '240px' },
       ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}

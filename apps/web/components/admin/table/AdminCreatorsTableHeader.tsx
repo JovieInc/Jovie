@@ -44,7 +44,7 @@ export function AdminCreatorsTableHeader({
   headerActions,
 }: Readonly<AdminCreatorsTableHeaderProps>) {
   const headerCellClass = cn(
-    'sticky z-20 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-2.5 text-left',
+    'sticky z-20 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-2 text-left',
     headerElevated && 'shadow-sm shadow-black/10 dark:shadow-black/40'
   );
 
@@ -65,16 +65,8 @@ export function AdminCreatorsTableHeader({
           />
         </th>
         <th className={headerCellClass} style={stickyStyle}>
-          <span className='sr-only'>Creator</span>
-          <div className='inline-flex items-center h-8'>
-            <div
-              className={cn(
-                'transition-all duration-150',
-                selectedCount > 0
-                  ? 'opacity-100 translate-y-0'
-                  : 'pointer-events-none opacity-0 -translate-y-0.5'
-              )}
-            >
+          <div className='inline-flex h-8 items-center'>
+            {selectedCount > 0 ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant='secondary' size='sm' className='normal-case'>
@@ -93,14 +85,18 @@ export function AdminCreatorsTableHeader({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            ) : (
+              <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+                Creator
+              </span>
+            )}
           </div>
         </th>
         <th
           className={cn(headerCellClass, 'hidden lg:table-cell')}
           style={stickyStyle}
         >
-          <span className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
+          <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Social
           </span>
         </th>
@@ -121,7 +117,7 @@ export function AdminCreatorsTableHeader({
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (
-            <span className='text-xs font-semibold uppercase tracking-wide text-(--linear-text-tertiary)'>
+            <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               Actions
             </span>
           )}

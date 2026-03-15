@@ -306,6 +306,7 @@ export function AppleStyleOnboardingForm({
           {ONBOARDING_STEPS[currentStepIndex]?.title} step content
         </div>
         <div
+          key={currentStepIndex}
           data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
           className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
             isTransitioning

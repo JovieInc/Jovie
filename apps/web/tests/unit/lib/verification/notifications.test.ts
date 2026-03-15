@@ -8,11 +8,11 @@ import {
 const mockSendSlackMessage = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
 const mockFormatFounderSender = vi.hoisted(() =>
-  vi.fn(() => 'Tim White <tim@jov.ie>')
+  vi.fn(() => 'Tim White <tim@send.jov.ie>')
 );
 const mockGetSenderPolicy = vi.hoisted(() =>
   vi.fn(() => ({
-    fromEmail: 'tim@jov.ie',
+    fromEmail: 'tim@send.jov.ie',
     replyToEmail: 'tim@jov.ie',
   }))
 );
@@ -70,7 +70,7 @@ describe('verification notifications', () => {
     expect(mockSendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'pro@example.com',
-        from: 'Tim White <tim@jov.ie>',
+        from: 'Tim White <tim@send.jov.ie>',
         replyTo: 'tim@jov.ie',
         subject: 'Quick update from Tim',
       })

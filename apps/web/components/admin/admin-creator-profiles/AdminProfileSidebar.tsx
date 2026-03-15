@@ -77,26 +77,27 @@ export function AdminProfileSidebar({
       title='Creator profile'
       onClose={onClose}
       entityHeader={
-        <div className='space-y-4'>
+        <div className='space-y-3'>
           <ProfileContactHeader
             displayName={profile.displayName ?? profile.username}
             username={profile.username}
             avatarUrl={profile.avatarUrl}
           />
-          <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
-            <span className='text-[11px] font-[510] text-(--linear-text-tertiary)'>
+          <div className='grid grid-cols-[76px,minmax(0,1fr)] items-center gap-2.5'>
+            <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
               Profile link
             </span>
             <div className='flex items-center gap-2'>
               <CopyLinkInput
                 url={`${BASE_URL}/${profile.username}`}
-                size='md'
+                size='sm'
                 className='flex-1'
-                inputClassName='h-8 px-3 py-2'
+                inputClassName='h-7 rounded-[10px] px-2.5 py-1.5 text-[12px]'
+                buttonClassName='right-0.5'
               />
               <AppIconButton
                 ariaLabel='Open public profile'
-                className='h-8 w-8 shrink-0 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='h-7 w-7 shrink-0 rounded-[10px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={() =>
                   globalThis.open(
                     `${BASE_URL}/${profile.username}`,
@@ -119,6 +120,7 @@ export function AdminProfileSidebar({
           }
           options={PROFILE_TAB_OPTIONS}
           ariaLabel='Creator profile sidebar view'
+          triggerClassName='h-8 px-3 text-[12px]'
         />
       }
     >

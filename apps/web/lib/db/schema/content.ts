@@ -120,8 +120,8 @@ export const discogTracks = pgTable(
       table.releaseId,
       table.slug
     ),
-    trackIsrcUnique: uniqueIndex('discog_tracks_isrc_unique')
-      .on(table.isrc)
+    releaseIsrcUnique: uniqueIndex('discog_tracks_release_isrc_unique')
+      .on(table.releaseId, table.isrc)
       .where(drizzleSql`isrc IS NOT NULL`),
     releaseIndex: index('discog_tracks_release_id_idx').on(table.releaseId),
     creatorIndex: index('discog_tracks_creator_profile_id_idx').on(

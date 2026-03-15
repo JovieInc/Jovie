@@ -49,7 +49,7 @@ interface SettingsSidebarProps {
 
 const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
   <aside className='h-fit'>
-    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-xl border border-subtle bg-surface-1/85 p-2 shadow-none backdrop-blur-sm'>
+    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
       {groups.map(group => (
         <div key={group.id} className='mb-2.5 last:mb-0'>
           <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
@@ -61,7 +61,7 @@ const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
                 <li key={section.id}>
                   <a
                     href={`#${section.id}`}
-                    className='flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+                    className='flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                   >
                     {section.title}
                   </a>
@@ -286,7 +286,7 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-5xl gap-8 pb-6 lg:grid-cols-[190px_minmax(0,720px)] lg:justify-center lg:gap-10'
+      className='mx-auto grid w-full max-w-5xl gap-7 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-10'
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-5 lg:self-start'>
@@ -298,12 +298,12 @@ export function SettingsPolished({
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
-            className='rounded-2xl border border-subtle bg-surface-1 px-4 py-5 sm:px-6'
+            className='px-1'
           >
-            <h3 className='mb-5 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <h3 className='mb-5 px-1 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </h3>
-            <div className='space-y-7'>
+            <div className='space-y-8'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

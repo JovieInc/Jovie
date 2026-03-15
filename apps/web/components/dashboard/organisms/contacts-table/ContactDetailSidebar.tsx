@@ -13,7 +13,10 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerPropertyRow,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -222,6 +225,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   const roleLabel = contact
     ? getContactRoleLabel(contact.role, contact.customLabel)
     : '';
+  const contactDisplayName =
+    contact?.personName?.trim() ||
+    contact?.companyName?.trim() ||
+    'Untitled contact';
   const territorySummary = contact
     ? summarizeTerritories(contact.territories).summary
     : '';
@@ -242,36 +249,40 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     // Both states use h-8 (32px) height to match the input height
     if (isEditing) {
       return (
-        <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-          <Label className='text-[13px] text-(--linear-text-secondary)'>
-            {label}
-          </Label>
-          <Input
-            ref={inputRef}
-            value={editValue}
-            onChange={e => setEditValue(e.target.value)}
-            onBlur={saveField}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            className='h-8 text-[13px]'
-          />
-        </div>
+        <DrawerPropertyRow
+          label={label}
+          value={
+            <Input
+              ref={inputRef}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onBlur={saveField}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              className='h-8 text-[13px]'
+            />
+          }
+          labelWidth={96}
+          className='px-0 py-0'
+          labelClassName='normal-case tracking-normal text-[12px]'
+          valueClassName='overflow-visible'
+        />
       );
     }
 
     return (
-      <button
-        type='button'
+      <DrawerPropertyRow
+        label={label}
+        value={
+          <span className='truncate text-[13px] text-(--linear-text-primary)'>
+            {displayValue}
+          </span>
+        }
+        labelWidth={96}
+        interactive
         onClick={() => startEditing(field)}
-        className='-mx-2 grid min-h-8 w-full grid-cols-[96px_minmax(0,1fr)] items-center gap-2 rounded-[8px] px-2 text-left transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-      >
-        <span className='text-[13px] text-(--linear-text-secondary)'>
-          {label}
-        </span>
-        <span className='truncate text-[13px] text-(--linear-text-primary)'>
-          {displayValue}
-        </span>
-      </button>
+        labelClassName='normal-case tracking-normal text-[12px]'
+      />
     );
   };
 
@@ -284,12 +295,23 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       headerActions={headerActions}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
+      entityHeader={
+        contact ? (
+          <div className='rounded-[10px] border border-(--linear-border-subtle)/75 bg-(--linear-bg-surface-0) px-3 py-2.5'>
+            <p className='text-[15px] font-[520] leading-5 text-(--linear-text-primary)'>
+              {contactDisplayName}
+            </p>
+            <p className='mt-1 text-[12px] text-(--linear-text-secondary)'>
+              {roleLabel}
+            </p>
+          </div>
+        ) : undefined
+      }
     >
       {contact && (
         <>
-          {/* Role Section */}
-          <DrawerSection title='Role'>
-            <div className='space-y-2'>
+          <DrawerSection title='Role' className='space-y-2'>
+            <div className='rounded-[10px] border border-(--linear-border-subtle)/75 bg-(--linear-bg-surface-0) p-2.5'>
               <Label className='text-[13px] text-(--linear-text-secondary)'>
                 Contact type
               </Label>
@@ -318,9 +340,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </div>
           </DrawerSection>
 
-          {/* Contact Info Section */}
-          <DrawerSection title='Contact Info'>
-            <div className='space-y-3'>
+          <DrawerSection
+            title='Contact Info'
+            className='border-t border-(--linear-border-subtle)/65 pt-4'
+          >
+            <div className='space-y-1'>
               {renderEditableField(
                 'personName',
                 'Name',
@@ -340,7 +364,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Preferred Channel */}
           {hasEmailAndPhone && (
-            <DrawerSection title='Preferred Contact'>
+            <DrawerSection
+              title='Preferred Contact'
+              className='border-t border-(--linear-border-subtle)/65 pt-4'
+            >
               <div className='space-y-2'>
                 <Label className='text-[13px] text-(--linear-text-secondary)'>
                   Default action
@@ -363,15 +390,17 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </DrawerSection>
           )}
 
-          {/* Territories Section */}
-          <DrawerSection title='Territories'>
+          <DrawerSection
+            title='Territories'
+            className='border-t border-(--linear-border-subtle)/65 pt-4'
+          >
             <div className='space-y-3'>
-              <div className='grid grid-cols-[96px_minmax(0,1fr)] items-center gap-2 min-h-8'>
-                <span className='text-[13px] text-(--linear-text-secondary)'>
-                  Coverage
-                </span>
-                <Badge size='sm'>{territorySummary}</Badge>
-              </div>
+              <DrawerPropertyRow
+                label='Coverage'
+                value={<Badge size='sm'>{territorySummary}</Badge>}
+                labelWidth={96}
+                labelClassName='normal-case tracking-normal text-[12px]'
+              />
               <div className='flex flex-wrap gap-1.5'>
                 {CONTACT_TERRITORY_PRESETS.map(territory => {
                   const isSelected = contact.territories.includes(territory);
