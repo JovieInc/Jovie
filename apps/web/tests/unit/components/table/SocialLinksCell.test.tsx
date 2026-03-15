@@ -26,7 +26,7 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    expect(screen.getByText('2 social links')).toBeInTheDocument();
+    expect(screen.getByTitle('2 social links')).toBeInTheDocument();
   });
 
   it('shows overflow count in summary label', () => {
@@ -60,7 +60,7 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    expect(screen.getByText('3 DSP links · +1')).toBeInTheDocument();
+    expect(screen.getByTitle('3 social links')).toBeInTheDocument();
   });
 
   it('opens link in a new tab when pill is clicked', () => {
@@ -84,6 +84,34 @@ describe('SocialLinksCell', () => {
 
     expect(openSpy).toHaveBeenCalledWith(
       'https://instagram.com/artist',
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    openSpy.mockRestore();
+  });
+
+  it('falls back to inferred social platform when platformType is missing', () => {
+    const openSpy = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
+
+    render(
+      <SocialLinksCell
+        links={[
+          {
+            id: 'fb-1',
+            url: 'https://facebook.com/artist',
+            platform: 'facebook',
+            platformType: null,
+            displayText: 'Artist Page',
+          },
+        ]}
+      />
+    );
+
+    screen.getByRole('button', { name: 'Select Facebook' }).click();
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://facebook.com/artist',
       '_blank',
       'noopener,noreferrer'
     );

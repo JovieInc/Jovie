@@ -9,6 +9,30 @@ import {
 } from '@/components/organisms/contact-sidebar/utils';
 import { typography } from '../table.styles';
 
+const MUSIC_PLATFORM_IDS = new Set([
+  'spotify',
+  'apple_music',
+  'soundcloud',
+  'tidal',
+]);
+
+function inferPlatformType(
+  platformType: string | null | undefined,
+  platform: string | null | undefined
+): 'music' | 'social' | string {
+  const normalizedPlatformType = platformType?.toLowerCase();
+  if (normalizedPlatformType) {
+    return normalizedPlatformType;
+  }
+
+  const normalizedPlatform = platform?.toLowerCase();
+  if (!normalizedPlatform) {
+    return 'social';
+  }
+
+  return MUSIC_PLATFORM_IDS.has(normalizedPlatform) ? 'music' : 'social';
+}
+
 /**
  * Display labels for platforms with special casing requirements
  * These override the generic toTitleCase conversion
@@ -45,8 +69,8 @@ function toDisplayLabel(str: string): string {
 interface SocialLink {
   id: string;
   url: string;
-  platform: string;
-  platformType: string;
+  platform?: string | null;
+  platformType?: string | null;
   displayText?: string | null;
 }
 
@@ -111,7 +135,10 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
       ? filterPlatformType.map(t => t.toLowerCase())
       : [filterPlatformType.toLowerCase()];
     filteredLinks = links.filter(link => {
-      const platformTypeLower = link.platformType.toLowerCase();
+      const platformTypeLower = inferPlatformType(
+        link.platformType,
+        link.platform
+      );
       // Match against the platform category (social, music, etc.)
       return types.includes(platformTypeLower);
     });
@@ -134,24 +161,22 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
           '';
         const displayUsername = formatUsername(username);
 
-        const platformLower = link.platform.toLowerCase();
+        const platformLower = link.platform?.toLowerCase() ?? '';
+        const inferredPlatformType = inferPlatformType(
+          link.platformType,
+          link.platform
+        );
         const isGenericType =
           platformLower === 'music_streaming' ||
           platformLower === 'social_media';
 
-        const platformIcon = isGenericType
-          ? link.platformType.toLowerCase()
-          : platformLower;
+        const platformIcon =
+          (isGenericType ? inferredPlatformType : platformLower) || 'link';
         const platformName = isGenericType
-          ? toDisplayLabel(link.platformType)
-          : toDisplayLabel(link.platform);
+          ? toDisplayLabel(inferredPlatformType)
+          : toDisplayLabel(link.platform ?? inferredPlatformType);
 
-        const isMusicPlatform = [
-          'spotify',
-          'apple_music',
-          'soundcloud',
-          'tidal',
-        ].includes(platformIcon);
+        const isMusicPlatform = MUSIC_PLATFORM_IDS.has(platformIcon);
 
         const primaryText =
           isMusicPlatform && link.displayText
