@@ -126,39 +126,52 @@ export default function AdminOutreachDmPage() {
     setDailyCount(getDailyCount());
   }, []);
 
-  const fetchQueue = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        queue: 'dm',
-        sort: 'priorityScore',
-        sortOrder: 'desc',
-        limit: '50',
-      });
-      const res = await fetch(`/api/admin/outreach?${params}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error('Failed to load DM queue');
-      const data = (await res.json()) as DmQueueResponse;
-      setLeads(data.items);
-      setTotal(data.total);
-    } catch {
-      toast.error('Failed to load DM queue');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchQueue = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!silent) {
+        setLoading(true);
+      }
+      try {
+        const params = new URLSearchParams({
+          queue: 'dm',
+          sort: 'priorityScore',
+          sortOrder: 'desc',
+          limit: '50',
+        });
+        const res = await fetch(`/api/admin/outreach?${params}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) throw new Error('Failed to load DM queue');
+        const data = (await res.json()) as DmQueueResponse;
+        setLeads(data.items);
+        setTotal(data.total);
+      } catch {
+        toast.error('Failed to load DM queue');
+      } finally {
+        if (!silent) {
+          setLoading(false);
+        }
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     fetchQueue();
   }, [fetchQueue]);
 
   function handleMarkedSent(leadId: string) {
+    const shouldRefillQueue = leads.length <= 1;
+
     // Optimistic removal — no loading flash
     setLeads(prev => prev.filter(l => l.id !== leadId));
-    setTotal(prev => prev - 1);
+    setTotal(prev => Math.max(prev - 1, 0));
     setSessionCount(prev => prev + 1);
     setDailyCount(incrementDailyCount());
+
+    if (shouldRefillQueue) {
+      void fetchQueue({ silent: true });
+    }
   }
 
   function handleSendDm(_leadId: string, index: number) {
