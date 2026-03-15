@@ -16,7 +16,7 @@ function mockMatchMedia(matches: boolean) {
 }
 
 describe('DesktopQrOverlay', () => {
-  let imageSrcSetter: ReturnType<typeof vi.fn>;
+  let imageSrcSetter: ReturnType<typeof vi.fn<(value: string) => void>>;
 
   beforeEach(() => {
     vi.stubGlobal('matchMedia', mockMatchMedia(true));
