@@ -15,12 +15,8 @@ export function ArtistContactsButton({
   artistName,
   onNavigate,
 }: ArtistContactsButtonProps) {
-  const {
-    available,
-    onIconClick,
-    primaryChannel,
-    isEnabled,
-  } = useArtistContacts({ contacts, artistHandle, onNavigate });
+  const { available, onIconClick, primaryChannel, isEnabled } =
+    useArtistContacts({ contacts, artistHandle, onNavigate });
 
   const isMobile = useBreakpointDown('md');
   const [drawerOpen, setDrawerOpen] = useState(false);
