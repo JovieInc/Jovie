@@ -41,23 +41,31 @@ export function CopyableUrlRow({
     };
   }, []);
 
-  const handleCopy = useCallback(() => {
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        setIsCopied(true);
-        onCopySuccess?.();
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        timeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-      })
-      .catch(() => {
-        onCopyError?.();
-      });
-  }, [url, onCopySuccess, onCopyError]);
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigator.clipboard
+        .writeText(url)
+        .then(() => {
+          setIsCopied(true);
+          onCopySuccess?.();
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
+        })
+        .catch(() => {
+          onCopyError?.();
+        });
+    },
+    [url, onCopySuccess, onCopyError]
+  );
 
-  const handleOpen = useCallback(() => {
-    globalThis.open(url, '_blank', 'noopener,noreferrer');
-  }, [url]);
+  const handleOpen = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      globalThis.open(url, '_blank', 'noopener,noreferrer');
+    },
+    [url]
+  );
 
   const sizeClasses = {
     sm: {
