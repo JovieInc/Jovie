@@ -88,7 +88,7 @@ describe('POST /api/webhooks/sentry', () => {
 
     mockAcquireRecentDispatch.mockResolvedValue(true);
     mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 5000)
+      new ServerFetchTimeoutError('timed out', 10000)
     );
 
     const { POST } = await import('@/app/api/webhooks/sentry/route');
@@ -120,7 +120,7 @@ describe('POST /api/webhooks/sentry', () => {
       expect.any(ServerFetchTimeoutError),
       expect.objectContaining({
         route: '/api/webhooks/sentry',
-        timeoutMs: 5000,
+        timeoutMs: 10000,
       })
     );
   });
