@@ -54,6 +54,8 @@ interface ContactDetailSidebarProps {
   readonly onUpdate: (updates: Partial<EditableContact>) => void;
   readonly onSave: () => void;
   readonly onDelete: () => void;
+  /** Canonical context menu items for right-click on sidebar */
+  readonly contextMenuItems?: import('@jovie/ui').CommonDropdownItem[];
 }
 
 export const ContactDetailSidebar = memo(function ContactDetailSidebar({
@@ -63,6 +65,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   onUpdate,
   onSave,
   onDelete,
+  contextMenuItems,
 }: ContactDetailSidebarProps) {
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -293,6 +296,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       title={headerTitle}
       onClose={handleClose}
       headerActions={headerActions}
+      contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
       entityHeader={

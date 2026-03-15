@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button } from '@jovie/ui';
+import { Badge, Button, type CommonDropdownItem } from '@jovie/ui';
 import { Copy, ExternalLink, X } from 'lucide-react';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
@@ -11,6 +11,7 @@ import type { AdminUserRow } from '@/lib/admin/users';
 interface AdminUserDetailDrawerProps {
   readonly user: AdminUserRow | null;
   readonly onClose: () => void;
+  readonly contextMenuItems?: CommonDropdownItem[];
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
@@ -282,9 +283,15 @@ function UserDrawerContent({
 export function AdminUserDetailDrawer({
   user,
   onClose,
+  contextMenuItems,
 }: AdminUserDetailDrawerProps) {
   return (
-    <RightDrawer isOpen={user !== null} width={400} ariaLabel='User details'>
+    <RightDrawer
+      isOpen={user !== null}
+      width={400}
+      ariaLabel='User details'
+      contextMenuItems={contextMenuItems}
+    >
       {user && <UserDrawerContent user={user} onClose={onClose} />}
     </RightDrawer>
   );

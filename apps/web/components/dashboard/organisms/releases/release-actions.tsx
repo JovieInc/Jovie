@@ -17,12 +17,16 @@ const menuIcon = (
     | 'Clock'
     | 'Trash2'
     | 'Copy'
+    | 'RefreshCw'
+    | 'Sparkles'
 ) => <Icon name={name} className='h-3.5 w-3.5' />;
 
 export interface BuildReleaseActionsOptions {
   readonly release: ReleaseViewModel;
-  readonly onEdit: (release: ReleaseViewModel) => void;
-  readonly onCopy: (
+  /** Edit handler — when provided, an "Edit links" action is included */
+  readonly onEdit?: (release: ReleaseViewModel) => void;
+  /** Copy handler — when provided, "Copy smart link" and UTM share presets are included */
+  readonly onCopy?: (
     path: string,
     label: string,
     testId: string
@@ -39,6 +43,14 @@ export interface BuildReleaseActionsOptions {
   readonly onCopyQrCode?: () => void;
   /** Custom icon for QR code action (lucide-react QrCode is not in the Icon atom) */
   readonly qrCodeIcon?: ReactNode;
+  /** Open smart link in a new tab */
+  readonly onOpenSmartLink?: () => void;
+  /** Copy the /sounds variant of the smart link (Use Sound link) */
+  readonly onCopyUseSoundLink?: () => void;
+  /** Refresh release data */
+  readonly onRefresh?: () => void;
+  /** Whether a refresh is currently in progress */
+  readonly isRefreshing?: boolean;
 }
 
 /**
@@ -59,57 +71,75 @@ export function buildReleaseActions({
   onDelete,
   onCopyQrCode,
   qrCodeIcon,
+  onOpenSmartLink,
+  onCopyUseSoundLink,
+  onRefresh,
+  isRefreshing = false,
 }: BuildReleaseActionsOptions): ContextMenuItemType[] {
   const locked = isSmartLinkLocked?.(release.id) ?? false;
   const lockReason = getSmartLinkLockReason?.(release.id) ?? null;
   const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
 
-  // ── Edit group ──
-  const items: ContextMenuItemType[] = [
-    {
+  const items: ContextMenuItemType[] = [];
+
+  // ── Edit group (when handler provided) ──
+  if (onEdit) {
+    items.push({
       id: 'edit',
       label: 'Edit links',
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
-    },
-  ];
+    });
+  }
 
   // ── Copy / share group ──
-  if (locked) {
-    items.push({
-      id: 'copy-smart-link',
-      label:
-        lockReason === 'scheduled' ? 'Scheduled (Pro)' : 'Smart link (Pro)',
-      icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
-      disabled: true,
-      onClick: () => {},
-    } as ContextMenuItemType);
-  } else {
-    items.push(
-      {
+  if (onCopy) {
+    if (locked) {
+      items.push({
         id: 'copy-smart-link',
-        label: 'Copy smart link',
-        icon: menuIcon('Copy'),
-        onClick: () => {
-          void onCopy(
-            release.smartLinkPath,
-            `${release.title} smart link`,
-            `smart-link-copy-${release.id}`
-          );
-        },
-      } as ContextMenuItemType,
-      // UTM share presets
-      ...getUTMShareContextMenuItems({
-        smartLinkUrl,
-        context: buildUTMContext({
+        label:
+          lockReason === 'scheduled' ? 'Scheduled (Pro)' : 'Smart link (Pro)',
+        icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
+        disabled: true,
+        onClick: () => {},
+      } as ContextMenuItemType);
+    } else {
+      items.push(
+        {
+          id: 'copy-smart-link',
+          label: 'Copy smart link',
+          icon: menuIcon('Copy'),
+          onClick: () => {
+            void onCopy(
+              release.smartLinkPath,
+              `${release.title} smart link`,
+              `smart-link-copy-${release.id}`
+            );
+          },
+        } as ContextMenuItemType,
+        // UTM share presets
+        ...getUTMShareContextMenuItems({
           smartLinkUrl,
-          releaseSlug: release.slug,
-          releaseTitle: release.title,
-          artistName,
-          releaseDate: release.releaseDate,
-        }),
-      })
-    );
+          context: buildUTMContext({
+            smartLinkUrl,
+            releaseSlug: release.slug,
+            releaseTitle: release.title,
+            artistName,
+            releaseDate: release.releaseDate,
+          }),
+        })
+      );
+    }
+  }
+
+  // ── Open smart link (when handler provided) ──
+  if (onOpenSmartLink) {
+    items.push({
+      id: 'open-smart-link',
+      label: 'Open smart link',
+      icon: menuIcon('ExternalLink'),
+      onClick: onOpenSmartLink,
+    });
   }
 
   // ── QR code (when handler provided) ──
@@ -119,6 +149,16 @@ export function buildReleaseActions({
       label: 'Copy QR code',
       icon: qrCodeIcon,
       onClick: onCopyQrCode,
+    });
+  }
+
+  // ── Copy Use Sound link (when handler provided and release has video links) ──
+  if (onCopyUseSoundLink && release.hasVideoLinks) {
+    items.push({
+      id: 'copy-sounds-link',
+      label: 'Copy Use Sound link',
+      icon: menuIcon('Sparkles'),
+      onClick: onCopyUseSoundLink,
     });
   }
 
@@ -167,6 +207,20 @@ export function buildReleaseActions({
         },
       });
     }
+  }
+
+  // ── Refresh (when handler provided) ──
+  if (onRefresh) {
+    items.push(
+      { type: 'separator' },
+      {
+        id: 'refresh',
+        label: isRefreshing ? 'Refreshing...' : 'Refresh release',
+        icon: menuIcon('RefreshCw'),
+        disabled: isRefreshing,
+        onClick: onRefresh,
+      }
+    );
   }
 
   // ── Destructive group ──

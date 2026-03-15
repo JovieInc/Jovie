@@ -21,6 +21,7 @@ vi.mock('next/link', () => ({
   default: ({
     href,
     children,
+    prefetch: _prefetch,
     ...rest
   }: {
     href: string;

@@ -2,7 +2,7 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Copy, ExternalLink, Users } from 'lucide-react';
+import { Copy, Users } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -27,6 +27,7 @@ import {
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
+import { convertToCommonDropdownItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
@@ -39,6 +40,7 @@ import type { AdminUserRow } from '@/lib/admin/users';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
+import { buildAdminUserActions } from './admin-user-actions';
 import type { AdminUsersTableProps } from './types';
 import {
   createActionsCellRenderer,
@@ -244,79 +246,9 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const headerCheckboxStateRef = useRef(headerCheckboxState);
   headerCheckboxStateRef.current = headerCheckboxState;
 
-  // Context menu items for right-click AND actions button
+  // Context menu items for right-click, actions button, AND drawer
   const getContextMenuItems = useCallback(
-    (user: AdminUserRow): ContextMenuItemType[] => {
-      const items: ContextMenuItemType[] = [];
-
-      // Copy Clerk user ID, Copy email, Copy User ID
-      items.push(
-        {
-          id: 'copy-clerk-id',
-          label: 'Copy Clerk user ID',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            copyToClipboard(user.clerkId).then(ok => {
-              if (ok) {
-                toast.success('Clerk ID copied', { duration: 2000 });
-              } else {
-                toast.error('Failed to copy Clerk ID');
-              }
-            });
-          },
-        },
-        {
-          id: 'copy-email',
-          label: 'Copy email',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            if (user.email) {
-              copyToClipboard(user.email).then(ok => {
-                if (ok) {
-                  toast.success('Email copied', { duration: 2000 });
-                } else {
-                  toast.error('Failed to copy email');
-                }
-              });
-            }
-          },
-          disabled: !user.email,
-        },
-        {
-          id: 'copy-user-id',
-          label: 'Copy User ID',
-          icon: <Copy className='h-3.5 w-3.5' />,
-          onClick: () => {
-            copyToClipboard(user.id).then(ok => {
-              if (ok) {
-                toast.success('User ID copied', { duration: 2000 });
-              } else {
-                toast.error('Failed to copy User ID');
-              }
-            });
-          },
-        }
-      );
-
-      // Open in Clerk (if has Clerk ID)
-      const hasClerkConsoleUrl = user.clerkId.length > 0;
-      if (hasClerkConsoleUrl) {
-        const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(user.clerkId)}`;
-        items.push(
-          { type: 'separator' as const },
-          {
-            id: 'open-in-clerk',
-            label: 'Open in Clerk',
-            icon: <ExternalLink className='h-3.5 w-3.5' />,
-            onClick: () => {
-              globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
-            },
-          }
-        );
-      }
-
-      return items;
-    },
+    (user: AdminUserRow): ContextMenuItemType[] => buildAdminUserActions(user),
     []
   );
 
@@ -615,6 +547,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
         <AdminUserDetailDrawer
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
+          contextMenuItems={
+            selectedUser
+              ? convertToCommonDropdownItems(
+                  buildAdminUserActions(selectedUser)
+                )
+              : undefined
+          }
         />
       </div>
     </QueryErrorBoundary>

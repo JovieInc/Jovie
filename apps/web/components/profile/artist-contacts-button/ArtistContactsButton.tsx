@@ -65,7 +65,13 @@ export function ArtistContactsButton({
       data-testid='contacts-trigger'
       className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
       onClick={() => {
-        router.push(getProfileModeHref(artistHandle, 'contact'));
+        const href = getProfileModeHref(artistHandle, 'contact');
+        onIconClick();
+        if (onNavigate) {
+          onNavigate(href);
+          return;
+        }
+        router.push(href);
       }}
     >
       <Mail className='h-4 w-4' aria-hidden='true' />

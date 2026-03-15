@@ -50,8 +50,8 @@ export function AdminCreatorsToolbar({
   const someSelectedVerified = selectedProfiles.some(p => p.isVerified);
 
   return (
-    <AdminTableSubheader>
-      <div className='flex min-h-11 w-full flex-wrap items-center gap-2.5'>
+    <AdminTableSubheader className='py-1.5'>
+      <div className='flex min-h-9 w-full flex-wrap items-center gap-2'>
         {hasSelection ? (
           // Bulk Actions Mode - replaces "Creator" text
           <>
@@ -123,11 +123,11 @@ export function AdminCreatorsToolbar({
         ) : (
           // Normal Mode
           <>
-            <div className='hidden text-[12px] font-normal text-(--linear-text-tertiary) tabular-nums md:block'>
+            <div className='hidden text-[11.5px] leading-none font-normal text-(--linear-text-tertiary) tabular-nums md:block'>
               Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
               {total.toLocaleString()} profiles
             </div>
-            <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end'>
+            <div className='flex w-full flex-wrap items-center gap-1.5 sm:ml-auto sm:w-auto sm:justify-end'>
               <ActionBar>
                 <ActionBarItem tooltipLabel='Export'>
                   <ExportCSVButton<AdminCreatorProfileRow>

@@ -6,21 +6,39 @@ const openSpy = vi.fn();
 
 vi.stubGlobal('open', openSpy);
 
-vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
-  DrawerHeaderActions: ({
-    overflowActions,
+vi.mock('@/components/atoms/AppIconButton', () => ({
+  AppIconButton: ({
+    children,
+    ariaLabel,
+    ...rest
   }: {
-    primaryActions: { id: string; label: string; onClick: () => void }[];
-    overflowActions: { id: string; label: string; onClick: () => void }[];
+    children: React.ReactNode;
+    ariaLabel: string;
+    onClick?: () => void;
+  }) => (
+    <button type='button' aria-label={ariaLabel} {...rest}>
+      {children}
+    </button>
+  ),
+}));
+
+vi.mock('@/components/atoms/table-action-menu', () => ({
+  TableActionMenu: ({
+    items,
+    children,
+  }: {
+    items: { id: string; label: string; onClick?: () => void }[];
+    children: React.ReactNode;
   }) => (
     <div>
-      {overflowActions.map(
-        (a: { id: string; label: string; onClick: () => void }) => (
+      {children}
+      {items
+        .filter((a: { id: string; label: string }) => a.label)
+        .map((a: { id: string; label: string; onClick?: () => void }) => (
           <button key={a.id} type='button' onClick={a.onClick}>
             {a.label}
           </button>
-        )
-      )}
+        ))}
     </div>
   ),
 }));
@@ -66,11 +84,22 @@ describe('useReleaseHeaderParts', () => {
     vi.clearAllMocks();
   });
 
-  it('shows open smart link action and opens in new tab', async () => {
+  it('shows actions from contextMenuItems in overflow menu', async () => {
     const user = userEvent.setup();
+    const onOpenSmartLink = vi.fn();
 
     render(
-      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
+      <TestHarness
+        release={release}
+        hasRelease
+        contextMenuItems={[
+          {
+            id: 'open-smart-link',
+            label: 'Open smart link',
+            onClick: onOpenSmartLink,
+          },
+        ]}
+      />
     );
 
     const openButton = screen.getByRole('button', {
@@ -78,31 +107,18 @@ describe('useReleaseHeaderParts', () => {
     });
     await user.click(openButton);
 
-    expect(openSpy).toHaveBeenCalledWith(
-      '/r/test-release--profile_1',
-      '_blank',
-      'noopener,noreferrer'
-    );
+    expect(onOpenSmartLink).toHaveBeenCalled();
   });
 
   it('displays primary ISRC in header', () => {
-    render(
-      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
-    );
+    render(<TestHarness release={release} hasRelease />);
 
     expect(screen.getByText('USRC17607839')).toBeInTheDocument();
   });
 
   it('falls back to release title when no ISRC', () => {
     const releaseNoIsrc = { ...release, primaryIsrc: undefined };
-    render(
-      <TestHarness
-        release={releaseNoIsrc}
-        hasRelease
-        artistName='Test Artist'
-        onCopySmartLink={vi.fn()}
-      />
-    );
+    render(<TestHarness release={releaseNoIsrc} hasRelease />);
 
     expect(screen.getByText('Test Release')).toBeInTheDocument();
   });

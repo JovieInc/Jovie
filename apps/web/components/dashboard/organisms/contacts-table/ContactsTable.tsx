@@ -13,6 +13,7 @@ import {
   PageToolbar,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { convertToCommonDropdownItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import type { ContactRole } from '@/types/contacts';
@@ -238,6 +239,13 @@ export const ContactsTable = memo(function ContactsTable({
         onUpdate={handleUpdate}
         onSave={handleSave}
         onDelete={handleDelete}
+        contextMenuItems={
+          selectedContact
+            ? convertToCommonDropdownItems(
+                buildContactActions(selectedContact, { onDelete })
+              )
+            : undefined
+        }
       />
     </div>
   );

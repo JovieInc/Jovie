@@ -97,4 +97,18 @@ describe('ProfileSidebarHeader QR download', () => {
     });
     expect(downloadBlob).not.toHaveBeenCalled();
   });
+
+  it('downloads a vCard through the shared blob helper', async () => {
+    const user = userEvent.setup({ delay: null });
+
+    render(<HeaderHarness />);
+    await user.click(screen.getByRole('button', { name: 'Download vCard' }));
+
+    expect(downloadBlob).toHaveBeenCalledTimes(1);
+    expect(downloadBlob).toHaveBeenLastCalledWith(
+      expect.any(Blob),
+      'timwhite.vcf'
+    );
+    expect(toast.success).toHaveBeenCalledWith('vCard downloaded');
+  });
 });

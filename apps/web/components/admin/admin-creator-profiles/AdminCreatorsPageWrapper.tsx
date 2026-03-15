@@ -12,6 +12,7 @@ import {
 } from 'react';
 import { BatchIngestModal } from '@/components/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -20,14 +21,13 @@ import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
 function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
   return (
-    <button
-      type='button'
+    <DashboardHeaderActionButton
+      ariaLabel='Open batch ingest'
       onClick={onClick}
-      className='inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-secondary-token hover:bg-accent/10 hover:text-primary-token'
-    >
-      <ListPlus className='h-3.5 w-3.5' />
-      Batch Ingest
-    </button>
+      icon={<ListPlus className='h-3.5 w-3.5' />}
+      label='Batch Ingest'
+      className='px-2.5'
+    />
   );
 }
 

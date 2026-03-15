@@ -42,6 +42,7 @@ vi.mock('next/link', () => ({
   default: ({
     href,
     children,
+    prefetch: _prefetch,
     ...rest
   }: {
     href: string;
@@ -104,7 +105,7 @@ describe('ProfilePrimaryCTA', () => {
     );
 
     expect(
-      screen.getByRole('link', { name: /open listen page/i })
+      screen.getByRole('link', { name: /listen now/i })
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /^subscribe$/i })

@@ -157,6 +157,25 @@ describe('ArtistContactsButton', () => {
     expect(pushMock).toHaveBeenCalledWith('/test?mode=contact');
   });
 
+  it('uses the provided navigation callback on desktop when present', () => {
+    useBreakpointDownMock.mockReturnValue(false);
+    const onNavigate = vi.fn();
+
+    render(
+      <ArtistContactsButton
+        contacts={[makeContact()]}
+        artistHandle='test'
+        artistName='Test Artist'
+        onNavigate={onNavigate}
+      />
+    );
+
+    fireEvent.click(screen.getByTestId('contacts-trigger'));
+
+    expect(onNavigate).toHaveBeenCalledWith('/test?mode=contact');
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
   it('opens drawer when multiple contacts are provided', () => {
     const contacts: PublicContact[] = [
       makeContact(),

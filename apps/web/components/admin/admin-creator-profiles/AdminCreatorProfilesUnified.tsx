@@ -10,6 +10,7 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import { convertToCommonDropdownItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { getProfileUrl } from '@/constants/domains';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -315,12 +316,12 @@ export function AdminCreatorProfilesUnified({
 
     if (isChecked || isSelected) {
       return cn(
-        'group bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
+        'group bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_rgba(91,140,255,0.44)] hover:bg-(--linear-bg-surface-1)'
       );
     }
 
     return cn(
-      'group bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out'
+      'group bg-transparent hover:bg-(--linear-bg-surface-0) transition-colors duration-100 ease-out'
     );
   }, []);
 
@@ -331,6 +332,14 @@ export function AdminCreatorProfilesUnified({
     [filteredProfiles, selectedId]
   );
 
+  const sidebarContextMenuItems = useMemo(
+    () =>
+      selectedProfile
+        ? convertToCommonDropdownItems(getContextMenuItems(selectedProfile))
+        : undefined,
+    [selectedProfile, getContextMenuItems]
+  );
+
   const sidebarPanel = useMemo(
     () => (
       <AdminProfileSidebar
@@ -338,9 +347,16 @@ export function AdminCreatorProfilesUnified({
         contact={effectiveContact}
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         onClose={handleSidebarClose}
+        contextMenuItems={sidebarContextMenuItems}
       />
     ),
-    [sidebarOpen, selectedProfile, effectiveContact, handleSidebarClose]
+    [
+      sidebarOpen,
+      selectedProfile,
+      effectiveContact,
+      handleSidebarClose,
+      sidebarContextMenuItems,
+    ]
   );
 
   useRegisterRightPanel(sidebarPanel);

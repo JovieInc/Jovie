@@ -7,19 +7,12 @@
  * including artwork, title, release date, and DSP links.
  */
 
-import type { CommonDropdownItem } from '@jovie/ui';
-import {
-  Copy,
-  ExternalLink,
-  Pause,
-  Play,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { buildReleaseActions } from '@/components/dashboard/organisms/releases/release-actions';
 import {
   DrawerAsyncToggle,
   DrawerMediaThumb,
@@ -28,6 +21,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { convertToCommonDropdownItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -37,7 +31,6 @@ import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
@@ -195,95 +188,6 @@ function ReleaseEntityHeader({
   );
 }
 
-function buildContextMenuItems(
-  release: Release | null,
-  artistName: string | null | undefined,
-  handleCopySmartLink: () => void,
-  onRefresh: (() => void) | undefined,
-  isRefreshing: boolean
-): CommonDropdownItem[] {
-  if (!release) return [];
-
-  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
-  const items: CommonDropdownItem[] = [];
-
-  const utmContext = buildUTMContext({
-    smartLinkUrl,
-    releaseSlug: release.slug,
-    releaseTitle: release.title,
-    artistName,
-    releaseDate: release.releaseDate,
-  });
-
-  items.push(
-    {
-      type: 'action',
-      id: 'copy-url',
-      label: 'Copy smart link',
-      icon: <Copy className='h-4 w-4' />,
-      onClick: () => {
-        handleCopySmartLink();
-      },
-    },
-    {
-      type: 'action',
-      id: 'open-release',
-      label: 'Open release',
-      icon: <ExternalLink className='h-4 w-4' />,
-      onClick: () => globalThis.open(smartLinkUrl, '_blank'),
-    },
-    // UTM share presets
-    ...getUTMShareDropdownItems({
-      smartLinkUrl,
-      context: utmContext,
-    })
-  );
-
-  // "Copy Use Sound link" — only when release has video provider links
-  if (release.hasVideoLinks) {
-    const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
-    items.push(
-      { type: 'separator', id: 'sep-sounds' },
-      {
-        type: 'action',
-        id: 'copy-sounds-link',
-        label: 'Copy Use Sound link',
-        icon: <Sparkles className='h-4 w-4' />,
-        onClick: () => {
-          navigator.clipboard
-            ?.writeText(soundsUrl)
-            .then(() => {
-              toast.success('Use Sound link copied');
-            })
-            .catch(() => {
-              // Silently fail
-            });
-        },
-      }
-    );
-  }
-
-  items.push(
-    { type: 'separator', id: 'sep-actions' },
-    {
-      type: 'action',
-      id: 'refresh',
-      label: isRefreshing ? 'Refreshing…' : 'Refresh',
-      icon: <RefreshCw className='h-4 w-4' />,
-      onClick: () => {
-        if (isRefreshing) return;
-        if (onRefresh) {
-          onRefresh();
-        } else {
-          globalThis.location.reload();
-        }
-      },
-    }
-  );
-
-  return items;
-}
-
 export function ReleaseSidebar({
   release,
   mode,
@@ -401,27 +305,42 @@ export function ReleaseSidebar({
     }).catch(() => {});
   }, [toggleTrack, release]);
 
-  const contextMenuItems = useMemo<CommonDropdownItem[]>(
-    () =>
-      buildContextMenuItems(
-        release,
-        artistName,
-        handleCopySmartLink,
-        onRefresh,
-        isRefreshing
-      ),
-    [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]
+  // Build canonical actions once, reuse for both right-click and header overflow
+  const canonicalActions = useMemo(() => {
+    if (!release) return [];
+    const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+    const soundsUrl = `${getBaseUrl()}${release.smartLinkPath}/sounds`;
+    return buildReleaseActions({
+      release,
+      artistName,
+      onCopy: async () => {
+        handleCopySmartLink();
+      },
+      onOpenSmartLink: () => {
+        globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
+      },
+      onCopyUseSoundLink: () => {
+        navigator.clipboard
+          ?.writeText(soundsUrl)
+          .then(() => {
+            toast.success('Use Sound link copied');
+          })
+          .catch(() => {});
+      },
+      onRefresh,
+      isRefreshing,
+    });
+  }, [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]);
+
+  const contextMenuItems = useMemo(
+    () => convertToCommonDropdownItems(canonicalActions),
+    [canonicalActions]
   );
 
   const { title: headerTitle, actions: headerActions } = useReleaseHeaderParts({
     release,
     hasRelease,
-    artistName: artistName ?? undefined,
-    onRefresh,
-    isRefreshing,
-    onCopySmartLink: () => {
-      handleCopySmartLink();
-    },
+    contextMenuItems: canonicalActions,
     onClose,
   });
 

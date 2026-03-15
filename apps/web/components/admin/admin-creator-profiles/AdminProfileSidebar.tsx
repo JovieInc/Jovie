@@ -1,5 +1,6 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -38,6 +39,7 @@ interface AdminProfileSidebarProps {
   readonly contact: Contact | null;
   readonly isOpen: boolean;
   readonly onClose: () => void;
+  readonly contextMenuItems?: CommonDropdownItem[];
 }
 
 export function AdminProfileSidebar({
@@ -45,6 +47,7 @@ export function AdminProfileSidebar({
   contact,
   isOpen,
   onClose,
+  contextMenuItems,
 }: AdminProfileSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
@@ -76,15 +79,17 @@ export function AdminProfileSidebar({
       ariaLabel='Creator profile'
       title='Creator profile'
       onClose={onClose}
+      contextMenuItems={contextMenuItems}
+      tabsContainerClassName='px-4 py-1.5'
       entityHeader={
-        <div className='space-y-3'>
+        <div className='space-y-2.5'>
           <ProfileContactHeader
             displayName={profile.displayName ?? profile.username}
             username={profile.username}
             avatarUrl={profile.avatarUrl}
           />
-          <div className='grid grid-cols-[76px,minmax(0,1fr)] items-center gap-2.5'>
-            <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <div className='grid grid-cols-[72px,minmax(0,1fr)] items-center gap-2'>
+            <span className='text-[9.5px] font-[510] uppercase tracking-[0.1em] text-(--linear-text-tertiary)'>
               Profile link
             </span>
             <div className='flex items-center gap-2'>
@@ -92,12 +97,12 @@ export function AdminProfileSidebar({
                 url={`${BASE_URL}/${profile.username}`}
                 size='sm'
                 className='flex-1'
-                inputClassName='h-7 rounded-[10px] px-2.5 py-1.5 text-[12px]'
-                buttonClassName='right-0.5'
+                inputClassName='h-[30px] rounded-[9px] px-2.5 py-1 text-[11.5px]'
+                buttonClassName='right-1'
               />
               <AppIconButton
                 ariaLabel='Open public profile'
-                className='h-7 w-7 shrink-0 rounded-[10px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='h-[30px] w-[30px] shrink-0 rounded-[9px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-[13px] [&_svg]:w-[13px]'
                 onClick={() =>
                   globalThis.open(
                     `${BASE_URL}/${profile.username}`,
@@ -120,7 +125,7 @@ export function AdminProfileSidebar({
           }
           options={PROFILE_TAB_OPTIONS}
           ariaLabel='Creator profile sidebar view'
-          triggerClassName='h-8 px-3 text-[12px]'
+          triggerClassName='h-[30px] px-2.5 text-[11.5px]'
         />
       }
     >

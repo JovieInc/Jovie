@@ -9,7 +9,7 @@
 
 import { Check, Contact, Copy, ExternalLink, QrCode } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -70,7 +70,7 @@ export function useProfileHeaderParts({
       : getProfileModePath(username, 'profile');
   const profileUrl = `${BASE_URL}${resolvedProfilePath}`;
 
-  const handleCopyUrl = async () => {
+  const handleCopyUrl = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(profileUrl);
       setIsCopied(true);
@@ -80,26 +80,28 @@ export function useProfileHeaderParts({
     } catch {
       toast.error('Failed to copy');
     }
-  };
+  }, [profileUrl]);
 
-  const handleOpenProfile = () => {
+  const handleOpenProfile = useCallback(() => {
     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer');
-  };
+  }, [profileUrl]);
 
-  const handleDownloadVCard = () => {
-    const blob = new Blob([generateVCard(displayName, username, profileUrl)], {
-      type: 'text/vcard',
-    });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${username}.vcf`;
-    link.click();
-    URL.revokeObjectURL(blobUrl);
-    toast.success('vCard downloaded');
-  };
+  const handleDownloadVCard = useCallback(() => {
+    try {
+      const blob = new Blob(
+        [generateVCard(displayName, username, profileUrl)],
+        {
+          type: 'text/vcard',
+        }
+      );
+      downloadBlob(blob, `${username}.vcf`);
+      toast.success('vCard downloaded');
+    } catch {
+      toast.error('Unable to download vCard');
+    }
+  }, [displayName, profileUrl, username]);
 
-  const handleDownloadQRCode = async () => {
+  const handleDownloadQRCode = useCallback(async () => {
     try {
       const qrUrl = getQrCodeUrl(profileUrl, 420);
       const response = await fetch(qrUrl);
@@ -114,7 +116,7 @@ export function useProfileHeaderParts({
     } catch {
       toast.error('Unable to download QR code');
     }
-  };
+  }, [profileUrl, username]);
 
   const primaryActions: DrawerHeaderAction[] = [
     {
