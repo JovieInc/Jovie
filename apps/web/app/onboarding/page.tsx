@@ -1,12 +1,12 @@
-import { currentUser } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { AuthLayout } from '@/components/auth';
 import { OnboardingFormWrapper } from '@/components/dashboard/organisms/OnboardingFormWrapper';
 import { APP_ROUTES } from '@/constants/routes';
+import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
-import { resolveUserState } from '@/lib/auth/gate';
+import { resolveUserState, UserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
@@ -36,6 +36,15 @@ export default async function OnboardingPage({
   // Just get user data and render the form
   const authResult = await resolveUserState();
 
+  // Gate blocked states — proxy normally prevents these from reaching here,
+  // but the page must not render for banned/failed users regardless.
+  if (authResult.state === UserState.BANNED) {
+    redirect('/banned');
+  }
+  if (authResult.state === UserState.USER_CREATION_FAILED) {
+    redirect('/error/user-creation-failed');
+  }
+
   // Defensive check: ensure we have a valid Clerk user ID
   // This can happen legitimately in certain scenarios:
   // - Clerk bypass/mock mode is enabled
@@ -63,7 +72,7 @@ export default async function OnboardingPage({
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
   }
 
-  const user = await currentUser();
+  const user = await getCachedCurrentUser();
   const clerkIdentity = resolveClerkIdentity(user);
   const userEmail = authResult.context.email ?? clerkIdentity.email ?? null;
   const userId = authResult.clerkUserId;
