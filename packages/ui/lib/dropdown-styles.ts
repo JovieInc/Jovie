@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
 
 /**
  * Shadow effect for elevated appearance
@@ -163,13 +163,13 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-[5px] text-[12.5px] font-[450] leading-[18px] outline-none ' +
+  'relative flex cursor-default select-none items-center gap-1.5 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[450] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-[0.46] ' +
   'focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1) ' +
-  '[&_svg]:pointer-events-none [&_svg]:h-[13px] [&_svg]:w-[13px] [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
+  '[&_svg]:pointer-events-none [&_svg]:h-3 [&_svg]:w-3 [&_svg]:shrink-0 [&_svg]:[stroke-width:1.5] [&_svg]:text-(--linear-text-tertiary) ' +
   'hover:[&_svg]:text-(--linear-text-primary) data-[highlighted]:[&_svg]:text-(--linear-text-primary)';
 
 /**
@@ -185,7 +185,7 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-(--linear-app-radius-item) py-[5px] pl-8 pr-2 text-[12.5px] font-[450] leading-[18px] outline-none ' +
+  'relative flex cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1 pl-7 pr-2 text-[12.5px] font-[450] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
@@ -233,14 +233,14 @@ export const MENU_ITEM_COMPACT_DESTRUCTIVE = MENU_ITEM_DESTRUCTIVE;
  * Menu label styles (group headers)
  */
 export const MENU_LABEL_BASE =
-  'px-2 py-1.5 text-[11px] font-medium text-(--linear-text-tertiary)';
+  'px-2 py-1 text-[11px] font-medium text-(--linear-text-tertiary)';
 
 /**
  * Menu separator styles
  * Uses design token for border consistency
  */
 export const MENU_SEPARATOR_BASE =
-  '-mx-0.5 my-0.5 h-px bg-(--linear-border-subtle)';
+  '-mx-0.5 my-px h-px bg-(--linear-border-subtle)';
 
 /**
  * Keyboard shortcut indicator styles
