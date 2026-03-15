@@ -46,11 +46,11 @@ describe('sender policy', () => {
 
   it('honors system env overrides for from/reply-to', async () => {
     const policy = await loadSenderPolicy({
-      resendFromEmail: 'notifications@notify.jov.ie',
+      resendFromEmail: 'custom@example.com',
       resendReplyToEmail: 'support@jov.ie',
     });
     expect(policy.getSenderPolicy('system')).toEqual({
-      fromEmail: 'notifications@notify.jov.ie',
+      fromEmail: 'custom@example.com',
       replyToEmail: 'support@jov.ie',
     });
   });
