@@ -26,25 +26,8 @@ function isMissingLeadInsertColumnError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
 
-  return (
-    normalized.includes(
-      'column "spotify_popularity" of relation "leads" does not exist'
-    ) ||
-    normalized.includes(
-      'column "spotify_followers" of relation "leads" does not exist'
-    ) ||
-    normalized.includes(
-      'column "release_count" of relation "leads" does not exist'
-    ) ||
-    normalized.includes(
-      'column "latest_release_date" of relation "leads" does not exist'
-    ) ||
-    normalized.includes(
-      'column "priority_score" of relation "leads" does not exist'
-    ) ||
-    normalized.includes(
-      'column "is_linktree_verified" of relation "leads" does not exist'
-    )
+  return /^column "[a-z_]+" of relation "leads" does not exist$/m.test(
+    normalized
   );
 }
 
