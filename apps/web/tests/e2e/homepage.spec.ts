@@ -72,10 +72,10 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.'
+      'One link that captures every fan.'
     );
     await expect(
-      page.getByText(/Connect your Spotify, capture every fan/i)
+      page.getByText(/Connect Spotify, grow your audience automatically/i)
     ).toBeVisible();
 
     // Claim handle input in hero
@@ -113,7 +113,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     await expect(page.locator('h1')).toContainText(
-      'The link your music deserves.',
+      'One link that captures every fan.',
       { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
 
