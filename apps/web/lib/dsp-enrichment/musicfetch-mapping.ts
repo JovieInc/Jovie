@@ -13,6 +13,7 @@ export interface MusicFetchProfileFieldState {
   spotifyUrl: string | null;
   spotifyId: string | null;
   bio: string | null;
+  avatarUrl: string | null;
   appleMusicUrl: string | null;
   appleMusicId: string | null;
   youtubeUrl: string | null;
@@ -93,6 +94,10 @@ export function mapMusicFetchProfileFields(
 
   if (!existingProfile.bio && artistData.bio) {
     updates.bio = artistData.bio;
+  }
+
+  if (!existingProfile.avatarUrl && artistData.image?.url) {
+    updates.avatarUrl = artistData.image.url;
   }
 
   return updates;
