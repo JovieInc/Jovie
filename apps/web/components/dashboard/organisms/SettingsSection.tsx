@@ -33,11 +33,11 @@ export function SettingsSection({
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
       className={cn(
-        'scroll-mt-4 rounded-xl border border-subtle/70 bg-surface-0 px-4 py-4 sm:px-5',
+        'scroll-mt-4 rounded-xl border border-subtle/65 bg-surface-0/95 px-4 py-3.5 sm:px-5',
         className
       )}
     >
-      <div className={cn('mb-3', headerClassName)}>
+      <div className={cn('mb-2.5', headerClassName)}>
         <h2
           id={headingId}
           className={cn(
