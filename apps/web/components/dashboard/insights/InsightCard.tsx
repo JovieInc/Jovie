@@ -1,5 +1,6 @@
 'use client';
 
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { InsightResponse } from '@/types/insights';
 import { InsightActions } from './InsightActions';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
@@ -22,8 +23,9 @@ interface InsightCardProps {
 
 export function InsightCard({ insight }: InsightCardProps) {
   return (
-    <article
-      className={`rounded-xl border border-subtle border-l-[3px] ${PRIORITY_STYLES[insight.priority]} bg-surface-1 p-4 transition-all duration-200`}
+    <ContentSurfaceCard
+      as='article'
+      className={`border-l-[3px] ${PRIORITY_STYLES[insight.priority]} p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)`}
       aria-label={`${PRIORITY_LABELS[insight.priority]} insight: ${insight.title}`}
     >
       <div className='flex items-start gap-3'>
@@ -42,7 +44,7 @@ export function InsightCard({ insight }: InsightCardProps) {
 
           {/* Action suggestion */}
           {insight.actionSuggestion ? (
-            <p className='mt-2 text-[13px] font-[510] text-accent-token'>
+            <p className='mt-2 text-[13px] font-[510] text-(--linear-text-primary)'>
               &rarr; {insight.actionSuggestion}
             </p>
           ) : null}
@@ -61,6 +63,6 @@ export function InsightCard({ insight }: InsightCardProps) {
           </div>
         </div>
       </div>
-    </article>
+    </ContentSurfaceCard>
   );
 }

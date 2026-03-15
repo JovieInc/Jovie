@@ -12,6 +12,63 @@ interface PushLeadParams {
   priorityScore: number;
 }
 
+function isRateLimitRetry(status: number, attempt: number): boolean {
+  return status === 429 && attempt === 0;
+}
+
+function shouldRethrowImmediately(error: unknown, attempt: number): boolean {
+  return (
+    attempt === 0 && !(error instanceof Error && error.message.includes('429'))
+  );
+}
+
+async function attemptLeadPush(
+  apiKey: string,
+  body: object,
+  email: string
+): Promise<string> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(`${INSTANTLY_API_BASE}/leads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (isRateLimitRetry(response.status, attempt)) {
+        pipelineLog('instantly', 'Rate limited, retrying after 2s', { email });
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => 'Unknown error');
+        throw new Error(`Instantly API error ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      const instantlyLeadId = data.id ?? data.lead_id ?? '';
+      pipelineLog('instantly', 'Lead pushed successfully', {
+        email,
+        instantlyLeadId,
+      });
+      return instantlyLeadId;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (shouldRethrowImmediately(error, attempt)) {
+        throw lastError;
+      }
+    }
+  }
+
+  throw lastError ?? new Error('Instantly push failed after retries');
+}
+
 export async function pushLeadToInstantly(
   params: PushLeadParams
 ): Promise<string> {
@@ -50,49 +107,5 @@ export async function pushLeadToInstantly(
     },
   };
 
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const response = await fetch(`${INSTANTLY_API_BASE}/leads`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (response.status === 429 && attempt === 0) {
-        pipelineLog('instantly', 'Rate limited, retrying after 2s', {
-          email: params.email,
-        });
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        continue;
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => 'Unknown error');
-        throw new Error(`Instantly API error ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
-      const instantlyLeadId = data.id ?? data.lead_id ?? '';
-      pipelineLog('instantly', 'Lead pushed successfully', {
-        email: params.email,
-        instantlyLeadId,
-      });
-      return instantlyLeadId;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (
-        attempt === 0 &&
-        !(error instanceof Error && error.message.includes('429'))
-      ) {
-        throw lastError;
-      }
-    }
-  }
-
-  throw lastError ?? new Error('Instantly push failed after retries');
+  return attemptLeadPush(apiKey, body, params.email);
 }

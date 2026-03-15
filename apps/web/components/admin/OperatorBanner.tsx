@@ -4,7 +4,7 @@ import { QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { publicEnv } from '@/lib/env-public';
-import { useEnvHealthQuery } from '@/lib/queries/useEnvHealthQuery';
+import { useEnvHealthQuery } from '@/lib/queries';
 
 /**
  * Operator Banner Component (ENG-004)

@@ -8,6 +8,7 @@ import {
   formatVerifiedPriceLabel,
   getPreferredVerifiedPrice,
 } from '@/lib/billing/verified-upgrade';
+import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   useCheckoutMutation,
@@ -47,9 +48,12 @@ export function useUserMenuActions({
   const notifications = useNotifications();
   const router = useRouter();
   const [signOutLoading, setSignOutLoading] = useState(false);
+  const isPassiveRuntime = env.IS_E2E;
 
   // TanStack Query for pricing options (pre-fetched for faster checkout)
-  const { data: pricingData, refetch: fetchPricing } = usePricingOptionsQuery();
+  const { data: pricingData, refetch: fetchPricing } = usePricingOptionsQuery({
+    enabled: !isPassiveRuntime,
+  });
 
   // TanStack Query mutations for Stripe operations
   const checkoutMutation = useCheckoutMutation();
@@ -103,6 +107,10 @@ export function useUserMenuActions({
     if (derivedLoading.upgrade) return;
 
     try {
+      if (isPassiveRuntime) {
+        return;
+      }
+
       track('billing_upgrade_clicked', {
         ...ANALYTICS_CONTEXT,
         plan: billingStatus.plan ?? 'unknown',
@@ -159,6 +167,10 @@ export function useUserMenuActions({
     if (derivedLoading.manageBilling) return;
 
     try {
+      if (isPassiveRuntime) {
+        return;
+      }
+
       if (!billingStatus.hasStripeCustomer) {
         track('billing_manage_billing_missing_customer', {
           ...ANALYTICS_CONTEXT,

@@ -1,4 +1,5 @@
 import { type Page, type Route } from '@playwright/test';
+import { profileModes } from '@/components/profile/registry';
 import { expect, test } from './setup';
 import {
   checkElementVisibility,
@@ -22,6 +23,10 @@ import {
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
+test.skip(
+  process.env.E2E_FAST_ITERATION === '1',
+  'Public profile matrix coverage runs in the slower public-profile lane'
+);
 
 const hasDatabase = !!(
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')
@@ -245,13 +250,15 @@ describeProfile('Profile - Admin (/tim)', () => {
 // Profile Modes x Breakpoints
 // ============================================================================
 
-const PROFILE_MODES = [
-  { mode: 'profile', query: '' },
-  { mode: 'listen', query: '?mode=listen' },
-  { mode: 'tip', query: '?mode=tip' },
-  { mode: 'subscribe', query: '?mode=subscribe' },
-  { mode: 'about', query: '?mode=about' },
-] as const;
+const PROFILE_MODES = profileModes
+  .filter(mode => mode !== 'contact' && mode !== 'tour')
+  .map(mode => ({
+    mode,
+    query: mode === 'profile' ? '' : `?mode=${mode}`,
+  })) as ReadonlyArray<{
+  mode: (typeof profileModes)[number];
+  query: string;
+}>;
 
 const BREAKPOINTS = [
   { name: 'mobile', width: 375, height: 812 },

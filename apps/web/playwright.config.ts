@@ -18,15 +18,18 @@ if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
 const isSmokeOnly = process.env.SMOKE_ONLY === '1';
 const isCI = !!process.env.CI;
 const isFullMatrix = process.env.E2E_FULL_MATRIX === '1';
+const shouldSkipManagedWebServer = process.env.E2E_SKIP_WEB_SERVER === '1';
 const sentryE2eEnabled =
   process.env.SENTRY_E2E_REPORTING === '1' && Boolean(process.env.SENTRY_DSN);
 
 const videoMode: 'off' | 'retain-on-failure' =
   isCI && isSmokeOnly ? 'off' : 'retain-on-failure';
 
+const stableLocalServerCommand =
+  process.env.E2E_WEB_SERVER_COMMAND ?? 'pnpm run dev:local:playwright';
 const webServerCommand = process.env.DATABASE_URL
-  ? 'pnpm run dev:local'
-  : 'doppler run -- pnpm run dev:local';
+  ? stableLocalServerCommand
+  : `doppler run -- ${stableLocalServerCommand}`;
 
 function getRetries(): number {
   if (!isCI) return 0;
@@ -127,7 +130,7 @@ export default defineConfig({
   ],
 
   // Only start web server if not in CI (when BASE_URL is not set)
-  ...(isCI && process.env.BASE_URL
+  ...(shouldSkipManagedWebServer || (isCI && process.env.BASE_URL)
     ? {}
     : {
         webServer: {
@@ -138,7 +141,10 @@ export default defineConfig({
             ...process.env,
             NODE_ENV: 'test',
             PORT: '3100',
+            NEXT_PUBLIC_E2E_MODE: '1',
             NEXT_DISABLE_TOOLBAR: '1',
+            E2E_FAST_ONBOARDING: '1',
+            E2E_ALLOW_DEV_CSP: '1',
             NODE_OPTIONS:
               `${process.env.NODE_OPTIONS || ''} --max-old-space-size=8192`.trim(),
           },

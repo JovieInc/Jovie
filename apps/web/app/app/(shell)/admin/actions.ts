@@ -10,6 +10,7 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
 
@@ -21,14 +22,7 @@ class AdminUnauthorizedError extends Error {
 }
 
 function isAllowedAvatarHost(hostname: string): boolean {
-  const allowedHosts = [
-    'images.clerk.dev',
-    'img.clerk.com',
-    'images.unsplash.com',
-    'blob.vercel-storage.com',
-  ];
-
-  return allowedHosts.includes(hostname);
+  return isAllowedAvatarHostname(hostname);
 }
 
 function validateAvatarUrl(url: string): string {
@@ -158,11 +152,12 @@ export async function bulkRerunCreatorIngestionAction(
     const batch = profiles.slice(index, index + BATCH_SIZE);
     const jobIds = await Promise.all(
       batch.map(async profile => {
-        const spotifyUrl = profile.spotifyUrl?.trim()
-          ? profile.spotifyUrl
-          : profile.spotifyId
-            ? `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`
-            : null;
+        let spotifyUrl: string | null = null;
+        if (profile.spotifyUrl?.trim()) {
+          spotifyUrl = profile.spotifyUrl;
+        } else if (profile.spotifyId) {
+          spotifyUrl = `https://open.spotify.com/artist/${encodeURIComponent(profile.spotifyId)}`;
+        }
 
         if (!spotifyUrl) {
           return null;

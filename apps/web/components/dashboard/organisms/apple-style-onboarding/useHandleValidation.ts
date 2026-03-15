@@ -30,6 +30,11 @@ interface ApiValidationResult {
   error?: string;
 }
 
+interface HandleValidationResponse {
+  input: string;
+  result: ApiValidationResult;
+}
+
 /** Maximum time (ms) to stay in "checking" state before resetting */
 const CHECKING_SAFETY_TIMEOUT_MS =
   PACER_TIMING.VALIDATION_TIMEOUT_MS + PACER_TIMING.VALIDATION_DEBOUNCE_MS;
@@ -48,9 +53,10 @@ export function useHandleValidation({
   fullName,
 }: UseHandleValidationOptions): UseHandleValidationReturn {
   const [handle, setHandle] = useState(normalizedInitialHandle);
+  const handleRef = useRef(normalizedInitialHandle);
   const [handleValidation, setHandleValidation] =
     useState<HandleValidationState>({
-      available: false,
+      available: Boolean(normalizedInitialHandle),
       checking: false,
       error: null,
       clientValid: Boolean(normalizedInitialHandle),
@@ -58,11 +64,18 @@ export function useHandleValidation({
     });
 
   // TanStack Pacer hook for API validation with debouncing and caching
+  const latestRequestedHandleRef = useRef(normalizedInitialHandle);
+
+  useEffect(() => {
+    handleRef.current = handle;
+  }, [handle]);
+
   const {
     validate: validateApi,
+    cancel: cancelValidation,
     isPending,
     isValidating,
-  } = useAsyncValidation<string, ApiValidationResult>({
+  } = useAsyncValidation<string, HandleValidationResponse>({
     validatorFn: async (normalizedInput: string, signal: AbortSignal) => {
       const response = await fetch(
         `/api/handle/check?handle=${encodeURIComponent(normalizedInput)}`,
@@ -76,11 +89,18 @@ export function useHandleValidation({
         throw new Error(data.error || 'Unable to check handle.');
       }
 
-      return (await response.json()) as ApiValidationResult;
+      return {
+        input: normalizedInput,
+        result: (await response.json()) as ApiValidationResult,
+      };
     },
     wait: PACER_TIMING.ONBOARDING_HANDLE_DEBOUNCE_MS,
     timeout: PACER_TIMING.VALIDATION_TIMEOUT_MS,
-    onSuccess: (result: ApiValidationResult) => {
+    onSuccess: ({ input, result }: HandleValidationResponse) => {
+      if (input !== latestRequestedHandleRef.current) {
+        return;
+      }
+
       if (result.available) {
         setHandleValidation({
           available: true,
@@ -91,7 +111,7 @@ export function useHandleValidation({
         });
       } else {
         // Generate suggestions for taken handles
-        const suggestions = generateUsernameSuggestions(handle, fullName).slice(
+        const suggestions = generateUsernameSuggestions(input, fullName).slice(
           0,
           3
         );
@@ -105,6 +125,10 @@ export function useHandleValidation({
       }
     },
     onError: (error: Error) => {
+      if (latestRequestedHandleRef.current !== handleRef.current) {
+        return;
+      }
+
       if (isAbortError(error)) {
         // Reset local checking flag. If Pacer still has a pending request,
         // isChecking (isPending || isValidating) keeps the combined state true.
@@ -117,7 +141,7 @@ export function useHandleValidation({
       }
 
       // Capture warning to Sentry for monitoring API failures
-      void captureWarning('Handle validation API failed', error, {
+      captureWarning('Handle validation API failed', error, {
         handle,
         route: '/onboarding',
         component: 'useHandleValidation',
@@ -177,11 +201,14 @@ export function useHandleValidation({
     (input: string) => {
       const normalizedInput = input.trim().toLowerCase();
 
+      latestRequestedHandleRef.current = normalizedInput;
+
       // Fast path: if input matches initial handle, mark as valid immediately
       if (
         normalizedInitialHandle &&
         normalizedInput === normalizedInitialHandle
       ) {
+        cancelValidation();
         setHandle(normalizedInput);
         setHandleValidation({
           available: true,
@@ -196,6 +223,7 @@ export function useHandleValidation({
       // Client-side validation first (synchronous)
       const clientResult = validateUsernameFormat(normalizedInput);
       if (!clientResult.valid) {
+        cancelValidation();
         setHandleValidation({
           available: false,
           checking: false,
@@ -217,16 +245,25 @@ export function useHandleValidation({
       });
 
       // Trigger API validation via Pacer (debounced, cached)
-      void validateApiRef.current(normalizedInput);
+      validateApiRef.current(normalizedInput);
     },
-    [normalizedInitialHandle]
+    [cancelValidation, normalizedInitialHandle]
   );
+
+  const isSeededInitialHandleReady =
+    Boolean(normalizedInitialHandle) &&
+    handle === normalizedInitialHandle &&
+    handleValidation.available &&
+    handleValidation.clientValid &&
+    !handleValidation.error;
 
   return {
     handleValidation: {
       ...handleValidation,
       // Ensure checking reflects Pacer's state
-      checking: handleValidation.checking || isChecking,
+      checking: isSeededInitialHandleReady
+        ? false
+        : handleValidation.checking || isChecking,
     },
     setHandleValidation,
     handle,

@@ -1,5 +1,7 @@
 import { expect, test } from './setup';
 
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Legal Pages Tests
  *
@@ -11,6 +13,11 @@ import { expect, test } from './setup';
 test.use({ storageState: { cookies: [], origins: [] } });
 
 test.describe('Legal Pages', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Legal page coverage runs in the slower public-content lane'
+  );
+
   // Legal pages use heavy markdown rendering which can take 90s+ on first Turbopack compile
   test.setTimeout(300_000);
 

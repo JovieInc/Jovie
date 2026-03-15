@@ -60,8 +60,8 @@ export default function ContactsLoading() {
       {/* Desktop: table layout (hidden below sm) */}
       <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
         <table className='w-full border-collapse text-[13px]'>
-          <thead className='sticky top-0 z-10 bg-surface-1'>
-            <tr className='border-b border-subtle'>
+          <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface)'>
+            <tr className='border-b border-(--linear-border-subtle)'>
               {CONTACTS_HEADER_KEYS.map(key => (
                 <th key={key} className='px-4 py-3 text-left'>
                   <LoadingSkeleton
@@ -77,7 +77,7 @@ export default function ContactsLoading() {
             {CONTACTS_ROW_KEYS.map(rowKey => (
               <tr
                 key={rowKey}
-                className='border-b border-subtle'
+                className='border-b border-(--linear-border-subtle)'
                 style={{ height: 44 }}
               >
                 {CONTACTS_HEADER_KEYS.map(colKey => (
@@ -96,7 +96,7 @@ export default function ContactsLoading() {
       </div>
 
       {/* Footer matching actual contacts footer */}
-      <div className='shrink-0 flex items-center justify-between border-t border-subtle px-4 py-2'>
+      <div className='shrink-0 flex items-center justify-between border-t border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-2'>
         <LoadingSkeleton height='h-4' width='w-20' rounded='md' />
         <LoadingSkeleton height='h-8' width='w-28' rounded='lg' />
       </div>

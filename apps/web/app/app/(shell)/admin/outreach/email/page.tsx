@@ -1,11 +1,20 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { OutreachStatusBadge } from '@/components/admin/outreach/OutreachStatusBadge';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  CONTENT_TABLE_CELL_CLASS,
+  CONTENT_TABLE_FOOTER_CLASS,
+  CONTENT_TABLE_HEAD_CELL_CLASS,
+  CONTENT_TABLE_HEAD_ROW_CLASS,
+  CONTENT_TABLE_ROW_CLASS,
+  ContentTable,
+  ContentTableStateRow,
+} from '@/components/molecules/ContentTable';
+import { cn } from '@/lib/utils';
 
 interface EmailQueueLead {
   id: string;
@@ -29,10 +38,12 @@ export default function AdminOutreachEmailPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const limit = 50;
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = new URLSearchParams({
         queue: 'email',
@@ -49,125 +60,110 @@ export default function AdminOutreachEmailPage() {
       setLeads(data.items);
       setTotal(data.total);
     } catch {
-      toast.error('Failed to load email queue');
+      setLeads([]);
+      setTotal(0);
+      setLoadError(
+        'We could not load the email queue right now. Please try again shortly.'
+      );
     } finally {
       setLoading(false);
     }
   }, [page]);
 
   useEffect(() => {
-    void fetchQueue();
+    fetchQueue();
   }, [fetchQueue]);
 
   const totalPages = Math.ceil(total / limit);
+  const hasPreviousPage = page > 1;
+  const hasNextPage = page < totalPages;
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
-      <section className='rounded-lg border border-subtle p-4 sm:p-6'>
-        <div className='mb-4'>
-          <h2 className='text-sm font-semibold text-primary-token'>
-            Email Queue ({total})
-          </h2>
-        </div>
+    <div className='flex flex-col gap-4'>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader
+          title='Email Queue'
+          subtitle='Highest-priority leads queued for email outreach'
+          actions={
+            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+              {total} queued
+            </span>
+          }
+          className='min-h-0 px-4 py-3 sm:px-6'
+          actionsClassName='shrink-0'
+        />
 
-        <div className='overflow-x-auto'>
-          <table className='w-full text-xs'>
-            <thead>
-              <tr className='border-b border-subtle text-left text-secondary-token'>
-                <th className='pb-2 pr-3 font-medium'>Name</th>
-                <th className='pb-2 pr-3 font-medium'>Priority</th>
-                <th className='pb-2 pr-3 font-medium'>Fit Score</th>
-                <th className='pb-2 pr-3 font-medium'>Email</th>
-                <th className='pb-2 pr-3 font-medium'>Status</th>
-                <th className='pb-2 font-medium'>Queued At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    <LoadingSpinner
-                      size='sm'
-                      tone='muted'
-                      className='mx-auto'
-                    />
+        <ContentTable>
+          <thead>
+            <tr className={CONTENT_TABLE_HEAD_ROW_CLASS}>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Name</th>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Priority</th>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Fit Score</th>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Email</th>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Status</th>
+              <th className={CONTENT_TABLE_HEAD_CELL_CLASS}>Queued At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading || leads.length === 0 ? (
+              <ContentTableStateRow
+                colSpan={6}
+                isLoading={loading}
+                emptyMessage={loadError ?? 'No leads in email queue'}
+                loadingLabel='Loading email queue'
+              />
+            ) : (
+              leads.map(lead => (
+                <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
+                  <td className={CONTENT_TABLE_CELL_CLASS}>
+                    <span className='font-[560] text-(--linear-text-primary)'>
+                      {lead.displayName || '-'}
+                    </span>
                   </td>
-                </tr>
-              ) : leads.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className='py-8 text-center text-secondary-token'
-                  >
-                    No leads in email queue
+                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
+                    {lead.priorityScore ?? '-'}
                   </td>
-                </tr>
-              ) : (
-                leads.map(lead => (
-                  <tr
-                    key={lead.id}
-                    className='border-b border-subtle hover:bg-white/[0.03]'
-                  >
-                    <td className='py-2.5 pr-3'>
-                      <span className='font-medium text-primary-token'>
-                        {lead.displayName || '-'}
-                      </span>
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.priorityScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3 tabular-nums'>
-                      {lead.fitScore ?? '-'}
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      <span className='text-secondary-token'>
-                        {lead.contactEmail || '-'}
-                      </span>
-                    </td>
-                    <td className='py-2.5 pr-3'>
-                      <OutreachStatusBadge status={lead.outreachStatus} />
-                    </td>
-                    <td className='py-2.5 text-secondary-token'>
+                  <td className={cn(CONTENT_TABLE_CELL_CLASS, 'tabular-nums')}>
+                    {lead.fitScore ?? '-'}
+                  </td>
+                  <td className={CONTENT_TABLE_CELL_CLASS}>
+                    <span className='text-(--linear-text-secondary)'>
+                      {lead.contactEmail || '-'}
+                    </span>
+                  </td>
+                  <td className={CONTENT_TABLE_CELL_CLASS}>
+                    <OutreachStatusBadge status={lead.outreachStatus} />
+                  </td>
+                  <td className={CONTENT_TABLE_CELL_CLASS}>
+                    <span className='text-(--linear-text-secondary)'>
                       {lead.outreachQueuedAt
                         ? new Date(lead.outreachQueuedAt).toLocaleDateString()
                         : '-'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </ContentTable>
 
         {totalPages > 1 && (
-          <div className='mt-3 flex items-center justify-between'>
-            <span className='text-xs text-secondary-token'>
-              Page {page} of {totalPages}
-            </span>
-            <div className='flex gap-1'>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1 || loading}
-              >
-                <ChevronLeft className='size-4' />
-              </Button>
-              <Button
-                variant='outline'
-                size='sm'
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages || loading}
-              >
-                <ChevronRight className='size-4' />
-              </Button>
-            </div>
+          <div className={CONTENT_TABLE_FOOTER_CLASS}>
+            <AdminTablePagination
+              page={page}
+              totalPages={totalPages}
+              from={(page - 1) * limit + 1}
+              to={Math.min(page * limit, total)}
+              total={total}
+              canPrev={hasPreviousPage && !loading}
+              canNext={hasNextPage && !loading}
+              onPrevClick={() => setPage(p => Math.max(1, p - 1))}
+              onNextClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              entityLabel='leads'
+            />
           </div>
         )}
-      </section>
+      </ContentSurfaceCard>
     </div>
   );
 }

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 import {
+  FetchError,
+  fetchWithTimeout,
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
-} from '@/lib/queries/useDashboardSocialLinksQuery';
+} from '@/lib/queries';
 import {
   getPlatform,
   normalizeUrl,

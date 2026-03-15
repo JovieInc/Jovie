@@ -2,11 +2,12 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/components/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
-import { useAnalyticsFilterMutation } from '@/lib/queries/useSettingsMutation';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useAnalyticsFilterMutation } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 export interface SettingsAnalyticsSectionProps {
@@ -48,13 +49,15 @@ export function SettingsAnalyticsSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
-      <SettingsStatusPill status={saveStatus} className='px-4 pt-3' />
-      <div className='px-4 py-3'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Analytics filtering'
+        subtitle='Control whether your own visits are excluded from profile analytics.'
+        className='min-h-0 px-4 py-3'
+        actions={<SettingsStatusPill status={saveStatus} />}
+        actionsClassName='w-auto shrink-0'
+      />
+      <div className='space-y-3 px-4 py-3'>
         <SettingsToggleRow
           title='Exclude Yourself from Analytics'
           description='When enabled, your own visits to your profile page will not be counted in your analytics data.'
@@ -64,11 +67,8 @@ export function SettingsAnalyticsSection({
           ariaLabel='Exclude yourself from analytics'
           gated={!isPro}
         />
-      </div>
-
-      {isPro && excludeSelf && (
-        <div className='px-4 py-3'>
-          <div className='flex items-start gap-3'>
+        {isPro && excludeSelf ? (
+          <ContentSurfaceCard className='flex items-start gap-3 bg-(--linear-bg-surface-0) p-3.5'>
             <BarChart3 className='h-4 w-4 text-secondary-token mt-0.5 shrink-0' />
             <div>
               <p className='text-[13px] font-[510] text-primary-token'>
@@ -79,9 +79,9 @@ export function SettingsAnalyticsSection({
                 your analytics.
               </p>
             </div>
-          </div>
-        </div>
-      )}
-    </DashboardCard>
+          </ContentSurfaceCard>
+        ) : null}
+      </div>
+    </ContentSurfaceCard>
   );
 }

@@ -1,6 +1,7 @@
 import { Skeleton } from '@jovie/ui';
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   PageContent,
   PageHeader,
@@ -19,11 +20,14 @@ const ScreenshotGallery = dynamic(
     loading: () => (
       <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
         {SKELETON_KEYS.map(key => (
-          <div key={key} className='space-y-2'>
+          <ContentSurfaceCard
+            key={key}
+            className='space-y-3 rounded-[12px] bg-(--linear-bg-surface-0) p-3.5'
+          >
             <Skeleton className='aspect-video w-full' rounded='lg' />
             <Skeleton className='h-4 w-3/4' />
             <Skeleton className='h-8 w-24' rounded='md' />
-          </div>
+          </ContentSurfaceCard>
         ))}
       </div>
     ),

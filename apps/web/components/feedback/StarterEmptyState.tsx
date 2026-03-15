@@ -1,8 +1,10 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { Rocket, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import React from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 export interface StarterEmptyStateAction {
@@ -36,70 +38,68 @@ export function StarterEmptyState({
     isPrimary: boolean
   ) => {
     const variant = action.variant ?? (isPrimary ? 'primary' : 'secondary');
-    const baseClasses =
-      'inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2';
-    const variantClasses =
-      variant === 'primary'
-        ? 'bg-black text-white hover:bg-zinc-900 focus-visible:ring-zinc-900 dark:bg-white dark:text-black'
-        : 'border border-subtle bg-surface-1 text-primary-token hover:bg-surface-2 focus-visible:ring-zinc-900';
-    const classes = cn(baseClasses, variantClasses);
 
     if (action.href) {
       const isInternal = action.href.startsWith('/');
 
       if (isInternal && !action.onClick) {
         return (
-          <Link
+          <Button
             key={`${action.label}-${action.href}`}
-            href={action.href}
-            className={classes}
+            asChild
+            variant={variant === 'primary' ? 'primary' : 'secondary'}
+            size='sm'
           >
-            {action.label}
-          </Link>
+            <Link href={action.href}>{action.label}</Link>
+          </Button>
         );
       }
 
       return (
-        <a
+        <Button
           key={`${action.label}-${action.href}`}
-          href={action.href}
-          onClick={action.onClick}
-          className={classes}
+          asChild
+          variant={variant === 'primary' ? 'primary' : 'secondary'}
+          size='sm'
         >
-          {action.label}
-        </a>
+          <a href={action.href} onClick={action.onClick}>
+            {action.label}
+          </a>
+        </Button>
       );
     }
 
     return (
-      <button
+      <Button
         key={action.label}
         type='button'
+        variant={variant === 'primary' ? 'primary' : 'secondary'}
+        size='sm'
         onClick={action.onClick}
-        className={classes}
       >
         {action.label}
-      </button>
+      </Button>
     );
   };
 
   return (
-    <output
+    <ContentSurfaceCard
       aria-live='polite'
       data-testid={testId ?? 'app-empty-state'}
-      className={cn(
-        'rounded-2xl border border-dashed border-subtle bg-surface-1 p-6 shadow-sm',
-        className
-      )}
+      className={cn('border-dashed bg-(--linear-bg-surface-1) p-6', className)}
     >
       <div className='flex items-start gap-4'>
-        <div className='flex h-12 w-12 items-center justify-center rounded-xl bg-white text-zinc-900 shadow-sm ring-1 ring-subtle dark:bg-zinc-900 dark:text-white'>
+        <div className='flex h-12 w-12 items-center justify-center rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary) shadow-sm'>
           {icon ?? <Sparkles className='h-6 w-6' aria-hidden='true' />}
         </div>
         <div className='flex-1 space-y-2'>
           <div>
-            <p className='text-sm font-medium text-secondary-token'>{title}</p>
-            <p className='text-sm text-tertiary-token'>{description}</p>
+            <p className='text-sm font-medium text-(--linear-text-primary)'>
+              {title}
+            </p>
+            <p className='text-sm text-(--linear-text-secondary)'>
+              {description}
+            </p>
           </div>
 
           {(primaryAction || secondaryAction) && (
@@ -110,8 +110,11 @@ export function StarterEmptyState({
           )}
         </div>
 
-        <Rocket className='hidden h-10 w-10 text-accent-token sm:block' />
+        <Rocket
+          className='hidden h-10 w-10 text-(--linear-accent) sm:block'
+          aria-hidden='true'
+        />
       </div>
-    </output>
+    </ContentSurfaceCard>
   );
 }

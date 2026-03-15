@@ -39,4 +39,16 @@ export const FEATURE_FLAGS = {
    * Set to true when thread UX is ready for production.
    */
   THREADS_ENABLED: false,
+
+  /**
+   * "Replaces Linktree + Linkfire + Mailchimp" section on the marketing homepage.
+   * Set to true when copy and design are approved.
+   */
+  SHOW_REPLACES_SECTION: false,
+
+  /**
+   * PWA install banner in the sidebar.
+   * Set to true to enable the PWA install prompt for users.
+   */
+  PWA_INSTALL_BANNER: false,
 } as const;

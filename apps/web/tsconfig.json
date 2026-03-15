@@ -40,16 +40,13 @@
     "next-env.d.ts",
     ".next/types/**/*.ts",
     "tests/types/**/*.d.ts",
-    ".next/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "supabase/functions",
     // Next.js auto-generated validator file is noisy/unstable (unused @ts-expect-error); exclude for consistent typecheck.
     ".next/types/validator.ts",
-    ".next/dev/types/validator.ts",
-    ".next/dev/dev/types/validator.ts",
     "vitest.config.ts",
     "vitest.config.fast.ts",
     "**/*.stories.*",

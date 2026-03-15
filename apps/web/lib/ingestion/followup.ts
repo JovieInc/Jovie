@@ -150,8 +150,5 @@ export async function enqueueFollowupIngestionJobs(params: {
   if (jobValues.length === 0) return;
 
   // Batch insert all jobs in a single statement with conflict handling
-  await tx
-    .insert(ingestionJobs)
-    .values(jobValues)
-    .onConflictDoNothing({ target: ingestionJobs.dedupKey });
+  await tx.insert(ingestionJobs).values(jobValues).onConflictDoNothing();
 }

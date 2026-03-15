@@ -88,14 +88,18 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
 
 const PRO_FEATURES: readonly string[] = [
   'All Free features +',
-  'Unlimited smart links',
   'Pre-release & countdown pages',
   'Remove Jovie branding',
   'Extended analytics (90 days)',
   'Advanced analytics & geographic insights',
   'Filter your own visits',
+  'AI-powered insights',
   'Unlimited contacts',
   'Contact export',
+  'Fan CRM',
+  'Tips & payments',
+  'Earnings dashboard',
+  'Ad pixel tracking',
   'Verified badge',
   'AI assistant (100 messages/day)',
   'Priority support',
@@ -134,11 +138,23 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Auto-sync from Spotify',
         'Smart deep links',
         'Edit & customize smart links',
-        'Release notifications',
+        'Release pages with listen links per DSP',
+        'Short link redirects',
+        'Vanity URLs',
+        'Auto DSP detection & linking',
         'Manual release creation',
-        'AI-powered assistant (25 msgs/day)',
+        'Public artist profile page',
+        'Artist bio & social links',
+        'Subscribe / follow page',
+        'Contact page',
+        'About page',
+        'Tour dates (Bandsintown)',
+        'Release notifications',
+        'Click & visit tracking',
         'Basic analytics (30 days)',
+        'Audience intelligence',
         'Up to 100 contacts',
+        'AI assistant (25 msgs/day)',
       ],
       price: null,
     },
@@ -150,7 +166,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       displayName: 'Founding Member',
       tagline: 'Early supporter pricing, locked in for life',
       features: PRO_FEATURES,
-      price: { monthly: 9, yearly: null },
+      price: { monthly: 12, yearly: null },
     },
   },
   pro: {
@@ -188,19 +204,217 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       tagline: 'For serious artists',
       features: [
         'All Pro features +',
-        'Unlimited smart links',
         'Full analytics (1 year)',
-        'Automated follow-ups',
-        'A/B testing',
-        'Meta pixel integration',
-        'Custom domain',
-        'Catalog monitoring',
-        'Impersonation detection',
+        'AI assistant (500 messages/day)',
+        'A/B testing (Coming soon)',
+        'Automated follow-ups (Coming soon)',
+        'Catalog monitoring (Coming soon)',
       ],
       price: { monthly: 99, yearly: 948 },
     },
   },
 } as const;
+
+// ---------------------------------------------------------------------------
+// Pricing comparison chart data
+// ---------------------------------------------------------------------------
+
+export interface ComparisonFeature {
+  readonly name: string;
+  readonly free: boolean | string;
+  readonly pro: boolean | string;
+  readonly growth: boolean | string;
+  readonly comingSoon?: boolean;
+}
+
+export interface PricingCategory {
+  readonly category: string;
+  readonly features: readonly ComparisonFeature[];
+}
+
+export const PRICING_COMPARISON: readonly PricingCategory[] = [
+  {
+    category: 'Smart Links',
+    features: [
+      { name: 'Unlimited smart links', free: true, pro: true, growth: true },
+      { name: 'Auto-sync from Spotify', free: true, pro: true, growth: true },
+      {
+        name: 'Smart deep links (native apps)',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Edit & customize smart links',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Release pages with listen links per DSP',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      { name: 'Short link redirects', free: true, pro: true, growth: true },
+      { name: 'Vanity URLs', free: true, pro: true, growth: true },
+      {
+        name: 'Auto DSP detection & linking',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Manual release creation',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Pre-release & countdown pages',
+        free: false,
+        pro: true,
+        growth: true,
+      },
+    ],
+  },
+  {
+    category: 'Artist Profile',
+    features: [
+      {
+        name: 'Public artist profile page',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Artist bio & social links',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Subscribe / follow page',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      { name: 'Contact page', free: true, pro: true, growth: true },
+      { name: 'About page', free: true, pro: true, growth: true },
+      {
+        name: 'Tour dates (Bandsintown)',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      { name: 'Verified badge', free: false, pro: true, growth: true },
+      { name: 'Remove Jovie branding', free: false, pro: true, growth: true },
+    ],
+  },
+  {
+    category: 'Analytics',
+    features: [
+      {
+        name: 'Click & visit tracking',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Data retention',
+        free: '30 days',
+        pro: '90 days',
+        growth: '1 year',
+      },
+      {
+        name: 'Audience intelligence (device, location, intent)',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Advanced analytics & geographic insights',
+        free: false,
+        pro: true,
+        growth: true,
+      },
+      {
+        name: 'Filter your own visits',
+        free: false,
+        pro: true,
+        growth: true,
+      },
+      { name: 'AI-powered insights', free: false, pro: true, growth: true },
+      { name: 'Ad pixel tracking', free: false, pro: true, growth: true },
+      {
+        name: 'A/B testing',
+        free: false,
+        pro: false,
+        growth: true,
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    category: 'Audience & Growth',
+    features: [
+      {
+        name: 'Contact / subscriber capture',
+        free: 'Up to 100',
+        pro: 'Unlimited',
+        growth: 'Unlimited',
+      },
+      {
+        name: 'Release notifications (email to fans)',
+        free: true,
+        pro: true,
+        growth: true,
+      },
+      { name: 'Contact export', free: false, pro: true, growth: true },
+      { name: 'Fan CRM', free: false, pro: true, growth: true },
+      {
+        name: 'Automated follow-ups',
+        free: false,
+        pro: false,
+        growth: true,
+        comingSoon: true,
+      },
+      {
+        name: 'Catalog monitoring',
+        free: false,
+        pro: false,
+        growth: true,
+        comingSoon: true,
+      },
+    ],
+  },
+  {
+    category: 'Monetization',
+    features: [
+      { name: 'Tips & payments (Venmo)', free: false, pro: true, growth: true },
+      { name: 'Earnings dashboard', free: false, pro: true, growth: true },
+    ],
+  },
+  {
+    category: 'AI Assistant',
+    features: [
+      {
+        name: 'Daily messages',
+        free: '25 / day',
+        pro: '100 / day',
+        growth: '500 / day',
+      },
+      { name: 'AI tool use', free: true, pro: true, growth: true },
+    ],
+  },
+  {
+    category: 'Support',
+    features: [
+      { name: 'Email support', free: true, pro: true, growth: true },
+      { name: 'Priority support', free: false, pro: true, growth: true },
+    ],
+  },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Helpers

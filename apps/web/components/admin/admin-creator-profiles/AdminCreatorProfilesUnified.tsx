@@ -3,30 +3,23 @@
 import type { RowSelectionState } from '@tanstack/react-table';
 import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
 import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import {
-  convertToCommonDropdownItems,
-  UnifiedTable,
-  useRowSelection,
-} from '@/components/organisms/table';
-import { APP_ROUTES } from '@/constants/routes';
+import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { useAdminCreatorsInfiniteQuery } from '@/lib/queries/admin-infinite';
+import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { AdminProfileSidebar } from './AdminProfileSidebar';
 import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
-import { useContactSave } from './useContactSave';
-import { useDebouncedContactSave } from './useDebouncedContactSave';
 import { useIngestRefresh } from './useIngestRefresh';
 import { createCreatorProfileColumns } from './utils/column-definitions';
 
@@ -54,27 +47,14 @@ const SendInviteDialog = dynamic(
   { ssr: false }
 );
 
-const ContactSidebar = dynamic(
-  () =>
-    import('@/components/organisms/contact-sidebar').then(mod => ({
-      default: mod.ContactSidebar,
-    })),
-  {
-    loading: () => <div className='h-full w-full animate-pulse bg-surface-2' />,
-    ssr: false,
-  }
-);
-
 export function AdminCreatorProfilesUnified({
   profiles: initialProfiles,
   pageSize,
   total,
   search,
   sort,
-  mode = 'admin',
-  basePath = APP_ROUTES.ADMIN_CREATORS,
+  mode: _mode = 'admin',
 }: Readonly<AdminCreatorProfilesWithSidebarProps>) {
-  const router = useRouter();
   const { profiles, toggleVerification } =
     useCreatorVerification(initialProfiles);
 
@@ -121,7 +101,6 @@ export function AdminCreatorProfilesUnified({
 
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -168,35 +147,16 @@ export function AdminCreatorProfilesUnified({
     });
   }, []);
 
-  const {
-    setDraftContact,
-    effectiveContact,
-    refetchSocialLinks,
-    handleContactChange,
-  } = useContactHydration({
-    profiles: filteredProfiles,
-    selectedId,
-    enabled: sidebarOpen,
-  });
+  const { setDraftContact, effectiveContact, refetchSocialLinks } =
+    useContactHydration({
+      profiles: filteredProfiles,
+      selectedId,
+      enabled: sidebarOpen,
+    });
 
   const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
     selectedId,
     onRefreshComplete: refetchSocialLinks,
-  });
-
-  const { handleAvatarUpload } = useAvatarUpload();
-
-  const { saveContact, isSaving } = useContactSave({
-    onSaveSuccess: updatedContact => {
-      setDraftContact(updatedContact);
-    },
-  });
-
-  useDebouncedContactSave({
-    effectiveContact,
-    sidebarOpen,
-    isSaving,
-    saveContact,
   });
 
   const { getContextMenuItems } = useContextMenuItems({
@@ -235,6 +195,18 @@ export function AdminCreatorProfilesUnified({
     [setDraftContact]
   );
 
+  const handleOpenProfile = useCallback(() => {
+    const activeProfile = filteredProfiles.find(
+      profile => profile.id === selectedId
+    );
+    if (!activeProfile?.username) return;
+    globalThis.open(
+      getProfileUrl(activeProfile.username),
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [filteredProfiles, selectedId]);
+
   // Contact hydration now happens automatically via TanStack Query
   // when selectedId changes and sidebarOpen is true (enabled prop)
 
@@ -243,6 +215,7 @@ export function AdminCreatorProfilesUnified({
     selectedId,
     onSelect: setSelectedId,
     onToggleSidebar: () => setSidebarOpen(open => !open),
+    onActivate: handleOpenProfile,
     onCloseSidebar: () => setSidebarOpen(false),
     isSidebarOpen: sidebarOpen,
     getId: profile => profile.id,
@@ -251,11 +224,6 @@ export function AdminCreatorProfilesUnified({
   const handleSidebarClose = useCallback(() => {
     setSidebarOpen(false);
   }, []);
-
-  const handleSidebarRefresh = useCallback(() => {
-    router.refresh();
-    refetchSocialLinks();
-  }, [router, refetchSocialLinks]);
 
   React.useEffect(() => {
     if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
@@ -345,52 +313,34 @@ export function AdminCreatorProfilesUnified({
     const isChecked = selectedIdsRef.current.has(profile.id);
     const isSelected = profile.id === selectedIdRef.current;
 
-    const getSelectionClass = () => {
-      if (isChecked) return 'bg-white/[0.04]';
-      if (isSelected) return 'bg-white/[0.04]';
-      return 'hover:bg-white/[0.02]';
-    };
+    if (isChecked || isSelected) {
+      return cn(
+        'group bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
+      );
+    }
 
-    return cn('group', getSelectionClass());
+    return cn(
+      'group bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out'
+    );
   }, []);
 
   // Register right panel with AuthShell instead of rendering inline.
   // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
-  const sidebarContextMenuItems = useMemo(() => {
-    const selectedProfile = selectedId
-      ? filteredProfiles.find(profile => profile.id === selectedId)
-      : null;
-
-    if (!selectedProfile) {
-      return [];
-    }
-
-    return convertToCommonDropdownItems(getContextMenuItems(selectedProfile));
-  }, [selectedId, filteredProfiles, getContextMenuItems]);
+  const selectedProfile = useMemo(
+    () => filteredProfiles.find(profile => profile.id === selectedId) ?? null,
+    [filteredProfiles, selectedId]
+  );
 
   const sidebarPanel = useMemo(
     () => (
-      <ContactSidebar
+      <AdminProfileSidebar
+        profile={selectedProfile}
         contact={effectiveContact}
-        mode={mode}
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         onClose={handleSidebarClose}
-        onRefresh={handleSidebarRefresh}
-        onContactChange={handleContactChange}
-        contextMenuItems={sidebarContextMenuItems}
-        onAvatarUpload={handleAvatarUpload}
       />
     ),
-    [
-      sidebarOpen,
-      effectiveContact,
-      mode,
-      handleSidebarClose,
-      handleSidebarRefresh,
-      handleContactChange,
-      sidebarContextMenuItems,
-      handleAvatarUpload,
-    ]
+    [sidebarOpen, selectedProfile, effectiveContact, handleSidebarClose]
   );
 
   useRegisterRightPanel(sidebarPanel);
@@ -407,14 +357,9 @@ export function AdminCreatorProfilesUnified({
           }}
           toolbar={
             <AdminCreatorsToolbar
-              basePath={basePath}
-              search={search}
-              sort={sort}
-              pageSize={pageSize}
               from={from}
               to={to}
               total={total}
-              clearHref={clearHref}
               profiles={profilesWithActions}
               selectedIds={selectedIds}
               onBulkVerify={handleBulkVerify}

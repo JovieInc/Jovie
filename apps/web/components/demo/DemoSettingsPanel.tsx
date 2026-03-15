@@ -1,6 +1,8 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { runDemoAction } from './demo-actions';
 
 const PLATFORM_CONNECTIONS = [
@@ -14,90 +16,98 @@ const PLATFORM_CONNECTIONS = [
 
 export function DemoSettingsPanel() {
   return (
-    <div className='h-full overflow-y-auto'>
-      {/* Profile section */}
-      <div className='border-b border-subtle p-4'>
-        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-          Artist Profile
-        </h3>
-        <div className='space-y-3'>
-          <SettingsRow label='Name' value='Sora Vale' />
-          <SettingsRow
-            label='Bio'
-            value='Indie electronic artist from Portland, OR. Creating sounds between ambient and synthwave.'
+    <div className='h-full overflow-y-auto p-4'>
+      <div className='space-y-4'>
+        <ContentSurfaceCard className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Artist Profile'
+            subtitle='Core public-facing identity fields for your artist page.'
+            className='px-4 py-3'
           />
-          <SettingsRow
-            label='Genres'
-            value='Indie Electronic, Synthwave, Ambient'
-          />
-          <SettingsRow label='Handle' value='@soravale' />
-        </div>
-      </div>
+          <div className='space-y-3 px-4 py-3'>
+            <SettingsRow label='Name' value='Sora Vale' />
+            <SettingsRow
+              label='Bio'
+              value='Indie electronic artist from Portland, OR. Creating sounds between ambient and synthwave.'
+            />
+            <SettingsRow
+              label='Genres'
+              value='Indie Electronic, Synthwave, Ambient'
+            />
+            <SettingsRow label='Handle' value='@soravale' />
+          </div>
+        </ContentSurfaceCard>
 
-      {/* Platform connections */}
-      <div className='border-b border-subtle p-4'>
-        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-          Platform Connections
-        </h3>
-        <div className='space-y-2'>
-          {PLATFORM_CONNECTIONS.map(platform => (
-            <div
-              key={platform.name}
-              className='flex items-center justify-between rounded-md border border-subtle px-3 py-2 text-app'
-            >
-              <div className='flex items-center gap-2'>
-                <span
-                  className='size-2 shrink-0 rounded-full'
-                  style={{
-                    backgroundColor: platform.connected
-                      ? 'var(--color-success)'
-                      : 'var(--color-text-quaternary-token)',
-                  }}
-                />
-                <span className='font-medium' style={{ color: platform.color }}>
-                  {platform.name}
-                </span>
-              </div>
-              <Button
-                size='sm'
-                variant='secondary'
-                onClick={() =>
-                  runDemoAction({
-                    successMessage: platform.connected
-                      ? `${platform.name} reconnected (demo).`
-                      : `${platform.name} connected (demo).`,
-                  })
-                }
+        <ContentSurfaceCard className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Platform Connections'
+            subtitle='Link and maintain the streaming services tied to this profile.'
+            className='px-4 py-3'
+          />
+          <div className='space-y-2 px-4 py-3'>
+            {PLATFORM_CONNECTIONS.map(platform => (
+              <ContentSurfaceCard
+                key={platform.name}
+                className='flex items-center justify-between px-3 py-2.5'
               >
-                {platform.connected ? 'Reconnect' : 'Connect'}
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
+                <div className='flex min-w-0 items-center gap-2'>
+                  <span
+                    className='size-2 shrink-0 rounded-full'
+                    style={{
+                      backgroundColor: platform.connected
+                        ? 'var(--color-success)'
+                        : 'var(--linear-text-quaternary)',
+                    }}
+                  />
+                  <span
+                    className='truncate text-[13px] font-[510]'
+                    style={{ color: platform.color }}
+                  >
+                    {platform.name}
+                  </span>
+                </div>
+                <Button
+                  size='sm'
+                  variant='secondary'
+                  onClick={() =>
+                    runDemoAction({
+                      successMessage: platform.connected
+                        ? `${platform.name} reconnected (demo).`
+                        : `${platform.name} connected (demo).`,
+                    })
+                  }
+                >
+                  {platform.connected ? 'Reconnect' : 'Connect'}
+                </Button>
+              </ContentSurfaceCard>
+            ))}
+          </div>
+        </ContentSurfaceCard>
 
-      {/* Preferences */}
-      <div className='p-4'>
-        <h3 className='mb-3 text-2xs uppercase tracking-wider text-tertiary-token [font-weight:var(--font-weight-medium)]'>
-          Preferences
-        </h3>
-        <div className='space-y-3'>
-          <ToggleRow
-            label='Auto-sync new releases'
-            description='Automatically create smart links when new releases are detected'
-            defaultChecked
+        <ContentSurfaceCard className='overflow-hidden p-0'>
+          <ContentSectionHeader
+            title='Preferences'
+            subtitle='Choose how the demo profile behaves and notifies you.'
+            className='px-4 py-3'
           />
-          <ToggleRow
-            label='Email notifications'
-            description='Get notified when platforms sync or require attention'
-            defaultChecked
-          />
-          <ToggleRow
-            label='Public profile'
-            description='Allow your artist page to be discoverable'
-            defaultChecked={false}
-          />
-        </div>
+          <div className='space-y-3 px-4 py-3'>
+            <ToggleRow
+              label='Auto-sync new releases'
+              description='Automatically create smart links when new releases are detected'
+              defaultChecked
+            />
+            <ToggleRow
+              label='Email notifications'
+              description='Get notified when platforms sync or require attention'
+              defaultChecked
+            />
+            <ToggleRow
+              label='Public profile'
+              description='Allow your artist page to be discoverable'
+              defaultChecked={false}
+            />
+          </div>
+        </ContentSurfaceCard>
       </div>
     </div>
   );
@@ -111,9 +121,9 @@ function SettingsRow({
   readonly value: string;
 }) {
   return (
-    <div className='flex items-start justify-between gap-4 text-app'>
-      <span className='shrink-0 text-tertiary-token'>{label}</span>
-      <span className='text-right text-primary-token'>{value}</span>
+    <div className='flex items-start justify-between gap-4 text-[13px]'>
+      <span className='shrink-0 text-(--linear-text-tertiary)'>{label}</span>
+      <span className='text-right text-(--linear-text-primary)'>{value}</span>
     </div>
   );
 }
@@ -130,16 +140,20 @@ function ToggleRow({
   return (
     <label
       aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 rounded-md border border-subtle px-3 py-2.5'
+      className='flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) px-3 py-2.5'
     >
       <div>
-        <p className='text-app font-medium text-primary-token'>{label}</p>
-        <p className='text-2xs text-tertiary-token'>{description}</p>
+        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          {label}
+        </p>
+        <p className='text-[12px] text-(--linear-text-tertiary)'>
+          {description}
+        </p>
       </div>
       <input
         type='checkbox'
         defaultChecked={defaultChecked}
-        className='mt-0.5 size-4 shrink-0 accent-[var(--color-accent)] rounded'
+        className='mt-0.5 size-4 shrink-0 rounded accent-[var(--color-accent)]'
         onChange={() =>
           runDemoAction({ successMessage: `Setting updated (demo).` })
         }

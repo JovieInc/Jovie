@@ -1,20 +1,21 @@
 import 'server-only';
 
-import { sql as drizzleSql, isNull } from 'drizzle-orm';
+import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
-import { db } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import {
   clickEvents,
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 
 export interface AdminBraggingRights {
-  /** Unique record labels (sorted) */
+  /** Unique record labels sorted by frequency (most common first) */
   labels: string[];
-  /** Unique distributors (sorted) */
+  /** Unique distributors sorted by frequency (most common first) */
   distributors: string[];
   /** Sum of all profile views across all creators */
   totalProfileViews: number;
@@ -24,46 +25,62 @@ export interface AdminBraggingRights {
   totalContactsCaptured: number;
 }
 
-async function getDistinctLabels(): Promise<string[]> {
+async function getTopLabels(): Promise<string[]> {
   try {
     const rows = await db
-      .selectDistinct({ label: discogReleases.label })
+      .select({
+        label: discogReleases.label,
+      })
       .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
       .where(
-        isNull(discogReleases.label)
-          ? undefined
-          : drizzleSql`${discogReleases.label} IS NOT NULL AND ${discogReleases.label} <> ''`
-      );
+        and(
+          eq(creatorProfiles.isClaimed, true),
+          drizzleSql`${discogReleases.label} IS NOT NULL AND ${discogReleases.label} <> ''`
+        )
+      )
+      .groupBy(discogReleases.label)
+      .orderBy(desc(drizzleSql<number>`count(*)`), discogReleases.label);
 
     return rows
       .map(r => r.label)
       .filter(
         (l): l is string => l !== null && l !== undefined && l.trim() !== ''
-      )
-      .sort((a, b) => a.localeCompare(b));
+      );
   } catch (error) {
     captureError('Error fetching distinct labels for bragging rights', error);
     return [];
   }
 }
 
-async function getDistinctDistributors(): Promise<string[]> {
+async function getTopDistributors(): Promise<string[]> {
   try {
     const rows = await db
-      .selectDistinct({ distributor: discogReleases.distributor })
+      .select({
+        distributor: discogReleases.distributor,
+      })
       .from(discogReleases)
+      .innerJoin(
+        creatorProfiles,
+        eq(discogReleases.creatorProfileId, creatorProfiles.id)
+      )
       .where(
-        isNull(discogReleases.distributor)
-          ? undefined
-          : drizzleSql`${discogReleases.distributor} IS NOT NULL AND ${discogReleases.distributor} <> ''`
-      );
+        and(
+          eq(creatorProfiles.isClaimed, true),
+          drizzleSql`${discogReleases.distributor} IS NOT NULL AND ${discogReleases.distributor} <> ''`
+        )
+      )
+      .groupBy(discogReleases.distributor)
+      .orderBy(desc(drizzleSql<number>`count(*)`), discogReleases.distributor);
 
     return rows
       .map(r => r.distributor)
       .filter(
         (d): d is string => d !== null && d !== undefined && d.trim() !== ''
-      )
-      .sort((a, b) => a.localeCompare(b));
+      );
   } catch (error) {
     captureError(
       'Error fetching distinct distributors for bragging rights',
@@ -75,6 +92,13 @@ async function getDistinctDistributors(): Promise<string[]> {
 
 async function getTotalProfileViews(): Promise<number> {
   try {
+    const hasDailyProfileViews = await doesTableExist(
+      TABLE_NAMES.dailyProfileViews
+    );
+    if (!hasDailyProfileViews) {
+      return 0;
+    }
+
     const [row] = await db
       .select({
         total: drizzleSql<number>`COALESCE(SUM(${dailyProfileViews.viewCount}), 0)::int`,
@@ -124,8 +148,8 @@ export async function getAdminBraggingRights(): Promise<AdminBraggingRights> {
     totalDspClicks,
     totalContactsCaptured,
   ] = await Promise.all([
-    getDistinctLabels(),
-    getDistinctDistributors(),
+    getTopLabels(),
+    getTopDistributors(),
     getTotalProfileViews(),
     getTotalDspClicks(),
     getTotalContactsCaptured(),

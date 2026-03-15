@@ -4,6 +4,7 @@ import { useClerk, useUser } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-client';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
 import type { Artist } from '@/types/db';
@@ -46,7 +47,10 @@ export function useUserButton({
   const { signOut } = useClerk();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
-  const { data, isLoading, error } = useBillingStatusQuery();
+  const isPassiveRuntime = env.IS_E2E;
+  const { data, isLoading, error } = useBillingStatusQuery({
+    enabled: !isPassiveRuntime,
+  });
   const billingErrorNotifiedRef = useRef(false);
 
   // Normalize error to string without nested ternary
@@ -59,13 +63,15 @@ export function useUserButton({
   // Normalize TanStack Query result to legacy shape for consumers
   const billingStatus: BillingStatus = useMemo(
     () => ({
-      isPro: data?.isPro ?? false,
-      plan: data?.plan ?? null,
-      hasStripeCustomer: data?.hasStripeCustomer ?? false,
-      loading: isLoading,
-      error: errorMessage,
+      isPro: isPassiveRuntime ? false : (data?.isPro ?? false),
+      plan: isPassiveRuntime ? null : (data?.plan ?? null),
+      hasStripeCustomer: isPassiveRuntime
+        ? false
+        : (data?.hasStripeCustomer ?? false),
+      loading: isPassiveRuntime ? false : isLoading,
+      error: isPassiveRuntime ? null : errorMessage,
     }),
-    [data, isLoading, errorMessage]
+    [data, errorMessage, isLoading, isPassiveRuntime]
   );
 
   const redirectToUrl = (url: string) => {

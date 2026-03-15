@@ -20,7 +20,7 @@ interface OutreachStatusBadgeProps {
 export function OutreachStatusBadge({ status }: OutreachStatusBadgeProps) {
   return (
     <Badge variant={STATUS_VARIANT[status] ?? 'secondary'}>
-      {status.replace(/_/g, ' ')}
+      {status.replaceAll('_', ' ')}
     </Badge>
   );
 }

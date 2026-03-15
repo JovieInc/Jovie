@@ -18,6 +18,11 @@ const STATS = [
   { label: 'Cities reached', value: '189', icon: MapPin },
   { label: 'Tips earned', value: '$1,204', icon: DollarSign },
 ];
+const BENEFITS = [
+  'See who clicked',
+  'Know where they came from',
+  'Re-engage high-intent fans',
+] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Loading skeleton (matches old FansTable layout)                     */
@@ -99,7 +104,7 @@ export function AudienceCRMSection() {
           height: '500px',
           borderRadius: '50%',
           background:
-            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.15), transparent 65%)',
+            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.2), transparent 65%)',
         }}
       />
 
@@ -107,16 +112,14 @@ export function AudienceCRMSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
-              Stop renting your audience.
-              <br />
-              Start building it.
+            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
+              Turn listeners into contacts you own.
             </h2>
-            <div className='max-w-lg'>
+            <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Most artist pages leak demand to streaming apps and social
-                platforms. Jovie turns each visit into first-party audience data
-                you can actually use later.
+                Most profile traffic disappears into Spotify, Instagram, and
+                ticketing pages. Jovie captures emails, source, city, and intent
+                so you can follow up later.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in fan CRM
@@ -124,40 +127,40 @@ export function AudienceCRMSection() {
             </div>
           </div>
 
+          <div
+            className='mt-8 grid gap-3 sm:grid-cols-3 reveal-on-scroll'
+            data-delay='120'
+          >
+            {BENEFITS.map(benefit => (
+              <div
+                key={benefit}
+                className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3 text-[13px] font-medium text-[var(--linear-text-secondary)]'
+              >
+                {benefit}
+              </div>
+            ))}
+          </div>
+
           {/* Product demo */}
-          <div className='relative mt-16 md:mt-20 mx-auto w-full'>
+          <div
+            className='relative mt-16 md:mt-20 mx-auto w-full reveal-on-scroll'
+            data-delay='160'
+          >
             {/* Dashboard window */}
             <div
               className='relative overflow-hidden rounded-xl md:rounded-2xl'
               style={{
                 border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow: [
-                  '0 0 0 1px rgba(255,255,255,0.03)',
-                  '0 8px 40px rgba(0,0,0,0.35)',
-                  '0 24px 80px rgba(0,0,0,0.25)',
-                ].join(', '),
+                boxShadow: 'var(--linear-shadow-card-elevated)',
               }}
             >
               {/* Shine border overlay */}
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
-                style={{
-                  border: '1px solid rgba(255,255,255,0.04)',
-                }}
+                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
               />
-
-              {/* Top edge highlight — Linear glass reflection */}
-              <div
-                aria-hidden='true'
-                className='pointer-events-none absolute inset-x-0 top-0 h-px z-10'
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
-                }}
-              />
-
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
                 <div className='flex gap-2'>
@@ -194,6 +197,18 @@ export function AudienceCRMSection() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className='flex flex-wrap items-center gap-2 border-t border-[var(--linear-border-subtle)] px-5 py-3 text-[11px] text-[var(--linear-text-tertiary)]'>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 font-medium text-[var(--linear-text-secondary)]'>
+                  Captured from profile
+                </span>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                  Source tracked
+                </span>
+                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                  High-intent fan scoring
+                </span>
               </div>
 
               {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}

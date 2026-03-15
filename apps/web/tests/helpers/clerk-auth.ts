@@ -1,6 +1,9 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
+
+const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
 /**
  * Check if the test target is a production deployment (jov.ie).
@@ -149,7 +152,10 @@ export async function signInUser(
 
   // Navigate to a page that loads ClerkProvider
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does
-  await page.goto('/signin', { waitUntil: 'domcontentloaded' });
+  await smokeNavigateWithRetry(page, '/signin', {
+    timeout: 120_000,
+    retries: 2,
+  });
 
   // Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
@@ -241,16 +247,16 @@ export async function signInUser(
     }
   }
 
-  // After sign-in, navigate to the dashboard profile page to verify authentication
-  // The signin page doesn't automatically redirect in test mode
-  // Use DASHBOARD_PROFILE (which exists) instead of PROFILE (which 404s)
-  await page.goto(APP_ROUTES.DASHBOARD_PROFILE, {
-    waitUntil: 'domcontentloaded',
-    timeout: 120_000, // Turbopack cold compilation can take 60-90+ seconds
+  // After sign-in, navigate to a stable authenticated shell route to verify auth.
+  // Profile data can 404 transiently in local dev and should not be the auth probe.
+  await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+    timeout: 120_000,
+    retries: 2,
   });
 
   // Dismiss Next.js dev error overlay and wait for page to stabilize
   // Handles React hydration mismatches (nonce attr) and transient hooks errors
+  let hasReloaded = false;
   await expect(async () => {
     // Dismiss error overlay if present
     const overlay = page.locator(
@@ -269,10 +275,92 @@ export async function signInUser(
     // Verify dashboard element is visible
     const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
     const userButton = page.locator('[data-clerk-element="userButton"]');
-    await expect(dashNav.or(userButton)).toBeVisible({ timeout: 5000 });
-  }).toPass({ timeout: 30000, intervals: [1000, 2000, 5000, 10000] });
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+    if (!(await isShellReady()) && !hasReloaded) {
+      hasReloaded = true;
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+    }
+    await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
+  }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
 
   return page;
+}
+
+/**
+ * Prefer an existing persisted auth session for fast local iteration, but
+ * fall back to the real Clerk sign-in flow when the stored session is stale.
+ */
+export async function ensureSignedInUser(
+  page: Page,
+  credentials?: { username?: string; password?: string }
+) {
+  if (process.env.E2E_USE_STORED_AUTH === '1') {
+    await smokeNavigateWithRetry(page, AUTH_READY_ROUTE, {
+      timeout: 120_000,
+      retries: 2,
+    });
+
+    const dashNav = page.locator('nav[aria-label="Dashboard navigation"]');
+    const userButton = page.locator('[data-clerk-element="userButton"]');
+    const chatComposer = page
+      .locator(
+        'textarea, [contenteditable="true"], button:has-text("New thread")'
+      )
+      .first();
+    const main = page.locator('main').first();
+    const isShellReady = async () =>
+      (page.url().includes('/app') &&
+        !page.url().includes('/signin') &&
+        !page.url().includes('/sign-in') &&
+        !page.url().includes('/onboarding') &&
+        (await main.isVisible().catch(() => false))) ||
+      (await dashNav.isVisible().catch(() => false)) ||
+      (await userButton.isVisible().catch(() => false)) ||
+      (await chatComposer.isVisible().catch(() => false));
+
+    let hasReloaded = false;
+    const hasStoredSession = await expect(async () => {
+      if (
+        page.url().includes('/signin') ||
+        page.url().includes('/sign-in') ||
+        page.url().includes('/signup') ||
+        page.url().includes('/sign-up')
+      ) {
+        throw new Error('Stored auth redirected to auth page');
+      }
+
+      if (!(await isShellReady())) {
+        if (!hasReloaded) {
+          hasReloaded = true;
+          await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+        }
+        await expect.poll(isShellReady, { timeout: 10_000 }).toBe(true);
+      }
+    })
+      .toPass({ timeout: 30_000, intervals: [2_000, 5_000, 10_000] })
+      .then(() => true)
+      .catch(() => false);
+
+    if (hasStoredSession) {
+      return page;
+    }
+  }
+
+  return signInUser(page, credentials);
 }
 
 /**
@@ -336,6 +424,6 @@ export async function setupAuthenticatedTest(page: Page) {
     );
   }
 
-  await signInUser(page);
+  await ensureSignedInUser(page);
   return page;
 }

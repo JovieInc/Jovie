@@ -260,19 +260,11 @@ export async function dedupedFetchWithMeta<T = unknown>(
   };
 }
 
-/**
- * Custom error class for fetch failures with status information
- */
-export class FetchError extends Error {
-  constructor(
-    message: string,
-    public readonly status: number,
-    public readonly body: string
-  ) {
-    super(message);
-    this.name = 'FetchError';
-  }
-}
+// Use the canonical FetchError from lib/queries/fetch
+import { FetchError } from '@/lib/queries/fetch';
+
+// Re-export for backwards compatibility
+export { FetchError } from '@/lib/queries/fetch';
 
 /**
  * Invalidate a specific cache entry

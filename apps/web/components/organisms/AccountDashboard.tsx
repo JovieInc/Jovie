@@ -3,6 +3,8 @@
 import { Button } from '@jovie/ui';
 import { CreditCard, Settings, User } from 'lucide-react';
 import Link from 'next/link';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DOCS_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -11,27 +13,27 @@ export function AccountDashboard() {
     <div className='space-y-6'>
       {/* Header */}
       <div>
-        <h1 className='text-3xl font-bold text-primary-token'>
+        <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-(--linear-text-primary)'>
           Account Settings
         </h1>
-        <p className='mt-2 text-secondary-token'>
+        <p className='mt-2 text-[13px] text-(--linear-text-secondary)'>
           Manage your account preferences and settings
         </p>
       </div>
 
       {/* Quick Actions */}
-      <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
+      <div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3'>
         {/* Billing & Subscription */}
-        <div className='bg-surface-1 shadow rounded-lg p-6'>
+        <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <CreditCard className='h-8 w-8 text-[var(--accent-analytics)]' />
+              <CreditCard className='h-7 w-7 text-[var(--accent-analytics)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-lg font-medium text-primary-token'>
+              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
                 Billing & Subscription
               </h3>
-              <p className='text-sm text-secondary-token'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
                 Manage your subscription and payment methods
               </p>
             </div>
@@ -41,19 +43,19 @@ export function AccountDashboard() {
               <Link href={APP_ROUTES.SETTINGS_BILLING}>Manage Billing</Link>
             </Button>
           </div>
-        </div>
+        </ContentSurfaceCard>
 
         {/* Profile Settings */}
-        <div className='bg-surface-1 shadow rounded-lg p-6'>
+        <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <User className='h-8 w-8 text-[var(--accent-speed)]' />
+              <User className='h-7 w-7 text-[var(--accent-speed)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-lg font-medium text-primary-token'>
+              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
                 Creator Profile
               </h3>
-              <p className='text-sm text-secondary-token'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
                 Update your public profile and links
               </p>
             </div>
@@ -65,19 +67,19 @@ export function AccountDashboard() {
               </Link>
             </Button>
           </div>
-        </div>
+        </ContentSurfaceCard>
 
         {/* General Settings */}
-        <div className='bg-surface-1 shadow rounded-lg p-6'>
+        <ContentSurfaceCard className='p-5'>
           <div className='flex items-center'>
             <div className='shrink-0'>
-              <Settings className='h-8 w-8 text-[var(--accent-conv)]' />
+              <Settings className='h-7 w-7 text-[var(--accent-conv)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-lg font-medium text-primary-token'>
+              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
                 General Settings
               </h3>
-              <p className='text-sm text-secondary-token'>
+              <p className='text-[13px] text-(--linear-text-secondary)'>
                 Configure app preferences and notifications
               </p>
             </div>
@@ -87,43 +89,44 @@ export function AccountDashboard() {
               <Link href={APP_ROUTES.SETTINGS}>View Settings</Link>
             </Button>
           </div>
-        </div>
+        </ContentSurfaceCard>
       </div>
 
       {/* Account Information */}
-      <div className='bg-surface-1 shadow rounded-lg p-6'>
-        <h3 className='text-lg font-medium text-primary-token mb-4'>
-          Account Information
-        </h3>
-        <div className='space-y-4'>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Account Information'
+          subtitle='Status and privacy settings related to this account.'
+          className='px-5 py-3'
+        />
+        <div className='space-y-4 px-5 py-4'>
           <div>
-            <h4 className='text-sm font-medium text-primary-token'>
+            <h4 className='text-[13px] font-[510] text-(--linear-text-primary)'>
               Account Status
             </h4>
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
               Your account is active and in good standing
             </p>
           </div>
           <div>
-            <h4 className='text-sm font-medium text-primary-token'>
+            <h4 className='text-[13px] font-[510] text-(--linear-text-primary)'>
               Data & Privacy
             </h4>
-            <p className='text-sm text-secondary-token'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
               We protect your data according to our privacy policy
             </p>
           </div>
         </div>
-      </div>
+      </ContentSurfaceCard>
 
       {/* Support */}
-      <div className='bg-surface-1 shadow rounded-lg p-6'>
-        <h3 className='text-lg font-medium text-primary-token mb-4'>
-          Need Help?
-        </h3>
-        <p className='text-sm text-secondary-token mb-4'>
-          Get support, view documentation, or contact our team
-        </p>
-        <div className='flex flex-col sm:flex-row gap-3'>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Need Help?'
+          subtitle='Get support, review docs, or contact the team.'
+          className='px-5 py-3'
+        />
+        <div className='flex flex-col gap-3 px-5 py-4 sm:flex-row'>
           <Button variant='outline' size='sm' asChild>
             <Link href='/support'>Contact Support</Link>
           </Button>
@@ -133,7 +136,7 @@ export function AccountDashboard() {
             </a>
           </Button>
         </div>
-      </div>
+      </ContentSurfaceCard>
     </div>
   );
 }

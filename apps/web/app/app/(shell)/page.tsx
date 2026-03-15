@@ -7,7 +7,9 @@ import { getDashboardData } from './dashboard/actions';
 const DASHBOARD_DESCRIPTION = 'Start a new thread with Jovie AI';
 
 const getDashboardTitle = async () => {
-  const { profile } = await getSessionContext({ requireProfile: false });
+  const profile = await getSessionContext({ requireProfile: false })
+    .then(result => result.profile)
+    .catch(() => null);
   const displayName = profile?.displayName?.trim();
 
   return displayName ? `${displayName} | Jovie` : 'Home | Jovie';

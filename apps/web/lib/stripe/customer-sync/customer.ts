@@ -35,6 +35,62 @@ function isCustomerWithMetadata(
 }
 
 /**
+ * Validate and return an existing Stripe customer ID, or null if invalid/missing.
+ * Returns null on any validation failure so the caller can proceed to create a new customer.
+ */
+async function validateExistingStripeCustomer(
+  stripeCustomerId: string,
+  clerkUserId: string
+): Promise<string | null> {
+  try {
+    const existing = await stripe.customers.retrieve(stripeCustomerId);
+
+    if (
+      existing &&
+      typeof existing === 'object' &&
+      'deleted' in existing &&
+      existing.deleted
+    ) {
+      throw new Error('Stripe customer is deleted');
+    }
+
+    if (!isCustomerWithMetadata(existing)) {
+      throw new Error('Stripe customer payload is missing id');
+    }
+
+    const customer = existing;
+    const existingClerkUserId = customer.metadata?.clerk_user_id;
+
+    if (
+      typeof existingClerkUserId === 'string' &&
+      existingClerkUserId.length > 0 &&
+      existingClerkUserId !== clerkUserId
+    ) {
+      throw new Error('Stripe customer belongs to a different user');
+    }
+
+    if (existingClerkUserId !== clerkUserId) {
+      await stripe.customers.update(customer.id, {
+        metadata: {
+          ...customer.metadata,
+          clerk_user_id: clerkUserId,
+          created_via: 'jovie_app',
+        },
+      });
+    }
+
+    return stripeCustomerId;
+  } catch (error) {
+    await captureWarning(
+      'Stored Stripe customer ID is invalid; repairing',
+      error,
+      { clerkUserId, function: 'ensureStripeCustomer' }
+    );
+    return null;
+  }
+}
+
+/**
  * Ensure a Stripe customer exists for the current user.
  *
  * This function uses fetchUserBillingData internally with BILLING_FIELDS_CUSTOMER
@@ -87,56 +143,12 @@ export async function ensureStripeCustomer(): Promise<{
 
       // If we already have a Stripe customer ID, validate and return it
       if (userData.stripeCustomerId) {
-        try {
-          const existing = await stripe.customers.retrieve(
-            userData.stripeCustomerId
-          );
-
-          if (
-            existing &&
-            typeof existing === 'object' &&
-            'deleted' in existing &&
-            existing.deleted
-          ) {
-            throw new Error('Stripe customer is deleted');
-          }
-
-          if (!isCustomerWithMetadata(existing)) {
-            throw new Error('Stripe customer payload is missing id');
-          }
-
-          const customer = existing;
-
-          const existingClerkUserId = customer.metadata?.clerk_user_id;
-          if (
-            typeof existingClerkUserId === 'string' &&
-            existingClerkUserId.length > 0 &&
-            existingClerkUserId !== clerkUserId
-          ) {
-            throw new Error('Stripe customer belongs to a different user');
-          }
-
-          // Update metadata if needed
-          if (existingClerkUserId !== clerkUserId) {
-            await stripe.customers.update(customer.id, {
-              metadata: {
-                ...customer.metadata,
-                clerk_user_id: clerkUserId,
-                created_via: 'jovie_app',
-              },
-            });
-          }
-
-          return { success: true, customerId: userData.stripeCustomerId };
-        } catch (error) {
-          await captureWarning(
-            'Stored Stripe customer ID is invalid; repairing',
-            error,
-            {
-              clerkUserId,
-              function: 'ensureStripeCustomer',
-            }
-          );
+        const validCustomerId = await validateExistingStripeCustomer(
+          userData.stripeCustomerId,
+          clerkUserId
+        );
+        if (validCustomerId) {
+          return { success: true, customerId: validCustomerId };
         }
       }
 

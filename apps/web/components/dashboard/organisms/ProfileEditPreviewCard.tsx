@@ -7,12 +7,13 @@
  * Allows the user to apply or cancel the change.
  */
 
-import { Button } from '@jovie/ui';
 import { Check, Loader2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { useConfirmChatEditMutation } from '@/lib/queries/useConfirmChatEditMutation';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DrawerButton } from '@/components/molecules/drawer';
+import { useConfirmChatEditMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 export interface ProfileEditPreview {
@@ -89,77 +90,93 @@ export function ProfileEditPreviewCard({
   // Show completed state
   if (applied) {
     return (
-      <div className='rounded-xl border border-success/30 bg-success-subtle p-4'>
-        <div className='flex items-center gap-2 text-success'>
-          <Check className='h-4 w-4' />
-          <span className='text-[13px] font-[510]'>
-            {preview.fieldLabel} updated
+      <ContentSurfaceCard className='p-4'>
+        <div className='flex items-center justify-between gap-3'>
+          <div className='min-w-0 space-y-1'>
+            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+              {preview.fieldLabel}
+            </p>
+            <p className='text-[12px] text-(--linear-text-secondary)'>
+              Updated successfully
+            </p>
+          </div>
+          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-success/20 bg-success-subtle px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-success'>
+            <Check className='h-3.5 w-3.5' />
+            Applied
           </span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   // Show cancelled state
   if (cancelled) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 opacity-60'>
-        <div className='flex items-center gap-2 text-secondary-token'>
-          <X className='h-4 w-4' />
-          <span className='text-[13px]'>Edit cancelled</span>
+      <ContentSurfaceCard className='p-4 opacity-70'>
+        <div className='flex items-center justify-between gap-3'>
+          <div className='min-w-0 space-y-1'>
+            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+              {preview.fieldLabel}
+            </p>
+            <p className='text-[12px] text-(--linear-text-secondary)'>
+              Edit cancelled
+            </p>
+          </div>
+          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
+            <X className='h-3.5 w-3.5' />
+            Cancelled
+          </span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='rounded-xl border border-accent/30 bg-accent/5 p-4'>
-      {/* Header */}
-      <div className='mb-3 flex items-start justify-between'>
-        <div>
-          <h4 className='text-[13px] font-[510] text-primary-token'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <div className='border-b border-(--linear-border-subtle) px-4 py-3'>
+        <div className='space-y-0.5'>
+          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
             Update {preview.fieldLabel}
           </h4>
           {preview.reason && (
-            <p className='mt-0.5 text-[11px] text-secondary-token'>
+            <p className='text-[11px] leading-[1.45] text-(--linear-text-secondary)'>
               {preview.reason}
             </p>
           )}
         </div>
       </div>
 
-      {/* Diff view */}
-      <div className='mb-4 space-y-2'>
-        <div className='rounded-lg bg-surface-1 p-3'>
-          <div className='mb-1 text-[11px] font-[510] text-tertiary-token'>
+      <div className='space-y-2 px-4 py-3'>
+        <div className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-3'>
+          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Current
           </div>
           <div
             className={cn(
-              'text-[13px]',
-              !preview.currentValue && 'italic text-tertiary-token'
+              'text-[13px] tracking-[-0.01em] text-(--linear-text-primary)',
+              !preview.currentValue && 'italic text-(--linear-text-tertiary)'
             )}
           >
             {formatValue(preview.currentValue)}
           </div>
         </div>
-        <div className='rounded-lg border border-accent/20 bg-accent/10 p-3'>
-          <div className='mb-1 text-[11px] font-[510] text-accent'>New</div>
-          <div className='text-[13px] text-primary-token'>
+        <div className='rounded-[10px] border border-(--linear-accent)/20 bg-(--linear-accent)/8 px-3 py-3'>
+          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-accent)'>
+            New
+          </div>
+          <div className='text-[13px] tracking-[-0.01em] text-(--linear-text-primary)'>
             {formatValue(preview.newValue)}
           </div>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className='flex gap-2'>
-        <Button
+      <div className='flex items-center gap-2 border-t border-(--linear-border-subtle) px-4 py-3'>
+        <DrawerButton
           type='button'
-          variant='primary'
-          size='sm'
+          tone='primary'
           onClick={handleApply}
           disabled={confirmEdit.isPending}
-          className='flex-1 gap-1.5'
+          className='flex-1 justify-center gap-1.5'
         >
           {confirmEdit.isPending ? (
             <>
@@ -172,19 +189,18 @@ export function ProfileEditPreviewCard({
               Apply
             </>
           )}
-        </Button>
-        <Button
+        </DrawerButton>
+        <DrawerButton
           type='button'
-          variant='secondary'
-          size='sm'
+          tone='secondary'
           onClick={handleCancel}
           disabled={confirmEdit.isPending}
-          className='gap-1.5'
+          className='justify-center gap-1.5'
         >
           <X className='h-3.5 w-3.5' />
           Cancel
-        </Button>
+        </DrawerButton>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

@@ -13,8 +13,9 @@ import { useCreatorVerification } from '@/components/admin/useCreatorVerificatio
 import { useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useAvatarUploadMutation } from '@/lib/queries';
+import type { Contact } from '@/types';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useIngestRefresh } from './useIngestRefresh';
 
@@ -114,7 +115,13 @@ export function useAdminCreatorProfiles({
     onRefreshComplete: refetchSocialLinks,
   });
 
-  const { handleAvatarUpload } = useAvatarUpload();
+  const { mutateAsync: uploadAvatar } = useAvatarUploadMutation();
+  const handleAvatarUpload = useCallback(
+    async (file: File, contact: Contact): Promise<string> => {
+      return uploadAvatar({ file, profileId: contact.id });
+    },
+    [uploadAvatar]
+  );
 
   const handleRowClick = useCallback(
     (id: string) => {

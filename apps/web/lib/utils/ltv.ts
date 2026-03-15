@@ -13,8 +13,8 @@ export type LtvTier = 'none' | 'low' | 'medium' | 'high';
 const STREAMING_CLICK_VALUE_CENTS = 1;
 
 const LTV_TIER_THRESHOLDS = {
-  medium: 10_00,
-  high: 40_00,
+  medium: 1_000,
+  high: 4_000,
 } as const;
 
 export interface LtvBreakdown {

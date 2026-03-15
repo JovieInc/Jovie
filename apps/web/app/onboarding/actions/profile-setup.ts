@@ -24,6 +24,8 @@ export async function createUserAndProfile(
   trimmedDisplayName: string
 ): Promise<CompletionResult> {
   try {
+    const createUserAndProfileTimer = 'db:onboarding:createUserAndProfile';
+    console.time(createUserAndProfileTimer);
     const result = await tx.execute(
       drizzleSql<{ profile_id: string }>`
         SELECT create_profile_with_user(
@@ -34,6 +36,7 @@ export async function createUserAndProfile(
         ) AS profile_id
       `
     );
+    console.timeEnd(createUserAndProfileTimer);
 
     const profileId = result.rows?.[0]?.profile_id
       ? String(result.rows[0].profile_id)
@@ -46,6 +49,53 @@ export async function createUserAndProfile(
     };
   } catch (error) {
     await captureError('createUserAndProfile failed', error, {
+      route: 'profile-setup',
+    });
+    throw error;
+  }
+}
+
+/**
+ * Creates a profile for an already-existing user row.
+ */
+export async function createProfileForExistingUser(
+  tx: DbTransaction,
+  userId: string,
+  normalizedUsername: string,
+  trimmedDisplayName: string
+): Promise<CompletionResult> {
+  try {
+    const createProfileTimer = 'db:onboarding:createProfileForExistingUser';
+    console.time(createProfileTimer);
+    const [profile] = await tx
+      .insert(creatorProfiles)
+      .values({
+        userId,
+        creatorType: 'creator',
+        username: normalizedUsername,
+        usernameNormalized: normalizedUsername,
+        displayName: trimmedDisplayName,
+        isPublic: true,
+        isClaimed: true,
+        claimedAt: new Date(),
+        onboardingCompletedAt: new Date(),
+        settings: {},
+        theme: {},
+        ingestionStatus: 'idle',
+      })
+      .returning({
+        id: creatorProfiles.id,
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      });
+    console.timeEnd(createProfileTimer);
+
+    return {
+      username: profile?.usernameNormalized || normalizedUsername,
+      status: 'created',
+      profileId: profile?.id ?? null,
+    };
+  } catch (error) {
+    await captureError('createProfileForExistingUser failed', error, {
       route: 'profile-setup',
     });
     throw error;
@@ -66,6 +116,8 @@ export async function updateExistingProfile(
     const nextDisplayName =
       trimmedDisplayName || profile.displayName || username;
 
+    const updateProfileTimer = 'db:onboarding:updateExistingProfile';
+    console.time(updateProfileTimer);
     const [updated] = await tx
       .update(creatorProfiles)
       .set({
@@ -79,7 +131,10 @@ export async function updateExistingProfile(
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, profile.id))
-      .returning();
+      .returning({
+        usernameNormalized: creatorProfiles.usernameNormalized,
+      });
+    console.timeEnd(updateProfileTimer);
 
     return {
       username: updated?.usernameNormalized || normalizedUsername,
@@ -102,11 +157,14 @@ export async function fetchExistingUser(
   clerkUserId: string
 ): Promise<{ id: string } | null> {
   try {
+    const fetchUserTimer = 'db:onboarding:fetchExistingUser';
+    console.time(fetchUserTimer);
     const [existingUser] = await tx
       .select({ id: users.id })
       .from(users)
       .where(eq(users.clerkId, clerkUserId))
       .limit(1);
+    console.timeEnd(fetchUserTimer);
 
     return existingUser ?? null;
   } catch (error) {
@@ -125,11 +183,14 @@ export async function fetchExistingProfile(
   userId: string
 ): Promise<CreatorProfile | null> {
   try {
+    const fetchProfileTimer = 'db:onboarding:fetchExistingProfile';
+    console.time(fetchProfileTimer);
     const [existingProfile] = await tx
       .select()
       .from(creatorProfiles)
       .where(eq(creatorProfiles.userId, userId))
       .limit(1);
+    console.timeEnd(fetchProfileTimer);
 
     return existingProfile ?? null;
   } catch (error) {

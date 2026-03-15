@@ -120,8 +120,10 @@ jobs:
           POLL_INTERVAL=30
 
           while true; do
-            OPEN_AGENT_PRS=$(gh pr list --state open --json headRefName --limit 200 \
-              | jq '[.[] | select(.headRefName | test("^(codex|codegen-bot|linear|claude)/") or (.headRefName | test("^[^/]+/jov-[0-9]+-"; "i")))] | length')
+            # Use gh api (REST) instead of gh pr list (GraphQL) to avoid
+            # App token scope issues with gh CLI's internal GraphQL queries
+            OPEN_AGENT_PRS=$(gh api "repos/${{ github.repository }}/pulls?state=open&per_page=100" \
+              | jq '[.[] | select(.head.ref | test("^(codex|codegen-bot|linear|claude)/") or test("^[^/]+/jov-[0-9]+-"; "i"))] | length')
 
             echo "Open agent PRs: $OPEN_AGENT_PRS / $MAX_OPEN_AGENT_PRS (waited ${WAITED}s)"
 

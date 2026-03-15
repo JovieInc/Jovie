@@ -53,11 +53,11 @@ function ErrorCards() {
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 dark:bg-sky-500/15'>
             <BarChart3 className='h-4 w-4 text-sky-600 dark:text-sky-400' />
           </div>
-          <p className='text-[13px] font-[510] text-secondary-token'>
+          <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
             Profile views
           </p>
         </div>
-        <p className='text-[13px] text-tertiary-token'>
+        <p className='text-[13px] text-(--linear-text-tertiary)'>
           Temporarily unavailable
         </p>
       </div>
@@ -66,11 +66,11 @@ function ErrorCards() {
           <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-[13px] font-[510] text-secondary-token'>
+          <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
             Unique visitors
           </p>
         </div>
-        <p className='text-[13px] text-tertiary-token'>
+        <p className='text-[13px] text-(--linear-text-tertiary)'>
           Temporarily unavailable
         </p>
       </div>
@@ -97,7 +97,7 @@ function getEmptyStateAction(
   }
   return {
     label: 'Open profile settings',
-    href: APP_ROUTES.PROFILE,
+    href: APP_ROUTES.CHAT,
   };
 }
 
@@ -267,7 +267,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                 <TooltipTrigger asChild>
                   <button
                     type='button'
-                    className='text-tertiary-token hover:text-secondary-token transition-colors'
+                    className='text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary)'
                     aria-label='Learn more about profile views'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
@@ -294,7 +294,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                 <TooltipTrigger asChild>
                   <button
                     type='button'
-                    className='text-tertiary-token hover:text-secondary-token transition-colors'
+                    className='text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary)'
                     aria-label='Learn more about unique visitors'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
@@ -310,7 +310,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             }
           >
             <div className='flex items-center justify-between'>
-              <p className='text-[13px] text-tertiary-token'>
+              <p className='text-[13px] text-(--linear-text-tertiary)'>
                 Identified audience
               </p>
               <Link
@@ -336,10 +336,12 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
             Overview
           </p>
-          <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>
+          <p className='text-[13px] text-(--linear-text-secondary)'>
+            {rangeLabel}
+          </p>
         </div>
         <Button
           type='button'

@@ -1,5 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, Clock3 } from 'lucide-react';
+import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { AdminReliabilitySummary } from '@/lib/admin/overview';
 
 interface ReliabilityCardProps {
@@ -49,64 +51,48 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
     : '—';
 
   return (
-    <Card className='h-full border-subtle bg-transparent'>
-      <CardHeader className='space-y-1 p-5 pb-3'>
-        <div className='flex items-start justify-between gap-2'>
-          <div>
-            <CardTitle className='text-lg tracking-tight'>
-              Reliability
-            </CardTitle>
-            <p className='text-2xs text-tertiary-token'>
-              System health metrics
-            </p>
-          </div>
-          <span className={`text-app font-medium ${tone.labelClassName}`}>
+    <ContentSurfaceCard className='h-full overflow-hidden'>
+      <ContentSectionHeader
+        title='Reliability'
+        subtitle='System health metrics'
+        actions={
+          <span className={`text-[12px] font-medium ${tone.labelClassName}`}>
             {tone.label}
           </span>
-        </div>
-      </CardHeader>
-      <CardContent className='space-y-3 p-5 pt-0 text-app text-secondary-token'>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <CheckCircle2 className={`h-4 w-4 ${tone.iconClassName}`} />
-            Error rate
-          </div>
-          <span className='text-primary-token tabular-nums'>
-            {errorRateLabel}
-          </span>
-        </div>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
-            <Clock3 className={`h-4 w-4 ${tone.iconClassName}`} />
-            p95 latency
-          </div>
-          <span className='text-primary-token tabular-nums'>
-            {latencyLabel}
-          </span>
-        </div>
-        <div className='flex items-center justify-between rounded-md bg-surface-2 px-3 py-2'>
-          <div className='flex items-center gap-2 font-medium text-primary-token'>
-            {summary.incidents24h > 0 ? (
-              <AlertTriangle className={`h-4 w-4 ${tone.iconClassName}`} />
-            ) : (
-              <CheckCircle2 className='h-4 w-4 text-success' />
-            )}
-            Incidents (24h)
-          </div>
-          <span className='text-primary-token tabular-nums'>
-            {incidentsLabel}
-          </span>
-        </div>
+        }
+        className='px-5 py-3'
+      />
+      <div className='space-y-3 p-5 text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+        <ContentMetricRow
+          label='Error rate'
+          value={errorRateLabel}
+          icon={CheckCircle2}
+          iconClassName={tone.iconClassName}
+        />
+        <ContentMetricRow
+          label='p95 latency'
+          value={latencyLabel}
+          icon={Clock3}
+          iconClassName={tone.iconClassName}
+        />
+        <ContentMetricRow
+          label='Incidents (24h)'
+          value={incidentsLabel}
+          icon={summary.incidents24h > 0 ? AlertTriangle : CheckCircle2}
+          iconClassName={
+            summary.incidents24h > 0 ? tone.iconClassName : 'text-success'
+          }
+        />
 
         {summary.lastIncidentAt && (
-          <p className='pt-1 text-2xs text-tertiary-token'>
+          <p className='pt-1 text-[11px] text-(--linear-text-tertiary)'>
             Last incident on {lastIncidentLabel}.
             {tone.label !== 'Healthy' && (
               <> Review logs and alerts before shipping new changes.</>
             )}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </ContentSurfaceCard>
   );
 }

@@ -180,7 +180,7 @@ export async function getProfileSocialLinks(
     .limit(MAX_SOCIAL_LINKS);
 
   if (links.length === MAX_SOCIAL_LINKS) {
-    captureWarning('[profile-service] MAX_SOCIAL_LINKS limit hit', {
+    captureWarning('[profile-service] MAX_SOCIAL_LINKS limit hit', undefined, {
       profileId,
       count: links.length,
     });
@@ -227,7 +227,7 @@ export async function getProfileContacts(
       .limit(MAX_CONTACTS);
 
     if (contacts.length === MAX_CONTACTS) {
-      captureWarning('[profile-service] MAX_CONTACTS limit hit', {
+      captureWarning('[profile-service] MAX_CONTACTS limit hit', undefined, {
         profileId,
         count: contacts.length,
       });
@@ -283,7 +283,7 @@ export async function getProfileWithLinks(
         return reviveProfileDates(cached);
       }
     } catch (error) {
-      captureWarning('[profile-service] Redis cache read failed', { error });
+      captureWarning('[profile-service] Redis cache read failed', error);
       // Fall through to database query
     }
   }
@@ -302,10 +302,13 @@ export async function getProfileWithLinks(
       ),
     ]);
   } catch (error) {
-    captureWarning('[profile-service] Profile query failed or timed out', {
+    captureWarning(
+      '[profile-service] Profile query failed or timed out',
       error,
-      username: normalizedUsername,
-    });
+      {
+        username: normalizedUsername,
+      }
+    );
     return null;
   }
 
@@ -317,7 +320,7 @@ export async function getProfileWithLinks(
         ex: PROFILE_CACHE_TTL_SECONDS,
       })
       .catch(error => {
-        captureWarning('[profile-service] Redis cache write failed', { error });
+        captureWarning('[profile-service] Redis cache write failed', error);
       });
   }
 
@@ -490,9 +493,7 @@ export async function invalidateProfileEdgeCache(
   try {
     await redis.del(cacheKey);
   } catch (error) {
-    captureWarning('[profile-service] Failed to invalidate edge cache', {
-      error,
-    });
+    captureWarning('[profile-service] Failed to invalidate edge cache', error);
   }
 }
 

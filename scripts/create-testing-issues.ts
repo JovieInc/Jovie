@@ -15,6 +15,27 @@ interface LinearIssue {
   projectId?: string;
 }
 
+const TEAMS = {
+  engineering: 'jovie-engineering',
+  operations: 'jovie-operations',
+} as const;
+
+const OPERATIONS_LABELS = new Set(['monitoring', 'operations', 'ops']);
+
+function resolveTeam(
+  issue: Pick<LinearIssue, 'title' | 'description' | 'labels'>
+): string {
+  const hasOperationsLabel = issue.labels.some(label =>
+    OPERATIONS_LABELS.has(label.toLowerCase())
+  );
+
+  if (hasOperationsLabel) {
+    return TEAMS.operations;
+  }
+
+  return TEAMS.engineering;
+}
+
 const issues: LinearIssue[] = [
   // Phase 1: Quick Wins
   {
@@ -311,9 +332,22 @@ const issues: LinearIssue[] = [
 console.log(
   `Generated ${issues.length} Linear issues for testing optimization`
 );
+
+const triagedIssues = issues.map(issue => ({
+  ...issue,
+  team: resolveTeam(issue),
+}));
+
+const operationIssueCount = triagedIssues.filter(
+  issue => issue.team === TEAMS.operations
+).length;
+
+console.log(
+  `Triaged ${operationIssueCount} operations issues to ${TEAMS.operations}; remaining issues assigned to ${TEAMS.engineering}`
+);
 console.log('\nIssues can be created in parallel by phase:');
 console.log('Phase 1 (Parallel): Issues 1.1-1.5');
 console.log('Phase 2 (Parallel): Issues 2.1-2.4 (after Phase 1)');
 console.log('Phase 3 (Parallel): Issues 3.1-3.2 (after Phase 1)');
 
-export { issues };
+export { triagedIssues as issues };

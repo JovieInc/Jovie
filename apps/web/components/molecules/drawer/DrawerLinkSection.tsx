@@ -3,6 +3,11 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { DrawerEmptyState } from './DrawerEmptyState';
+import { DrawerSectionHeading } from './DrawerSectionHeading';
+
+export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
+  'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-[7px] border border-transparent text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-(--linear-bg-surface-1) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */
@@ -17,6 +22,8 @@ export interface DrawerLinkSectionProps {
   readonly emptyMessage?: string;
   /** Whether the section has no links */
   readonly isEmpty?: boolean;
+  /** Stable selector for the empty state container */
+  readonly emptyStateTestId?: string;
   /** The link list items */
   readonly children: ReactNode;
   readonly className?: string;
@@ -37,34 +44,27 @@ export function DrawerLinkSection({
   headerActions,
   emptyMessage = 'No links yet.',
   isEmpty = false,
+  emptyStateTestId,
   children,
   className,
 }: DrawerLinkSectionProps) {
   return (
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex items-center justify-between min-h-[44px] lg:min-h-0'>
-        <h4
-          className={[
-            'text-[11px] font-[510] uppercase',
-            'tracking-[0.08em] text-tertiary-token',
-          ].join(' ')}
+      <div className='flex min-h-[40px] items-center justify-between gap-2 lg:min-h-0'>
+        <DrawerSectionHeading
+          as='h4'
+          className='min-w-0 flex-1 truncate text-[11px] tracking-[0.08em]'
         >
           {title}
-        </h4>
-        <div className='flex items-center gap-1 lg:gap-0.5'>
+        </DrawerSectionHeading>
+        <div className='flex shrink-0 items-center gap-1 lg:gap-0.5'>
           {headerActions}
           {onAdd && (
             <button
               type='button'
               onClick={onAdd}
-              className={[
-                'min-h-[44px] min-w-[44px] flex items-center justify-center',
-                'lg:min-h-0 lg:min-w-0 lg:p-1 rounded-md text-tertiary-token',
-                'active:bg-surface-2/50 lg:active:bg-transparent',
-                'lg:hover:text-primary-token lg:hover:bg-surface-2',
-                'transition-colors',
-              ].join(' ')}
+              className={DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME}
               aria-label={addLabel}
             >
               <Plus className='h-4 w-4' />
@@ -75,7 +75,11 @@ export function DrawerLinkSection({
 
       {/* Link items — full-bleed on mobile (no rounded corners) */}
       {isEmpty ? (
-        <p className='text-xs text-tertiary-token py-2'>{emptyMessage}</p>
+        <DrawerEmptyState
+          message={emptyMessage}
+          className='min-h-[96px]'
+          testId={emptyStateTestId}
+        />
       ) : (
         <div className='-mx-5 lg:mx-0'>{children}</div>
       )}

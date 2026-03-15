@@ -8,6 +8,7 @@
 import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
 import { env } from '@/lib/env-server';
+import { parseWindowToMs } from './config';
 import { MemoryRateLimiter } from './memory-limiter';
 import { createRedisRateLimiter, isRedisAvailable } from './redis-limiter';
 import type {
@@ -24,6 +25,8 @@ export type RateLimiterBackend = 'redis' | 'memory';
 export interface RateLimiterOptions {
   /** Whether to prefer Redis over in-memory (default: true) */
   preferRedis?: boolean;
+  /** Whether Redis is required and memory fallback must be disabled */
+  requireRedis?: boolean;
   /** Whether to log warnings when falling back to memory (default: true in production) */
   warnOnFallback?: boolean;
   /** Custom logger function */
@@ -45,6 +48,7 @@ export class RateLimiter {
     this.config = config;
     this.options = {
       preferRedis: options.preferRedis ?? true,
+      requireRedis: options.requireRedis ?? false,
       warnOnFallback: options.warnOnFallback ?? env.NODE_ENV === 'production',
       logger:
         options.logger ??
@@ -101,6 +105,16 @@ export class RateLimiter {
         console.error(message);
         this.options.logger(message);
       }
+    }
+
+    if (this.options.requireRedis) {
+      return {
+        success: false,
+        limit: this.config.limit,
+        remaining: 0,
+        reset: new Date(Date.now() + parseWindowToMs(this.config.window)),
+        reason: `${this.config.name} rate limiter is temporarily unavailable`,
+      };
     }
 
     // Fall back to in-memory

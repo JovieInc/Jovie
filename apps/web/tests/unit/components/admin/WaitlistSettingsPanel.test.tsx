@@ -32,7 +32,7 @@ describe('WaitlistSettingsPanel', () => {
 
     render(<WaitlistSettingsPanel />);
 
-    expect(screen.getByText('Loading settings…')).toBeInTheDocument();
+    expect(screen.getByText('Loading waitlist settings…')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText('Waitlist gate controls')).toBeInTheDocument();

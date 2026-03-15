@@ -136,6 +136,63 @@ vi.mock('next/cache', () => ({
   unstable_noStore: vi.fn(),
 }));
 
+// Mock animation and UI-heavy dependencies globally to reduce per-file mock
+// setup overhead in component tests.
+vi.mock('motion/react', () => ({
+  AnimatePresence: ({ children }: { children: unknown }) => children,
+  motion: new Proxy(
+    {},
+    {
+      get:
+        () =>
+        ({ children, ...props }: Record<string, unknown>) =>
+          children ?? null,
+    }
+  ),
+}));
+
+vi.mock('@headlessui/react', async () => {
+  const React = await vi.importActual<typeof import('react')>('react');
+  const passthrough = (name: string) => {
+    const HeadlessPassthrough = ({
+      children,
+      ...props
+    }: Record<string, unknown>) =>
+      React.createElement(
+        'div',
+        { ...props, 'data-headlessui': name },
+        children as React.ReactNode
+      );
+
+    HeadlessPassthrough.displayName = `HeadlessUiMock(${name})`;
+    return HeadlessPassthrough;
+  };
+
+  return {
+    Dialog: passthrough('dialog'),
+    DialogPanel: passthrough('dialog-panel'),
+    DialogTitle: passthrough('dialog-title'),
+    Transition: passthrough('transition'),
+    TransitionChild: passthrough('transition-child'),
+    Menu: passthrough('menu'),
+    MenuButton: passthrough('menu-button'),
+    MenuItems: passthrough('menu-items'),
+    MenuItem: passthrough('menu-item'),
+    Listbox: passthrough('listbox'),
+    ListboxButton: passthrough('listbox-button'),
+    ListboxOptions: passthrough('listbox-options'),
+    ListboxOption: passthrough('listbox-option'),
+  };
+});
+
+vi.mock('@clerk/nextjs', () => ({
+  useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
+  useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
+  SignedIn: ({ children }: { children: unknown }) => children,
+  SignedOut: ({ children }: { children: unknown }) => children,
+  ClerkProvider: ({ children }: { children: unknown }) => children,
+}));
+
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
 afterEach(() => {
   cleanup();

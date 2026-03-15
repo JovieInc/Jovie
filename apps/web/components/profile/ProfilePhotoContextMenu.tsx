@@ -14,15 +14,10 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@jovie/ui';
-import { Download, FileCode2, ImageDown, QrCode } from 'lucide-react';
+import { Download, ImageDown } from 'lucide-react';
 import { useCallback } from 'react';
-import { getQrCodeUrl } from '@/components/molecules/QRCode';
-import { getProfileUrl } from '@/constants/domains';
 import { track } from '@/lib/analytics';
 import { captureException } from '@/lib/sentry/client-lite';
 
@@ -35,8 +30,6 @@ interface ProfilePhotoContextMenuProps {
   readonly name: string;
   /** Profile handle/username */
   readonly handle: string;
-  /** Profile tagline or bio */
-  readonly tagline?: string;
   /** Available download sizes */
   readonly sizes: AvatarSize[];
   /** Whether profile photo downloads are allowed */
@@ -52,50 +45,13 @@ function sanitizeFilename(value: string): string {
   return sanitized || 'profile-photo';
 }
 
-function downloadBlob(blob: Blob, filename: string): void {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(objectUrl);
-}
-
-function buildVxarCard(params: {
-  name: string;
-  handle: string;
-  profileUrl: string;
-  tagline?: string;
-}): string {
-  const { name, handle, profileUrl, tagline } = params;
-  return [
-    'BEGIN:VCARD',
-    'VERSION:3.0',
-    `FN:${name}`,
-    `N:${name};;;;`,
-    `NICKNAME:${handle}`,
-    `URL:${profileUrl}`,
-    tagline ? `NOTE:${tagline}` : null,
-    `X-JOVIE-PROFILE:${profileUrl}`,
-    `X-JOVIE-HANDLE:${handle}`,
-    'X-VXAR-FORMAT:1.0',
-    'END:VCARD',
-  ]
-    .filter(Boolean)
-    .join('\n');
-}
-
 export function ProfilePhotoContextMenu({
   children,
   name,
   handle,
-  tagline,
   sizes,
   allowDownloads,
 }: ProfilePhotoContextMenuProps) {
-  const profileUrl = getProfileUrl(handle);
   const safeFilename = sanitizeFilename(handle || name);
 
   const handleDownload = useCallback(
@@ -140,46 +96,6 @@ export function ProfilePhotoContextMenu({
     [safeFilename]
   );
 
-  const handleDownloadVxar = useCallback(() => {
-    const vxar = buildVxarCard({
-      name,
-      handle,
-      profileUrl,
-      tagline,
-    });
-    downloadBlob(
-      new Blob([vxar], { type: 'text/vcard' }),
-      `${safeFilename}.vxar`
-    );
-  }, [handle, name, profileUrl, safeFilename, tagline]);
-
-  const handleDownloadQr = useCallback(async () => {
-    const qrUrl = getQrCodeUrl(profileUrl, 512);
-    const response = await fetch(qrUrl);
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const blob = await response.blob();
-    downloadBlob(blob, `${safeFilename}-qr-code.png`);
-  }, [profileUrl, safeFilename]);
-
-  const handleDownloadProfileJson = useCallback(() => {
-    const payload = {
-      format: 'jovie-profile-v1',
-      exportedAt: new Date().toISOString(),
-      profile: {
-        name,
-        handle,
-        tagline: tagline ?? null,
-        profileUrl,
-      },
-    };
-    downloadBlob(
-      new Blob([JSON.stringify(payload, null, 2)], {
-        type: 'application/json',
-      }),
-      `${safeFilename}.json`
-    );
-  }, [handle, name, profileUrl, safeFilename, tagline]);
-
   const showDownloads = allowDownloads && sizes.length > 0;
 
   if (!showDownloads) {
@@ -192,41 +108,21 @@ export function ProfilePhotoContextMenu({
       <ContextMenuContent>
         <ContextMenuLabel>Download Profile Photo</ContextMenuLabel>
         <ContextMenuSeparator />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>
-            <Download className='mr-2 h-4 w-4' />
-            Download
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ContextMenuItem onClick={handleDownloadVxar}>
-              <FileCode2 className='mr-2 h-4 w-4' />
-              Download as VXAR
-            </ContextMenuItem>
-            <ContextMenuItem
-              onClick={() => {
-                handleDownloadQr().catch(() => {});
-              }}
-            >
-              <QrCode className='mr-2 h-4 w-4' />
-              Download QR Code
-            </ContextMenuItem>
-            {sizes.map(size => (
-              <ContextMenuItem
-                key={size.key}
-                onClick={() => {
-                  handleDownload(size).catch(() => {});
-                }}
-              >
-                <ImageDown className='mr-2 h-4 w-4' />
-                {size.label}
-              </ContextMenuItem>
-            ))}
-            <ContextMenuItem onClick={handleDownloadProfileJson}>
-              <FileCode2 className='mr-2 h-4 w-4' />
-              Download Profile as JSON
-            </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
+        {sizes.map(size => (
+          <ContextMenuItem
+            key={size.key}
+            onClick={() => {
+              handleDownload(size).catch(() => {});
+            }}
+          >
+            {size.key === 'original' ? (
+              <Download className='mr-2 h-4 w-4' />
+            ) : (
+              <ImageDown className='mr-2 h-4 w-4' />
+            )}
+            {size.label}
+          </ContextMenuItem>
+        ))}
       </ContextMenuContent>
     </ContextMenu>
   );

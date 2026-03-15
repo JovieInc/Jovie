@@ -4,6 +4,7 @@ import { memo } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { track } from '@/lib/analytics';
 import { getSocialDeepLinkConfig, openDeepLink } from '@/lib/deep-links';
+import { useTrackingMutation } from '@/lib/queries';
 import type { LegacySocialLink as SocialLinkType } from '@/types/db';
 
 interface SocialLinkProps {
@@ -13,6 +14,10 @@ interface SocialLinkProps {
 }
 
 function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
+  const trackSocialClick = useTrackingMutation({
+    endpoint: '/api/track',
+  });
+
   // Guard against incomplete link data
   if (!link.platform || !link.url) {
     return null;
@@ -28,19 +33,11 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
     });
 
     // Fire-and-forget server tracking
-    fetch('/api/track', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        handle,
-        linkType: 'social',
-        target: link.platform,
-        linkId: link.id,
-      }),
-    }).catch(() => {
-      // Ignore tracking errors
+    trackSocialClick.mutate({
+      handle,
+      linkType: 'social',
+      target: link.platform,
+      linkId: link.id,
     });
 
     // Try deep linking
@@ -70,7 +67,7 @@ function SocialLinkComponent({ link, handle, artistName }: SocialLinkProps) {
     <a
       href={link.url}
       onClick={handleClick}
-      className='group flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-transparent text-secondary-token transition-colors hover:border-subtle hover:bg-surface-2 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
+      className='group flex h-10 w-10 items-center justify-center rounded-full border border-subtle/40 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0'
       title={`Follow on ${link.platform}`}
       aria-label={`Follow ${artistName} on ${link.platform}`}
     >

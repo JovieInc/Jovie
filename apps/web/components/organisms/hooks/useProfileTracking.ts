@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTrackingMutation } from '@/lib/queries';
 
 export function useTipPageTracking({
   artistHandle,
@@ -11,25 +12,22 @@ export function useTipPageTracking({
   mode?: string | null;
   source?: string | null;
 }) {
+  const trackTip = useTrackingMutation({
+    endpoint: '/api/track',
+  });
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistHandle) return;
     if (mode !== 'tip') return;
 
-    fetch('/api/track', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        handle: artistHandle,
-        linkType: 'tip',
-        target: 'tip_page',
-        source,
-      }),
-      keepalive: true,
-    }).catch(() => {
-      // Ignore tracking errors
+    trackTip.mutate({
+      handle: artistHandle,
+      linkType: 'tip',
+      target: 'tip_page',
+      source,
     });
-  }, [artistHandle, mode, source]);
+  }, [artistHandle, mode, source, trackTip]);
 }
 
 /**
@@ -63,7 +61,14 @@ function extractUtmParams():
   return utm;
 }
 
-export function useProfileVisitTracking(artistId?: string) {
+export function useProfileVisitTracking(
+  artistId?: string,
+  trackingToken?: string
+) {
+  const trackVisit = useTrackingMutation({
+    endpoint: '/api/audience/visit',
+  });
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistId) return;
@@ -71,19 +76,13 @@ export function useProfileVisitTracking(artistId?: string) {
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;
 
-    fetch('/api/audience/visit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        profileId: artistId,
-        referrer,
-        ...(utmParams && { utmParams }),
-      }),
-      keepalive: true,
-    }).catch(() => {
-      // Ignore tracking errors
+    trackVisit.mutate({
+      profileId: artistId,
+      referrer,
+      ...(utmParams && { utmParams }),
+      ...(trackingToken && { trackingToken }),
     });
-  }, [artistId]);
+  }, [artistId, trackingToken, trackVisit]);
 }
 
 export function usePopstateReset(callback: () => void) {

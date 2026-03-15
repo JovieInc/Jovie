@@ -6,6 +6,7 @@ import {
   eq,
   gt,
   gte,
+  ne,
   type SQL,
 } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -34,7 +35,7 @@ import type {
 
 export type AudienceMode = 'members' | 'subscribers';
 
-export type AudienceView = 'all' | 'subscribers' | 'anonymous';
+export type AudienceView = 'all' | 'identified' | 'anonymous';
 
 export type AudienceServerRow = AudienceMember;
 
@@ -367,22 +368,27 @@ async function fetchMembersData(
   options: {
     includeDetails: boolean;
     memberId: string | undefined;
-    typeFilter?: AudienceMemberType;
+    viewFilter: AudienceView;
     segmentFilter?: string[];
   }
 ): Promise<
   Omit<AudienceServerData, 'view' | 'subscriberCount' | 'totalAudienceCount'>
 > {
-  const { includeDetails, memberId, typeFilter, segmentFilter } = options;
+  const { includeDetails, memberId, viewFilter, segmentFilter } = options;
   const safe = parseMemberQueryParams(searchParams);
   const sortColumn = MEMBER_SORT_COLUMNS[safe.sort];
   const orderFn = safe.direction === 'asc' ? asc : desc;
 
   const ownershipFilter = buildOwnershipFilter(clerkUserId);
   const memberIdFilter = buildMemberIdFilter(memberId);
-  const typeCondition = typeFilter
-    ? eq(audienceMembers.type, typeFilter)
-    : drizzleSql<boolean>`true`;
+  let typeCondition: SQL<boolean>;
+  if (viewFilter === 'anonymous') {
+    typeCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  } else if (viewFilter === 'identified') {
+    typeCondition = ne(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  } else {
+    typeCondition = drizzleSql<boolean>`true`;
+  }
   const segmentCondition = buildSegmentFilter(segmentFilter);
 
   // Keyset cursor WHERE clause — avoids full-table OFFSET scan (JOV-1254).
@@ -438,7 +444,7 @@ async function fetchMembersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows[rows.length - 1];
+    const lastRow = rows.at(-1)!;
     const rawSortVal = lastRow.lastSeenAt;
     const sortValStr =
       rawSortVal instanceof Date
@@ -463,7 +469,7 @@ async function fetchMembersData(
 /**
  * Fetch subscribers data
  */
-async function fetchSubscribersData(
+async function _fetchSubscribersData(
   tx: DbSessionTx,
   clerkUserId: string | null,
   selectedProfileId: string,
@@ -575,7 +581,7 @@ async function fetchSubscribersData(
   // Build next-page cursor from the last returned row.
   let nextCursor: string | null = null;
   if (hasMore && rows.length > 0) {
-    const lastRow = rows[rows.length - 1];
+    const lastRow = rows.at(-1)!;
     const sortValStr = toISOStringOrNull(lastRow.createdAt) ?? '';
     nextCursor = encodeCursor(sortValStr, lastRow.id);
   }
@@ -641,7 +647,7 @@ function buildEmptyAudienceData(
     total: null,
     page: 1,
     pageSize: 10,
-    sort: mode === 'members' ? DEFAULT_MEMBER_SORT : DEFAULT_SUBSCRIBER_SORT,
+    sort: DEFAULT_MEMBER_SORT,
     direction: 'desc',
     nextCursor: null,
     hasMore: false,
@@ -654,25 +660,14 @@ function buildDataPromise(
   tx: DbSessionTx,
   clerkUserId: string,
   selectedProfileId: string,
-  mode: AudienceMode,
   view: AudienceView,
   searchParams: SearchParams,
   options: { includeDetails: boolean; memberId?: string; segments?: string[] }
 ) {
-  if (mode === 'subscribers') {
-    return fetchSubscribersData(
-      tx,
-      clerkUserId,
-      selectedProfileId,
-      searchParams
-    );
-  }
   return fetchMembersData(tx, clerkUserId, selectedProfileId, searchParams, {
     includeDetails: options.includeDetails,
     memberId: options.memberId,
-    // 'all' shows all members, 'anonymous' filters to anonymous only
-    typeFilter:
-      view === 'anonymous' ? ('anonymous' as AudienceMemberType) : undefined,
+    viewFilter: view,
     segmentFilter: options.segments,
   });
 }
@@ -699,7 +694,7 @@ export async function getAudienceServerData(params: {
   } = params;
 
   // Map view to internal mode
-  const mode: AudienceMode = view === 'subscribers' ? 'subscribers' : 'members';
+  const mode: AudienceMode = 'members';
 
   if (!selectedProfileId) {
     return buildEmptyAudienceData(mode, view);
@@ -712,7 +707,6 @@ export async function getAudienceServerData(params: {
       tx,
       clerkUserId,
       selectedProfileId,
-      mode,
       view,
       searchParams,
       { includeDetails, memberId, segments }

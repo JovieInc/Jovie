@@ -53,6 +53,6 @@ export const getDemoCreator = unstable_cache(
  *
  * Re-exports getFeaturedCreators with the same cache.
  */
-export { getFeaturedCreators as getDemoCreators };
+export { getFeaturedCreators as getDemoCreators } from '@/lib/featured-creators';
 
 export { TIM_WHITE_FALLBACK };

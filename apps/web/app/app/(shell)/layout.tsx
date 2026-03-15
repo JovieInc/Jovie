@@ -8,7 +8,8 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
-import { HydrateClient } from '@/lib/queries/HydrateClient';
+import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
+import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
@@ -17,11 +18,15 @@ import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+const EMPTY_FEATURE_FLAGS_BOOTSTRAP: FeatureFlagsBootstrap = { gates: {} };
+
 export default async function AppShellLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
+  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+
   // NO MORE AUTH GATE - proxy.ts already routed us correctly!
   // If we're rendering this layout, user is ACTIVE and can access the app.
   try {
@@ -35,7 +40,9 @@ export default async function AppShellLayout({
     // Feature flags now run in parallel instead of waiting for dashboard data.
     const [dashboardData, featureFlagsBootstrap] = await Promise.all([
       getDashboardData(),
-      getFeatureFlagsBootstrap(auth.userId ?? null),
+      isE2EClientRuntime
+        ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
+        : getFeatureFlagsBootstrap(auth.userId ?? null),
     ]);
 
     // Read sidebar cookie server-side so SSR matches client state (no flash)
@@ -54,7 +61,7 @@ export default async function AppShellLayout({
             <AuthShellWrapper
               persistSidebarCollapsed={setSidebarCollapsed}
               sidebarDefaultOpen={sidebarDefaultOpen}
-              previewPanelDefaultOpen={dashboardData.isFirstSession}
+              previewPanelDefaultOpen
             >
               {children}
             </AuthShellWrapper>

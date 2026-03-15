@@ -22,6 +22,7 @@ import {
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
@@ -122,6 +123,35 @@ export async function GET(request: Request) {
   }
 }
 
+type UserBatch = Awaited<ReturnType<typeof fetchUserBatch>>;
+
+async function processUserChunk(
+  userChunk: UserBatch,
+  stats: ReconciliationStats,
+  errors: string[]
+): Promise<void> {
+  const results = await Promise.allSettled(
+    userChunk.map(user => processSingleUser(db, stripe, user))
+  );
+
+  for (let i = 0; i < results.length; i++) {
+    stats.usersChecked++;
+    const result = results[i];
+    const user = userChunk[i];
+
+    if (result.status === 'fulfilled') {
+      updateStatsFromResult(stats, errors, user.id, result.value);
+    } else {
+      stats.errors++;
+      const message =
+        result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason);
+      errors.push(`Error processing user ${user?.id ?? 'unknown'}: ${message}`);
+    }
+  }
+}
+
 /**
  * Reconcile users who have a subscription ID stored in DB
  * Uses cursor-based pagination to handle >100 users.
@@ -143,7 +173,7 @@ async function reconcileUsersWithSubscriptions(
     if (batch.length === 0) break;
 
     // Update cursor to last user in batch before parallel processing
-    lastUserId = batch[batch.length - 1].id;
+    lastUserId = batch.at(-1)!.id;
 
     // Process users with bounded concurrency to avoid Stripe rate limits
     for (
@@ -155,27 +185,7 @@ async function reconcileUsersWithSubscriptions(
         chunkStart,
         chunkStart + FIRST_PASS_CONCURRENCY
       );
-
-      const results = await Promise.allSettled(
-        userChunk.map(user => processSingleUser(db, stripe, user))
-      );
-
-      for (let i = 0; i < results.length; i++) {
-        stats.usersChecked++;
-        const result = results[i];
-        const user = userChunk[i];
-
-        if (result.status === 'fulfilled') {
-          updateStatsFromResult(stats, errors, user.id, result.value);
-        } else {
-          stats.errors++;
-          const message =
-            result.reason instanceof Error
-              ? result.reason.message
-              : String(result.reason);
-          errors.push(`Error processing user ${user.id}: ${message}`);
-        }
-      }
+      await processUserChunk(userChunk, stats, errors);
     }
 
     if (batch.length < BATCH_SIZE) break;
@@ -275,7 +285,7 @@ async function repairProUserWithoutSubscription(user: {
 
     if (activeSubscription) {
       // They have an active subscription - link it
-      await db.transaction(async tx => {
+      await runLegacyDbTransaction(async tx => {
         await tx
           .update(users)
           .set({
@@ -301,7 +311,7 @@ async function repairProUserWithoutSubscription(user: {
   }
 
   // No active subscription found - they shouldn't be Pro
-  await db.transaction(async tx => {
+  await runLegacyDbTransaction(async tx => {
     await tx
       .update(users)
       .set({

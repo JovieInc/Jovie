@@ -39,11 +39,11 @@ export function ContactSection({
   }
 
   return (
-    <main className='space-y-4' aria-labelledby='contact-title'>
+    <main className='-mt-1 space-y-3' aria-labelledby='contact-title'>
       <h1 id='contact-title' className='sr-only'>
         Contact {artistName}
       </h1>
-      <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-2 shadow-sm ring-1 ring-black/5 dark:ring-white/5'>
         <div className='space-y-2'>
           {available.map(contact => {
             const primary = primaryChannel(contact);
@@ -86,12 +86,17 @@ export function ContactSection({
                     const channelHref = getActionHref(channel);
                     if (!channelHref) return null;
 
+                    const channelLabels: Record<string, string> = {
+                      email: 'Email',
+                      sms: 'Text',
+                    };
+                    const channelLabel = channelLabels[channel.type] ?? 'Call';
                     return (
                       <a
                         key={`${contact.id}-${channel.type}`}
                         href={channelHref}
                         className='flex h-9 w-9 items-center justify-center rounded-full text-primary-token transition-colors hover:bg-surface-1 active:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
-                        aria-label={`${channel.type === 'email' ? 'Email' : 'Call'} ${contact.roleLabel}`}
+                        aria-label={`${channelLabel} ${contact.roleLabel}`}
                         onClick={() => trackAction(channel, contact)}
                         data-testid='contact-channel-action'
                       >

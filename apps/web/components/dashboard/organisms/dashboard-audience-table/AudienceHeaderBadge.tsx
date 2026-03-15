@@ -1,7 +1,12 @@
 'use client';
 
-import { BellRing, Ghost, Users } from 'lucide-react';
 import { memo } from 'react';
+import { Icon } from '@/components/atoms/Icon';
+import {
+  PAGE_TOOLBAR_ICON_CLASS,
+  PAGE_TOOLBAR_ICON_STROKE_WIDTH,
+  PageToolbarTabButton,
+} from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 import type { AudienceView } from './types';
 
@@ -16,11 +21,11 @@ interface AudienceHeaderBadgeProps {
 
 const VIEW_OPTIONS: {
   value: AudienceView;
-  Icon: typeof Users;
+  icon: string;
 }[] = [
-  { value: 'all', Icon: Users },
-  { value: 'subscribers', Icon: BellRing },
-  { value: 'anonymous', Icon: Ghost },
+  { value: 'all', icon: 'Users' },
+  { value: 'identified', icon: 'User' },
+  { value: 'anonymous', icon: 'EyeOff' },
 ];
 
 export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
@@ -35,38 +40,33 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       : null;
 
   const labels: Record<AudienceView, string> = {
-    all:
-      totalAudienceCount !== null
-        ? `All Audience (${totalAudienceCount})`
-        : 'All Audience',
-    subscribers:
-      subscriberCount !== null ? `Followers (${subscriberCount})` : 'Followers',
+    all: totalAudienceCount === null ? 'All' : `All (${totalAudienceCount})`,
+    identified:
+      subscriberCount === null
+        ? 'Identified'
+        : `Identified (${subscriberCount})`,
     anonymous:
-      anonymousCount !== null ? `Anonymous (${anonymousCount})` : 'Anonymous',
+      anonymousCount === null ? 'Anonymous' : `Anonymous (${anonymousCount})`,
   };
 
   return (
-    <div className='flex items-center min-w-0 overflow-x-auto scrollbar-hide'>
-      <fieldset className='inline-flex items-center gap-0.5 rounded-lg border border-subtle bg-surface-0/80 p-[3px] backdrop-blur-sm'>
-        <legend className='sr-only'>Audience view filter</legend>
-        {VIEW_OPTIONS.map(({ value, Icon }) => (
-          <button
-            key={value}
-            type='button'
-            onClick={() => onViewChange(value)}
-            aria-pressed={view === value}
-            className={cn(
-              'inline-flex h-7 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-[510] tracking-[-0.01em] transition-all duration-150 whitespace-nowrap',
-              view === value
-                ? 'border-default bg-surface-2 text-primary-token shadow-card'
-                : 'border-transparent text-tertiary-token hover:text-secondary-token hover:bg-surface-1'
-            )}
-          >
-            <Icon className='h-3 w-3' />
-            {labels[value]}
-          </button>
-        ))}
-      </fieldset>
+    <div className='scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto pb-px'>
+      {VIEW_OPTIONS.map(({ value, icon }) => (
+        <PageToolbarTabButton
+          key={value}
+          active={view === value}
+          onClick={() => onViewChange(value)}
+          className={cn('whitespace-nowrap')}
+          icon={
+            <Icon
+              name={icon}
+              className={PAGE_TOOLBAR_ICON_CLASS}
+              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+            />
+          }
+          label={labels[value]}
+        />
+      ))}
     </div>
   );
 });

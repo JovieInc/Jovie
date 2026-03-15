@@ -1,11 +1,7 @@
 import * as Sentry from '@sentry/nextjs';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import {
-  discogReleases,
-  discogTracks,
-  providerLinks,
-} from '@/lib/db/schema/content';
+import { discogReleases, discogTracks } from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
@@ -57,6 +53,31 @@ const MAX_RELEASES_PER_IMPORT = 200;
 const MAX_TRACKS_PER_RELEASE = 100;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
+
+function sanitizeBoundedInteger(
+  value: number | null | undefined,
+  min: number,
+  max: number,
+  fallback: number
+): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(Math.trunc(value), max));
+}
+
+function sanitizeBoundedNullableInteger(
+  value: number | null | undefined,
+  min: number,
+  max: number
+): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.max(min, Math.min(Math.trunc(value), max));
+}
 
 export interface SpotifyImportResult {
   success: boolean;
@@ -412,6 +433,7 @@ function parseAlbumArtistInputs(
  * Fetch existing track slugs to preserve them across re-imports
  */
 async function fetchExistingTrackSlugs(
+  creatorProfileId: string,
   spotifyTrackIds: string[]
 ): Promise<Map<string, { id: string; slug: string }>> {
   const existingTracksBySpotifyId = new Map<
@@ -427,15 +449,19 @@ async function fetchExistingTrackSlugs(
     .select({
       id: discogTracks.id,
       slug: discogTracks.slug,
-      spotifyTrackId: providerLinks.externalId,
+      spotifyTrackId:
+        drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+          'spotify_track_id'
+        ),
     })
-    .from(providerLinks)
-    .innerJoin(discogTracks, eq(discogTracks.id, providerLinks.trackId))
+    .from(discogTracks)
     .where(
       and(
-        eq(providerLinks.ownerType, 'track'),
-        eq(providerLinks.providerId, 'spotify'),
-        inArray(providerLinks.externalId, spotifyTrackIds)
+        eq(discogTracks.creatorProfileId, creatorProfileId),
+        inArray(
+          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+          spotifyTrackIds
+        )
       )
     );
 
@@ -465,8 +491,10 @@ async function processTracksForRelease(
     MAX_TRACKS_PER_RELEASE
   );
   const spotifyTrackIds = tracksToImport.map(t => t.id).filter(Boolean);
-  const existingTracksBySpotifyId =
-    await fetchExistingTrackSlugs(spotifyTrackIds);
+  const existingTracksBySpotifyId = await fetchExistingTrackSlugs(
+    creatorProfileId,
+    spotifyTrackIds
+  );
 
   let hasExplicit = false;
 
@@ -501,9 +529,13 @@ async function processTracksForRelease(
       creatorProfileId,
       title: sanitizedTrackTitle,
       slug: trackSlug,
-      trackNumber: Math.max(1, Math.min(track.track_number, 999)),
-      discNumber: Math.max(1, Math.min(track.disc_number, 99)),
-      durationMs: Math.max(0, Math.min(track.duration_ms, 60 * 60 * 1000)),
+      trackNumber: sanitizeBoundedInteger(track.track_number, 1, 999, 1),
+      discNumber: sanitizeBoundedInteger(track.disc_number, 1, 99, 1),
+      durationMs: sanitizeBoundedNullableInteger(
+        track.duration_ms,
+        0,
+        60 * 60 * 1000
+      ),
       isExplicit: track.explicit,
       isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
@@ -520,9 +552,13 @@ async function processTracksForRelease(
       trackId: createdTrack.id,
       providerId: 'spotify',
       url: buildSpotifyTrackUrl(track.id),
-      externalId: track.id,
+      externalId: null,
       sourceType: 'ingested',
       isPrimary: true,
+      metadata: {
+        providerExternalId: track.id,
+        isrc: sanitizedIsrc,
+      },
     });
 
     const trackArtistInputs: SpotifyArtistInput[] = track.artists.map(a => ({
@@ -568,19 +604,19 @@ async function importSingleRelease(
 ): Promise<void> {
   const metadata = sanitizeAlbumMetadata(album, fullAlbum);
 
-  // If this album was previously imported, preserve its slug for stability
+  // If this album was previously imported for this creator, preserve its slug
+  // for stability even when provider_links cannot store a duplicate
+  // external_id under the current global unique index.
   const [existingRelease] = await db
     .select({
       id: discogReleases.id,
       slug: discogReleases.slug,
     })
-    .from(providerLinks)
-    .innerJoin(discogReleases, eq(discogReleases.id, providerLinks.releaseId))
+    .from(discogReleases)
     .where(
       and(
-        eq(providerLinks.ownerType, 'release'),
-        eq(providerLinks.providerId, 'spotify'),
-        eq(providerLinks.externalId, album.id)
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`
       )
     )
     .limit(1);
@@ -639,9 +675,12 @@ async function importSingleRelease(
     releaseId: release.id,
     providerId: 'spotify',
     url: buildSpotifyAlbumUrl(album.id),
-    externalId: album.id,
+    externalId: null,
     sourceType: 'ingested',
     isPrimary: true,
+    metadata: {
+      providerExternalId: album.id,
+    },
   });
 
   // Process release-level artist credits

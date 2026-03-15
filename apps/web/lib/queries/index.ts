@@ -39,6 +39,20 @@
  * }
  */
 
+// Admin infinite queries
+export {
+  type AdminCreatorProfileRow,
+  type AdminCreatorProfilesSort,
+  type AdminUserRow,
+  type AdminUserStatus,
+  type AdminUsersSort,
+  useAdminCreatorsInfiniteQuery,
+  useAdminUsersInfiniteQuery,
+  useAdminWaitlistInfiniteQuery,
+  type WaitlistEntryRow,
+} from './admin-infinite';
+// Audience infinite query
+export { useAudienceInfiniteQuery } from './audience-infinite';
 // Cache strategy presets
 export {
   FREQUENT_CACHE,
@@ -80,6 +94,29 @@ export {
 } from './useAccountMutations';
 // Query hooks
 export { useActivityFeedQuery } from './useActivityFeedQuery';
+// Admin bulk refresh mutation
+export { useAdminBulkRefreshMutation } from './useAdminBulkRefreshMutation';
+// Admin feedback mutation
+export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
+export {
+  type AdminLead,
+  type AdminLeadKeyword,
+  type AdminLeadListResponse,
+  type LeadPipelineSettings,
+  useAddLeadKeywordsMutation,
+  useDeleteLeadKeywordMutation,
+  useLeadKeywordsQuery,
+  useLeadPipelineSettingsQuery,
+  useLeadsListQuery,
+  useMarkLeadDmSentMutation,
+  useQueueLeadUrlsMutation,
+  useRunLeadDiscoveryMutation,
+  useRunLeadQualificationMutation,
+  useSeedLeadKeywordsMutation,
+  useToggleLeadKeywordMutation,
+  useUpdateLeadPipelineSettingsMutation,
+  useUpdateLeadStatusMutation,
+} from './useAdminLeadsPrimitives';
 // Admin social links query
 export {
   type AdminSocialLink,
@@ -107,8 +144,25 @@ export {
   type ArtistThemeResponse,
   useArtistThemeMutation,
 } from './useArtistThemeMutation';
+// Artwork download mutation
+export { useArtworkDownloadMutation } from './useArtworkDownloadMutation';
+// Avatar upload mutation (admin)
+export {
+  type AvatarUploadInput,
+  type UseAvatarUploadMutationOptions,
+  updateCreatorAvatar,
+  uploadAvatarToBlob,
+  useAvatarUploadMutation,
+} from './useAvatarUploadMutation';
 // Bandsintown connection status
 export { useBandsintownConnectionQuery } from './useBandsintownConnectionQuery';
+// Batch ingest mutation (admin)
+export {
+  type BatchIngestApiResponse,
+  type BatchIngestInput,
+  type BatchResult,
+  useBatchIngestMutation,
+} from './useBatchIngestMutation';
 export {
   type BillingHistoryEntry,
   useBillingHistoryQuery,
@@ -124,12 +178,14 @@ export {
 } from './useBillingMutations';
 export {
   type BillingStatusData,
+  billingStatusQueryOptions,
   useBillingStatusQuery,
   useIsPro,
 } from './useBillingStatusQuery';
 // Build info / version monitoring
 export {
   type BuildInfo,
+  fetchBuildInfo,
   type UseVersionMonitorOptions,
   type UseVersionMonitorResult,
   useBuildInfoQuery,
@@ -144,21 +200,70 @@ export {
   type JobQueueStats,
   type SendCampaignInvitesInput,
   type SendCampaignInvitesResponse,
+  useCampaignInvitesQuery,
+  useCampaignOverviewQuery,
   useCampaignPreviewQuery,
+  useCampaignSettings,
   useCampaignStatsQuery,
+  useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from './useCampaignInvites';
+// Chat conversation query
+export { useChatConversationQuery } from './useChatConversationQuery';
+// Chat conversations list query
+export {
+  type ChatConversation,
+  useChatConversationsQuery,
+} from './useChatConversationsQuery';
+// Chat mutations
+export {
+  type ChatMessage,
+  useAddMessagesMutation,
+  useCreateConversationMutation,
+  useDeleteConversationMutation,
+  useUpdateConversationMutation,
+} from './useChatMutations';
+// Chat usage query
+export {
+  type ChatUsageData,
+  chatUsageQueryOptions,
+  useChatUsageQuery,
+} from './useChatUsageQuery';
+// Confirm chat edit mutation
+export {
+  type ConfirmChatEditInput,
+  useConfirmChatEditMutation,
+} from './useConfirmChatEditMutation';
+// Confirm chat link mutation
+export {
+  type ConfirmChatLinkInput,
+  useConfirmChatLinkMutation,
+} from './useConfirmChatLinkMutation';
+// Confirm chat remove link mutation
+export {
+  type ConfirmChatRemoveLinkInput,
+  useConfirmChatRemoveLinkMutation,
+} from './useConfirmChatRemoveLinkMutation';
+// Contacts query
+export { useContactsQuery } from './useContactsQuery';
 // Admin creator mutations
 export {
   useDeleteCreatorMutation,
   useToggleFeaturedMutation,
   useToggleMarketingMutation,
 } from './useCreatorMutations';
+// Creator verification mutation
+export {
+  type ToggleVerificationInput,
+  type ToggleVerificationResponse,
+  useToggleVerificationMutation,
+} from './useCreatorVerificationMutation';
 export { useDashboardAnalyticsQuery } from './useDashboardAnalyticsQuery';
 export {
   type DashboardProfile,
   useDashboardProfileQuery,
   useUpdateDashboardProfileMutation,
+  useUpdateVenmoMutation,
 } from './useDashboardProfileQuery';
 // Dashboard social links query and mutation
 export {
@@ -199,6 +304,20 @@ export {
   type UseDspMatchesQueryOptions,
   useDspMatchesQuery,
 } from './useDspMatchesQuery';
+// Earnings query
+export {
+  type EarningsResponse,
+  type EarningsStats,
+  type TipperRow,
+  useEarningsQuery,
+} from './useEarningsQuery';
+// Environment health query
+export {
+  type EnvHealthResponse,
+  useEnvHealthQuery,
+} from './useEnvHealthQuery';
+// Feedback mutation
+export { useFeedbackMutation } from './useFeedbackMutation';
 // Growth plan early access request
 export {
   type GrowthAccessRequestInput,
@@ -218,12 +337,34 @@ export {
   useEndImpersonationMutation,
   useImpersonationQuery,
 } from './useImpersonationQuery';
+// Ingest profile mutation
+export {
+  type IngestProfileInput,
+  type IngestProfileResponse,
+  useIngestProfileMutation,
+} from './useIngestProfileMutation';
 // Ingest refresh mutation
 export {
   type IngestRefreshInput,
   type IngestRefreshResponse,
   useIngestRefreshMutation,
 } from './useIngestRefreshMutation';
+// Insights mutation
+export {
+  useGenerateInsightsMutation,
+  useUpdateInsightMutation,
+} from './useInsightsMutation';
+// Insights query
+export {
+  useInsightsQuery,
+  useInsightsSummaryQuery,
+} from './useInsightsQuery';
+// Invite mutation
+export {
+  type CreateInviteInput,
+  type CreateInviteResponse,
+  useCreateInviteMutation,
+} from './useInviteMutation';
 // Link verification mutation
 export {
   type LinkVerificationInput,
@@ -239,15 +380,21 @@ export {
   useUpdateContentPreferencesMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
-// Pixel settings mutation
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
   usePixelSettingsDeleteMutation,
   usePixelSettingsMutation,
 } from './usePixelSettingsMutation';
+// Pixel settings query and mutation
+export {
+  type PixelSettingsData,
+  usePixelSettingsQuery,
+} from './usePixelSettingsQuery';
 // Plan gate hook
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
+// Pre-save mutation
+export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
   type PricingOption,
   type PricingOptionsResponse,
@@ -270,6 +417,8 @@ export {
   type UsePublicProfileQueryOptions,
   usePublicProfileQuery,
 } from './usePublicProfileQuery';
+// QR code download mutation
+export { useQrCodeDownloadMutation } from './useQrCodeDownloadMutation';
 export {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
@@ -282,10 +431,21 @@ export {
 } from './useReleaseMutations';
 // Release queries and mutations
 export { useReleasesQuery } from './useReleasesQuery';
+
+export {
+  type ReleaseTrack,
+  useReleaseTracksQuery,
+} from './useReleaseTracksQuery';
+// Remove social link mutation
+export {
+  type RemoveSocialLinkInput,
+  useRemoveSocialLinkMutation,
+} from './useRemoveSocialLinkMutation';
 // Settings mutations
 export {
   type SettingsUpdateInput,
   useAnalyticsFilterMutation,
+  useBrandingSettingsMutation,
   useHighContrastMutation,
   useNotificationSettingsMutation,
   useThemeMutation,
@@ -304,6 +464,21 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// Tour date mutations
+export {
+  useConnectBandsintownMutation,
+  useCreateTourDateMutation,
+  useDeleteTourDateMutation,
+  useDisconnectBandsintownMutation,
+  useRemoveBandsintownApiKeyMutation,
+  useSaveBandsintownApiKeyMutation,
+  useSyncFromBandsintownMutation,
+  useUpdateTourDateMutation,
+} from './useTourDateMutations';
+// Tracking mutation (fire-and-forget)
+export { useTrackingMutation } from './useTrackingMutation';
+// Unified artist search query
+export { useUnifiedArtistSearchQuery } from './useUnifiedArtistSearchQuery';
 // User avatar upload mutation
 export {
   type UseUserAvatarMutationOptions,
@@ -314,9 +489,28 @@ export {
   type ApproveWaitlistInput,
   type UpdateWaitlistStatusInput,
   useApproveWaitlistMutation,
+  useDisapproveWaitlistMutation,
   useUpdateWaitlistStatusMutation,
   useWaitlistSubmitMutation,
   type WaitlistMutationResponse,
   type WaitlistSubmitInput,
   type WaitlistSubmitResponse,
 } from './useWaitlistMutations';
+// Waitlist settings query and mutation (admin)
+export {
+  useWaitlistSettingsMutation,
+  useWaitlistSettingsQuery,
+  type WaitlistSettingsResponse,
+  type WaitlistSettingsUpdateInput,
+} from './useWaitlistSettingsQuery';
+// Waitlist status query
+export {
+  useWaitlistStatusQuery,
+  type WaitlistStatusResponse,
+} from './useWaitlistStatusQuery';
+// Wrap link mutation
+export {
+  useWrapLinkMutation,
+  type WrapLinkInput,
+  type WrapLinkResponse,
+} from './useWrapLinkMutation';

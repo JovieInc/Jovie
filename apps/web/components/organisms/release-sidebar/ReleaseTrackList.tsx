@@ -21,87 +21,48 @@ import {
   Pause,
   Play,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { DrawerSection } from '@/components/molecules/drawer';
+import {
+  DRAWER_SECTION_HEADING_CLASSNAME,
+  DrawerEmptyState,
+  DrawerInlineIconButton,
+  DrawerSection,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
-import type { TrackViewModel } from '@/lib/discography/types';
+import { useReleaseTracksQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import type { Release } from './types';
+import type { Release, ReleaseSidebarTrack } from './types';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
-
-/** Track shape returned by the API route for sidebar tracklist + actions. */
-type SidebarTrack = Pick<
-  TrackViewModel,
-  | 'id'
-  | 'releaseId'
-  | 'title'
-  | 'slug'
-  | 'smartLinkPath'
-  | 'trackNumber'
-  | 'discNumber'
-  | 'durationMs'
-  | 'isrc'
-  | 'isExplicit'
-  | 'previewUrl'
-  | 'audioUrl'
-  | 'audioFormat'
-  | 'providers'
->;
-
-/**
- * Fetch tracks via the route handler instead of a server action.
- * Server action calls trigger RSC tree reconciliation which can
- * cause the parent drawer to unmount.
- */
-async function fetchTracks(
-  releaseId: string,
-  signal?: AbortSignal
-): Promise<SidebarTrack[]> {
-  const res = await fetch(
-    `/api/dashboard/releases/${encodeURIComponent(releaseId)}/tracks`,
-    { signal }
-  );
-  if (!res.ok) throw new Error('Failed to load tracks');
-  return res.json() as Promise<SidebarTrack[]>;
-}
 
 interface ReleaseTrackListProps {
   readonly release: Release;
-  readonly onTrackClick?: (track: SidebarTrack) => void;
+  readonly onTrackClick?: (track: ReleaseSidebarTrack) => void;
+  readonly tracksOverride?: ReleaseSidebarTrack[];
 }
 
 export function ReleaseTrackList({
   release,
   onTrackClick,
+  tracksOverride,
 }: ReleaseTrackListProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
-  const [tracks, setTracks] = useState<SidebarTrack[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasError, setHasError] = useState(false);
-
-  // Auto-fetch tracks on mount since tracklist starts expanded
-  useEffect(() => {
-    if (release.totalTracks === 0) return;
-    const controller = new AbortController();
-    setIsLoading(true);
-    fetchTracks(release.id, controller.signal)
-      .then(data => {
-        if (!controller.signal.aborted) setTracks(data);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setTracks(null);
-        setHasError(true);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false);
-      });
-    return () => controller.abort();
-  }, [release.id, release.totalTracks]);
+  const {
+    data: fetchedTracks,
+    isLoading,
+    isFetching,
+    isError: hasError,
+    refetch,
+  } = useReleaseTracksQuery(
+    release.id,
+    !tracksOverride && isExpanded && release.totalTracks > 0
+  );
+  const tracks = tracksOverride ?? fetchedTracks;
 
   const handleToggle = useCallback(async () => {
     if (isExpanded) {
@@ -111,22 +72,10 @@ export function ReleaseTrackList({
 
     setIsExpanded(true);
 
-    // Only fetch if not already cached (null = not fetched, [] = empty)
-    if (tracks !== null && !hasError) return;
-
-    setIsLoading(true);
-    setHasError(false);
-    try {
-      const result = await fetchTracks(release.id);
-      setTracks(result);
-    } catch (error) {
-      console.error('Failed to load tracks:', error);
-      setTracks(null);
-      setHasError(true);
-    } finally {
-      setIsLoading(false);
+    if (!tracksOverride && hasError) {
+      await refetch();
     }
-  }, [isExpanded, tracks, hasError, release.id]);
+  }, [hasError, isExpanded, refetch, tracksOverride]);
 
   if (release.totalTracks === 0) return null;
 
@@ -139,9 +88,12 @@ export function ReleaseTrackList({
         }}
         aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className='flex w-full items-center justify-between rounded-md py-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token hover:text-secondary-token transition-colors'
+        className={cn(
+          DRAWER_SECTION_HEADING_CLASSNAME,
+          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+        )}
       >
-        <span>Tracklist ({release.totalTracks})</span>
+        <span>Tracks ({release.totalTracks})</span>
         {isExpanded ? (
           <ChevronDown className='h-3.5 w-3.5' />
         ) : (
@@ -150,41 +102,41 @@ export function ReleaseTrackList({
       </button>
 
       {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
-          {isLoading && (
+        <div id={`release-tracklist-${release.id}`} className='space-y-1'>
+          {(isLoading || (isFetching && !tracks)) && (
             <div className='space-y-0.5'>
-              {Array.from({ length: Math.min(release.totalTracks, 6) }).map(
-                (_, i) => (
-                  <div
-                    key={`skeleton-${
-                      // biome-ignore lint/suspicious/noArrayIndexKey: skeleton placeholder
-                      i
-                    }`}
-                    className='flex items-start gap-2 px-1 py-1.5'
+              {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
+                .slice(0, Math.min(release.totalTracks, 6))
+                .map(id => (
+                  <DrawerSurfaceCard
+                    key={id}
+                    className='flex items-start gap-3 px-2.5 py-2'
                   >
-                    <div className='w-6 shrink-0 pt-0.5'>
-                      <div className='ml-auto h-3 w-4 rounded skeleton' />
+                    <div className='w-7 shrink-0 pt-0.5'>
+                      <div className='ml-auto h-3.5 w-4 rounded skeleton' />
                     </div>
                     <div className='min-w-0 flex-1 space-y-1'>
-                      <div className='h-3.5 w-3/4 rounded skeleton' />
-                      <div className='h-2.5 w-1/3 rounded skeleton' />
+                      <div className='h-4 w-3/4 rounded skeleton' />
+                      <div className='h-3 w-1/3 rounded skeleton' />
                     </div>
-                  </div>
-                )
-              )}
+                  </DrawerSurfaceCard>
+                ))}
             </div>
           )}
 
           {!isLoading && hasError && (
-            <p className='py-2 text-[13px] text-error'>
-              Failed to load tracks. Collapse and expand to retry.
-            </p>
+            <DrawerEmptyState
+              className='min-h-[48px] px-3'
+              message='Failed to load tracks. Collapse and expand to retry.'
+              tone='error'
+            />
           )}
 
           {!isLoading && !hasError && tracks?.length === 0 && (
-            <p className='py-2 text-[13px] text-tertiary-token'>
-              No track data available.
-            </p>
+            <DrawerEmptyState
+              className='min-h-[48px] px-3'
+              message='No track data available.'
+            />
           )}
 
           {!isLoading &&
@@ -212,8 +164,8 @@ function TrackItem({
   playbackState,
   onToggleTrack,
 }: {
-  readonly track: SidebarTrack;
-  readonly onClick?: (track: SidebarTrack) => void;
+  readonly track: ReleaseSidebarTrack;
+  readonly onClick?: (track: ReleaseSidebarTrack) => void;
   readonly playbackState: {
     activeTrackId: string | null;
     isPlaying: boolean;
@@ -279,23 +231,21 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-md px-1 py-1.5 transition-colors hover:bg-surface-2/50'>
-      {/* Track number */}
-      <span className='w-6 shrink-0 pt-0.5 text-right text-[11px] tabular-nums text-tertiary-token'>
+    <div className='group flex items-start gap-3 rounded-[10px] px-2.5 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-app-frame-seam)]'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
 
-      {/* Track details */}
       <div className='min-w-0 flex-1'>
         <button
           type='button'
           onClick={handleClick}
-          className='w-full text-left focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded'
+          className='w-full rounded-[6px] text-left focus-visible:outline-none'
         >
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[13px] text-primary-token hover:underline'
+              className='text-[13.5px] font-[510] text-(--linear-text-primary)'
               tooltipSide='top'
             >
               {track.title}
@@ -303,15 +253,14 @@ function TrackItem({
             {track.isExplicit && (
               <Badge
                 variant='secondary'
-                className='shrink-0 bg-surface-2 px-1 py-0 text-[9px] text-tertiary-token'
+                className='shrink-0 bg-(--linear-bg-surface-1) px-1 py-0 text-[8px] text-(--linear-text-tertiary)'
               >
                 E
               </Badge>
             )}
           </div>
 
-          {/* Duration + ISRC row */}
-          <div className='mt-0.5 flex items-center gap-2 text-[11px] text-tertiary-token'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -320,16 +269,16 @@ function TrackItem({
             {track.isrc && (
               <>
                 {track.durationMs != null && (
-                  <span className='text-tertiary-token/50'>|</span>
+                  <span className='text-(--linear-text-quaternary)'>|</span>
                 )}
-                <span className='font-mono text-[10px]'>{track.isrc}</span>
+                <span className='font-mono text-[11px]'>{track.isrc}</span>
               </>
             )}
           </div>
         </button>
 
         {playableUrl && (
-          <div className='mt-2 space-y-1.5'>
+          <div className='mt-1.5 space-y-1'>
             <div className='flex items-center gap-2'>
               <button
                 type='button'
@@ -337,23 +286,23 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle text-secondary-token hover:border-primary hover:text-primary-token transition-colors'
+                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
-                  <Pause className='h-3.5 w-3.5' />
+                  <Pause className='h-3 w-3' />
                 ) : (
-                  <Play className='h-3.5 w-3.5' />
+                  <Play className='h-3 w-3' />
                 )}
               </button>
-              <div className='h-1 flex-1 rounded-full bg-surface-2'>
+              <div className='h-0.5 flex-1 rounded-full bg-(--linear-bg-surface-1)'>
                 <div
-                  className='h-full rounded-full bg-primary transition-[width]'
+                  className='h-full rounded-full bg-(--linear-accent) transition-[width]'
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-            <p className='text-[10px] text-tertiary-token'>
+            <p className='text-[10.5px] text-(--linear-text-tertiary)'>
               {track.audioFormat
                 ? `Audio preview · ${track.audioFormat.toUpperCase()}`
                 : 'Audio preview'}
@@ -362,7 +311,6 @@ function TrackItem({
         )}
       </div>
 
-      {/* Actions menu */}
       <TrackActionsMenu
         track={track}
         streamingProviders={streamingProviders}
@@ -373,29 +321,26 @@ function TrackItem({
   );
 }
 
-// Shared provider labels — single source of truth
-
 function TrackActionsMenu({
   track,
   streamingProviders,
   onCopyIsrc,
   onCopySmartLink,
 }: {
-  readonly track: SidebarTrack;
-  readonly streamingProviders: SidebarTrack['providers'];
+  readonly track: ReleaseSidebarTrack;
+  readonly streamingProviders: ReleaseSidebarTrack['providers'];
   readonly onCopyIsrc: () => void;
   readonly onCopySmartLink: () => void;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
-          type='button'
-          className='mt-0.5 shrink-0 self-start rounded p-0.5 opacity-60 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary'
+        <DrawerInlineIconButton
           aria-label={`Actions for ${track.title}`}
+          className='h-[22px] w-[22px] self-center group-hover:opacity-100'
         >
-          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
-        </button>
+          <MoreHorizontal className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+        </DrawerInlineIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>
         {track.isrc && (
@@ -417,20 +362,22 @@ function TrackActionsMenu({
                 Open on platform
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                {streamingProviders.map(provider => (
-                  <DropdownMenuItem
-                    key={provider.key}
-                    onClick={() =>
-                      globalThis.open(
-                        provider.url,
-                        '_blank',
-                        'noopener,noreferrer'
-                      )
-                    }
-                  >
-                    {PROVIDER_LABELS[provider.key] ?? provider.label}
-                  </DropdownMenuItem>
-                ))}
+                {streamingProviders.map(
+                  (provider: ReleaseSidebarTrack['providers'][number]) => (
+                    <DropdownMenuItem
+                      key={provider.key}
+                      onClick={() =>
+                        globalThis.open(
+                          provider.url,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
+                    >
+                      {PROVIDER_LABELS[provider.key] ?? provider.label}
+                    </DropdownMenuItem>
+                  )
+                )}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           </>

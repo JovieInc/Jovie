@@ -13,10 +13,7 @@ import {
 } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  type SpotifyArtistResult,
-  useArtistSearchQuery,
-} from '@/lib/queries/useArtistSearchQuery';
+import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 

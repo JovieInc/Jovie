@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
-import { spotifyClient } from '@/lib/spotify/client';
+import { spotifyClient } from '@/lib/spotify';
 import { SPOTIFY_API_BASE } from '@/lib/spotify/env';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { computePriorityScore } from './priority-score';
@@ -19,7 +19,7 @@ interface SpotifyAlbumsResponse {
 }
 
 function extractArtistId(spotifyUrl: string): string | null {
-  const match = spotifyUrl.match(/\/artist\/([a-zA-Z0-9]+)/);
+  const match = /\/artist\/([a-zA-Z0-9]+)/.exec(spotifyUrl);
   return match?.[1] ?? null;
 }
 

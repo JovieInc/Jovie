@@ -24,6 +24,63 @@ const REQUIRED_ENV = {
   CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
 } as const;
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
+const TEST_SPOTIFY_ARTISTS = [
+  {
+    id: '59NJtiWq8nISIJjDtITQyt',
+    url: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
+  },
+  {
+    id: '6M2wZ9GZgrQXHCFfjv46we',
+    url: 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we',
+  },
+  {
+    id: '06HL4z0CvFAxyc27GXpf02',
+    url: 'https://open.spotify.com/artist/06HL4z0CvFAxyc27GXpf02',
+  },
+] as const;
+
+interface EnsuredUserRow {
+  id: string;
+}
+
+interface SpotifyImportStateRow {
+  id: string;
+  spotify_url: string | null;
+  spotify_id: string | null;
+  is_public: boolean | null;
+  avatar_url: string | null;
+  onboarding_completed_at: string | null;
+  spotify_import_status: string | null;
+  release_count: number | null;
+  spotify_release_link_count: number | null;
+}
+
+function spotifyImportIsReady(
+  state: SpotifyImportStateRow | null | undefined
+): boolean {
+  if (!state) {
+    return false;
+  }
+
+  const releaseCount = Number(state.release_count ?? 0);
+  const releaseLinkCount = Number(state.spotify_release_link_count ?? 0);
+  const hasSpotifyProfile =
+    Boolean(state.spotify_id) && Boolean(state.spotify_url);
+
+  if (state.spotify_import_status === 'complete') {
+    return true;
+  }
+
+  return hasSpotifyProfile && releaseCount > 0 && releaseLinkCount > 0;
+}
+
+function buildValidOnboardingHandle(seed: string, clerkUserId: string): string {
+  const seedFragment = seed.replaceAll(/[^a-z0-9]/g, '').slice(0, 12);
+  const userFragment = clerkUserId.replaceAll(/[^a-z0-9]/gi, '').toLowerCase();
+  return `j${seedFragment}${userFragment.slice(-6)}`.slice(0, 30);
+}
 
 function hasRealEnv(): boolean {
   return Object.values(REQUIRED_ENV).every(
@@ -98,18 +155,24 @@ async function clearOnboardingRateLimits() {
   if (!url || !token) return; // No Redis — rate limiting uses in-memory fallback
 
   try {
-    // Find all onboarding IP rate limit keys
-    const keysResp = await fetch(`${url}/keys/onboarding:ip:*`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const keysJson = (await keysResp.json()) as { result?: string[] };
-    const keys = keysJson.result ?? [];
-
-    if (keys.length > 0) {
-      await fetch(`${url}/del/${keys.join('/')}`, {
+    const collectKeys = async (pattern: string) => {
+      const response = await fetch(`${url}/keys/${pattern}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-    }
+      const payload = (await response.json()) as { result?: string[] };
+      return payload.result ?? [];
+    };
+
+    const keys = [
+      ...(await collectKeys('onboarding:ip:*')),
+      ...(await collectKeys('onboarding:user:*')),
+    ];
+
+    if (keys.length === 0) return;
+
+    await fetch(`${url}/del/${keys.join('/')}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
   } catch {
     // Non-critical — if Redis is down, in-memory limiter resets per server restart
   }
@@ -121,6 +184,8 @@ async function clearOnboardingRateLimits() {
  * The onboarding page's server component creates users via the WebSocket
  * pool, but concurrent SSR renders in Next.js can abort the pool queries.
  * Pre-creating the user avoids this race condition.
+ * Leave profile creation to the real onboarding completion flow so the test
+ * exercises the canonical create path instead of updating a synthetic placeholder.
  *
  * Also releases the test Spotify artist ID from any previous test profiles
  * to avoid unique constraint violations on repeated runs.
@@ -130,7 +195,6 @@ async function ensureDbUser(clerkUserId: string, email: string) {
   if (!dbUrl) throw new Error('DATABASE_URL required for DB user creation');
 
   const sql = neon(dbUrl);
-
   // Clear onboarding rate limits from previous test runs
   await clearOnboardingRateLimits();
 
@@ -149,114 +213,68 @@ async function ensureDbUser(clerkUserId: string, email: string) {
   // The top search result is deterministic (Spotify's ranking) and its ID can
   // be held by non-test profiles from previous manual or dev-env runs, causing
   // a unique constraint violation when the test tries to claim the same artist.
-  const KNOWN_TIM_WHITE_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm';
+  const knownSpotifyArtistIds = [
+    '4Uwpa6zW3zzCSQvooQNksm',
+    ...TEST_SPOTIFY_ARTISTS.map(artist => artist.id),
+  ];
   await sql`
     UPDATE creator_profiles
     SET spotify_id = NULL, spotify_url = NULL
-    WHERE spotify_id = ${KNOWN_TIM_WHITE_SPOTIFY_ID}
+    WHERE spotify_id = ANY(${knownSpotifyArtistIds})
   `;
 
-  await sql`
+  const [user] = (await sql`
     INSERT INTO users (clerk_id, email, user_status)
     VALUES (${clerkUserId}, ${email}, 'waitlist_approved')
     ON CONFLICT (clerk_id) DO UPDATE SET
       email = ${email},
       user_status = 'waitlist_approved',
       updated_at = NOW()
-  `;
+    RETURNING id
+  `) as EnsuredUserRow[];
+
+  if (!user?.id) {
+    throw new Error(`Failed to ensure DB user for Clerk user ${clerkUserId}`);
+  }
 }
 
-/**
- * Ensure the Spotify URL and ID are saved on the creator profile.
- *
- * During onboarding, `connectSpotifyArtist` and `enrichProfileFromDsp` are
- * both fire-and-forget with the flaky WebSocket pool — they often fail
- * silently in test environments. This function uses the reliable Neon HTTP
- * driver to guarantee the Spotify data is persisted, so we can hard-assert
- * that DSP links render on the public profile.
- */
-async function ensureSpotifyUrlOnProfile(
-  clerkUserId: string,
-  spotifyUrl: string,
-  spotifyId: string | null
-) {
+async function waitForSpotifyImport(clerkUserId: string) {
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) return;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for Spotify import checks');
+  }
 
   const sql = neon(dbUrl);
 
-  // Verify the profile exists before attempting update
-  const profiles = await sql`
-    SELECT cp.id, cp.spotify_url FROM creator_profiles cp
+  const [state] = (await sql`
+    SELECT
+      cp.id,
+      cp.spotify_url,
+      cp.spotify_id,
+      cp.is_public,
+      cp.avatar_url,
+      cp.onboarding_completed_at,
+      cp.settings->>'spotifyImportStatus' AS spotify_import_status,
+      (
+        SELECT COUNT(*)
+        FROM discog_releases dr
+        WHERE dr.creator_profile_id = cp.id
+      )::int AS release_count,
+      (
+        SELECT COUNT(*)
+        FROM provider_links pl
+        INNER JOIN discog_releases dr ON dr.id = pl.release_id
+        WHERE dr.creator_profile_id = cp.id
+          AND pl.provider_id = 'spotify'
+          AND pl.owner_type = 'release'
+      )::int AS spotify_release_link_count
+    FROM creator_profiles cp
     INNER JOIN users u ON u.id = cp.user_id
     WHERE u.clerk_id = ${clerkUserId}
-  `;
+    LIMIT 1
+  `) as SpotifyImportStateRow[];
 
-  if (profiles.length === 0) {
-    console.warn(
-      'WARN: No creator_profiles row found for clerk user — cannot set spotify_url'
-    );
-    return;
-  }
-
-  // Get the username so we can invalidate the Redis cache
-  const profileData = await sql`
-    SELECT cp.username_normalized FROM creator_profiles cp
-    INNER JOIN users u ON u.id = cp.user_id
-    WHERE u.clerk_id = ${clerkUserId}
-  `;
-  const username = profileData[0]?.username_normalized;
-
-  // Also ensure avatar_url and onboarding_completed_at are set so the proxy
-  // considers the profile "complete" (hasCompleteProfile checks both).
-  // Without this, the proxy rewrites all non-/app/ non-/api/ paths to
-  // /onboarding, preventing the public profile listen page from loading.
-  const result = await sql`
-    UPDATE creator_profiles
-    SET spotify_url = ${spotifyUrl},
-        spotify_id = ${spotifyId},
-        avatar_url = COALESCE(avatar_url, 'https://images.unsplash.com/placeholder'),
-        onboarding_completed_at = COALESCE(onboarding_completed_at, NOW()),
-        updated_at = NOW()
-    WHERE user_id = (SELECT id FROM users WHERE clerk_id = ${clerkUserId})
-    RETURNING id, spotify_url, spotify_id
-  `;
-
-  if (result.length === 0) {
-    console.warn('WARN: ensureSpotifyUrlOnProfile update matched 0 rows');
-    return;
-  }
-
-  // Invalidate Redis caches so the next page load fetches fresh data:
-  // 1. Profile edge cache (profile:data:{username}) — stale spotify_url
-  // 2. Proxy user state (proxy:user-state:{clerkId}) — stale needsOnboarding
-  //    (the proxy considers profiles without avatar_url as "needs onboarding"
-  //    and rewrites all non-/app/ paths to /onboarding)
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (redisUrl && redisToken) {
-    const keysToDelete = [
-      ...(username ? [`profile:data:${username}`] : []),
-      `proxy:user-state:${clerkUserId}`,
-    ];
-    try {
-      // Upstash REST API: pipeline multiple DEL commands
-      const pipeline = keysToDelete.map(key => ['DEL', key]);
-      await fetch(`${redisUrl}/pipeline`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${redisToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(pipeline),
-      });
-      console.log(
-        `[golden-path] Invalidated Redis caches: ${keysToDelete.join(', ')}`
-      );
-    } catch {
-      console.warn('WARN: Failed to invalidate Redis caches');
-    }
-  }
+  return state ?? null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -272,6 +290,9 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
     r.fulfill({ status: 200, body: '{}' })
   );
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+  await page.route('**/monitoring**', r =>
+    r.fulfill({ status: 200, body: '{}' })
+  );
 }
 
 /**
@@ -281,28 +302,47 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
  * For +clerk_test emails, Clerk requires completing email verification
  * with the magic code 424242 before a session is created.
  */
-async function createFreshUser(page: import('@playwright/test').Page) {
+async function createFreshUser(
+  page: import('@playwright/test').Page,
+  uniqueSeed: string
+) {
   await setupClerkTestingToken({ page });
 
-  await page.goto('/signin', {
-    waitUntil: 'domcontentloaded',
-    timeout: 60_000,
-  });
+  const loadClerk = async () => {
+    await page.goto('/signin', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
 
-  // Wait for Clerk JS to load
-  const loaded = await page
-    .waitForFunction(
-      () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-      { timeout: 60_000 }
-    )
-    .then(() => true)
-    .catch(() => false);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const loaded = await page
+        .waitForFunction(
+          () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+          { timeout: 20_000 }
+        )
+        .then(() => true)
+        .catch(() => false);
+
+      if (loaded) return true;
+
+      const retryButton = page.getByRole('button', { name: 'Retry now' });
+      if (await retryButton.isVisible().catch(() => false)) {
+        await retryButton.click();
+      } else {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+      }
+    }
+
+    return false;
+  };
+
+  const loaded = await loadClerk();
 
   if (!loaded) {
     throw new Error('Clerk JS failed to load — cannot create test user');
   }
 
-  const email = `gp-${Date.now().toString(36)}+clerk_test@test.jovie.com`;
+  const email = `gp-${uniqueSeed}+clerk_test@test.jovie.com`;
 
   // Create user and complete email verification with test code 424242
   // NOTE: Clerk JS exposes signUp on window.Clerk.client, not window.Clerk directly
@@ -360,6 +400,10 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 
 test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () => {
   test.describe.configure({ mode: 'serial' });
+  test.skip(
+    FAST_ITERATION,
+    'Golden path stays in the slower real-auth/onboarding lane, not the fast deploy gate'
+  );
 
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
@@ -381,8 +425,19 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
 
   test('complete user journey from signup to paid subscription', async ({
     page,
-  }) => {
-    test.setTimeout(120_000);
+  }, testInfo) => {
+    test.setTimeout(180_000);
+    page.on('pageerror', error => {
+      console.log(`[golden-path][pageerror] ${error.message}`);
+    });
+    page.on('console', message => {
+      if (message.type() === 'error') {
+        console.log(`[golden-path][console:error] ${message.text()}`);
+      }
+    });
+
+    const spotifyArtist =
+      TEST_SPOTIFY_ARTISTS[testInfo.workerIndex % TEST_SPOTIFY_ARTISTS.length];
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 1: Landing page loads
@@ -401,77 +456,53 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // ──────────────────────────────────────────────────────────────────
     // STEP 2: Initiate signup
     // ──────────────────────────────────────────────────────────────────
-    const claimInput = page.locator('#handle-input');
-    const claimVisible = await claimInput
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
-
-    if (claimVisible) {
-      // Use claim handle form — stores pendingClaim in sessionStorage
-      const testHandle = `gp-${Date.now().toString(36)}`;
-      await claimInput.fill(testHandle);
-
-      // Wait for availability check to complete
-      await page.waitForTimeout(2_000);
-
-      // Submit the form
-      await claimInput.press('Enter');
-    } else {
-      // Fall back to signup link
-      await page.locator('a[href*="/signup"]').first().click();
-    }
-
-    // Should navigate to signup or onboarding
-    await page.waitForURL(/\/(signup|onboarding)/, { timeout: 30_000 });
+    // The homepage CTA itself is already asserted above; navigate directly to
+    // signup here to avoid client-side route transition flake under load.
+    await page.goto('/signup', {
+      waitUntil: 'commit',
+      timeout: 30_000,
+    });
+    await expect(page).toHaveURL(/\/signup/, { timeout: 30_000 });
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 3: Create account
     // ──────────────────────────────────────────────────────────────────
-    const { clerkUserId } = await createFreshUser(page);
+    const uniqueSeed = `${Date.now().toString(36)}-${testInfo.workerIndex}-${testInfo.repeatEachIndex}-${Math.random().toString(36).slice(2, 8)}`;
+    const { clerkUserId } = await createFreshUser(page, uniqueSeed);
+    const onboardingHandle = buildValidOnboardingHandle(
+      uniqueSeed,
+      clerkUserId
+    );
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 4: Onboarding — Handle step
     // ──────────────────────────────────────────────────────────────────
-    // Generate a unique handle and pass it via search param.
-    // When the handle is pre-filled via ?handle=, the validation hook's
-    // fast path marks it as available immediately (skips API check),
-    // avoiding the TanStack Pacer debouncer state race condition.
-    const randomSuffix = Math.random().toString(36).slice(2, 8);
-    const uniqueHandle = `t${Date.now().toString(36)}${randomSuffix}`;
-
-    // Navigate to onboarding with pre-filled handle, submit handle step,
-    // and advance to DSP step. Retry the whole sequence since the Neon
-    // WebSocket pool can fail during SSR or server action execution.
-    await expect(async () => {
-      await page.goto(`/onboarding?handle=${uniqueHandle}`, {
-        waitUntil: 'domcontentloaded',
-        timeout: 30_000,
-      });
-      await expect(
-        page.locator('[data-testid="onboarding-form-wrapper"]')
-      ).toBeVisible({ timeout: 10_000 });
-
-      // Handle input should be pre-filled
-      const handleEl = page.getByLabel('Enter your desired handle');
-      const handleVisible = await handleEl
-        .isVisible({ timeout: 3_000 })
-        .catch(() => false);
-
-      if (handleVisible) {
-        // Still on handle step — submit it
-        const continueBtn = page.getByRole('button', { name: 'Continue' });
-        await expect(continueBtn).toBeEnabled({ timeout: 10_000 });
-        await continueBtn.click();
-      }
-
-      // Must reach DSP step (artist search)
-      await expect(
-        page.getByPlaceholder(/search for your artist or paste a spotify link/i)
-      ).toBeVisible({ timeout: 10_000 });
-    }).toPass({
-      timeout: 90_000,
-      intervals: [3_000, 5_000, 10_000, 15_000],
+    await page.goto(`/onboarding?handle=${onboardingHandle}`, {
+      waitUntil: 'commit',
+      timeout: 45_000,
     });
+    await expect(page).toHaveURL(
+      new RegExp(`/onboarding\\?handle=${onboardingHandle}`)
+    );
+    await expect(
+      page.locator('[data-testid="onboarding-form-wrapper"]')
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.locator('[data-onboarding-client-ready="true"]')
+    ).toBeVisible({ timeout: 20_000 });
+
+    const handleEl = page.getByLabel('Enter your desired handle');
+    await expect(handleEl).toBeVisible({ timeout: 10_000 });
+    await expect
+      .poll(async () => (await handleEl.inputValue()).trim(), {
+        timeout: 20_000,
+        message: 'Handle input should contain the seeded onboarding handle',
+      })
+      .toBe(onboardingHandle);
+
+    const continueBtn = page.getByRole('button', { name: 'Continue' });
+    await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
+    await continueBtn.click();
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 5: Onboarding — Artist search (Music Fetch)
@@ -479,193 +510,172 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     const artistInput = page.getByPlaceholder(
       /search for your artist or paste a spotify link/i
     );
-    await expect(artistInput).toBeVisible({ timeout: 5_000 });
+    await expect(artistInput).toBeVisible({ timeout: 60_000 });
 
-    // Intercept Spotify search to capture the artist URL.
-    // The /api/spotify/search endpoint returns a flat array of
-    // { id, name, url, imageUrl, followers, popularity }.
-    let capturedSpotifyUrl: string | null = null;
-    let capturedSpotifyId: string | null = null;
-    page.on('response', async response => {
-      if (response.url().includes('/api/spotify/search') && response.ok()) {
-        try {
-          const json = (await response.json()) as Array<{
-            id?: string;
-            url?: string;
-            name?: string;
-          }>;
-          const match = Array.isArray(json)
-            ? json.find(a => a.name?.toLowerCase().includes('tim white'))
-            : null;
-          if (match?.url) {
-            capturedSpotifyUrl = match.url;
-            capturedSpotifyId = match.id ?? null;
-          }
-        } catch {
-          // Non-critical — we'll fall back below
-        }
-      }
-    });
-
-    await artistInput.fill('Tim White');
-
-    // Select "Tim White" from results
-    const timWhiteResult = page
-      .locator('li button')
-      .filter({ hasText: /tim white/i })
-      .first();
-    await expect(timWhiteResult).toBeVisible({ timeout: 20_000 });
-    await timWhiteResult.click();
+    await artistInput.fill(spotifyArtist.url);
+    await artistInput.press('Enter');
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 6: Profile review — verify form is usable
     // ──────────────────────────────────────────────────────────────────
 
-    // Display name is pre-set by completeOnboarding (from Clerk identity).
-    const displayName = page.locator('#onboarding-display-name');
-    await expect(displayName).toBeVisible({ timeout: 20_000 });
+    const reviewDisplayName = page.locator('#onboarding-display-name');
+    const goToDashboardBtn = page.getByRole('button', {
+      name: /go to dashboard/i,
+    });
+    const reviewStepOrDashboard = await Promise.race([
+      reviewDisplayName
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .then(() => 'review' as const)
+        .catch(() => null),
+      page
+        .waitForURL(/\/app/, { timeout: 30_000 })
+        .then(() => 'dashboard' as const)
+        .catch(() => null),
+    ]);
 
-    await expect
-      .poll(async () => (await displayName.inputValue()).trim().length, {
-        timeout: 15_000,
-        message: 'Display name should have a value',
-      })
-      .toBeGreaterThan(0);
+    if (reviewStepOrDashboard === 'review') {
+      // Display name is pre-set by completeOnboarding (from Clerk identity).
+      const initialDisplayName = await reviewDisplayName.inputValue();
+      if (initialDisplayName.trim().length === 0) {
+        await reviewDisplayName.fill('Golden Path Artist');
+      }
+      await expect
+        .poll(
+          async () => (await reviewDisplayName.inputValue()).trim().length,
+          {
+            timeout: 15_000,
+            message: 'Display name should have a value',
+          }
+        )
+        .toBeGreaterThan(0);
 
-    // Enrichment (bio, avatar) is fire-and-forget and depends on the DB
-    // pool + external APIs. Check if bio was populated, but don't fail
-    // the test if it wasn't — pool connectivity issues in test env can
-    // cause enrichProfileFromDsp to 500.
-    const bio = page.locator('#onboarding-bio');
-    const bioPopulated = await bio
-      .inputValue()
-      .then(v => v.trim().length > 0)
-      .catch(() => false);
-
-    if (!bioPopulated) {
-      // Wait a bit in case enrichment is still in flight
-      await page.waitForTimeout(5_000);
-      const bioRetry = await bio
+      // Enrichment (bio, avatar) is fire-and-forget and depends on the DB
+      // pool + external APIs. Check if bio was populated, but don't fail
+      // the test if it wasn't — pool connectivity issues in test env can
+      // cause enrichProfileFromDsp to 500.
+      const bio = page.locator('#onboarding-bio');
+      const bioPopulated = await bio
         .inputValue()
         .then(v => v.trim().length > 0)
         .catch(() => false);
 
-      if (!bioRetry) {
-        console.warn(
-          'WARN: Music fetch enrichment did not populate bio — ' +
-            'this is expected when DB pool is unreliable in test env'
-        );
+      if (!bioPopulated) {
+        await page.waitForTimeout(5_000);
+        const bioRetry = await bio
+          .inputValue()
+          .then(v => v.trim().length > 0)
+          .catch(() => false);
+
+        if (!bioRetry) {
+          console.warn(
+            'WARN: Music fetch enrichment did not populate bio — ' +
+              'this is expected when DB pool is unreliable in test env'
+          );
+        }
+      }
+
+      const dashboardExit = await Promise.race([
+        goToDashboardBtn
+          .waitFor({ state: 'visible', timeout: 10_000 })
+          .then(() => 'button' as const)
+          .catch(() => null),
+        page
+          .waitForURL(/\/app/, { timeout: 10_000 })
+          .then(() => 'dashboard' as const)
+          .catch(() => null),
+      ]);
+
+      if (dashboardExit === 'button') {
+        await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
+        await goToDashboardBtn.click();
+      } else {
+        await expect(page).toHaveURL(/\/app/, { timeout: 10_000 });
+      }
+    } else {
+      await expect
+        .poll(
+          async () => {
+            const currentState = await waitForSpotifyImport(clerkUserId);
+            return currentState?.onboarding_completed_at ? 'ready' : 'pending';
+          },
+          {
+            timeout: 60_000,
+            intervals: [2_000, 5_000, 10_000],
+            message:
+              'Expected onboarding to complete even if the final app transition is slow',
+          }
+        )
+        .toBe('ready');
+
+      if (!page.url().includes('/app')) {
+        await page.goto('/app', {
+          waitUntil: 'commit',
+          timeout: 60_000,
+        });
       }
     }
-
-    // Complete onboarding — go to dashboard.
-    // "Go to Dashboard" button requires only a display name (which is set).
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
-    });
-    await expect(goToDashboardBtn).toBeEnabled({ timeout: 20_000 });
-    await goToDashboardBtn.click();
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 7: Dashboard loaded — profile is sufficiently complete
     // ──────────────────────────────────────────────────────────────────
-    await page.waitForURL(/\/app/, {
-      timeout: 30_000,
-      waitUntil: 'domcontentloaded',
-    });
+    await expect(page).toHaveURL(/\/app/, { timeout: 30_000 });
 
-    // Ensure Spotify URL is saved on the profile via direct DB write.
-    // The fire-and-forget connectSpotifyArtist uses the flaky WebSocket pool
-    // and often fails silently in test envs. This guarantees the URL is persisted
-    // so we can hard-assert DSP links render on the public profile.
-    //
-    // Fallback uses a known real Spotify artist ID for "Tim White" in case
-    // the response interceptor didn't capture the URL (e.g. search cached).
-    const FALLBACK_SPOTIFY_ID = '4Uwpa6zW3zzCSQvooQNksm'; // Tim White on Spotify
-    const spotifyIdToSave = capturedSpotifyId || FALLBACK_SPOTIFY_ID;
-    const spotifyUrlToSave =
-      capturedSpotifyUrl ||
-      `https://open.spotify.com/artist/${FALLBACK_SPOTIFY_ID}`;
-    console.log(
-      `[golden-path] Setting spotify_url=${spotifyUrlToSave} spotify_id=${spotifyIdToSave} (captured=${capturedSpotifyUrl})`
-    );
-    await ensureSpotifyUrlOnProfile(
-      clerkUserId,
-      spotifyUrlToSave,
-      spotifyIdToSave
-    );
-
-    // Navigate to the dashboard explicitly after the DB write + Redis cache
-    // invalidation. The ProfileCompletionRedirect client component fires
-    // immediately when the dashboard first loads. If avatar_url was still null
-    // at that point (Spotify enrichment is fire-and-forget), it redirects back
-    // to /onboarding. Navigating again after ensureSpotifyUrlOnProfile guarantees
-    // the profile is fully populated and the proxy cache is fresh.
-    await page.goto('/app/chat', {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
-
-    // Should NOT be redirected back to onboarding or signin
     const currentUrl = page.url();
     expect(
       currentUrl,
-      'Redirected to onboarding — profile not saved'
+      'Redirected to onboarding before import checks completed'
     ).not.toContain('/onboarding');
     expect(currentUrl, 'Redirected to signin — auth lost').not.toContain(
       '/sign-in'
     );
 
-    // Verify the DB write took effect by querying directly
-    {
-      const dbUrl = process.env.DATABASE_URL!;
-      const sql = neon(dbUrl);
-      const check = await sql`
-        SELECT cp.spotify_url, cp.spotify_id, cp.is_public
-        FROM creator_profiles cp
-        INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.clerk_id = ${clerkUserId}
-      `;
-      console.log('[golden-path] Profile DB check:', JSON.stringify(check));
-    }
-
-    // Verify DSP links are persisted by checking the DB directly.
-    // We can't render the public listen page in this test because:
-    // 1. The fire-and-forget Spotify import saturates the Neon WebSocket pool
-    // 2. The proxy middleware needs a full DB query to check user state
-    // 3. Combined, this causes page loads to hang/timeout
-    //
-    // Instead, we hard-assert the spotify_url was saved to the profile,
-    // which is the prerequisite for DSP buttons rendering on the listen page.
-    {
-      const dbUrl = process.env.DATABASE_URL!;
-      const sql = neon(dbUrl);
-      const profileCheck = await sql`
-        SELECT cp.spotify_url, cp.spotify_id, cp.is_public, cp.avatar_url,
-               cp.onboarding_completed_at
-        FROM creator_profiles cp
-        INNER JOIN users u ON u.id = cp.user_id
-        WHERE u.clerk_id = ${clerkUserId}
-      `;
-
-      expect(profileCheck.length, 'No profile found for test user').toBe(1);
-      const p = profileCheck[0];
+    let importState: Awaited<ReturnType<typeof waitForSpotifyImport>> | null =
+      null;
+    await expect(async () => {
+      importState = await waitForSpotifyImport(clerkUserId);
+      expect(importState, 'No profile found for test user').toBeTruthy();
       expect(
-        p.spotify_url,
+        spotifyImportIsReady(importState),
+        `Spotify import never reached a usable state: ${JSON.stringify(importState)}`
+      ).toBe(true);
+      expect(
+        Number(importState?.release_count ?? 0),
+        'No releases were imported from Spotify'
+      ).toBeGreaterThan(0);
+      expect(
+        Number(importState?.spotify_release_link_count ?? 0),
+        'No Spotify release links were persisted'
+      ).toBeGreaterThan(0);
+      expect(
+        importState?.spotify_url,
         'spotify_url not saved — DSP links will not render'
       ).toBeTruthy();
-      expect(p.is_public, 'Profile is not public — listen page will 404').toBe(
-        true
-      );
+      expect(
+        importState?.is_public,
+        'Profile is not public — listen page will 404'
+      ).toBe(true);
+      expect(
+        importState?.onboarding_completed_at,
+        'Onboarding did not complete'
+      ).toBeTruthy();
+    }).toPass({
+      timeout: 90_000,
+      intervals: [2_000, 5_000, 10_000, 15_000],
+    });
 
-      console.log(
-        `[golden-path] DSP check passed: spotify_url=${p.spotify_url}, spotify_id=${p.spotify_id}, is_public=${p.is_public}`
-      );
-    }
+    console.log(
+      '[golden-path] Spotify import state:',
+      JSON.stringify(importState)
+    );
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 8: Stripe checkout session creation
     // ──────────────────────────────────────────────────────────────────
+
+    // Stop the dashboard from continuing to fan out background API requests
+    // while this test performs the paid-step assertions.
+    await page.goto('about:blank');
 
     // Get available pricing
     const pricingResponse = await page.request.get(

@@ -40,9 +40,7 @@ interface SpeechRecognitionInstance extends EventTarget {
   stop(): void;
 }
 
-interface SpeechRecognitionConstructor {
-  new (): SpeechRecognitionInstance;
-}
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 declare global {
   interface Window {
@@ -82,19 +80,23 @@ export function useSpeechRecognition({
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onTranscriptRef = useRef(onTranscript);
+  const browserWindow = globalThis.window ?? undefined;
   useEffect(() => {
     onTranscriptRef.current = onTranscript;
   }, [onTranscript]);
 
   const isSupported =
-    typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+    browserWindow !== undefined &&
+    ('SpeechRecognition' in browserWindow ||
+      'webkitSpeechRecognition' in browserWindow);
 
   const getRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;
     if (!isSupported) return null;
 
-    const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+    const Ctor =
+      browserWindow?.SpeechRecognition ??
+      browserWindow?.webkitSpeechRecognition;
     if (!Ctor) return null;
 
     const recognition = new Ctor();
@@ -108,8 +110,8 @@ export function useSpeechRecognition({
       // indices are already-final results whose text must also be included
       // so the caller always receives the complete in-session transcript.
       let transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+      for (const result of Array.from(event.results)) {
+        transcript += result[0].transcript;
       }
       onTranscriptRef.current(transcript);
     };
@@ -130,7 +132,7 @@ export function useSpeechRecognition({
 
     recognitionRef.current = recognition;
     return recognition;
-  }, [isSupported, lang]);
+  }, [browserWindow, isSupported, lang]);
 
   const start = useCallback(() => {
     const recognition = getRecognition();

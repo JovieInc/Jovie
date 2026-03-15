@@ -177,23 +177,20 @@ describe('DashboardOverview', () => {
     ).toBeInTheDocument();
   });
 
-  it('uses responsive sizing for header action buttons', () => {
+  it('uses shared compact shell sizing for header action buttons', () => {
     const profile = makeProfile({
       userId: 'db-user-123',
       spotifyUrl: 'https://open.spotify.com/artist/123',
     });
     renderDashboard(profile, true);
 
-    // The "View profile" link button should use responsive sizing (smaller on mobile)
+    // The "View profile" link button should use the shared compact shell control sizing.
     const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
-    const viewProfileBtn = viewProfileLink.closest('[class*="rounded-full"]');
-    expect(viewProfileBtn).not.toBeNull();
-    const btnClass = viewProfileBtn!.className;
+    const btnClass = viewProfileLink.className;
 
-    // Should have mobile-first small size and sm: breakpoint for larger
-    expect(btnClass).toContain('h-8');
-    expect(btnClass).toContain('w-8');
-    expect(btnClass).toContain('sm:h-11');
-    expect(btnClass).toContain('sm:w-11');
+    expect(btnClass).toContain('h-[var(--linear-app-control-height-sm)]');
+    expect(btnClass).toContain('w-[var(--linear-app-control-height-sm)]');
+    expect(btnClass).not.toContain('sm:h-11');
+    expect(btnClass).not.toContain('sm:w-11');
   });
 });

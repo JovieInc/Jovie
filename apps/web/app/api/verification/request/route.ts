@@ -4,6 +4,7 @@ import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { notifyVerificationRequest } from '@/lib/verification/notifications';
 
 export const runtime = 'nodejs';
@@ -58,28 +59,55 @@ export async function POST() {
         );
       }
 
-      await notifyVerificationRequest({
+      const notificationResult = await notifyVerificationRequest({
         name: user.name?.trim() || user.email || user.clerkId,
         email: user.email,
         username: profile.usernameNormalized,
         profileId: profile.id,
       });
 
+      if (notificationResult.status !== 'sent') {
+        await captureError(
+          'Verification request notification did not send',
+          new Error(notificationResult.error ?? 'Slack notification skipped'),
+          {
+            route: '/api/verification/request',
+            userId: user.id,
+            profileId: profile.id,
+            slackStatus: notificationResult.status,
+            slackDetail: notificationResult.detail,
+          }
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              'We could not notify our team about your verification request. Please try again in a moment.',
+          },
+          { status: 503 }
+        );
+      }
+
       return NextResponse.json({ success: true });
     });
   } catch (error) {
+    const isUnauthorized =
+      error instanceof Error && error.message === 'Unauthorized';
+
+    if (!isUnauthorized) {
+      await captureError('Verification request route failed', error, {
+        route: '/api/verification/request',
+      });
+    }
+
     return NextResponse.json(
       {
-        error:
-          error instanceof Error && error.message === 'Unauthorized'
-            ? 'Unauthorized'
-            : 'Unable to submit verification request',
+        error: isUnauthorized
+          ? 'Unauthorized'
+          : 'Unable to submit verification request',
       },
       {
-        status:
-          error instanceof Error && error.message === 'Unauthorized'
-            ? 401
-            : 500,
+        status: isUnauthorized ? 401 : 500,
       }
     );
   }

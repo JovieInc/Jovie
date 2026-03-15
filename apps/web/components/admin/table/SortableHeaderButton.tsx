@@ -22,10 +22,10 @@ export function SortableHeaderButton({
       onClick={onClick}
       className={cn(
         'inline-flex w-full items-center gap-2 text-left text-xs font-medium uppercase tracking-[0.08em]',
-        'transition-colors duration-200',
-        'hover:text-primary-token hover:bg-surface-2/50',
-        'focus-visible:outline-1 focus-visible:outline-offset-1 focus-visible:outline-accent',
-        'active:bg-surface-3/50',
+        'rounded-[7px] px-1.5 py-1 transition-[background-color,color,box-shadow] duration-150',
+        'text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
+        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'active:bg-(--linear-bg-surface-0)',
         className
       )}
     >
@@ -34,8 +34,8 @@ export function SortableHeaderButton({
         className={cn(
           'text-[10px] transition-opacity',
           direction
-            ? 'opacity-100 text-primary-token'
-            : 'opacity-50 text-secondary-token'
+            ? 'opacity-100 text-(--linear-text-primary)'
+            : 'opacity-50 text-(--linear-text-secondary)'
         )}
         aria-hidden='true'
       >

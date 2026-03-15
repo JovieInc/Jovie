@@ -9,7 +9,10 @@ import {
   AdminTableHeader,
   AdminTableSubheader,
 } from '@/components/admin/table/AdminTableHeader';
-import { UnifiedTable } from '@/components/organisms/table';
+import {
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  UnifiedTable,
+} from '@/components/organisms/table';
 import type {
   AdminActivityItem,
   AdminActivityStatus,
@@ -76,7 +79,7 @@ interface ActivityTableUnifiedProps {
 }
 
 /** Standard row class for activity table */
-const getRowClassName = () => 'group hover:bg-white/[0.02]';
+const getRowClassName = () => 'group hover:bg-(--linear-row-hover)';
 
 const columnHelper = createColumnHelper<AdminActivityItem>();
 
@@ -123,27 +126,29 @@ export function ActivityTableUnified({
 
   return (
     <div
-      className='h-full border border-subtle bg-surface-1'
+      className='h-full border border-(--linear-border-subtle) bg-(--linear-app-content-surface)'
       data-testid='admin-activity-content'
     >
       <AdminTableHeader
         title='Activity'
         subtitle='Monitor operational actions and recent system outcomes.'
       />
-      <AdminTableSubheader>
-        <p className='text-xs text-secondary-token'>Last 7 days.</p>
-      </AdminTableSubheader>
+      <AdminTableSubheader
+        start={<p className={PAGE_TOOLBAR_META_TEXT_CLASS}>Last 7 days.</p>}
+      />
       <div className='overflow-x-auto'>
         <UnifiedTable
           data={items}
           columns={columns}
           isLoading={false}
           emptyState={
-            <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+            <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-(--linear-text-secondary)'>
               <Activity className='h-6 w-6' />
               <div>
-                <div className='font-medium'>No recent activity</div>
-                <div className='text-xs'>
+                <div className='font-medium text-(--linear-text-primary)'>
+                  No recent activity
+                </div>
+                <div className='text-xs text-(--linear-text-secondary)'>
                   Activity from the last 7 days will appear here.
                 </div>
               </div>

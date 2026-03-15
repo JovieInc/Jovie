@@ -25,19 +25,19 @@ const LazyLineChart = dynamic(
             <CartesianGrid
               strokeDasharray='3 3'
               vertical={false}
-              stroke='hsl(var(--color-border-subtle))'
+              stroke='var(--linear-border-subtle)'
               opacity={0.3}
             />
             <XAxis
               dataKey='date'
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 11, fill: 'hsl(var(--color-text-tertiary))' }}
+              tick={{ fontSize: 11, fill: 'var(--linear-text-tertiary)' }}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 11, fill: 'hsl(var(--color-text-tertiary))' }}
+              tick={{ fontSize: 11, fill: 'var(--linear-text-tertiary)' }}
             />
             <Line
               type='monotone'
@@ -64,7 +64,7 @@ const LazyLineChart = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className='h-64 animate-pulse rounded-lg bg-surface-2' />
+      <div className='h-64 animate-pulse rounded-lg bg-(--linear-bg-surface-1)' />
     ),
   }
 );
@@ -100,12 +100,12 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
     return (
       <div className='space-y-3'>
         <div>
-          <h3 className='text-sm font-medium text-primary-token'>
+          <h3 className='text-sm font-medium text-(--linear-text-primary)'>
             Daily active users
           </h3>
-          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
+          <p className='text-2xs text-(--linear-text-tertiary)'>Last 14 days</p>
         </div>
-        <p className='text-sm text-secondary-token'>
+        <p className='text-sm text-(--linear-text-secondary)'>
           No usage data available yet.
         </p>
       </div>
@@ -116,13 +116,13 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
     <div className='space-y-4'>
       <div className='flex items-start justify-between'>
         <div>
-          <h3 className='text-sm font-medium text-primary-token'>
+          <h3 className='text-sm font-medium text-(--linear-text-primary)'>
             Daily active users
           </h3>
-          <p className='text-2xs text-tertiary-token'>Last 14 days</p>
+          <p className='text-2xs text-(--linear-text-tertiary)'>Last 14 days</p>
         </div>
         <div
-          className={`flex items-center gap-1.5 text-app font-medium tabular-nums ${
+          className={`flex items-center gap-1.5 text-[13px] font-medium tabular-nums ${
             stats.deltaPct >= 0 ? 'text-success' : 'text-error'
           }`}
         >
@@ -142,20 +142,20 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
 
       <div className='grid gap-4 sm:grid-cols-3'>
         <div>
-          <p className='text-2xs text-tertiary-token'>Current DAU</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
+          <p className='text-2xs text-(--linear-text-tertiary)'>Current DAU</p>
+          <p className='text-2xl font-semibold tabular-nums text-(--linear-text-primary)'>
             {stats.latest.users.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className='text-2xs text-tertiary-token'>14d Average</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
+          <p className='text-2xs text-(--linear-text-tertiary)'>14d Average</p>
+          <p className='text-2xl font-semibold tabular-nums text-(--linear-text-primary)'>
             {stats.avgUsers.toLocaleString()}
           </p>
         </div>
         <div>
-          <p className='text-2xs text-tertiary-token'>Peak day</p>
-          <p className='text-2xl font-semibold tabular-nums text-primary-token'>
+          <p className='text-2xs text-(--linear-text-tertiary)'>Peak day</p>
+          <p className='text-2xl font-semibold tabular-nums text-(--linear-text-primary)'>
             {stats.maxUsers.toLocaleString()}
           </p>
         </div>

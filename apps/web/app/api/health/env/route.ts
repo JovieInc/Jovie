@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import type { EnvHealthResponse } from '@/lib/contracts/api';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { getEnvironmentInfo, validateEnvironment } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
-  createRateLimitHeadersFromStatus,
+  createRateLimitHeaders,
   getClientIP,
   healthLimiter,
 } from '@/lib/rate-limit';
@@ -13,39 +14,14 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-interface EnvHealthResponse {
-  service: 'env';
-  status: 'ok' | 'warning' | 'error';
-  ok: boolean;
-  timestamp: string;
-  details: {
-    environment: string;
-    platform: string;
-    nodeVersion: string;
-    startupValidationCompleted: boolean;
-    currentValidation: {
-      valid: boolean;
-      errors: string[];
-      warnings: string[];
-      critical: string[];
-    };
-    integrations: {
-      database: boolean;
-      auth: boolean;
-      payments: boolean;
-      images: boolean;
-    };
-  };
-}
-
 export async function GET(request: Request) {
   const now = new Date().toISOString();
 
   // Rate limiting check
   const clientIP = getClientIP(request);
-  const rateLimitStatus = healthLimiter.getStatus(clientIP);
+  const rateLimitResult = await healthLimiter.limit(clientIP);
 
-  if (rateLimitStatus.blocked) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       {
         service: 'env',
@@ -75,14 +51,11 @@ export async function GET(request: Request) {
         status: 429,
         headers: {
           ...HEALTH_CHECK_CONFIG.cacheHeaders,
-          ...createRateLimitHeadersFromStatus(rateLimitStatus),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
-
-  // Trigger rate limit counter increment (fire-and-forget)
-  void healthLimiter.limit(clientIP);
 
   try {
     // Get current environment validation
@@ -160,7 +133,7 @@ export async function GET(request: Request) {
         : HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeadersFromStatus(rateLimitStatus),
+        ...createRateLimitHeaders(rateLimitResult),
       },
     });
   } catch (error) {
@@ -212,7 +185,7 @@ export async function GET(request: Request) {
       status: HEALTH_CHECK_CONFIG.statusCodes.unhealthy,
       headers: {
         ...HEALTH_CHECK_CONFIG.cacheHeaders,
-        ...createRateLimitHeadersFromStatus(rateLimitStatus),
+        ...createRateLimitHeaders(rateLimitResult),
       },
     });
   }

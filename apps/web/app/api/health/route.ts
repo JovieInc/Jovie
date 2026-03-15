@@ -8,7 +8,7 @@ import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, RETRY_AFTER_HEALTH } from '@/lib/http/headers';
 import {
-  createRateLimitHeadersFromStatus,
+  createRateLimitHeaders,
   getClientIP,
   healthLimiter,
 } from '@/lib/rate-limit';
@@ -24,26 +24,26 @@ import {
 export async function GET(request: Request) {
   // Rate limit check (30 req/60s for health endpoints)
   const clientIP = getClientIP(request);
-  const rateLimitStatus = healthLimiter.getStatus(clientIP);
+  const rateLimitResult = await healthLimiter.limit(clientIP);
 
-  if (rateLimitStatus.blocked) {
+  if (!rateLimitResult.success) {
     return NextResponse.json(
       {
         error: 'Too many requests',
-        retryAfter: rateLimitStatus.retryAfterSeconds,
+        retryAfter: Math.max(
+          0,
+          Math.ceil((rateLimitResult.reset.getTime() - Date.now()) / 1000)
+        ),
       },
       {
         status: 429,
         headers: {
           ...NO_STORE_HEADERS,
-          ...createRateLimitHeadersFromStatus(rateLimitStatus),
+          ...createRateLimitHeaders(rateLimitResult),
         },
       }
     );
   }
-
-  // Trigger rate limit counter increment (fire-and-forget)
-  void healthLimiter.limit(clientIP);
 
   // Minimal response - only status and timestamp (no environment details)
   const summary: Record<string, unknown> = {
@@ -75,7 +75,10 @@ export async function GET(request: Request) {
     summary.database = profileCount >= 3 ? 'ok' : 'degraded';
     return NextResponse.json(summary, {
       status: 200,
-      headers: NO_STORE_HEADERS,
+      headers: {
+        ...NO_STORE_HEADERS,
+        ...createRateLimitHeaders(rateLimitResult),
+      },
     });
   } catch (error) {
     void captureWarning('Health check degraded', error, {
@@ -86,7 +89,11 @@ export async function GET(request: Request) {
     summary.database = 'error';
     return NextResponse.json(summary, {
       status: 503, // Service Unavailable - allows monitoring to detect issues
-      headers: { ...NO_STORE_HEADERS, 'Retry-After': RETRY_AFTER_HEALTH },
+      headers: {
+        ...NO_STORE_HEADERS,
+        ...createRateLimitHeaders(rateLimitResult),
+        'Retry-After': RETRY_AFTER_HEALTH,
+      },
     });
   }
 }

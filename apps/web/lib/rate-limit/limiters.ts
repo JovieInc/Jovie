@@ -145,50 +145,50 @@ export const trackingIpVisitsLimiter = createRateLimiter(
 );
 
 // ============================================================================
-// Public & Health Endpoints (Memory-only for high throughput)
+// Public & Health Endpoints (Durable Redis-backed enforcement)
 // ============================================================================
 
 /**
  * Rate limiter for public profile requests
- * Limit: 100 requests per minute per IP (in-memory only)
+ * Limit: 100 requests per minute per IP
  */
 export const publicProfileLimiter = createRateLimiter(
   RATE_LIMITERS.publicProfile,
   {
-    preferRedis: false, // Use memory for high-throughput public endpoints
+    requireRedis: true,
   }
 );
 
 /**
  * Rate limiter for public click endpoint
- * Limit: 50 requests per minute per IP (in-memory only)
+ * Limit: 50 requests per minute per IP
  */
 export const publicClickLimiter = createRateLimiter(RATE_LIMITERS.publicClick, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * Rate limiter for public visit endpoint
- * Limit: 50 requests per minute per IP (in-memory only)
+ * Limit: 50 requests per minute per IP
  */
 export const publicVisitLimiter = createRateLimiter(RATE_LIMITERS.publicVisit, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * Rate limiter for health endpoints
- * Limit: 30 requests per minute per IP (in-memory only)
+ * Limit: 30 requests per minute per IP
  */
 export const healthLimiter = createRateLimiter(RATE_LIMITERS.health, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 /**
  * General purpose rate limiter
- * Limit: 60 requests per minute per IP (in-memory only)
+ * Limit: 60 requests per minute per IP
  */
 export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
-  preferRedis: false,
+  requireRedis: true,
 });
 
 // ============================================================================
@@ -559,6 +559,14 @@ export async function checkIsrcRescanRateLimit(
 // Apple Music Rescan (plan-aware)
 // ============================================================================
 
+// Internal instances (used in getAllLimiters without triggering deprecated-symbol warnings)
+const _appleMusicRescanFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanFree
+);
+const _appleMusicRescanPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.appleMusicRescanPaid
+);
+
 /**
  * Rate limiter for Apple Music rescan (free plan)
  * Limit: 1 per day per profile
@@ -566,9 +574,7 @@ export async function checkIsrcRescanRateLimit(
  * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
  * This individual limiter is kept for backward compatibility.
  */
-export const appleMusicRescanFreeLimiter = createRateLimiter(
-  RATE_LIMITERS.appleMusicRescanFree
-);
+export const appleMusicRescanFreeLimiter = _appleMusicRescanFreeLimiter;
 
 /**
  * Rate limiter for Apple Music rescan (paid plan)
@@ -577,9 +583,7 @@ export const appleMusicRescanFreeLimiter = createRateLimiter(
  * @deprecated Use appleMusicRescanPlanAwareLimiter instead for new code.
  * This individual limiter is kept for backward compatibility.
  */
-export const appleMusicRescanPaidLimiter = createRateLimiter(
-  RATE_LIMITERS.appleMusicRescanPaid
-);
+export const appleMusicRescanPaidLimiter = _appleMusicRescanPaidLimiter;
 
 /**
  * Plan-aware Apple Music rescan limiter.
@@ -616,6 +620,14 @@ export async function checkAppleMusicRescanRateLimit(
 // Release Refresh (plan-aware)
 // ============================================================================
 
+// Internal instances (used in getAllLimiters without triggering deprecated-symbol warnings)
+const _releaseRefreshFreeLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshFree
+);
+const _releaseRefreshPaidLimiter = createRateLimiter(
+  RATE_LIMITERS.releaseRefreshPaid
+);
+
 /**
  * Rate limiter for release refresh (free plan)
  * Limit: 1 per day per release
@@ -623,9 +635,7 @@ export async function checkAppleMusicRescanRateLimit(
  * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
  * This individual limiter is kept for backward compatibility.
  */
-export const releaseRefreshFreeLimiter = createRateLimiter(
-  RATE_LIMITERS.releaseRefreshFree
-);
+export const releaseRefreshFreeLimiter = _releaseRefreshFreeLimiter;
 
 /**
  * Rate limiter for release refresh (paid plan)
@@ -634,9 +644,7 @@ export const releaseRefreshFreeLimiter = createRateLimiter(
  * @deprecated Use releaseRefreshPlanAwareLimiter instead for new code.
  * This individual limiter is kept for backward compatibility.
  */
-export const releaseRefreshPaidLimiter = createRateLimiter(
-  RATE_LIMITERS.releaseRefreshPaid
-);
+export const releaseRefreshPaidLimiter = _releaseRefreshPaidLimiter;
 
 /**
  * Plan-aware release refresh limiter.
@@ -816,10 +824,10 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     aiChat: aiChatLimiter,
     bandsintownSync: bandsintownSyncLimiter,
     appleMusicSearch: appleMusicSearchLimiter,
-    appleMusicRescanFree: appleMusicRescanFreeLimiter,
-    appleMusicRescanPaid: appleMusicRescanPaidLimiter,
-    releaseRefreshFree: releaseRefreshFreeLimiter,
-    releaseRefreshPaid: releaseRefreshPaidLimiter,
+    appleMusicRescanFree: _appleMusicRescanFreeLimiter,
+    appleMusicRescanPaid: _appleMusicRescanPaidLimiter,
+    releaseRefreshFree: _releaseRefreshFreeLimiter,
+    releaseRefreshPaid: _releaseRefreshPaidLimiter,
     accountDelete: accountDeleteLimiter,
     accountExport: accountExportLimiter,
     wrapLink: wrapLinkLimiter,

@@ -4,12 +4,18 @@ import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { InfoBox } from '@/components/molecules/InfoBox';
 import { APP_ROUTES } from '@/constants/routes';
-import { useChatUsageQuery } from '@/lib/queries/useChatUsageQuery';
+import { env } from '@/lib/env-client';
+import { useChatUsageQuery } from '@/lib/queries';
 
 export function ChatUsageAlert() {
-  const { data, isLoading } = useChatUsageQuery();
+  const { data, isLoading } = useChatUsageQuery({ enabled: !env.IS_E2E });
 
-  if (isLoading || !data || (!data.isNearLimit && !data.isExhausted)) {
+  if (
+    env.IS_E2E ||
+    isLoading ||
+    !data ||
+    (!data.isNearLimit && !data.isExhausted)
+  ) {
     return null;
   }
 

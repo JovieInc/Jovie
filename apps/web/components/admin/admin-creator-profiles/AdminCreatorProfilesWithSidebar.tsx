@@ -1,8 +1,9 @@
 'use client';
 
+import { UserCircle2 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import React, { Suspense, useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
 import {
   getNextSort,
@@ -15,15 +16,16 @@ import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdm
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
 import { TableErrorFallback } from '@/components/atoms/TableErrorFallback';
-import { RightDrawer } from '@/components/organisms/RightDrawer';
-import { useRowSelection } from '@/components/organisms/table';
+import { DrawerLoadingSkeleton } from '@/components/molecules/drawer';
+import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
+import { TableEmptyState, useRowSelection } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { useNotifications } from '@/lib/hooks/useNotifications';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
+import { QueryErrorBoundary, useAvatarUploadMutation } from '@/lib/queries';
+import type { Contact } from '@/types';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
-import { useAvatarUpload } from './useAvatarUpload';
 import { useContactHydration } from './useContactHydration';
 import { useContactSave } from './useContactSave';
 import { useDebouncedContactSave } from './useDebouncedContactSave';
@@ -61,7 +63,12 @@ const ContactSidebar = dynamic(
       default: mod.ContactSidebar,
     })),
   {
-    loading: () => <div className='h-full w-full animate-pulse bg-surface-1' />,
+    loading: () => (
+      <DrawerLoadingSkeleton
+        ariaLabel='Loading creator details'
+        contentRows={5}
+      />
+    ),
     ssr: false,
   }
 );
@@ -122,7 +129,6 @@ export function AdminCreatorProfilesWithSidebar({
   const filteredProfiles = profilesWithActions;
   const from = filteredProfiles.length > 0 ? 1 : 0;
   const to = filteredProfiles.length;
-  const clearHref = basePath;
 
   const rowIds = useMemo(
     () => filteredProfiles.map(profile => profile.id),
@@ -153,7 +159,13 @@ export function AdminCreatorProfilesWithSidebar({
     onRefreshComplete: refetchSocialLinks,
   });
 
-  const { handleAvatarUpload } = useAvatarUpload();
+  const { mutateAsync: uploadAvatar } = useAvatarUploadMutation();
+  const handleAvatarUpload = useCallback(
+    async (file: File, contact: Contact): Promise<string> => {
+      return uploadAvatar({ file, profileId: contact.id });
+    },
+    [uploadAvatar]
+  );
 
   const { saveContact, isSaving } = useContactSave({
     onSaveSuccess: updatedContact => {
@@ -261,6 +273,37 @@ export function AdminCreatorProfilesWithSidebar({
     setSidebarOpen(false);
   }, []);
 
+  const { setTableMeta } = useTableMeta();
+  const filteredProfilesRef = React.useRef(filteredProfiles);
+  filteredProfilesRef.current = filteredProfiles;
+
+  React.useEffect(() => {
+    const toggle = () => {
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+        return;
+      }
+
+      const nextProfile =
+        filteredProfilesRef.current.find(
+          profile => profile.id === selectedId
+        ) ?? filteredProfilesRef.current[0];
+
+      if (!nextProfile) return;
+
+      setSelectedId(nextProfile.id);
+      setSidebarOpen(true);
+      setDraftContact(null);
+    };
+
+    setTableMeta({
+      rowCount: filteredProfiles.length,
+      toggle: filteredProfiles.length > 0 ? toggle : null,
+      rightPanelWidth: sidebarOpen ? SIDEBAR_WIDTH : 0,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setTableMeta is a stable context setter
+  }, [filteredProfiles.length, selectedId, setDraftContact, sidebarOpen]);
+
   const getProfileId = useCallback(
     (profile: (typeof filteredProfiles)[number]) => profile.id,
     []
@@ -346,14 +389,9 @@ export function AdminCreatorProfilesWithSidebar({
             }}
             toolbar={
               <AdminCreatorsToolbar
-                basePath={basePath}
-                search={search}
-                sort={sort}
-                pageSize={pageSize}
                 from={from}
                 to={to}
                 total={total}
-                clearHref={clearHref}
                 profiles={profilesWithActions}
               />
             }
@@ -377,14 +415,15 @@ export function AdminCreatorProfilesWithSidebar({
                 />
                 <tbody>
                   {profilesWithActions.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className='px-4 py-10 text-center text-sm text-secondary-token'
-                      >
-                        No creator profiles found.
-                      </td>
-                    </tr>
+                    <TableEmptyState
+                      colSpan={6}
+                      icon={
+                        <UserCircle2 className='h-6 w-6' aria-hidden='true' />
+                      }
+                      title='No creator profiles found'
+                      description='Creator profiles will appear here once created.'
+                      className='min-h-[220px] rounded-none border-x-0 border-b-0 shadow-none'
+                    />
                   ) : (
                     profilesWithActions.map((profile, index) => {
                       const handlers = rowActionHandlers.get(profile.id);
@@ -432,34 +471,17 @@ export function AdminCreatorProfilesWithSidebar({
           </AdminTableShell>
         </QueryErrorBoundary>
       </div>
-      <RightDrawer
-        isOpen={sidebarOpen && Boolean(effectiveContact)}
-        width={SIDEBAR_WIDTH}
-        ariaLabel='Contact details'
-        className='bg-surface-2 border-subtle'
-      >
-        <div className='flex-1 min-h-0 overflow-auto'>
-          <Suspense
-            fallback={
-              <div className='space-y-4 p-4'>
-                <div className='h-10 w-32 animate-pulse rounded-md bg-surface-1' />
-                <div className='h-20 w-full animate-pulse rounded-md bg-surface-1' />
-                <div className='h-40 w-full animate-pulse rounded-md bg-surface-1' />
-              </div>
-            }
-          >
-            <ContactSidebar
-              contact={effectiveContact}
-              mode={mode}
-              isOpen={sidebarOpen && Boolean(effectiveContact)}
-              onClose={handleSidebarClose}
-              onRefresh={handleSidebarRefresh}
-              onContactChange={handleContactChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
-          </Suspense>
-        </div>
-      </RightDrawer>
+      {sidebarOpen && effectiveContact ? (
+        <ContactSidebar
+          contact={effectiveContact}
+          mode={mode}
+          isOpen={true}
+          onClose={handleSidebarClose}
+          onRefresh={handleSidebarRefresh}
+          onContactChange={handleContactChange}
+          onAvatarUpload={handleAvatarUpload}
+        />
+      ) : null}
       <DeleteCreatorDialog
         profile={profileToDelete}
         open={deleteDialogOpen}

@@ -19,9 +19,100 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
+function getBorderColor(isAvailable: boolean, isHero: boolean): string {
+  if (isAvailable) return 'rgba(74,222,128,0.25)';
+  if (isHero) return 'rgba(255,255,255,0.1)';
+  return 'rgba(255,255,255,0.06)';
+}
+
+function getContainerStyles(
+  isHero: boolean,
+  isAvailable: boolean
+): React.CSSProperties {
+  const shadow = isHero
+    ? [
+        '0 20px 50px rgba(0,0,0,0.22)',
+        'inset 0 1px 3px rgba(0,0,0,0.25)',
+        isAvailable
+          ? '0 0 24px rgba(74,222,128,0.08)'
+          : '0 2px 8px rgba(0,0,0,0.2)',
+      ].join(', ')
+    : [
+        'inset 0 1px 2px rgba(0,0,0,0.2)',
+        isAvailable
+          ? '0 0 20px rgba(74,222,128,0.06)'
+          : '0 1px 2px rgba(0,0,0,0.1)',
+      ].join(', ');
+  return {
+    minHeight: isHero ? 68 : 52,
+    background: isHero
+      ? 'linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.032) 100%)'
+      : 'rgba(255,255,255,0.03)',
+    border: `1px solid ${getBorderColor(isAvailable, isHero)}`,
+    boxShadow: shadow,
+  };
+}
+
+function getDomainPrefixStyles(isHero: boolean): React.CSSProperties {
+  return isHero
+    ? {
+        fontSize: 'clamp(16px, 4.8vw, 19px)',
+        fontWeight: 510,
+        letterSpacing: '-0.03em',
+        color: 'var(--linear-text-quaternary)',
+        fontFamily: 'inherit',
+      }
+    : {
+        fontSize: '13px',
+        fontWeight: 400,
+        color: 'var(--linear-text-tertiary)',
+        letterSpacing: '-0.02em',
+        fontFamily: 'monospace',
+      };
+}
+
+function getInputStyles(
+  isHero: boolean,
+  isAvailable: boolean
+): React.CSSProperties {
+  const color = isAvailable ? 'rgb(74,222,128)' : 'var(--linear-text-primary)';
+  return isHero
+    ? {
+        fontSize: 'clamp(16px, 4.8vw, 19px)',
+        fontWeight: 510,
+        letterSpacing: '-0.03em',
+        color,
+      }
+    : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
+}
+
+function getButtonStyles(
+  isHero: boolean,
+  isDisabled: boolean
+): React.CSSProperties {
+  return {
+    height: isHero ? 'clamp(44px, 12vw, 50px)' : 36,
+    fontSize: isHero ? '14px' : '13px',
+    fontWeight: 510,
+    letterSpacing: '-0.01em',
+    background: isDisabled
+      ? 'rgba(255,255,255,0.06)'
+      : 'linear-gradient(180deg, rgb(244,245,246) 0%, rgb(228,230,232) 100%)',
+    color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
+    boxShadow: isDisabled
+      ? 'none'
+      : '0 10px 24px rgba(0,0,0,0.2), 0 1px 3px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.4)',
+    border: isDisabled
+      ? '1px solid transparent'
+      : '1px solid rgba(255,255,255,0.18)',
+  };
+}
+
 export function ClaimHandleForm({
   onHandleChange,
+  size = 'default',
 }: Readonly<ClaimHandleFormProps>) {
+  const isHero = size === 'hero';
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -127,33 +218,38 @@ export function ClaimHandleForm({
       <div
         className={cn(
           'claim-input-row',
-          'relative flex w-full items-center gap-2 rounded-[14px] p-1.5',
-          'transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
+          isHero ? 'rounded-2xl p-1 sm:gap-2 sm:p-2' : 'rounded-[14px] p-1.5',
           isAvailable && 'claim-input-row--available'
         )}
-        style={{
-          minHeight: 52,
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.2)' : 'rgba(255,255,255,0.06)'}`,
-          boxShadow: [
-            'inset 0 1px 2px rgba(0,0,0,0.2)',
-            isAvailable
-              ? '0 0 20px rgba(74,222,128,0.06)'
-              : '0 1px 2px rgba(0,0,0,0.1)',
-          ].join(', '),
-        }}
+        style={getContainerStyles(isHero, isAvailable)}
       >
-        <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
+        {isHero && (
+          <>
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-x-2 top-0 h-px rounded-full'
+              style={{
+                background:
+                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0.18) 80%, transparent)',
+              }}
+            />
+            <div
+              aria-hidden='true'
+              className='pointer-events-none absolute inset-y-2 right-[5rem] hidden w-px sm:block'
+              style={{
+                background:
+                  'linear-gradient(180deg, transparent, rgba(255,255,255,0.08), transparent)',
+              }}
+            />
+          </>
+        )}
+
+        <div className='flex min-w-0 flex-1 items-center gap-0 pl-2.5 pr-0.5 sm:pl-3.5 sm:pr-1'>
           {/* Domain prefix — etched, permanent feel */}
           <span
-            className='shrink-0 select-none font-mono'
-            style={{
-              fontSize: '13px',
-              fontWeight: 400,
-              color: 'var(--linear-text-quaternary)',
-              letterSpacing: '-0.02em',
-              opacity: 0.7,
-            }}
+            className='shrink-0 select-none'
+            style={getDomainPrefixStyles(isHero)}
           >
             {displayDomain}/
           </span>
@@ -164,22 +260,15 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder='your-name'
+            placeholder={isHero ? 'you' : 'your-name'}
             required
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className='min-w-0 flex-1 bg-transparent focus-visible:outline-none placeholder:opacity-40 placeholder:text-[var(--linear-text-tertiary)]'
-            style={{
-              fontSize: '13px',
-              fontWeight: 450,
-              letterSpacing: '-0.01em',
-              color: isAvailable
-                ? 'rgb(74,222,128)'
-                : 'var(--linear-text-primary)',
-            }}
+            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHero ? 'placeholder:text-[var(--linear-text-quaternary)]' : 'placeholder:text-[var(--linear-text-tertiary)]'}`}
+            style={getInputStyles(isHero, isAvailable)}
           />
 
           <HandleStatusIcon
@@ -195,24 +284,15 @@ export function ClaimHandleForm({
           type='submit'
           disabled={isDisabled}
           className={cn(
-            'group shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[10px] px-4 sm:px-5 transition-all duration-200 focus-ring-themed',
+            'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
+            isHero
+              ? 'rounded-[14px] px-3.5 sm:px-6'
+              : 'rounded-[10px] px-4 sm:px-5',
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'
           )}
-          style={{
-            height: 36,
-            fontSize: '13px',
-            fontWeight: 500,
-            letterSpacing: '-0.01em',
-            background: isDisabled
-              ? 'rgba(255,255,255,0.06)'
-              : 'rgb(237,238,238)',
-            color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
-            boxShadow: isDisabled
-              ? 'none'
-              : '0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.15)',
-          }}
+          style={getButtonStyles(isHero, isDisabled)}
         >
           <span className='inline-flex items-center gap-1.5 whitespace-nowrap'>
             {buttonContent}

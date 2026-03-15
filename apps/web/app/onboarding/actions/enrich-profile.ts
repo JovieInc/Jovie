@@ -16,11 +16,13 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import {
   extractMusicFetchLinks,
+  type MusicFetchProfileFieldState,
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
+  type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
 import {
   getBestSpotifyImageUrl,
@@ -28,7 +30,6 @@ import {
 } from '@/lib/dsp-enrichment/providers/spotify';
 import { captureError } from '@/lib/error-tracking';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
-import type { ExtractedLink } from '@/lib/ingestion/types';
 import { logger } from '@/lib/utils/logger';
 import { uploadRemoteAvatar } from './avatar';
 
@@ -40,110 +41,153 @@ export interface EnrichedProfileData {
   followers: number | null;
 }
 
-/**
- * Enrich a creator profile from Spotify API + MusicFetch API.
- *
- * Called synchronously during onboarding after a user connects their
- * Spotify artist profile. Fetches and saves:
- * - Display name (from Spotify)
- * - Profile photo (from Spotify, uploaded to blob storage)
- * - Bio (from MusicFetch)
- * - Genres, followers, popularity (from Spotify)
- * - Social links (from MusicFetch)
- *
- * Returns the enriched data for display in the profile review step.
- */
-export async function enrichProfileFromDsp(
+async function uploadProfileImage(
+  profileId: string,
+  imageUrl: string,
+  imageSource: 'musicfetch' | 'spotify',
   spotifyArtistId: string,
-  spotifyUrl: string
-): Promise<EnrichedProfileData> {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-
-  // Fetch profile via Clerk ID → users → creator_profiles join
-  const [profile] = await db
-    .select({
-      id: creatorProfiles.id,
-      displayName: creatorProfiles.displayName,
-      displayNameLocked: creatorProfiles.displayNameLocked,
-      avatarUrl: creatorProfiles.avatarUrl,
-      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
-      bio: creatorProfiles.bio,
-      usernameNormalized: creatorProfiles.usernameNormalized,
-      spotifyUrl: creatorProfiles.spotifyUrl,
-      spotifyId: creatorProfiles.spotifyId,
-      appleMusicUrl: creatorProfiles.appleMusicUrl,
-      appleMusicId: creatorProfiles.appleMusicId,
-      youtubeUrl: creatorProfiles.youtubeUrl,
-      youtubeMusicId: creatorProfiles.youtubeMusicId,
-      deezerId: creatorProfiles.deezerId,
-      tidalId: creatorProfiles.tidalId,
-      soundcloudId: creatorProfiles.soundcloudId,
-    })
-    .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
-    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
-    .limit(1);
-
-  if (!profile) {
-    throw new Error('Profile not found');
-  }
-
-  const result: EnrichedProfileData = {
-    name: profile.displayName,
-    imageUrl: profile.avatarUrl,
-    bio: profile.bio,
-    genres: [],
-    followers: null,
-  };
-
-  // Prioritize MusicFetch to reduce direct Spotify API load.
-  let musicFetch: Awaited<ReturnType<typeof fetchArtistBySpotifyUrl>> = null;
-  if (isMusicFetchAvailable()) {
-    const musicFetchData = await Promise.allSettled([
-      fetchArtistBySpotifyUrl(spotifyUrl),
-    ]);
-
-    const musicFetchResult = musicFetchData[0];
-    musicFetch =
-      musicFetchResult.status === 'fulfilled' ? musicFetchResult.value : null;
-
-    if (musicFetchResult.status === 'rejected') {
-      await captureError(
-        'MusicFetch failed during onboarding enrichment',
-        musicFetchResult.reason,
-        { spotifyUrl }
-      );
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    const uploaded = await uploadRemoteAvatar({
+      imageUrl,
+      cookieHeader: cookieStore.toString(),
+      maxRetries: 2,
+    });
+    if (uploaded) {
+      profileUpdates.avatarUrl = uploaded.blobUrl;
+      result.imageUrl = uploaded.blobUrl;
+      logger.info('Artist image uploaded during onboarding enrichment', {
+        profileId,
+        spotifyArtistId,
+        source: imageSource,
+      });
     }
-  }
-
-  const needsSpotifyArtistData =
-    (!profile.displayNameLocked && !profile.displayName && !musicFetch?.name) ||
-    (!profile.avatarLockedByUser &&
-      !profile.avatarUrl &&
-      !musicFetch?.image?.url);
-
-  const spotifyArtist = needsSpotifyArtistData
-    ? await Promise.allSettled([getSpotifyArtistProfile(spotifyArtistId)])
-    : [];
-
-  const spotifyResult = spotifyArtist[0];
-  const artist =
-    spotifyResult?.status === 'fulfilled' ? spotifyResult.value : null;
-
-  if (spotifyResult?.status === 'rejected') {
+  } catch (error) {
     await captureError(
-      'Spotify artist fetch failed during onboarding enrichment',
-      spotifyResult.reason,
-      { spotifyArtistId }
+      'Failed to upload artist image during onboarding enrichment',
+      error,
+      { profileId, spotifyArtistId }
     );
   }
+}
 
-  // Build profile updates
-  const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
+async function processMusicFetchSocialLinks(
+  profile: {
+    id: string;
+    usernameNormalized: string;
+    avatarUrl: string | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean | null;
+    displayNameLocked: boolean | null;
+  },
+  musicFetch: MusicFetchArtistResult,
+  spotifyUrl: string,
+  result: EnrichedProfileData
+): Promise<void> {
+  const socialLinks = extractMusicFetchLinks(
+    musicFetch,
+    spotifyUrl,
+    'onboarding_enrichment'
+  );
+  if (socialLinks.length === 0) return;
+  try {
+    await withDbSessionTx(async tx => {
+      await normalizeAndMergeExtraction(
+        tx,
+        {
+          id: profile.id,
+          usernameNormalized: profile.usernameNormalized,
+          avatarUrl: result.imageUrl ?? profile.avatarUrl,
+          displayName: result.name ?? profile.displayName,
+          avatarLockedByUser: profile.avatarLockedByUser,
+          displayNameLocked: profile.displayNameLocked,
+        },
+        {
+          links: socialLinks,
+          sourcePlatform: 'musicfetch',
+          sourceUrl: spotifyUrl,
+        }
+      );
+    });
+  } catch (error) {
+    await captureError(
+      'Failed to merge social links during onboarding enrichment',
+      error,
+      { profileId: profile.id }
+    );
+  }
+}
 
+async function loadMusicFetchData(
+  spotifyUrl: string
+): Promise<MusicFetchArtistResult | null> {
+  if (!isMusicFetchAvailable()) return null;
+
+  const [result] = await Promise.allSettled([
+    fetchArtistBySpotifyUrl(spotifyUrl),
+  ]);
+
+  if (result.status === 'rejected') {
+    await captureError(
+      'MusicFetch failed during onboarding enrichment',
+      result.reason,
+      { spotifyUrl }
+    );
+    return null;
+  }
+
+  return result.value;
+}
+
+async function loadSpotifyArtistIfNeeded(
+  spotifyArtistId: string,
+  _profile: {
+    displayNameLocked: boolean | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean | null;
+    avatarUrl: string | null;
+    genres: string[] | null;
+    spotifyFollowers: number | null;
+    spotifyPopularity: number | null;
+  },
+  _musicFetch: MusicFetchArtistResult | null
+): Promise<Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null> {
+  // Always fetch Spotify artist metadata during onboarding so we can persist
+  // genres/followers/popularity even when MusicFetch already provided
+  // display name or image fields.
+  if (!spotifyArtistId) return null;
+
+  const [result] = await Promise.allSettled([
+    getSpotifyArtistProfile(spotifyArtistId),
+  ]);
+
+  if (result.status === 'rejected') {
+    await captureError(
+      'Spotify artist fetch failed during onboarding enrichment',
+      result.reason,
+      { spotifyArtistId }
+    );
+    return null;
+  }
+
+  return result.value;
+}
+
+function buildEnrichmentUpdates(
+  profile: MusicFetchProfileFieldState & {
+    displayNameLocked: boolean | null;
+    displayName: string | null;
+  },
+  musicFetch: MusicFetchArtistResult | null,
+  artist: Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null,
+  spotifyUrl: string,
+  spotifyArtistId: string,
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): void {
   if (musicFetch) {
     Object.assign(
       profileUpdates,
@@ -183,46 +227,127 @@ export async function enrichProfileFromDsp(
   }
 
   // Save Spotify URL and ID so DSP links render on the public profile
-  if (spotifyUrl) {
-    profileUpdates.spotifyUrl = spotifyUrl;
+  if (spotifyUrl) profileUpdates.spotifyUrl = spotifyUrl;
+  if (spotifyArtistId) profileUpdates.spotifyId = spotifyArtistId;
+}
+
+async function applyImageEnrichmentIfNeeded(
+  profile: {
+    id: string;
+    avatarLockedByUser: boolean | null;
+    avatarUrl: string | null;
+  },
+  musicFetch: MusicFetchArtistResult | null,
+  artist: Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null,
+  spotifyArtistId: string,
+  result: EnrichedProfileData,
+  profileUpdates: Partial<typeof creatorProfiles.$inferInsert>
+): Promise<void> {
+  if (profile.avatarLockedByUser || profile.avatarUrl) return;
+  const imageUrl =
+    musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
+  if (!imageUrl) return;
+  const imageSource = musicFetch?.image?.url ? 'musicfetch' : 'spotify';
+  await uploadProfileImage(
+    profile.id,
+    imageUrl,
+    imageSource,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
+}
+
+/**
+ * Enrich a creator profile from Spotify API + MusicFetch API.
+ *
+ * Called synchronously during onboarding after a user connects their
+ * Spotify artist profile. Fetches and saves:
+ * - Display name (from Spotify)
+ * - Profile photo (from Spotify, uploaded to blob storage)
+ * - Bio (from MusicFetch)
+ * - Genres, followers, popularity (from Spotify)
+ * - Social links (from MusicFetch)
+ *
+ * Returns the enriched data for display in the profile review step.
+ */
+export async function enrichProfileFromDsp(
+  spotifyArtistId: string,
+  spotifyUrl: string
+): Promise<EnrichedProfileData> {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
   }
-  if (spotifyArtistId) {
-    profileUpdates.spotifyId = spotifyArtistId;
+
+  // Fetch profile via Clerk ID → users → creator_profiles join
+  const [profile] = await db
+    .select({
+      id: creatorProfiles.id,
+      displayName: creatorProfiles.displayName,
+      displayNameLocked: creatorProfiles.displayNameLocked,
+      avatarUrl: creatorProfiles.avatarUrl,
+      avatarLockedByUser: creatorProfiles.avatarLockedByUser,
+      bio: creatorProfiles.bio,
+      genres: creatorProfiles.genres,
+      spotifyFollowers: creatorProfiles.spotifyFollowers,
+      spotifyPopularity: creatorProfiles.spotifyPopularity,
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      spotifyId: creatorProfiles.spotifyId,
+      appleMusicUrl: creatorProfiles.appleMusicUrl,
+      appleMusicId: creatorProfiles.appleMusicId,
+      youtubeUrl: creatorProfiles.youtubeUrl,
+      youtubeMusicId: creatorProfiles.youtubeMusicId,
+      deezerId: creatorProfiles.deezerId,
+      tidalId: creatorProfiles.tidalId,
+      soundcloudId: creatorProfiles.soundcloudId,
+    })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .limit(1);
+
+  if (!profile) {
+    throw new Error('Profile not found');
   }
+
+  const result: EnrichedProfileData = {
+    name: profile.displayName,
+    imageUrl: profile.avatarUrl,
+    bio: profile.bio,
+    genres: [],
+    followers: null,
+  };
+
+  const musicFetch = await loadMusicFetchData(spotifyUrl);
+  const artist = await loadSpotifyArtistIfNeeded(
+    spotifyArtistId,
+    profile,
+    musicFetch
+  );
+
+  // Build profile updates
+  const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
+  buildEnrichmentUpdates(
+    profile,
+    musicFetch,
+    artist,
+    spotifyUrl,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
 
   // Upload profile image from MusicFetch first, then Spotify fallback.
-  if (!profile.avatarLockedByUser && !profile.avatarUrl) {
-    const imageUrl =
-      musicFetch?.image?.url ?? getBestSpotifyImageUrl(artist?.images ?? []);
-    if (imageUrl) {
-      try {
-        const cookieStore = await cookies();
-        const cookieHeader = cookieStore.toString();
-        const uploaded = await uploadRemoteAvatar({
-          imageUrl,
-          cookieHeader,
-          maxRetries: 2,
-        });
-
-        if (uploaded) {
-          profileUpdates.avatarUrl = uploaded.blobUrl;
-          result.imageUrl = uploaded.blobUrl;
-
-          logger.info('Artist image uploaded during onboarding enrichment', {
-            profileId: profile.id,
-            spotifyArtistId,
-            source: musicFetch?.image?.url ? 'musicfetch' : 'spotify',
-          });
-        }
-      } catch (error) {
-        await captureError(
-          'Failed to upload artist image during onboarding enrichment',
-          error,
-          { profileId: profile.id, spotifyArtistId }
-        );
-      }
-    }
-  }
+  await applyImageEnrichmentIfNeeded(
+    profile,
+    musicFetch,
+    artist,
+    spotifyArtistId,
+    result,
+    profileUpdates
+  );
 
   // Apply profile updates
   if (Object.keys(profileUpdates).length > 0) {
@@ -235,40 +360,7 @@ export async function enrichProfileFromDsp(
 
   // Process social links from MusicFetch
   if (musicFetch) {
-    const socialLinks: ExtractedLink[] = extractMusicFetchLinks(
-      musicFetch,
-      spotifyUrl,
-      'onboarding_enrichment'
-    );
-
-    if (socialLinks.length > 0) {
-      try {
-        await withDbSessionTx(async tx => {
-          await normalizeAndMergeExtraction(
-            tx,
-            {
-              id: profile.id,
-              usernameNormalized: profile.usernameNormalized,
-              avatarUrl: result.imageUrl ?? profile.avatarUrl,
-              displayName: result.name ?? profile.displayName,
-              avatarLockedByUser: profile.avatarLockedByUser,
-              displayNameLocked: profile.displayNameLocked,
-            },
-            {
-              links: socialLinks,
-              sourcePlatform: 'musicfetch',
-              sourceUrl: spotifyUrl,
-            }
-          );
-        });
-      } catch (error) {
-        await captureError(
-          'Failed to merge social links during onboarding enrichment',
-          error,
-          { profileId: profile.id }
-        );
-      }
-    }
+    await processMusicFetchSocialLinks(profile, musicFetch, spotifyUrl, result);
   }
 
   return result;

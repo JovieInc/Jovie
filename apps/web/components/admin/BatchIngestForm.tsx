@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, Textarea } from '@jovie/ui';
+import { Button, Textarea } from '@jovie/ui';
 import {
   CheckCircle2,
   ChevronRight,
@@ -8,27 +8,14 @@ import {
   CircleMinus,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AnimatedAccordion } from '@/components/organisms/AnimatedAccordion';
-import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  type BatchIngestApiResponse,
+  useBatchIngestMutation,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { parseBatchUrls } from './batch-url-utils';
-
-interface BatchResult {
-  input: string;
-  status: 'success' | 'skipped' | 'error';
-  reason?: string;
-  username?: string;
-}
-
-interface BatchIngestApiResponse {
-  results: BatchResult[];
-  summary: {
-    total: number;
-    success: number;
-    skipped: number;
-    error: number;
-  };
-}
 
 interface BatchIngestFormProps {
   readonly onComplete?: () => void;
@@ -57,9 +44,14 @@ export function BatchIngestForm({
 }: Readonly<BatchIngestFormProps>) {
   const [value, setValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<BatchIngestApiResponse | null>(null);
-  const notifications = useNotifications();
+
+  const { mutateAsync, isPending } = useBatchIngestMutation({
+    onSuccess: data => {
+      setResult(data);
+      onComplete?.();
+    },
+  });
 
   const parsedCount = useMemo(() => parseBatchUrls(value).length, [value]);
 
@@ -72,47 +64,8 @@ export function BatchIngestForm({
 
   const handleSubmit = async () => {
     const urls = parseBatchUrls(value);
-
-    if (urls.length === 0) {
-      notifications.error('Paste at least one URL to import.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      const response = await fetch('/api/admin/batch-ingest', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ urls }),
-      });
-
-      const payload = (await response.json()) as BatchIngestApiResponse & {
-        error?: string;
-        details?: string;
-      };
-
-      if (!response.ok) {
-        notifications.error(
-          payload.details ?? payload.error ?? 'Batch ingest failed.'
-        );
-        return;
-      }
-
-      setResult(payload);
-      notifications.success(
-        `Batch complete: ${payload.summary.success} created, ${payload.summary.skipped} skipped, ${payload.summary.error} errors.`
-      );
-      onComplete?.();
-    } catch (error) {
-      notifications.error(
-        error instanceof Error ? error.message : 'Failed to ingest URLs.'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (urls.length === 0) return;
+    await mutateAsync({ urls });
   };
 
   let summaryText: string | null;
@@ -126,29 +79,31 @@ export function BatchIngestForm({
   }
 
   return (
-    <Card>
-      <CardHeader className='p-0'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <div className='p-0'>
         <button
           type='button'
           onClick={() => setIsOpen(open => !open)}
-          className='flex w-full items-center gap-2 px-4 py-2.5 text-left'
+          className='flex w-full items-center gap-2 border-b border-(--linear-border-subtle) px-4 py-3 text-left'
         >
           <ChevronRight
             className={cn(
-              'h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform duration-200',
+              'h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary) transition-transform duration-200',
               isOpen && 'rotate-90'
             )}
           />
-          <span className='text-app font-medium'>Batch URL import</span>
+          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            Batch URL import
+          </span>
           {summaryText && !isOpen && (
-            <span className='ml-auto text-2xs text-tertiary-token'>
+            <span className='ml-auto text-[11px] text-(--linear-text-tertiary)'>
               {summaryText}
             </span>
           )}
         </button>
-      </CardHeader>
+      </div>
       <AnimatedAccordion isOpen={isOpen}>
-        <CardContent className='space-y-2 pt-0'>
+        <div className='space-y-2 px-4 py-3'>
           <Textarea
             rows={4}
             value={value}
@@ -157,7 +112,7 @@ export function BatchIngestForm({
 https://open.spotify.com/artist/...
 https://www.instagram.com/artistname, https://artist-website.com'
           />
-          <div className='flex items-center justify-between text-2xs text-tertiary-token'>
+          <div className='flex flex-col gap-2 text-[11px] text-(--linear-text-tertiary) sm:flex-row sm:items-center sm:justify-between'>
             <span>
               {parsedCount} URL{parsedCount === 1 ? '' : 's'} parsed
             </span>
@@ -165,16 +120,17 @@ https://www.instagram.com/artistname, https://artist-website.com'
               type='button'
               size='sm'
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={isPending}
+              className='w-full sm:w-auto'
             >
-              {isSubmitting ? 'Ingesting\u2026' : 'Run batch import'}
+              {isPending ? 'Ingesting\u2026' : 'Run batch import'}
             </Button>
           </div>
 
           {result && (
-            <div className='space-y-2 rounded-md border border-subtle p-3 text-xs'>
+            <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3 text-[12px] text-(--linear-text-secondary)'>
               {/* Summary badges */}
-              <div className='flex items-center gap-3'>
+              <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (
                   <span className='inline-flex items-center gap-1 text-success'>
                     <CheckCircle2 className='size-3' />
@@ -215,7 +171,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
                           {config.label}
                         </span>{' '}
                         {item.input}
-                        {item.username ? ` → @${item.username}` : ''}
+                        {item.username ? ` \u2192 @${item.username}` : ''}
                         {item.reason ? ` (${item.reason})` : ''}
                       </span>
                     </li>
@@ -224,8 +180,8 @@ https://www.instagram.com/artistname, https://artist-website.com'
               </ul>
             </div>
           )}
-        </CardContent>
+        </div>
       </AnimatedAccordion>
-    </Card>
+    </ContentSurfaceCard>
   );
 }

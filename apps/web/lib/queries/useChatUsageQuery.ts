@@ -30,6 +30,11 @@ export const chatUsageQueryOptions = {
   retryDelay: (attempt: number) => Math.min(1000 * 2 ** attempt, 10000),
 } as const;
 
-export function useChatUsageQuery() {
-  return useQuery<ChatUsageData, Error>(chatUsageQueryOptions);
+export function useChatUsageQuery(options?: { enabled?: boolean }) {
+  const { enabled = true } = options ?? {};
+
+  return useQuery<ChatUsageData, Error>({
+    ...chatUsageQueryOptions,
+    enabled,
+  });
 }

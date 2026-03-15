@@ -11,6 +11,12 @@ interface Props {
   readonly creators: FeaturedCreator[];
 }
 
+const CREATOR_LABELS = [
+  'Release-first profile',
+  'Tour conversion flow',
+  'Audience capture setup',
+] as const;
+
 export function SeeItInActionCarousel({ creators }: Props) {
   const displayed = creators.slice(0, 3);
 
@@ -22,12 +28,13 @@ export function SeeItInActionCarousel({ creators }: Props) {
             See it in action
           </h2>
           <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-            Real profiles, real artists. See how creators use Jovie.
+            See how artists use one Jovie profile for listening, touring, and
+            fan capture.
           </p>
         </div>
 
         <div className='mt-14 grid grid-cols-1 sm:grid-cols-3 gap-6'>
-          {displayed.map(creator => (
+          {displayed.map((creator, index) => (
             <Link
               key={creator.id}
               href={`/${creator.handle}`}
@@ -55,6 +62,9 @@ export function SeeItInActionCarousel({ creators }: Props) {
               <p className='mt-1 text-[13px] text-[color:var(--linear-text-tertiary)] font-mono'>
                 jov.ie/{creator.handle}
               </p>
+              <span className='mt-3 rounded-full border border-[var(--linear-border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] font-medium text-[color:var(--linear-text-secondary)]'>
+                {CREATOR_LABELS[index] ?? 'Artist growth profile'}
+              </span>
               <span
                 className='mt-4 inline-flex items-center rounded-lg px-4 py-2 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{

@@ -1,6 +1,6 @@
 'use client';
 
-import { useInsightsSummaryQuery } from '@/lib/queries/useInsightsQuery';
+import { useInsightsSummaryQuery } from '@/lib/queries';
 
 /**
  * Small badge showing the count of active high-priority insights.

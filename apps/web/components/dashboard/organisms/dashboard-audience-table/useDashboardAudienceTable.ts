@@ -169,21 +169,22 @@ export function useDashboardAudienceTable({
 
   const handleCopyProfileLink = React.useCallback(async () => {
     if (!profileUrl) return;
-    try {
-      await navigator.clipboard.writeText(profileUrl);
-      notifications.success('Profile link copied');
-      setCopiedProfileLink(true);
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
-      }
-      copyTimeoutRef.current = setTimeout(() => {
-        setCopiedProfileLink(false);
-        copyTimeoutRef.current = null;
-      }, 2000);
-    } catch (error) {
-      console.error('Failed to copy profile link', error);
+
+    const success = await copyTextToClipboard(profileUrl);
+    if (!success) {
       notifications.error('Unable to copy profile link');
+      return;
     }
+
+    notifications.success('Profile link copied');
+    setCopiedProfileLink(true);
+    if (copyTimeoutRef.current) {
+      clearTimeout(copyTimeoutRef.current);
+    }
+    copyTimeoutRef.current = setTimeout(() => {
+      setCopiedProfileLink(false);
+      copyTimeoutRef.current = null;
+    }, 2000);
   }, [notifications, profileUrl]);
 
   React.useEffect(() => {

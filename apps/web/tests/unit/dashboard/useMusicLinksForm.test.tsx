@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { FormEvent } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useMusicLinksForm } from '@/components/dashboard/organisms/listen-now-form/useMusicLinksForm';
-import type { DashboardSocialLink } from '@/lib/queries/useDashboardSocialLinksQuery';
+import type { DashboardSocialLink } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 const mockUseDashboardSocialLinksQuery = vi.fn();

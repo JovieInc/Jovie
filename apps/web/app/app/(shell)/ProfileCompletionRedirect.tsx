@@ -14,6 +14,8 @@ function isBlank(value: string | null | undefined): boolean {
  * If server-side onboarding checks fail due to network/cache timing,
  * this guard ensures authenticated users without a usable profile
  * (missing handle or display name) are sent to onboarding.
+ *
+ * Avatar is intentionally optional because onboarding no longer requires it.
  */
 export function ProfileCompletionRedirect() {
   const { selectedProfile, dashboardLoadError } = useDashboardData();
@@ -34,8 +36,7 @@ export function ProfileCompletionRedirect() {
 
     if (
       isBlank(selectedProfile.username) ||
-      isBlank(selectedProfile.displayName) ||
-      isBlank(selectedProfile.avatarUrl)
+      isBlank(selectedProfile.displayName)
     ) {
       router.replace('/onboarding');
     }

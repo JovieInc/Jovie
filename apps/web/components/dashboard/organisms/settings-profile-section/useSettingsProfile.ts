@@ -10,6 +10,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  buildProfileIdentityFields,
+  buildProfileSaveState,
+} from '@/components/profile/view-models';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useAutoSave } from '@/lib/pacer/hooks';
 import {
@@ -61,23 +65,20 @@ export function useSettingsProfile({
   onRefresh,
 }: UseSettingsProfileOptions): UseSettingsProfileReturn {
   const notifications = useNotifications();
+  const identityFields = buildProfileIdentityFields(artist);
   const [formData, setFormData] = useState<ProfileFormData>({
-    username: artist.handle || '',
-    displayName: artist.name || '',
+    username: identityFields.username,
+    displayName: identityFields.displayName,
   });
 
   const [profileSaveStatus, setProfileSaveStatus] = useState<ProfileSaveStatus>(
-    {
-      saving: false,
-      success: null,
-      error: null,
-    }
+    buildProfileSaveState()
   );
 
   // Track last saved values for deduplication
   const lastProfileSavedRef = useRef<ProfileUpdateData | null>({
-    displayName: artist.name || '',
-    username: artist.handle || '',
+    displayName: identityFields.displayName,
+    username: identityFields.username,
   });
 
   // Store artist ref for async operations
@@ -255,11 +256,15 @@ export function useSettingsProfile({
   // Reset status when artist changes
   useEffect(() => {
     lastProfileSavedRef.current = {
-      displayName: artist.name || '',
-      username: artist.handle || '',
+      displayName: identityFields.displayName,
+      username: identityFields.username,
     };
-    setProfileSaveStatus({ saving: false, success: null, error: null });
-  }, [artist.handle, artist.name]);
+    setFormData({
+      displayName: identityFields.displayName,
+      username: identityFields.username,
+    });
+    setProfileSaveStatus(buildProfileSaveState());
+  }, [identityFields.displayName, identityFields.username]);
 
   // Clear success status after delay
   useEffect(() => {

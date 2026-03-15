@@ -2,13 +2,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { queryKeys } from '@/lib/queries/keys';
 import {
   type DashboardSocialLink,
+  queryKeys,
   type SaveSocialLinksInput,
   useDashboardSocialLinksQuery,
   useSaveSocialLinksMutation,
-} from '@/lib/queries/useDashboardSocialLinksQuery';
+} from '@/lib/queries';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -24,6 +24,7 @@ vi.mock('sonner', () => ({
 
 // Mock Sentry
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));

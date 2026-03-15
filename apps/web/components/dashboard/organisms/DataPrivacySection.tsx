@@ -15,10 +15,9 @@ import { Download, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import {
-  useDeleteAccountMutation,
-  useExportDataMutation,
-} from '@/lib/queries/useAccountMutations';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
 export function DataPrivacySection() {
   const router = useRouter();
@@ -48,48 +47,57 @@ export function DataPrivacySection() {
 
   return (
     <div className='space-y-4'>
-      <DashboardCard variant='settings' className='divide-y divide-subtle'>
-        {/* Data Export */}
-        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4'>
-          <div className='min-w-0'>
-            <p className='text-[13px] sm:text-[14px] font-[510] text-primary-token'>
-              Export Your Data
-            </p>
-            <p className='text-xs sm:text-[13px] text-secondary-token mt-0.5 sm:mt-1'>
-              Download a copy of all your data including profile information,
-              links, contacts, and settings.
-            </p>
-          </div>
-          <Button
-            variant='outline'
-            onClick={handleExport}
-            disabled={exportMutation.isPending}
-            className='w-full sm:w-auto shrink-0'
-          >
-            <Download className='h-4 w-4 mr-2' />
-            {exportMutation.isPending ? 'Exporting...' : 'Export Data'}
-          </Button>
-        </div>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Data & privacy'
+          subtitle='Export your account data or permanently delete your profile and settings.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='space-y-3 px-4 py-3'>
+          <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-(--linear-bg-surface-0) p-4 sm:flex-row sm:items-start sm:gap-4'>
+            <div className='min-w-0'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                Export your data
+              </p>
+              <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+                Download a copy of your profile information, links, contacts,
+                and settings.
+              </p>
+            </div>
+            <Button
+              variant='outline'
+              onClick={handleExport}
+              disabled={exportMutation.isPending}
+              className='w-full shrink-0 sm:w-auto'
+            >
+              <Download className='mr-2 h-4 w-4' aria-hidden />
+              {exportMutation.isPending ? 'Exporting...' : 'Export Data'}
+            </Button>
+          </ContentSurfaceCard>
 
-        {/* Account Deletion */}
-        <div className='flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pt-3 sm:pt-4'>
-          <div className='min-w-0'>
-            <p className='text-[13px] sm:text-[14px] font-[510] text-primary-token'>
+          <ContentSurfaceCard className='flex flex-col justify-between gap-3 bg-(--linear-bg-surface-0) p-4 sm:flex-row sm:items-start sm:gap-4'>
+            <div className='min-w-0'>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                Delete account
+              </p>
+              <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+                Permanently delete your account and all associated data. This
+                action cannot be undone.
+              </p>
+            </div>
+            <Button
+              variant='destructive'
+              onClick={() => setDeleteDialogOpen(true)}
+              className='w-full shrink-0 sm:w-auto'
+            >
+              <Trash2 className='mr-2 h-4 w-4' aria-hidden />
               Delete Account
-            </p>
-            <p className='text-xs sm:text-[13px] text-secondary-token mt-0.5 sm:mt-1'>
-              Permanently delete your account and all associated data. This
-              action cannot be undone.
-            </p>
-          </div>
-          <Button
-            variant='destructive'
-            onClick={() => setDeleteDialogOpen(true)}
-            className='w-full sm:w-auto shrink-0'
-          >
-            <Trash2 className='h-4 w-4 mr-2' />
-            Delete Account
-          </Button>
+            </Button>
+          </ContentSurfaceCard>
         </div>
       </DashboardCard>
 
@@ -113,7 +121,7 @@ export function DataPrivacySection() {
           <div className='py-4'>
             <label
               htmlFor='delete-confirm'
-              className='text-[13px] text-secondary-token block mb-2'
+              className='mb-2 block text-[13px] text-(--linear-text-secondary)'
             >
               Type <strong>DELETE</strong> to confirm
             </label>

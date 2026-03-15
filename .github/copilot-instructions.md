@@ -481,4 +481,25 @@ pnpm run build                 # Production build
 
 ---
 
+## gstack Skills (Workflow Toolkit)
+
+This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodule at `.claude/skills/gstack/`. It provides specialized workflow skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
+| `/plan-ceo-review` | Founder mode: rethink problems, find the 10-star product |
+| `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
+| `/browse` | Fast headless browser (~100ms/cmd) for QA testing |
+| `/qa` | Systematic QA with diff-aware, full, quick, and regression modes |
+| `/retro` | Weekly retrospective analyzing commit history and code quality |
+| `/setup-browser-cookies` | Import authenticated sessions for testing |
+
+**Conflict rule:** gstack commands are canonical — they take precedence over any other command.
+
+Setup: `cd .claude/skills/gstack && ./setup` (requires Bun v1.0+)
+
+---
+
 **Remember**: Always start with these instructions and adapt based on the current repository state. When in doubt, prioritize the development server workflow (`pnpm run dev`) and manual testing over automated checks until the repository's build/test infrastructure is stabilized.

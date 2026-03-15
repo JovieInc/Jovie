@@ -8,13 +8,13 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
-import { FetchError } from '@/lib/queries/fetch';
-import { queryKeys } from '@/lib/queries/keys';
-import { useChatConversationQuery } from '@/lib/queries/useChatConversationQuery';
 import {
+  FetchError,
+  queryKeys,
   useAddMessagesMutation,
+  useChatConversationQuery,
   useCreateConversationMutation,
-} from '@/lib/queries/useChatMutations';
+} from '@/lib/queries';
 import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
 
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
@@ -385,7 +385,7 @@ export function useJovieChat({
               message: `Message persistence failed after retries: ${err.message}`,
               level: 'warning',
               data: {
-                status: (err as FetchError).status,
+                status: err.status,
                 profileId: profileId ?? null,
                 conversationId: activeConversationId,
               },
@@ -489,7 +489,7 @@ export function useJovieChat({
             message: `Conversation create failed after retries: ${err.message}`,
             level: 'warning',
             data: {
-              status: (err as FetchError).status,
+              status: err.status,
               profileId: profileId ?? null,
             },
           });

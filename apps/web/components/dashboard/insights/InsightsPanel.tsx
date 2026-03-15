@@ -1,10 +1,11 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useMemo, useState } from 'react';
+import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
-import { useGenerateInsightsMutation } from '@/lib/queries/useInsightsMutation';
-import { useInsightsQuery } from '@/lib/queries/useInsightsQuery';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useGenerateInsightsMutation, useInsightsQuery } from '@/lib/queries';
 import type { InsightCategory, InsightResponse } from '@/types/insights';
 import { InsightCard } from './InsightCard';
 import { InsightEmptyState } from './InsightEmptyState';
@@ -61,22 +62,31 @@ function InsightsPanelContent({
 }: InsightsPanelContentProps) {
   if (isLoading) {
     return (
-      <div className='flex items-center justify-center py-12'>
-        <Icon
-          name='Loader2'
-          className='h-5 w-5 animate-spin text-tertiary-token'
-        />
+      <div className='space-y-3' aria-hidden='true'>
+        {['high', 'medium', 'low'].map(key => (
+          <ContentSurfaceCard
+            key={key}
+            className='flex items-start gap-3 p-4 sm:p-5'
+          >
+            <div className='h-8 w-8 rounded-lg skeleton motion-reduce:animate-none' />
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='h-4 w-40 rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='h-3 w-full rounded-sm skeleton motion-reduce:animate-none' />
+              <div className='h-3 w-4/5 rounded-sm skeleton motion-reduce:animate-none' />
+            </div>
+          </ContentSurfaceCard>
+        ))}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-6 text-center'>
-        <p className='text-[13px] text-secondary-token'>
+      <ContentSurfaceCard className='p-6 text-center'>
+        <p className='text-[13px] text-(--linear-text-secondary)'>
           Failed to load insights. Please try again.
         </p>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
@@ -98,7 +108,7 @@ function InsightsPanelContent({
       />
       <PrioritySection
         label='Informational'
-        colorClass='text-tertiary-token'
+        colorClass='text-(--linear-text-tertiary)'
         insights={grouped.low}
       />
     </div>
@@ -135,7 +145,7 @@ export function InsightsPanel() {
   const { mutate: generate, isPending: isGenerating } =
     useGenerateInsightsMutation();
 
-  const insights = data?.insights ?? [];
+  const insights = useMemo(() => data?.insights ?? [], [data?.insights]);
   const total = data?.total ?? 0;
 
   // Group insights by priority
@@ -151,46 +161,39 @@ export function InsightsPanel() {
       {/* Header */}
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <h2 className='text-lg font-[590] text-primary-token'>AI Insights</h2>
-          <p className='text-[13px] text-secondary-token'>
+          <h2 className='text-lg font-[590] text-(--linear-text-primary)'>
+            AI Insights
+          </h2>
+          <p className='text-[13px] text-(--linear-text-secondary)'>
             {getSubtitle(total)}
           </p>
         </div>
 
-        <Button
-          variant='secondary'
-          size='sm'
+        <DashboardHeaderActionButton
+          ariaLabel={isGenerating ? 'Generating insights' : 'Generate insights'}
           disabled={isGenerating}
           onClick={() => generate()}
-          className='h-8 gap-2 px-3'
-        >
-          <Icon
-            name={isGenerating ? 'Loader2' : 'Sparkles'}
-            className={
-              isGenerating ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'
-            }
-          />
-          {isGenerating ? 'Generating...' : 'Generate'}
-        </Button>
+          icon={
+            <Icon
+              name={isGenerating ? 'Loader2' : 'Sparkles'}
+              className={isGenerating ? 'animate-spin' : undefined}
+            />
+          }
+          label={isGenerating ? 'Generating...' : 'Generate'}
+          className='h-8 px-3'
+        />
       </div>
 
       {/* Category filter pills */}
-      <div className='flex flex-wrap gap-1.5'>
-        {CATEGORY_FILTERS.map(filter => (
-          <button
-            key={filter.value}
-            type='button'
-            onClick={() => setSelectedCategory(filter.value)}
-            className={`rounded-full px-3 py-1 text-[13px] font-[510] transition-colors ${
-              selectedCategory === filter.value
-                ? 'bg-accent-token text-white'
-                : 'bg-surface-2 text-secondary-token hover:text-primary-token'
-            }`}
-          >
-            {filter.label}
-          </button>
-        ))}
-      </div>
+      <AppSegmentControl
+        value={selectedCategory}
+        onValueChange={setSelectedCategory}
+        options={CATEGORY_FILTERS}
+        aria-label='Filter insights by category'
+        surface='ghost'
+        className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
+        triggerClassName='min-h-8 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1 text-[12.5px] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary)'
+      />
 
       {/* Content */}
       <InsightsPanelContent

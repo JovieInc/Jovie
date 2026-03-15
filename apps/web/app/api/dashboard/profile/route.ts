@@ -81,10 +81,13 @@ async function attemptClerkRollback(
 export async function GET() {
   try {
     return await withDbSession(async clerkUserId => {
+      const profileFetchTimer = 'db:dashboard-profile:getProfileByClerkId';
+      console.time(profileFetchTimer);
       const userProfile = await dashboardQuery(
         () => getProfileByClerkId(clerkUserId),
         'User profile fetch'
       );
+      console.timeEnd(profileFetchTimer);
 
       if (!userProfile) {
         return NextResponse.json(
@@ -180,11 +183,14 @@ export async function PUT(req: Request) {
 
       let updateResult;
       try {
+        const updateProfileTimer = 'db:dashboard-profile:updateProfileRecords';
+        console.time(updateProfileTimer);
         updateResult = await updateProfileRecords({
           clerkUserId,
           dbProfileUpdates,
           displayNameForUserUpdate,
         });
+        console.timeEnd(updateProfileTimer);
       } catch (error) {
         await attemptClerkRollback(rollback, clerkUserId, 'db_update_failed');
         throw error;
@@ -196,6 +202,9 @@ export async function PUT(req: Request) {
 
       const { updatedProfile, oldUsernameNormalized } = updateResult;
 
+      const syncSocialLinksTimer =
+        'db:dashboard-profile:syncSocialLinksFromPrimaryMusicUrls';
+      console.time(syncSocialLinksTimer);
       await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
         spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
         appleMusicUrl: dbProfileUpdates.appleMusicUrl as
@@ -204,6 +213,7 @@ export async function PUT(req: Request) {
           | undefined,
         youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
       });
+      console.timeEnd(syncSocialLinksTimer);
 
       await finalizeProfileResponse({
         updatedProfile,

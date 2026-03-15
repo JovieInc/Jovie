@@ -4,6 +4,7 @@ import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
 import { toast } from 'sonner';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
+import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
@@ -28,12 +29,49 @@ export function renderNameCell({
   const user = row.original;
   const name = getValue();
   const displayName = name || 'Email Subscriber';
+  const profileUrl = user.profileUsername
+    ? getProfileUrl(user.profileUsername)
+    : null;
 
   return (
     <div className='min-w-0'>
-      <TruncatedText lines={1} className='font-semibold text-primary-token'>
-        {displayName}
-      </TruncatedText>
+      <div className='group flex min-w-0 items-center gap-1.5'>
+        <TruncatedText lines={1} className='font-semibold text-primary-token'>
+          {displayName}
+        </TruncatedText>
+        {profileUrl ? (
+          <span className='flex shrink-0 items-center gap-0.5'>
+            <InlineIconButton
+              aria-label={`Copy link for @${user.profileUsername}`}
+              fadeOnParentHover
+              className='[&_svg]:h-3 [&_svg]:w-3'
+              onClick={e => {
+                e.stopPropagation();
+                copyToClipboard(profileUrl).then(ok => {
+                  if (ok) {
+                    toast.success('Profile link copied', { duration: 2000 });
+                  } else {
+                    toast.error('Failed to copy link');
+                  }
+                });
+              }}
+            >
+              <Copy className='h-3 w-3' />
+            </InlineIconButton>
+            <InlineIconButton
+              href={profileUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              aria-label={`Open profile for @${user.profileUsername}`}
+              fadeOnParentHover
+              className='[&_svg]:h-3 [&_svg]:w-3'
+              onClick={e => e.stopPropagation()}
+            >
+              <ExternalLink className='h-3 w-3' />
+            </InlineIconButton>
+          </span>
+        ) : null}
+      </div>
       {name && user.email ? (
         <TruncatedText lines={1} className='text-xs text-secondary-token'>
           {user.email}
@@ -58,15 +96,15 @@ export function renderUsernameCell({
   const profileUrl = getProfileUrl(username);
 
   return (
-    <div className='group/username flex items-center gap-1.5 min-w-0'>
+    <div className='group flex min-w-0 items-center gap-1.5'>
       <TruncatedText lines={1} className='text-secondary-token'>
         {`@${username}`}
       </TruncatedText>
-      <span className='flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/username:opacity-100'>
-        <button
-          type='button'
-          className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
+      <span className='flex shrink-0 items-center gap-0.5'>
+        <InlineIconButton
           aria-label={`Copy link for @${username}`}
+          fadeOnParentHover
+          className='[&_svg]:h-3 [&_svg]:w-3'
           onClick={e => {
             e.stopPropagation();
             copyToClipboard(profileUrl).then(ok => {
@@ -79,17 +117,18 @@ export function renderUsernameCell({
           }}
         >
           <Copy className='h-3 w-3' />
-        </button>
-        <a
+        </InlineIconButton>
+        <InlineIconButton
           href={profileUrl}
           target='_blank'
           rel='noopener noreferrer'
-          className='rounded p-0.5 text-tertiary-token hover:text-primary-token hover:bg-surface-2'
           aria-label={`Open profile for @${username}`}
+          fadeOnParentHover
+          className='[&_svg]:h-3 [&_svg]:w-3'
           onClick={e => e.stopPropagation()}
         >
           <ExternalLink className='h-3 w-3' />
-        </a>
+        </InlineIconButton>
       </span>
     </div>
   );
@@ -147,13 +186,15 @@ export function renderProfileCell({
  */
 export function renderFunnelCell({ row }: CellContext<AdminUserRow, string>) {
   const status = row.original.userStatus;
-  const label = status.replace(/_/g, ' ');
-  const variant =
-    status === 'active'
-      ? 'success'
-      : status === 'banned' || status === 'suspended'
-        ? 'warning'
-        : ('secondary' as const);
+  const label = status.replaceAll('_', ' ');
+  let variant: 'success' | 'warning' | 'secondary';
+  if (status === 'active') {
+    variant = 'success';
+  } else if (status === 'banned' || status === 'suspended') {
+    variant = 'warning';
+  } else {
+    variant = 'secondary';
+  }
   return (
     <Badge size='sm' variant={variant}>
       {label}

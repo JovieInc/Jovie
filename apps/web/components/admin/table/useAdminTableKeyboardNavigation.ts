@@ -7,6 +7,7 @@ interface UseAdminTableKeyboardNavigationOptions<ItemType> {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onToggleSidebar?: () => void;
+  onActivate?: () => void;
   onCloseSidebar?: () => void;
   isSidebarOpen?: boolean;
   getId?: (item: ItemType) => string;
@@ -36,6 +37,7 @@ export function useAdminTableKeyboardNavigation<ItemType>(
     selectedId,
     onSelect,
     onToggleSidebar,
+    onActivate,
     onCloseSidebar,
     isSidebarOpen,
     getId = (item: ItemType) => (item as { id: string }).id,
@@ -77,6 +79,29 @@ export function useAdminTableKeyboardNavigation<ItemType>(
     [onToggleSidebar, selectedId]
   );
 
+  const handleEnterKey = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>) => {
+      if (!selectedId) return;
+      event.preventDefault();
+      if (onActivate) {
+        onActivate();
+        return;
+      }
+      onToggleSidebar?.();
+    },
+    [onActivate, onToggleSidebar, selectedId]
+  );
+
+  const handleHomeEndNavigation = useCallback(
+    (event: React.KeyboardEvent<HTMLElement>, key: 'Home' | 'End') => {
+      if (itemIds.length === 0) return;
+      event.preventDefault();
+      const targetIndex = key === 'Home' ? 0 : itemIds.length - 1;
+      onSelect(itemIds[targetIndex] ?? null);
+    },
+    [itemIds, onSelect]
+  );
+
   const handleEscapeKey = useCallback(
     (event: React.KeyboardEvent<HTMLElement>) => {
       if (!isSidebarOpen || !onCloseSidebar) return;
@@ -102,9 +127,22 @@ export function useAdminTableKeyboardNavigation<ItemType>(
         case 'Escape':
           handleEscapeKey(event);
           break;
+        case 'Enter':
+          handleEnterKey(event);
+          break;
+        case 'Home':
+        case 'End':
+          handleHomeEndNavigation(event, event.key);
+          break;
       }
     },
-    [handleArrowNavigation, handleEscapeKey, handleSpaceKey]
+    [
+      handleArrowNavigation,
+      handleEnterKey,
+      handleEscapeKey,
+      handleHomeEndNavigation,
+      handleSpaceKey,
+    ]
   );
 
   return { selectedIndex, handleKeyDown };

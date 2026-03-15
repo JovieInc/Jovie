@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ProfileShell } from '@/components/organisms/profile-shell';
+import type { ProfileMode } from '@/components/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
@@ -13,8 +14,7 @@ type ArtistPageShellProps = {
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
-  /** Current profile mode — controls social-bar visibility for conversion optimization */
-  readonly mode?: string;
+  readonly mode?: ProfileMode;
   readonly showTipButton?: boolean;
   readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
@@ -27,6 +27,8 @@ type ArtistPageShellProps = {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
 };
 
 // Using React.memo to prevent unnecessary re-renders when only children content changes
@@ -48,6 +50,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   showNotificationButton = false,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  visitTrackingToken,
 }: ArtistPageShellProps) {
   return (
     <ProfileShell
@@ -69,6 +72,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       showGradientBlurs={true}
       photoDownloadSizes={photoDownloadSizes}
       allowPhotoDownloads={allowPhotoDownloads}
+      visitTrackingToken={visitTrackingToken}
     >
       {children}
     </ProfileShell>

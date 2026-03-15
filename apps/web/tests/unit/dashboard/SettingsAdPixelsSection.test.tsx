@@ -35,7 +35,14 @@ vi.mock('@jovie/ui', () => ({
   Badge: ({ children }: { children: React.ReactNode }) => (
     <span>{children}</span>
   ),
-  Button: ({ children, ...props }: { children: React.ReactNode }) => (
+  Button: ({
+    children,
+    loading: _loading,
+    ...props
+  }: {
+    children: React.ReactNode;
+    loading?: boolean;
+  }) => (
     <button type='button' {...props}>
       {children}
     </button>

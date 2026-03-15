@@ -19,6 +19,42 @@ interface DmQueueResponse {
   total: number;
 }
 
+function DmQueueBody({
+  loading,
+  leads,
+  fetchQueue,
+}: {
+  readonly loading: boolean;
+  readonly leads: DmQueueLead[];
+  readonly fetchQueue: () => void;
+}) {
+  if (loading) {
+    return (
+      <div className='flex items-center justify-center py-16'>
+        <LoadingSpinner size='md' tone='muted' />
+      </div>
+    );
+  }
+  if (leads.length === 0) {
+    return (
+      <p className='py-8 text-center text-sm text-secondary-token'>
+        No leads in DM queue
+      </p>
+    );
+  }
+  return (
+    <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+      {leads.map(lead => (
+        <DmQueueCard
+          key={lead.id}
+          lead={lead}
+          onMarkedSent={() => fetchQueue()}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function AdminOutreachDmPage() {
   const [leads, setLeads] = useState<DmQueueLead[]>([]);
   const [total, setTotal] = useState(0);
@@ -48,7 +84,7 @@ export default function AdminOutreachDmPage() {
   }, []);
 
   useEffect(() => {
-    void fetchQueue();
+    fetchQueue();
   }, [fetchQueue]);
 
   return (
@@ -57,25 +93,7 @@ export default function AdminOutreachDmPage() {
         DM Queue ({total})
       </h2>
 
-      {loading ? (
-        <div className='flex items-center justify-center py-16'>
-          <LoadingSpinner size='md' tone='muted' />
-        </div>
-      ) : leads.length === 0 ? (
-        <p className='py-8 text-center text-sm text-secondary-token'>
-          No leads in DM queue
-        </p>
-      ) : (
-        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
-          {leads.map(lead => (
-            <DmQueueCard
-              key={lead.id}
-              lead={lead}
-              onMarkedSent={() => void fetchQueue()}
-            />
-          ))}
-        </div>
-      )}
+      <DmQueueBody loading={loading} leads={leads} fetchQueue={fetchQueue} />
     </div>
   );
 }

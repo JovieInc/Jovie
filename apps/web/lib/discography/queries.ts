@@ -1,6 +1,7 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import {
+  artists,
   type DiscogRelease,
   discogReleases,
   discogTracks,
@@ -9,6 +10,7 @@ import {
   type NewProviderLink,
   type ProviderLink,
   providerLinks,
+  releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { resolveTrackProviderLinks } from './track-provider-links';
@@ -27,6 +29,7 @@ export interface TrackSummary {
 // Types for release data with provider links
 export interface ReleaseWithProviders extends DiscogRelease {
   providerLinks: ProviderLink[];
+  artistNames?: string[];
   trackSummary?: TrackSummary;
 }
 
@@ -40,6 +43,10 @@ async function hasDiscogTracksTable(): Promise<boolean> {
 
 async function hasProviderLinksTable(): Promise<boolean> {
   return doesTableExist('provider_links');
+}
+
+async function hasReleaseArtistsTable(): Promise<boolean> {
+  return doesTableExist('release_artists');
 }
 
 export interface UpsertReleaseInput {
@@ -95,6 +102,29 @@ export type UpsertProviderLinkInput =
   | UpsertReleaseProviderLinkInput
   | UpsertTrackProviderLinkInput;
 
+function isUniqueConstraintViolation(
+  error: unknown,
+  constraint: string
+): boolean {
+  const getField = (value: unknown, key: string): unknown =>
+    typeof value === 'object' && value !== null && key in value
+      ? (value as Record<string, unknown>)[key]
+      : undefined;
+
+  const code = getField(error, 'code');
+  const actualConstraint = getField(error, 'constraint');
+  const sourceError = getField(error, 'sourceError');
+  const sourceCode = getField(sourceError, 'code');
+  const sourceConstraint = getField(sourceError, 'constraint');
+  const message = getField(error, 'message');
+
+  return (
+    (code === '23505' && actualConstraint === constraint) ||
+    (sourceCode === '23505' && sourceConstraint === constraint) ||
+    (typeof message === 'string' && message.includes(constraint))
+  );
+}
+
 /**
  * Get track summaries (total duration, primary ISRC) for releases
  */
@@ -129,6 +159,40 @@ async function getTrackSummariesForReleases(
     });
   }
   return summaryMap;
+}
+
+async function getArtistNamesForReleases(
+  releaseIds: string[]
+): Promise<Map<string, string[]>> {
+  if (releaseIds.length === 0 || !(await hasReleaseArtistsTable())) {
+    return new Map();
+  }
+
+  const rows = await db
+    .select({
+      releaseId: releaseArtists.releaseId,
+      artistName: artists.name,
+      creditName: releaseArtists.creditName,
+    })
+    .from(releaseArtists)
+    .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
+    .where(inArray(releaseArtists.releaseId, releaseIds))
+    .orderBy(releaseArtists.releaseId, releaseArtists.position);
+
+  const namesByRelease = new Map<string, string[]>();
+
+  for (const row of rows) {
+    const displayName = (row.creditName ?? row.artistName ?? '').trim();
+    if (!displayName) continue;
+
+    const existing = namesByRelease.get(row.releaseId) ?? [];
+    if (!existing.includes(displayName)) {
+      existing.push(displayName);
+      namesByRelease.set(row.releaseId, existing);
+    }
+  }
+
+  return namesByRelease;
 }
 
 /**
@@ -261,23 +325,25 @@ export async function getReleasesForProfile(
   const releaseIds = releases.map(r => r.id);
 
   // Fetch track summaries (duration, ISRC) in parallel with provider links
-  const [trackSummaries, providerLinksResult] = await Promise.all([
-    getTrackSummariesForReleases(releaseIds),
-    hasProviderLinksTable().then(async hasTable => {
-      if (!hasTable) return [];
-      if (releaseIds.length === 0) return [];
-      // Use SQL filtering instead of JavaScript for better performance
-      return db
-        .select()
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release'),
-            inArray(providerLinks.releaseId, releaseIds)
-          )
-        );
-    }),
-  ]);
+  const [trackSummaries, artistNamesByRelease, providerLinksResult] =
+    await Promise.all([
+      getTrackSummariesForReleases(releaseIds),
+      getArtistNamesForReleases(releaseIds),
+      hasProviderLinksTable().then(async hasTable => {
+        if (!hasTable) return [];
+        if (releaseIds.length === 0) return [];
+        // Use SQL filtering instead of JavaScript for better performance
+        return db
+          .select()
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'release'),
+              inArray(providerLinks.releaseId, releaseIds)
+            )
+          );
+      }),
+    ]);
 
   // Group links by release ID
   const linksByRelease = new Map<string, ProviderLink[]>();
@@ -292,6 +358,7 @@ export async function getReleasesForProfile(
   return releases.map(release => ({
     ...release,
     providerLinks: linksByRelease.get(release.id) ?? [],
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
     trackSummary: trackSummaries.get(release.id),
   }));
 }
@@ -322,9 +389,15 @@ export async function getReleaseBySlug(
     return null;
   }
 
-  if (!(await hasProviderLinksTable())) {
+  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+    getArtistNamesForReleases([release.id]),
+    hasProviderLinksTable(),
+  ]);
+
+  if (!hasLinksTable) {
     return {
       ...release,
+      artistNames: artistNamesByRelease.get(release.id) ?? [],
       providerLinks: [],
     };
   }
@@ -342,6 +415,7 @@ export async function getReleaseBySlug(
 
   return {
     ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
     providerLinks: links,
   };
 }
@@ -366,9 +440,15 @@ export async function getReleaseById(
     return null;
   }
 
-  if (!(await hasProviderLinksTable())) {
+  const [artistNamesByRelease, hasLinksTable] = await Promise.all([
+    getArtistNamesForReleases([release.id]),
+    hasProviderLinksTable(),
+  ]);
+
+  if (!hasLinksTable) {
     return {
       ...release,
+      artistNames: artistNamesByRelease.get(release.id) ?? [],
       providerLinks: [],
     };
   }
@@ -386,6 +466,7 @@ export async function getReleaseById(
 
   return {
     ...release,
+    artistNames: artistNamesByRelease.get(release.id) ?? [],
     providerLinks: links,
   };
 }
@@ -481,24 +562,64 @@ export async function upsertProviderLink(
     ? [providerLinks.providerId, providerLinks.trackId]
     : [providerLinks.providerId, providerLinks.releaseId];
 
-  // Try to insert, on conflict update
-  const [result] = await db
-    .insert(providerLinks)
-    .values(insertData)
-    .onConflictDoUpdate({
-      target: conflictTarget,
-      set: {
-        url: input.url,
-        externalId: input.externalId ?? null,
-        sourceType: input.sourceType ?? 'ingested',
-        isPrimary: input.isPrimary ?? false,
-        metadata: input.metadata ?? {},
-        updatedAt: now,
-      },
-    })
-    .returning();
+  try {
+    const [result] = await db
+      .insert(providerLinks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: conflictTarget,
+        set: {
+          url: input.url,
+          externalId: input.externalId ?? null,
+          sourceType: input.sourceType ?? 'ingested',
+          isPrimary: input.isPrimary ?? false,
+          metadata: input.metadata ?? {},
+          updatedAt: now,
+        },
+      })
+      .returning();
 
-  return result;
+    return result;
+  } catch (error) {
+    if (
+      !input.externalId ||
+      !isUniqueConstraintViolation(error, 'provider_links_provider_external')
+    ) {
+      throw error;
+    }
+
+    // `provider_links_provider_external` is globally unique, but the same DSP
+    // album/track can legitimately appear on multiple creators (collabs,
+    // compilations, label samplers). Preserve the URL on this owner-specific
+    // row and keep the provider external ID in metadata instead.
+    const fallbackMetadata = {
+      ...input.metadata,
+      providerExternalId: input.externalId,
+      providerExternalIdDeferred: true,
+    };
+
+    const [fallbackResult] = await db
+      .insert(providerLinks)
+      .values({
+        ...insertData,
+        externalId: null,
+        metadata: fallbackMetadata,
+      })
+      .onConflictDoUpdate({
+        target: conflictTarget,
+        set: {
+          url: input.url,
+          externalId: null,
+          sourceType: input.sourceType ?? 'ingested',
+          isPrimary: input.isPrimary ?? false,
+          metadata: fallbackMetadata,
+          updatedAt: now,
+        },
+      })
+      .returning();
+
+    return fallbackResult;
+  }
 }
 
 /**
@@ -583,6 +704,21 @@ export async function upsertTrack(input: {
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
   const now = new Date();
+  const discNumber = input.discNumber ?? 1;
+  const fallbackSlug = `${input.slug}-${discNumber}-${input.trackNumber}`;
+  const baseSet = {
+    title: input.title,
+    slug: input.slug,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    isrc: input.isrc ?? null,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
 
   const insertData: NewDiscogTrack = {
     releaseId: input.releaseId,
@@ -590,7 +726,7 @@ export async function upsertTrack(input: {
     title: input.title,
     slug: input.slug,
     trackNumber: input.trackNumber,
-    discNumber: input.discNumber ?? 1,
+    discNumber,
     durationMs: input.durationMs ?? null,
     isExplicit: input.isExplicit ?? false,
     isrc: input.isrc ?? null,
@@ -603,32 +739,74 @@ export async function upsertTrack(input: {
     updatedAt: now,
   };
 
-  const [result] = await db
-    .insert(discogTracks)
-    .values(insertData)
-    .onConflictDoUpdate({
-      target: [
-        discogTracks.releaseId,
-        discogTracks.discNumber,
-        discogTracks.trackNumber,
-      ],
-      set: {
-        title: input.title,
-        slug: input.slug,
-        durationMs: input.durationMs ?? null,
-        isExplicit: input.isExplicit ?? false,
-        isrc: input.isrc ?? null,
-        previewUrl: input.previewUrl ?? null,
-        audioUrl: input.audioUrl ?? null,
-        audioFormat: input.audioFormat ?? null,
-        sourceType: input.sourceType ?? 'ingested',
-        metadata: input.metadata ?? {},
-        updatedAt: now,
-      },
-    })
-    .returning();
+  try {
+    const [result] = await db
+      .insert(discogTracks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [
+          discogTracks.releaseId,
+          discogTracks.discNumber,
+          discogTracks.trackNumber,
+        ],
+        set: baseSet,
+      })
+      .returning();
 
-  return result;
+    return result;
+  } catch (error) {
+    if (
+      isUniqueConstraintViolation(error, 'discog_tracks_release_slug_unique')
+    ) {
+      const [result] = await db
+        .insert(discogTracks)
+        .values({
+          ...insertData,
+          slug: fallbackSlug,
+        })
+        .onConflictDoUpdate({
+          target: [
+            discogTracks.releaseId,
+            discogTracks.discNumber,
+            discogTracks.trackNumber,
+          ],
+          set: {
+            ...baseSet,
+            slug: fallbackSlug,
+          },
+        })
+        .returning();
+
+      return result;
+    }
+
+    if (
+      !isUniqueConstraintViolation(error, 'discog_tracks_release_isrc_unique')
+    ) {
+      throw error;
+    }
+
+    const [result] = await db
+      .insert(discogTracks)
+      .values({
+        ...insertData,
+        isrc: null,
+      })
+      .onConflictDoUpdate({
+        target: [
+          discogTracks.releaseId,
+          discogTracks.discNumber,
+          discogTracks.trackNumber,
+        ],
+        set: {
+          ...baseSet,
+          isrc: null,
+        },
+      })
+      .returning();
+
+    return result;
+  }
 }
 
 /**

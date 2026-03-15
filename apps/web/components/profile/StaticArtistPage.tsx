@@ -1,93 +1,44 @@
 import { Suspense } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/components/profile/AboutSection';
-import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
 import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
 } from '@/components/profile/artist-notifications-cta';
 import { ContactSection } from '@/components/profile/ContactSection';
+import type {
+  ProfileMode,
+  ProfilePublicViewModel,
+} from '@/components/profile/contracts';
 import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
 import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
 import { TourModePanel } from '@/components/profile/TourModePanel';
+import { PublicProfileTemplate } from '@/components/profile/templates/PublicProfileTemplate';
+import { extractVenmoUsername } from '@/components/profile/utils/venmo';
 import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
+import { buildProfilePublicViewModel } from '@/components/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
-import { type AvailableDSP, DSP_CONFIGS, getAvailableDSPs } from '@/lib/dsp';
+import type { AvailableDSP } from '@/lib/dsp';
+import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
-type PrimaryAction = 'subscribe' | 'listen';
-
-// Platform keyword to DSP key mappings
-const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
-  [
-    { keywords: ['spotify'], dspKey: 'spotify' },
-    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
-    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-    { keywords: ['tidal'], dspKey: 'tidal' },
-    { keywords: ['deezer'], dspKey: 'deezer' },
-    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-    { keywords: ['pandora'], dspKey: 'pandora' },
-  ];
-
 const TIP_AMOUNTS = [3, 5, 7];
-const ALLOWED_VENMO_HOSTS = new Set(['venmo.com', 'www.venmo.com']);
 
-function mapSocialPlatformToDSPKey(
-  platform: string | undefined
-): string | null {
-  if (typeof platform !== 'string' || !platform) {
-    return null;
-  }
-  const normalized = platform.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
-
-  for (const { keywords, dspKey } of PLATFORM_TO_DSP_MAPPINGS) {
-    if (
-      keywords.some(
-        keyword => normalized.includes(keyword) || normalized === keyword
-      )
-    ) {
-      return dspKey;
-    }
-  }
-
-  return null;
-}
-
-function extractVenmoUsername(url: string | null): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (ALLOWED_VENMO_HOSTS.has(u.hostname)) {
-      const parts = u.pathname.split('/').filter(Boolean);
-      if (parts[0] === 'u' && parts[1]) return parts[1];
-      if (parts[0]) return parts[0];
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-interface StaticArtistPageProps {
-  readonly mode: string;
+export interface StaticArtistPageProps {
+  readonly mode: ProfileMode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly contacts: PublicContact[];
   readonly subtitle: string;
   readonly showTipButton: boolean;
-  readonly isTipModeActive?: boolean;
   readonly showBackButton: boolean;
   readonly showTourButton?: boolean;
-  readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly autoOpenCapture?: boolean;
-  readonly primaryAction?: PrimaryAction;
   readonly enableDynamicEngagement?: boolean;
   readonly latestRelease?: DiscogRelease | null;
   /** Available download sizes for profile photo */
@@ -99,101 +50,48 @@ interface StaticArtistPageProps {
   /** Artist genres for the about section */
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
+  readonly showSubscriptionConfirmedBanner?: boolean;
 }
 
 /**
  * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
  * Artist DSPs take priority (listed first).
  */
-function getMergedDSPs(
-  artist: Artist,
-  socialLinks: LegacySocialLink[]
-): AvailableDSP[] {
-  const socialDSPs: AvailableDSP[] = (() => {
-    const mapped = socialLinks
-      .filter(link => link.url)
-      .map(link => {
-        const dspKey = mapSocialPlatformToDSPKey(link.platform);
-        if (!dspKey) return null;
-        const config = DSP_CONFIGS[dspKey] ?? {
-          name: dspKey,
-          color: '#0f111a',
-          textColor: '#ffffff',
-          logoSvg: '',
-        };
-        return {
-          key: dspKey,
-          name: config.name,
-          url: link.url,
-          config,
-        } satisfies AvailableDSP;
-      })
-      .filter(Boolean) as AvailableDSP[];
-
-    const deduped = new Map<string, AvailableDSP>();
-    mapped.forEach(item => {
-      if (!deduped.has(item.key)) {
-        deduped.set(item.key, item);
-      }
-    });
-    return Array.from(deduped.values());
-  })();
-
-  const artistDSPs = getAvailableDSPs(artist);
-  const byKey = new Map<string, AvailableDSP>();
-  [...artistDSPs, ...socialDSPs].forEach(dsp => {
-    if (!byKey.has(dsp.key)) byKey.set(dsp.key, dsp);
-  });
-  return Array.from(byKey.values());
+function getMergedDSPs(artist: Artist) {
+  return getCanonicalProfileDSPs(artist);
 }
 
 interface RenderContentOptions {
-  readonly mode: string;
-  readonly artist: Artist;
-  readonly socialLinks: LegacySocialLink[];
-  readonly contacts: PublicContact[];
+  readonly viewModel: ProfilePublicViewModel;
   readonly mergedDSPs: AvailableDSP[];
-  readonly primaryAction: PrimaryAction;
-  readonly enableDynamicEngagement: boolean;
-  readonly subscribeTwoStep: boolean;
-  readonly genres?: string[] | null;
-  readonly tourDates: TourDateViewModel[];
 }
 
-function renderContent({
-  mode,
-  artist,
-  socialLinks,
-  contacts,
-  mergedDSPs,
-  primaryAction,
-  enableDynamicEngagement,
-  subscribeTwoStep,
-  genres,
-  tourDates,
-}: RenderContentOptions) {
-  switch (mode) {
+function renderContent({ viewModel, mergedDSPs }: RenderContentOptions) {
+  switch (viewModel.mode) {
     case 'listen':
       return (
         <div className='flex justify-center'>
           <StaticListenInterface
-            artist={artist}
-            handle={artist.handle}
+            artist={viewModel.artist}
+            handle={viewModel.artist.handle}
             dspsOverride={mergedDSPs}
-            enableDynamicEngagement={enableDynamicEngagement}
+            enableDynamicEngagement={viewModel.enableDynamicEngagement}
           />
         </div>
       );
 
     case 'tip': {
       const venmoLink =
-        socialLinks.find(l => l.platform === 'venmo')?.url || null;
+        viewModel.socialLinks.find(link => link.platform === 'venmo')?.url ??
+        null;
       const venmoUsername = extractVenmoUsername(venmoLink);
 
       return (
         <main className='space-y-4' aria-labelledby='tipping-title'>
           <h1 id='tipping-title' className='sr-only'>
-            Tip {artist.name}
+            Tip {viewModel.artist.name}
           </h1>
 
           {venmoLink ? (
@@ -219,10 +117,14 @@ function renderContent({
       // Subscribe mode - show notification subscription form directly
       return (
         <div className='space-y-3 py-2 sm:py-3'>
-          {subscribeTwoStep ? (
-            <TwoStepNotificationsCTA artist={artist} />
+          {viewModel.subscribeTwoStep ? (
+            <TwoStepNotificationsCTA artist={viewModel.artist} />
           ) : (
-            <ArtistNotificationsCTA artist={artist} variant='button' autoOpen />
+            <ArtistNotificationsCTA
+              artist={viewModel.artist}
+              variant='button'
+              autoOpen
+            />
           )}
         </div>
       );
@@ -230,23 +132,33 @@ function renderContent({
     case 'contact':
       return (
         <ContactSection
-          contacts={contacts}
-          artistName={artist.name}
-          artistHandle={artist.handle}
+          contacts={viewModel.contacts}
+          artistName={viewModel.artist.name}
+          artistHandle={viewModel.artist.handle}
         />
       );
 
     case 'about':
-      return <AboutSection artist={artist} genres={genres} />;
+      return (
+        <AboutSection artist={viewModel.artist} genres={viewModel.genres} />
+      );
 
     case 'tour':
-      return <TourModePanel artist={artist} tourDates={tourDates} />;
+      return (
+        <TourModePanel
+          artist={viewModel.artist}
+          tourDates={viewModel.tourDates}
+        />
+      );
 
     default: // 'profile' mode
       // spotifyPreferred is now read client-side in ProfilePrimaryCTA
       return (
         <div className='space-y-4'>
-          <ProfilePrimaryCTA artist={artist} socialLinks={socialLinks} />
+          <ProfilePrimaryCTA
+            artist={viewModel.artist}
+            socialLinks={viewModel.socialLinks}
+          />
         </div>
       );
   }
@@ -261,13 +173,10 @@ export function StaticArtistPage({
   contacts,
   subtitle,
   showTipButton,
-  isTipModeActive = false,
   showBackButton,
   showTourButton = false,
-  isTourModeActive = false,
   showFooter = true,
   autoOpenCapture,
-  primaryAction = 'subscribe',
   enableDynamicEngagement = false,
   latestRelease,
   photoDownloadSizes = [],
@@ -275,71 +184,70 @@ export function StaticArtistPage({
   subscribeTwoStep = false,
   genres,
   tourDates = [],
+  visitTrackingToken,
+  showSubscriptionConfirmedBanner = true,
 }: StaticArtistPageProps) {
-  const resolvedAutoOpenCapture = autoOpenCapture ?? mode === 'profile';
-  const mergedDSPs = getMergedDSPs(artist, socialLinks);
+  const mergedDSPs = getMergedDSPs(artist);
+  const viewModel = buildProfilePublicViewModel({
+    mode,
+    artist,
+    socialLinks,
+    contacts,
+    subtitle,
+    showTipButton,
+    showBackButton,
+    showTourButton,
+    showFooter,
+    autoOpenCapture,
+    enableDynamicEngagement,
+    latestRelease,
+    photoDownloadSizes,
+    allowPhotoDownloads,
+    subscribeTwoStep,
+    genres,
+    tourDates,
+    visitTrackingToken,
+    showSubscriptionConfirmedBanner,
+  });
 
   return (
-    <div className='w-full'>
-      <ArtistPageShell
-        artist={artist}
-        socialLinks={socialLinks}
-        contacts={contacts}
-        subtitle={subtitle}
-        mode={mode}
-        showTipButton={showTipButton}
-        isTipModeActive={isTipModeActive}
-        showBackButton={showBackButton}
-        showTourButton={showTourButton}
-        isTourModeActive={isTourModeActive}
-        showFooter={showFooter}
-        showNotificationButton={true}
-        photoDownloadSizes={photoDownloadSizes}
-        allowPhotoDownloads={allowPhotoDownloads}
-      >
-        <div>
+    <PublicProfileTemplate viewModel={viewModel}>
+      <div>
+        {viewModel.showSubscriptionConfirmedBanner ? (
           <Suspense>
             <SubscriptionConfirmedBanner />
           </Suspense>
-          {mode === 'profile' ? (
-            <div className='space-y-3'>
-              {latestRelease && (
-                <LatestReleaseCard
-                  release={latestRelease}
-                  artistHandle={artist.handle}
-                  artist={artist}
-                  dsps={mergedDSPs}
-                  enableDynamicEngagement={enableDynamicEngagement}
-                />
-              )}
-              <div data-testid='primary-cta'>
-                <ProfilePrimaryCTA
-                  artist={artist}
-                  socialLinks={socialLinks}
-                  mergedDSPs={mergedDSPs}
-                  enableDynamicEngagement={enableDynamicEngagement}
-                  autoOpenCapture={resolvedAutoOpenCapture}
-                  showCapture
-                  subscribeTwoStep={subscribeTwoStep}
-                />
-              </div>
+        ) : null}
+        {viewModel.mode === 'profile' ? (
+          <div className='space-y-3'>
+            {viewModel.latestRelease && (
+              <LatestReleaseCard
+                release={viewModel.latestRelease}
+                artistHandle={viewModel.artist.handle}
+                artist={viewModel.artist}
+                dsps={mergedDSPs}
+                enableDynamicEngagement={viewModel.enableDynamicEngagement}
+              />
+            )}
+            <div data-testid='primary-cta'>
+              <ProfilePrimaryCTA
+                artist={viewModel.artist}
+                socialLinks={viewModel.socialLinks}
+                mergedDSPs={mergedDSPs}
+                enableDynamicEngagement={viewModel.enableDynamicEngagement}
+                autoOpenCapture={viewModel.autoOpenCapture}
+                showCapture
+                subscribeTwoStep={viewModel.subscribeTwoStep}
+              />
             </div>
-          ) : (
-            renderContent({
-              mode,
-              artist,
-              socialLinks,
-              contacts,
-              mergedDSPs,
-              primaryAction,
-              enableDynamicEngagement,
-              subscribeTwoStep,
-              genres,
-              tourDates,
-            })
-          )}
-        </div>
-      </ArtistPageShell>
-    </div>
+          </div>
+        ) : (
+          renderContent({
+            viewModel,
+            mergedDSPs,
+          })
+        )}
+      </div>
+    </PublicProfileTemplate>
   );
 }

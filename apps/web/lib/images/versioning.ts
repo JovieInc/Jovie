@@ -129,10 +129,10 @@ export function transformImageUrl(
     gravity?: 'auto' | 'face' | 'center';
   } = {}
 ): string {
-  if (!url) return url;
+  if (!url) return '';
 
   // Return URL as-is — Next.js Image Optimization handles transformations
-  return url;
+  return url; // NOSONAR typescript:S3516 — intentional passthrough, options reserved for future use
 }
 
 /**

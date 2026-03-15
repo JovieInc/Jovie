@@ -1,18 +1,21 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, Input, Label } from '@jovie/ui';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { EntitySidebarShell } from '@/components/molecules/drawer';
+import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import {
   useDeleteTourDateMutation,
   useUpdateTourDateMutation,
-} from '@/lib/queries/useTourDateMutations';
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatISODate } from '@/lib/utils/date-formatting';
+import { buildTourDateActions } from './tour-date-actions';
 
 interface TourDateSidebarProps {
   readonly tourDate: TourDateViewModel | null;
@@ -103,6 +106,19 @@ export function TourDateSidebar({
 
   const isPending = updateMutation.isPending || deleteMutation.isPending;
 
+  // Build sidebar overflow menu from canonical tour date actions
+  const contextMenuItems = useMemo<CommonDropdownItem[]>(() => {
+    if (!tourDate) return [];
+    return convertToCommonDropdownItems(
+      buildTourDateActions(tourDate, {
+        onEdit: () => {
+          // Already editing — no-op in sidebar context
+        },
+        onDelete: () => setDeleteDialogOpen(true),
+      })
+    );
+  }, [tourDate]);
+
   const footerContent = tourDate ? (
     <div className='flex items-center gap-2'>
       <Button
@@ -151,6 +167,7 @@ export function TourDateSidebar({
         isEmpty={!tourDate}
         emptyMessage='Select a tour date to edit'
         footer={footerContent}
+        contextMenuItems={contextMenuItems}
       >
         {tourDate && (
           <div className='space-y-4'>

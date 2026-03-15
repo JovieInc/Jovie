@@ -13,6 +13,7 @@ import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
+import { withRetry } from '@/lib/db/client';
 import { isSecureEnv } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -29,6 +30,7 @@ import { handleBackgroundAvatarUpload } from './avatar';
 import { logOnboardingError } from './errors';
 import { profileIsPublishable } from './helpers';
 import {
+  createProfileForExistingUser,
   createUserAndProfile,
   fetchExistingProfile,
   fetchExistingUser,
@@ -126,79 +128,88 @@ export async function completeOnboarding({
     // where two users could claim the same handle simultaneously.
     // This ensures that concurrent transactions will see a consistent view
     // of the data and will fail if there's a conflict.
-    const completion = await withDbSessionTx(
-      async (tx, clerkUserId: string) => {
-        const existingUser = await fetchExistingUser(tx, clerkUserId);
+    const completion = await withRetry(
+      () =>
+        withDbSessionTx(
+          async (tx, clerkUserId: string) => {
+            const existingUser = await fetchExistingUser(tx, clerkUserId);
 
-        // If the user record does not exist, the stored function will create both user + profile
-        if (!existingUser) {
-          if (userEmail) {
-            await ensureEmailAvailable(tx, clerkUserId, userEmail);
-          }
-          await ensureHandleAvailable(tx, normalizedUsername, null);
-          return await createUserAndProfile(
-            tx,
-            clerkUserId,
-            userEmail,
-            normalizedUsername,
-            trimmedDisplayName
-          );
-        }
+            // If the user record does not exist, the stored function will create both user + profile
+            if (!existingUser) {
+              if (userEmail) {
+                await ensureEmailAvailable(tx, clerkUserId, userEmail);
+              }
+              await ensureHandleAvailable(tx, normalizedUsername, null);
+              return await createUserAndProfile(
+                tx,
+                clerkUserId,
+                userEmail,
+                normalizedUsername,
+                trimmedDisplayName
+              );
+            }
 
-        const existingProfile = await fetchExistingProfile(tx, existingUser.id);
+            const existingProfile = await fetchExistingProfile(
+              tx,
+              existingUser.id
+            );
 
-        // If a profile already exists, ensure the handle is either the same or available
-        const handleChanged =
-          existingProfile?.usernameNormalized !== normalizedUsername;
+            // If a profile already exists, ensure the handle is either the same or available
+            const handleChanged =
+              existingProfile?.usernameNormalized !== normalizedUsername;
 
-        if (handleChanged) {
-          await ensureHandleAvailable(
-            tx,
-            normalizedUsername,
-            existingProfile?.id
-          );
-        }
+            if (handleChanged) {
+              await ensureHandleAvailable(
+                tx,
+                normalizedUsername,
+                existingProfile?.id
+              );
+            }
 
-        const needsPublish = !profileIsPublishable(existingProfile);
-        // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
-        // which filters profiles by isClaimed=true. Without this, users with
-        // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
-        const needsClaim = existingProfile && !existingProfile.isClaimed;
+            const needsPublish = !profileIsPublishable(existingProfile);
+            // CRITICAL: Also update if isClaimed is not set - this is required by gate.ts
+            // which filters profiles by isClaimed=true. Without this, users with
+            // "publishable" profiles but isClaimed=false get stuck in an onboarding loop.
+            const needsClaim = existingProfile && !existingProfile.isClaimed;
 
-        if (existingProfile && (needsPublish || handleChanged || needsClaim)) {
-          return await updateExistingProfile(
-            tx,
-            existingProfile,
-            normalizedUsername,
-            trimmedDisplayName,
-            username
-          );
-        }
+            if (
+              existingProfile &&
+              (needsPublish || handleChanged || needsClaim)
+            ) {
+              return await updateExistingProfile(
+                tx,
+                existingProfile,
+                normalizedUsername,
+                trimmedDisplayName,
+                username
+              );
+            }
 
-        if (existingProfile) {
-          const completed: CompletionResult = {
-            username: existingProfile.usernameNormalized,
-            status: 'complete',
-            profileId: existingProfile.id,
-          };
+            if (existingProfile) {
+              const completed: CompletionResult = {
+                username: existingProfile.usernameNormalized,
+                status: 'complete',
+                profileId: existingProfile.id,
+              };
 
-          return completed;
-        }
+              return completed;
+            }
 
-        // Fallback: user exists but no profile yet
-        if (userEmail) {
-          await ensureEmailAvailable(tx, clerkUserId, userEmail);
-        }
-        await ensureHandleAvailable(tx, normalizedUsername, null);
-        return await createUserAndProfile(
-          tx,
-          clerkUserId,
-          userEmail,
-          normalizedUsername,
-          trimmedDisplayName
-        );
-      },
-      { isolationLevel: 'serializable' }
+            // Fallback: user exists but no profile yet
+            if (userEmail) {
+              await ensureEmailAvailable(tx, clerkUserId, userEmail);
+            }
+            await ensureHandleAvailable(tx, normalizedUsername, null);
+            return await createProfileForExistingUser(
+              tx,
+              existingUser.id,
+              normalizedUsername,
+              trimmedDisplayName
+            );
+          },
+          { isolationLevel: 'serializable' }
+        ),
+      'completeOnboarding'
     );
 
     await cacheHandleAvailability(completion.username, false);

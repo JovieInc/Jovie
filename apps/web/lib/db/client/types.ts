@@ -2,8 +2,9 @@
  * Database Client Types
  *
  * Type definitions for the database client module.
- * Uses Neon WebSocket (serverless) driver for stateful connection pooling.
- * This enables proper RLS session isolation via db.transaction().
+ * Uses Neon serverless driver types shared across app and low-level db wrappers.
+ * App-level code should avoid direct `db.transaction()` usage; legacy
+ * transaction exceptions are centralized in `lib/db/legacy-transaction.ts`.
  */
 
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
@@ -14,9 +15,8 @@ export type DbType = NeonDatabase<typeof schema>;
 /**
  * Inferred transaction parameter type from Drizzle's `.transaction()` method.
  *
- * The Neon WebSocket driver supports interactive transactions.
- * Use db.transaction() to ensure RLS session variables are scoped
- * to a single stateful connection.
+ * Transaction type is preserved for legacy helper signatures only.
+ * New app code should prefer sequential/batch operations and shared wrappers.
  */
 export type TransactionType = Parameters<DbType['transaction']>[0] extends (
   tx: infer T

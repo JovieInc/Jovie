@@ -261,7 +261,25 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
-### 7. Marketing Pages Must Be Fully Static
+### 7. Public/Webhook Coordination Must Be Durable
+
+- **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers
+- Public traffic controls and webhook dedupe MUST use durable storage (Redis, database, or another cross-instance store)
+- Cold starts, deploys, and horizontal scale must not reset critical protections or duplicate suppression
+
+### 8. Server-Side External HTTP Must Be Bounded
+
+- **ALWAYS** use a shared timeout + retry wrapper for server-side external HTTP on request handlers, webhooks, cron jobs, and admin/HUD paths
+- Raw `fetch()` is forbidden on these paths unless the PR explicitly documents why timeout/retry is intentionally omitted
+- Non-critical notifications and observability sinks must not sit on revenue-critical or user-facing success paths without bounded failure handling
+
+### 9. Persistence-Critical Success Must Fail Closed
+
+- Helpers performing persistence-critical writes must throw on failure; they must not swallow errors and return `undefined`, `null`, or empty-success sentinels
+- User-facing success responses must only be returned after the critical write succeeds
+- If a follow-up side effect is optional, isolate it explicitly so the primary success path stays truthful
+
+### 10. Marketing Pages Must Be Fully Static
 
 - All marketing, blog, and legal pages **must be fully static** (`export const revalidate = false`): no `headers()`, `cookies()`, `fetch` with `no-store`, or per-request data/nonce in `app/(marketing)` and `app/(dynamic)/legal` pages/layouts.
 - Any non-`false` `revalidate` value under `app/(marketing)` is a bug unless a human explicitly documents an exception in the PR.
@@ -275,7 +293,7 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** Fully static marketing pages eliminate cold start 500 errors, reduce Vercel costs (no serverless invocations), and provide instant TTFB (<100ms from CDN).
 
-### 8. Global UI Components Render Once
+### 11. Global UI Components Render Once
 
 Global UI elements must only render in root `app/layout.tsx`:
 - Cookie banners
@@ -286,7 +304,7 @@ Global UI elements must only render in root `app/layout.tsx`:
 **NEVER** render these in individual pages or nested layouts—causes duplicate overlapping UI elements.
 - Nested layouts must not mount `CookieBannerSection`, `ToastProvider`, `ClerkAnalytics`, or other analytics/provider singletons directly.
 
-### 9. Entitlements: Single Source of Truth
+### 12. Entitlements: Single Source of Truth
 
 Entitlements behavior must stay centralized and predictable. Use these files as the canonical chain:
 
@@ -308,6 +326,35 @@ Forbidden patterns:
 - Granting paid access based only on a raw `plan` string when canonical booleans/limits exist.
 
 For deeper implementation guidance, use `.claude/skills/entitlements.md`.
+
+### 10. Self-Improvement Loop
+
+After any correction from a human reviewer:
+
+1. **Identify the root cause** — what rule or assumption led to the mistake?
+2. **Add a rule** to `AGENTS.md` (or the relevant skill file) that prevents the same mistake from recurring.
+3. **Add a lesson** to `LESSONS.md` with the pattern and fix.
+4. **Never repeat the same mistake** — the correction should be the last time that error occurs.
+
+If you realize mid-task that you've made an assumption that turned out wrong, document it immediately without being asked.
+
+### 11. Plan Before Executing Complex Tasks
+
+For any task with 3 or more steps, architectural decisions, schema changes, or significant refactors:
+
+- Use plan mode (Shift+Tab twice in Claude Code) to outline the approach
+- Wait for human approval before executing
+- Single-step bug fixes and trivial copy changes do not require plan mode
+
+### 12. Verify Before Marking Done
+
+Never mark a task complete without confirming the fix works:
+
+- Run the relevant test file: `pnpm --filter web exec vitest run <test-file>`
+- Run typecheck: `pnpm --filter web exec tsc --noEmit`
+- For UI changes: confirm the component renders without errors
+- For API changes: confirm the endpoint returns expected shape
+- Paste the passing output as evidence in the PR description
 
 ---
 
@@ -1036,6 +1083,44 @@ worktrees|git worktree add ../dir -b branch|cache shared automatically across wo
 schema|$schema: turborepo.dev/schema.json|validates turbo.json in editors, use turborepo.dev domain
 daemon|daemon: false|background process for optimization (disabled in Jovie due to gRPC issues)
 ```
+
+---
+
+## gstack Skills (Workflow Toolkit)
+
+This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodule at `.claude/skills/gstack/`. It provides specialized workflow skills available to all AI agents.
+
+**Conflict rule:** gstack commands are canonical. If a gstack skill conflicts with any other command or workflow, the gstack version takes precedence.
+
+### Available Skills
+
+| Skill | Invocation | Purpose |
+|-------|------------|---------|
+| Ship | `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
+| Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
+| Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |
+| Browse | `/browse` | Fast headless browser (~100ms/cmd) for QA testing and site verification |
+| QA | `/qa` | Systematic QA with diff-aware, full, quick, and regression modes |
+| Retro | `/retro` | Weekly retrospective analyzing commit history and code quality metrics |
+| Browser Cookies | `/setup-browser-cookies` | Import authenticated sessions for testing |
+| Upgrade | `/gstack-upgrade` | Upgrade gstack to latest version |
+
+### Setup
+
+gstack requires **Bun v1.0+**. The session-start hook installs Bun and runs setup automatically. For manual setup:
+
+```bash
+cd .claude/skills/gstack && ./setup
+```
+
+### Updating gstack
+
+```bash
+cd .claude/skills/gstack && git pull origin main && ./setup
+```
+
+Or use `/gstack-upgrade` from within Claude Code.
 
 ---
 

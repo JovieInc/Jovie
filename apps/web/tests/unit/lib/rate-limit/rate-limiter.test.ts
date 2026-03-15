@@ -46,6 +46,7 @@ vi.mock('@/lib/rate-limit/memory-limiter', () => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   addBreadcrumb: vi.fn(),
 }));
 
@@ -234,6 +235,37 @@ describe('rate-limiter.ts', () => {
 
       expect(result).toEqual(memoryResult);
       expect(mockRedisLimiter.limit).not.toHaveBeenCalled();
+    });
+
+    it('returns bounded failure when Redis is unavailable and requireRedis is true', async () => {
+      mockCreateRedisRateLimiter.mockReturnValue(null);
+
+      const limiter = new RateLimiter(baseConfig, {
+        requireRedis: true,
+        warnOnFallback: false,
+      });
+      const result = await limiter.limit('user-1');
+
+      expect(result.success).toBe(false);
+      expect(result.limit).toBe(baseConfig.limit);
+      expect(result.remaining).toBe(0);
+      expect(result.reason).toContain('temporarily unavailable');
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
+    });
+
+    it('returns bounded failure when Redis throws and requireRedis is true', async () => {
+      mockRedisLimiter.limit.mockRejectedValue(new Error('Redis down'));
+
+      const limiter = new RateLimiter(baseConfig, {
+        requireRedis: true,
+        warnOnFallback: false,
+      });
+      const result = await limiter.limit('user-1');
+
+      expect(result.success).toBe(false);
+      expect(result.remaining).toBe(0);
+      expect(result.reason).toContain('temporarily unavailable');
+      expect(mockMemoryInstance.limit).not.toHaveBeenCalled();
     });
   });
 

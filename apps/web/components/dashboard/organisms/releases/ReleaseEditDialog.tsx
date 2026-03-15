@@ -1,8 +1,15 @@
 'use client';
 
-import { Badge, Button, Input } from '@jovie/ui';
+import { Badge, Input } from '@jovie/ui';
 import { Icon } from '@/components/atoms/Icon';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { ProviderIcon } from '@/components/atoms/ProviderIcon';
+import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerSurfaceCard,
+  EntityHeaderCard,
+} from '@/components/molecules/drawer';
 import {
   Dialog,
   DialogActions,
@@ -10,6 +17,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
+import { formatReleaseDateShort } from '@/lib/discography/formatting';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 interface ProviderInfo {
@@ -55,15 +63,15 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-(--linear-text-primary)'>
         <Icon
           name='Link'
-          className='h-5 w-5 text-secondary-token'
+          className='h-5 w-5 text-(--linear-text-secondary)'
           aria-hidden='true'
         />
         Edit release links
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-secondary-token'>
+      <DialogDescription className='text-[13px] text-(--linear-text-secondary)'>
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
@@ -71,35 +79,34 @@ export function ReleaseEditDialog({
         {release ? (
           <div className='space-y-4'>
             {/* Release info header */}
-            <div className='flex items-center gap-4 rounded-xl border border-subtle bg-surface-2/60 p-4'>
-              {/* Artwork */}
-              <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-surface-2 shadow-card'>
-                <ImageWithFallback
-                  src={release.artworkUrl}
-                  alt={`${release.title} artwork`}
-                  fill
-                  className='object-cover'
-                  sizes='64px'
-                  fallbackVariant='release'
-                />
-              </div>
-              <div className='min-w-0 flex-1'>
-                <p className='text-base font-[590] text-primary-token'>
-                  {release.title}
-                </p>
-                <p className='mt-0.5 text-[11px] text-secondary-token'>
-                  Smart link: {release.smartLinkPath}
-                </p>
-                <Badge
-                  variant='secondary'
-                  className='mt-2 border border-subtle bg-transparent text-[11px] text-secondary-token'
-                >
-                  {release.releaseDate
-                    ? new Date(release.releaseDate).toLocaleDateString()
-                    : 'Date TBD'}
-                </Badge>
-              </div>
-            </div>
+            <DrawerSurfaceCard className='rounded-[12px] p-4'>
+              <EntityHeaderCard
+                image={
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none'>
+                    <ImageWithFallback
+                      src={release.artworkUrl}
+                      alt={`${release.title} artwork`}
+                      fill
+                      className='object-cover'
+                      sizes='64px'
+                      fallbackVariant='release'
+                    />
+                  </div>
+                }
+                title={release.title}
+                subtitle={`Smart link: ${release.smartLinkPath}`}
+                badge={
+                  <Badge
+                    variant='secondary'
+                    className='border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
+                  >
+                    {release.releaseDate
+                      ? formatReleaseDateShort(release.releaseDate)
+                      : 'Date TBD'}
+                  </Badge>
+                }
+              />
+            </DrawerSurfaceCard>
 
             {/* Provider inputs grid */}
             <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
@@ -114,18 +121,18 @@ export function ReleaseEditDialog({
                 );
 
                 return (
-                  <div
+                  <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
-                    className='rounded-lg border border-subtle bg-surface-1 p-3 shadow-card'
+                    className='rounded-[10px] p-3 shadow-none'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
-                        <span
-                          className='block h-2.5 w-2.5 rounded-full'
-                          style={{ backgroundColor: provider.accent }}
+                        <ProviderIcon
+                          provider={provider.key}
+                          className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-[510] text-primary-token'>
+                        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
                           {provider.label}
                         </p>
                       </div>
@@ -138,10 +145,11 @@ export function ReleaseEditDialog({
                         </Badge>
                       ) : null}
                     </div>
-                    <p className='mt-1 text-[11px] text-secondary-token'>
-                      {helperText}
-                    </p>
-                    <div className='mt-2 space-y-2'>
+                    <DrawerFormField
+                      label='URL'
+                      helperText={helperText}
+                      className='mt-2 space-y-2'
+                    >
                       <Input
                         value={value}
                         onChange={event =>
@@ -151,27 +159,25 @@ export function ReleaseEditDialog({
                         data-testid={`provider-input-${release.id}-${provider.key}`}
                       />
                       <div className='flex items-center justify-between gap-2'>
-                        <Button
-                          variant='primary'
-                          size='sm'
+                        <DrawerButton
+                          tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
                           onClick={() => onSave(provider.key)}
                         >
                           Save
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='sm'
+                        </DrawerButton>
+                        <DrawerButton
+                          tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
-                        </Button>
+                        </DrawerButton>
                       </div>
-                    </div>
-                  </div>
+                    </DrawerFormField>
+                  </DrawerSurfaceCard>
                 );
               })}
             </div>
@@ -179,9 +185,7 @@ export function ReleaseEditDialog({
         ) : null}
       </DialogBody>
       <DialogActions className='justify-end'>
-        <Button variant='secondary' size='sm' onClick={onClose}>
-          Done
-        </Button>
+        <DrawerButton onClick={onClose}>Done</DrawerButton>
       </DialogActions>
     </Dialog>
   );

@@ -24,6 +24,31 @@ export async function fetchWithTimeout<T>(
   url: string,
   options: FetchOptions = {}
 ): Promise<T> {
+  const response = await fetchWithTimeoutResponse(url, options);
+
+  // Parse JSON with error handling for malformed responses
+  let data: T;
+  try {
+    data = (await response.json()) as T;
+  } catch (parseError) {
+    if (parseError instanceof SyntaxError) {
+      throw new FetchError('Invalid JSON response', 502, response);
+    }
+    throw parseError;
+  }
+  return data;
+}
+
+/**
+ * Edge-compatible fetch with timeout that returns the raw Response.
+ *
+ * Useful for call sites that need non-JSON response handling (e.g. blobs)
+ * while preserving timeout/cancellation behavior and status normalization.
+ */
+export async function fetchWithTimeoutResponse(
+  url: string,
+  options: FetchOptions = {}
+): Promise<Response> {
   const { timeout = 10000, signal: externalSignal, ...fetchOptions } = options;
 
   const controller = new AbortController();
@@ -53,17 +78,7 @@ export async function fetchWithTimeout<T>(
       );
     }
 
-    // Parse JSON with error handling for malformed responses
-    let data: T;
-    try {
-      data = (await response.json()) as T;
-    } catch (parseError) {
-      if (parseError instanceof SyntaxError) {
-        throw new FetchError('Invalid JSON response', 502, response);
-      }
-      throw parseError;
-    }
-    return data;
+    return response;
   } catch (error) {
     if (error instanceof FetchError) {
       throw error;
@@ -96,15 +111,26 @@ function getFetchErrorMessage(response: Response): string {
 
 /**
  * Custom error class for fetch failures with status code.
+ *
+ * This is the canonical FetchError used across the app. It supports both
+ * raw Response objects (from fetchWithTimeout) and string bodies (from dedupedFetch).
  */
 export class FetchError extends Error {
+  public readonly response?: Response;
+  public readonly body?: string;
+
   constructor(
     message: string,
     public readonly status: number,
-    public readonly response?: Response
+    responseOrBody?: Response | string
   ) {
     super(message);
     this.name = 'FetchError';
+    if (typeof responseOrBody === 'string') {
+      this.body = responseOrBody;
+    } else {
+      this.response = responseOrBody;
+    }
   }
 
   /**

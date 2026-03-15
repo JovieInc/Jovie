@@ -17,13 +17,14 @@ import {
 } from './shared';
 
 let statsigInitialized = false;
+const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
 /**
  * Initialize Statsig server SDK
  * Call this once at application startup or lazily on first use
  */
 async function initializeStatsig(): Promise<void> {
-  if (statsigInitialized) return;
+  if (statsigInitialized || isE2ERuntime) return;
 
   const serverSecret = env.STATSIG_SERVER_SECRET;
   if (!serverSecret) {
@@ -58,6 +59,10 @@ export async function checkGate(
   gateKey: FeatureFlagKey,
   defaultValue = false
 ): Promise<boolean> {
+  if (isE2ERuntime) {
+    return defaultValue;
+  }
+
   await initializeStatsig();
 
   if (!statsigInitialized) {
@@ -88,6 +93,10 @@ export async function getExperiment(
   userId: string | null,
   experimentKey: string
 ): Promise<Record<string, unknown>> {
+  if (isE2ERuntime) {
+    return {};
+  }
+
   await initializeStatsig();
   if (!statsigInitialized) return {};
   try {
@@ -128,6 +137,10 @@ export async function getSubscribeCTAVariant(
 export async function getFeatureFlagsBootstrap(
   userId: string | null
 ): Promise<FeatureFlagsBootstrap> {
+  if (isE2ERuntime) {
+    return { gates: {} };
+  }
+
   await initializeStatsig();
 
   const gates: Record<string, boolean> = {};

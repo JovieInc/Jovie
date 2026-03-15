@@ -5,6 +5,7 @@ const { mockWarn } = vi.hoisted(() => ({
 }));
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   logger: {
     warn: mockWarn,
   },
@@ -97,7 +98,7 @@ describe('handleMigrationErrors', () => {
 
     expect(result).toEqual({ shouldRetry: false, fallbackData: false });
     expect(mockWarn).toHaveBeenCalledWith(
-      '[Dashboard] social_links migration in progress',
+      '[Dashboard] social_links migration in progress; treating as no links',
       { userId: 'user_123', operation: 'social_links_count' }
     );
   });
@@ -116,7 +117,7 @@ describe('handleMigrationErrors', () => {
 
     expect(result).toEqual({ shouldRetry: false, fallbackData: false });
     expect(mockWarn).toHaveBeenCalledWith(
-      '[Dashboard] social_links.state column missing; treating as no links',
+      '[Dashboard] social_links migration in progress; treating as no links',
       { userId: 'user_123', operation: 'social_links_count' }
     );
   });
@@ -135,7 +136,7 @@ describe('handleMigrationErrors', () => {
 
     expect(result).toEqual({ shouldRetry: false, fallbackData: false });
     expect(mockWarn).toHaveBeenCalledWith(
-      '[Dashboard] social_links.state column missing; treating as no music links',
+      '[Dashboard] social_links migration in progress; treating as no music links',
       { userId: 'user_123', operation: 'music_links_count' }
     );
   });
@@ -214,7 +215,7 @@ describe('handleMigrationErrors', () => {
 
     expect(result).toEqual({ shouldRetry: false, fallbackData: false });
     expect(mockWarn).toHaveBeenCalledWith(
-      '[Dashboard] social_links.state column missing; treating as no links',
+      '[Dashboard] social_links migration in progress; treating as no links',
       { userId: 'user_123', operation: 'social_links_count' }
     );
   });

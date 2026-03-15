@@ -20,8 +20,8 @@ import {
   AudienceTypeBadge,
   AudienceUserCell,
   AudienceVisitsCell,
-} from '@/components/dashboard/audience/table/atoms';
-import { convertContextMenuItems } from '@/components/organisms/table';
+  convertContextMenuItems,
+} from '@/components/organisms/table';
 import type { AudienceMember } from '@/types';
 import {
   useAudienceTableStableContext,
@@ -38,8 +38,6 @@ export function renderUserCell({
     <AudienceUserCell
       displayName={row.original.displayName}
       type={row.original.type}
-      email={row.original.email}
-      phone={row.original.phone}
       deviceType={row.original.deviceType}
       geoCity={row.original.geoCity}
       geoCountry={row.original.geoCountry}
@@ -129,6 +127,30 @@ export function renderSourceCell({
       referrerHistory={row.original.referrerHistory}
       utmParams={row.original.utmParams}
     />
+  );
+}
+
+/**
+ * Renders tightly grouped icon indicators for platform/engagement signals.
+ */
+export function renderPlatformsCell({
+  row,
+}: CellContext<AudienceMember, unknown>) {
+  return (
+    <div className='flex items-center justify-center'>
+      <div className='inline-flex items-center gap-1'>
+        <AudienceIntentScoreCell
+          intentLevel={row.original.intentLevel}
+          className='w-4'
+        />
+        <AudienceReturningCell visits={row.original.visits} className='w-4' />
+        <AudienceSourceCell
+          referrerHistory={row.original.referrerHistory}
+          utmParams={row.original.utmParams}
+          className='w-4'
+        />
+      </div>
+    </div>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { cn } from '@/lib/utils';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 
 interface ExpandButtonProps {
   /** Whether the row is currently expanded */
@@ -31,37 +31,30 @@ export const ExpandButton = memo(function ExpandButton({
 }: ExpandButtonProps) {
   // Don't show expand button for singles (1 track)
   if (totalTracks <= 1) {
-    return <div className='w-5 h-5' aria-hidden='true' />;
+    return <div className='h-[18px] w-[18px]' aria-hidden='true' />;
   }
 
   return (
-    <button
-      type='button'
+    <DrawerInlineIconButton
       onClick={onClick}
       disabled={isLoading}
-      className={cn(
-        'flex items-center justify-center w-5 h-5 rounded',
-        'text-tertiary-token hover:text-secondary-token',
-        'hover:bg-surface-2 transition-colors',
-        'focus-visible:outline-none focus-visible:bg-interactive-hover',
-        'disabled:opacity-50 disabled:cursor-not-allowed'
-      )}
+      className='h-[18px] w-[18px] rounded-[5px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >
       {isLoading ? (
         <Icon
           name='Loader2'
-          className='h-4 w-4 animate-spin'
+          className='h-3.5 w-3.5 animate-spin'
           aria-hidden='true'
         />
       ) : (
         <Icon
           name={isExpanded ? 'ChevronDown' : 'ChevronRight'}
-          className='h-4 w-4'
+          className='h-3.5 w-3.5'
           aria-hidden='true'
         />
       )}
-    </button>
+    </DrawerInlineIconButton>
   );
 });

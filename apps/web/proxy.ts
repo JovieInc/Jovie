@@ -8,11 +8,18 @@ import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
   COUNTRY_CODE_COOKIE,
+  HOMEPAGE_CITY_COOKIE,
+  HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import {
+  resolveTestBypassUserId,
+  TEST_AUTH_BYPASS_MODE,
+  TEST_MODE_HEADER,
+} from '@/lib/auth/test-mode';
 import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
 import {
   COOKIE_BANNER_REQUIRED_COOKIE,
@@ -36,7 +43,7 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // Single Domain Architecture
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
-// - meetjovie.com: 301 redirects to jov.ie (kept for email marketing only)
+// - meetjovie.com: 301 redirects to jov.ie (legacy redirect domain)
 // ============================================================================
 
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
@@ -87,7 +94,6 @@ const DASHBOARD_ROUTES = [
   '/app/earnings',
   '/app/links',
   '/app/chat',
-  '/app/analytics',
 ] as const;
 
 const SETTINGS_ROUTES = [
@@ -250,6 +256,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // ========================================================================
     const pathInfo = categorizePath(pathname);
     const hostInfo = analyzeHost(hostname);
+    const isNavigationMethod = req.method === 'GET' || req.method === 'HEAD';
 
     // ========================================================================
     // Generate CSP nonce early and set on request headers
@@ -358,9 +365,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
 
-    // Only page routes need user state — API routes don't make routing decisions
+    // Only non-/app page routes need user state for middleware rewrites.
+    // /app and /app/* perform auth and onboarding/waitlist gating deeper in
+    // route handlers/layouts, so proxy-level state lookups are unnecessary.
     const needsUserState =
-      !pathname.startsWith('/api/') && !pathInfo.isAuthCallbackPath;
+      !pathname.startsWith('/api/') &&
+      !pathInfo.isAuthCallbackPath &&
+      pathname !== '/app' &&
+      !pathname.startsWith('/app/');
 
     // Skip the getUserState call for RSC prefetch requests when the user is
     // already known-active from the in-memory cache. Active users don't need
@@ -380,6 +392,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       pathInfo.isAuthPath &&
       !pathInfo.isAuthCallbackPath &&
       !isRSCPrefetch &&
+      isNavigationMethod &&
       userState
     ) {
       const redirectUrl = sanitizeRedirectUrl(
@@ -409,6 +422,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&
+        pathname !== '/app' &&
         !pathname.startsWith('/app/')
       ) {
         res = NextResponse.rewrite(new URL('/waitlist', req.url), {
@@ -418,6 +432,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         userState.needsOnboarding &&
         pathname !== '/onboarding' &&
         !pathname.startsWith('/api/') &&
+        pathname !== '/app' &&
         !pathname.startsWith('/app/')
       ) {
         const onboardingJustCompleted =
@@ -434,16 +449,18 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       } else if (
         (!isWaitlistEnabled() || !userState.needsWaitlist) &&
         pathname === '/waitlist' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
+        isNavigationMethod &&
         !isRSCPrefetch
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
-      } else if (pathInfo.isAuthPath && !isRSCPrefetch) {
+      } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
         // Redirect authenticated users away from any auth page (/signin, /sign-in,
         // /signup, /sign-up). Uses isAuthPath to cover all variants consistently.
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
@@ -470,6 +487,25 @@ async function handleRequest(req: NextRequest, userId: string | null) {
  * The nonce is pre-generated and set on request headers for Server Components.
  * Here we set it on response headers for the CSP policy.
  */
+
+function getGeoFromRequest(req: NextRequest): {
+  city: string | null;
+  region: string | null;
+} {
+  const geoRequest = req as NextRequest & {
+    geo?: { city?: string | null; region?: string | null };
+  };
+
+  const cityFromHeader = req.headers.get('x-vercel-ip-city')?.trim() ?? null;
+  const regionFromHeader =
+    req.headers.get('x-vercel-ip-country-region')?.trim() ?? null;
+
+  return {
+    city: cityFromHeader || geoRequest.geo?.city?.trim() || null,
+    region: regionFromHeader || geoRequest.geo?.region?.trim() || null,
+  };
+}
+
 function buildFinalResponse(
   req: NextRequest,
   res: NextResponse,
@@ -483,16 +519,18 @@ function buildFinalResponse(
   // Set CSP headers using the pre-generated nonce
   // The nonce was already set on request headers for Server Components
   if (nonce && pathInfo.needsNonce) {
+    const allowTestRuntimeRelaxations = process.env.E2E_ALLOW_DEV_CSP === '1';
     res.headers.set(SCRIPT_NONCE_HEADER, nonce);
     res.headers.set(
       'Content-Security-Policy',
-      buildContentSecurityPolicy({ nonce })
+      buildContentSecurityPolicy({ nonce, allowTestRuntimeRelaxations })
     );
 
     const cspReportUri = getCspReportUri();
     if (cspReportUri) {
       const reportOnlyPolicy = buildContentSecurityPolicyReportOnly({
         nonce,
+        allowTestRuntimeRelaxations,
         reportUri: cspReportUri,
       });
       if (reportOnlyPolicy) {
@@ -507,6 +545,31 @@ function buildFinalResponse(
         );
       }
     }
+  }
+
+  const geo = getGeoFromRequest(req);
+
+  if (geo.city && req.cookies.get(HOMEPAGE_CITY_COOKIE)?.value !== geo.city) {
+    res.cookies.set(HOMEPAGE_CITY_COOKIE, geo.city, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
+  }
+
+  if (
+    geo.region &&
+    req.cookies.get(HOMEPAGE_REGION_COOKIE)?.value !== geo.region
+  ) {
+    res.cookies.set(HOMEPAGE_REGION_COOKIE, geo.region, {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,
+      path: '/',
+    });
   }
 
   const countryCode =
@@ -594,6 +657,13 @@ const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
 });
 
 export default function middleware(req: NextRequest, event: NextFetchEvent) {
+  if (process.env.NODE_ENV === 'test') {
+    const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
+    if (testMode === TEST_AUTH_BYPASS_MODE) {
+      return handleRequest(req, resolveTestBypassUserId(req.headers));
+    }
+  }
+
   // Check if Clerk config is missing or mocked
   const clerkConfigMissing = isMockOrMissingClerkConfig();
 

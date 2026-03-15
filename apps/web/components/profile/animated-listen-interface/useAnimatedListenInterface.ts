@@ -16,6 +16,7 @@ import {
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
+import { useTrackingMutation } from '@/lib/queries';
 import { detectPlatformFromUA } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
@@ -63,6 +64,9 @@ export function useAnimatedListenInterface(
   const router = useRouter();
   const prefersReducedMotion = useReducedMotion();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trackClick = useTrackingMutation({
+    endpoint: '/api/track',
+  });
 
   // Handle backspace key to go back
   useEffect(() => {
@@ -113,19 +117,7 @@ export function useAnimatedListenInterface(
       }
 
       // Track click
-      try {
-        fetch('/api/track', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ handle, linkType: 'listen', target: dsp.key }),
-          keepalive: true,
-        }).catch(() => {});
-      } catch (error) {
-        console.error(
-          '[AnimatedListenInterface] Failed to track click:',
-          error
-        );
-      }
+      trackClick.mutate({ handle, linkType: 'listen', target: dsp.key });
 
       // Try deep linking
       const deepLinkConfig = getDSPDeepLinkConfig(dsp.key);

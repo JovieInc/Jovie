@@ -2,6 +2,7 @@ import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { PricingComparisonChart } from '@/components/pricing/PricingComparisonChart';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
@@ -55,6 +56,7 @@ const PRICING_SCHEMA = JSON.stringify({
     '@type': 'ItemList',
     itemListElement: getAllPlanIds()
       .filter(planId => growthPlanEnabled || planId !== 'growth')
+      .filter(planId => planId !== 'founding')
       .map((planId, index) => {
         const plan = ENTITLEMENT_REGISTRY[planId];
         const price = plan.marketing.price?.monthly ?? 0;
@@ -90,6 +92,7 @@ interface PricingTierProps {
   readonly billingLabel: string;
   readonly price: string;
   readonly priceSuffix?: string;
+  readonly foundingCallout?: string;
   readonly buttonLabel: string;
   readonly buttonHref: string;
   readonly buttonVariant: 'primary' | 'secondary';
@@ -103,6 +106,7 @@ function PricingTier({
   billingLabel,
   price,
   priceSuffix,
+  foundingCallout,
   buttonLabel,
   buttonHref,
   buttonVariant,
@@ -178,6 +182,20 @@ function PricingTier({
             </span>
           )}
         </div>
+
+        {/* Founding Member callout */}
+        {foundingCallout && (
+          <div
+            className='mt-2 rounded-md px-2.5 py-1.5 text-[12px] inline-block'
+            style={{
+              backgroundColor: 'var(--linear-bg-surface-2)',
+              border: '1px solid var(--linear-border-subtle)',
+              color: 'var(--linear-text-secondary)',
+            }}
+          >
+            {foundingCallout}
+          </div>
+        )}
       </div>
 
       {/* CTA Button */}
@@ -234,6 +252,8 @@ function PricingTier({
 }
 
 export default function PricingPage() {
+  const founding = ENTITLEMENT_REGISTRY.founding;
+
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
@@ -296,6 +316,7 @@ export default function PricingPage() {
                 billingLabel='Billed monthly'
                 price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
                 priceSuffix='/month'
+                foundingCallout={`${founding.marketing.displayName}: $${founding.marketing.price!.monthly}/mo locked in`}
                 buttonLabel='Get started'
                 buttonHref='/signup?plan=pro'
                 buttonVariant='primary'
@@ -319,16 +340,20 @@ export default function PricingPage() {
                 </div>
               )}
             </div>
+          </div>
 
-            <p
-              className='mt-4 text-center'
+          {/* Full Feature Comparison Chart */}
+          <div className='mt-20'>
+            <h2
+              className='text-center text-2xl md:text-3xl mb-10'
               style={{
-                fontSize: 'var(--linear-label-size)',
-                color: 'var(--linear-text-tertiary)',
+                fontWeight: 'var(--linear-font-weight-medium)',
+                color: 'var(--linear-text-primary)',
               }}
             >
-              Unlimited subject to abuse guardrails.
-            </p>
+              Compare all features
+            </h2>
+            <PricingComparisonChart />
           </div>
         </div>
       </Container>

@@ -1,4 +1,5 @@
 import { CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
 import { cn } from '@/lib/utils';
 
@@ -18,24 +19,24 @@ function MetricCard({
   bgClass,
 }: MetricCardProps) {
   return (
-    <div className='flex items-center gap-2.5 px-3 py-2.5'>
+    <ContentSurfaceCard className='flex items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5'>
       <div
         className={cn(
-          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
           bgClass
         )}
       >
-        <Icon className={cn('h-3.5 w-3.5', colorClass)} />
+        <Icon className={cn('h-4 w-4', colorClass)} aria-hidden />
       </div>
       <div className='min-w-0'>
-        <p className='text-[10px] font-semibold text-tertiary-token uppercase tracking-wide'>
+        <p className='text-[10px] font-[560] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
           {label}
         </p>
-        <p className='text-sm font-semibold text-primary-token tabular-nums leading-tight'>
+        <p className='text-[15px] font-[590] leading-tight tabular-nums text-primary-token'>
           {value.toLocaleString()}
         </p>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }
 
@@ -46,7 +47,7 @@ interface WaitlistMetricsProps {
 export function WaitlistMetrics({ metrics }: WaitlistMetricsProps) {
   return (
     <div
-      className='grid grid-cols-3 divide-x divide-subtle rounded-md border border-subtle'
+      className='grid gap-3 sm:grid-cols-3'
       data-testid='admin-waitlist-content'
     >
       <MetricCard

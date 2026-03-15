@@ -1,4 +1,9 @@
+import type {
+  ReleaseSidebarAnalytics,
+  ReleaseSidebarTrack,
+} from '@/components/organisms/release-sidebar/types';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type { PlanGateEntitlements } from '@/lib/queries';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 
 export interface ReleaseProviderMatrixProps {
@@ -16,6 +21,51 @@ export interface ReleaseProviderMatrixProps {
   readonly allowArtworkDownloads?: boolean;
   /** Whether a Spotify import is currently in progress (from server) */
   readonly initialImporting?: boolean;
+  /** Optional adapter that swaps live behaviors for demo/static rendering */
+  readonly experienceAdapter?: ReleaseExperienceAdapter;
+}
+
+export interface ReleaseSidebarFixtureData {
+  readonly analytics?: ReleaseSidebarAnalytics | null;
+  readonly tracks?: ReleaseSidebarTrack[];
+}
+
+export interface ReleaseExperienceAdapter {
+  readonly mode?: 'live' | 'demo';
+  readonly entitlements?: Partial<PlanGateEntitlements>;
+  readonly onCopy?: (
+    path: string,
+    label: string,
+    testId: string
+  ) => Promise<string>;
+  readonly onCreateRelease?: () => void;
+  readonly onSync?: () => void;
+  readonly onRefreshRelease?: (releaseId: string) => void;
+  readonly onArtworkUpload?: (
+    file: File,
+    release: ReleaseViewModel
+  ) => Promise<string>;
+  readonly onArtworkRevert?: (
+    releaseId: string,
+    release: ReleaseViewModel | null
+  ) => Promise<string>;
+  readonly onAddDspLink?: (
+    releaseId: string,
+    provider: ProviderKey,
+    url: string
+  ) => Promise<void>;
+  readonly onRescanIsrc?: (releaseId: string) => void;
+  readonly onSaveLyrics?: (releaseId: string, lyrics: string) => Promise<void>;
+  readonly onFormatLyrics?: (
+    releaseId: string,
+    lyrics: string
+  ) => Promise<string[]>;
+  readonly onCanvasStatusUpdate?: (
+    releaseId: string,
+    status: CanvasStatus
+  ) => Promise<void>;
+  readonly onToggleArtworkDownloads?: (enabled: boolean) => Promise<void>;
+  readonly sidebarDataByReleaseId?: Record<string, ReleaseSidebarFixtureData>;
 }
 
 export type DraftState = Partial<Record<ProviderKey, string>>;

@@ -69,6 +69,13 @@ export type { IconName, IconProps } from './Icon';
 export { Icon } from './Icon';
 export { IconBadge } from './IconBadge';
 export { ImageWithFallback } from './ImageWithFallback';
+export type { InlineIconButtonProps } from './InlineIconButton';
+export {
+  INLINE_ICON_BUTTON_BASE_CLASSNAME,
+  INLINE_ICON_BUTTON_FADE_CLASSNAME,
+  INLINE_ICON_BUTTON_VISIBLE_CLASSNAME,
+  InlineIconButton,
+} from './InlineIconButton';
 export { JovieIcon } from './JovieIcon';
 export { JovieLogo } from './JovieLogo';
 export type { LabelProps } from './Label';

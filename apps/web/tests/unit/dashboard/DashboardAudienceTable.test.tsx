@@ -4,6 +4,7 @@ import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AudiencePanelProvider } from '@/components/dashboard/organisms/AudiencePanelContext';
+import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import type { AudienceMember } from '@/types';
 
@@ -148,9 +149,11 @@ function renderWithProviders(
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <RightPanelProvider>
-            <AudiencePanelProvider>{children}</AudiencePanelProvider>
-          </RightPanelProvider>
+          <HeaderActionsProvider>
+            <RightPanelProvider>
+              <AudiencePanelProvider>{children}</AudiencePanelProvider>
+            </RightPanelProvider>
+          </HeaderActionsProvider>
         </TooltipProvider>
       </QueryClientProvider>
     ),
@@ -215,11 +218,11 @@ describe('DashboardAudienceTable', () => {
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
-  it('shows subscriber empty state in subscribers mode', () => {
+  it('shows unified empty state in subscribers mode', () => {
     renderWithProviders(
       <DashboardAudienceTable {...defaultProps} mode='subscribers' rows={[]} />
     );
-    expect(screen.getByText('Get Your First Subscriber')).toBeInTheDocument();
+    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
   });
 
   it('renders table when rows are provided', () => {

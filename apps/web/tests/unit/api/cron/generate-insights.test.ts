@@ -10,6 +10,7 @@ const persistInsightsMock = vi.fn();
 const completeGenerationRunMock = vi.fn();
 
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
 }));
 

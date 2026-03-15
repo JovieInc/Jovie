@@ -90,9 +90,9 @@ export function DashboardReleasesDemo() {
                   const config = DSP_CONFIGS[key];
                   const isAvailable = release.platforms.some(
                     p =>
-                      p.toLowerCase().replace(/\s+/g, '_') === key ||
-                      p.toLowerCase().replace(/\s+/g, '') ===
-                        key.replace(/_/g, '')
+                      p.toLowerCase().replaceAll(/\s+/g, '_') === key ||
+                      p.toLowerCase().replaceAll(/\s+/g, '') ===
+                        key.replaceAll('_', '')
                   );
                   return (
                     <span

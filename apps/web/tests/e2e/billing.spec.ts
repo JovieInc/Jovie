@@ -8,6 +8,8 @@ import {
   waitForUrlStable,
 } from './utils/smoke-test-utils';
 
+const IS_FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+
 /**
  * Billing Route Tests
  *
@@ -18,6 +20,11 @@ import {
  * They add ~30-60s to smoke tests without catching critical regressions.
  */
 test.describe('Billing Routes', () => {
+  test.skip(
+    IS_FAST_ITERATION,
+    'Billing route health is covered by the faster dashboard and golden-path lanes'
+  );
+
   test('/billing redirects or loads without errors', async ({
     page,
   }, testInfo) => {
@@ -121,6 +128,11 @@ test.describe('Billing Routes', () => {
   test('/billing/success redirects or loads without errors', async ({
     page,
   }, testInfo) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Stripe success callback coverage runs in the slower billing and golden-path lanes'
+    );
+
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {
@@ -176,6 +188,11 @@ test.describe('Billing Routes', () => {
   test('/billing/cancel redirects or loads without errors', async ({
     page,
   }, testInfo) => {
+    test.skip(
+      IS_FAST_ITERATION,
+      'Stripe cancel callback coverage runs in the slower billing and golden-path lanes'
+    );
+
     const { getContext, cleanup } = setupPageMonitoring(page);
 
     try {

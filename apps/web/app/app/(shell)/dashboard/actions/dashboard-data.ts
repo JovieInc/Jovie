@@ -17,6 +17,7 @@ import {
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { withDbSessionTx } from '@/lib/auth/session';
+import { CACHE_TAGS } from '@/lib/cache/tags';
 import { type DbOrTransaction } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -164,11 +165,21 @@ function buildProfileCompletion(
     };
   }
 
+  const hasConnectedDspProfile =
+    hasText(selectedProfile.spotifyUrl) ||
+    hasText(selectedProfile.appleMusicUrl) ||
+    hasText(selectedProfile.youtubeUrl) ||
+    hasText(selectedProfile.spotifyId) ||
+    hasText(selectedProfile.appleMusicId) ||
+    hasText(selectedProfile.youtubeMusicId);
+
+  const hasMusicPresence = hasMusicLinks || hasConnectedDspProfile;
+
   const completion = calculateRequiredProfileCompletion({
     displayName: selectedProfile.displayName,
     avatarUrl: selectedProfile.avatarUrl,
     email,
-    hasMusicLinks,
+    hasMusicLinks: hasMusicPresence,
   });
 
   const steps: ProfileCompletionStep[] = [];
@@ -214,7 +225,7 @@ function buildProfileCompletion(
     completion.hasName &&
     completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    completion.hasMusicLinks;
+    hasMusicPresence;
 
   return {
     percentage: completion.percentage,
@@ -394,7 +405,7 @@ async function fetchDashboardCoreWithSession(
           .catch((error: unknown) => {
             const migrationResult = handleMigrationErrors(error, {
               userId: userData.id,
-              operation: 'social_links_count',
+              operation: 'social_links_existence',
             });
 
             if (!migrationResult.shouldRetry) {
@@ -669,7 +680,10 @@ async function resolveDashboardData(): Promise<DashboardData> {
 const getCachedDashboardCore = unstableCache(
   async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
   ['dashboard-core'],
-  { revalidate: 30 }
+  {
+    revalidate: 30,
+    tags: [CACHE_TAGS.DASHBOARD_DATA],
+  }
 );
 
 /**

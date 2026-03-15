@@ -179,14 +179,14 @@ export function ProfileNotificationsMenu({
           }}
         >
           <div className='flex-1'>
-            <p className='text-sm font-semibold text-primary-token'>
+            <p className='text-sm font-semibold text-(--linear-text-primary)'>
               {label}{' '}
-              <span className='text-xs font-normal text-tertiary-token'>
+              <span className='text-xs font-normal text-(--linear-text-tertiary)'>
                 (tap to unsubscribe)
               </span>
             </p>
             {contactValue ? (
-              <p className='break-all text-xs text-tertiary-token'>
+              <p className='break-all text-xs text-(--linear-text-tertiary)'>
                 {targetChannel === 'sms'
                   ? formatE164PhoneForDisplay(contactValue)
                   : contactValue}
@@ -212,14 +212,14 @@ export function ProfileNotificationsMenu({
         }}
       >
         <div className='flex-1'>
-          <p className='text-sm font-semibold text-primary-token'>
+          <p className='text-sm font-semibold text-(--linear-text-primary)'>
             Add {label}
           </p>
-          <p className='text-xs text-tertiary-token'>
+          <p className='text-xs text-(--linear-text-tertiary)'>
             Stay in the loop via {label.toLowerCase()}.
           </p>
         </div>
-        <span aria-hidden className='text-xs text-tertiary-token'>
+        <span aria-hidden className='text-xs text-(--linear-text-tertiary)'>
           +
         </span>
       </DropdownMenuItem>
@@ -243,7 +243,7 @@ export function ProfileNotificationsMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align='end' className='w-72' sideOffset={8}>
           {/* ── Channels ─────────────────────────────── */}
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+          <DropdownMenuLabel className='text-sm font-semibold text-(--linear-text-primary)'>
             How you get notified
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -255,19 +255,21 @@ export function ProfileNotificationsMenu({
             className='flex items-start gap-2 cursor-default opacity-70'
           >
             <div className='flex-1'>
-              <p className='text-sm font-semibold text-primary-token'>
+              <p className='text-sm font-semibold text-(--linear-text-primary)'>
                 Instagram DMs
               </p>
-              <p className='text-xs text-tertiary-token'>Coming soon</p>
+              <p className='text-xs text-(--linear-text-tertiary)'>
+                Coming soon
+              </p>
             </div>
-            <span aria-hidden className='text-xs text-tertiary-token'>
+            <span aria-hidden className='text-xs text-(--linear-text-tertiary)'>
               …
             </span>
           </DropdownMenuItem>
 
           {/* ── Listening preference ───────────────────── */}
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+          <DropdownMenuLabel className='text-sm font-semibold text-(--linear-text-primary)'>
             Listening preference
           </DropdownMenuLabel>
           <div className='px-2 pb-2'>
@@ -278,7 +280,7 @@ export function ProfileNotificationsMenu({
               id='preferred-dsp-select'
               value={selectedDspPreference}
               onChange={event => handleDspPreferenceChange(event.target.value)}
-              className='h-9 w-full rounded-md border border-subtle bg-surface-0 px-2 text-sm text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]'
+              className='h-9 w-full rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-2.5 text-sm text-(--linear-text-primary) shadow-none focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
             >
               <option value=''>Choose your platform</option>
               {availableDspPreferences.map(preference => (
@@ -287,14 +289,14 @@ export function ProfileNotificationsMenu({
                 </option>
               ))}
             </select>
-            <p className='pt-1 text-xs text-tertiary-token'>
+            <p className='pt-1 text-xs text-(--linear-text-tertiary)'>
               We&apos;ll open this platform first on future smart links.
             </p>
           </div>
 
           {/* ── Content types ────────────────────────── */}
           <DropdownMenuSeparator />
-          <DropdownMenuLabel className='text-sm font-semibold text-primary-token'>
+          <DropdownMenuLabel className='text-sm font-semibold text-(--linear-text-primary)'>
             What you hear about
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
@@ -309,10 +311,10 @@ export function ProfileNotificationsMenu({
               }}
             >
               <div className='flex-1 min-w-0'>
-                <p className='text-sm font-semibold text-primary-token'>
+                <p className='text-sm font-semibold text-(--linear-text-primary)'>
                   {label}
                 </p>
-                <p className='text-xs text-tertiary-token truncate'>
+                <p className='truncate text-xs text-(--linear-text-tertiary)'>
                   {description}
                 </p>
               </div>
@@ -334,14 +336,14 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md'>
+        <AlertDialogContent className='max-w-md rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-bg-surface-0) shadow-[var(--linear-app-drawer-shadow)]'>
           <AlertDialogHeader className='gap-2'>
-            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
+            <AlertDialogTitle className='text-base font-semibold text-(--linear-text-primary)'>
               {confirmChannel
                 ? `Unsubscribe from ${labelForChannel(confirmChannel)}`
                 : 'Unsubscribe'}
             </AlertDialogTitle>
-            <AlertDialogDescription className='text-sm text-secondary-token'>
+            <AlertDialogDescription className='text-sm text-(--linear-text-secondary)'>
               {confirmChannel
                 ? `You will stop receiving ${labelForChannel(confirmChannel).toLowerCase()} updates from this artist.`
                 : 'You will stop receiving updates from this artist.'}
@@ -350,14 +352,14 @@ export function ProfileNotificationsMenu({
           <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel
               disabled={isConfirming}
-              className='flex-1 sm:flex-none'
+              className='flex-1 rounded-[8px] border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) sm:flex-none'
             >
               Keep
             </AlertDialogCancel>
             <AlertDialogAction
               variant='destructive'
               disabled={isConfirming || confirmChannel === null}
-              className='flex-1 sm:flex-none'
+              className='flex-1 rounded-[8px] sm:flex-none'
               onClick={() => handleConfirm(onUnsubscribe)}
             >
               {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}

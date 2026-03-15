@@ -86,7 +86,8 @@ function SmartLinkClaimBanner({
 
   if (isDismissed) return null;
 
-  const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodeURIComponent(`/${username}`)}`;
+  const encodedRedirect = encodeURIComponent(`/${username}`);
+  const signupUrl = `${APP_ROUTES.SIGNUP}?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
     <div className='mt-4 rounded-xl bg-surface-1/55 p-3 text-left ring-1 ring-inset ring-white/10 backdrop-blur-sm'>

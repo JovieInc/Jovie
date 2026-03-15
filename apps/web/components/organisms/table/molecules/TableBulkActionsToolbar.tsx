@@ -35,7 +35,7 @@ export function TableBulkActionsToolbar({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-2 bg-surface-1 px-3 py-2.5 border-b border-subtle sm:gap-3 sm:px-4 sm:py-3',
+        'flex flex-wrap items-center gap-2 border-b border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3',
         className
       )}
     >
@@ -74,7 +74,7 @@ export function TableBulkActionsToolbar({
         variant='ghost'
         size='sm'
         onClick={onClearSelection}
-        className='ml-auto'
+        className='ml-auto h-7 rounded-[7px] border border-transparent px-2 text-(--linear-text-secondary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
       >
         <X className='h-4 w-4 mr-1' />
         Clear

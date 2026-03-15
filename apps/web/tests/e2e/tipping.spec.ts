@@ -40,8 +40,14 @@ declare global {
 const hasDatabase = !!(
   process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('dummy')
 );
+const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 
 test.describe('Tipping MVP', () => {
+  test.skip(
+    FAST_ITERATION,
+    'Dedicated tipping coverage runs outside the broad fast lane'
+  );
+
   // Turbopack cold compilation of profile pages can take 60-120s
   test.setTimeout(180_000);
 

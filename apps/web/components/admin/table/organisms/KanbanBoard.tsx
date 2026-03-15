@@ -3,6 +3,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type * as React from 'react';
 import { useCallback, useMemo, useRef } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 export interface KanbanColumn<TData> {
@@ -180,9 +181,9 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <div className='flex min-w-[320px] max-w-[400px] flex-1 flex-col rounded-lg border border-subtle'>
+    <ContentSurfaceCard className='flex min-w-[320px] max-w-[400px] flex-1 flex-col overflow-hidden bg-(--linear-bg-surface-1)'>
       {/* Column Header */}
-      <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
+      <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-4 py-3'>
         <div className='flex items-center gap-2'>
           {accentStyle && (
             <span
@@ -191,16 +192,19 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-sm font-semibold text-primary-token'>
+          <h3 className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
             {column.title}
           </h3>
         </div>
+        <span className='text-xs tabular-nums text-(--linear-text-tertiary)'>
+          {column.count}
+        </span>
       </div>
 
       {/* Column Content */}
       <fieldset
         ref={containerRef}
-        className='flex-1 overflow-y-auto p-3 m-0 min-w-0 border-0'
+        className='m-0 min-w-0 flex-1 overflow-y-auto border-0 p-3'
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -208,8 +212,8 @@ function KanbanColumn<TData>({
         {(() => {
           if (column.items.length === 0) {
             return (
-              <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
-                <div className='text-sm text-tertiary-token'>
+              <div className='flex h-32 items-center justify-center rounded-[10px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+                <div className='text-sm text-(--linear-text-tertiary)'>
                   {emptyState ?? 'No items'}
                 </div>
               </div>
@@ -279,6 +283,6 @@ function KanbanColumn<TData>({
           );
         })()}
       </fieldset>
-    </div>
+    </ContentSurfaceCard>
   );
 }

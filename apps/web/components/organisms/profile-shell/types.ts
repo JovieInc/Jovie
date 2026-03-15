@@ -2,6 +2,7 @@ import type {
   ProfileNotificationsHydrationStatus,
   ProfileNotificationsState,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
+import type { ProfileMode } from '@/components/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -39,8 +40,7 @@ export interface ProfileShellProps {
   readonly subtitle?: string;
   readonly children?: React.ReactNode;
   readonly showSocialBar?: boolean;
-  /** Current profile mode — controls social-bar visibility for conversion optimization */
-  readonly mode?: string;
+  readonly mode?: ProfileMode;
   readonly showTipButton?: boolean;
   readonly isTipModeActive?: boolean;
   readonly showBackButton?: boolean;
@@ -55,6 +55,8 @@ export interface ProfileShellProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  /** HMAC-signed tracking token for authenticating visit tracking requests */
+  readonly visitTrackingToken?: string;
 }
 
 export const SOCIAL_NETWORK_PLATFORMS = [

@@ -87,6 +87,54 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: '*.linktr.ee',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.fbcdn.net',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.fbsbx.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.twimg.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.discordapp.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'secure.gravatar.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
         hostname: 'api.qrserver.com',
         port: '',
         pathname: '/**',
@@ -251,6 +299,16 @@ const nextConfig = {
         destination: '/legal/terms',
         permanent: true,
       },
+      {
+        source: '/app/analytics',
+        destination: '/app/dashboard/audience',
+        permanent: false,
+      },
+      {
+        source: '/app/dashboard/analytics',
+        destination: '/app/dashboard/audience',
+        permanent: false,
+      },
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -285,10 +343,6 @@ const nextConfig = {
       {
         source: '/app/chat',
         destination: '/app/dashboard/chat',
-      },
-      {
-        source: '/app/analytics',
-        destination: '/app/dashboard/analytics',
       },
       {
         source: '/app/insights',

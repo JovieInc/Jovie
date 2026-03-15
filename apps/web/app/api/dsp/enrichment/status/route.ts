@@ -85,6 +85,10 @@ function calculateOverallProgress(
   return Math.round(totalProgress / providerStatuses.length);
 }
 
+function isTerminalJobStatus(status: string | null | undefined): boolean {
+  return status === 'succeeded' || status === 'failed';
+}
+
 // ============================================================================
 // Route Handler
 // ============================================================================
@@ -137,22 +141,44 @@ export async function GET(request: Request) {
     }
 
     // Fetch the most recent discovery job for this profile
-    const [discoveryJob] = await db
-      .select({
-        id: ingestionJobs.id,
-        status: ingestionJobs.status,
-        createdAt: ingestionJobs.createdAt,
-        updatedAt: ingestionJobs.updatedAt,
-      })
-      .from(ingestionJobs)
-      .where(
-        and(
-          eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-          drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+    let discoveryJob:
+      | {
+          id: string;
+          status: string;
+          createdAt: Date | null;
+          updatedAt: Date | null;
+        }
+      | undefined;
+
+    try {
+      const [job] = await db
+        .select({
+          id: ingestionJobs.id,
+          status: ingestionJobs.status,
+          createdAt: ingestionJobs.createdAt,
+          updatedAt: ingestionJobs.updatedAt,
+        })
+        .from(ingestionJobs)
+        .where(
+          and(
+            eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
+            drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+          )
         )
-      )
-      .orderBy(desc(ingestionJobs.createdAt))
-      .limit(1);
+        .orderBy(desc(ingestionJobs.createdAt))
+        .limit(1);
+
+      discoveryJob = job;
+    } catch (dbError) {
+      console.error(
+        '[DSP Enrichment Status - fetch discoveryJob] Failed to fetch discovery job',
+        { profileId, dbError }
+      );
+      return NextResponse.json(
+        { error: 'Internal Server Error' },
+        { status: 500 }
+      );
+    }
 
     const hasPendingDiscoveryJob =
       discoveryJob?.status === 'pending' ||
@@ -212,28 +238,16 @@ export async function GET(request: Request) {
       ? 25
       : calculateOverallProgress(providerStatuses);
 
-    // Calculate timestamps from job record
+    // Calculate timestamps from the discovery job record
     const discoveryStartedAt = toISOStringOrNull(discoveryJob?.createdAt);
-    const discoveryCompletedAt =
-      discoveryJob?.status === 'succeeded'
-        ? toISOStringOrNull(discoveryJob?.updatedAt)
-        : null;
-
-    // Enrichment timestamps are based on provider statuses
-    // Started when any provider has progress, completed when all are done
-    const hasEnrichmentStarted = providerStatuses.some(s => s.progress > 0);
-    const enrichmentStartedAt = hasEnrichmentStarted
-      ? (providerStatuses
-          .filter(s => s.lastUpdatedAt)
-          .sort((a, b) => a.lastUpdatedAt.localeCompare(b.lastUpdatedAt))[0]
-          ?.lastUpdatedAt ?? null)
+    const discoveryCompletedAt = isTerminalJobStatus(discoveryJob?.status)
+      ? toISOStringOrNull(discoveryJob?.updatedAt)
       : null;
+
+    const enrichmentStartedAt = discoveryCompletedAt;
     const enrichmentCompletedAt =
-      overallPhase === 'complete'
-        ? (providerStatuses
-            .filter(s => s.lastUpdatedAt)
-            .sort((a, b) => b.lastUpdatedAt.localeCompare(a.lastUpdatedAt))[0]
-            ?.lastUpdatedAt ?? null)
+      overallPhase === 'complete' && isTerminalJobStatus(discoveryJob?.status)
+        ? toISOStringOrNull(discoveryJob?.updatedAt)
         : null;
 
     return NextResponse.json({

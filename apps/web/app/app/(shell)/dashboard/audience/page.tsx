@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
 import { DashboardAudienceClient } from '@/components/dashboard/organisms/DashboardAudienceClient';
+import { AudienceTableLoadingShell } from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/components/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_URL } from '@/constants/app';
@@ -28,6 +29,8 @@ async function AudienceContent({
   searchParams: Promise<SearchParams>;
 }>) {
   try {
+    const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+
     // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
 
@@ -73,10 +76,10 @@ async function AudienceContent({
           direction: parsedParams.direction,
         },
         view: parsedParams.view,
-        includeDetails: true,
+        includeDetails: !isE2E,
         segments: validSegments,
       }),
-      artist?.id
+      !isE2E && artist?.id
         ? loadUpcomingTourDates(artist.id).catch(() => [])
         : Promise.resolve([]),
     ]);
@@ -118,15 +121,7 @@ async function AudienceContent({
 }
 
 function AudienceSkeleton() {
-  return (
-    <div className='space-y-6'>
-      <div className='flex items-center justify-between'>
-        <div className='h-8 w-48 skeleton motion-reduce:animate-none rounded' />
-        <div className='h-10 w-32 skeleton motion-reduce:animate-none rounded' />
-      </div>
-      <div className='h-96 skeleton motion-reduce:animate-none rounded-lg' />
-    </div>
-  );
+  return <AudienceTableLoadingShell />;
 }
 
 export default async function AudiencePage({

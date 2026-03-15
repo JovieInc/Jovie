@@ -1,6 +1,5 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {
   lazy,
@@ -16,22 +15,26 @@ import {
 import { toast } from 'sonner';
 import {
   connectAppleMusicArtist,
-  rescanAppleMusicLinks,
   revertReleaseArtwork,
 } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
-import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import {
+  DrawerButton,
+  DrawerLoadingSkeleton,
+} from '@/components/molecules/drawer';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
+import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
-import type { ReleaseViewModel } from '@/lib/discography/types';
-import { QueryErrorBoundary } from '@/lib/queries/QueryErrorBoundary';
-import { usePlanGate } from '@/lib/queries/usePlanGate';
+import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AppleMusicSyncBanner } from './AppleMusicSyncBanner';
 import { useImportPolling } from './hooks/useImportPolling';
@@ -88,8 +91,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicArtistName = null,
   allowArtworkDownloads = false,
   initialImporting = false,
+  experienceAdapter,
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
+  const experienceMode = experienceAdapter?.mode ?? 'live';
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
   const [isImporting, setIsImporting] = useState(initialImporting);
@@ -100,7 +105,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
@@ -124,6 +129,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     handleFormatLyrics,
     isLyricsSaving,
   } = useReleaseProviderMatrix({ releases, providerConfig, primaryProviders });
+  const copyHandler = experienceAdapter?.onCopy ?? handleCopy;
 
   const [editingTrack, setEditingTrack] = useState<TrackSidebarData | null>(
     null
@@ -165,7 +171,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       durationMs: number | null;
       isrc: string | null;
       isExplicit: boolean;
-      providers: Array<{ key: string; label: string; url: string }>;
+      providers: Array<{ key: ProviderKey; label: string; url: string }>;
       releaseId: string;
       previewUrl?: string | null;
       audioUrl?: string | null;
@@ -195,15 +201,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Table display preferences (column visibility)
-  const {
-    columnVisibility,
-    rowHeight,
-    availableColumns,
-    onColumnVisibilityChange,
-    resetToDefaults,
-    groupByYear,
-    onGroupByYearChange,
-  } = useReleaseTablePreferences();
+  const { columnVisibility, rowHeight, groupByYear, onGroupByYearChange } =
+    useReleaseTablePreferences();
 
   // Filter state
   const [filters, setFilters] = useState<ReleaseFilters>(
@@ -211,18 +210,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   // Release view filter state (Tracks / Releases)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
+  const [releaseView, setReleaseView] = useState<ReleaseView>('tracks');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const deferredSearchQuery = useDeferredValue(searchQuery);
-  const searchInputRef = useCallback((node: HTMLInputElement | null) => {
-    if (node) node.focus();
-  }, []);
-
-  // Derive showTracks from releaseView toggle
-  const showTracksFromView = releaseView === 'tracks';
 
   // Apply filters and search to rows
   const filteredRows = useMemo(() => {
@@ -242,13 +234,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   }, [rows, filters, deferredSearchQuery, releaseView]);
 
   // Smart link gating
+  const planGate = usePlanGate();
   const {
     smartLinksLimit,
     isPro,
     canCreateManualReleases,
     canEditSmartLinks,
     canAccessFutureReleases,
-  } = usePlanGate();
+  } = {
+    ...planGate,
+    ...experienceAdapter?.entitlements,
+  };
 
   /** Soft cap: show a "request higher limit" banner (not a hard lock) */
   const SMART_LINK_SOFT_CAP = 100;
@@ -403,33 +399,15 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     []
   );
 
-  // Apple Music refresh handler
-  const [isAmSyncing, setIsAmSyncing] = useState(false);
-  const handleAppleMusicRescan = useCallback(async () => {
-    setIsAmSyncing(true);
-    try {
-      const result = await rescanAppleMusicLinks();
-      if (result.rateLimited) {
-        toast.error(
-          `Apple Music refresh is rate limited. Available again in ${result.retryAfter}.`
-        );
-      } else if (result.success) {
-        toast.success(result.message);
-        // Reload the page to pick up any new links
-        router.refresh();
-      } else {
-        toast.error(result.message);
-      }
-    } catch {
-      toast.error('Failed to refresh Apple Music links');
-    } finally {
-      setIsAmSyncing(false);
-    }
-  }, [router]);
+  const _isAmSyncing = false;
 
   const handleNewRelease = useCallback(() => {
+    if (experienceAdapter?.onCreateRelease) {
+      experienceAdapter.onCreateRelease();
+      return;
+    }
     setAddReleaseOpen(true);
-  }, []);
+  }, [experienceAdapter]);
 
   const handleAddReleaseCreated = useCallback(() => {
     router.refresh();
@@ -523,158 +501,98 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   ]);
 
   // Set header badge (DSP pills on left) and actions (drawer toggle on right)
-  const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
+  const { setHeaderActions } = useSetHeaderActions();
 
   // Memoize both badge and actions to avoid creating new JSX on every render
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-1'>
-        {canCreateManualReleases && (
-          <Button
-            variant='ghost'
-            size='sm'
-            onClick={handleNewRelease}
-            className='h-8 gap-1.5 border-none text-secondary-token hover:text-primary-token'
-          >
-            <Icon name='Plus' className='h-4 w-4' />
-            <span className='hidden sm:inline'>New Release</span>
-          </Button>
-        )}
-        <DrawerToggleButton />
-      </div>
-    ),
-    [handleNewRelease, canCreateManualReleases]
-  );
-
-  const spotifyBadge = useMemo(() => {
-    if (isConnected) {
-      return (
-        <button
-          type='button'
-          onClick={handleSync}
-          disabled={isSyncing}
-          className='group relative inline-flex items-center gap-1.5 rounded-md border border-[#1DB954]/28 bg-[#1DB954]/12 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-white transition-colors hover:bg-[#1DB954]/18 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1DB954]/45 focus-visible:ring-offset-2 disabled:opacity-60'
-          aria-label={
-            isSyncing ? 'Syncing with Spotify...' : 'Refresh from Spotify'
-          }
-        >
-          <SocialIcon platform='spotify' className='h-4 w-4 text-white' />
-          <span>{artistName || 'Connected'}</span>
-          {/* Status dot - visible when not hovered/syncing */}
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full bg-[#1DB954] transition-opacity duration-150',
-              'group-hover:opacity-0 group-focus-visible:opacity-0',
-              isSyncing && 'opacity-0'
-            )}
-            aria-hidden='true'
+      <div className='flex min-w-0 items-center gap-[var(--linear-app-toolbar-gap)]'>
+        <DashboardHeaderActionGroup className='min-w-0 flex-1'>
+          <HeaderSearchAction
+            searchValue={searchQuery}
+            onSearchValueChange={setSearchQuery}
+            onClearAction={() => setSearchQuery('')}
+            onApply={() => undefined}
+            placeholder='Search releases'
+            ariaLabel='Search releases'
+            submitAriaLabel='Search releases'
+            submitIcon={
+              <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
+            }
+            tooltipLabel='Search'
           />
-          {/* Refresh icon - visible on hover or when syncing */}
-          <Icon
-            name={isSyncing ? 'Loader2' : 'RefreshCw'}
-            className={cn(
-              'absolute right-2 h-4 w-4 opacity-0 transition-opacity duration-150',
-              'group-hover:opacity-100 group-focus-visible:opacity-100',
-              isSyncing && 'animate-spin opacity-100'
-            )}
-            aria-hidden='true'
+          {canCreateManualReleases ? (
+            <DashboardHeaderActionButton
+              ariaLabel='Create a new release'
+              onClick={handleNewRelease}
+              icon={
+                <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
+              }
+              label='New Release'
+              iconOnly
+              tooltipLabel='New Release'
+            />
+          ) : null}
+        </DashboardHeaderActionGroup>
+        <div className='ml-auto shrink-0'>
+          <DrawerToggleButton
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
           />
-        </button>
-      );
-    }
-
-    return (
-      <DspConnectionPill
-        provider='spotify'
-        connected={isConnected}
-        artistName={artistName}
-        onClick={isConnected ? undefined : () => setSpotifySearchOpen(true)}
-        onSyncNow={isConnected ? handleSync : undefined}
-        disabled={isSyncing}
-      />
-    );
-  }, [artistName, handleSync, isConnected, isSyncing, setSpotifySearchOpen]);
-
-  const appleMusicBadge = useMemo(
-    () => (
-      <DspConnectionPill
-        provider='apple_music'
-        connected={isAmConnected}
-        artistName={amArtistName}
-        onClick={isAmConnected ? undefined : () => setAmPaletteOpen(true)}
-        onSyncNow={isAmConnected ? handleAppleMusicRescan : undefined}
-        disabled={isAmSyncing}
-      />
-    ),
-    [isAmConnected, amArtistName, handleAppleMusicRescan, isAmSyncing]
-  );
-
-  // DSP badges for subheader (moved from header)
-  const dspBadges = useMemo(
-    () => (
-      <div className='flex items-center gap-2'>
-        {spotifyBadge}
-        {appleMusicBadge}
+        </div>
       </div>
     ),
-    [spotifyBadge, appleMusicBadge]
+    [canCreateManualReleases, handleNewRelease, searchQuery]
   );
-
-  // Header search input — shown when search is open
-  const handleSearchClose = useCallback(() => {
-    setIsSearchOpen(false);
-    setSearchQuery('');
-  }, []);
-
-  const headerBadgeContent = useMemo(() => {
-    if (!isSearchOpen) return null; // Show default breadcrumb label
-
-    return (
-      <div className='flex flex-1 items-center gap-2'>
-        <Icon
-          name='Search'
-          className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-        />
-        <input
-          ref={searchInputRef}
-          type='text'
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          onKeyDown={e => {
-            if (e.key === 'Escape') handleSearchClose();
-          }}
-          placeholder='Search releases…'
-          className='flex-1 bg-transparent text-[13px] text-primary-token placeholder:text-tertiary-token outline-none'
-          aria-label='Search releases'
-        />
-        {searchQuery && (
-          <button
-            type='button'
-            onClick={() => setSearchQuery('')}
-            className='rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
-            aria-label='Clear search'
-          >
-            <Icon name='X' className='h-3.5 w-3.5' />
-          </button>
-        )}
-      </div>
-    );
-  }, [isSearchOpen, searchQuery, handleSearchClose, searchInputRef]);
 
   useEffect(() => {
-    // Search input or null (for default breadcrumb) on left side of header
-    setHeaderBadge(headerBadgeContent);
-
-    // New Release button + drawer toggle on right side (use memoized element to prevent infinite loops)
+    // New Release button on the right side (use memoized element to prevent infinite loops)
     setHeaderActions(headerActions);
 
     return () => {
-      setHeaderBadge(null);
       setHeaderActions(null);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderBadge/setHeaderActions are stable context setters
-  }, [headerBadgeContent, headerActions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
+  }, [headerActions]);
+
+  const releaseSidebarHandlers = useMemo(
+    () => ({
+      refresh: editingRelease
+        ? () =>
+            (experienceAdapter?.onRefreshRelease ?? handleRefreshRelease)(
+              editingRelease.id
+            )
+        : undefined,
+      rescan: editingRelease
+        ? () =>
+            (experienceAdapter?.onRescanIsrc ?? handleRescanIsrc)(
+              editingRelease.id
+            )
+        : undefined,
+      artworkRevert: experienceAdapter?.onArtworkRevert
+        ? (releaseId: string) =>
+            experienceAdapter.onArtworkRevert?.(
+              releaseId,
+              editingRelease ?? null
+            ) ?? Promise.resolve(editingRelease?.artworkUrl ?? '')
+        : handleArtworkRevert,
+      formatLyrics: experienceAdapter?.onFormatLyrics
+        ? (releaseId: string, lyrics: string) =>
+            experienceAdapter.onFormatLyrics?.(releaseId, lyrics) ??
+            Promise.resolve([])
+        : handleFormatLyrics,
+    }),
+    [
+      editingRelease,
+      experienceAdapter,
+      handleArtworkRevert,
+      handleFormatLyrics,
+      handleRefreshRelease,
+      handleRescanIsrc,
+    ]
+  );
 
   // Register right panel with AuthShell - supports both release and track drawers
   const sidebarPanel = useMemo(() => {
@@ -682,9 +600,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       return (
         <Suspense
           fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
+            <DrawerLoadingSkeleton
+              ariaLabel='Loading track details'
+              width={SIDEBAR_WIDTH}
+              showTabs={false}
+              contentRows={5}
             />
           }
         >
@@ -697,52 +617,55 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         </Suspense>
       );
     }
-    if (isReleaseSidebarOpen) {
-      return (
-        <Suspense
-          fallback={
-            <div
-              className='h-full animate-pulse bg-surface-2'
-              style={{ width: SIDEBAR_WIDTH }}
-            />
-          }
-        >
-          <ReleaseSidebar
-            release={editingRelease}
-            mode='admin'
-            isOpen={isReleaseSidebarOpen}
-            providerConfig={providerConfig}
-            artistName={artistName}
-            onClose={closeEditor}
-            onRefresh={
-              editingRelease
-                ? () => handleRefreshRelease(editingRelease.id)
-                : undefined
-            }
-            isRefreshing={refreshingReleaseId === editingRelease?.id}
-            onAddDspLink={handleAddUrl}
-            onRescanIsrc={
-              editingRelease
-                ? () => handleRescanIsrc(editingRelease.id)
-                : undefined
-            }
-            isRescanningIsrc={isRescanningIsrc}
-            onArtworkUpload={handleArtworkUpload}
-            onArtworkRevert={handleArtworkRevert}
-            onReleaseChange={handleReleaseChange}
-            onSaveLyrics={handleSaveLyrics}
-            onFormatLyrics={handleFormatLyrics}
-            isLyricsSaving={isLyricsSaving}
-            isSaving={isSaving}
-            allowDownloads={allowArtworkDownloads}
-            readOnly={!canEditSmartLinks}
-            onCanvasStatusUpdate={handleCanvasStatusUpdate}
-            onTrackClick={handleTrackClickFromRelease}
+    if (!isReleaseSidebarOpen) return null;
+
+    const selectedSidebarData =
+      experienceAdapter?.sidebarDataByReleaseId?.[editingRelease?.id ?? ''];
+
+    return (
+      <Suspense
+        fallback={
+          <DrawerLoadingSkeleton
+            ariaLabel='Loading release details'
+            width={SIDEBAR_WIDTH}
+            showTabs
+            contentRows={6}
           />
-        </Suspense>
-      );
-    }
-    return null;
+        }
+      >
+        <ReleaseSidebar
+          release={editingRelease}
+          mode='admin'
+          isOpen={isReleaseSidebarOpen}
+          providerConfig={providerConfig}
+          artistName={artistName}
+          onClose={closeEditor}
+          onRefresh={releaseSidebarHandlers.refresh}
+          isRefreshing={refreshingReleaseId === editingRelease?.id}
+          onAddDspLink={experienceAdapter?.onAddDspLink ?? handleAddUrl}
+          onRescanIsrc={releaseSidebarHandlers.rescan}
+          isRescanningIsrc={isRescanningIsrc}
+          onArtworkUpload={
+            experienceAdapter?.onArtworkUpload ?? handleArtworkUpload
+          }
+          onArtworkRevert={releaseSidebarHandlers.artworkRevert}
+          onReleaseChange={handleReleaseChange}
+          onSaveLyrics={experienceAdapter?.onSaveLyrics ?? handleSaveLyrics}
+          onFormatLyrics={releaseSidebarHandlers.formatLyrics}
+          isLyricsSaving={isLyricsSaving}
+          isSaving={isSaving}
+          allowDownloads={allowArtworkDownloads}
+          onToggleArtworkDownloads={experienceAdapter?.onToggleArtworkDownloads}
+          readOnly={experienceMode === 'demo' ? false : !canEditSmartLinks}
+          analyticsOverride={selectedSidebarData?.analytics ?? null}
+          tracksOverride={selectedSidebarData?.tracks}
+          onCanvasStatusUpdate={
+            experienceAdapter?.onCanvasStatusUpdate ?? handleCanvasStatusUpdate
+          }
+          onTrackClick={handleTrackClickFromRelease}
+        />
+      </Suspense>
+    );
   }, [
     isReleaseSidebarOpen,
     isTrackSidebarOpen,
@@ -752,23 +675,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     artistName,
     closeEditor,
     closeTrackDrawer,
-    handleRefreshRelease,
+    experienceAdapter,
     handleBackToReleaseFromTrack,
     handleTrackClickFromRelease,
     refreshingReleaseId,
     handleAddUrl,
-    handleRescanIsrc,
     isRescanningIsrc,
     handleArtworkUpload,
-    handleArtworkRevert,
     handleReleaseChange,
     handleSaveLyrics,
-    handleFormatLyrics,
     isLyricsSaving,
     isSaving,
     allowArtworkDownloads,
     canEditSmartLinks,
+    experienceMode,
     handleCanvasStatusUpdate,
+    releaseSidebarHandlers,
   ]);
 
   useRegisterRightPanel(sidebarPanel);
@@ -786,45 +708,36 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             <ReleaseTableSubheader
               releases={filteredRows}
               selectedIds={selectedIds}
-              columnVisibility={columnVisibility}
-              onColumnVisibilityChange={onColumnVisibilityChange}
-              availableColumns={availableColumns}
-              onResetToDefaults={resetToDefaults}
               filters={filters}
               onFiltersChange={setFilters}
               groupByYear={groupByYear}
               onGroupByYearChange={onGroupByYearChange}
               releaseView={releaseView}
               onReleaseViewChange={setReleaseView}
-              dspBadges={dspBadges}
-              isSearchOpen={isSearchOpen}
-              onSearchToggle={() => setIsSearchOpen(open => !open)}
             />
           )}
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            {showImportProgress && (
+            {showReleasesTable && (
               <ImportProgressBanner
                 artistName={artistName}
                 importedCount={importedCount}
+                visible={showImportProgress}
               />
             )}
-
-            {showEmptyState && (
-              <ReleasesEmptyState
-                onConnectSpotify={() => setSpotifySearchOpen(true)}
-              />
-            )}
-
-            {/* Apple Music sync status banner — only when not already connected */}
             {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
               <AppleMusicSyncBanner
                 profileId={rows[0].profileId}
                 spotifyConnected={isConnected}
                 releases={rows}
-                className='mx-4 mt-2'
                 onMatchStatusChange={handleMatchStatusChange}
+                className='mx-4 mt-2'
+              />
+            )}
+            {showEmptyState && (
+              <ReleasesEmptyState
+                onConnectSpotify={() => setSpotifySearchOpen(true)}
               />
             )}
 
@@ -858,11 +771,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   releases={filteredRows}
                   providerConfig={providerConfig}
                   artistName={artistName}
-                  onCopy={handleCopy}
+                  onCopy={copyHandler}
                   onEdit={openEditor}
                   columnVisibility={columnVisibility}
                   rowHeight={rowHeight}
-                  showTracks={showTracksFromView}
                   groupByYear={groupByYear}
                   selectedReleaseId={editingRelease?.id}
                   selectedTrackId={editingTrack?.id}
@@ -878,27 +790,26 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-xl bg-surface-2'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
                   <Icon
                     name='Disc3'
-                    className='h-8 w-8 text-tertiary-token'
+                    className='h-8 w-8 text-(--linear-text-tertiary)'
                     aria-hidden='true'
                   />
                 </div>
-                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
+                <h3 className='mt-4 text-lg font-[590] text-(--linear-text-primary)'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
+                <p className='mt-1 max-w-sm text-[13px] text-(--linear-text-secondary)'>
                   {canCreateManualReleases
                     ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
                     : 'Sync your releases from Spotify to start generating smart links.'}
                 </p>
                 <div className='mt-4 flex items-center gap-3'>
-                  <Button
-                    variant='primary'
-                    size='sm'
+                  <DrawerButton
+                    tone='primary'
                     disabled={isSyncing}
-                    onClick={handleSync}
+                    onClick={experienceAdapter?.onSync ?? handleSync}
                     className='inline-flex items-center gap-2'
                     data-testid='sync-spotify-empty-state'
                   >
@@ -911,11 +822,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                       aria-hidden='true'
                     />
                     {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </Button>
+                  </DrawerButton>
                   {canCreateManualReleases && (
-                    <Button
-                      variant='secondary'
-                      size='sm'
+                    <DrawerButton
                       onClick={handleNewRelease}
                       className='inline-flex items-center gap-2'
                       data-testid='create-release-empty-state'
@@ -926,7 +835,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                         aria-hidden='true'
                       />
                       Create Release
-                    </Button>
+                    </DrawerButton>
                   )}
                 </div>
               </div>
@@ -943,7 +852,18 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         onArtistSelect={handleAppleMusicConnect}
       />
 
-      <Suspense fallback={null}>
+      <Suspense
+        fallback={
+          spotifySearchOpen ? (
+            <DialogLoadingSkeleton
+              open={spotifySearchOpen}
+              onClose={() => setSpotifySearchOpen(false)}
+              size='lg'
+              rows={3}
+            />
+          ) : null
+        }
+      >
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
@@ -952,8 +872,19 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         />
       </Suspense>
 
-      {canCreateManualReleases && (
-        <Suspense fallback={null}>
+      {experienceMode === 'live' && canCreateManualReleases && (
+        <Suspense
+          fallback={
+            addReleaseOpen ? (
+              <DrawerLoadingSkeleton
+                ariaLabel='Loading add release form'
+                width={SIDEBAR_WIDTH}
+                showTabs={false}
+                contentRows={6}
+              />
+            ) : null
+          }
+        >
           <AddReleaseSidebar
             isOpen={addReleaseOpen}
             onClose={() => setAddReleaseOpen(false)}

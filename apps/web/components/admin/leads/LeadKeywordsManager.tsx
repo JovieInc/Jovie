@@ -1,45 +1,37 @@
 'use client';
 
 import { Badge, Button, Switch, Textarea } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
-
-interface Keyword {
-  id: string;
-  query: string;
-  enabled: boolean;
-  resultsFoundTotal: number;
-  lastUsedAt: string | null;
-}
+import {
+  queryKeys,
+  useAddLeadKeywordsMutation,
+  useDeleteLeadKeywordMutation,
+  useLeadKeywordsQuery,
+  useSeedLeadKeywordsMutation,
+  useToggleLeadKeywordMutation,
+} from '@/lib/queries';
 
 export function LeadKeywordsManager() {
-  const [keywords, setKeywords] = useState<Keyword[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [newQueries, setNewQueries] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [seeding, setSeeding] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchKeywords = useCallback(async () => {
-    try {
-      const res = await fetch('/api/admin/leads/keywords', {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error('Failed to load keywords');
-      const data = (await res.json()) as { keywords: Keyword[] };
-      setKeywords(data.keywords);
-    } catch {
-      toast.error('Failed to load keywords');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data, isLoading } = useLeadKeywordsQuery();
+  const addKeywordsMutation = useAddLeadKeywordsMutation();
+  const seedFeatureFmMutation = useSeedLeadKeywordsMutation();
+  const toggleKeywordMutation = useToggleLeadKeywordMutation();
+  const deleteKeywordMutation = useDeleteLeadKeywordMutation();
+  const keywords = data?.keywords ?? [];
 
-  useEffect(() => {
-    void fetchKeywords();
-  }, [fetchKeywords]);
+  async function refreshKeywords() {
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.admin.leads.keywords(),
+    });
+  }
 
   async function addKeywords() {
     const queries = newQueries
@@ -48,54 +40,33 @@ export function LeadKeywordsManager() {
       .filter(Boolean);
     if (queries.length === 0) return;
 
-    setAdding(true);
     try {
-      const res = await fetch('/api/admin/leads/keywords', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ queries }),
-      });
-      if (!res.ok) throw new Error('Failed to add keywords');
-      const data = (await res.json()) as { count: number };
+      const data = await addKeywordsMutation.mutateAsync(queries);
       toast.success(`Added ${data.count} keywords`);
       setNewQueries('');
-      await fetchKeywords();
+      await refreshKeywords();
     } catch {
       toast.error('Failed to add keywords');
-    } finally {
-      setAdding(false);
     }
   }
 
   async function seedFeatureFm() {
-    setSeeding(true);
     try {
-      const res = await fetch('/api/admin/leads/seed', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to seed keywords');
-      const data = (await res.json()) as {
-        result: { inserted: number; skipped: number };
-      };
+      const data = await seedFeatureFmMutation.mutateAsync();
       toast.success(
         `Seeded ${data.result.inserted} Feature.fm keywords (${data.result.skipped} already existed)`
       );
-      await fetchKeywords();
+      await refreshKeywords();
     } catch {
       toast.error('Failed to seed keywords');
-    } finally {
-      setSeeding(false);
     }
   }
 
   async function toggleKeyword(id: string, enabled: boolean) {
     setTogglingId(id);
     try {
-      const res = await fetch('/api/admin/leads/keywords', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, enabled }),
-      });
-      if (!res.ok) throw new Error('Failed to toggle keyword');
-      setKeywords(prev => prev.map(k => (k.id === id ? { ...k, enabled } : k)));
+      await toggleKeywordMutation.mutateAsync({ id, enabled });
+      await refreshKeywords();
     } catch {
       toast.error('Failed to toggle keyword');
     } finally {
@@ -106,14 +77,9 @@ export function LeadKeywordsManager() {
   async function deleteKeyword(id: string) {
     setDeletingId(id);
     try {
-      const res = await fetch('/api/admin/leads/keywords', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) throw new Error('Failed to delete keyword');
-      setKeywords(prev => prev.filter(k => k.id !== id));
+      await deleteKeywordMutation.mutateAsync(id);
       toast.success('Keyword deleted');
+      await refreshKeywords();
     } catch {
       toast.error('Failed to delete keyword');
     } finally {
@@ -121,7 +87,7 @@ export function LeadKeywordsManager() {
     }
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className='rounded-lg border border-subtle p-4 text-sm text-secondary-token'>
         Loading keywords...
@@ -138,7 +104,7 @@ export function LeadKeywordsManager() {
           </h2>
           <p className='mt-1 text-xs text-secondary-token'>
             Google CSE queries used to find new Linktree leads.{' '}
-            {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}{' '}
+            {keywords.length} keyword{keywords.length === 1 ? '' : 's'}{' '}
             configured.
           </p>
         </div>
@@ -146,9 +112,9 @@ export function LeadKeywordsManager() {
           variant='outline'
           size='sm'
           onClick={() => void seedFeatureFm()}
-          disabled={seeding}
+          disabled={seedFeatureFmMutation.isPending}
         >
-          {seeding ? (
+          {seedFeatureFmMutation.isPending ? (
             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
           ) : (
             <Sparkles className='mr-2 h-4 w-4' />
@@ -185,13 +151,13 @@ export function LeadKeywordsManager() {
                   type='button'
                   onClick={() => void deleteKeyword(keyword.id)}
                   disabled={deletingId === keyword.id}
-                  className='text-secondary-token hover:text-destructive disabled:opacity-50'
-                  aria-label={`Delete ${keyword.query}`}
+                  className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                  title='Delete keyword'
                 >
                   {deletingId === keyword.id ? (
-                    <Loader2 className='h-3.5 w-3.5 animate-spin' />
+                    <Loader2 className='h-4 w-4 animate-spin' />
                   ) : (
-                    <Trash2 className='h-3.5 w-3.5' />
+                    <Trash2 className='h-4 w-4' />
                   )}
                 </button>
               </div>
@@ -202,20 +168,20 @@ export function LeadKeywordsManager() {
 
       <div className='space-y-2'>
         <Textarea
+          rows={3}
           value={newQueries}
           onChange={e => setNewQueries(e.target.value)}
-          placeholder={
-            'Add keywords (one per line):\nsite:linktr.ee "ffm.to"\nsite:linktr.ee "feature.fm" spotify'
-          }
-          rows={3}
+          placeholder='One keyword per line\nsite:linktr.ee "music" "spotify"\nsite:linktr.ee "artist" "tour"'
           className='text-xs'
         />
         <Button
           size='sm'
           onClick={() => void addKeywords()}
-          disabled={adding || !newQueries.trim()}
+          disabled={
+            addKeywordsMutation.isPending || newQueries.trim().length === 0
+          }
         >
-          {adding ? (
+          {addKeywordsMutation.isPending ? (
             <Loader2 className='mr-2 h-4 w-4 animate-spin' />
           ) : (
             <Plus className='mr-2 h-4 w-4' />

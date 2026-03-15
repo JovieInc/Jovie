@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { PageToolbar } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
 
 interface AdminTableHeaderProps {
@@ -9,7 +11,9 @@ interface AdminTableHeaderProps {
 }
 
 interface AdminTableSubheaderProps {
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
+  readonly start?: ReactNode;
+  readonly end?: ReactNode;
   readonly className?: string;
 }
 
@@ -20,28 +24,41 @@ export function AdminTableHeader({
   className,
 }: Readonly<AdminTableHeaderProps>) {
   return (
-    <div
+    <ContentSectionHeader
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
       className={cn(
-        'flex flex-wrap items-start justify-between gap-3 border-b border-subtle px-3 py-3 sm:px-4',
+        'bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_0_var(--linear-app-frame-seam)]',
         className
       )}
-    >
-      <div className='space-y-1'>
-        <h2 className='text-sm font-semibold text-primary-token'>{title}</h2>
-        <p className='text-xs text-secondary-token'>{subtitle}</p>
-      </div>
-      {actions ? <div className='w-full sm:w-auto'>{actions}</div> : null}
-    </div>
+    />
   );
 }
 
 export function AdminTableSubheader({
   children,
+  start,
+  end,
   className,
 }: Readonly<AdminTableSubheaderProps>) {
+  const hasToolbar = start !== undefined || end !== undefined;
+  const toolbarContent = hasToolbar ? (
+    <PageToolbar start={start ?? null} end={end} />
+  ) : (
+    children
+  );
+
   return (
-    <div className={cn('border-b border-subtle px-3 py-2 sm:px-4', className)}>
-      {children}
+    <div
+      className={cn(
+        hasToolbar
+          ? 'bg-(--linear-app-content-surface)'
+          : 'border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-[var(--linear-app-header-padding-x)] py-2',
+        className
+      )}
+    >
+      {toolbarContent}
     </div>
   );
 }

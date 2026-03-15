@@ -27,6 +27,13 @@ import {
 import { processCampaigns } from '@/lib/email/campaigns/processor';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import {
+  claimPendingJobs,
+  handleIngestionJobFailure,
+  processJob,
+  succeedJob,
+} from '@/lib/ingestion/processor';
+import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { runDiscovery } from '@/lib/leads/discovery';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
@@ -211,6 +218,42 @@ export async function GET(request: Request) {
     }
   } else {
     results.alphabetCache = { success: true, skipped: true };
+  }
+
+  // 7. Fallback ingestion job processing — drains up to 2 jobs if the
+  //    dedicated cron hasn't picked them up. Runs last to stay within budget.
+  const elapsed = Date.now() - startTime;
+  if (elapsed < 50_000) {
+    results.ingestionFallback = await runSubJob(
+      'ingestionFallback',
+      async () => {
+        const fallbackNow = new Date();
+        const claimed = await withSystemIngestionSession(tx =>
+          claimPendingJobs(tx, fallbackNow, 2)
+        );
+        let processed = 0;
+        for (const job of claimed) {
+          try {
+            await withSystemIngestionSession(async tx => {
+              await processJob(tx, job);
+              await succeedJob(tx, job);
+            });
+            processed++;
+          } catch (error) {
+            await withSystemIngestionSession(tx =>
+              handleIngestionJobFailure(tx, job, error)
+            );
+            logger.error('[frequent-cron] ingestion fallback job failed', {
+              jobId: job.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+        return { claimed: claimed.length, processed };
+      }
+    );
+  } else {
+    results.ingestionFallback = { success: true, skipped: true };
   }
 
   const duration = Date.now() - startTime;

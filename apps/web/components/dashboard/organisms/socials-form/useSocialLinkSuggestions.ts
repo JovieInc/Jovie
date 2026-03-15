@@ -1,10 +1,14 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
-import { STANDARD_CACHE } from '@/lib/queries/cache-strategies';
-import { queryKeys } from '@/lib/queries/keys';
+import {
+  createMutationFn,
+  fetchWithTimeout,
+  queryKeys,
+  STANDARD_CACHE,
+} from '@/lib/queries';
 
 export interface SocialLinkSuggestion {
   id: string;
@@ -23,6 +27,11 @@ interface UseSocialLinkSuggestionsReturn {
   dismiss: (suggestion: SocialLinkSuggestion) => Promise<void>;
 }
 
+interface SuggestionsApiResponse {
+  success: boolean;
+  suggestions: ProfileSuggestion[];
+}
+
 function toSocialLinkSuggestion(s: ProfileSuggestion): SocialLinkSuggestion {
   return {
     id: s.id,
@@ -38,18 +47,24 @@ async function fetchSocialLinkSuggestions(
   profileId: string,
   signal?: AbortSignal
 ): Promise<SocialLinkSuggestion[]> {
-  const res = await fetch(
-    `/api/suggestions?profileId=${encodeURIComponent(profileId)}`,
-    { signal }
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
-  if (data.success && Array.isArray(data.suggestions)) {
-    return (data.suggestions as ProfileSuggestion[])
-      .filter(s => s.type === 'social_link')
-      .map(toSocialLinkSuggestion);
+  try {
+    const data = await fetchWithTimeout<SuggestionsApiResponse>(
+      `/api/suggestions?profileId=${encodeURIComponent(profileId)}`,
+      { signal }
+    );
+    if (data.success && Array.isArray(data.suggestions)) {
+      return data.suggestions
+        .filter(s => s.type === 'social_link')
+        .map(toSocialLinkSuggestion);
+    }
+    return [];
+  } catch {
+    return [];
   }
-  return [];
+}
+
+interface SuggestionActionInput {
+  profileId: string;
 }
 
 export function useSocialLinkSuggestions(
@@ -65,62 +80,62 @@ export function useSocialLinkSuggestions(
     ...STANDARD_CACHE,
   });
 
-  const confirm = useCallback(
-    async (suggestion: SocialLinkSuggestion) => {
-      if (actioningId || !profileId) return;
-      setActioningId(suggestion.id);
-      try {
-        const res = await fetch(
-          `/api/suggestions/social-links/${suggestion.id}/approve`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId }),
-          }
-        );
-        if (res.ok) {
-          // Optimistically remove from cache
-          queryClient.setQueryData<SocialLinkSuggestion[]>(
-            queryKeys.suggestions.list(profileId),
-            old => old?.filter(s => s.id !== suggestion.id) ?? []
-          );
-          queryClient.invalidateQueries({
-            queryKey: queryKeys.dashboard.socialLinks(profileId),
-          });
-        }
-      } finally {
-        setActioningId(null);
-      }
+  const approveMutation = useMutation({
+    mutationFn: ({
+      suggestionId,
+      profileId: pid,
+    }: SuggestionActionInput & { suggestionId: string }) =>
+      createMutationFn<{ profileId: string }, Record<string, unknown>>(
+        `/api/suggestions/social-links/${suggestionId}/approve`,
+        'POST'
+      )({ profileId: pid }),
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<SocialLinkSuggestion[]>(
+        queryKeys.suggestions.list(variables.profileId),
+        old => old?.filter(s => s.id !== variables.suggestionId) ?? []
+      );
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.dashboard.socialLinks(variables.profileId),
+      });
     },
-    [actioningId, profileId, queryClient]
-  );
+    onSettled: () => setActioningId(null),
+  });
 
-  const dismiss = useCallback(
-    async (suggestion: SocialLinkSuggestion) => {
-      if (actioningId || !profileId) return;
-      setActioningId(suggestion.id);
-      try {
-        const res = await fetch(
-          `/api/suggestions/social-links/${suggestion.id}/reject`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profileId }),
-          }
-        );
-        if (res.ok) {
-          // Optimistically remove from cache
-          queryClient.setQueryData<SocialLinkSuggestion[]>(
-            queryKeys.suggestions.list(profileId),
-            old => old?.filter(s => s.id !== suggestion.id) ?? []
-          );
-        }
-      } finally {
-        setActioningId(null);
-      }
+  const rejectMutation = useMutation({
+    mutationFn: ({
+      suggestionId,
+      profileId: pid,
+    }: SuggestionActionInput & { suggestionId: string }) =>
+      createMutationFn<{ profileId: string }, Record<string, unknown>>(
+        `/api/suggestions/social-links/${suggestionId}/reject`,
+        'POST'
+      )({ profileId: pid }),
+    onSuccess: (_, variables) => {
+      queryClient.setQueryData<SocialLinkSuggestion[]>(
+        queryKeys.suggestions.list(variables.profileId),
+        old => old?.filter(s => s.id !== variables.suggestionId) ?? []
+      );
     },
-    [actioningId, profileId, queryClient]
-  );
+    onSettled: () => setActioningId(null),
+  });
+
+  const confirm = async (suggestion: SocialLinkSuggestion) => {
+    if (actioningId || !profileId) return;
+    setActioningId(suggestion.id);
+    await approveMutation.mutateAsync({
+      suggestionId: suggestion.id,
+      profileId,
+    });
+  };
+
+  const dismiss = async (suggestion: SocialLinkSuggestion) => {
+    if (actioningId || !profileId) return;
+    setActioningId(suggestion.id);
+    await rejectMutation.mutateAsync({
+      suggestionId: suggestion.id,
+      profileId,
+    });
+  };
 
   return { suggestions, isLoading, actioningId, confirm, dismiss };
 }

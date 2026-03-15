@@ -24,10 +24,7 @@ vi.mock('@/lib/queries/mutation-utils', () => ({
 }));
 
 // ---- import after mocks ----
-import {
-  useDeleteAccountMutation,
-  useExportDataMutation,
-} from '@/lib/queries/useAccountMutations';
+import { useDeleteAccountMutation, useExportDataMutation } from '@/lib/queries';
 
 // ---- helpers ----
 function createWrapper() {

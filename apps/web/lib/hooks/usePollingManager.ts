@@ -16,6 +16,28 @@ export interface PollingManagerState {
   pauseReasons: PauseReason[];
 }
 
+/**
+ * Returns a TanStack Query-compatible `refetchInterval` value that pauses
+ * polling when the page is hidden or a sidebar is open.
+ *
+ * @param baseInterval - The desired polling interval in ms (e.g. 2000).
+ * @param options - Visibility / sidebar options forwarded to `usePollingManager`.
+ * @returns `baseInterval` when polling should be active, `false` when paused.
+ *
+ * @example
+ * ```tsx
+ * const refetchInterval = useSmartRefetchInterval(5000, { isSidebarOpen });
+ * useQuery({ queryKey: ['data'], queryFn: fetchData, refetchInterval });
+ * ```
+ */
+export function useSmartRefetchInterval(
+  baseInterval: number,
+  options: PollingManagerOptions = {}
+): number | false {
+  const { isPaused } = usePollingManager(options);
+  return isPaused ? false : baseInterval;
+}
+
 export function usePollingManager({
   isSidebarOpen = false,
   pauseWhenHidden = true,

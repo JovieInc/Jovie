@@ -10,6 +10,7 @@
 import { useCallback, useTransition } from 'react';
 import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { env } from '@/lib/env-client';
 import type { ReleasesEmptyStateAction } from '../types';
 
 export interface SpotifyArtist {
@@ -44,6 +45,7 @@ export function useSpotifyConnect({
   fireAndForget = false,
 }: UseSpotifyConnectParams) {
   const [isPending, startTransition] = useTransition();
+  const includeTracks = env.IS_E2E ? false : undefined;
 
   // Extract Spotify artist ID from URL
   const extractSpotifyArtistId = useCallback((input: string): string | null => {
@@ -68,6 +70,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artistId,
           spotifyArtistUrl: artistUrl,
           artistName: '',
+          includeTracks,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });
@@ -81,6 +84,7 @@ export function useSpotifyConnect({
             spotifyArtistId: artistId,
             spotifyArtistUrl: artistUrl,
             artistName: '',
+            includeTracks,
           });
 
           if (result.success) {
@@ -107,7 +111,14 @@ export function useSpotifyConnect({
         }
       });
     },
-    [dispatch, searchClear, onConnected, onImportStart, fireAndForget]
+    [
+      dispatch,
+      searchClear,
+      onConnected,
+      onImportStart,
+      fireAndForget,
+      includeTracks,
+    ]
   );
 
   // Handle selection from search results
@@ -124,6 +135,7 @@ export function useSpotifyConnect({
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
           artistName: artist.name,
+          includeTracks,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });
@@ -137,6 +149,7 @@ export function useSpotifyConnect({
             spotifyArtistId: artist.id,
             spotifyArtistUrl: artist.url,
             artistName: artist.name,
+            includeTracks,
           });
 
           if (result.success) {
@@ -162,7 +175,14 @@ export function useSpotifyConnect({
         }
       });
     },
-    [searchClear, dispatch, onConnected, onImportStart, fireAndForget]
+    [
+      searchClear,
+      dispatch,
+      onConnected,
+      onImportStart,
+      fireAndForget,
+      includeTracks,
+    ]
   );
 
   return {

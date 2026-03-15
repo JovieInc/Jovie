@@ -6,7 +6,7 @@ import {
   STABLE_CACHE,
   STANDARD_CACHE,
   STATIC_CACHE,
-} from '@/lib/queries/cache-strategies';
+} from '@/lib/queries';
 
 // Time constants for assertions
 const SECOND = 1000;

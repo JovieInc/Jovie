@@ -59,12 +59,12 @@ function ShortcutItem({ shortcut }: { shortcut: KeyboardShortcut }) {
   const Icon = shortcut.icon;
 
   return (
-    <div className='flex items-center justify-between py-2 px-3 rounded-lg hover:bg-surface-2 transition-colors'>
+    <div className='group flex items-center justify-between rounded-[8px] border border-transparent px-2.5 py-1.5 transition-colors hover:border-subtle/70 hover:bg-surface-1'>
       <div className='flex items-center gap-3 min-w-0'>
         {Icon && (
           <Icon className='h-4 w-4 shrink-0 text-tertiary-token' aria-hidden />
         )}
-        <span className='text-sm text-primary-token truncate'>
+        <span className='text-[13px] text-primary-token truncate'>
           {shortcut.label}
         </span>
       </div>
@@ -86,8 +86,8 @@ function ShortcutCategorySection({
   if (shortcuts.length === 0) return null;
 
   return (
-    <div className='space-y-1'>
-      <h3 className='text-xs font-medium text-tertiary-token uppercase tracking-wider px-3 py-2'>
+    <section className='space-y-1'>
+      <h3 className='px-2.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.08em] text-tertiary-token'>
         {SHORTCUT_CATEGORY_LABELS[category]}
       </h3>
       <div className='space-y-0.5'>
@@ -95,7 +95,7 @@ function ShortcutCategorySection({
           <ShortcutItem key={shortcut.id} shortcut={shortcut} />
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
@@ -167,66 +167,66 @@ export function KeyboardShortcutsSheet() {
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
       <SheetContent
         side='right'
-        className='w-full sm:max-w-md p-0 flex flex-col gap-0 top-1 right-1 bottom-1 h-auto rounded-xl border border-subtle'
+        className='top-2 right-2 bottom-2 flex h-auto w-full flex-col gap-0 rounded-[12px] border border-subtle/90 bg-surface-0 p-0 sm:max-w-[26rem]'
         hideClose
         onAnimationEnd={handleAnimationEnd}
       >
-        {/* Header with back button and title */}
-        <SheetHeader className='px-4 py-3 border-b border-subtle flex-shrink-0 flex-row items-center gap-3 space-y-0'>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-8 w-8 shrink-0'
-            onClick={close}
-            aria-label='Close keyboard shortcuts'
-          >
-            <ChevronLeft className='h-4 w-4' />
-          </Button>
-          <SheetTitle className='text-sm font-medium'>
-            Keyboard Shortcuts
-          </SheetTitle>
-          <Button
-            variant='ghost'
-            size='icon'
-            className='h-8 w-8 shrink-0 ml-auto'
-            onClick={close}
-            aria-label='Close'
-          >
-            <X className='h-4 w-4' />
-          </Button>
-        </SheetHeader>
+        <div className='sticky top-0 z-10 shrink-0 border-b border-subtle/80 bg-surface-0/95 backdrop-blur-md'>
+          <SheetHeader className='flex flex-row items-center gap-2 space-y-0 px-3.5 py-2.5'>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='h-8 w-8 shrink-0'
+              onClick={close}
+              aria-label='Close keyboard shortcuts'
+            >
+              <ChevronLeft className='h-4 w-4' />
+            </Button>
+            <SheetTitle className='text-[13px] font-medium tracking-[-0.01em]'>
+              Keyboard Shortcuts
+            </SheetTitle>
+            <Button
+              variant='ghost'
+              size='icon'
+              className='ml-auto h-8 w-8 shrink-0'
+              onClick={close}
+              aria-label='Close'
+            >
+              <X className='h-4 w-4' />
+            </Button>
+          </SheetHeader>
 
-        {/* Search input */}
-        <div className='px-4 py-3 border-b border-subtle flex-shrink-0'>
-          <div className='relative'>
-            <Search className='absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-tertiary-token' />
-            <Input
-              ref={inputRef}
-              type='text'
-              placeholder='Search shortcuts'
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className='pl-9 bg-surface-2 border-subtle'
-              inputSize='sm'
-            />
-            {searchQuery && (
-              <Button
-                variant='ghost'
-                size='icon'
-                className='absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6'
-                onClick={() => setSearchQuery('')}
-                aria-label='Clear search'
-              >
-                <X className='h-3 w-3' />
-              </Button>
-            )}
+          <div className='border-t border-subtle/60 px-3.5 py-2.5'>
+            <div className='relative'>
+              <Search className='absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tertiary-token' />
+              <Input
+                ref={inputRef}
+                type='text'
+                placeholder='Search shortcuts'
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className='border-subtle bg-surface-1 pl-9 text-[13px]'
+                inputSize='sm'
+              />
+              {searchQuery && (
+                <Button
+                  variant='ghost'
+                  size='icon'
+                  className='absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2'
+                  onClick={() => setSearchQuery('')}
+                  aria-label='Clear search'
+                >
+                  <X className='h-3 w-3' />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Shortcuts list */}
-        <div className='flex-1 overflow-y-auto px-2 py-3'>
+        <div className='flex-1 overflow-y-auto px-2 py-2.5'>
           {hasResults ? (
-            <div className='space-y-4'>
+            <div className='space-y-4 pb-1'>
               {categoryOrder.map(category => (
                 <ShortcutCategorySection
                   key={category}

@@ -1,25 +1,55 @@
 (function () {
   try {
-    if (typeof globalThis.matchMedia !== 'function') return;
-    // Guard against null localStorage (private browsing, restricted contexts)
-    if (typeof localStorage === 'undefined' || !localStorage) return;
-    var ls = localStorage.getItem('jovie-theme');
-    var mql = globalThis.matchMedia('(prefers-color-scheme: dark)');
-    var systemPref = mql.matches ? 'dark' : 'light';
-    var pref = ls && ls !== 'system' ? ls : systemPref;
     var root = document.documentElement;
-    if (pref === 'dark') root.classList.add('dark');
-    else root.classList.remove('dark');
+    var pathname = globalThis.location?.pathname ?? '/';
+    var isThemeEnabledRoute =
+      pathname.startsWith('/app') || pathname.startsWith('/onboarding');
 
-    // Update theme-color meta tag to match active theme (PWA system bar color)
-    var themeColor = pref === 'dark' ? '#0a0a0a' : '#ffffff';
-    var metaTheme = document.querySelector('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.setAttribute('content', themeColor);
+    if (isThemeEnabledRoute) {
+      var storageValue =
+        typeof localStorage !== 'undefined'
+          ? localStorage.getItem('jovie-theme')
+          : null;
+      var theme =
+        storageValue === 'light' ||
+        storageValue === 'dark' ||
+        storageValue === 'system'
+          ? storageValue
+          : 'system';
+
+      var systemPrefersDark =
+        typeof globalThis.matchMedia === 'function' &&
+        globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
+      var resolvedDark =
+        theme === 'dark' || (theme === 'system' && systemPrefersDark);
+
+      root.classList.toggle('dark', resolvedDark);
+      root.style.colorScheme = resolvedDark ? 'dark' : 'light';
+
+      var metaThemeEnabled = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeEnabled) {
+        metaThemeEnabled.setAttribute(
+          'content',
+          resolvedDark ? '#0a0a0a' : '#ffffff'
+        );
+      }
+    } else {
+      // Public surfaces are intentionally forced dark.
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
+
+      var metaThemeDark = document.querySelector('meta[name="theme-color"]');
+      if (metaThemeDark) {
+        metaThemeDark.setAttribute('content', '#0a0a0a');
+      }
+    }
 
     // High contrast mode (independent of light/dark)
-    var hc = localStorage.getItem('jovie-high-contrast');
-    if (hc === 'true') root.classList.add('high-contrast');
-    else root.classList.remove('high-contrast');
+    if (typeof localStorage !== 'undefined' && localStorage) {
+      var hc = localStorage.getItem('jovie-high-contrast');
+      if (hc === 'true') root.classList.add('high-contrast');
+      else root.classList.remove('high-contrast');
+    }
   } catch {
     // Theme detection failed - defaults will apply
   }

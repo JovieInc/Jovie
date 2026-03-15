@@ -10,6 +10,7 @@
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -28,6 +29,16 @@ interface UseReleaseHeaderPartsProps {
   readonly isRefreshing?: boolean;
   readonly onCopySmartLink: () => void;
   readonly onClose?: () => void;
+}
+
+function buildTitleText(
+  isrcValue: string | null | undefined,
+  hasRelease: boolean,
+  release: Release | null
+): string {
+  if (isrcValue) return isrcValue;
+  if (hasRelease && release?.title) return release.title;
+  return 'No release selected';
 }
 
 /**
@@ -63,25 +74,36 @@ export function useReleaseHeaderParts({
     copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
   }, [onCopySmartLink]);
 
-  const handleCopyReleaseId = useCallback(() => {
+  const handleOpenSmartLink = useCallback(() => {
+    if (!release?.smartLinkPath) return;
+    globalThis.open(release.smartLinkPath, '_blank', 'noopener,noreferrer');
+  }, [release?.smartLinkPath]);
+
+  const handleRefreshClick = useCallback(() => {
+    if (isRefreshing) return;
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    globalThis.location.reload();
+  }, [isRefreshing, onRefresh]);
+
+  const handleCopyReleaseId = useCallback(async () => {
     const releaseId = release?.id ?? '';
     if (!releaseId) {
       alert('No release ID available to copy.');
       return;
     }
-
-    navigator.clipboard
-      ?.writeText(releaseId)
-      .then(() => {
-        setIsIdCopied(true);
-        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
-      })
-      .catch(() => {
-        alert(
-          'Failed to copy the release ID. Your browser may not allow clipboard access.'
-        );
-      });
+    try {
+      await navigator.clipboard?.writeText(releaseId);
+      setIsIdCopied(true);
+      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+    } catch {
+      alert(
+        'Failed to copy the release ID. Your browser may not allow clipboard access.'
+      );
+    }
   }, [release]);
 
   const overflowActions: DrawerHeaderAction[] = [];
@@ -101,27 +123,13 @@ export function useReleaseHeaderParts({
         id: 'open',
         label: 'Open smart link',
         icon: ExternalLink,
-        onClick: () => {
-          if (!release?.smartLinkPath) return;
-          globalThis.open(
-            release.smartLinkPath,
-            '_blank',
-            'noopener,noreferrer'
-          );
-        },
+        onClick: handleOpenSmartLink,
       },
       {
         id: 'refresh',
         label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
         icon: RefreshCw,
-        onClick: () => {
-          if (isRefreshing) return;
-          if (onRefresh) {
-            onRefresh();
-            return;
-          }
-          globalThis.location.reload();
-        },
+        onClick: handleRefreshClick,
       }
     );
     /* eslint-enable react-hooks/refs */
@@ -140,40 +148,36 @@ export function useReleaseHeaderParts({
   }
 
   const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
-  const titleText = isrcValue
-    ? isrcValue
-    : hasRelease && release?.title
-      ? release.title
-      : 'No release selected';
+  const titleText = buildTitleText(isrcValue, hasRelease, release);
 
-  const handleCopyIsrc = useCallback(() => {
+  const handleCopyIsrc = useCallback(async () => {
     if (!isrcValue) return;
-    navigator.clipboard
-      ?.writeText(isrcValue)
-      .then(() => {
-        setIsIdCopied(true);
-        if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-        idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
-      })
-      .catch(() => {});
+    try {
+      await navigator.clipboard?.writeText(isrcValue);
+      setIsIdCopied(true);
+      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
+      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
+    } catch {}
   }, [isrcValue]);
 
   const title = (
     <span className='group/isrc flex min-w-0 items-center gap-1'>
-      <span className='truncate font-mono'>{titleText}</span>
+      <span className='truncate font-mono text-[11.5px] tracking-[0.04em] text-(--linear-text-tertiary)'>
+        {titleText}
+      </span>
       {isrcValue && (
-        <button
-          type='button'
+        <DrawerInlineIconButton
           onClick={handleCopyIsrc}
           title={isIdCopied ? 'Copied!' : 'Copy ISRC'}
-          className='shrink-0 rounded p-0.5 text-tertiary-token opacity-0 transition-opacity group-hover/isrc:opacity-100 hover:text-primary-token'
+          fadeOnParentHover
+          className='group-hover/isrc:opacity-100 group-focus-within/isrc:opacity-100'
         >
           {isIdCopied ? (
             <Check className='h-3 w-3' />
           ) : (
             <Copy className='h-3 w-3' />
           )}
-        </button>
+        </DrawerInlineIconButton>
       )}
     </span>
   );

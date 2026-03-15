@@ -4,6 +4,7 @@ import { Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { getProfileModeHref } from '@/components/profile/registry';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { ContactDrawer } from './ContactDrawer';
 import type { ArtistContactsButtonProps } from './types';
@@ -15,14 +16,8 @@ export function ArtistContactsButton({
   artistName,
   onNavigate,
 }: ArtistContactsButtonProps) {
-  const {
-    available,
-    performAction,
-    onIconClick,
-    primaryChannel,
-    buildTerritoryLabel,
-    isEnabled,
-  } = useArtistContacts({ contacts, artistHandle, onNavigate });
+  const { available, onIconClick, primaryChannel, isEnabled } =
+    useArtistContacts({ contacts, artistHandle, onNavigate });
 
   const isMobile = useBreakpointDown('md');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -40,7 +35,7 @@ export function ArtistContactsButton({
           variant='ghost'
           ariaLabel='Contacts'
           data-testid='contacts-trigger'
-          className='border border-transparent hover:border-subtle hover:bg-surface-2'
+          className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
           onClick={() => {
             onIconClick();
             setDrawerOpen(true);
@@ -54,9 +49,7 @@ export function ArtistContactsButton({
           artistName={artistName}
           artistHandle={artistHandle}
           contacts={available}
-          performAction={performAction}
           primaryChannel={primaryChannel}
-          buildTerritoryLabel={buildTerritoryLabel}
         />
       </>
     );
@@ -69,10 +62,10 @@ export function ArtistContactsButton({
       variant='ghost'
       ariaLabel='Contacts'
       data-testid='contacts-trigger'
-      className='border border-transparent hover:border-subtle hover:bg-surface-2'
+      className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
       asChild
     >
-      <Link href={`/${artistHandle}?mode=contact`}>
+      <Link href={getProfileModeHref(artistHandle, 'contact')}>
         <Mail className='h-4 w-4' aria-hidden='true' />
       </Link>
     </CircleIconButton>

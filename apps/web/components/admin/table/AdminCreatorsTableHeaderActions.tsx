@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { PanelRight, PanelRightOpen } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 
 export interface AdminCreatorsTableHeaderActionsProps {
@@ -42,16 +42,14 @@ export function AdminCreatorsTableHeaderActions({
       <div className='h-6 w-px bg-border' aria-hidden='true' />
 
       {/* Drawer toggle button */}
-      <Button
-        variant='ghost'
-        size='icon'
+      <AppIconButton
         onClick={() => tableMeta.toggle?.()}
         aria-label='Toggle contact details'
-        className='h-8 w-8 rounded-md text-tertiary-token transition-colors hover:bg-surface-2 hover:text-primary-token'
+        className='h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
         disabled={!tableMeta.toggle}
       >
         <DrawerIcon className='h-3.5 w-3.5' />
-      </Button>
+      </AppIconButton>
     </div>
   );
 }

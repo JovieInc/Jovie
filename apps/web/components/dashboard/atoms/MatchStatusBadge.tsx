@@ -16,23 +16,24 @@ const STATUS_STYLES: Record<
   suggested: {
     label: 'Suggested',
     className:
-      'border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      'border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400',
     dotClassName: 'bg-blue-500',
   },
   confirmed: {
     label: 'Confirmed',
-    className: 'border-green-500/30 bg-green-500/10 text-success',
+    className: 'border-green-500/25 bg-green-500/10 text-success',
     dotClassName: 'bg-green-500',
   },
   auto_confirmed: {
     label: 'Auto-confirmed',
-    className: 'border-green-500/30 bg-green-500/10 text-success',
+    className: 'border-green-500/25 bg-green-500/10 text-success',
     dotClassName: 'bg-green-500',
   },
   rejected: {
     label: 'Rejected',
-    className: 'border-subtle bg-surface-2/40 text-tertiary-token',
-    dotClassName: 'bg-tertiary-token',
+    className:
+      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)',
+    dotClassName: 'bg-(--linear-text-tertiary)',
   },
 };
 

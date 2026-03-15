@@ -1,13 +1,19 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Input } from '@jovie/ui';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  DrawerButton,
+  DrawerFormField,
+  DrawerSurfaceCard,
+} from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
-import { useCreateInviteMutation } from '@/lib/queries/useInviteMutation';
+import { useCreateInviteMutation } from '@/lib/queries';
 import { normalizeEmail } from '@/lib/utils/email';
 
 interface SendInviteDialogProps {
@@ -26,16 +32,29 @@ export function SendInviteDialog({
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // TanStack Query mutation for cache invalidation
   const createInviteMutation = useCreateInviteMutation();
 
-  if (!profile) return null;
+  useEffect(() => {
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const isLoading = createInviteMutation.isPending;
 
+  if (!profile) return null;
+
   const handleClose = () => {
     if (!isLoading) {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
       setEmail('');
       setError(null);
       setSuccess(false);
@@ -78,7 +97,7 @@ export function SendInviteDialog({
       setEmail('');
 
       // Close dialog after showing success briefly
-      setTimeout(() => {
+      successTimeoutRef.current = setTimeout(() => {
         handleClose();
         onSuccess?.();
       }, 1500);
@@ -95,7 +114,7 @@ export function SendInviteDialog({
       <DialogBody>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {/* Profile info */}
-          <div className='flex items-center gap-3 rounded-lg border border-subtle bg-surface-2/50 p-3'>
+          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-(--linear-bg-surface-0) p-3'>
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
@@ -107,28 +126,28 @@ export function SendInviteDialog({
                 unoptimized={profile.avatarUrl.includes('i.scdn.co')}
               />
             ) : (
-              <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-3'>
-                <Icon name='User' className='h-5 w-5 text-tertiary-token' />
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+                <Icon
+                  name='User'
+                  className='h-5 w-5 text-(--linear-text-tertiary)'
+                />
               </div>
             )}
             <div>
-              <p className='text-sm font-medium text-primary-token'>
+              <p className='text-sm font-medium text-(--linear-text-primary)'>
                 {profile.displayName || profile.username}
               </p>
-              <p className='text-xs text-secondary-token'>
+              <p className='text-xs text-(--linear-text-secondary)'>
                 @{profile.username}
               </p>
             </div>
-          </div>
+          </ContentSurfaceCard>
 
           {/* Email input */}
-          <div className='space-y-2'>
-            <label
-              htmlFor='invite-email'
-              className='text-sm font-medium text-primary-token'
-            >
-              Email Address
-            </label>
+          <DrawerFormField
+            label='Email Address'
+            helperText='An invite will be queued to send to this email address'
+          >
             <Input
               id='invite-email'
               type='email'
@@ -141,25 +160,22 @@ export function SendInviteDialog({
               autoFocus
               className='w-full'
             />
-            <p className='text-xs text-secondary-token'>
-              An invite will be queued to send to this email address
-            </p>
-          </div>
+          </DrawerFormField>
 
           {/* Error message */}
           {error && (
-            <div className='flex items-center gap-2 rounded-lg bg-destructive/10 px-3 py-2'>
+            <DrawerSurfaceCard className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'>
               <Icon
                 name='XCircle'
                 className='h-3.5 w-3.5 text-destructive shrink-0'
               />
               <p className='text-xs font-medium text-destructive'>{error}</p>
-            </div>
+            </DrawerSurfaceCard>
           )}
 
           {/* Success message */}
           {success && (
-            <div className='flex items-center gap-2 rounded-lg bg-success/10 px-3 py-2'>
+            <DrawerSurfaceCard className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'>
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'
@@ -167,22 +183,22 @@ export function SendInviteDialog({
               <p className='text-xs font-medium text-success'>
                 Invite created successfully!
               </p>
-            </div>
+            </DrawerSurfaceCard>
           )}
 
           {/* Actions */}
           <div className='flex gap-3 justify-end pt-2'>
-            <Button
+            <DrawerButton
               type='button'
-              variant='ghost'
+              tone='ghost'
               onClick={handleClose}
               disabled={isLoading}
             >
               Cancel
-            </Button>
-            <Button
+            </DrawerButton>
+            <DrawerButton
               type='submit'
-              variant='primary'
+              tone='primary'
               disabled={isLoading || success || !email.trim()}
             >
               {isLoading ? (
@@ -199,7 +215,7 @@ export function SendInviteDialog({
                   Create Invite
                 </>
               )}
-            </Button>
+            </DrawerButton>
           </div>
         </form>
       </DialogBody>

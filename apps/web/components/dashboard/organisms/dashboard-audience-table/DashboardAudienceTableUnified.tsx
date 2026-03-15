@@ -3,33 +3,28 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  Bell,
-  BellRing,
-  Copy,
-  Download,
-  Eye,
-  Phone,
-  UserMinus,
-  Users,
-} from 'lucide-react';
+import { Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
-import { AudienceMobileCard } from '@/components/dashboard/audience/table/atoms/AudienceMobileCard';
+import { Icon } from '@/components/atoms/Icon';
+import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { AnalyticsSidebar } from '@/components/dashboard/organisms/AnalyticsSidebar';
 import { useAudiencePanel } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { AudienceMemberSidebar } from '@/components/dashboard/organisms/audience-member-sidebar';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
+  AudienceMobileCard,
   type ContextMenuItemType,
   convertToCommonDropdownItems,
   UnifiedTable,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
-import { queryKeys } from '@/lib/queries/keys';
+import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
   buildTouringCityMap,
@@ -41,19 +36,15 @@ import {
   AudienceTableVolatileProvider,
 } from './AudienceTableContext';
 import { AudienceTableSubheader } from './AudienceTableSubheader';
+import { buildAudienceActions } from './audience-actions';
 import type { DashboardAudienceTableProps } from './types';
 import { useDashboardAudienceTable } from './useDashboardAudienceTable';
-import { downloadVCard } from './utils';
+import { copyTextToClipboard, downloadVCard } from './utils';
 import {
-  LastSeenCell,
-  MenuCell,
   QuickActionsCell,
-  renderEmailCell,
-  renderIntentScoreCell,
   renderLastActionCell,
   renderLtvCell,
-  renderReturningCell,
-  renderSourceCell,
+  renderPlatformsCell,
   renderUserCell,
   SelectCell,
   TouringCityCell,
@@ -61,32 +52,17 @@ import {
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
 
-// Module-level icon constants — allocated once, reused across all rows and renders.
-const ICON_EYE = <Eye className='h-3.5 w-3.5' />;
-const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
-const ICON_PHONE = <Phone className='h-3.5 w-3.5' />;
-const ICON_BELL = <Bell className='h-3.5 w-3.5' />;
-const ICON_DOWNLOAD = <Download className='h-3.5 w-3.5' />;
-const ICON_USER_MINUS = <UserMinus className='h-3.5 w-3.5' />;
-
-function getSrDescription(
-  isEmpty: boolean,
-  mode: 'members' | 'subscribers'
-): string {
+function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return mode === 'members'
-      ? 'Track visitors and grow your fan base'
-      : 'Build a subscriber base for notifications';
+    return 'Track visitors and grow your fan base';
   }
-  return mode === 'members'
-    ? 'Every visitor, anonymous or identified, lives in this table.'
-    : 'Notification signups from your notification modal.';
+  return 'Every visitor, anonymous or identified, lives in this table.';
 }
 
 /**
  * Compact Linear-style column definitions for members mode.
  *
- * Layout: Select | User (primary label) | Intent dot | LTV ($) | Returning icon | Source icon | Touring badge | Last Action | Quick Actions
+ * Layout: Select | User (primary label) | LTV ($) | Platforms (icon cluster) | Touring badge | Last Action | Quick Actions
  *
  * Headers are hidden via `hideHeader` on the table. Icon columns use fixed widths
  * so layout never shifts when content appears/disappears.
@@ -104,29 +80,20 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     cell: renderUserCell,
     size: 260,
   }),
-  memberColumnHelper.accessor('intentLevel', {
-    id: 'intentScore',
-    header: 'Intent',
-    cell: renderIntentScoreCell,
-    size: 40,
-  }),
   memberColumnHelper.accessor('tipAmountTotalCents', {
     id: 'ltv',
     header: 'LTV',
     cell: renderLtvCell,
     size: 40,
+    meta: {
+      className: 'px-2',
+    },
   }),
-  memberColumnHelper.accessor('visits', {
-    id: 'returning',
-    header: 'Returning',
-    cell: renderReturningCell,
-    size: 40,
-  }),
-  memberColumnHelper.accessor('referrerHistory', {
-    id: 'source',
-    header: 'Source',
-    cell: renderSourceCell,
-    size: 40,
+  memberColumnHelper.display({
+    id: 'platforms',
+    header: 'Platforms',
+    cell: renderPlatformsCell,
+    size: 44,
   }),
   memberColumnHelper.display({
     id: 'touringCity',
@@ -148,42 +115,6 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   }),
 ];
 
-/**
- * Stable column definitions for subscribers mode.
- */
-const SUBSCRIBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
-  memberColumnHelper.display({
-    id: 'select',
-    header: () => null,
-    cell: SelectCell,
-    size: 100,
-  }),
-  memberColumnHelper.accessor('displayName', {
-    id: 'user',
-    header: 'User',
-    cell: renderUserCell,
-    size: 300,
-  }),
-  memberColumnHelper.accessor('email', {
-    id: 'email',
-    header: 'Email',
-    cell: renderEmailCell,
-    size: 240,
-  }),
-  memberColumnHelper.accessor('lastSeenAt', {
-    id: 'subscribedAt',
-    header: 'Subscribed',
-    cell: LastSeenCell,
-    size: 180,
-  }),
-  memberColumnHelper.display({
-    id: 'menu',
-    header: '',
-    cell: MenuCell,
-    size: 48,
-  }),
-];
-
 /** Estimated height of each mobile card row in px. */
 const MOBILE_CARD_HEIGHT = 72;
 
@@ -195,7 +126,7 @@ const MobileCardList = memo(function MobileCardList({
   onTap,
 }: {
   rows: AudienceMember[];
-  mode: 'members' | 'subscribers';
+  mode: 'members';
   selectedMemberId: string | null;
   onTap: (member: AudienceMember) => void;
 }) {
@@ -227,7 +158,7 @@ const MobileCardList = memo(function MobileCardList({
             >
               <AudienceMobileCard
                 member={member}
-                mode={mode}
+                mode='members'
                 isSelected={selectedMemberId === member.id}
                 onTap={onTap}
               />
@@ -299,7 +230,7 @@ export const DashboardAudienceTableUnified = memo(
           if (selectedMember?.id === member.id) {
             setSelectedMember(null);
           }
-          void queryClient.invalidateQueries({
+          queryClient.invalidateQueries({
             queryKey: queryKeys.audience.all,
           });
         } catch {
@@ -326,9 +257,11 @@ export const DashboardAudienceTableUnified = memo(
     // Quick action: view member profile (opens contact sidebar)
     const {
       mode: panelMode,
+      toggle,
       open: openPanel,
       close: closePanel,
     } = useAudiencePanel();
+    const { setHeaderActions } = useSetHeaderActions();
 
     // Auto-select first row when contact panel opens with no selection
     React.useEffect(() => {
@@ -348,13 +281,19 @@ export const DashboardAudienceTableUnified = memo(
     // Quick action: send notification (copies contact info for now)
     const handleSendNotification = React.useCallback(
       (member: AudienceMember) => {
-        if (member.email) {
-          void navigator.clipboard.writeText(member.email);
-          toast.success('Email copied - ready to send notification');
-        } else if (member.phone) {
-          void navigator.clipboard.writeText(member.phone);
-          toast.success('Phone copied - ready to send notification');
+        const contact = member.email ?? member.phone;
+        if (!contact) {
+          return;
         }
+
+        void copyTextToClipboard(contact).then(success => {
+          if (!success) {
+            toast.error('Unable to copy contact details');
+            return;
+          }
+
+          toast.success('Contact copied and ready for notification');
+        });
       },
       []
     );
@@ -370,82 +309,48 @@ export const DashboardAudienceTableUnified = memo(
       [touringCityMap]
     );
 
-    // Context menu items for right-click
+    // Context menu items for right-click — uses canonical builder
     const getContextMenuItems = React.useCallback(
       (member: AudienceMember): ContextMenuItemType[] => {
-        return [
-          {
-            id: 'view-details',
-            label: 'View details',
-            icon: ICON_EYE,
-            onClick: () => setSelectedMember(member),
+        return buildAudienceActions(member, {
+          onViewDetails: setSelectedMember,
+          onCopyEmail: m => {
+            if (m.email) {
+              void copyTextToClipboard(m.email).then(success => {
+                if (success) {
+                  toast.success('Email copied to clipboard');
+                  return;
+                }
+                toast.error('Unable to copy email');
+              });
+            }
           },
-          {
-            id: 'copy-email',
-            label: 'Copy email',
-            icon: ICON_COPY,
-            onClick: () => {
-              if (member.email) {
-                void navigator.clipboard.writeText(member.email);
-                toast.success('Email copied to clipboard');
-              }
-            },
-            disabled: !member.email,
+          onCopyPhone: m => {
+            if (m.phone) {
+              void copyTextToClipboard(m.phone).then(success => {
+                if (success) {
+                  toast.success('Phone number copied to clipboard');
+                  return;
+                }
+                toast.error('Unable to copy phone number');
+              });
+            }
           },
-          {
-            id: 'copy-phone',
-            label: 'Copy phone',
-            icon: ICON_PHONE,
-            onClick: () => {
-              if (member.phone) {
-                void navigator.clipboard.writeText(member.phone);
-                toast.success('Phone number copied to clipboard');
-              }
-            },
-            disabled: !member.phone,
+          onSendNotification: handleSendNotification,
+          onExportVCard: m => {
+            downloadVCard(m);
+            toast.success('Contact exported as vCard');
           },
-          {
-            id: 'send-notification',
-            label: 'Send notification',
-            icon: ICON_BELL,
-            onClick: () => {
-              if (member.email) {
-                void navigator.clipboard.writeText(member.email);
-                toast.success('Email copied - ready to send notification');
-              } else if (member.phone) {
-                void navigator.clipboard.writeText(member.phone);
-                toast.success('Phone copied - ready to send notification');
-              }
-            },
-            disabled: !member.email && !member.phone,
+          onBlock: m => {
+            handleRemoveMember(m).catch(() => {});
           },
-          { type: 'separator' as const },
-          {
-            id: 'export-contact',
-            label: 'Export as vCard',
-            icon: ICON_DOWNLOAD,
-            onClick: () => {
-              downloadVCard(member);
-              toast.success('Contact exported as vCard');
-            },
-          },
-          { type: 'separator' as const },
-          {
-            id: 'remove-member',
-            label: 'Block',
-            icon: ICON_USER_MINUS,
-            onClick: () => {
-              handleRemoveMember(member).catch(() => {});
-            },
-            disabled: !profileId,
-            destructive: true,
-          },
-        ];
+          canBlock: Boolean(profileId),
+        });
       },
-      [setSelectedMember, profileId, handleRemoveMember]
+      [setSelectedMember, profileId, handleRemoveMember, handleSendNotification]
     );
 
-    const columns = mode === 'members' ? MEMBER_COLUMNS : SUBSCRIBER_COLUMNS;
+    const columns = MEMBER_COLUMNS;
 
     // Stable context: callbacks that rarely change — consumers won't re-render on selection/menu toggle
     const stableContextValue = useMemo(
@@ -480,18 +385,10 @@ export const DashboardAudienceTableUnified = memo(
       [selectedIds, openMenuRowId]
     );
 
-    const emptyStateHeading =
-      mode === 'members' ? 'Grow Your Audience' : 'Get Your First Subscriber';
+    const emptyStateHeading = 'Grow Your Audience';
     const emptyStateDescription =
-      mode === 'members'
-        ? 'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.'
-        : 'Encourage fans to tap the bell icon on your profile to get notified when you post new content or updates.';
-    const emptyStateIcon =
-      mode === 'members' ? (
-        <Users className='h-6 w-6' aria-hidden='true' />
-      ) : (
-        <BellRing className='h-6 w-6' aria-hidden='true' />
-      );
+      'Share your profile link on social media to invite visitors. Most creators get their first audience member by sharing on X or IG bio.';
+    const emptyStateIcon = <Users className='h-6 w-6' aria-hidden='true' />;
     const emptyStatePrimaryAction = profileUrl
       ? {
           label: copiedProfileLink ? 'Link copied' : 'Copy profile link',
@@ -501,11 +398,10 @@ export const DashboardAudienceTableUnified = memo(
         }
       : {
           label: 'Open profile settings',
-          href: APP_ROUTES.PROFILE,
+          href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
         };
     const emptyStateSecondaryAction = {
-      label:
-        mode === 'members' ? 'Learn about audience' : 'Learn about subscribers',
+      label: 'Learn about audience',
       href: '/support',
     };
 
@@ -570,6 +466,51 @@ export const DashboardAudienceTableUnified = memo(
 
     useRegisterRightPanel(sidebarPanel);
 
+    const headerActions = useMemo(
+      () => (
+        <DashboardHeaderActionGroup
+          trailing={
+            <DashboardHeaderActionButton
+              ariaLabel={
+                panelMode === 'contact'
+                  ? 'Close contact details'
+                  : 'Open contact details'
+              }
+              pressed={panelMode === 'contact'}
+              onClick={() => toggle('contact')}
+              icon={<Icon name='User' className='h-4 w-4' strokeWidth={1.9} />}
+              iconOnly
+              tooltipLabel='Contact details'
+            />
+          }
+        >
+          <DashboardHeaderActionButton
+            ariaLabel={
+              panelMode === 'analytics'
+                ? 'Close analytics panel'
+                : 'Open analytics panel'
+            }
+            pressed={panelMode === 'analytics'}
+            onClick={() => toggle('analytics')}
+            icon={
+              <Icon name='ChartBar' className='h-4 w-4' strokeWidth={1.9} />
+            }
+            iconOnly
+            tooltipLabel='Analytics'
+          />
+        </DashboardHeaderActionGroup>
+      ),
+      [panelMode, toggle]
+    );
+
+    React.useEffect(() => {
+      setHeaderActions(headerActions);
+
+      return () => {
+        setHeaderActions(null);
+      };
+    }, [headerActions, setHeaderActions]);
+
     return (
       <AudienceTableStableProvider value={stableContextValue}>
         <AudienceTableVolatileProvider value={volatileContextValue}>
@@ -580,9 +521,7 @@ export const DashboardAudienceTableUnified = memo(
             <h1 className='sr-only'>
               {rows.length === 0 ? 'Audience' : 'Audience CRM'}
             </h1>
-            <p className='sr-only'>
-              {getSrDescription(rows.length === 0, mode)}
-            </p>
+            <p className='sr-only'>{getSrDescription(rows.length === 0)}</p>
 
             {/* Subheader with filter dropdown and export */}
             <AudienceTableSubheader
@@ -597,7 +536,7 @@ export const DashboardAudienceTableUnified = memo(
               total={total}
             />
 
-            <div className='flex-1 min-h-0 flex flex-col bg-surface-1'>
+            <div className='flex-1 min-h-0 flex flex-col bg-(--linear-app-content-surface)'>
               {/* Scrollable content area */}
               <div className='flex-1 min-h-0 overflow-auto'>
                 {rows.length === 0 ? (
@@ -613,7 +552,7 @@ export const DashboardAudienceTableUnified = memo(
                     {/* Mobile card list (virtualized) */}
                     <MobileCardList
                       rows={rows}
-                      mode={mode}
+                      mode='members'
                       selectedMemberId={selectedMember?.id ?? null}
                       onTap={setSelectedMember}
                     />
@@ -636,7 +575,7 @@ export const DashboardAudienceTableUnified = memo(
                         getRowId={row => row.id}
                         enableVirtualization={true}
                         enableKeyboardNavigation={true}
-                        hideHeader={mode === 'members'}
+                        hideHeader={true}
                         minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
                         className='text-[13px]'
                         getRowClassName={getRowClassName}

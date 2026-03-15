@@ -6,8 +6,7 @@ import dynamic, { type DynamicOptionsLoadingProps } from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import { ThemeProvider, useTheme } from 'next-themes';
 import React, { useEffect, useMemo } from 'react';
-import { useFeatureGate } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { env } from '@/lib/env-client';
 import { useChunkErrorHandler } from '@/lib/hooks/useChunkErrorHandler';
 import { PACER_TIMING } from '@/lib/pacer/hooks';
 import { isFormElement } from '@/lib/utils/keyboard';
@@ -25,16 +24,11 @@ function LazyProvidersSkeleton(props: DynamicOptionsLoadingProps) {
   return <>{children}</>;
 }
 
-function ThemeKeyboardShortcut() {
+function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const isLightModeEnabled = useFeatureGate(
-    FEATURE_FLAG_KEYS.ENABLE_LIGHT_MODE,
-    false
-  );
 
   useEffect(() => {
-    // Only register theme keyboard shortcut when light mode feature flag is on
-    if (!isLightModeEnabled) return;
+    if (!isEnabled) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
@@ -50,7 +44,7 @@ function ThemeKeyboardShortcut() {
     return () => {
       globalThis.removeEventListener('keydown', handleKeyDown);
     };
-  }, [resolvedTheme, setTheme, isLightModeEnabled]);
+  }, [resolvedTheme, setTheme, isEnabled]);
 
   return null;
 }
@@ -81,12 +75,14 @@ function CoreProvidersInner({
   enableMonitoring,
   usePacer,
   initialThemeMode,
+  themeEnabled,
 }: {
   children: React.ReactNode;
   enableAnalytics: boolean;
   enableMonitoring: boolean;
   usePacer: boolean;
   initialThemeMode: ThemeMode;
+  themeEnabled: boolean;
 }) {
   // Handle chunk load errors gracefully (common with version mismatches)
   useChunkErrorHandler();
@@ -149,12 +145,13 @@ function CoreProvidersInner({
   const content = (
     <ThemeProvider
       attribute='class'
-      defaultTheme={initialThemeMode}
-      enableSystem
+      forcedTheme={themeEnabled ? undefined : 'dark'}
+      defaultTheme={themeEnabled ? initialThemeMode : 'dark'}
+      enableSystem={themeEnabled}
       disableTransitionOnChange
       storageKey='jovie-theme'
     >
-      <ThemeKeyboardShortcut />
+      <ThemeKeyboardShortcut isEnabled={themeEnabled} />
       <TooltipProvider delayDuration={1200}>
         <LazyProviders enableAnalytics={enableAnalytics}>
           {children}
@@ -214,6 +211,8 @@ const FULL_PROVIDER_PREFIXES = [
   '/onboarding',
 ] as const;
 
+const THEME_ENABLED_PREFIXES = ['/app', '/onboarding'] as const;
+
 type CoreProviderVariant = 'full' | 'public';
 
 export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
@@ -222,18 +221,25 @@ export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
     : 'public';
 }
 
+export function isThemeEnabledRoute(pathname: string): boolean {
+  return THEME_ENABLED_PREFIXES.some(prefix => pathname.startsWith(prefix));
+}
+
 export function CoreProviders({
   children,
   initialThemeMode = 'dark',
 }: CoreProvidersProps) {
   const pathname = usePathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
+  const themeEnabled = useMemo(() => isThemeEnabledRoute(pathname), [pathname]);
   const isPublicVariant = variant === 'public';
+  const isTestRuntime = env.IS_TEST || env.IS_E2E;
   const enableAnalytics = useMemo(
     () =>
+      !isTestRuntime &&
       pathname !== '/' &&
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
-    [pathname]
+    [isTestRuntime, pathname]
   );
 
   const providers = (
@@ -241,8 +247,9 @@ export function CoreProviders({
       <QueryProvider>
         <CoreProvidersInner
           enableAnalytics={enableAnalytics}
-          enableMonitoring={!isPublicVariant}
+          enableMonitoring={!isPublicVariant && !isTestRuntime}
           initialThemeMode={initialThemeMode}
+          themeEnabled={themeEnabled}
           usePacer={!isPublicVariant}
         >
           {children}
@@ -251,7 +258,7 @@ export function CoreProviders({
     </NuqsProvider>
   );
 
-  if (isPublicVariant) {
+  if (isPublicVariant || isTestRuntime) {
     return providers;
   }
 

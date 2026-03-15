@@ -1,3 +1,7 @@
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+
 export default function SettingsBillingLoading() {
   return (
     <div className='mx-auto max-w-3xl pt-2'>
@@ -14,14 +18,25 @@ export default function SettingsBillingLoading() {
           </div>
 
           {/* Skeleton card matching SettingsBillingSection layout */}
-          <div className='rounded-2xl bg-surface-1/40 p-6 shadow-none'>
-            <div className='flex items-center justify-between'>
-              <div className='space-y-2'>
-                <div className='h-4 w-80 rounded skeleton' />
+          <ContentSurfaceCard className='overflow-hidden'>
+            <ContentSectionHeaderSkeleton
+              titleWidth='w-40'
+              descriptionWidth='w-80'
+              className='min-h-0 px-4 py-3'
+            />
+            <div className='space-y-3 px-4 py-3'>
+              <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3.5'>
+                <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
+                <LoadingSkeleton
+                  height='h-4'
+                  width='w-full'
+                  rounded='md'
+                  className='mt-2'
+                />
               </div>
-              <div className='h-9 w-40 rounded skeleton' />
+              <LoadingSkeleton height='h-8' width='w-40' rounded='md' />
             </div>
-          </div>
+          </ContentSurfaceCard>
         </section>
       </div>
     </div>

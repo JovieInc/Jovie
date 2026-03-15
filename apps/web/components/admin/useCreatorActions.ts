@@ -7,7 +7,7 @@ import {
   useDeleteCreatorMutation,
   useToggleFeaturedMutation,
   useToggleMarketingMutation,
-} from '@/lib/queries/useCreatorActionsMutation';
+} from '@/lib/queries';
 
 export type CreatorActionStatus = 'idle' | 'loading' | 'success' | 'error';
 

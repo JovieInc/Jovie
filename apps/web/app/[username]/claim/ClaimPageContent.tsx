@@ -18,7 +18,8 @@ export function ClaimPageContent({
   displayName,
   avatarUrl,
 }: ClaimPageContentProps) {
-  const signupUrl = `/signup?handle=${encodeURIComponent(username)}&redirect_url=${encodeURIComponent(`/${username}`)}`;
+  const encodedRedirect = encodeURIComponent(`/${username}`);
+  const signupUrl = `/signup?handle=${encodeURIComponent(username)}&redirect_url=${encodedRedirect}`;
 
   return (
     <>

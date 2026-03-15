@@ -8,6 +8,7 @@ import { insightGenerationRuns } from '@/lib/db/schema/insights';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { aggregateMetrics } from '@/lib/services/insights/data-aggregator';
 import { generateInsights } from '@/lib/services/insights/insight-generator';
 import {
@@ -31,17 +32,6 @@ export const maxDuration = 300; // 5 minutes for batch processing
 interface ProfileProcessResult {
   insightsGenerated: number;
   error?: string;
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Timed out after ${timeoutMs}ms`));
-      }, timeoutMs);
-    }),
-  ]);
 }
 
 async function processProfile(
@@ -86,6 +76,34 @@ async function processProfile(
   });
 
   return { insightsGenerated: persisted };
+}
+
+function processChunkResults(
+  results: PromiseSettledResult<{
+    profileId: string;
+    profileResult: ProfileProcessResult;
+  }>[],
+  chunk: { profile_id: string }[]
+): { insightsTotal: number; processed: number; errors: string[] } {
+  let insightsTotal = 0;
+  let processed = 0;
+  const errors: string[] = [];
+  for (const [resultIndex, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      insightsTotal += result.value.profileResult.insightsGenerated;
+      processed++;
+      continue;
+    }
+    const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
+    const msg =
+      result.reason instanceof Error ? result.reason.message : 'Unknown error';
+    errors.push(`Profile ${profileId}: ${msg}`);
+    logger.error(
+      `[insights-cron] Failed for profile ${profileId}:`,
+      result.reason
+    );
+  }
+  return { insightsTotal, processed, errors };
 }
 
 /**
@@ -186,31 +204,17 @@ export async function GET(request: Request) {
       );
       const results = await Promise.allSettled(
         chunk.map(({ profile_id: profileId }) =>
-          withTimeout(
-            processProfile(profileId),
-            INSIGHTS_CRON_PROFILE_TIMEOUT_MS
-          ).then(profileResult => ({ profileId, profileResult }))
+          withTimeout(processProfile(profileId), {
+            timeoutMs: INSIGHTS_CRON_PROFILE_TIMEOUT_MS,
+            context: `insight generation for profile ${profileId}`,
+          }).then(profileResult => ({ profileId, profileResult }))
         )
       );
 
-      for (const [resultIndex, result] of results.entries()) {
-        if (result.status === 'fulfilled') {
-          insightsTotal += result.value.profileResult.insightsGenerated;
-          processed++;
-          continue;
-        }
-
-        const profileId = chunk[resultIndex]?.profile_id ?? 'unknown-profile';
-        const msg =
-          result.reason instanceof Error
-            ? result.reason.message
-            : 'Unknown error';
-        errors.push(`Profile ${profileId}: ${msg}`);
-        logger.error(
-          `[insights-cron] Failed for profile ${profileId}:`,
-          result.reason
-        );
-      }
+      const chunkStats = processChunkResults(results, chunk);
+      insightsTotal += chunkStats.insightsTotal;
+      processed += chunkStats.processed;
+      errors.push(...chunkStats.errors);
     }
 
     const duration = Date.now() - startTime;

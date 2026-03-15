@@ -1056,36 +1056,12 @@ function createSubmitFeedbackTool(clerkUserId: string) {
         .describe('The feedback message from the artist'),
     }),
     execute: async ({ message }) => {
-      const userRecord = await db.query.users.findFirst({
-        where: eq(users.clerkId, clerkUserId),
-        columns: { id: true, name: true, email: true },
-      });
+      const { submitChatFeedback } = await import('@/lib/chat/submit-feedback');
 
-      const { createFeedbackItem } = await import('@/lib/feedback');
-      const { notifySlackFeedbackSubmission } = await import(
-        '@/lib/notifications/providers/slack'
-      );
-
-      await createFeedbackItem({
-        userId: userRecord?.id ?? null,
+      return submitChatFeedback({
+        clerkUserId,
         message,
-        source: 'chat',
-        context: {
-          pathname: '/app',
-          userAgent: null,
-          timestampIso: new Date().toISOString(),
-        },
       });
-
-      await notifySlackFeedbackSubmission({
-        message,
-        name: userRecord?.name ?? 'Jovie user',
-        email: userRecord?.email,
-        source: 'chat',
-        pathname: '/app',
-      });
-
-      return { success: true };
     },
   });
 }
@@ -1136,6 +1112,20 @@ function buildChatTools(
 
 function toNullableString(value: unknown): string | null {
   return value && typeof value === 'string' ? value : null;
+}
+
+async function fetchOptionalReleases(
+  profileId: string | null
+): Promise<ReleaseContext[]> {
+  if (!profileId) {
+    return [];
+  }
+
+  try {
+    return await fetchReleasesForChat(profileId);
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -1229,6 +1219,46 @@ function buildChatErrorResponse(
   );
 }
 
+async function tryRouteViaIntent(
+  uiMessages: UIMessage[],
+  profileId: unknown,
+  userId: string,
+  corsHeaders: Record<string, string>,
+  requestId: string
+): Promise<NextResponse | null> {
+  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
+  if (!lastUserMsg) return null;
+
+  const userText = lastUserMsg.parts
+    .filter(
+      (p): p is { type: 'text'; text: string } =>
+        p.type === 'text' && typeof p.text === 'string'
+    )
+    .map(p => p.text)
+    .join('')
+    .trim();
+
+  const intent = classifyIntent(userText);
+  if (!isDeterministicIntent(intent)) return null;
+
+  const resolvedProfileId = toNullableString(profileId);
+  const result = await routeIntent(intent, {
+    clerkUserId: userId,
+    profileId: resolvedProfileId,
+  });
+  if (!result) return null;
+
+  return NextResponse.json(result, {
+    status: result.success ? 200 : 400,
+    headers: {
+      ...corsHeaders,
+      'x-request-id': requestId,
+      'x-intent-routed': 'true',
+      'x-intent-category': intent.category,
+    },
+  });
+}
+
 export async function POST(req: Request) {
   const requestId = extractRequestId(req);
   const corsHeaders = createAuthenticatedCorsHeaders(
@@ -1316,38 +1346,14 @@ export async function POST(req: Request) {
   const uiMessages = messages as UIMessage[];
 
   // --- Deterministic intent routing (skip AI for simple CRUD) ---
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  if (lastUserMsg) {
-    const userText = lastUserMsg.parts
-      .filter(
-        (p): p is { type: 'text'; text: string } =>
-          p.type === 'text' && typeof p.text === 'string'
-      )
-      .map(p => p.text)
-      .join('')
-      .trim();
-
-    const intent = classifyIntent(userText);
-    if (isDeterministicIntent(intent)) {
-      const resolvedProfileId = toNullableString(profileId);
-      const result = await routeIntent(intent, {
-        clerkUserId: userId,
-        profileId: resolvedProfileId,
-      });
-
-      if (result) {
-        return NextResponse.json(result, {
-          status: result.success ? 200 : 400,
-          headers: {
-            ...corsHeaders,
-            'x-request-id': requestId,
-            'x-intent-routed': 'true',
-            'x-intent-category': intent.category,
-          },
-        });
-      }
-    }
-  }
+  const intentResponse = await tryRouteViaIntent(
+    uiMessages,
+    profileId,
+    userId,
+    corsHeaders,
+    requestId
+  );
+  if (intentResponse) return intentResponse;
 
   // Fetch artist context server-side (preferred) or fall back to client-provided
   const contextResult = await resolveArtistContext(
@@ -1363,15 +1369,7 @@ export async function POST(req: Request) {
 
   const resolvedProfileId = toNullableString(profileId);
   const resolvedConversationId = toNullableString(conversationId);
-
-  let releases: ReleaseContext[] = [];
-  if (resolvedProfileId) {
-    try {
-      releases = await fetchReleasesForChat(resolvedProfileId);
-    } catch {
-      releases = [];
-    }
-  }
+  const releases = await fetchOptionalReleases(resolvedProfileId);
 
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
@@ -1401,9 +1399,6 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools,
       abortSignal: req.signal,
-      providerOptions: {
-        anthropic: { cacheControl: true },
-      },
       experimental_telemetry: {
         isEnabled: true,
         recordInputs: true,

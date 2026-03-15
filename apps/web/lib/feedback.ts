@@ -31,7 +31,7 @@ export async function createFeedbackItem(params: {
   message: string;
   source?: string;
   context: FeedbackContext;
-}) {
+}): Promise<{ id: string }> {
   try {
     const [item] = await db
       .insert(feedbackItems)
@@ -44,10 +44,14 @@ export async function createFeedbackItem(params: {
       })
       .returning({ id: feedbackItems.id });
 
+    if (!item) {
+      throw new Error('Feedback persistence returned no row');
+    }
+
     return item;
   } catch (error) {
     console.error('[feedback] createFeedbackItem failed:', error);
-    return undefined;
+    throw error;
   }
 }
 

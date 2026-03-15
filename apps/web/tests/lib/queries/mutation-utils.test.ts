@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { FetchError } from '@/lib/queries/fetch';
 import {
   createMutationCallbacks,
+  FetchError,
   getErrorMessage,
   handleMutationError,
   handleMutationSuccess,
-} from '@/lib/queries/mutation-utils';
+} from '@/lib/queries';
 
 // Mock sonner toast - must use factory function pattern for hoisting
 vi.mock('sonner', () => ({
@@ -17,6 +17,7 @@ vi.mock('sonner', () => ({
 
 // Mock Sentry - must use factory function pattern for hoisting
 vi.mock('@sentry/nextjs', () => ({
+  getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   addBreadcrumb: vi.fn(),
 }));
@@ -40,6 +41,15 @@ describe('mutation-utils', () => {
 
     it('returns specific message for 403 forbidden', () => {
       const error = new FetchError('Forbidden', 403);
+      expect(getErrorMessage(error, 'Fallback')).toBe(
+        'You do not have permission to do this.'
+      );
+    });
+
+    it('normalizes raw 403 permission copy to a user-friendly message', () => {
+      const error = new Error(
+        'Error: 403 Forbidden — You do not have permission to perform this action.'
+      );
       expect(getErrorMessage(error, 'Fallback')).toBe(
         'You do not have permission to do this.'
       );

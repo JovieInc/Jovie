@@ -106,9 +106,7 @@ describe('profile drawers dismiss behavior', () => {
         artistName='A'
         artistHandle='artist'
         contacts={[]}
-        performAction={vi.fn()}
         primaryChannel={vi.fn()}
-        buildTerritoryLabel={vi.fn()}
       />
     );
 

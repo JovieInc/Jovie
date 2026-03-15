@@ -1,9 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
 import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
-import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface QueueResponse {
   items: unknown[];
@@ -18,9 +19,11 @@ export default function AdminOutreachPage() {
     total: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchCounts = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const [emailRes, dmRes, reviewRes] = await Promise.all([
         fetch('/api/admin/outreach?queue=email&limit=1'),
@@ -49,26 +52,44 @@ export default function AdminOutreachPage() {
         total: email + dm + manualReview,
       });
     } catch {
-      toast.error('Failed to load outreach counts');
+      setCounts({ email: 0, dm: 0, manualReview: 0, total: 0 });
+      setLoadError(
+        'We could not load outreach counts right now. Please try again shortly.'
+      );
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void fetchCounts();
+    fetchCounts();
   }, [fetchCounts]);
 
   if (loading) {
     return (
-      <div className='flex items-center justify-center py-16'>
-        <LoadingSpinner size='md' tone='muted' />
-      </div>
+      <ContentSurfaceCard className='overflow-hidden' aria-hidden='true'>
+        <ContentSectionHeaderSkeleton
+          titleWidth='w-36'
+          descriptionWidth='w-56'
+          actionWidths={['w-16']}
+          className='min-h-0 px-4 py-3 sm:px-5'
+        />
+        <div className='grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4'>
+          {['total', 'email', 'dm', 'review'].map(key => (
+            <ContentMetricCardSkeleton key={key} />
+          ))}
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
+    <div className='flex flex-col gap-4'>
+      {loadError && (
+        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+          <p>{loadError}</p>
+        </ContentSurfaceCard>
+      )}
       <OutreachKpis counts={counts} />
     </div>
   );

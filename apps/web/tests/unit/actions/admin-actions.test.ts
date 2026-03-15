@@ -475,6 +475,8 @@ describe('admin/actions.ts', () => {
         'https://img.clerk.com/avatar.png',
         'https://images.unsplash.com/photo.jpg',
         'https://blob.vercel-storage.com/file.jpg',
+        'https://lineup-images.scdn.co/artist.jpg',
+        'https://cdn.linktr.ee/profiles/artist.jpg',
       ];
 
       const { updateCreatorAvatarAsAdmin } = await import(

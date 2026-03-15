@@ -1,175 +1,112 @@
 'use client';
 
-import { Button, Input, Switch } from '@jovie/ui';
+import { Button, Input } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { APP_ROUTES } from '@/constants/routes';
-
-interface WaitlistSettingsResponse {
-  gateEnabled: boolean;
-  autoAcceptEnabled: boolean;
-  autoAcceptDailyLimit: number;
-  autoAcceptedToday: number;
-  autoAcceptResetsAt: string;
-}
+import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  useWaitlistSettingsMutation,
+  useWaitlistSettingsQuery,
+  type WaitlistSettingsResponse,
+} from '@/lib/queries';
 
 export function WaitlistSettingsPanel() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: fetchedSettings,
+    isLoading: loading,
+    isError,
+    error,
+  } = useWaitlistSettingsQuery();
+
+  const { mutate: save, isPending: saving } = useWaitlistSettingsMutation();
+
+  // Local state for form edits (initialized from query data)
   const [settings, setSettings] = useState<WaitlistSettingsResponse | null>(
     null
   );
 
+  // Sync fetched data into local state
   useEffect(() => {
-    const controller = new AbortController();
-
-    async function loadSettings() {
-      try {
-        setError(null);
-        const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
-          cache: 'no-store',
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to load waitlist settings');
-        }
-
-        const payload = (await response.json()) as {
-          settings?: WaitlistSettingsResponse;
-        };
-
-        if (!payload.settings) {
-          throw new Error('Invalid waitlist settings response');
-        }
-
-        setSettings(payload.settings);
-      } catch {
-        if (!controller.signal.aborted) {
-          setError(
-            'Unable to load waitlist settings. Please refresh and try again.'
-          );
-          toast.error('Unable to load waitlist settings');
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
+    if (fetchedSettings && !settings) {
+      setSettings(fetchedSettings);
     }
+  }, [fetchedSettings, settings]);
 
-    void loadSettings();
-
-    return () => {
-      controller.abort();
-    };
-  }, []);
-
-  async function save() {
+  const handleSave = () => {
     if (!settings) return;
-    setSaving(true);
-    try {
-      const response = await fetch(APP_ROUTES.ADMIN_WAITLIST_SETTINGS, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          gateEnabled: settings.gateEnabled,
-          autoAcceptEnabled: settings.autoAcceptEnabled,
-          autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Save failed');
-      const payload = (await response.json()) as {
-        settings: WaitlistSettingsResponse;
-      };
-      setSettings(payload.settings);
-      setError(null);
-      toast.success('Waitlist settings saved');
-    } catch {
-      toast.error('Failed to save waitlist settings');
-    } finally {
-      setSaving(false);
-    }
-  }
+    save({
+      gateEnabled: settings.gateEnabled,
+      autoAcceptEnabled: settings.autoAcceptEnabled,
+      autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
+    });
+  };
 
   if (loading) {
     return (
-      <div className='rounded-md border border-subtle px-3 py-2.5 text-xs text-secondary-token'>
-        <Loader2 className='mr-1.5 inline h-3 w-3 animate-spin' />
-        Loading settings…
-      </div>
+      <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-(--linear-text-secondary)'>
+        <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
+        Loading waitlist settings...
+      </ContentSurfaceCard>
     );
   }
 
-  if (error || !settings) {
+  if (isError || !settings) {
     return (
-      <div className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-xs text-destructive'>
-        {error ??
-          'Unable to load waitlist settings. Please refresh and try again.'}
-      </div>
+      <ContentSurfaceCard className='border-destructive/25 bg-destructive/5 px-4 py-3.5 text-[13px] text-destructive'>
+        {error instanceof Error
+          ? error.message
+          : 'Unable to load waitlist settings. Please refresh and try again.'}
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <section className='rounded-md border border-subtle'>
-      <div className='border-b border-subtle px-3 py-2'>
-        <h2 className='text-xs font-semibold text-primary-token'>
-          Waitlist gate controls
-        </h2>
-      </div>
+    <ContentSurfaceCard as='section' className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Waitlist gate controls'
+        subtitle='Control approvals, auto-accept behavior, and daily intake limits.'
+        className='min-h-0 px-4 py-3'
+      />
 
-      <div className='divide-y divide-subtle'>
-        <div className='flex items-center justify-between gap-3 px-3 py-2.5'>
-          <div className='min-w-0'>
-            <p className='text-xs font-medium text-primary-token'>
-              Waitlist gate
-            </p>
-            <p className='text-[11px] text-secondary-token'>
-              When off, signups bypass approval.
-            </p>
-          </div>
-          <Switch
+      <div className='space-y-3 px-4 py-3'>
+        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <SettingsToggleRow
+            title='Waitlist gate'
+            description='When disabled, new submissions bypass manual approval.'
             checked={settings.gateEnabled}
             onCheckedChange={checked =>
               setSettings(current =>
                 current ? { ...current, gateEnabled: checked } : current
               )
             }
-            aria-label='Toggle waitlist gate'
+            ariaLabel='Toggle waitlist gate'
             disabled={saving}
           />
-        </div>
+        </ContentSurfaceCard>
 
-        <div className='flex items-center justify-between gap-3 px-3 py-2.5'>
-          <div className='min-w-0'>
-            <p className='text-xs font-medium text-primary-token'>
-              Auto-accept
-            </p>
-            <p className='text-[11px] text-secondary-token'>
-              Auto-approve a daily limit of new submissions.
-            </p>
-          </div>
-          <Switch
+        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <SettingsToggleRow
+            title='Auto-accept'
+            description='Automatically approve a limited number of new submissions each day.'
             checked={settings.autoAcceptEnabled}
             onCheckedChange={checked =>
               setSettings(current =>
                 current ? { ...current, autoAcceptEnabled: checked } : current
               )
             }
-            aria-label='Toggle auto-accept'
+            ariaLabel='Toggle auto-accept'
             disabled={saving}
           />
-        </div>
+        </ContentSurfaceCard>
 
-        <div className='flex items-center justify-between gap-3 px-3 py-2.5'>
+        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5'>
           <div className='min-w-0'>
-            <p className='text-xs font-medium text-primary-token'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               Daily limit
             </p>
-            <p className='text-[11px] text-secondary-token'>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
               Today: {settings.autoAcceptedToday}
             </p>
           </div>
@@ -190,24 +127,24 @@ export function WaitlistSettingsPanel() {
               );
             }}
             size='sm'
-            className='w-20'
+            className='w-24 text-right tabular-nums'
             disabled={saving}
             aria-label='Daily auto-accept limit'
           />
+        </ContentSurfaceCard>
+
+        <div className='flex justify-end pt-1'>
+          <Button
+            variant='primary'
+            size='sm'
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving && <Loader2 className='mr-1.5 h-3 w-3 animate-spin' />}
+            Save
+          </Button>
         </div>
       </div>
-
-      <div className='border-t border-subtle px-3 py-2'>
-        <Button
-          variant='primary'
-          size='sm'
-          onClick={() => void save()}
-          disabled={saving}
-        >
-          {saving && <Loader2 className='mr-1.5 h-3 w-3 animate-spin' />}
-          Save
-        </Button>
-      </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }

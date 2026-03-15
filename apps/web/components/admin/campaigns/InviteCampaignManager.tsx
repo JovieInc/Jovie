@@ -12,9 +12,13 @@ import {
   Button,
   Input,
 } from '@jovie/ui';
-import { useCallback, useEffect, useState } from 'react';
+import type { ChangeEvent, ComponentPropsWithoutRef, ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   type SendCampaignInvitesResponse,
   useCampaignInvitesQuery,
@@ -24,7 +28,8 @@ import {
   useCampaignStatsQuery,
   useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
-} from '@/lib/queries/useCampaignInvites';
+} from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 interface ThrottlingConfig {
   minDelayMs: number;
@@ -51,6 +56,134 @@ function formatEngagementStatus(engagement: {
   return 'No events';
 }
 
+function CampaignSection({
+  title,
+  subtitle,
+  actions,
+  children,
+  className,
+  bodyClassName,
+}: Readonly<{
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  bodyClassName?: string;
+}>) {
+  return (
+    <ContentSurfaceCard className={cn('overflow-hidden', className)}>
+      <ContentSectionHeader
+        title={title}
+        subtitle={subtitle}
+        actions={actions}
+        className='min-h-0 px-5 py-3'
+        actionsClassName='w-auto shrink-0'
+      />
+      <div className={cn('space-y-4 px-5 py-4 pt-3', bodyClassName)}>
+        {children}
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
+function CampaignCallout({
+  tone,
+  icon,
+  children,
+  className,
+  ...props
+}: Readonly<{
+  tone: 'destructive' | 'info' | 'success' | 'warning';
+  icon: 'AlertTriangle' | 'CheckCircle' | 'Info' | 'Loader2' | 'XCircle';
+  children: ReactNode;
+  className?: string;
+}> &
+  ComponentPropsWithoutRef<'div'>) {
+  const toneClassNames: Record<typeof tone, string> = {
+    destructive: 'border-destructive/20 bg-destructive/10 text-destructive',
+    info: 'border-info/20 bg-info/5 text-info',
+    success: 'border-success/20 bg-success/10 text-success',
+    warning: 'border-warning/20 bg-warning/10 text-warning',
+  };
+  const toneClassName = toneClassNames[tone];
+
+  return (
+    <div
+      className={cn(
+        'flex items-start gap-2 rounded-[10px] border px-4 py-3',
+        toneClassName,
+        className
+      )}
+      {...props}
+    >
+      <Icon name={icon} className='mt-0.5 h-4 w-4 shrink-0' />
+      <div className='min-w-0'>{children}</div>
+    </div>
+  );
+}
+
+function CampaignMetric({
+  label,
+  value,
+  subtitle,
+  valueClassName,
+}: Readonly<{
+  label: string;
+  value: ReactNode;
+  subtitle: string;
+  valueClassName?: string;
+}>) {
+  return (
+    <ContentMetricCard
+      label={label}
+      value={value}
+      subtitle={subtitle}
+      className='h-full bg-(--linear-bg-surface-0) shadow-none'
+      labelClassName='tracking-[0.06em]'
+      valueClassName={valueClassName}
+    />
+  );
+}
+
+function CampaignDataTable({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <div className='overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+      <table className='w-full text-sm'>{children}</table>
+    </div>
+  );
+}
+
+function CampaignTableHeaderCell({
+  children,
+}: Readonly<{
+  children: ReactNode;
+}>) {
+  return (
+    <th className='px-4 py-2 text-left text-[11px] font-[560] uppercase tracking-[0.04em] text-(--linear-text-tertiary)'>
+      {children}
+    </th>
+  );
+}
+
+function CampaignTableCell({
+  children,
+  className,
+}: Readonly<{
+  children: ReactNode;
+  className?: string;
+}>) {
+  return (
+    <td className={cn('px-4 py-2 text-(--linear-text-secondary)', className)}>
+      {children}
+    </td>
+  );
+}
+
 export function InviteCampaignManager() {
   const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
   const [limit, setLimit] = useState(20);
@@ -60,6 +193,7 @@ export function InviteCampaignManager() {
     useState<SendCampaignInvitesResponse | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
+  const settingsSavedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load persisted settings on mount
   const { data: savedSettings } = useCampaignSettings();
@@ -73,6 +207,14 @@ export function InviteCampaignManager() {
       setThrottling(s.throttlingConfig);
     }
   }, [savedSettings]);
+
+  useEffect(() => {
+    return () => {
+      if (settingsSavedTimeoutRef.current) {
+        clearTimeout(settingsSavedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // TanStack Query for preview data
   const {
@@ -109,7 +251,13 @@ export function InviteCampaignManager() {
       throttlingConfig: throttling,
     });
     setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 3000);
+    if (settingsSavedTimeoutRef.current) {
+      clearTimeout(settingsSavedTimeoutRef.current);
+    }
+    settingsSavedTimeoutRef.current = setTimeout(() => {
+      setSettingsSaved(false);
+      settingsSavedTimeoutRef.current = null;
+    }, 3000);
   }, [saveCampaignSettings, fitScoreThreshold, limit, throttling]);
 
   const handleConfirmSend = useCallback(async () => {
@@ -159,101 +307,102 @@ export function InviteCampaignManager() {
 
   return (
     <div className='space-y-8' data-testid='admin-campaigns-content'>
-      {/* Campaign Results Dashboard */}
-      <section className='rounded-lg border border-subtle p-6'>
-        <div className='flex items-center justify-between mb-4'>
-          <h2 className='text-lg font-semibold text-primary-token'>
-            Campaign Results
-          </h2>
-          {isLoadingStats && (
+      <CampaignSection
+        title='Campaign Results'
+        subtitle='Live invite throughput and conversion outcomes'
+        actions={
+          isLoadingStats ? (
             <Icon
               name='Loader2'
-              className='h-3.5 w-3.5 animate-spin text-secondary-token'
+              className='h-4 w-4 animate-spin text-(--linear-text-tertiary)'
+              aria-hidden='true'
             />
-          )}
-        </div>
-
+          ) : null
+        }
+      >
         {stats && (
           <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-6'>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-                {stats.campaign.total}
-              </p>
-              <p className='text-xs text-secondary-token'>Total Invites</p>
-            </div>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-warning'>
-                {stats.campaign.pending}
-              </p>
-              <p className='text-xs text-secondary-token'>Pending</p>
-            </div>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-info'>
-                {stats.campaign.sending}
-              </p>
-              <p className='text-xs text-secondary-token'>Sending</p>
-            </div>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-success'>
-                {stats.campaign.sent}
-              </p>
-              <p className='text-xs text-secondary-token'>Sent</p>
-            </div>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-destructive'>
-                {stats.campaign.failed}
-              </p>
-              <p className='text-xs text-secondary-token'>Failed</p>
-            </div>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-2xl font-semibold tabular-nums text-accent'>
-                {stats.campaign.claimed}
-              </p>
-              <p className='text-xs text-secondary-token'>Claimed</p>
-            </div>
+            <CampaignMetric
+              label='Total Invites'
+              value={stats.campaign.total}
+              subtitle='Queued across all runs'
+            />
+            <CampaignMetric
+              label='Pending'
+              value={stats.campaign.pending}
+              subtitle='Awaiting processing'
+              valueClassName='text-warning'
+            />
+            <CampaignMetric
+              label='Sending'
+              value={stats.campaign.sending}
+              subtitle='In progress right now'
+              valueClassName='text-info'
+            />
+            <CampaignMetric
+              label='Sent'
+              value={stats.campaign.sent}
+              subtitle='Delivered successfully'
+              valueClassName='text-success'
+            />
+            <CampaignMetric
+              label='Failed'
+              value={stats.campaign.failed}
+              subtitle='Need follow-up'
+              valueClassName='text-destructive'
+            />
+            <CampaignMetric
+              label='Claimed'
+              value={stats.campaign.claimed}
+              subtitle='Profiles converted'
+              valueClassName='text-accent'
+            />
           </div>
         )}
-      </section>
+      </CampaignSection>
 
-      {/* Job Queue Status */}
       {stats?.jobQueue && hasActiveJobs && (
-        <section className='rounded-lg border border-info/20 bg-info/5 p-6'>
-          <div className='flex items-center gap-2 mb-4'>
-            <Icon name='Loader2' className='h-5 w-5 animate-spin text-info' />
-            <h2 className='text-lg font-semibold text-info'>
-              Job Queue Active
-            </h2>
-          </div>
-
+        <CampaignSection
+          title='Job Queue Active'
+          subtitle='Background work currently processing invite jobs'
+          className='border-info/20 bg-info/5'
+          actions={
+            <Icon
+              name='Loader2'
+              className='h-4 w-4 animate-spin text-info'
+              aria-hidden='true'
+            />
+          }
+        >
           <div className='grid gap-4 md:grid-cols-4'>
-            <div>
-              <p className='text-2xl font-semibold tabular-nums text-info'>
-                {stats.jobQueue.pending}
-              </p>
-              <p className='text-xs text-info'>Jobs Pending</p>
-            </div>
-            <div>
-              <p className='text-2xl font-semibold tabular-nums text-info'>
-                {stats.jobQueue.processing}
-              </p>
-              <p className='text-xs text-info'>Processing</p>
-            </div>
-            <div>
-              <p className='text-2xl font-semibold tabular-nums text-success'>
-                {stats.jobQueue.succeeded}
-              </p>
-              <p className='text-xs text-info'>Succeeded</p>
-            </div>
-            <div>
-              <p className='text-2xl font-semibold tabular-nums text-info'>
-                ~{stats.jobQueue.estimatedMinutesRemaining} min
-              </p>
-              <p className='text-xs text-info'>Est. Remaining</p>
-            </div>
+            <CampaignMetric
+              label='Jobs Pending'
+              value={stats.jobQueue.pending}
+              subtitle='Queued workers'
+              valueClassName='text-info'
+            />
+            <CampaignMetric
+              label='Processing'
+              value={stats.jobQueue.processing}
+              subtitle='Running now'
+              valueClassName='text-info'
+            />
+            <CampaignMetric
+              label='Succeeded'
+              value={stats.jobQueue.succeeded}
+              subtitle='Completed jobs'
+              valueClassName='text-success'
+            />
+            <CampaignMetric
+              label='Est. Remaining'
+              value={`~${stats.jobQueue.estimatedMinutesRemaining} min`}
+              subtitle='Until queue clears'
+              valueClassName='text-info'
+            />
           </div>
 
           {stats.jobQueue.nextRunAt && (
-            <p className='mt-4 text-xs text-info'>
+            <p className='text-xs text-info'>
               Next job scheduled:{' '}
               {new Date(stats.jobQueue.nextRunAt).toLocaleTimeString(
                 undefined,
@@ -265,81 +414,107 @@ export function InviteCampaignManager() {
               )}
             </p>
           )}
-        </section>
+        </CampaignSection>
       )}
 
-      {/* Targeting Section */}
-      <section className='rounded-lg border border-subtle p-6'>
-        <h2 className='text-lg font-semibold text-primary-token mb-4'>
-          Targeting
-        </h2>
-
-        <div className='grid gap-6 md:grid-cols-2'>
-          {/* Fit Score Threshold */}
-          <div className='space-y-2'>
-            <label
-              htmlFor='fit-score-threshold'
-              className='text-sm font-medium text-primary-token'
-            >
-              Minimum Fit Score
-            </label>
-            <div className='flex items-center gap-4'>
-              <input
-                id='fit-score-threshold'
-                type='range'
-                min={0}
-                max={100}
-                value={fitScoreThreshold}
-                onChange={e => setFitScoreThreshold(Number(e.target.value))}
-                className='flex-1'
-              />
-              <span className='w-12 text-right font-mono text-sm text-primary-token'>
-                {fitScoreThreshold}
-              </span>
-            </div>
-            <p className='text-xs text-secondary-token'>
-              Only invite profiles with fit score {'>='} {fitScoreThreshold}
-            </p>
-          </div>
-
-          {/* Batch Limit */}
-          <div className='space-y-2'>
-            <label
-              htmlFor='batch-size'
-              className='text-sm font-medium text-primary-token'
-            >
-              Batch Size
-            </label>
-            <Input
-              id='batch-size'
-              type='number'
-              min={1}
+      <CampaignSection
+        title='Targeting'
+        subtitle='Tune who receives invites in each batch'
+        bodyClassName='grid gap-6 px-5 py-4 pt-3 md:grid-cols-2'
+      >
+        <div className='space-y-2'>
+          <label
+            htmlFor='fit-score-threshold'
+            className='text-sm font-medium text-(--linear-text-primary)'
+          >
+            Minimum Fit Score
+          </label>
+          <div className='flex items-center gap-4'>
+            <input
+              id='fit-score-threshold'
+              type='range'
+              min={0}
               max={100}
-              value={limit}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setLimit(Number(e.target.value))
-              }
-              className='w-full'
+              value={fitScoreThreshold}
+              onChange={e => setFitScoreThreshold(Number(e.target.value))}
+              className='flex-1'
             />
-            <p className='text-xs text-secondary-token'>
-              Maximum invites to send in this batch
-            </p>
+            <span className='w-12 text-right font-mono text-sm text-(--linear-text-primary)'>
+              {fitScoreThreshold}
+            </span>
           </div>
+          <p className='text-xs text-(--linear-text-secondary)'>
+            Only invite profiles with fit score {'>='} {fitScoreThreshold}
+          </p>
         </div>
-      </section>
 
-      {/* Throttling Section */}
-      <section className='rounded-lg border border-subtle p-6'>
-        <h2 className='text-lg font-semibold text-primary-token mb-4'>
-          Throttling & Anti-Spam
-        </h2>
+        <div className='space-y-2'>
+          <label
+            htmlFor='batch-size'
+            className='text-sm font-medium text-(--linear-text-primary)'
+          >
+            Batch Size
+          </label>
+          <Input
+            id='batch-size'
+            type='number'
+            min={1}
+            max={100}
+            value={limit}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setLimit(Number(e.target.value))
+            }
+            className='w-full'
+          />
+          <p className='text-xs text-(--linear-text-secondary)'>
+            Maximum invites to send in this batch
+          </p>
+        </div>
+      </CampaignSection>
 
+      <CampaignSection
+        title='Throttling & Anti-Spam'
+        subtitle='Control pacing so invite sends stay human-like'
+        actions={
+          <div className='flex flex-wrap items-center gap-3'>
+            <Button
+              variant='secondary'
+              size='sm'
+              onClick={handleSaveSettings}
+              disabled={saveCampaignSettings.isPending}
+            >
+              {saveCampaignSettings.isPending ? (
+                <>
+                  <Icon
+                    name='Loader2'
+                    className='mr-2 h-3.5 w-3.5 animate-spin'
+                  />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Icon name='Save' className='mr-2 h-3.5 w-3.5' />
+                  Save Settings
+                </>
+              )}
+            </Button>
+            {settingsSaved ? (
+              <output
+                className='flex items-center gap-1 text-xs text-success'
+                aria-live='polite'
+              >
+                <Icon name='CheckCircle' className='h-3.5 w-3.5' />
+                Settings saved
+              </output>
+            ) : null}
+          </div>
+        }
+      >
         <div className='grid gap-6 md:grid-cols-3'>
-          {/* Min Delay */}
           <div className='space-y-2'>
             <label
               htmlFor='min-delay'
-              className='text-sm font-medium text-primary-token'
+              className='text-sm font-medium text-(--linear-text-primary)'
             >
               Min Delay (seconds)
             </label>
@@ -349,7 +524,7 @@ export function InviteCampaignManager() {
               min={10}
               max={300}
               value={throttling.minDelayMs / 1000}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMin = Number(e.target.value) * 1000;
                   return {
@@ -362,12 +537,12 @@ export function InviteCampaignManager() {
               className='w-full'
             />
           </div>
-
-          {/* Max Delay */}
+        </div>
+        <div className='grid gap-6 md:grid-cols-3'>
           <div className='space-y-2'>
             <label
               htmlFor='max-delay'
-              className='text-sm font-medium text-primary-token'
+              className='text-sm font-medium text-(--linear-text-primary)'
             >
               Max Delay (seconds)
             </label>
@@ -377,7 +552,7 @@ export function InviteCampaignManager() {
               min={30}
               max={600}
               value={throttling.maxDelayMs / 1000}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 setThrottling(t => {
                   const newMax = Number(e.target.value) * 1000;
                   return {
@@ -391,179 +566,120 @@ export function InviteCampaignManager() {
             />
           </div>
 
-          {/* Rate Info */}
-          <div className='space-y-2'>
-            <p className='text-sm font-medium text-primary-token'>
-              Effective Rate
-            </p>
-            <div className='rounded-lg bg-surface-2 px-4 py-3'>
-              <p className='text-lg font-semibold text-primary-token'>
-                ~{effectiveRatePerHour}/hour
-              </p>
-              <p className='text-xs text-secondary-token'>
-                Avg delay: {avgDelaySeconds}s
-              </p>
-            </div>
-          </div>
+          <CampaignMetric
+            label='Effective Rate'
+            value={`~${effectiveRatePerHour}/hour`}
+            subtitle={`Avg delay: ${avgDelaySeconds}s`}
+            valueClassName='text-[24px]'
+          />
         </div>
 
-        <div className='mt-4 flex items-start gap-2 rounded-lg bg-warning/10 px-4 py-3'>
-          <Icon
-            name='AlertTriangle'
-            className='h-3.5 w-3.5 text-warning mt-0.5'
-          />
-          <p className='text-xs text-warning'>
+        <CampaignCallout tone='warning' icon='AlertTriangle'>
+          <p className='text-xs'>
             Delays are randomized between min and max to appear human-like. Stay
             under 50/hour to avoid spam filters.
           </p>
-        </div>
+        </CampaignCallout>
 
-        <div className='mt-4 flex items-center gap-3'>
-          <Button
-            variant='secondary'
-            size='sm'
-            onClick={handleSaveSettings}
-            disabled={saveCampaignSettings.isPending}
-          >
-            {saveCampaignSettings.isPending ? (
-              <>
-                <Icon
-                  name='Loader2'
-                  className='mr-2 h-3.5 w-3.5 animate-spin'
-                />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Icon name='Save' className='mr-2 h-3.5 w-3.5' />
-                Save Settings
-              </>
-            )}
-          </Button>
-          {settingsSaved && (
-            <span className='flex items-center gap-1 text-xs text-success'>
-              <Icon name='CheckCircle' className='h-3.5 w-3.5' />
-              Settings saved
-            </span>
-          )}
-          {saveCampaignSettings.error && (
-            <span className='text-xs text-destructive'>
-              {saveCampaignSettings.error.message}
-            </span>
-          )}
-        </div>
-      </section>
+        {saveCampaignSettings.error && (
+          <p className='text-xs text-destructive'>
+            {saveCampaignSettings.error.message}
+          </p>
+        )}
+      </CampaignSection>
 
-      <section className='rounded-lg border border-subtle p-6'>
-        <div className='flex items-center justify-between mb-4'>
-          <h2 className='text-lg font-semibold text-primary-token'>
-            Claim Funnel
-          </h2>
-        </div>
-
+      <CampaignSection
+        title='Claim Funnel'
+        subtitle='Invite-to-claim performance across recent sends'
+      >
         <div className='grid gap-4 md:grid-cols-4'>
-          <div className='rounded-lg bg-surface-2 px-4 py-3'>
-            <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-              {campaignOverview?.invites.sent ?? 0}
-            </p>
-            <p className='text-xs text-secondary-token'>Invites sent</p>
-          </div>
-          <div className='rounded-lg bg-surface-2 px-4 py-3'>
-            <p className='text-2xl font-semibold tabular-nums text-info'>
-              {campaignOverview?.engagement.uniqueClicks ?? 0}
-            </p>
-            <p className='text-xs text-secondary-token'>
-              Unique click-throughs
-            </p>
-          </div>
-          <div className='rounded-lg bg-surface-2 px-4 py-3'>
-            <p className='text-2xl font-semibold tabular-nums text-success'>
-              {campaignOverview?.conversion.profilesClaimed ?? 0}
-            </p>
-            <p className='text-xs text-secondary-token'>Profiles claimed</p>
-          </div>
-          <div className='rounded-lg bg-surface-2 px-4 py-3'>
-            <p className='text-2xl font-semibold tabular-nums text-accent'>
-              {(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%
-            </p>
-            <p className='text-xs text-secondary-token'>
-              Claim conversion rate
-            </p>
-          </div>
+          <CampaignMetric
+            label='Invites sent'
+            value={campaignOverview?.invites.sent ?? 0}
+            subtitle='Total delivered'
+          />
+          <CampaignMetric
+            label='Unique click-throughs'
+            value={campaignOverview?.engagement.uniqueClicks ?? 0}
+            subtitle='Visitors who engaged'
+            valueClassName='text-info'
+          />
+          <CampaignMetric
+            label='Profiles claimed'
+            value={campaignOverview?.conversion.profilesClaimed ?? 0}
+            subtitle='Successful conversions'
+            valueClassName='text-success'
+          />
+          <CampaignMetric
+            label='Claim conversion rate'
+            value={`${(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%`}
+            subtitle='Invite to claim'
+            valueClassName='text-accent'
+          />
         </div>
-      </section>
+      </CampaignSection>
 
-      <section className='rounded-lg border border-subtle p-6'>
-        <div className='mb-4 flex items-center justify-between'>
-          <h2 className='text-lg font-semibold text-primary-token'>
-            Recent Invite Activity
-          </h2>
-          {isLoadingInvites && (
+      <CampaignSection
+        title='Recent Invite Activity'
+        subtitle='Latest recipients, status, and downstream engagement'
+        actions={
+          isLoadingInvites ? (
             <Icon
               name='Loader2'
-              className='h-3.5 w-3.5 animate-spin text-secondary-token'
+              className='h-4 w-4 animate-spin text-(--linear-text-tertiary)'
+              aria-hidden='true'
             />
-          )}
-        </div>
-
+          ) : null
+        }
+      >
         {inviteList && inviteList.invites.length > 0 ? (
-          <div className='overflow-hidden rounded-lg border border-subtle'>
-            <table className='w-full text-sm'>
-              <thead className='bg-surface-2'>
-                <tr>
-                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                    Creator
-                  </th>
-                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                    Status
-                  </th>
-                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                    Engagement
-                  </th>
-                  <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                    Claimed
-                  </th>
+          <CampaignDataTable>
+            <thead className='bg-(--linear-bg-surface-1)'>
+              <tr>
+                <CampaignTableHeaderCell>Creator</CampaignTableHeaderCell>
+                <CampaignTableHeaderCell>Status</CampaignTableHeaderCell>
+                <CampaignTableHeaderCell>Engagement</CampaignTableHeaderCell>
+                <CampaignTableHeaderCell>Claimed</CampaignTableHeaderCell>
+              </tr>
+            </thead>
+            <tbody className='divide-y divide-(--linear-border-subtle)'>
+              {inviteList.invites.map(invite => (
+                <tr key={invite.id}>
+                  <CampaignTableCell className='text-(--linear-text-primary)'>
+                    @{invite.profile.username}
+                  </CampaignTableCell>
+                  <CampaignTableCell className='capitalize'>
+                    {invite.status}
+                  </CampaignTableCell>
+                  <CampaignTableCell>
+                    {formatEngagementStatus(invite.engagement)}
+                  </CampaignTableCell>
+                  <CampaignTableCell>
+                    <span
+                      className={
+                        invite.profile.isClaimed
+                          ? 'text-success'
+                          : 'text-(--linear-text-secondary)'
+                      }
+                    >
+                      {invite.profile.isClaimed ? 'Yes' : 'No'}
+                    </span>
+                  </CampaignTableCell>
                 </tr>
-              </thead>
-              <tbody className='divide-y divide-subtle'>
-                {inviteList.invites.map(invite => (
-                  <tr key={invite.id}>
-                    <td className='px-4 py-2 text-primary-token'>
-                      @{invite.profile.username}
-                    </td>
-                    <td className='px-4 py-2 text-secondary-token capitalize'>
-                      {invite.status}
-                    </td>
-                    <td className='px-4 py-2 text-secondary-token'>
-                      {formatEngagementStatus(invite.engagement)}
-                    </td>
-                    <td className='px-4 py-2'>
-                      <span
-                        className={
-                          invite.profile.isClaimed
-                            ? 'text-success'
-                            : 'text-secondary-token'
-                        }
-                      >
-                        {invite.profile.isClaimed ? 'Yes' : 'No'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </CampaignDataTable>
         ) : (
-          <p className='text-sm text-secondary-token'>
+          <p className='text-sm text-(--linear-text-secondary)'>
             No invite activity yet.
           </p>
         )}
-      </section>
+      </CampaignSection>
 
-      {/* Preview Section */}
-      <section className='rounded-lg border border-subtle p-6'>
-        <div className='flex items-center justify-between mb-4'>
-          <h2 className='text-lg font-semibold text-primary-token'>Preview</h2>
+      <CampaignSection
+        title='Preview'
+        subtitle='Preview the next invite batch before queuing it'
+        actions={
           <Button
             variant='ghost'
             size='sm'
@@ -577,98 +693,90 @@ export function InviteCampaignManager() {
             )}
             <span className='ml-2'>Refresh</span>
           </Button>
-        </div>
-
+        }
+      >
         {error && (
-          <div className='mb-4 flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3'>
-            <Icon name='XCircle' className='h-3.5 w-3.5 text-destructive' />
-            <p className='text-sm text-destructive'>{error}</p>
-          </div>
+          <CampaignCallout tone='destructive' icon='XCircle'>
+            <p className='text-sm'>{error}</p>
+          </CampaignCallout>
         )}
 
         {preview && (
           <div className='space-y-4'>
             {/* Stats */}
             <div className='grid gap-4 md:grid-cols-3'>
-              <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-semibold tabular-nums text-primary-token'>
-                  {preview.totalEligible}
-                </p>
-                <p className='text-xs text-secondary-token'>
-                  Total eligible (score {'>='} {preview.threshold})
-                </p>
-              </div>
-              <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-semibold tabular-nums text-success'>
-                  {preview.sample.withEmails}
-                </p>
-                <p className='text-xs text-secondary-token'>
-                  With contact email
-                </p>
-              </div>
-              <div className='rounded-lg bg-surface-2 px-4 py-3'>
-                <p className='text-2xl font-semibold tabular-nums text-warning'>
-                  {preview.sample.withoutEmails}
-                </p>
-                <p className='text-xs text-secondary-token'>Missing email</p>
-              </div>
+              <CampaignMetric
+                label='Total eligible'
+                value={preview.totalEligible}
+                subtitle={`Score >= ${preview.threshold}`}
+              />
+              <CampaignMetric
+                label='With contact email'
+                value={preview.sample.withEmails}
+                subtitle='Ready to send'
+                valueClassName='text-success'
+              />
+              <CampaignMetric
+                label='Missing email'
+                value={preview.sample.withoutEmails}
+                subtitle='Needs enrichment first'
+                valueClassName='text-warning'
+              />
             </div>
 
             {/* Sample Profiles */}
             {preview.sample.profiles.length > 0 && (
               <div>
-                <p className='text-sm font-medium text-primary-token mb-2'>
+                <p className='mb-2 text-sm font-medium text-(--linear-text-primary)'>
                   Sample profiles to invite:
                 </p>
-                <div className='overflow-hidden rounded-lg border border-subtle'>
-                  <table className='w-full text-sm'>
-                    <thead className='bg-surface-2'>
-                      <tr>
-                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                          Username
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                          Fit Score
-                        </th>
-                        <th className='px-4 py-2 text-left text-xs font-semibold uppercase tracking-wide text-tertiary-token'>
-                          Email
-                        </th>
+                <CampaignDataTable>
+                  <thead className='bg-(--linear-bg-surface-1)'>
+                    <tr>
+                      <CampaignTableHeaderCell>
+                        Username
+                      </CampaignTableHeaderCell>
+                      <CampaignTableHeaderCell>
+                        Fit Score
+                      </CampaignTableHeaderCell>
+                      <CampaignTableHeaderCell>Email</CampaignTableHeaderCell>
+                    </tr>
+                  </thead>
+                  <tbody className='divide-y divide-(--linear-border-subtle)'>
+                    {preview.sample.profiles.map(profile => (
+                      <tr key={profile.id}>
+                        <CampaignTableCell className='text-(--linear-text-primary)'>
+                          @{profile.username}
+                        </CampaignTableCell>
+                        <CampaignTableCell>
+                          <span className='inline-flex items-center rounded-full border border-info/20 bg-info/10 px-2 py-0.5 text-xs font-medium text-info'>
+                            {profile.fitScore ?? 'N/A'}
+                          </span>
+                        </CampaignTableCell>
+                        <CampaignTableCell className='font-mono text-xs'>
+                          {profile.email}
+                        </CampaignTableCell>
                       </tr>
-                    </thead>
-                    <tbody className='divide-y divide-subtle'>
-                      {preview.sample.profiles.map(profile => (
-                        <tr key={profile.id}>
-                          <td className='px-4 py-2 text-primary-token'>
-                            @{profile.username}
-                          </td>
-                          <td className='px-4 py-2'>
-                            <span className='inline-flex items-center rounded-full bg-info/10 px-2 py-0.5 text-xs font-medium text-info'>
-                              {profile.fitScore ?? 'N/A'}
-                            </span>
-                          </td>
-                          <td className='px-4 py-2 font-mono text-xs text-secondary-token'>
-                            {profile.email}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </CampaignDataTable>
               </div>
             )}
           </div>
         )}
-      </section>
+      </CampaignSection>
 
-      {/* Send Section */}
-      <section className='rounded-lg border border-subtle p-6'>
-        <h2 className='text-lg font-semibold text-primary-token mb-4'>
-          Send Invites
-        </h2>
-
+      <CampaignSection
+        title='Send Invites'
+        subtitle='Queue the next batch once your preview looks correct'
+      >
         {sendResult?.ok && (
-          <div className='mb-4 flex items-center gap-2 rounded-lg bg-success/10 px-4 py-3'>
-            <Icon name='CheckCircle' className='h-3.5 w-3.5 text-success' />
+          <CampaignCallout
+            tone='success'
+            icon='CheckCircle'
+            role='status'
+            aria-live='polite'
+          >
             <div>
               <p className='text-sm font-medium text-success'>
                 Successfully queued {sendResult.jobsEnqueued} invites!
@@ -677,7 +785,7 @@ export function InviteCampaignManager() {
                 Estimated completion: ~{sendResult.estimatedMinutes} minutes
               </p>
             </div>
-          </div>
+          </CampaignCallout>
         )}
 
         <div className='flex items-center gap-4'>
@@ -707,7 +815,7 @@ export function InviteCampaignManager() {
             )}
           </Button>
 
-          <p className='text-sm text-secondary-token'>
+          <p className='text-sm text-(--linear-text-secondary)'>
             Emails will be sent over ~
             {preview
               ? Math.ceil((preview.sample.withEmails * avgDelaySeconds) / 60)
@@ -715,7 +823,7 @@ export function InviteCampaignManager() {
             minutes
           </p>
         </div>
-      </section>
+      </CampaignSection>
 
       {/* Confirmation Modal for Large Batches */}
       <AlertDialog open={showConfirmModal} onOpenChange={setShowConfirmModal}>
@@ -739,18 +847,12 @@ export function InviteCampaignManager() {
               to complete.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className='mt-4 rounded-lg bg-warning/10 px-4 py-3'>
-            <div className='flex items-start gap-2'>
-              <Icon
-                name='AlertTriangle'
-                className='h-3.5 w-3.5 text-warning mt-0.5'
-              />
-              <p className='text-xs text-warning'>
-                This action cannot be undone. Emails will be queued and sent
-                gradually to avoid spam filters.
-              </p>
-            </div>
-          </div>
+          <CampaignCallout tone='warning' icon='AlertTriangle' className='mt-4'>
+            <p className='text-xs'>
+              This action cannot be undone. Emails will be queued and sent
+              gradually to avoid spam filters.
+            </p>
+          </CampaignCallout>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction variant='primary' onClick={handleConfirmSend}>

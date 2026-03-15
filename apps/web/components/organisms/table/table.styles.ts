@@ -18,18 +18,20 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: '40px', // Fixed height for consistent alignment (Linear compact standard)
-  cellPadding: 'px-4 py-2.5', // Consistent padding for cells
-  headerPadding: 'px-4 py-2', // Compact padding for headers
+  rowHeight: '34px', // Fixed height for consistent alignment (Linear compact standard)
+  cellPadding: 'px-4 py-2', // Consistent padding for cells
+  headerPadding: 'px-4 py-1.5', // Compact padding for headers
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
 // Row Selection Colors — aligned with Linear design tokens
 export const selection = {
-  unchecked: 'hover:bg-white/[0.02] transition-colors duration-150',
-  checked: 'bg-white/[0.04] hover:bg-white/[0.06]',
-  selected: 'bg-white/[0.04]',
-  hover: 'hover:bg-white/[0.02]',
+  unchecked:
+    'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150',
+  checked:
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)',
+  selected: 'bg-(--linear-row-selected)',
+  hover: 'hover:bg-(--linear-row-hover)',
 } as const;
 
 // Icon Colors (use CSS variables where possible)
@@ -66,20 +68,20 @@ export const columnWidths = {
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
-  rowHeight: '40px',
-  headerHeight: '36px', // Compact header with py-2 padding
+  rowHeight: '34px',
+  headerHeight: '30px', // Compact header with py-1.5 padding
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '40px', // Must match rowHeight
+  skeletonRowHeight: '34px', // Must match rowHeight
 } as const;
 
 // Border Styles
 export const borders = {
-  cell: 'border-b border-subtle/50',
-  header: 'border-b border-subtle',
-  groupHeader: 'border-b-2 border-subtle/60',
-  subtle: 'border-subtle/50',
+  cell: 'border-b border-(--linear-border-subtle)',
+  header: 'border-b border-(--linear-border-subtle)',
+  groupHeader: 'border-b-2 border-(--linear-border-subtle)',
+  subtle: 'border-(--linear-border-subtle)',
 } as const;
 
 // Loading Skeleton Styles
@@ -119,20 +121,21 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-surface-1',
-    borders.header
+    'bg-(--linear-app-content-surface)',
+    'shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'
   ),
   stickyGroupHeader: cn(
     'sticky top-0',
     zIndex.groupHeader,
-    'bg-base dark:bg-surface-2',
+    'bg-(--linear-app-content-surface)',
     borders.groupHeader
   ),
   tableRow: cn(
     alignment.rowHeight,
     borders.cell,
     selection.unchecked,
-    'last:border-b-0'
+    'last:border-b-0',
+    'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),

@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Check,
   ChevronLeft,
@@ -9,30 +10,14 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-interface Lead {
-  id: string;
-  linktreeHandle: string;
-  linktreeUrl: string;
-  displayName: string | null;
-  status: string;
-  fitScore: number | null;
-  hasPaidTier: boolean | null;
-  hasSpotifyLink: boolean;
-  hasInstagram: boolean;
-  musicToolsDetected: string[];
-  contactEmail: string | null;
-  createdAt: string;
-}
-
-interface LeadListResponse {
-  items: Lead[];
-  total: number;
-  page: number;
-  limit: number;
-}
+import {
+  type AdminLead,
+  queryKeys,
+  useLeadsListQuery,
+  useUpdateLeadStatusMutation,
+} from '@/lib/queries';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -60,63 +45,76 @@ interface LeadTableProps {
   readonly refreshKey?: number;
 }
 
+function renderLeadRows(
+  loading: boolean,
+  loadError: string | null,
+  leads: AdminLead[],
+  renderRow: (lead: AdminLead) => ReactNode
+): ReactNode {
+  if (loading) {
+    return (
+      <tr>
+        <td colSpan={6} className='py-8 text-center text-secondary-token'>
+          <Loader2 className='mx-auto h-5 w-5 animate-spin' />
+        </td>
+      </tr>
+    );
+  }
+  if (loadError) {
+    return (
+      <tr>
+        <td colSpan={6} className='py-8 text-center text-secondary-token'>
+          {loadError}
+        </td>
+      </tr>
+    );
+  }
+  if (leads.length === 0) {
+    return (
+      <tr>
+        <td colSpan={6} className='py-8 text-center text-secondary-token'>
+          No leads found
+        </td>
+      </tr>
+    );
+  }
+  return leads.map(renderRow);
+}
+
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [total, setTotal] = useState(0);
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'createdAt' | 'fitScore'>('createdAt');
   const [actioningId, setActioningId] = useState<string | null>(null);
   const limit = 25;
 
-  const fetchLeads = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(limit),
-        sortBy,
-        sortOrder: 'desc',
-      });
-      if (statusFilter) params.set('status', statusFilter);
-      if (search) params.set('search', search);
-
-      const res = await fetch(`/api/admin/leads?${params}`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error('Failed to load leads');
-      const data = (await res.json()) as LeadListResponse;
-      setLeads(data.items);
-      setTotal(data.total);
-    } catch {
-      toast.error('Failed to load leads');
-    } finally {
-      setLoading(false);
-    }
-  }, [page, statusFilter, search, sortBy]);
+  const leadsQuery = useLeadsListQuery({
+    page,
+    limit,
+    sortBy,
+    status: statusFilter || undefined,
+    search: search || undefined,
+  });
+  const updateLeadStatusMutation = useUpdateLeadStatusMutation();
 
   useEffect(() => {
-    void fetchLeads();
-  }, [fetchLeads, refreshKey]);
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.admin.leads.all(),
+    });
+  }, [queryClient, refreshKey]);
+
+  const loadError = leadsQuery.isError
+    ? 'Unable to load leads right now. Try again in a moment.'
+    : null;
+  const leads = leadsQuery.data?.items ?? [];
+  const total = leadsQuery.data?.total ?? 0;
 
   async function updateLeadStatus(id: string, status: 'approved' | 'rejected') {
     setActioningId(id);
     try {
-      const res = await fetch(`/api/admin/leads/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) throw new Error(`Failed to ${status} lead`);
-      const data = (await res.json()) as Lead & {
-        ingestion?: {
-          success: boolean;
-          profileUsername?: string;
-          error?: string;
-        } | null;
-      };
+      const data = await updateLeadStatusMutation.mutateAsync({ id, status });
 
       if (status === 'approved' && data.ingestion) {
         if (data.ingestion.success) {
@@ -132,7 +130,9 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         toast.success(`Lead ${status}`);
       }
 
-      await fetchLeads();
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.admin.leads.all(),
+      });
     } catch {
       toast.error(`Failed to ${status} lead`);
     } finally {
@@ -150,7 +150,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         </h2>
       </div>
 
-      {/* Filters */}
       <div className='mb-4 flex flex-wrap items-center gap-2'>
         {STATUS_OPTIONS.map(opt => (
           <button
@@ -191,7 +190,6 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         </select>
       </div>
 
-      {/* Table */}
       <div className='overflow-x-auto'>
         <table className='w-full text-xs'>
           <thead>
@@ -205,128 +203,107 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className='py-8 text-center text-secondary-token'
-                >
-                  <Loader2 className='mx-auto h-5 w-5 animate-spin' />
+            {renderLeadRows(leadsQuery.isLoading, loadError, leads, lead => (
+              <tr
+                key={lead.id}
+                className='border-b border-subtle/50 hover:bg-white/[0.02]'
+              >
+                <td className='py-2.5 pr-3'>
+                  <div className='flex flex-col'>
+                    <span className='font-medium text-primary-token'>
+                      {lead.displayName || lead.linktreeHandle}
+                    </span>
+                    <a
+                      href={lead.linktreeUrl}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
+                    >
+                      @{lead.linktreeHandle}
+                      <ExternalLink className='h-3 w-3' />
+                    </a>
+                  </div>
                 </td>
-              </tr>
-            ) : leads.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={6}
-                  className='py-8 text-center text-secondary-token'
-                >
-                  No leads found
+                <td className='py-2.5 pr-3'>
+                  <Badge variant={STATUS_VARIANT[lead.status] ?? 'secondary'}>
+                    {lead.status}
+                  </Badge>
                 </td>
-              </tr>
-            ) : (
-              leads.map(lead => (
-                <tr
-                  key={lead.id}
-                  className='border-b border-subtle/50 hover:bg-white/[0.02]'
-                >
-                  <td className='py-2.5 pr-3'>
-                    <div className='flex flex-col'>
-                      <span className='font-medium text-primary-token'>
-                        {lead.displayName || lead.linktreeHandle}
-                      </span>
-                      <a
-                        href={lead.linktreeUrl}
-                        target='_blank'
-                        rel='noopener noreferrer'
-                        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-                      >
-                        @{lead.linktreeHandle}
-                        <ExternalLink className='h-3 w-3' />
-                      </a>
-                    </div>
-                  </td>
-                  <td className='py-2.5 pr-3'>
-                    <Badge variant={STATUS_VARIANT[lead.status] ?? 'secondary'}>
-                      {lead.status}
-                    </Badge>
-                  </td>
-                  <td className='py-2.5 pr-3 tabular-nums'>
-                    {lead.fitScore ?? '-'}
-                  </td>
-                  <td className='py-2.5 pr-3'>
+                <td className='py-2.5 pr-3 tabular-nums'>
+                  {lead.fitScore ?? '-'}
+                </td>
+                <td className='py-2.5 pr-3'>
+                  <div className='flex gap-1'>
+                    {lead.hasSpotifyLink && (
+                      <Badge variant='secondary' className='text-2xs'>
+                        Spotify
+                      </Badge>
+                    )}
+                    {lead.hasPaidTier && (
+                      <Badge variant='secondary' className='text-2xs'>
+                        Paid
+                      </Badge>
+                    )}
+                    {lead.hasInstagram && (
+                      <Badge variant='secondary' className='text-2xs'>
+                        IG
+                      </Badge>
+                    )}
+                    {lead.contactEmail && (
+                      <Badge variant='secondary' className='text-2xs'>
+                        Email
+                      </Badge>
+                    )}
+                  </div>
+                </td>
+                <td className='py-2.5 pr-3'>
+                  {lead.musicToolsDetected.length > 0 ? (
+                    <span className='text-secondary-token'>
+                      {lead.musicToolsDetected.join(', ')}
+                    </span>
+                  ) : (
+                    <span className='text-tertiary-token'>-</span>
+                  )}
+                </td>
+                <td className='py-2.5'>
+                  {(lead.status === 'qualified' ||
+                    lead.status === 'discovered') && (
                     <div className='flex gap-1'>
-                      {lead.hasSpotifyLink && (
-                        <Badge variant='secondary' className='text-2xs'>
-                          Spotify
-                        </Badge>
-                      )}
-                      {lead.hasPaidTier && (
-                        <Badge variant='secondary' className='text-2xs'>
-                          Paid
-                        </Badge>
-                      )}
-                      {lead.hasInstagram && (
-                        <Badge variant='secondary' className='text-2xs'>
-                          IG
-                        </Badge>
-                      )}
-                      {lead.contactEmail && (
-                        <Badge variant='secondary' className='text-2xs'>
-                          Email
-                        </Badge>
-                      )}
+                      <button
+                        type='button'
+                        onClick={() =>
+                          void updateLeadStatus(lead.id, 'approved')
+                        }
+                        disabled={actioningId === lead.id}
+                        className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
+                        title='Approve & ingest'
+                      >
+                        {actioningId === lead.id ? (
+                          <Loader2 className='h-4 w-4 animate-spin' />
+                        ) : (
+                          <Check className='h-4 w-4' />
+                        )}
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() =>
+                          void updateLeadStatus(lead.id, 'rejected')
+                        }
+                        disabled={actioningId === lead.id}
+                        className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                        title='Reject'
+                      >
+                        <X className='h-4 w-4' />
+                      </button>
                     </div>
-                  </td>
-                  <td className='py-2.5 pr-3'>
-                    {lead.musicToolsDetected.length > 0 ? (
-                      <span className='text-secondary-token'>
-                        {lead.musicToolsDetected.join(', ')}
-                      </span>
-                    ) : (
-                      <span className='text-tertiary-token'>-</span>
-                    )}
-                  </td>
-                  <td className='py-2.5'>
-                    {(lead.status === 'qualified' ||
-                      lead.status === 'discovered') && (
-                      <div className='flex gap-1'>
-                        <button
-                          type='button'
-                          onClick={() =>
-                            void updateLeadStatus(lead.id, 'approved')
-                          }
-                          disabled={actioningId === lead.id}
-                          className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
-                          title='Approve & ingest'
-                        >
-                          {actioningId === lead.id ? (
-                            <Loader2 className='h-4 w-4 animate-spin' />
-                          ) : (
-                            <Check className='h-4 w-4' />
-                          )}
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() =>
-                            void updateLeadStatus(lead.id, 'rejected')
-                          }
-                          disabled={actioningId === lead.id}
-                          className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
-                          title='Reject'
-                        >
-                          <X className='h-4 w-4' />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
+                  )}
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className='mt-3 flex items-center justify-between'>
           <span className='text-xs text-secondary-token'>
@@ -337,7 +314,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
               variant='outline'
               size='sm'
               onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1 || loading}
+              disabled={page === 1 || leadsQuery.isLoading}
             >
               <ChevronLeft className='h-4 w-4' />
             </Button>
@@ -345,7 +322,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
               variant='outline'
               size='sm'
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages || loading}
+              disabled={page === totalPages || leadsQuery.isLoading}
             >
               <ChevronRight className='h-4 w-4' />
             </Button>

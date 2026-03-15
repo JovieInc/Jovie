@@ -100,6 +100,11 @@ export async function GET(request: NextRequest) {
 
       const { profileId, sort, direction, cursor, pageSize, segments } =
         parsed.data;
+      const viewParam = searchParams.get('view');
+      const view =
+        viewParam === 'identified' || viewParam === 'anonymous'
+          ? viewParam
+          : 'all';
 
       // Verify user owns the profile
       const profile = await verifyProfileOwnership(tx, profileId, clerkUserId);
@@ -113,6 +118,19 @@ export async function GET(request: NextRequest) {
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const segmentCondition = buildSegmentCondition(segments);
+      let viewCondition: SQL<boolean>;
+      if (view === 'anonymous') {
+        viewCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+      } else if (view === 'identified') {
+        viewCondition = or(
+          eq(audienceMembers.type, 'email'),
+          eq(audienceMembers.type, 'sms'),
+          eq(audienceMembers.type, 'spotify'),
+          eq(audienceMembers.type, 'customer')
+        ) as SQL<boolean>;
+      } else {
+        viewCondition = drizzleSql<boolean>`true`;
+      }
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
       let cursorCondition: SQL<unknown> = drizzleSql`true`;
@@ -196,6 +214,7 @@ export async function GET(request: NextRequest) {
           and(
             eq(audienceMembers.creatorProfileId, profileId),
             segmentCondition,
+            viewCondition,
             cursorCondition
           )
         );

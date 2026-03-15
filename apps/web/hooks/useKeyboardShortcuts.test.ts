@@ -20,9 +20,29 @@ function fireKey(
   return event;
 }
 
+function fireKeyOn(
+  target: EventTarget,
+  key: string,
+  modifiers: {
+    metaKey?: boolean;
+    ctrlKey?: boolean;
+    shiftKey?: boolean;
+    altKey?: boolean;
+  } = {}
+) {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    ...modifiers,
+  });
+  target.dispatchEvent(event);
+  return event;
+}
+
 describe('useKeyboardShortcuts', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    document.body.innerHTML = '';
   });
 
   it('calls handler when matching key is pressed', () => {
@@ -131,5 +151,26 @@ describe('useKeyboardShortcuts', () => {
 
     fireKey('b', { metaKey: true });
     expect(metaBHandler).toHaveBeenCalledOnce();
+  });
+
+  it('does not fire scoped shortcuts before the scope ref mounts', () => {
+    const handler = vi.fn();
+    const scopeRef = { current: null as HTMLElement | null };
+    const scopeElement = document.createElement('div');
+    document.body.appendChild(scopeElement);
+
+    renderHook(() =>
+      useKeyboardShortcuts(
+        [{ key: 'Escape', handler, description: 'Close panel' }],
+        { scopeRef }
+      )
+    );
+
+    fireKeyOn(scopeElement, 'Escape');
+    expect(handler).not.toHaveBeenCalled();
+
+    scopeRef.current = scopeElement;
+    fireKeyOn(scopeElement, 'Escape');
+    expect(handler).toHaveBeenCalledOnce();
   });
 });

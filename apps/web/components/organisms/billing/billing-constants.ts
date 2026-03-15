@@ -1,54 +1,41 @@
 import { AlertTriangle, CheckCircle, RefreshCw, XCircle } from 'lucide-react';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
 
 export const LINEAR_EASE = [0.16, 1, 0.3, 1] as const;
 
+const FEATURE_DETAIL_REGEX = /^(.+?)\s*\(([^)]+)\)$/;
+
+/**
+ * Plan features for the billing comparison UI, derived from ENTITLEMENT_REGISTRY.
+ * The `{ label, detail? }` shape is consumed by PlanComparisonSection.
+ */
 export const PLAN_FEATURES = {
   free: {
-    name: 'Free',
-    tagline: 'Get started',
-    features: [
-      { label: 'Unlimited smart links' },
-      { label: 'Auto-sync from Spotify' },
-      { label: 'Smart deep links' },
-      { label: 'Edit & customize smart links' },
-      { label: 'Release notifications' },
-      { label: 'Manual release creation' },
-      { label: 'Subscriber collection' },
-      { label: 'Basic analytics', detail: '30-day retention' },
-      { label: 'Up to 100 contacts' },
-      { label: 'AI assistant', detail: '25 messages/day' },
-    ],
+    name: ENTITLEMENT_REGISTRY.free.marketing.displayName,
+    tagline: ENTITLEMENT_REGISTRY.free.marketing.tagline,
+    features: ENTITLEMENT_REGISTRY.free.marketing.features.map(f => {
+      const match = FEATURE_DETAIL_REGEX.exec(f);
+      return match ? { label: match[1], detail: match[2] } : { label: f };
+    }),
   },
   pro: {
-    name: 'Pro',
-    tagline: 'For growing artists',
-    features: [
-      { label: 'Pre-release pages', detail: 'Countdown & notify me' },
-      { label: 'Remove Jovie branding' },
-      { label: 'Extended analytics', detail: '90-day retention' },
-      { label: 'Advanced analytics & geographic insights' },
-      { label: 'Filter your own visits' },
-      { label: 'Unlimited contacts' },
-      { label: 'Contact export' },
-      { label: 'Verified badge' },
-      { label: 'AI assistant', detail: '100 messages/day' },
-      { label: 'Priority support' },
-    ],
+    name: ENTITLEMENT_REGISTRY.pro.marketing.displayName,
+    tagline: ENTITLEMENT_REGISTRY.pro.marketing.tagline,
+    features: ENTITLEMENT_REGISTRY.pro.marketing.features.map(f => {
+      const match = FEATURE_DETAIL_REGEX.exec(f);
+      return match ? { label: match[1], detail: match[2] } : { label: f };
+    }),
   },
   growth: {
-    name: 'Growth',
-    tagline: 'For serious artists — Early Access',
-    features: [
-      { label: 'Full analytics', detail: '1-year retention' },
-      { label: 'Everything in Pro' },
-      { label: 'AI assistant', detail: '500 messages/day' },
-      { label: 'A/B testing', detail: 'Coming soon' },
-      { label: 'Meta pixel integration', detail: 'Coming soon' },
-      { label: 'Custom domain', detail: 'Coming soon' },
-    ],
+    name: ENTITLEMENT_REGISTRY.growth.marketing.displayName,
+    tagline: `${ENTITLEMENT_REGISTRY.growth.marketing.tagline} — Early Access`,
+    features: ENTITLEMENT_REGISTRY.growth.marketing.features.map(f => {
+      const match = FEATURE_DETAIL_REGEX.exec(f);
+      return match ? { label: match[1], detail: match[2] } : { label: f };
+    }),
   },
-} as const;
+};
 
 export type PlanKey = keyof typeof PLAN_FEATURES;
 

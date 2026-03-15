@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type DiscoveryKeyword,
@@ -7,6 +7,7 @@ import {
   leadPipelineSettings,
   leads,
 } from '@/lib/db/schema/leads';
+import { sqlArray } from '@/lib/db/sql-helpers';
 import { captureError } from '@/lib/error-tracking';
 import {
   extractLinktreeHandle,
@@ -14,11 +15,135 @@ import {
 } from '@/lib/ingestion/strategies/linktree';
 import { searchGoogleCSE } from './google-cse';
 
+interface DiscoveryCandidate {
+  linktreeHandle: string;
+  linktreeUrl: string;
+  discoverySource: 'google_cse';
+  discoveryQuery: string;
+}
+
+function isMissingLeadInsertColumnError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes(
+      'column "spotify_popularity" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "spotify_followers" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "release_count" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "latest_release_date" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "priority_score" of relation "leads" does not exist'
+    ) ||
+    normalized.includes(
+      'column "is_linktree_verified" of relation "leads" does not exist'
+    )
+  );
+}
+
+async function insertCandidatesWithLegacyFallback(
+  candidates: DiscoveryCandidate[],
+  result: DiscoveryResult
+): Promise<void> {
+  let insertedCount = 0;
+
+  for (const candidate of candidates) {
+    const insertResult = await db.execute<{ id: string }>(drizzleSql`
+      insert into "leads" (
+        "linktree_handle",
+        "linktree_url",
+        "discovery_source",
+        "discovery_query",
+        "music_tools_detected"
+      ) values (
+        ${candidate.linktreeHandle},
+        ${candidate.linktreeUrl},
+        ${candidate.discoverySource},
+        ${candidate.discoveryQuery},
+        ${sqlArray([])}
+      )
+      on conflict ("linktree_handle") do nothing
+      returning "id"
+    `);
+
+    if (insertResult.rows[0]?.id) {
+      insertedCount++;
+    }
+  }
+
+  result.newLeadsFound += insertedCount;
+  result.duplicatesSkipped += candidates.length - insertedCount;
+}
+
+async function insertCandidates(
+  candidates: DiscoveryCandidate[],
+  result: DiscoveryResult
+): Promise<void> {
+  if (candidates.length === 0) return;
+  try {
+    const insertedRows = await db
+      .insert(leads)
+      .values(candidates)
+      .onConflictDoNothing({ target: leads.linktreeHandle })
+      .returning({ id: leads.id });
+    result.newLeadsFound += insertedRows.length;
+    result.duplicatesSkipped += candidates.length - insertedRows.length;
+  } catch (error) {
+    if (!isMissingLeadInsertColumnError(error)) {
+      throw error;
+    }
+
+    await insertCandidatesWithLegacyFallback(candidates, result);
+  }
+}
+
 export interface DiscoveryResult {
   queriesUsed: number;
   candidatesProcessed: number;
   newLeadsFound: number;
   duplicatesSkipped: number;
+}
+
+function buildCandidateMap(
+  results: { link: string }[],
+  query: string
+): Map<
+  string,
+  {
+    linktreeHandle: string;
+    linktreeUrl: string;
+    discoverySource: 'google_cse';
+    discoveryQuery: string;
+  }
+> {
+  const map = new Map<
+    string,
+    {
+      linktreeHandle: string;
+      linktreeUrl: string;
+      discoverySource: 'google_cse';
+      discoveryQuery: string;
+    }
+  >();
+  for (const item of results) {
+    if (!isLinktreeUrl(item.link)) continue;
+    const handle = extractLinktreeHandle(item.link);
+    if (!handle) continue;
+    map.set(handle, {
+      linktreeHandle: handle,
+      linktreeUrl: `https://linktr.ee/${handle}`,
+      discoverySource: 'google_cse',
+      discoveryQuery: query,
+    });
+  }
+  return map;
 }
 
 /**
@@ -55,43 +180,10 @@ export async function runDiscovery(
 
     try {
       const results = await searchGoogleCSE(keyword.query);
-      const candidatesByHandle = new Map<
-        string,
-        {
-          linktreeHandle: string;
-          linktreeUrl: string;
-          discoverySource: 'google_cse';
-          discoveryQuery: string;
-        }
-      >();
-
-      for (const item of results) {
-        if (!isLinktreeUrl(item.link)) continue;
-
-        const handle = extractLinktreeHandle(item.link);
-        if (!handle) continue;
-
-        candidatesByHandle.set(handle, {
-          linktreeHandle: handle,
-          linktreeUrl: `https://linktr.ee/${handle}`,
-          discoverySource: 'google_cse',
-          discoveryQuery: keyword.query,
-        });
-      }
-
+      const candidatesByHandle = buildCandidateMap(results, keyword.query);
       const candidates = Array.from(candidatesByHandle.values());
       result.candidatesProcessed += candidates.length;
-
-      if (candidates.length > 0) {
-        const insertedRows = await db
-          .insert(leads)
-          .values(candidates)
-          .onConflictDoNothing({ target: leads.linktreeHandle })
-          .returning({ id: leads.id });
-
-        result.newLeadsFound += insertedRows.length;
-        result.duplicatesSkipped += candidates.length - insertedRows.length;
-      }
+      await insertCandidates(candidates, result);
 
       // Update keyword stats
       await db

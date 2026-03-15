@@ -1,6 +1,7 @@
 'use client';
 
 import { Check, Loader2, X } from 'lucide-react';
+import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import type { SocialLinkSuggestion } from './useSocialLinkSuggestions';
@@ -67,15 +68,10 @@ export function SocialLinkSuggestionRows({
                   )}
                   Add
                 </button>
-                <button
-                  type='button'
+                <InlineIconButton
                   onClick={() => onDismiss(suggestion)}
                   disabled={isActioning}
-                  className={cn(
-                    'inline-flex items-center gap-1 p-1 text-[13px] rounded-md',
-                    'text-secondary-token hover:bg-interactive-hover hover:text-primary-token',
-                    'disabled:opacity-50 transition-colors'
-                  )}
+                  className='[&_svg]:h-3 [&_svg]:w-3 disabled:opacity-50'
                   aria-label={`Dismiss ${suggestion.platformLabel}`}
                 >
                   {isActioning ? (
@@ -83,7 +79,7 @@ export function SocialLinkSuggestionRows({
                   ) : (
                     <X className='h-3 w-3' />
                   )}
-                </button>
+                </InlineIconButton>
               </div>
             </div>
           );

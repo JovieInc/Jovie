@@ -1,7 +1,8 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getSessionSetupSql } from '@/lib/auth/session';
-import { db } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
@@ -235,7 +236,7 @@ export async function getUserAnalytics(
 ) {
   // Run inside a transaction to ensure the RLS session variable is set on the
   // same connection that queries the users table (which has RLS enabled).
-  return db.transaction(async tx => {
+  return runLegacyDbTransaction(async tx => {
     await tx.execute(getSessionSetupSql(clerkUserId));
 
     // Single JOIN query to get user and profile in one round-trip
@@ -306,7 +307,7 @@ export async function getUserDashboardAnalytics(
   //    causing RLS-protected tables (audience_members, notification_subscriptions,
   //    users) to return 0 rows — the root cause of JOV-1349.
   // 2. All CTEs see a consistent snapshot of the data.
-  return db.transaction(async tx => {
+  return runLegacyDbTransaction(async tx => {
     // Set the RLS session variable on this transaction's connection
     await tx.execute(getSessionSetupSql(clerkUserId));
 
@@ -340,6 +341,17 @@ export async function getUserDashboardAnalytics(
     const startDate = toStartDate(range);
     const recentThreshold = new Date();
     recentThreshold.setDate(recentThreshold.getDate() - 7);
+    const hasDailyProfileViews = await doesTableExist(
+      TABLE_NAMES.dailyProfileViews
+    );
+    const totalViewsSelect = hasDailyProfileViews
+      ? drizzleSql`(
+          select coalesce(sum(${dailyProfileViews.viewCount}), 0)
+          from ${dailyProfileViews}
+          where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
+            and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
+        )`
+      : drizzleSql`0`;
     // Consolidated dashboard analytics into one SQL round trip (previously eight queries).
     // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
     // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
@@ -353,34 +365,34 @@ export async function getUserDashboardAnalytics(
     const aggregates = await cacheQuery(
       `analytics:dashboard:${creatorProfile.id}:${range}`,
       () =>
-        dashboardQuery(() =>
-          db
-            .execute<{
-              top_cities: JsonArray<{ city: string | null; count: number }>;
-              top_countries: JsonArray<{
-                country: string | null;
-                count: number;
-              }>;
-              top_referrers: JsonArray<{
-                referrer: string | null;
-                count: number;
-              }>;
-              total_views: AggregateValue;
-              unique_users: AggregateValue;
-              total_clicks: AggregateValue;
-              spotify_clicks: AggregateValue;
-              social_clicks: AggregateValue;
-              recent_clicks: AggregateValue;
-              listen_clicks: AggregateValue;
-              subscribers: AggregateValue;
-              identified_users: AggregateValue;
-              top_links: JsonArray<{
-                id: string | null;
-                url: string | null;
-                clicks: number;
-              }>;
-            }>(
-              drizzleSql`
+        dashboardQuery(async () => {
+          type AggRow = {
+            top_cities: JsonArray<{ city: string | null; count: number }>;
+            top_countries: JsonArray<{
+              country: string | null;
+              count: number;
+            }>;
+            top_referrers: JsonArray<{
+              referrer: string | null;
+              count: number;
+            }>;
+            total_views: AggregateValue;
+            unique_users: AggregateValue;
+            total_clicks: AggregateValue;
+            spotify_clicks: AggregateValue;
+            social_clicks: AggregateValue;
+            recent_clicks: AggregateValue;
+            listen_clicks: AggregateValue;
+            subscribers: AggregateValue;
+            identified_users: AggregateValue;
+            top_links: JsonArray<{
+              id: string | null;
+              url: string | null;
+              clicks: number;
+            }>;
+          };
+          const result = await db.execute<AggRow>(
+            drizzleSql`
             with base_events as (
               select created_at, link_id, link_type, city, country, referrer
               from ${clickEvents}
@@ -447,15 +459,9 @@ export async function getUserDashboardAnalytics(
               where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
                 and ${audienceMembers.updatedAt} >= ${sqlTimestamp(startDate)}
                 and ${audienceMembers.email} is not null
-            ),
-            audience_views as (
-              select coalesce(sum(${dailyProfileViews.viewCount}), 0) as total_views
-              from ${dailyProfileViews}
-              where ${dailyProfileViews.creatorProfileId} = ${creatorProfile.id}
-                and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
             )
             select
-              (select total_views from audience_views) as total_views,
+              ${totalViewsSelect} as total_views,
               (select count(*) from audience_recent) as unique_users,
               (select count(*) from ranged_events) as total_clicks,
               (select count(*) from ranged_events where link_type = 'listen') as spotify_clicks,
@@ -470,9 +476,9 @@ export async function getUserDashboardAnalytics(
               coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links
             ;
           `
-            )
-            .then(res => res.rows?.[0])
-        ),
+          );
+          return result.rows?.[0];
+        }),
       { ttlSeconds: 300 }
     );
 

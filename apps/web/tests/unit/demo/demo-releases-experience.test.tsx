@@ -8,15 +8,18 @@ vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ isLoaded: true, user: null }),
   useClerk: () => ({ signOut: vi.fn() }),
   useAuth: () => ({ isSignedIn: false, userId: null }),
+  useSession: () => ({ isLoaded: true, isSignedIn: false, session: null }),
+  useSignIn: () => ({
+    isLoaded: true,
+    signIn: undefined,
+    setActive: vi.fn(),
+  }),
   ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock nuqs sort params hook (avoids deep next/navigation dependency via nuqs → useRouter)
 vi.mock('@/lib/nuqs/hooks', () => ({
-  useReleaseSortParams: () => [
-    { sort: 'releaseDate', direction: 'desc' },
-    vi.fn(),
-  ],
+  useReleaseSortParams: () => [{ sort: 'release', direction: 'desc' }, vi.fn()],
   useAudienceSortParams: () => [
     { sort: 'createdAt', direction: 'desc' },
     vi.fn(),
@@ -32,7 +35,12 @@ vi.mock('@/components/demo/demo-actions', () => ({
 // Mock next/image for test environment
 vi.mock('next/image', () => ({
   default: (props: Record<string, unknown>) => {
-    const { priority: _priority, fetchPriority: _fp, ...rest } = props;
+    const {
+      priority: _priority,
+      fetchPriority: _fp,
+      unoptimized: _unoptimized,
+      ...rest
+    } = props;
     return <img alt='' {...rest} />;
   },
 }));
@@ -63,14 +71,26 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
 // → AvailabilityCell) and directly imports drizzle-orm — mock it to stop the
 // schema evaluation chain.
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
+  connectSpotifyArtist: vi.fn(),
   getSpotifyImportStatus: vi.fn(),
   pollReleasesCount: vi.fn(),
   connectAppleMusicArtist: vi.fn(),
   rescanAppleMusicLinks: vi.fn(),
+  rescanIsrcLinks: vi.fn(),
   revertReleaseArtwork: vi.fn(),
+  refreshRelease: vi.fn(),
   getReleases: vi.fn(),
+  loadReleaseMatrix: vi.fn(),
   deleteRelease: vi.fn(),
+  createRelease: vi.fn(),
   updateRelease: vi.fn(),
+  saveProviderOverride: vi.fn(),
+  resetProviderOverride: vi.fn(),
+  saveCanvasStatus: vi.fn(),
+  saveReleaseLyrics: vi.fn(),
+  formatReleaseLyrics: vi.fn(),
+  updateAllowArtworkDownloads: vi.fn(),
+  syncFromSpotify: vi.fn(),
   importSpotifyReleases: vi.fn(),
 }));
 
@@ -138,6 +158,8 @@ describe('DemoReleasesExperience', () => {
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
 
+    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
+
     // Release titles should appear in the list
     expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
 
@@ -150,6 +172,8 @@ describe('DemoReleasesExperience', () => {
 
   it('renders release data in the table', () => {
     renderDemo();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
 
     // The table should contain mock release titles
     expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);

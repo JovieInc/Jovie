@@ -10,9 +10,8 @@
 import { Button, Input } from '@jovie/ui';
 import { CheckCircle, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
-
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 import type { ClerkEmailAddressResource, ClerkUserResource } from './types';
 import { useEmailManagement } from './useEmailManagement';
@@ -52,146 +51,142 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
   }
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
-      {/* Existing email rows */}
-      {sortedEmails.map(email => {
-        const isPrimary = email.id === primaryEmailId;
-        const isVerified = email.verification?.status === 'verified';
+    <ContentSurfaceCard className='overflow-hidden'>
+      <div className='space-y-3 px-4 py-3'>
+        {sortedEmails.map(email => {
+          const isPrimary = email.id === primaryEmailId;
+          const isVerified = email.verification?.status === 'verified';
 
-        return (
-          <div
-            key={email.id}
-            className='flex items-center justify-between px-4 py-3'
-          >
-            <div className='flex items-center gap-3'>
-              <div>
-                <p className='text-[13px] text-primary-token flex items-center gap-2'>
-                  {email.emailAddress}
-                  {isPrimary && (
-                    <span className='text-[11px] text-secondary-token'>
-                      Primary
-                    </span>
-                  )}
-                </p>
-                <p className='text-[11px] text-secondary-token flex items-center gap-1.5 mt-0.5'>
-                  {isVerified ? (
-                    <span className='inline-flex items-center gap-1 text-emerald-600'>
-                      <CheckCircle className='h-3.5 w-3.5' />
-                      Verified
-                    </span>
-                  ) : (
-                    <span className='inline-flex items-center gap-1 text-amber-600'>
-                      <ShieldAlert className='h-3.5 w-3.5' />
-                      Unverified
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className='flex items-center gap-2'>
-              {!isPrimary && isVerified && (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  disabled={syncingEmailId === email.id}
-                  onClick={() => handleMakePrimary(email)}
-                >
-                  {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
-                </Button>
-              )}
-              {!isPrimary && (
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  className='text-destructive hover:text-destructive hover:bg-destructive/10'
-                  disabled={syncingEmailId === email.id}
-                  onClick={() => setEmailToRemove(email)}
-                >
-                  {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
-                </Button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Add email row */}
-      <div className='px-4 py-3'>
-        <form
-          onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
-          className='flex flex-col gap-3 sm:flex-row sm:items-end'
-        >
-          <div className='flex-1'>
-            {pendingEmail ? (
-              <div>
-                <label
-                  htmlFor='verify-code'
-                  className='block text-[13px] text-primary-token mb-1.5'
-                >
-                  Verification code
-                </label>
-                <Input
-                  id='verify-code'
-                  inputMode='numeric'
-                  pattern='[0-9]*'
-                  maxLength={6}
-                  value={verificationCode}
-                  onChange={event => setVerificationCode(event.target.value)}
-                  placeholder='Enter 6-digit code'
-                  required
-                />
-              </div>
-            ) : (
-              <div>
-                <label
-                  htmlFor='new-email'
-                  className='block text-[13px] text-primary-token mb-1.5'
-                >
-                  Add email address
-                </label>
-                <Input
-                  id='new-email'
-                  type='email'
-                  value={newEmail}
-                  placeholder='you@example.com'
-                  onChange={event => setNewEmail(event.target.value)}
-                  required
-                />
-              </div>
-            )}
-            {emailError && (
-              <p className='text-[13px] text-destructive mt-1.5'>
-                {emailError}
-              </p>
-            )}
-          </div>
-          <div className='flex gap-2 shrink-0'>
-            <Button
-              type='submit'
-              size='sm'
-              disabled={
-                emailStatus === 'sending' || emailStatus === 'verifying'
-              }
+          return (
+            <ContentSurfaceCard
+              key={email.id}
+              className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
             >
-              {emailButtonLabel}
-            </Button>
-            {pendingEmail && (
+              <div className='min-w-0 flex items-center gap-3'>
+                <div>
+                  <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+                    {email.emailAddress}
+                    {isPrimary ? (
+                      <span className='text-[11px] text-(--linear-text-secondary)'>
+                        Primary
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-secondary)'>
+                    {isVerified ? (
+                      <span className='inline-flex items-center gap-1 text-emerald-600'>
+                        <CheckCircle className='h-3.5 w-3.5' aria-hidden />
+                        Verified
+                      </span>
+                    ) : (
+                      <span className='inline-flex items-center gap-1 text-amber-600'>
+                        <ShieldAlert className='h-3.5 w-3.5' aria-hidden />
+                        Unverified
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className='flex shrink-0 items-center gap-2'>
+                {!isPrimary && isVerified ? (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    disabled={syncingEmailId === email.id}
+                    onClick={() => handleMakePrimary(email)}
+                  >
+                    {syncingEmailId === email.id ? 'Updating…' : 'Make primary'}
+                  </Button>
+                ) : null}
+                {isPrimary ? null : (
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    className='text-destructive hover:text-destructive hover:bg-destructive/10'
+                    disabled={syncingEmailId === email.id}
+                    onClick={() => setEmailToRemove(email)}
+                  >
+                    {syncingEmailId === email.id ? 'Removing…' : 'Remove'}
+                  </Button>
+                )}
+              </div>
+            </ContentSurfaceCard>
+          );
+        })}
+
+        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+          <form
+            onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
+            className='flex flex-col gap-3 sm:flex-row sm:items-end'
+          >
+            <div className='flex-1'>
+              {pendingEmail ? (
+                <div>
+                  <label
+                    htmlFor='verify-code'
+                    className='mb-1.5 block text-[13px] text-(--linear-text-primary)'
+                  >
+                    Verification code
+                  </label>
+                  <Input
+                    id='verify-code'
+                    inputMode='numeric'
+                    pattern='[0-9]*'
+                    maxLength={6}
+                    value={verificationCode}
+                    onChange={event => setVerificationCode(event.target.value)}
+                    placeholder='Enter 6-digit code'
+                    required
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label
+                    htmlFor='new-email'
+                    className='mb-1.5 block text-[13px] text-(--linear-text-primary)'
+                  >
+                    Add email address
+                  </label>
+                  <Input
+                    id='new-email'
+                    type='email'
+                    value={newEmail}
+                    placeholder='you@example.com'
+                    onChange={event => setNewEmail(event.target.value)}
+                    required
+                  />
+                </div>
+              )}
+              {emailError ? (
+                <p className='mt-1.5 text-[13px] text-destructive'>
+                  {emailError}
+                </p>
+              ) : null}
+            </div>
+            <div className='flex shrink-0 gap-2'>
               <Button
-                type='button'
-                variant='ghost'
+                type='submit'
                 size='sm'
-                onClick={resetEmailForm}
+                disabled={
+                  emailStatus === 'sending' || emailStatus === 'verifying'
+                }
               >
-                Cancel
+                {emailButtonLabel}
               </Button>
-            )}
-          </div>
-        </form>
+              {pendingEmail ? (
+                <Button
+                  type='button'
+                  variant='ghost'
+                  size='sm'
+                  onClick={resetEmailForm}
+                >
+                  Cancel
+                </Button>
+              ) : null}
+            </div>
+          </form>
+        </ContentSurfaceCard>
       </div>
 
       <ConfirmDialog
@@ -207,6 +202,6 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           if (emailToRemove) await handleRemoveEmail(emailToRemove);
         }}
       />
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

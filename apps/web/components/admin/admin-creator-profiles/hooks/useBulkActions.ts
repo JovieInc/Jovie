@@ -9,7 +9,7 @@
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { APP_ROUTES } from '@/constants/routes';
+import { useAdminBulkRefreshMutation } from '@/lib/queries';
 import type { AdminCreatorProfileRow } from '../types';
 
 export interface BulkActionsParams {
@@ -47,6 +47,7 @@ export function useBulkActions({
   clearSelection,
 }: BulkActionsParams): BulkActions {
   const router = useRouter();
+  const { mutateAsync: bulkRefresh } = useAdminBulkRefreshMutation();
 
   const handleBulkVerify = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));
@@ -115,23 +116,8 @@ export function useBulkActions({
     }
 
     try {
-      const response = await fetch(
-        `${APP_ROUTES.ADMIN_CREATORS}/bulk-refresh`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ profileIds: selectedProfileIds }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Bulk refresh request failed');
-      }
-
-      const payload = (await response.json()) as { queuedCount?: number };
-      const queuedCount = Number(payload.queuedCount ?? 0);
+      const result = await bulkRefresh({ profileIds: selectedProfileIds });
+      const queuedCount = Number(result.queuedCount ?? 0);
 
       if (queuedCount > 0) {
         toast.success(
@@ -144,9 +130,9 @@ export function useBulkActions({
       clearSelection();
       router.refresh();
     } catch {
-      toast.error('Failed to queue MusicFetch refresh');
+      // Error toast handled by mutation's onError callback
     }
-  }, [profiles, selectedIds, clearSelection, router]);
+  }, [profiles, selectedIds, clearSelection, router, bulkRefresh]);
 
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));

@@ -1,5 +1,10 @@
 import { TooltipProvider } from '@jovie/ui';
-import { type RenderOptions, render, screen } from '@testing-library/react';
+import {
+  act,
+  type RenderOptions,
+  render,
+  screen,
+} from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
@@ -122,7 +127,9 @@ vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
     ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
-      <div data-testid='release-table'>rows:{releases.length}</div>
+      <div data-testid='release-table'>
+        ids:{releases.map(release => release.id).join(',')}
+      </div>
     ),
   })
 );
@@ -171,6 +178,22 @@ vi.mock(
   '@/components/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner',
   () => ({
     SmartLinkGateBanner: () => null,
+  })
+);
+
+vi.mock(
+  '@/components/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
+  () => ({
+    ImportProgressBanner: ({ visible = true }: { visible?: boolean }) => (
+      <div
+        data-testid='spotify-import-progress-banner'
+        aria-hidden={!visible}
+        style={{
+          visibility: visible ? 'visible' : 'hidden',
+          opacity: visible ? 1 : 0,
+        }}
+      />
+    ),
   })
 );
 
@@ -353,6 +376,38 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
+
+    it('keeps spotify import banner mounted and hidden when import is idle', () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease()]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+          initialImporting={false}
+        />
+      );
+
+      const banner = screen.getByTestId('spotify-import-progress-banner');
+      expect(banner).toHaveAttribute('aria-hidden', 'true');
+      expect(banner).toHaveStyle({ visibility: 'hidden', opacity: '0' });
+    });
+
+    it('shows spotify import banner when import is active', () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease()]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+          initialImporting={true}
+        />
+      );
+
+      const banner = screen.getByTestId('spotify-import-progress-banner');
+      expect(banner).toHaveAttribute('aria-hidden', 'false');
+      expect(banner).toHaveStyle({ visibility: 'visible', opacity: '1' });
+    });
   });
 
   describe('render stability', () => {
@@ -381,7 +436,7 @@ describe('ReleaseProviderMatrix', () => {
   });
 
   describe('release view filtering', () => {
-    it('filters to single-track entries when switched to tracks view', () => {
+    it('defaults to tracks rows on first render', () => {
       const single = makeRelease('single-track');
       const album = {
         ...makeRelease('album-track'),
@@ -398,9 +453,35 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      latestSubheaderProps?.onReleaseViewChange?.('tracks');
+      expect(screen.getByTestId('release-table')).toHaveTextContent(
+        'ids:single-track'
+      );
+    });
 
-      expect(screen.getByTestId('release-table')).toHaveTextContent('rows:1');
+    it('filters to multi-track releases when switched to releases view', () => {
+      const single = makeRelease('single-track');
+      const album = {
+        ...makeRelease('album-track'),
+        releaseType: 'album' as const,
+        totalTracks: 12,
+      };
+
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[single, album]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      act(() => {
+        latestSubheaderProps?.onReleaseViewChange?.('releases');
+      });
+
+      expect(screen.getByTestId('release-table')).toHaveTextContent(
+        'ids:album-track'
+      );
     });
   });
 });

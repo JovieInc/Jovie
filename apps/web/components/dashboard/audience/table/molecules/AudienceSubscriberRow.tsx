@@ -1,13 +1,13 @@
 'use client';
 
 import * as React from 'react';
-import { cn } from '@/lib/utils';
-import type { AudienceMember } from '@/types';
 import {
   AudienceCountryCell,
   AudienceCreatedAtCell,
   AudienceRowSelectionCell,
-} from '../atoms';
+} from '@/components/organisms/table';
+import { cn } from '@/lib/utils';
+import type { AudienceMember } from '@/types';
 
 export interface AudienceSubscriberRowProps {
   readonly row: AudienceMember;
@@ -45,8 +45,8 @@ export function AudienceSubscriberRow({
       data-index={dataIndex}
       ref={measureRef}
       className={cn(
-        'group cursor-pointer border-b border-subtle transition-colors duration-150 last:border-b-0 hover:bg-white/[0.02] focus-visible:outline-none focus-visible:bg-white/[0.04]',
-        isSelected && 'bg-white/[0.04]'
+        'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        isSelected && 'bg-(--linear-row-selected)'
       )}
       style={
         isVirtual
@@ -69,13 +69,13 @@ export function AudienceSubscriberRow({
         onToggle={onToggleSelect}
       />
 
-      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
+      <td className='px-4 py-3 align-middle text-[13px] text-(--linear-text-primary)'>
         {row.displayName && row.displayName !== row.phone
           ? row.displayName
           : 'Subscriber'}
       </td>
 
-      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
+      <td className='px-4 py-3 align-middle text-[13px] text-(--linear-text-primary)'>
         {row.phone ?? '—'}
       </td>
 

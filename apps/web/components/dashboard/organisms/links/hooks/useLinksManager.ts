@@ -9,7 +9,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { popularityIndex } from '@/constants/app';
-import { fetchWithTimeout } from '@/lib/queries/fetch';
+import {
+  MAX_MODE_LINKS,
+  MAX_PROFILE_LINKS,
+} from '@/lib/profile/social-link-limits';
+import { fetchWithTimeout } from '@/lib/queries';
 import { captureException } from '@/lib/sentry/client-lite';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { findDuplicate, mergeDuplicate } from '../services/duplicate-detection';
@@ -24,6 +28,21 @@ import {
   shouldMergeYouTubeDuplicate,
 } from '../services/youtube-handler';
 import { sectionOf } from '../utils';
+
+function isAtLinkCapacity(
+  section: string,
+  modeCount: number,
+  socialCount: number,
+  totalCount: number
+): boolean {
+  const socialCapacity = Math.max(
+    0,
+    MAX_PROFILE_LINKS - Math.min(modeCount, MAX_MODE_LINKS)
+  );
+  if (section === 'dsp') return modeCount >= MAX_MODE_LINKS;
+  if (section === 'social') return socialCount >= socialCapacity;
+  return totalCount >= MAX_PROFILE_LINKS;
+}
 
 type DuplicateResolution<T> = {
   next: T[];
@@ -263,6 +282,14 @@ export function useLinksManager<T extends DetectedLink = DetectedLink>({
               sectionOf(l) === otherSection
           )
         : false;
+
+      // Enforce public profile caps at add time.
+      const modeCount = links.filter(l => sectionOf(l) === 'dsp').length;
+      const socialCount = links.filter(l => sectionOf(l) === 'social').length;
+      const totalCount = modeCount + socialCount;
+      if (isAtLinkCapacity(section, modeCount, socialCount, totalCount)) {
+        return;
+      }
 
       // Step 4: Check YouTube cross-category logic
       const ytCrossCategory = checkYouTubeCrossCategory(

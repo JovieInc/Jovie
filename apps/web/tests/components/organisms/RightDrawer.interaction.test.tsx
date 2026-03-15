@@ -127,7 +127,12 @@ describe('RightDrawer', () => {
     );
 
     const desktopAside = screen.getByLabelText('Responsive drawer');
-    expect(desktopAside).toHaveClass('border-l', 'transition-[width,opacity]');
+    expect(desktopAside).toHaveClass(
+      'border-l',
+      'transition-[width,opacity]',
+      'lg:rounded-l-[18px]',
+      'shadow-[var(--linear-shadow-card)]'
+    );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
   });
@@ -163,6 +168,18 @@ describe('RightDrawer', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('keeps the inner content container unclipped for nested menus and popovers', () => {
+    const { container } = render(
+      <RightDrawer isOpen={true} width={360} ariaLabel='Popover drawer'>
+        <p>Drawer content</p>
+      </RightDrawer>
+    );
+
+    const innerContent = container.querySelector('aside > div > div');
+    expect(innerContent).toHaveClass('h-full', 'min-h-0');
+    expect(innerContent).not.toHaveClass('overflow-hidden');
   });
 
   it('supports rapid open and close cycles without stale width state', () => {

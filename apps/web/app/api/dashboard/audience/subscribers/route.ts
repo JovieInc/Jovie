@@ -58,6 +58,43 @@ function decodeCursor(raw: string): SubscriberCursor | null {
   }
 }
 
+function buildCursorFragment(
+  cursor: SubscriberCursor | null,
+  direction: string,
+  sortCol: string
+) {
+  if (!cursor) return drizzleSql``;
+  if (direction === 'asc') {
+    return drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} > ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id > ${cursor.id})
+            )`;
+  }
+  return drizzleSql`AND (
+              ${drizzleSql.raw(sortCol)} < ${cursor.sortValue}
+              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id < ${cursor.id})
+            )`;
+}
+
+function extractSortValue(
+  lastRow: {
+    email: string | null;
+    phone: string | null;
+    countryCode: string | null;
+    createdAt: Date | string;
+  },
+  sortCol: string
+): string | null {
+  if (sortCol === 'created_at') {
+    const v = lastRow.createdAt;
+    return v instanceof Date ? v.toISOString() : String(v);
+  }
+  if (sortCol === 'email') return lastRow.email;
+  if (sortCol === 'phone') return lastRow.phone;
+  if (sortCol === 'country_code') return lastRow.countryCode;
+  return null;
+}
+
 export async function GET(request: Request) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -104,17 +141,7 @@ export async function GET(request: Request) {
       //   OR (sortValue = cursor.sortValue AND id > cursor.id)
       // For (sortCol DESC, id DESC): after cursor means sortValue < cursor.sortValue
       //   OR (sortValue = cursor.sortValue AND id < cursor.id)
-      const cursorFragment = cursor
-        ? direction === 'asc'
-          ? drizzleSql`AND (
-              ${drizzleSql.raw(sortCol)} > ${cursor.sortValue}
-              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id > ${cursor.id})
-            )`
-          : drizzleSql`AND (
-              ${drizzleSql.raw(sortCol)} < ${cursor.sortValue}
-              OR (${drizzleSql.raw(sortCol)} = ${cursor.sortValue} AND id < ${cursor.id})
-            )`
-        : drizzleSql``;
+      const cursorFragment = buildCursorFragment(cursor, direction, sortCol);
 
       // Deduplicate by contact identifier: keep the most recent subscription per
       // unique phone/email using DISTINCT ON. A subquery is required because
@@ -144,22 +171,13 @@ export async function GET(request: Request) {
       }>;
 
       // Derive nextCursor from the last row in the page
-      const lastRow = rows[rows.length - 1];
+      const lastRow = rows.at(-1);
       let nextCursor: string | null = null;
       if (rows.length === pageSize && lastRow) {
-        // Pick the sort column value for the cursor
-        let sortValue: string | null = null;
-        if (sortCol === 'created_at') {
-          const v = lastRow.createdAt;
-          sortValue = v instanceof Date ? v.toISOString() : String(v);
-        } else if (sortCol === 'email') {
-          sortValue = lastRow.email;
-        } else if (sortCol === 'phone') {
-          sortValue = lastRow.phone;
-        } else if (sortCol === 'country_code') {
-          sortValue = lastRow.countryCode;
-        }
-        nextCursor = encodeCursor(sortValue, lastRow.id);
+        nextCursor = encodeCursor(
+          extractSortValue(lastRow, sortCol),
+          lastRow.id
+        );
       }
 
       // Only run the exact COUNT on the first page to avoid per-page overhead.

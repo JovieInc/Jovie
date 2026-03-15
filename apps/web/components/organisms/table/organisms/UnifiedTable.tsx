@@ -154,6 +154,20 @@ export interface UnifiedTableProps<TData> {
   readonly skeletonRows?: number;
 
   /**
+   * Optional per-column skeleton config to preserve final layout geometry.
+   */
+  readonly skeletonColumnConfig?: Array<{
+    readonly width?: string;
+    readonly variant?:
+      | 'text'
+      | 'avatar'
+      | 'badge'
+      | 'button'
+      | 'release'
+      | 'meta';
+  }>;
+
+  /**
    * Optional grouping configuration
    * When provided, table will render with grouped rows and sticky group headers
    */
@@ -323,6 +337,7 @@ export function UnifiedTable<TData>({
   containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
   skeletonRows = 20,
+  skeletonColumnConfig,
   groupingConfig,
   enableKeyboardNavigation,
   focusedRowIndex: controlledFocusedIndex,
@@ -470,6 +485,89 @@ export function UnifiedTable<TData>({
     onRowClick,
   });
 
+  // Row lookup map for grouped table mode — rebuilt when rows change
+  const groupedRowMap = useMemo(
+    () =>
+      new Map(
+        table
+          .getRowModel()
+          .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
+      ),
+    [rows, getRowId, table]
+  );
+
+  // Memoized row renderer for grouped table mode
+  const renderGroupedRow = useCallback(
+    (item: TData, index: number) => {
+      const row = groupedRowMap.get(getRowId ? getRowId(item) : item);
+      if (!row) return null;
+
+      const rowData = row.original as TData;
+
+      const rowElement = (
+        <VirtualizedTableRow
+          key={row.id}
+          row={row}
+          rowIndex={index}
+          rowRefsMap={rowRefs.current}
+          shouldEnableKeyboardNav={shouldEnableKeyboardNav}
+          shouldVirtualize={false}
+          focusedIndex={focusedIndex}
+          onRowClick={onRowClick}
+          onRowContextMenu={onRowContextMenu}
+          onKeyDown={handleKeyDown}
+          onFocusChange={setFocusedIndex}
+          getRowClassName={getRowClassName}
+          onRowShiftClick={onRowShiftClick}
+        />
+      );
+
+      const rowId =
+        getExpandableRowId?.(rowData) ?? getRowId?.(rowData) ?? row.id;
+      const isExpanded = expandedRowIds?.has(rowId);
+      const expandedContent =
+        isExpanded && renderExpandedContent
+          ? renderExpandedContent(rowData, columns.length)
+          : null;
+
+      const wrappedRowElement = getContextMenuItems ? (
+        <TableContextMenu key={row.id} items={getContextMenuItems(rowData)}>
+          {rowElement}
+        </TableContextMenu>
+      ) : (
+        rowElement
+      );
+
+      if (expandedContent) {
+        return (
+          <React.Fragment key={row.id}>
+            {wrappedRowElement}
+            {expandedContent}
+          </React.Fragment>
+        );
+      }
+
+      return wrappedRowElement;
+    },
+    [
+      groupedRowMap,
+      getRowId,
+      shouldEnableKeyboardNav,
+      focusedIndex,
+      onRowClick,
+      onRowContextMenu,
+      handleKeyDown,
+      setFocusedIndex,
+      getRowClassName,
+      onRowShiftClick,
+      getExpandableRowId,
+      expandedRowIds,
+      renderExpandedContent,
+      columns.length,
+      getContextMenuItems,
+    ]
+  );
+
   // Infinite scroll sentinel — fires onLoadMore when visible
   const sentinelRef = useRef<HTMLTableRowElement>(null);
   useEffect(() => {
@@ -513,6 +611,7 @@ export function UnifiedTable<TData>({
           <LoadingTableBody
             rows={skeletonRows}
             columns={columnCount}
+            columnConfig={skeletonColumnConfig}
             rowHeight={`${rowHeight}px`}
           />
         </table>
@@ -546,13 +645,6 @@ export function UnifiedTable<TData>({
 
   // Render grouped table if grouping is enabled
   if (groupingConfig && groupedData.length > 0) {
-    // Build row lookup map once for O(1) lookups: O(n)
-    const rowMap = new Map(
-      table
-        .getRowModel()
-        .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
-    );
-
     return (
       <div
         ref={setTableContainerRef}
@@ -568,64 +660,7 @@ export function UnifiedTable<TData>({
             observeGroupHeader={observeGroupHeader}
             visibleGroupIndex={visibleGroupIndex}
             columns={columns.length}
-            renderRow={(item, index) => {
-              const row = rowMap.get(getRowId ? getRowId(item) : item);
-              if (!row) return null;
-
-              const rowData = row.original as TData;
-
-              // Build row element using memoized VirtualizedTableRow
-              const rowElement = (
-                <VirtualizedTableRow
-                  key={row.id}
-                  row={row}
-                  rowIndex={index}
-                  rowRefsMap={rowRefs.current}
-                  shouldEnableKeyboardNav={shouldEnableKeyboardNav}
-                  shouldVirtualize={false}
-                  focusedIndex={focusedIndex}
-                  onRowClick={onRowClick}
-                  onRowContextMenu={onRowContextMenu}
-                  onKeyDown={handleKeyDown}
-                  onFocusChange={setFocusedIndex}
-                  getRowClassName={getRowClassName}
-                  onRowShiftClick={onRowShiftClick}
-                />
-              );
-
-              // Check if row is expanded and has expanded content
-              const rowId =
-                getExpandableRowId?.(rowData) ?? getRowId?.(rowData) ?? row.id;
-              const isExpanded = expandedRowIds?.has(rowId);
-              const expandedContent =
-                isExpanded && renderExpandedContent
-                  ? renderExpandedContent(rowData, columns.length)
-                  : null;
-
-              // Wrap with context menu if provided
-              const wrappedRowElement = getContextMenuItems ? (
-                <TableContextMenu
-                  key={row.id}
-                  items={getContextMenuItems(rowData)}
-                >
-                  {rowElement}
-                </TableContextMenu>
-              ) : (
-                rowElement
-              );
-
-              // If expanded, render both row and expanded content
-              if (expandedContent) {
-                return (
-                  <React.Fragment key={row.id}>
-                    {wrappedRowElement}
-                    {expandedContent}
-                  </React.Fragment>
-                );
-              }
-
-              return wrappedRowElement;
-            }}
+            renderRow={renderGroupedRow}
           />
         </table>
       </div>

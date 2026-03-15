@@ -74,6 +74,7 @@ describe('discography table guards', () => {
 
     expect(result).toEqual({
       ...release,
+      artistNames: [],
       providerLinks: [],
     });
     expect(hoisted.selectMock).toHaveBeenCalledTimes(1);
@@ -81,6 +82,10 @@ describe('discography table guards', () => {
       1,
       'discog_releases'
     );
-    expect(hoisted.doesTableExist).toHaveBeenNthCalledWith(2, 'provider_links');
+    expect(hoisted.doesTableExist).toHaveBeenNthCalledWith(
+      2,
+      'release_artists'
+    );
+    expect(hoisted.doesTableExist).toHaveBeenNthCalledWith(3, 'provider_links');
   });
 });

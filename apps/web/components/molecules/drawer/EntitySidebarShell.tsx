@@ -95,48 +95,56 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full flex-col'>
-        {/* Header bar — close is in the overflow dropdown */}
-        <DrawerHeader
-          title={title}
-          actions={
-            headerActions ??
-            (onClose ? (
-              <DrawerHeaderActions
-                primaryActions={[]}
-                overflowActions={[]}
-                onClose={onClose}
-              />
-            ) : undefined)
-          }
-        />
+      <div className='flex h-full min-h-0 flex-col'>
+        <div className='sticky top-0 z-20 shrink-0 border-b border-subtle/80 bg-surface-0/95 backdrop-blur supports-[backdrop-filter]:bg-surface-0/85'>
+          {/* Header bar — close is in the overflow dropdown */}
+          <DrawerHeader
+            title={title}
+            actions={
+              headerActions ??
+              (onClose ? (
+                <DrawerHeaderActions
+                  primaryActions={[]}
+                  overflowActions={[]}
+                  onClose={onClose}
+                />
+              ) : undefined)
+            }
+          />
+
+          {/* Entity header — image + name area */}
+          {entityHeader && (
+            <div className='overflow-visible px-5 pt-3 pb-3.5'>
+              {entityHeader}
+            </div>
+          )}
+
+          {/* Tabs */}
+          {tabs && (
+            <div className='overflow-visible border-t border-subtle/70 px-5 py-2.5 [&>*]:w-full'>
+              {tabs}
+            </div>
+          )}
+        </div>
 
         {isEmpty ? (
           /* Empty state */
-          <div className='flex-1 overflow-auto px-5 py-5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
             <DrawerEmptyState message={emptyMessage} />
           </div>
         ) : (
           <>
-            {/* Entity header — image + name area */}
-            {entityHeader && (
-              <div className='shrink-0 overflow-hidden px-5 pt-4 pb-4'>
-                {entityHeader}
-              </div>
-            )}
-
-            {/* Tabs */}
-            {tabs && (
-              <div className='shrink-0 px-5 py-2.5 [&>*]:w-full'>{tabs}</div>
-            )}
-
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
+            <div className='flex-1 min-h-0 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-4.5'>
               {children}
             </div>
 
             {/* Footer */}
-            {footer && <div className='shrink-0 px-5 py-3'>{footer}</div>}
+            {footer && (
+              <div className='shrink-0 border-t border-subtle bg-surface-0 px-5 py-3'>
+                {footer}
+              </div>
+            )}
           </>
         )}
       </div>

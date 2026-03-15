@@ -1,6 +1,7 @@
 'use client';
 
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 
@@ -39,42 +40,43 @@ export function ProviderCopyButton({
   const buttonLabel = getButtonLabel();
 
   return (
-    <button
-      type='button'
+    <DrawerButton
       data-testid={testId}
       data-url={path ? `${getBaseUrl()}${path}` : undefined}
       onClick={() => {
         if (!path) return;
         void onCopy(path, `${releaseTitle} – ${providerLabel}`, testId);
       }}
+      tone={isCopied ? 'secondary' : 'ghost'}
+      size='sm'
       className={cn(
-        'group/btn inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] transition-colors',
+        'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450]',
         isCopied
-          ? 'bg-green-100 text-success dark:bg-green-900/30 dark:text-success'
-          : 'text-secondary-token hover:bg-surface-2 hover:text-primary-token'
+          ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+          : 'text-(--linear-text-secondary)'
       )}
     >
       <span className='relative flex h-3.5 w-3.5 items-center justify-center'>
         <Icon
           name='Copy'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied
               ? 'scale-50 opacity-0'
-              : 'scale-100 opacity-0 group-hover/btn:opacity-100'
+              : 'scale-100 opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
           )}
           aria-hidden='true'
         />
         <Icon
           name='Check'
           className={cn(
-            'absolute h-3.5 w-3.5 transition-all duration-150',
+            'absolute h-3 w-3 transition-all duration-150',
             isCopied ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
           )}
           aria-hidden='true'
         />
       </span>
       <span className='line-clamp-1'>{buttonLabel}</span>
-    </button>
+    </DrawerButton>
   );
 }

@@ -45,9 +45,7 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
       {
         method: 'POST',
         body: 'test-body',
-        headers: {
-          'stripe-signature': 'sig_invalid',
-        },
+        headers: { 'stripe-signature': 'sig_invalid' },
       }
     );
 

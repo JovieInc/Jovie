@@ -106,6 +106,69 @@ interface UpdateCampaignSettingsBody {
   };
 }
 
+function validateCampaignSettingsBody(
+  body: UpdateCampaignSettingsBody
+): string | null {
+  if (
+    body.fitScoreThreshold !== undefined &&
+    (typeof body.fitScoreThreshold !== 'number' ||
+      body.fitScoreThreshold < 0 ||
+      body.fitScoreThreshold > 100)
+  ) {
+    return 'fitScoreThreshold must be a number between 0 and 100';
+  }
+  if (
+    body.batchLimit !== undefined &&
+    (typeof body.batchLimit !== 'number' ||
+      body.batchLimit < 1 ||
+      body.batchLimit > 500)
+  ) {
+    return 'batchLimit must be a number between 1 and 500';
+  }
+  if (
+    body.throttlingConfig !== undefined &&
+    isThrottlingConfigInvalid(body.throttlingConfig)
+  ) {
+    return 'Invalid throttlingConfig values';
+  }
+  return null;
+}
+
+function buildCampaignSettingsUpdates(
+  body: UpdateCampaignSettingsBody,
+  updatedBy: string | null
+): Partial<typeof campaignSettings.$inferInsert> {
+  const updates: Partial<typeof campaignSettings.$inferInsert> = {
+    updatedAt: new Date(),
+    updatedBy,
+  };
+  if (body.fitScoreThreshold !== undefined) {
+    updates.fitScoreThreshold = String(body.fitScoreThreshold);
+  }
+  if (body.batchLimit !== undefined) {
+    updates.batchLimit = body.batchLimit;
+  }
+  if (body.throttlingConfig !== undefined) {
+    updates.throttlingConfig = body.throttlingConfig;
+  }
+  return updates;
+}
+
+function isThrottlingConfigInvalid(config: {
+  minDelayMs: number;
+  maxDelayMs: number;
+  maxPerHour: number;
+}): boolean {
+  return (
+    typeof config.minDelayMs !== 'number' ||
+    typeof config.maxDelayMs !== 'number' ||
+    typeof config.maxPerHour !== 'number' ||
+    config.minDelayMs < 0 ||
+    config.maxDelayMs < config.minDelayMs ||
+    config.maxPerHour < 1
+  );
+}
+
 /**
  * POST /api/admin/campaigns/settings — Upserts campaign settings.
  */
@@ -133,60 +196,16 @@ export async function POST(request: NextRequest) {
     const body = parsed.data as UpdateCampaignSettingsBody;
 
     // Validate fields if provided
-    if (
-      body.fitScoreThreshold !== undefined &&
-      (typeof body.fitScoreThreshold !== 'number' ||
-        body.fitScoreThreshold < 0 ||
-        body.fitScoreThreshold > 100)
-    ) {
+    const validationError = validateCampaignSettingsBody(body);
+    if (validationError) {
       return NextResponse.json(
-        { error: 'fitScoreThreshold must be a number between 0 and 100' },
+        { error: validationError },
         { status: 400, headers: NO_STORE_HEADERS }
       );
-    }
-    if (
-      body.batchLimit !== undefined &&
-      (typeof body.batchLimit !== 'number' ||
-        body.batchLimit < 1 ||
-        body.batchLimit > 500)
-    ) {
-      return NextResponse.json(
-        { error: 'batchLimit must be a number between 1 and 500' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    if (body.throttlingConfig !== undefined) {
-      const { minDelayMs, maxDelayMs, maxPerHour } = body.throttlingConfig;
-      if (
-        typeof minDelayMs !== 'number' ||
-        typeof maxDelayMs !== 'number' ||
-        typeof maxPerHour !== 'number' ||
-        minDelayMs < 0 ||
-        maxDelayMs < minDelayMs ||
-        maxPerHour < 1
-      ) {
-        return NextResponse.json(
-          { error: 'Invalid throttlingConfig values' },
-          { status: 400, headers: NO_STORE_HEADERS }
-        );
-      }
     }
 
     const updatedBy = entitlements.userId ?? null;
-
-    const updates: Partial<typeof campaignSettings.$inferInsert> = {
-      updatedAt: new Date(),
-      updatedBy,
-    };
-    if (body.fitScoreThreshold !== undefined) {
-      updates.fitScoreThreshold = String(body.fitScoreThreshold);
-    }
-    if (body.batchLimit !== undefined) {
-      updates.batchLimit = body.batchLimit;
-    }
-    if (body.throttlingConfig !== undefined) {
-      updates.throttlingConfig = body.throttlingConfig;
-    }
+    const updates = buildCampaignSettingsUpdates(body, updatedBy);
 
     const [row] = await db
       .insert(campaignSettings)

@@ -14,7 +14,9 @@ vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
 }));
 
-vi.mock('@/lib/spotify/client', () => ({
+vi.mock('@/lib/spotify', () => ({
+  buildSpotifyArtistUrl: (artistId: string) =>
+    `https://open.spotify.com/artist/${artistId}`,
   isSpotifyAvailable: mockIsSpotifyAvailable,
   spotifyClient: {
     searchArtists: mockSearchArtists,

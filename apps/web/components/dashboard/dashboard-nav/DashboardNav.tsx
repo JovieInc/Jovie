@@ -1,6 +1,5 @@
 'use client';
 
-import { Badge } from '@jovie/ui/atoms/badge';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
@@ -9,13 +8,15 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
+import { env } from '@/lib/env-client';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
-import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import { useReleasesQuery } from '@/lib/queries';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
@@ -89,7 +90,6 @@ export function DashboardNav(_: DashboardNavProps) {
     });
   }, [artistName, releaseCount]);
 
-  const genres = selectedProfile?.genres ?? [];
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -139,7 +139,7 @@ export function DashboardNav(_: DashboardNavProps) {
   // Memoize renderSection to prevent creating new functions on every render
   const renderSection = useCallback(
     (items: NavItem[]) => (
-      <SidebarMenu className='gap-0.5'>
+      <SidebarMenu className='gap-px'>
         {items.map((item, index) => renderNavItem(item, index))}
       </SidebarMenu>
     ),
@@ -158,13 +158,16 @@ export function DashboardNav(_: DashboardNavProps) {
           </SidebarCollapsibleGroup>
         </>
       ) : (
-        <SidebarGroup className='mb-1'>
-          <SidebarGroupContent className='space-y-0'>
+        <SidebarGroup className='mb-0.5'>
+          <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-muted [font-weight:var(--font-weight-nav)]'>
+            Workspace
+          </SidebarGroupLabel>
+          <SidebarGroupContent className='space-y-px'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && (
-                  <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                  <div className='my-1 mx-2 border-t border-sidebar-border/70' />
                 )}
                 {renderSection(section.items)}
               </div>
@@ -173,36 +176,22 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroup>
       )}
 
-      {!isInSettings && genres.length > 0 && (
-        <div className='mt-3 group-data-[collapsible=icon]:hidden'>
-          <SidebarCollapsibleGroup label='Genres' defaultOpen>
-            <div className='flex flex-wrap gap-1.5 px-2 py-1'>
-              {genres.map(genre => (
-                <Badge key={genre} variant='secondary' size='sm'>
-                  {genre}
-                </Badge>
-              ))}
-            </div>
-          </SidebarCollapsibleGroup>
-        </div>
-      )}
-
-      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && (
+      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && !env.IS_E2E && (
         <div className='mt-3'>
           <RecentChats />
         </div>
       )}
 
       {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section' className='mt-3'>
+        <div data-testid='admin-nav-section' className='mt-2.5'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            <div className='space-y-2'>
+            <div className='space-y-1.5'>
               {adminNavigationSections.map((section, index) => (
                 <div key={section.label} data-admin-section={section.label}>
                   {index > 0 ? (
-                    <div className='my-1.5 mx-2 border-t border-sidebar-border' />
+                    <div className='my-1 mx-2 border-t border-sidebar-border/70' />
                   ) : null}
-                  <p className='px-2 pb-1 text-[11px] uppercase tracking-wide text-sidebar-muted group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2 pb-0.5 text-[10px] uppercase tracking-[0.08em] text-sidebar-muted/85 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

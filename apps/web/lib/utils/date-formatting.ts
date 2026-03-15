@@ -158,25 +158,24 @@ export function formatTimeAgo(value: string | Date | null | undefined): string {
 }
 
 /**
- * Format time remaining: "30 seconds", "5 minutes", "2 hours"
+ * Format time remaining: "now", "30 seconds", "5 minutes", "2 hours"
  * Used in: rate limit messages, countdown timers
  */
 export function formatTimeRemaining(resetTime: Date | number): string {
   const resetMs =
     typeof resetTime === 'number' ? resetTime : resetTime.getTime();
-  const remaining = Math.max(0, resetMs - Date.now());
+  const remainingMs = resetMs - Date.now();
 
-  const seconds = Math.ceil(remaining / 1000);
+  if (remainingMs <= 0) return 'now';
+
+  const seconds = Math.ceil(remainingMs / 1000);
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? '' : 's'}`;
+
   const minutes = Math.ceil(seconds / 60);
-  const hours = Math.ceil(minutes / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
 
-  if (seconds < 60) {
-    return `${seconds} ${seconds === 1 ? 'second' : 'seconds'}`;
-  }
-  if (minutes < 60) {
-    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
-  }
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hour${hours === 1 ? '' : 's'}`;
 }
 
 // ============================================================================

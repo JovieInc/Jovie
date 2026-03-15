@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import React from 'react';
+import { env } from '@/lib/env-client';
 import { ClerkAnalytics } from './ClerkAnalytics';
 
 const ToastProvider = dynamic(
@@ -38,11 +39,14 @@ export function LazyProviders({
   children,
   enableAnalytics = true,
 }: LazyProvidersProps) {
+  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  const showAnalytics = enableAnalytics && !isPassiveRuntime;
+
   return (
     <ToastProvider>
       {children}
-      <ClerkAnalytics />
-      {enableAnalytics ? <Analytics /> : null}
+      {isPassiveRuntime ? null : <ClerkAnalytics />}
+      {showAnalytics ? <Analytics /> : null}
     </ToastProvider>
   );
 }

@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { DbOrTransaction } from '@/lib/db';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -89,59 +89,55 @@ export async function syncSocialLinksFromPrimaryMusicUrls(
 
   if (entries.length === 0) return;
 
+  const canonicalPlatforms = entries.map(([field]) => {
+    const aliases = MUSIC_PLATFORM_ALIASES[MUSIC_FIELD_TO_LINK_KEY[field]];
+    return aliases[0];
+  });
+
+  const existingRows = await tx
+    .select({
+      id: socialLinks.id,
+      platform: socialLinks.platform,
+    })
+    .from(socialLinks)
+    .where(
+      and(
+        eq(socialLinks.creatorProfileId, profileId),
+        inArray(socialLinks.platform, canonicalPlatforms)
+      )
+    );
+
+  const existingByPlatform = new Map(
+    existingRows.map(row => [row.platform, row.id])
+  );
+
+  const updatesById: Array<{ id: string; url: string; platform: string }> = [];
+  const inserts: (typeof socialLinks.$inferInsert)[] = [];
+  const deactivateIds: string[] = [];
+
   for (const [field, rawValue] of entries) {
     const aliases = MUSIC_PLATFORM_ALIASES[MUSIC_FIELD_TO_LINK_KEY[field]];
     const normalized = toMusicUrl(rawValue);
+    const canonicalPlatform = aliases[0];
+    const existingId = existingByPlatform.get(canonicalPlatform);
 
     if (!normalized) {
-      await tx
-        .update(socialLinks)
-        .set({
-          state: 'rejected',
-          isActive: false,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(socialLinks.creatorProfileId, profileId),
-            inArray(socialLinks.platform, [...aliases])
-          )
-        );
+      if (existingId) {
+        deactivateIds.push(existingId);
+      }
       continue;
     }
 
-    const [existing] = await tx
-      .select({ id: socialLinks.id })
-      .from(socialLinks)
-      .where(
-        and(
-          eq(socialLinks.creatorProfileId, profileId),
-          inArray(socialLinks.platform, [...aliases])
-        )
-      )
-      .orderBy(
-        drizzleSql`${socialLinks.state} = 'active' DESC`,
-        socialLinks.updatedAt
-      )
-      .limit(1);
-
-    if (existing) {
-      await tx
-        .update(socialLinks)
-        .set({
-          url: normalized,
-          platform: aliases[0],
-          platformType: 'dsp',
-          state: 'active',
-          isActive: true,
-          sourceType: 'manual',
-          updatedAt: new Date(),
-        })
-        .where(eq(socialLinks.id, existing.id));
+    if (existingId) {
+      updatesById.push({
+        id: existingId,
+        url: normalized,
+        platform: canonicalPlatform,
+      });
     } else {
-      await tx.insert(socialLinks).values({
+      inserts.push({
         creatorProfileId: profileId,
-        platform: aliases[0],
+        platform: canonicalPlatform,
         platformType: 'dsp',
         url: normalized,
         sortOrder: 0,
@@ -152,5 +148,35 @@ export async function syncSocialLinksFromPrimaryMusicUrls(
         version: 1,
       });
     }
+  }
+
+  if (deactivateIds.length > 0) {
+    await tx
+      .update(socialLinks)
+      .set({
+        state: 'rejected',
+        isActive: false,
+        updatedAt: new Date(),
+      })
+      .where(inArray(socialLinks.id, deactivateIds));
+  }
+
+  for (const update of updatesById) {
+    await tx
+      .update(socialLinks)
+      .set({
+        url: update.url,
+        platform: update.platform,
+        platformType: 'dsp',
+        state: 'active',
+        isActive: true,
+        sourceType: 'manual',
+        updatedAt: new Date(),
+      })
+      .where(eq(socialLinks.id, update.id));
+  }
+
+  if (inserts.length > 0) {
+    await tx.insert(socialLinks).values(inserts);
   }
 }

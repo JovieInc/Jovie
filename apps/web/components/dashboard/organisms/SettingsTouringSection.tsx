@@ -29,8 +29,9 @@ import {
   syncFromBandsintown,
 } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
-import { SettingsErrorState } from '@/components/dashboard/molecules/SettingsErrorState';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TouringSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
 import {
   Dialog,
@@ -39,8 +40,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
-import { queryKeys } from '@/lib/queries/keys';
-import { useBandsintownConnectionQuery } from '@/lib/queries/useBandsintownConnectionQuery';
+import { queryKeys, useBandsintownConnectionQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const BANDSINTOWN_ACCENT = '#00B4B3';
@@ -70,18 +70,46 @@ export function SettingsTouringSection({
 
   if (isLoading) {
     return (
-      <DashboardCard variant='settings'>
-        <TouringSectionSkeleton />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Bandsintown'
+          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <TouringSectionSkeleton />
+        </div>
       </DashboardCard>
     );
   }
 
   if (isError) {
     return (
-      <SettingsErrorState
-        message='Failed to load connection status.'
-        onRetry={() => refetch()}
-      />
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Bandsintown'
+          subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-3.5'>
+            <p className='text-[13px] text-(--linear-text-secondary)'>
+              Failed to load connection status.
+            </p>
+            <Button variant='ghost' size='sm' onClick={() => refetch()}>
+              Try again
+            </Button>
+          </ContentSurfaceCard>
+        </div>
+      </DashboardCard>
     );
   }
 
@@ -127,23 +155,41 @@ export function SettingsTouringSection({
   };
 
   return (
-    <DashboardCard variant='settings'>
-      <div className='space-y-4'>
-        <p className='text-[13px] text-secondary-token'>
-          Tour dates will appear on your public profile when connected.
-        </p>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
+      <ContentSectionHeader
+        title='Bandsintown'
+        subtitle='Connect Bandsintown to keep the tour dates on your profile up to date.'
+        className='min-h-0 px-4 py-3'
+      />
+      <div className='px-4 py-3'>
+        <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+          <div className='space-y-1'>
+            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              {isConnected
+                ? 'Bandsintown connected'
+                : 'Bandsintown not connected'}
+            </p>
+            <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+              Tour dates will appear on your public profile when connected.
+            </p>
+          </div>
 
-        <div className='flex flex-wrap items-center gap-2'>
-          <BandsintownConnectionPill
-            connected={isConnected}
-            artistName={connectedArtist}
-            lastSyncedAt={lastSyncedAt}
-            isSyncing={isSyncing}
-            onConnect={() => setConnectDialogOpen(true)}
-            onSyncNow={handleSyncNow}
-            onDisconnect={() => setDisconnectDialogOpen(true)}
-          />
-        </div>
+          <div className='flex flex-wrap items-center gap-2'>
+            <BandsintownConnectionPill
+              connected={isConnected}
+              artistName={connectedArtist}
+              lastSyncedAt={lastSyncedAt}
+              isSyncing={isSyncing}
+              onConnect={() => setConnectDialogOpen(true)}
+              onSyncNow={handleSyncNow}
+              onDisconnect={() => setDisconnectDialogOpen(true)}
+            />
+          </div>
+        </ContentSurfaceCard>
       </div>
 
       <BandsintownConnectDialog
@@ -203,7 +249,7 @@ function BandsintownConnectionPill({
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-[510] transition-colors cursor-pointer',
+              'inline-flex cursor-pointer items-center gap-1.5 rounded-full border py-1 pl-2.5 pr-3 text-[13px] font-[510] transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
             )}
             style={
@@ -216,11 +262,11 @@ function BandsintownConnectionPill({
             aria-label={`Bandsintown connection: ${artistName || 'Connected'}`}
           >
             <Calendar className='h-4 w-4 shrink-0' style={{ color: accent }} />
-            <span className='truncate max-w-[160px] text-secondary-token'>
+            <span className='max-w-[160px] truncate text-(--linear-text-secondary)'>
               {artistName || 'Connected'}
             </span>
             {lastSyncedAt && !hovered && !menuOpen && (
-              <span className='text-[10px] text-tertiary-token ml-0.5'>
+              <span className='ml-0.5 text-[10px] text-(--linear-text-tertiary)'>
                 {new Date(lastSyncedAt).toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -262,8 +308,8 @@ function BandsintownConnectionPill({
       type='button'
       onClick={onConnect}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-subtle bg-surface-1 py-1 pl-2.5 pr-3 text-[13px] font-[510] text-secondary-token transition-colors',
-        'hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
+        'inline-flex items-center gap-1.5 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) py-1 pl-2.5 pr-3 text-[13px] font-[510] text-(--linear-text-secondary) transition-colors',
+        'hover:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2'
       )}
       style={
         {
@@ -387,7 +433,7 @@ function BandsintownConnectDialog({
           <div className='space-y-1.5'>
             <Label htmlFor='bandsintown-api-key' className='text-[11px]'>
               API key{' '}
-              <span className='text-tertiary-token font-normal'>
+              <span className='font-normal text-(--linear-text-tertiary)'>
                 (optional)
               </span>
             </Label>

@@ -41,11 +41,11 @@ export interface PillIconProps {
 export function PillIcon({ platformIcon, style }: Readonly<PillIconProps>) {
   return (
     <span
-      className='flex shrink-0 items-center justify-center rounded-lg bg-surface-2/60 p-0.5 transition-colors'
+      className='flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-(--linear-bg-surface-0) p-0.5 transition-colors'
       style={style}
       aria-hidden='true'
     >
-      <SocialIcon platform={platformIcon} className='h-3.5 w-3.5' />
+      <SocialIcon platform={platformIcon} className='h-3 w-3' />
     </span>
   );
 }
@@ -68,10 +68,10 @@ export function CollapsedContent({
   return (
     <span
       className={cn(
-        'whitespace-nowrap overflow-hidden transition-all duration-200',
+        'min-w-0 whitespace-nowrap overflow-hidden text-ellipsis transition-[max-width,opacity] duration-200 ease-out',
         !defaultExpanded &&
-          'w-0 opacity-0 group-hover/pill:w-auto group-hover/pill:opacity-100',
-        defaultExpanded && 'w-auto opacity-100'
+          'max-w-0 opacity-0 group-hover/pill:max-w-[12rem] group-hover/pill:opacity-100 group-focus-within/pill:max-w-[12rem] group-focus-within/pill:opacity-100',
+        defaultExpanded && 'max-w-[12rem] opacity-100'
       )}
     >
       {primaryText}

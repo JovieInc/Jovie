@@ -36,7 +36,7 @@ export const SidebarTrigger = React.forwardRef<
       onClick={handleClick}
       {...props}
     >
-      <PanelLeft className='h-3.5 w-3.5' />
+      <PanelLeft className='h-3 w-3' />
       <span className='sr-only'>Toggle Sidebar</span>
     </Button>
   );

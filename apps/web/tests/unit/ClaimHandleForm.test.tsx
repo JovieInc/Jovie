@@ -1,5 +1,7 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import type { ReactElement } from 'react';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 // Use hoisted mocks for shared state
 const { mockPush, mockPrefetch, mockFetch } = vi.hoisted(() => ({
@@ -30,9 +32,31 @@ global.fetch = mockFetch as unknown as typeof fetch;
 
 import { ClaimHandleForm } from '@/components/home/claim-handle';
 
+function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = createTestQueryClient();
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
+beforeEach(() => {
+  mockPush.mockReset();
+  mockPrefetch.mockReset();
+  mockFetch.mockClear();
+});
+
 describe('ClaimHandleForm', () => {
   test('renders with proper accessibility attributes', () => {
-    render(<ClaimHandleForm />);
+    renderWithQueryClient(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     expect(input).toHaveAttribute('required');
@@ -43,7 +67,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('renders form element', () => {
-    render(<ClaimHandleForm />);
+    renderWithQueryClient(<ClaimHandleForm />);
 
     const form = document.querySelector('form');
     expect(form).toBeInTheDocument();
@@ -53,7 +77,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('shows claim button when handle is entered', () => {
-    render(<ClaimHandleForm />);
+    renderWithQueryClient(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     fireEvent.change(input, { target: { value: 'testhandle' } });
@@ -64,7 +88,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('shows validation message for short handles', () => {
-    render(<ClaimHandleForm />);
+    renderWithQueryClient(<ClaimHandleForm />);
 
     const input = screen.getByRole('textbox', { name: /choose your handle/i });
     fireEvent.change(input, { target: { value: 'ab' } }); // Too short
@@ -76,7 +100,7 @@ describe('ClaimHandleForm', () => {
   });
 
   test('does not inject inline animation styles (moved to globals.css)', () => {
-    render(<ClaimHandleForm />);
+    renderWithQueryClient(<ClaimHandleForm />);
 
     const styleTags = document.querySelectorAll('style');
     const styleContents = Array.from(styleTags)

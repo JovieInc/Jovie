@@ -10,6 +10,7 @@ import { createRateLimiter, RateLimiter } from './rate-limiter';
 import type {
   PlanAwareLimiterOptions,
   PlanAwareRateLimiter,
+  PlanInput,
   PlanRateLimitConfig,
   RateLimitConfig,
   RateLimitResult,
@@ -27,16 +28,20 @@ const VALID_PLAN_IDS: readonly PlanId[] = [
   'growth',
 ] as const;
 
+function isPlanId(value: string): value is PlanId {
+  return (VALID_PLAN_IDS as ReadonlyArray<string>).includes(value);
+}
+
 /**
  * Normalize a plan string to a valid PlanId.
  * Returns 'free' for null, undefined, or unknown plans.
  */
-function normalizePlan(plan: PlanId | string | null | undefined): PlanId {
+function normalizePlan(plan: PlanInput): PlanId {
   if (!plan || typeof plan !== 'string') {
     return 'free';
   }
-  const normalized = plan.toLowerCase() as PlanId;
-  return VALID_PLAN_IDS.includes(normalized) ? normalized : 'free';
+  const normalized = plan.toLowerCase();
+  return isPlanId(normalized) ? normalized : 'free';
 }
 
 /**
@@ -51,8 +56,9 @@ function resolveConfigForPlan(
   plan: PlanId
 ): RateLimitConfig {
   // Exact match
-  if (configs[plan]) {
-    return configs[plan]!;
+  const exactConfig = configs[plan];
+  if (exactConfig) {
+    return exactConfig;
   }
 
   // founding -> pro fallback (founding is equivalent to pro for rate limits)
@@ -143,10 +149,7 @@ export function createPlanAwareRateLimiter(
   }
 
   return {
-    async limit(
-      identifier: string,
-      plan: PlanId | string | null | undefined
-    ): Promise<RateLimitResult> {
+    async limit(identifier: string, plan: PlanInput): Promise<RateLimitResult> {
       const normalizedPlan = normalizePlan(plan);
       const limiter = getLimiterForPlan(normalizedPlan);
       const result = await limiter.limit(identifier);
@@ -161,10 +164,7 @@ export function createPlanAwareRateLimiter(
       return result;
     },
 
-    getStatus(
-      identifier: string,
-      plan: PlanId | string | null | undefined
-    ): RateLimitStatus {
+    getStatus(identifier: string, plan: PlanInput): RateLimitStatus {
       const normalizedPlan = normalizePlan(plan);
       const limiter = getLimiterForPlan(normalizedPlan);
       return limiter.getStatus(identifier);
@@ -172,16 +172,14 @@ export function createPlanAwareRateLimiter(
 
     async wouldBeRateLimited(
       identifier: string,
-      plan: PlanId | string | null | undefined
+      plan: PlanInput
     ): Promise<boolean> {
       const normalizedPlan = normalizePlan(plan);
       const limiter = getLimiterForPlan(normalizedPlan);
       return limiter.wouldBeRateLimited(identifier);
     },
 
-    getConfigForPlan(
-      plan: PlanId | string | null | undefined
-    ): RateLimitConfig {
+    getConfigForPlan(plan: PlanInput): RateLimitConfig {
       const normalizedPlan = normalizePlan(plan);
       return resolveConfigForPlan(configs, normalizedPlan);
     },
