@@ -51,7 +51,7 @@ export function AdminCreatorsToolbar({
 
   return (
     <AdminTableSubheader>
-      <div className='flex min-h-14 w-full flex-wrap items-center gap-3'>
+      <div className='flex min-h-11 w-full flex-wrap items-center gap-2.5'>
         {hasSelection ? (
           // Bulk Actions Mode - replaces "Creator" text
           <>
@@ -123,11 +123,11 @@ export function AdminCreatorsToolbar({
         ) : (
           // Normal Mode
           <>
-            <div className='hidden text-xs text-secondary-token tabular-nums md:block'>
+            <div className='hidden text-[12px] font-normal text-(--linear-text-tertiary) tabular-nums md:block'>
               Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
               {total.toLocaleString()} profiles
             </div>
-            <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3'>
+            <div className='flex w-full flex-wrap items-center gap-2 sm:ml-auto sm:w-auto sm:justify-end'>
               <ActionBar>
                 <ActionBarItem tooltipLabel='Export'>
                   <ExportCSVButton<AdminCreatorProfileRow>
