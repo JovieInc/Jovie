@@ -449,6 +449,13 @@
       "when": 1773648000000,
       "tag": "0064_fix_audience_fingerprint_and_isrc_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1773820800000,
+      "tag": "0065_add_keyword_search_offset",
+      "breakpoints": true
     }
   ]
 }
