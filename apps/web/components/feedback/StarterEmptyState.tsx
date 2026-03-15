@@ -88,9 +88,9 @@ export function StarterEmptyState({
       data-testid={testId ?? 'app-empty-state'}
       className={cn('border-dashed bg-(--linear-bg-surface-1) p-6', className)}
     >
-      <div className='flex items-start gap-4'>
-        <div className='flex h-12 w-12 items-center justify-center rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary) shadow-sm'>
-          {icon ?? <Sparkles className='h-6 w-6' aria-hidden='true' />}
+      <div className='flex items-start gap-3.5'>
+        <div className='flex h-10 w-10 items-center justify-center rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary)'>
+          {icon ?? <Sparkles className='h-5 w-5' aria-hidden='true' />}
         </div>
         <div className='flex-1 space-y-2'>
           <div>
@@ -111,7 +111,7 @@ export function StarterEmptyState({
         </div>
 
         <Rocket
-          className='hidden h-10 w-10 text-(--linear-accent) sm:block'
+          className='hidden h-5 w-5 text-(--linear-text-tertiary) sm:block'
           aria-hidden='true'
         />
       </div>
