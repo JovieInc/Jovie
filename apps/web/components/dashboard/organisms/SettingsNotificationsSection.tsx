@@ -1,9 +1,9 @@
 'use client';
 
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
 interface SettingsNotificationsSectionProps {
@@ -24,11 +24,7 @@ export function SettingsNotificationsSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden bg-surface-0'>
       <ContentSectionHeader
         title='Notifications'
         subtitle='Control how subscriber confirmation behaves in Jovie.'
@@ -46,6 +42,6 @@ export function SettingsNotificationsSection({
           gatePlanName='Growth'
         />
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

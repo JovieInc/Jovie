@@ -3,8 +3,8 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -57,11 +57,7 @@ export function SettingsAppearanceSection() {
   else if (resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='divide-y divide-subtle'
-    >
+    <ContentSurfaceCard className='divide-y divide-subtle/70 bg-surface-0'>
       <div className='px-4 py-3'>
         <div className='min-w-0'>
           <h3 className='text-[13px] font-[510] text-primary-token'>
@@ -140,6 +136,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }
