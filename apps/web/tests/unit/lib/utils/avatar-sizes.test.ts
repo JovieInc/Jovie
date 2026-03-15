@@ -88,4 +88,21 @@ describe('buildAvatarSizes', () => {
     expect(sizes[0].url).toContain('/_next/image');
     expect(sizes[2].key).toBe('original');
   });
+
+  it('encodes Supabase avatar URLs correctly for Next.js image optimizer variants', () => {
+    const avatarUrl =
+      'https://abc123.supabase.co/storage/v1/object/public/avatars/user 1/avatar.png?download=1';
+
+    const sizes = buildAvatarSizes(null, avatarUrl);
+    const mediumUrl = new URL(sizes[0].url, 'https://jov.ie');
+    const largeUrl = new URL(sizes[1].url, 'https://jov.ie');
+
+    expect(mediumUrl.pathname).toBe('/_next/image');
+    expect(mediumUrl.searchParams.get('url')).toBe(avatarUrl);
+    expect(mediumUrl.searchParams.get('w')).toBe('400');
+
+    expect(largeUrl.pathname).toBe('/_next/image');
+    expect(largeUrl.searchParams.get('url')).toBe(avatarUrl);
+    expect(largeUrl.searchParams.get('w')).toBe('1000');
+  });
 });
