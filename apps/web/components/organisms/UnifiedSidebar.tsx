@@ -260,12 +260,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/70 bg-sidebar/70 backdrop-blur-[2px]'>
+      <div className='mt-auto shrink-0 border-t border-sidebar-border/35 bg-sidebar/40 pb-1 pt-0.5'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pb-3 pt-1'>
-          <span className='text-2xs text-sidebar-muted select-none'>
+        <div className='pl-2 pr-3.5 pb-2 pt-1'>
+          <span className='text-2xs text-sidebar-muted/70 select-none'>
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
             {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
               ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`

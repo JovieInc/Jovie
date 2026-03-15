@@ -30,7 +30,7 @@ function SkeletonCards() {
   const skeletonMetric = (
     <div className='space-y-2 py-1'>
       <div className='flex items-center gap-2'>
-        <div className='h-7 w-7 rounded-lg skeleton' />
+        <div className='h-6 w-6 rounded-md skeleton' />
         <div className='h-3 w-20 rounded skeleton' />
       </div>
       <div className='h-8 w-16 rounded skeleton' />
@@ -50,8 +50,8 @@ function ErrorCards() {
     <div className='grid grid-cols-2 gap-8'>
       <div className='space-y-2 py-1'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 dark:bg-sky-500/15'>
-            <BarChart3 className='h-4 w-4 text-sky-600 dark:text-sky-400' />
+          <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
+            <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
           </div>
           <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
             Profile views
@@ -63,8 +63,8 @@ function ErrorCards() {
       </div>
       <div className='space-y-2 py-1'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 dark:bg-emerald-500/15'>
-            <Users className='h-4 w-4 text-emerald-600 dark:text-emerald-400' />
+          <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
+            <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
           </div>
           <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
             Unique visitors
@@ -240,7 +240,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     if (showEmpty) {
       return (
         <EmptyState
-          icon={<BarChart3 className='h-6 w-6' aria-hidden='true' />}
+          icon={<BarChart3 className='h-5 w-5' aria-hidden='true' />}
           heading='No profile views yet'
           description='Share your profile link to start tracking clicks and engagement from your fans.'
           action={getEmptyStateAction(
