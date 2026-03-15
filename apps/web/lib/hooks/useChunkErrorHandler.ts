@@ -13,6 +13,9 @@ const CHUNK_ERROR_PATTERNS = [
   'loading css chunk',
   "couldn't find required dependency",
   'failed to fetch dynamically imported module',
+  'unrecognizedactionerror',
+  'server action',
+  'was not found on the server',
 ] as const;
 
 /**
