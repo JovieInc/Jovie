@@ -31,7 +31,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/hooks/useBreakpoint', () => ({
-  useBreakpointDown: (...args: unknown[]) => useBreakpointDownMock(...args),
+  useBreakpointDown: (...args: Parameters<typeof useBreakpointDownMock>) =>
+    useBreakpointDownMock(...args),
 }));
 
 function makeContact(overrides: Partial<PublicContact> = {}): PublicContact {

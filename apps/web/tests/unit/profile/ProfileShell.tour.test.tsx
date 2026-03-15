@@ -74,7 +74,7 @@ describe('ProfileShell tour navigation', () => {
               is_visible: true,
               sort_order: 0,
             },
-          ] as LegacySocialLink[]
+          ] as unknown as LegacySocialLink[]
         }
         contacts={[] as PublicContact[]}
         showTipButton
