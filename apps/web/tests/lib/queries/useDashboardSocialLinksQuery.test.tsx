@@ -27,6 +27,7 @@ vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
   captureException: vi.fn(),
   addBreadcrumb: vi.fn(),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 // Mock analytics

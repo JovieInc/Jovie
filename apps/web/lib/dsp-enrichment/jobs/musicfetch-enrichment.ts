@@ -129,6 +129,12 @@ export async function processMusicFetchEnrichmentJob(
     profile,
     spotifyUrl
   );
+
+  // Respect user's explicit avatar lock — don't overwrite a manually set photo
+  if (profile.avatarLockedByUser) {
+    delete dspUpdates.avatarUrl;
+  }
+
   const dspFieldNames = Object.keys(dspUpdates);
 
   // Apply profile DSP updates

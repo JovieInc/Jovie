@@ -392,9 +392,11 @@ When scanning Linear for issues to work on, always filter with:
 Before pushing to a branch, agents MUST pass locally:
 1. `pnpm turbo typecheck` (monorepo typecheck)
 2. `pnpm --filter web exec tsc --noEmit` (web typecheck)
-3. `pnpm biome check apps/web` (lint)
+3. `pnpm biome check --write apps/web` (lint + auto-fix formatting) — **must use `--write` to apply fixes before checking**
 4. `pnpm vitest --run --changed` (affected tests)
 5. `pnpm --filter web lint:server-boundaries` (boundaries)
+
+**IMPORTANT:** Always run `pnpm biome check --write apps/web` (not just `--check`) so formatting issues are fixed in-place before the pre-push hook runs. The pre-push hook calls `biome check .` (read-only) and will reject pushes with formatter violations. Running `--write` first prevents this.
 
 Do NOT push code that fails any of these. Fix first, push once.
 

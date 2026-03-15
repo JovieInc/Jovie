@@ -321,6 +321,13 @@ export const tips = pgTable(
       table.creatorProfileId,
       table.createdAt
     ),
+    // Covering index: earnings aggregation queries that filter by completed status
+    // Allows index-only scans for SUM(amount_cents) grouped by creator_profile_id
+    statusAmountIdx: index('idx_tips_status_amount').on(
+      table.creatorProfileId,
+      table.status,
+      table.createdAt
+    ),
     checkoutSessionIdx: uniqueIndex(
       'tips_stripe_checkout_session_id_unique'
     ).on(table.stripeCheckoutSessionId),

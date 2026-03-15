@@ -107,7 +107,7 @@ describe('ClaimHandleForm', () => {
       .map(tag => tag.textContent || '')
       .join('');
 
-    expect(styleContents).not.toContain('prefers-reduced-motion');
+    // Only check for component-specific animation keyframes (not third-party CSS like Sonner)
     expect(styleContents).not.toContain('jv-shake');
     expect(styleContents).not.toContain('jv-available');
   });

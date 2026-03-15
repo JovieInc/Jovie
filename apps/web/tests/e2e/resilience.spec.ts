@@ -402,3 +402,116 @@ test.describe('Auth expiry resilience', () => {
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MUSICFETCH / ENRICHMENT CHAOS
+// ─────────────────────────────────────────────────────────────────────────────
+
+test.describe('MusicFetch enrichment chaos', () => {
+  test.setTimeout(300_000);
+
+  test.beforeEach(async ({ page }) => {
+    test.skip(!hasClerkCredentials(), 'Clerk credentials not configured');
+    test.skip(
+      FAST_ITERATION,
+      'MusicFetch chaos runs in the slower resilience lane'
+    );
+    await ensureSignedInUser(page);
+  });
+
+  test('dashboard stays alive when enrichment status returns 500', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    // Simulate MusicFetch / DSP enrichment backend being completely down
+    await page.route('**/api/dsp/**', async route => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'DSP service unavailable' }),
+      });
+    });
+
+    const reactErrors: string[] = [];
+    page.on('pageerror', err => {
+      const msg = err.message.toLowerCase();
+      if (
+        msg.includes('hydration') ||
+        msg.includes('invalid hook') ||
+        msg.includes('maximum update') ||
+        msg.includes('unhandled')
+      ) {
+        reactErrors.push(err.message);
+      }
+    });
+
+    await gotoWithRetry(page, APP_ROUTES.DASHBOARD_OVERVIEW, {
+      waitUntil: 'domcontentloaded',
+      timeout: 90_000,
+    });
+    await page.waitForTimeout(3_000);
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+    expect(bodyText.toLowerCase()).not.toContain('something went wrong');
+    expect(bodyText.trim().length).toBeGreaterThan(50);
+    expect(
+      reactErrors,
+      `React errors when DSP is down: ${reactErrors.join('; ')}`
+    ).toHaveLength(0);
+  });
+
+  test('social link suggestion approve with invalid UUID returns 4xx not 5xx', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+
+    // Tests that our API validates IDs and doesn't crash on bad input.
+    // A 500 here means the server threw an unhandled exception on a bad ID.
+    const response = await page.request.post(
+      '/api/suggestions/social-links/not-a-valid-uuid/approve',
+      {
+        data: {},
+        headers: { 'content-type': 'application/json' },
+      }
+    );
+
+    expect(
+      response.status(),
+      'Approve endpoint crashed (500) on malformed UUID — should return 4xx'
+    ).not.toBe(500);
+  });
+
+  test('rapid concurrent requests to enrichment status do not cause 500s', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    // Fire 8 concurrent requests to the enrichment status endpoint.
+    // Tests for race conditions, connection pool exhaustion, or query timeouts.
+    const requests = Array.from({ length: 8 }, (_, i) =>
+      page.request
+        .get(
+          `/api/dsp/enrichment/status?profileId=00000000-0000-0000-0000-00000000000${i}`
+        )
+        .then(r => r.status())
+        .catch(() => 0)
+    );
+
+    const statuses = await Promise.all(requests);
+
+    // None should be 500 — either 400 (invalid ID) or 200
+    for (const status of statuses) {
+      expect(
+        status,
+        `Enrichment status returned ${status} under concurrency`
+      ).not.toBe(500);
+    }
+  });
+});

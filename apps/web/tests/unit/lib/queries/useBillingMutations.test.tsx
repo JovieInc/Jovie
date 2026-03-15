@@ -14,6 +14,8 @@ const { mockFetchWithTimeout, mockCaptureError, mockHandleMutationError } =
 
 vi.mock('@/lib/queries/fetch', () => ({
   fetchWithTimeout: mockFetchWithTimeout,
+  createMutationFn: vi.fn(),
+  createQueryFn: vi.fn(),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -33,6 +35,12 @@ vi.mock('@/lib/queries/keys', () => ({
       subscription: () => ['billing', 'subscription'] as const,
       invoices: () => ['billing', 'invoices'] as const,
       pricingOptions: () => ['billing', 'pricing-options'] as const,
+    },
+    chat: {
+      all: ['chat'] as const,
+      conversations: () => ['chat', 'conversations'] as const,
+      conversation: (id: string) => ['chat', 'conversation', id] as const,
+      usage: () => ['chat', 'usage'] as const,
     },
   },
 }));

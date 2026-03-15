@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type LinkProps = {
@@ -54,6 +56,14 @@ vi.mock('@/components/atoms/DspLogo', async importOriginal => {
   };
 });
 
+// Mock AlbumArtworkContextMenu to avoid QueryClient dependency
+vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+  AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+  buildArtworkSizes: () => [],
+}));
+
 // Lazy-import after mocks are set up
 const { ReleaseLandingPage } = await import(
   '../../../app/r/[slug]/ReleaseLandingPage'
@@ -62,13 +72,25 @@ const { UnreleasedReleaseHero } = await import(
   '@/components/release/UnreleasedReleaseHero'
 );
 
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+  );
+}
+
 describe('release artist links', () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
 
   it('renders artist name as link on release landing page when handle exists', () => {
-    render(
+    renderWithQueryClient(
       <ReleaseLandingPage
         release={{
           title: 'Test Release',
@@ -96,7 +118,7 @@ describe('release artist links', () => {
   });
 
   it('renders artist name as text on release landing page when handle is missing', () => {
-    render(
+    renderWithQueryClient(
       <ReleaseLandingPage
         release={{
           title: 'Test Release',
@@ -119,7 +141,7 @@ describe('release artist links', () => {
   });
 
   it('links artist name in unreleased hero to artist profile', () => {
-    render(
+    renderWithQueryClient(
       <UnreleasedReleaseHero
         release={{
           id: 'release-1',
@@ -145,7 +167,7 @@ describe('release artist links', () => {
   });
 
   it('renders a dismissible claim banner for unclaimed creators', () => {
-    render(
+    renderWithQueryClient(
       <ReleaseLandingPage
         release={{
           title: 'Test Release',
@@ -186,7 +208,7 @@ describe('release artist links', () => {
       '1'
     );
 
-    render(
+    renderWithQueryClient(
       <ReleaseLandingPage
         release={{
           title: 'Test Release',
