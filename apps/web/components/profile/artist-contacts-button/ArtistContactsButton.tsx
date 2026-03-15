@@ -54,9 +54,7 @@ export function ArtistContactsButton({
           artistName={artistName}
           artistHandle={artistHandle}
           contacts={available}
-          performAction={performAction}
           primaryChannel={primaryChannel}
-          buildTerritoryLabel={buildTerritoryLabel}
         />
       </>
     );

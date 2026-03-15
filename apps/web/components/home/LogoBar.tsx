@@ -1,7 +1,7 @@
 import {
   ArmadaMusicLogo,
   AwalLogo,
-  SonyMusicLogo,
+  TheOrchardLogo,
   UniversalMusicGroupLogo,
 } from './label-logos';
 
@@ -33,7 +33,7 @@ export function LogoBar() {
           }}
         >
           <AwalLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
-          <SonyMusicLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
+          <TheOrchardLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
           <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[12px]' />
           <ArmadaMusicLogo className='h-[12px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[14px]' />
         </div>

@@ -25,6 +25,91 @@ export const PHONE_CTA_CLASS =
   'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
+export const FALLBACK_CITY = 'Los Angeles';
+export const FALLBACK_REGION = 'CA';
+
+const TOUR_VENUES_BY_CITY = {
+  'los angeles': ['Academy LA', 'Avalon Hollywood'],
+  'new york': ['Brooklyn Steel', 'Webster Hall'],
+  nashville: ['Exit/In', 'Marathon Music Works'],
+  austin: ['Mohawk', "Emo's"],
+  philadelphia: ['The TLA', 'Union Transfer'],
+  richmond: ['The National'],
+  atlanta: ['The Masquerade', 'Terminal West'],
+  chicago: ['Metro', 'Thalia Hall'],
+  denver: ['Gothic Theatre', 'Bluebird Theater'],
+  toronto: ['The Danforth', 'Velvet Underground'],
+  london: ['Village Underground', 'Electric Brixton'],
+} as const;
+
+const CITY_ALIASES: Record<string, keyof typeof TOUR_VENUES_BY_CITY> = {
+  la: 'los angeles',
+  'los angeles': 'los angeles',
+  'new york city': 'new york',
+  nyc: 'new york',
+  philly: 'philadelphia',
+};
+
+const CITY_DISPLAY_NAMES: Record<keyof typeof TOUR_VENUES_BY_CITY, string> = {
+  'los angeles': 'Los Angeles',
+  'new york': 'New York',
+  nashville: 'Nashville',
+  austin: 'Austin',
+  philadelphia: 'Philadelphia',
+  richmond: 'Richmond',
+  atlanta: 'Atlanta',
+  chicago: 'Chicago',
+  denver: 'Denver',
+  toronto: 'Toronto',
+  london: 'London',
+};
+
+const formatCityKey = (city: string): string => city.trim().toLowerCase();
+
+const resolveCityKey = (
+  city: string
+): keyof typeof TOUR_VENUES_BY_CITY | null => {
+  const normalized = formatCityKey(city);
+  if (normalized in TOUR_VENUES_BY_CITY) {
+    return normalized as keyof typeof TOUR_VENUES_BY_CITY;
+  }
+  return CITY_ALIASES[normalized] ?? null;
+};
+
+export interface TourPersonalizationInput {
+  city?: string | null;
+  region?: string | null;
+  artistCity?: string | null;
+}
+
+export interface TourPersonalization {
+  city: string;
+  region: string;
+  venue: string;
+}
+
+export function getTourPersonalization({
+  city,
+  region,
+  artistCity,
+}: TourPersonalizationInput): TourPersonalization {
+  const preferredCity = artistCity?.trim() || city?.trim() || '';
+  const cityKey = preferredCity ? resolveCityKey(preferredCity) : null;
+
+  if (!cityKey) {
+    return {
+      city: FALLBACK_CITY,
+      region: FALLBACK_REGION,
+      venue: TOUR_VENUES_BY_CITY['los angeles'][0],
+    };
+  }
+
+  return {
+    city: CITY_DISPLAY_NAMES[cityKey],
+    region: region?.trim() || FALLBACK_REGION,
+    venue: TOUR_VENUES_BY_CITY[cityKey][0],
+  };
+}
 
 /* ------------------------------------------------------------------ */
 /*  Mode content panels                                                */
