@@ -24,7 +24,8 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "release_count" does not exist') ||
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
-    normalized.includes('column "is_linktree_verified" does not exist')
+    normalized.includes('column "is_linktree_verified" does not exist') ||
+    normalized.includes('column "music_tools_detected" does not exist')
   );
 }
 
@@ -119,7 +120,6 @@ export async function GET(request: NextRequest) {
             spotifyUrl: leads.spotifyUrl,
             hasInstagram: leads.hasInstagram,
             instagramHandle: leads.instagramHandle,
-            musicToolsDetected: leads.musicToolsDetected,
             allLinks: leads.allLinks,
             fitScore: leads.fitScore,
             fitScoreBreakdown: leads.fitScoreBreakdown,
