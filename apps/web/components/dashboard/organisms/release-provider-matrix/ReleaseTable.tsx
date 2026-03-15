@@ -137,7 +137,7 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_78%,transparent)] shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_86%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_56%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
@@ -155,7 +155,7 @@ export function ReleaseTable({
 
       return [
         'rounded-none',
-        'focus-within:shadow-[inset_1px_0_0_0_var(--linear-border-focus)]',
+        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_38%,transparent)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 320,
-      minSize: 208,
+      size: 356,
+      minSize: 240,
       meta: { className: 'hidden sm:table-cell' },
     });
 
