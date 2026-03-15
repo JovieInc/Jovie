@@ -54,12 +54,12 @@ export function TableEmptyState({
   const content = (
     <DrawerSurfaceCard
       className={cn(
-        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-[10px] border border-subtle/70 bg-surface-1/50 px-4 py-10 text-center',
+        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-[10px] bg-surface-1/25 px-4 py-10 text-center',
         className
       )}
     >
       {icon && (
-        <div className='flex h-10 w-10 items-center justify-center rounded-[8px] border border-subtle/70 bg-surface-0/70 text-(--linear-text-tertiary)'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-[8px] bg-surface-0/55 text-(--linear-text-tertiary)'>
           {icon}
         </div>
       )}
