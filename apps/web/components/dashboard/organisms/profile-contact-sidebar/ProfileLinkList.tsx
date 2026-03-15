@@ -31,8 +31,27 @@ export interface ProfileLinkListProps {
   readonly onDisconnectDsp?: (provider: 'spotify' | 'apple_music') => void;
 }
 
-function getLinkSection(platform: string): LinkSection {
-  const category = getPlatformCategory(platform);
+function mapPreviewCategoryToSection(
+  category: PreviewPanelLink['category']
+): LinkSection | null {
+  if (category === 'social') return 'social';
+  if (category === 'music') return 'dsp';
+  if (category === 'commerce') return 'earnings';
+  if (category === 'other') return 'custom';
+  return null;
+}
+
+function getLinkSection(link: PreviewPanelLink): LinkSection {
+  const fromCategory = mapPreviewCategoryToSection(link.category);
+  if (fromCategory) return fromCategory;
+
+  if (link.platformType) {
+    return link.platformType === 'websites'
+      ? 'custom'
+      : (link.platformType as LinkSection);
+  }
+
+  const category = getPlatformCategory(link.platform);
   return category === 'websites' ? 'custom' : (category as LinkSection);
 }
 
@@ -163,7 +182,7 @@ export function ProfileLinkList({
     };
 
     for (const link of links) {
-      const section = getLinkSection(link.platform);
+      const section = getLinkSection(link);
       groups[section].push(link);
     }
 
@@ -265,7 +284,7 @@ export function getCategoryCounts(
   };
 
   for (const link of links) {
-    const section = getLinkSection(link.platform);
+    const section = getLinkSection(link);
     counts[section]++;
   }
 
