@@ -64,7 +64,7 @@ export function ReleaseTableSkeleton() {
       {/* Desktop: table layout (hidden below sm) */}
       <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
         <table className='w-full border-collapse'>
-          <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface)'>
+          <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'>
             <tr className='border-b border-(--linear-border-subtle)'>
               <th className='w-14 px-4 py-3'>
                 <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />

@@ -123,9 +123,9 @@ function VirtualizedTableRowComponent<TData>({
         presets.tableRow,
         onRowClick && 'cursor-pointer',
         shouldEnableKeyboardNav &&
-          'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+          'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]',
         focusedIndex === rowIndex &&
-          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_65%,transparent)]',
+          'bg-(--linear-row-hover) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_35%,transparent)]',
         getRowClassName?.(rowData, rowIndex)
       )}
       onClick={handleClick}
