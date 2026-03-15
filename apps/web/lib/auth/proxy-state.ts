@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, eq, isNull, ne } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
@@ -15,6 +15,7 @@ export interface ProxyUserState {
   needsWaitlist: boolean;
   needsOnboarding: boolean;
   isActive: boolean;
+  isBanned: boolean;
 }
 
 // Redis cache settings for user state
@@ -86,11 +87,11 @@ function getUserStateLabel(state: ProxyUserState): string {
  * Determine the appropriate cache TTL based on user state.
  * - Active users (stable state): 5 minutes - state rarely changes
  * - Transitional users (waitlist/onboarding): 2 minutes - explicit invalidation on state change
+ * - Banned/deleted users: 2 minutes - invalidation is explicit on status change
  */
 function getTtlForUserState(state: ProxyUserState): number {
-  return state.isActive
-    ? USER_STATE_CACHE_TTL_ACTIVE_SECONDS
-    : USER_STATE_CACHE_TTL_SECONDS;
+  if (state.isActive) return USER_STATE_CACHE_TTL_ACTIVE_SECONDS;
+  return USER_STATE_CACHE_TTL_SECONDS;
 }
 
 /**
@@ -189,6 +190,7 @@ function determineUserState(
     | {
         dbUserId: string;
         userStatus: string | null;
+        deletedAt: Date | null;
         profileId: string | null;
         profileComplete: Date | null;
         profileUsername: string | null;
@@ -206,6 +208,15 @@ function determineUserState(
     return waitlistEnabled
       ? { ...DEFAULT_WAITLIST_STATE }
       : { ...NEEDS_ONBOARDING_STATE };
+  }
+
+  // Banned or soft-deleted users are blocked immediately
+  if (
+    result.deletedAt ||
+    result.userStatus === 'banned' ||
+    result.userStatus === 'suspended'
+  ) {
+    return { ...BANNED_STATE };
   }
 
   // Check waitlist approval using userStatus lifecycle
@@ -249,6 +260,7 @@ const DEFAULT_WAITLIST_STATE: ProxyUserState = {
   needsWaitlist: true,
   needsOnboarding: false,
   isActive: false,
+  isBanned: false,
 };
 
 /** State for users who need onboarding */
@@ -256,6 +268,7 @@ const NEEDS_ONBOARDING_STATE: ProxyUserState = {
   needsWaitlist: false,
   needsOnboarding: true,
   isActive: false,
+  isBanned: false,
 };
 
 /** State for fully active users */
@@ -263,6 +276,15 @@ const ACTIVE_USER_STATE: ProxyUserState = {
   needsWaitlist: false,
   needsOnboarding: false,
   isActive: true,
+  isBanned: false,
+};
+
+/** State for banned or soft-deleted users */
+const BANNED_STATE: ProxyUserState = {
+  needsWaitlist: false,
+  needsOnboarding: false,
+  isActive: false,
+  isBanned: true,
 };
 
 /**
@@ -281,6 +303,7 @@ async function executeUserStateQuery(clerkUserId: string) {
         .select({
           dbUserId: users.id,
           userStatus: users.userStatus,
+          deletedAt: users.deletedAt,
           profileId: creatorProfiles.id,
           profileComplete: creatorProfiles.onboardingCompletedAt,
           profileUsername: creatorProfiles.username,
@@ -297,13 +320,7 @@ async function executeUserStateQuery(clerkUserId: string) {
             eq(creatorProfiles.isClaimed, true)
           )
         )
-        .where(
-          and(
-            eq(users.clerkId, clerkUserId),
-            isNull(users.deletedAt),
-            ne(users.userStatus, 'banned')
-          )
-        )
+        .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
       const timeoutPromise = new Promise<never>((_, reject) => {
