@@ -423,6 +423,84 @@ describe('musicfetch-enrichment', () => {
       expect(result.dspFieldsUpdated).not.toContain('bio');
     });
 
+    it('saves avatarUrl from MusicFetch image when profile has no avatar', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        image: { url: 'https://i.scdn.co/image/artist-photo.jpg' },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({ avatarUrl: null, avatarLockedByUser: false }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(result.dspFieldsUpdated).toContain('avatarUrl');
+      const setCallArgs = mockTxSet.mock.calls[0]?.[0] as
+        | Record<string, unknown>
+        | undefined;
+      expect(setCallArgs?.avatarUrl).toBe(
+        'https://i.scdn.co/image/artist-photo.jpg'
+      );
+    });
+
+    it('does not overwrite avatarUrl when avatarLockedByUser is true', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        image: { url: 'https://i.scdn.co/image/artist-photo.jpg' },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({ avatarUrl: null, avatarLockedByUser: true }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(result.dspFieldsUpdated).not.toContain('avatarUrl');
+    });
+
+    it('does not overwrite existing avatarUrl', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        image: { url: 'https://i.scdn.co/image/new-photo.jpg' },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({
+          avatarUrl: 'https://existing-avatar.jpg',
+          avatarLockedByUser: false,
+        }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(result.dspFieldsUpdated).not.toContain('avatarUrl');
+    });
+
     it('YouTube URL falls back to YouTube Music when main YouTube unavailable', async () => {
       const musicFetchResult = makeMusicFetchResult({
         services: {
