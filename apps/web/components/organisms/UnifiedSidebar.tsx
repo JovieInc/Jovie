@@ -127,13 +127,13 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           General
         </span>
         <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -161,12 +161,15 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-7 items-center gap-2 rounded-md px-2 text-app tracking-tight text-sidebar-item-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
-          <ArrowLeft className='size-3.5' aria-hidden='true' />
-          <span className='truncate text-app tracking-tight group-data-[collapsible=icon]:hidden'>
+          <ArrowLeft
+            className='size-3 text-sidebar-item-icon/70'
+            aria-hidden='true'
+          />
+          <span className='truncate text-app tracking-tight text-sidebar-item-foreground/80 group-data-[collapsible=icon]:hidden'>
             Back to app
           </span>
         </Link>
@@ -179,20 +182,20 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-7 w-full items-center gap-2 rounded-md px-2 transition-[background] duration-0 ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent',
+                'flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size={14}
+                size={13}
                 tone='auto'
                 className='rounded-[4px] shrink-0'
               />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
               </span>
               <ChevronDown
-                className='size-3 shrink-0 text-sidebar-item-icon opacity-60 group-data-[collapsible=icon]:hidden'
+                className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
                 aria-hidden='true'
               />
             </button>
@@ -204,9 +207,9 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-foreground transition-[background] duration-normal ease-interactive hover:bg-sidebar-accent focus-visible:outline-none focus-visible:bg-sidebar-accent group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-6 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-item-icon/58 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 group-data-[collapsible=icon]:hidden'
         >
-          <SquarePen className='size-3.5' />
+          <SquarePen className='size-3' />
         </Link>
       )}
     </div>
@@ -239,7 +242,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-12 justify-center gap-0 pl-2 pr-3.5 pt-0 pb-0'>
+      <SidebarHeader className='relative h-10 justify-center gap-0 border-b border-sidebar-border/35 px-2.5 py-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -248,7 +251,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden pl-2 pr-3.5 pb-2'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -260,12 +263,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/35 bg-sidebar/40 pb-1 pt-0.5'>
+      <div className='mt-auto shrink-0 border-t border-sidebar-border/45 bg-sidebar/45 backdrop-blur-[1px]'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pb-2 pt-1'>
-          <span className='text-2xs text-sidebar-muted/70 select-none'>
+        <div className='pl-2 pr-3.5 pb-3 pt-1'>
+          <span className='text-2xs text-sidebar-muted/80 select-none'>
             v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
             {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
               ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
