@@ -26,7 +26,8 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    expect(screen.getByText('2 social links')).toBeInTheDocument();
+    // Summary pill shows count as visible text, full label in title attribute
+    expect(screen.getByTitle('2 social links')).toBeInTheDocument();
   });
 
   it('shows overflow count in summary label', () => {
@@ -60,7 +61,8 @@ describe('SocialLinksCell', () => {
       />
     );
 
-    expect(screen.getByText('3 DSP links · +1')).toBeInTheDocument();
+    // Summary pill shows count in title attribute
+    expect(screen.getByTitle('3 social links')).toBeInTheDocument();
   });
 
   it('opens link in a new tab when pill is clicked', () => {

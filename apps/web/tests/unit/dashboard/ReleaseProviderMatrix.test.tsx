@@ -1,4 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   act,
   type RenderOptions,
@@ -57,13 +58,6 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
   useRegisterRightPanel: vi.fn(),
 }));
 
-vi.mock('@/lib/queries/usePlanGate', () => ({
-  usePlanGate: () => ({
-    smartLinksLimit: null,
-    isPro: true,
-  }),
-}));
-
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {
     success: vi.fn(),
@@ -120,6 +114,13 @@ vi.mock('@/lib/queries', () => ({
     mutateAsync: vi.fn(),
     isPending: false,
   }),
+  usePlanGate: () => ({
+    smartLinksLimit: null,
+    isPro: true,
+  }),
+  QueryErrorBoundary: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
 }));
 
 // Mock heavy children
@@ -258,11 +259,19 @@ function renderWithProviders(
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>
 ) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
   return render(ui, {
     wrapper: ({ children }) => (
-      <TooltipProvider>
-        <RightPanelProvider>{children}</RightPanelProvider>
-      </TooltipProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <RightPanelProvider>{children}</RightPanelProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
     ),
     ...options,
   });

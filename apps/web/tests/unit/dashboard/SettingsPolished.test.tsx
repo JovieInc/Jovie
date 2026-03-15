@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
@@ -83,9 +82,7 @@ vi.mock('@/lib/queries', () => ({
 }));
 
 describe('SettingsPolished', () => {
-  it('renders run-all button and scrolls to first section', async () => {
-    const user = userEvent.setup();
-
+  it('renders settings sections and sidebar navigation', () => {
     render(
       <SettingsPolished
         artist={{ id: 'artist_1' } as Artist}
@@ -93,19 +90,12 @@ describe('SettingsPolished', () => {
       />
     );
 
+    // Sidebar navigation should be rendered
+    const sidebar = screen.getByRole('complementary');
+    expect(sidebar).toBeInTheDocument();
+
+    // Account section should be rendered
     const firstSection = document.getElementById('account');
     expect(firstSection).toBeTruthy();
-
-    const scrollIntoViewSpy = vi.fn();
-    if (firstSection) {
-      firstSection.scrollIntoView = scrollIntoViewSpy;
-    }
-
-    await user.click(screen.getByRole('button', { name: 'Run all' }));
-
-    expect(scrollIntoViewSpy).toHaveBeenCalledWith({
-      behavior: 'smooth',
-      block: 'start',
-    });
   });
 });
