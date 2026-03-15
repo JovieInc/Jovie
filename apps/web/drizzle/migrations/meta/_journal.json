@@ -435,6 +435,13 @@
       "when": 1773197224777,
       "tag": "0061_social_links_profile_platform_index",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1741968000000,
+      "tag": "0063_tips_status_amount_index",
+      "breakpoints": true
     }
   ]
 }

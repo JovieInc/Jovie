@@ -509,10 +509,24 @@ async function fetchTippingStatsWithSession(
   profileId: string
 ): Promise<TippingStats> {
   try {
+    // Set a PostgreSQL-level statement timeout to prevent long-running queries
+    // from holding Neon WebSocket connections open past the idle timeout.
+    // This is a safety net in addition to the JS-level timeout.
+    await tx.execute(drizzleSql`SET LOCAL statement_timeout = '5s'`);
+
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const startOfMonthISO = startOfMonth.toISOString();
+
+    // Use a 12-month lookback for totalReceived to avoid full table scans.
+    // This leverages the idx_tips_created_at index (creator_profile_id, created_at).
+    // For all-time totals, a materialized view or periodic rollup is preferred.
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12);
+    twelveMonthsAgo.setUTCDate(1);
+    twelveMonthsAgo.setUTCHours(0, 0, 0, 0);
+    const twelveMonthsAgoISO = twelveMonthsAgo.toISOString();
 
     const tipTotalsRawResult = await dashboardQuery(
       () =>
@@ -538,10 +552,16 @@ async function fetchTippingStatsWithSession(
           `,
           })
           .from(tips)
-          .where(eq(tips.creatorProfileId, profileId)),
+          .where(
+            and(
+              eq(tips.creatorProfileId, profileId),
+              drizzleSql`${tips.createdAt} >= ${twelveMonthsAgoISO}::timestamp`
+            )
+          ),
       'Tipping stats query'
     );
 
+    // Limit click events query to last 12 months to leverage indexes
     const clickStatsResult = await dashboardQuery(
       () =>
         tx
@@ -553,7 +573,8 @@ async function fetchTippingStatsWithSession(
           .where(
             and(
               eq(clickEvents.creatorProfileId, profileId),
-              eq(clickEvents.linkType, 'tip')
+              eq(clickEvents.linkType, 'tip'),
+              drizzleSql`${clickEvents.createdAt} >= ${twelveMonthsAgoISO}::timestamp`
             )
           ),
       'Click events query'
@@ -574,7 +595,9 @@ async function fetchTippingStatsWithSession(
     // Query timeouts are expected during Neon cold starts — downgrade to warning.
     // The dashboard degrades gracefully by showing empty tipping stats.
     const level =
-      error instanceof Error && error.name === 'QueryTimeoutError'
+      error instanceof Error &&
+      (error.name === 'QueryTimeoutError' ||
+        error.message.includes('statement timeout'))
         ? 'warning'
         : 'error';
     Sentry.captureException(error, {
