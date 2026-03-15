@@ -90,7 +90,7 @@ export function ReleaseTrackList({
         aria-controls={`release-tracklist-${release.id}`}
         className={cn(
           DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1)/75 hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1)/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         )}
       >
         <span>Tracks ({release.totalTracks})</span>
@@ -102,7 +102,7 @@ export function ReleaseTrackList({
       </button>
 
       {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-0.5'>
+        <div id={`release-tracklist-${release.id}`} className='space-y-px'>
           {(isLoading || (isFetching && !tracks)) && (
             <div className='space-y-0.5'>
               {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
@@ -231,7 +231,7 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1)/85 focus-within:bg-(--linear-bg-surface-1)/85 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
+    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1)/70 focus-within:bg-(--linear-bg-surface-1)/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
         {trackLabel}.
       </span>
