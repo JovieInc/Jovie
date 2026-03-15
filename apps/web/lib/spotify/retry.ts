@@ -85,7 +85,7 @@ export function calculateDelay(
 
   // Apply jitter
   const jitterRange = exponentialDelay * config.jitter;
-  const jitter = Math.random() * jitterRange * 2 - jitterRange;
+  const jitter = Math.random() * jitterRange * 2 - jitterRange; // NOSONAR (S2245) - Non-security use: exponential backoff jitter to prevent thundering herd
 
   // Cap at maxDelay and ensure non-negative
   return Math.max(0, Math.min(exponentialDelay + jitter, config.maxDelay));

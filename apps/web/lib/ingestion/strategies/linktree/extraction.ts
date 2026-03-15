@@ -37,7 +37,7 @@ import {
  * The remaining schemes are blocked because they are not extractable web URLs.
  */
 const BLOCKED_SCHEMES = [
-  'javascript:',
+  'javascript:', // NOSONAR (S5334) - Security blocklist: explicitly blocks javascript: URIs to prevent XSS
   'mailto:',
   'tel:',
   'data:',

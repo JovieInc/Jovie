@@ -81,7 +81,7 @@ export function SendInviteDialog({
     }
 
     // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/; // NOSONAR (S5852) - ReDoS bounded by RFC 5321 length check (≤254 chars) above
     if (!emailRegex.test(trimmedEmail)) {
       setError('Please enter a valid email address');
       return;

@@ -83,7 +83,7 @@ export function isValidEmail(email: string): boolean {
   if (email.length > 254) return false;
 
   // Simple pattern check
-  const basicPattern = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+  const basicPattern = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/; // NOSONAR (S5852) - ReDoS bounded by email.length > 254 check applied above
   if (!basicPattern.test(email)) return false;
 
   // Domain check - reject non-email domains

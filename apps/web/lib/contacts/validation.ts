@@ -1,6 +1,6 @@
 import type { ContactChannel, DashboardContactInput } from '@/types/contacts';
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[a-zA-Z]{2,}$/; // NOSONAR (S5852) - ReDoS bounded by RFC 5321 length check (≤254 chars) in validateEmail below
 
 export function normalizeTerritories(raw: string[]): string[] {
   const cleaned = raw.map(value => value.trim()).filter(Boolean);

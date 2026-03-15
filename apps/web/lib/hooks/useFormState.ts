@@ -86,7 +86,7 @@ export function calculateBackoffDelay(
 
   // Add jitter: ±10% to prevent thundering herd
   // Random value between 0.9 and 1.1
-  const jitterMultiplier = 0.9 + Math.random() * 0.2;
+  const jitterMultiplier = 0.9 + Math.random() * 0.2; // NOSONAR (S2245) - Non-security use: retry backoff jitter (±10%) to prevent thundering herd
 
   return Math.round(cappedDelay * jitterMultiplier);
 }

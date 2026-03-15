@@ -62,7 +62,7 @@ export function useUniversalLinkInput({
   const [autosuggestOpen, setAutosuggestOpen] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const autosuggestListId = useMemo(
-    () => `platform-autosuggest-${Math.random().toString(36).slice(2)}`,
+    () => `platform-autosuggest-${Math.random().toString(36).slice(2)}`, // NOSONAR (S2245) - Non-security use: unique HTML element ID for accessibility (aria-controls)
     []
   );
 

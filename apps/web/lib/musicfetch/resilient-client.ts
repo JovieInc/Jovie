@@ -56,7 +56,7 @@ function backoffMs(attempt: number, retryAfterSeconds?: number): number {
   const base = retryAfterSeconds
     ? retryAfterSeconds * 1000
     : 400 * 2 ** attempt;
-  const jitter = Math.floor(Math.random() * 250);
+  const jitter = Math.floor(Math.random() * 250); // NOSONAR (S2245) - Non-security use: retry backoff jitter to prevent thundering herd
   return base + jitter;
 }
 
