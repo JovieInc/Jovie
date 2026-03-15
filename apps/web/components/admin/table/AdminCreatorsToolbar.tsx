@@ -51,22 +51,22 @@ export function AdminCreatorsToolbar({
 
   return (
     <AdminTableSubheader>
-      <div className='flex min-h-11 w-full flex-wrap items-center gap-2.5'>
+      <div className='flex min-h-12 w-full flex-wrap items-center gap-2.5'>
         {hasSelection ? (
           // Bulk Actions Mode - replaces "Creator" text
           <>
-            <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3'>
+            <div className='flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-2.5'>
               <div className='text-sm font-medium text-primary-token'>
                 {selectedCount} {selectedCount === 1 ? 'creator' : 'creators'}{' '}
                 selected
               </div>
-              <div className='flex w-full flex-wrap items-center gap-2 sm:w-auto'>
+              <div className='flex w-full flex-wrap items-center gap-1.5 sm:w-auto'>
                 {someSelectedVerified ? (
                   <Button
                     size='sm'
                     variant='ghost'
                     onClick={onBulkUnverify}
-                    className='gap-2.5'
+                    className='h-8 gap-2'
                   >
                     <XCircle className='h-3.5 w-3.5' />
                     Unverify
@@ -76,7 +76,7 @@ export function AdminCreatorsToolbar({
                     size='sm'
                     variant='ghost'
                     onClick={onBulkVerify}
-                    className='gap-2.5'
+                    className='h-8 gap-2'
                   >
                     <CheckCircle className='h-3.5 w-3.5' />
                     Verify
@@ -86,7 +86,7 @@ export function AdminCreatorsToolbar({
                   size='sm'
                   variant='ghost'
                   onClick={onBulkFeature}
-                  className='gap-2.5'
+                  className='h-8 gap-2'
                 >
                   <Star className='h-3.5 w-3.5' />
                   Feature
@@ -95,7 +95,7 @@ export function AdminCreatorsToolbar({
                   size='sm'
                   variant='ghost'
                   onClick={onBulkRefreshMusicFetch}
-                  className='gap-2.5'
+                  className='h-8 gap-2'
                 >
                   <RefreshCw className='h-3.5 w-3.5' />
                   Refresh Music Data
@@ -104,7 +104,7 @@ export function AdminCreatorsToolbar({
                   size='sm'
                   variant='ghost'
                   onClick={onBulkDelete}
-                  className='gap-2.5 text-destructive hover:text-destructive'
+                  className='h-8 gap-2 text-destructive hover:text-destructive'
                 >
                   <Trash2 className='h-3.5 w-3.5' />
                   Delete
@@ -115,7 +115,7 @@ export function AdminCreatorsToolbar({
               size='sm'
               variant='ghost'
               onClick={onClearSelection}
-              className='ml-auto'
+              className='ml-auto h-8'
             >
               Clear Selection
             </Button>
@@ -123,7 +123,7 @@ export function AdminCreatorsToolbar({
         ) : (
           // Normal Mode
           <>
-            <div className='hidden text-[12px] font-normal text-(--linear-text-tertiary) tabular-nums md:block'>
+            <div className='hidden text-[11px] text-secondary-token tabular-nums md:block'>
               Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
               {total.toLocaleString()} profiles
             </div>

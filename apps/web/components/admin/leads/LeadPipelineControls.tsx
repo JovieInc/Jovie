@@ -2,10 +2,19 @@
 
 import { Button, Input, Switch } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, Play, Zap } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Loader2,
+  Play,
+  XCircle,
+  Zap,
+} from 'lucide-react';
 import { type ChangeEvent, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import {
+  type DiscoveryKeywordDiagnostic,
+  type DiscoveryResultResponse,
   type LeadPipelineSettings,
   queryKeys,
   useLeadPipelineSettingsQuery,
@@ -14,9 +23,119 @@ import {
   useUpdateLeadPipelineSettingsMutation,
 } from '@/lib/queries';
 
+function DiagnosticPanel({ result }: { result: DiscoveryResultResponse }) {
+  const hasErrors = result.diagnostics.some(d => d.error);
+  const totalRawResults = result.diagnostics.reduce(
+    (sum, d) => sum + d.rawResultCount,
+    0
+  );
+  const totalLinktreeUrls = result.diagnostics.reduce(
+    (sum, d) => sum + d.linktreeUrlsFound,
+    0
+  );
+
+  return (
+    <div className='mt-4 rounded-lg border border-subtle bg-surface-1 p-4'>
+      <h3 className='mb-2 text-sm font-semibold text-primary-token'>
+        Discovery diagnostics
+      </h3>
+
+      {/* Summary row */}
+      <div className='mb-3 flex flex-wrap gap-4 text-xs text-secondary-token'>
+        <span>Queries: {result.queriesUsed}</span>
+        <span>Raw results: {totalRawResults}</span>
+        <span>Linktree URLs: {totalLinktreeUrls}</span>
+        <span>New leads: {result.newLeadsFound}</span>
+        <span>Duplicates: {result.duplicatesSkipped}</span>
+        <span>Budget left: {result.budgetRemaining}</span>
+        <span>
+          Rotation: {result.keywordRotationIndex}/{result.totalEnabledKeywords}
+        </span>
+      </div>
+
+      {totalRawResults === 0 && !hasErrors && (
+        <div className='mb-3 flex items-start gap-2 rounded border border-yellow-500/30 bg-yellow-500/10 p-2 text-xs text-yellow-200'>
+          <AlertTriangle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
+          <div>
+            <p className='font-medium'>
+              Google CSE returned 0 results for all queries
+            </p>
+            <p className='mt-0.5 opacity-80'>
+              This likely means your keywords are too specific, or your Google
+              CSE engine is misconfigured. Try broader queries like{' '}
+              <code className='rounded bg-white/10 px-1'>
+                site:linktr.ee spotify music
+              </code>{' '}
+              or check your CSE settings in the Google Programmable Search
+              Console.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {hasErrors && (
+        <div className='mb-3 flex items-start gap-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-200'>
+          <XCircle className='mt-0.5 h-3.5 w-3.5 shrink-0' />
+          <div>
+            <p className='font-medium'>
+              Some queries failed — check Sentry for details
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Per-keyword breakdown */}
+      <div className='space-y-1.5'>
+        {result.diagnostics.map(d => (
+          <KeywordDiagnosticRow key={d.keywordId} diagnostic={d} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KeywordDiagnosticRow({
+  diagnostic: d,
+}: {
+  diagnostic: DiscoveryKeywordDiagnostic;
+}) {
+  return (
+    <div className='flex items-center gap-2 rounded border border-subtle px-2 py-1.5 text-xs'>
+      {d.error ? (
+        <XCircle className='h-3.5 w-3.5 shrink-0 text-red-400' />
+      ) : d.rawResultCount === 0 ? (
+        <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-yellow-400' />
+      ) : (
+        <CheckCircle2 className='h-3.5 w-3.5 shrink-0 text-green-400' />
+      )}
+      <code className='min-w-0 flex-1 truncate text-secondary-token'>
+        {d.query}
+      </code>
+      <div className='flex shrink-0 items-center gap-3 text-secondary-token'>
+        <span title='Google CSE start index (page offset)'>
+          p{Math.ceil(d.searchOffset / 10)}
+        </span>
+        <span title='Raw Google results'>{d.rawResultCount} raw</span>
+        <span title='Linktree URLs extracted'>
+          {d.linktreeUrlsFound} linktr.ee
+        </span>
+        <span title='New leads inserted'>{d.newLeadsInserted} new</span>
+        <span title='Query duration'>{d.durationMs}ms</span>
+      </div>
+      {d.error && (
+        <span className='ml-1 truncate text-red-400' title={d.error}>
+          {d.error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function LeadPipelineControls() {
   const queryClient = useQueryClient();
   const [settings, setSettings] = useState<LeadPipelineSettings | null>(null);
+  const [lastDiscoveryResult, setLastDiscoveryResult] =
+    useState<DiscoveryResultResponse | null>(null);
 
   const settingsQuery = useLeadPipelineSettingsQuery();
   const saveSettingsMutation = useUpdateLeadPipelineSettingsMutation();
@@ -44,11 +163,27 @@ export function LeadPipelineControls() {
   }
 
   async function triggerDiscovery() {
+    setLastDiscoveryResult(null);
     try {
       const data = await discoveryMutation.mutateAsync();
-      toast.success(
-        `Discovery complete: ${data.result.newLeadsFound} new leads from ${data.result.queriesUsed} queries`
+      setLastDiscoveryResult(data.result);
+
+      const { newLeadsFound, queriesUsed, diagnostics } = data.result;
+      const totalRaw = diagnostics.reduce(
+        (sum, d) => sum + d.rawResultCount,
+        0
       );
+
+      if (totalRaw === 0) {
+        toast.warning(
+          `Discovery ran ${queriesUsed} queries but Google returned 0 results. Check keyword configuration.`
+        );
+      } else {
+        toast.success(
+          `Discovery complete: ${newLeadsFound} new leads from ${queriesUsed} queries (${totalRaw} raw results)`
+        );
+      }
+
       await queryClient.invalidateQueries({
         queryKey: queryKeys.admin.leads.all(),
       });
@@ -248,6 +383,8 @@ export function LeadPipelineControls() {
           </Button>
         </div>
       </div>
+
+      {lastDiscoveryResult && <DiagnosticPanel result={lastDiscoveryResult} />}
     </section>
   );
 }

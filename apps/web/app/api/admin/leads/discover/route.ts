@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { discoveryKeywords, leadPipelineSettings } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import { runDiscovery } from '@/lib/leads/discovery';
+import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -13,6 +13,7 @@ export const maxDuration = 60;
 
 /**
  * POST /api/admin/leads/discover — Manually trigger one discovery cycle.
+ * Returns full per-keyword diagnostics so the UI can show search health.
  */
 export async function POST() {
   const entitlements = await getCurrentUserEntitlements();
@@ -43,11 +44,22 @@ export async function POST() {
         .returning();
     }
 
+    // Reset daily query budget if past reset time (or never initialized)
+    settings = await resetBudgetIfNeeded(settings);
+
     const keywords = await db.select().from(discoveryKeywords);
 
     if (keywords.length === 0) {
       return NextResponse.json(
         { error: 'No keywords configured. Add keywords first.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const enabledKeywords = keywords.filter(k => k.enabled);
+    if (enabledKeywords.length === 0) {
+      return NextResponse.json(
+        { error: 'All keywords are disabled. Enable at least one.' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }

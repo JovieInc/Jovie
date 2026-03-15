@@ -19,8 +19,8 @@ export function LogoBar() {
       />
 
       <div className='mx-auto flex max-w-[var(--linear-content-max)] flex-col items-center gap-5'>
-        <p className='max-w-xl text-center text-[11px] font-[number:var(--linear-font-weight-medium)] uppercase tracking-[0.16em] text-[color:var(--linear-text-tertiary)]'>
-          Used by artists across major-label and independent ecosystems
+        <p className='max-w-xl text-center text-xs font-[number:var(--linear-font-weight-medium)] uppercase tracking-[0.16em] text-[color:var(--linear-text-tertiary)]'>
+          Artists on these labels use Jovie
         </p>
         <div
           className='flex w-full max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-6 rounded-[28px] px-6 py-5 sm:flex-nowrap sm:gap-16 sm:px-10'

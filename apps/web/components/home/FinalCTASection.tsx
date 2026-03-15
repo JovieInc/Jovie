@@ -41,7 +41,7 @@ export function FinalCTASection() {
         <div className='reveal-on-scroll relative mx-auto flex max-w-xl flex-col items-center text-center'>
           {/* Eyebrow */}
           <span
-            className='mb-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium uppercase tracking-[0.08em]'
+            className='mb-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.08em]'
             style={{
               borderColor: 'rgba(255,255,255,0.1)',
               color: 'rgba(255,255,255,0.45)',
@@ -61,8 +61,8 @@ export function FinalCTASection() {
             className='mt-5 max-w-md marketing-lead-linear'
             style={{ color: 'rgba(255,255,255,0.5)' }}
           >
-            Launch a smart artist profile that captures contacts, routes fans to
-            the right action, and keeps your release growth compounding.
+            Launch an artist profile that grows your audience with every
+            release.
           </p>
 
           {/* Form */}

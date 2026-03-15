@@ -14,7 +14,7 @@ const DemoAudienceSection = lazy(
 
 const STATS = [
   { label: 'Total fans', value: '2,847', icon: Users },
-  { label: 'Emails captured', value: '2,341', icon: Mail },
+  { label: 'Email subscribers', value: '2,341', icon: Mail },
   { label: 'Cities reached', value: '189', icon: MapPin },
   { label: 'Tips earned', value: '$1,204', icon: DollarSign },
 ];
@@ -121,7 +121,7 @@ export function AudienceCRMSection() {
                 ticketing pages. Jovie captures emails, source, city, and intent
                 so you can follow up later.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in fan CRM
               </span>
             </div>
@@ -134,7 +134,7 @@ export function AudienceCRMSection() {
             {BENEFITS.map(benefit => (
               <div
                 key={benefit}
-                className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3 text-[13px] font-medium text-[var(--linear-text-secondary)]'
+                className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3 text-sm font-medium text-[var(--linear-text-secondary)]'
               >
                 {benefit}
               </div>
@@ -198,8 +198,11 @@ export function AudienceCRMSection() {
                   </div>
                 ))}
               </div>
+              <p className='text-xs text-white/50 mt-2 text-center'>
+                Real data from a Jovie artist profile
+              </p>
 
-              <div className='flex flex-wrap items-center gap-2 border-t border-[var(--linear-border-subtle)] px-5 py-3 text-[11px] text-[var(--linear-text-tertiary)]'>
+              <div className='flex flex-wrap items-center gap-2 border-t border-[var(--linear-border-subtle)] px-5 py-3 text-xs text-[var(--linear-text-tertiary)]'>
                 <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 font-medium text-[var(--linear-text-secondary)]'>
                   Captured from profile
                 </span>

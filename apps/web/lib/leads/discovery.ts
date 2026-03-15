@@ -14,6 +14,7 @@ import {
   isLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
 import { searchGoogleCSE } from './google-cse';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
 interface DiscoveryCandidate {
   linktreeHandle: string;
@@ -87,11 +88,76 @@ async function insertCandidates(
   }
 }
 
+/**
+ * Google CSE free tier supports startIndex 1..91 (pages 1-10, 10 results each).
+ * After 91 we reset to 1 to start the cycle over.
+ */
+const GOOGLE_CSE_MAX_START_INDEX = 91;
+
+/**
+ * Resets the daily query budget if the reset time has passed (or was never set).
+ * Returns a fresh copy of settings with zeroed counters if a reset occurred.
+ *
+ * Uses UTC midnight so the reset time is deterministic regardless of server timezone.
+ */
+export async function resetBudgetIfNeeded(
+  settings: LeadPipelineSettings
+): Promise<LeadPipelineSettings> {
+  const now = new Date();
+
+  // Compute next UTC midnight
+  const nextMidnightUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  );
+
+  const needsReset =
+    !settings.queryBudgetResetsAt || now > settings.queryBudgetResetsAt;
+
+  if (!needsReset) return settings;
+
+  pipelineLog('discovery', 'Resetting daily query budget', {
+    previousUsed: settings.queriesUsedToday,
+    previousResetAt: settings.queryBudgetResetsAt?.toISOString() ?? null,
+    newResetAt: nextMidnightUtc.toISOString(),
+  });
+
+  await db
+    .update(leadPipelineSettings)
+    .set({
+      queriesUsedToday: 0,
+      queryBudgetResetsAt: nextMidnightUtc,
+      updatedAt: now,
+    })
+    .where(eq(leadPipelineSettings.id, 1));
+
+  return {
+    ...settings,
+    queriesUsedToday: 0,
+    queryBudgetResetsAt: nextMidnightUtc,
+  };
+}
+
+export interface KeywordDiagnostic {
+  keywordId: string;
+  query: string;
+  rawResultCount: number;
+  linktreeUrlsFound: number;
+  newLeadsInserted: number;
+  duplicatesSkipped: number;
+  error: string | null;
+  durationMs: number;
+  searchOffset: number;
+}
+
 export interface DiscoveryResult {
   queriesUsed: number;
   candidatesProcessed: number;
   newLeadsFound: number;
   duplicatesSkipped: number;
+  diagnostics: KeywordDiagnostic[];
+  budgetRemaining: number;
+  keywordRotationIndex: number;
+  totalEnabledKeywords: number;
 }
 
 function buildCandidateMap(
@@ -137,22 +203,47 @@ export async function runDiscovery(
   settings: LeadPipelineSettings,
   keywords: DiscoveryKeyword[]
 ): Promise<DiscoveryResult> {
+  const enabledKeywords = keywords.filter(k => k.enabled);
+  const remainingBudget = settings.dailyQueryBudget - settings.queriesUsedToday;
+
   const result: DiscoveryResult = {
     queriesUsed: 0,
     candidatesProcessed: 0,
     newLeadsFound: 0,
     duplicatesSkipped: 0,
+    diagnostics: [],
+    budgetRemaining: remainingBudget,
+    keywordRotationIndex: settings.lastDiscoveryQueryIndex,
+    totalEnabledKeywords: enabledKeywords.length,
   };
 
-  if (keywords.length === 0) return result;
+  if (keywords.length === 0) {
+    pipelineWarn('discovery', 'No keywords configured — skipping discovery');
+    return result;
+  }
 
-  const enabledKeywords = keywords.filter(k => k.enabled);
-  if (enabledKeywords.length === 0) return result;
+  if (enabledKeywords.length === 0) {
+    pipelineWarn('discovery', 'All keywords disabled — skipping discovery', {
+      totalKeywords: keywords.length,
+    });
+    return result;
+  }
 
-  const remainingBudget = settings.dailyQueryBudget - settings.queriesUsedToday;
-  if (remainingBudget <= 0) return result;
+  if (remainingBudget <= 0) {
+    pipelineWarn('discovery', 'Daily query budget exhausted', {
+      budget: settings.dailyQueryBudget,
+      used: settings.queriesUsedToday,
+    });
+    return result;
+  }
 
   let queryIndex = settings.lastDiscoveryQueryIndex % enabledKeywords.length;
+
+  pipelineLog('discovery', 'Discovery cycle starting', {
+    enabledKeywords: enabledKeywords.length,
+    remainingBudget,
+    startIndex: queryIndex,
+  });
 
   // Use up to 10 queries per cron run (15-min interval × ~96 runs/day = ~960 queries max)
   const queriesThisRun = Math.min(remainingBudget, 10);
@@ -161,31 +252,105 @@ export async function runDiscovery(
     const keyword = enabledKeywords[queryIndex];
     if (!keyword) break;
 
+    // Use stored search offset for pagination — avoids re-fetching page 1 every run.
+    // The searchOffset column may not exist yet (pre-migration), so default to 1.
+    const currentOffset = keyword.searchOffset ?? 1;
+
+    const diagnostic: KeywordDiagnostic = {
+      keywordId: keyword.id,
+      query: keyword.query,
+      rawResultCount: 0,
+      linktreeUrlsFound: 0,
+      newLeadsInserted: 0,
+      duplicatesSkipped: 0,
+      error: null,
+      durationMs: 0,
+      searchOffset: currentOffset,
+    };
+    const queryStart = Date.now();
+
     try {
-      const results = await searchGoogleCSE(keyword.query);
+      const results = await searchGoogleCSE(keyword.query, currentOffset);
+      diagnostic.rawResultCount = results.length;
+
       const candidatesByHandle = buildCandidateMap(results, keyword.query);
       const candidates = Array.from(candidatesByHandle.values());
+      diagnostic.linktreeUrlsFound = candidates.length;
       result.candidatesProcessed += candidates.length;
-      await insertCandidates(candidates, result);
 
-      // Update keyword stats
+      // Track per-keyword insert stats separately
+      const beforeNew = result.newLeadsFound;
+      const beforeDups = result.duplicatesSkipped;
+      await insertCandidates(candidates, result);
+      diagnostic.newLeadsInserted = result.newLeadsFound - beforeNew;
+      diagnostic.duplicatesSkipped = result.duplicatesSkipped - beforeDups;
+
+      // Advance search offset for next run. If we got fewer than 10 results
+      // or exceeded max, reset to page 1.
+      const nextOffset = currentOffset + 10;
+      const newSearchOffset =
+        results.length < 10 || nextOffset > GOOGLE_CSE_MAX_START_INDEX
+          ? 1
+          : nextOffset;
+
+      // Update keyword stats + pagination offset
       await db
         .update(discoveryKeywords)
         .set({
           lastUsedAt: new Date(),
           resultsFoundTotal: keyword.resultsFoundTotal + results.length,
+          searchOffset: newSearchOffset,
         })
         .where(eq(discoveryKeywords.id, keyword.id));
+
+      pipelineLog('discovery', 'Keyword query complete', {
+        query: keyword.query,
+        searchOffset: currentOffset,
+        nextOffset: newSearchOffset,
+        rawResults: diagnostic.rawResultCount,
+        linktreeUrls: diagnostic.linktreeUrlsFound,
+        newLeads: diagnostic.newLeadsInserted,
+        duplicates: diagnostic.duplicatesSkipped,
+      });
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      diagnostic.error = errorMessage;
+
+      pipelineWarn('discovery', 'Keyword query failed', {
+        query: keyword.query,
+        searchOffset: currentOffset,
+        error: errorMessage,
+      });
+
       await captureError('Discovery query failed', error, {
         route: 'leads/discovery',
-        contextData: { query: keyword.query },
+        contextData: {
+          query: keyword.query,
+          keywordId: keyword.id,
+          queryIndex,
+          searchOffset: currentOffset,
+        },
       });
     }
 
+    diagnostic.durationMs = Date.now() - queryStart;
+    result.diagnostics.push(diagnostic);
     result.queriesUsed++;
     queryIndex = (queryIndex + 1) % enabledKeywords.length;
   }
+
+  result.budgetRemaining = remainingBudget - result.queriesUsed;
+  result.keywordRotationIndex = queryIndex;
+
+  pipelineLog('discovery', 'Discovery cycle complete', {
+    queriesUsed: result.queriesUsed,
+    candidatesProcessed: result.candidatesProcessed,
+    newLeadsFound: result.newLeadsFound,
+    duplicatesSkipped: result.duplicatesSkipped,
+    budgetRemaining: result.budgetRemaining,
+    nextKeywordIndex: queryIndex,
+  });
 
   // Update settings counters
   await db
