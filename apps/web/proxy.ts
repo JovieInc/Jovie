@@ -417,6 +417,16 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     // /waitlist during RSC navigation causes layout hierarchy mismatches that
     // manifest as "page not found" errors on the client.
     if (userState) {
+      // Redirect banned/deleted users immediately — before any other routing
+      if (
+        userState.isBanned &&
+        pathname !== '/banned' &&
+        isNavigationMethod &&
+        !isRSCPrefetch
+      ) {
+        return NextResponse.redirect(new URL('/banned', req.url));
+      }
+
       if (
         isWaitlistEnabled() &&
         userState.needsWaitlist &&

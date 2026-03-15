@@ -92,7 +92,7 @@ describe('POST /api/webhooks/linear', () => {
 
     mockAcquireRecentDispatch.mockResolvedValue(true);
     mockServerFetch.mockRejectedValue(
-      new ServerFetchTimeoutError('timed out', 5000)
+      new ServerFetchTimeoutError('timed out', 10000)
     );
 
     const { POST } = await import('@/app/api/webhooks/linear/route');
@@ -131,7 +131,7 @@ describe('POST /api/webhooks/linear', () => {
       expect.any(ServerFetchTimeoutError),
       expect.objectContaining({
         route: '/api/webhooks/linear',
-        timeoutMs: 5000,
+        timeoutMs: 10000,
       })
     );
   });
