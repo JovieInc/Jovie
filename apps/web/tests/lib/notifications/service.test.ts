@@ -25,15 +25,15 @@ vi.mock('@/lib/notifications/providers/resend', () => ({
 
 vi.mock('@/lib/notifications/config', () => ({
   NOTIFICATIONS_BRAND_NAME: 'Jovie',
-  EMAIL_FROM_ADDRESS: 'notifications@notify.jov.ie',
+  EMAIL_FROM_ADDRESS: 'notifications@send.jov.ie',
   EMAIL_REPLY_TO: 'reply@example.com',
 }));
 
 vi.mock('@/lib/notifications/sender-policy', () => ({
   formatSystemSender: vi.fn((displayName?: string) =>
     displayName
-      ? `${displayName} via Jovie <notifications@notify.jov.ie>`
-      : 'Jovie <notifications@notify.jov.ie>'
+      ? `${displayName} via Jovie <notifications@send.jov.ie>`
+      : 'Jovie <notifications@send.jov.ie>'
   ),
 }));
 
@@ -443,7 +443,7 @@ describe('Notification Service', () => {
       expect(formatSystemSender).toHaveBeenCalledWith('Artist Name');
       expect(customProvider.sendEmail).toHaveBeenCalledWith(
         expect.objectContaining({
-          from: 'Artist Name via Jovie <notifications@notify.jov.ie>',
+          from: 'Artist Name via Jovie <notifications@send.jov.ie>',
           replyTo: 'reply@example.com',
         })
       );
