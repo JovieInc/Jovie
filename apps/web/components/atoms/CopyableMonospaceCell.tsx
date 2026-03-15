@@ -32,12 +32,16 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
 }: CopyableMonospaceCellProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = useCallback(() => {
-    if (!value) return;
-    navigator.clipboard.writeText(value);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [value]);
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!value) return;
+      navigator.clipboard.writeText(value);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    },
+    [value]
+  );
 
   if (!value) {
     return (
