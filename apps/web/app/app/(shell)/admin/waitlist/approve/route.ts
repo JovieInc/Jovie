@@ -72,6 +72,28 @@ export async function POST(request: Request) {
       );
     }
 
+    if (result.outcome === 'no_profile') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'No profile found for this waitlist entry. The user must submit the waitlist form first.',
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (result.outcome === 'no_user') {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'No auth record found for this email. The user must sign in at least once before being approved.',
+        },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+
     await finalizeWaitlistApproval(result);
 
     // Send welcome email after successful approval
