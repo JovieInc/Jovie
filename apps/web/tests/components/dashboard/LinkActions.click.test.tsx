@@ -27,6 +27,13 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`} />,
 }));
 
+// Mock TableContextMenu to avoid deep @jovie/ui dependency
+vi.mock('@/components/organisms/table', () => ({
+  TableContextMenu: ({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+
 vi.mock('@/components/molecules/ConfirmDialog', () => ({
   ConfirmDialog: ({
     open,

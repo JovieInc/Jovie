@@ -22,7 +22,7 @@ const baseRelease: ReleaseViewModel = {
   slug: 'skyline-dreams',
   releaseType: 'single',
   isExplicit: false,
-  releaseDate: '2026-01-01',
+  releaseDate: '2026-06-15',
   artworkUrl: undefined,
   totalTracks: 1,
   providers: [],

@@ -18,6 +18,11 @@ vi.mock('@/lib/queries/useDashboardSocialLinksQuery', () => ({
 
 vi.mock('@/lib/queries', () => ({
   useProfileMutation: (...args: unknown[]) => mockUseProfileMutation(...args),
+  useDashboardSocialLinksQuery: (profileId: string) =>
+    mockUseDashboardSocialLinksQuery(profileId),
+  useSaveSocialLinksMutation: (profileId: string) =>
+    mockUseSaveSocialLinksMutation(profileId),
+  useDspMatchesQuery: () => ({ data: [], isLoading: false }),
 }));
 
 vi.mock('@/lib/queries/useDspMatchesQuery', () => ({

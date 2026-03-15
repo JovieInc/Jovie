@@ -31,6 +31,7 @@ const {
 
 vi.mock('@/lib/queries/fetch', () => ({
   createMutationFn: mockCreateMutationFnSpy,
+  createQueryFn: vi.fn(),
 }));
 
 vi.mock('@/lib/queries/mutation-utils', () => ({
@@ -43,6 +44,19 @@ vi.mock('@/lib/queries/keys', () => ({
     user: {
       all: ['user'] as const,
       settings: () => ['user', 'settings'] as const,
+    },
+    billing: {
+      all: ['billing'] as const,
+      status: () => ['billing', 'status'] as const,
+      subscription: () => ['billing', 'subscription'] as const,
+      invoices: () => ['billing', 'invoices'] as const,
+      pricingOptions: () => ['billing', 'pricing-options'] as const,
+    },
+    chat: {
+      all: ['chat'] as const,
+      conversations: () => ['chat', 'conversations'] as const,
+      conversation: (id: string) => ['chat', 'conversation', id] as const,
+      usage: () => ['chat', 'usage'] as const,
     },
   },
 }));
