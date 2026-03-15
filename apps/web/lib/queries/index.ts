@@ -102,6 +102,8 @@ export {
   type AdminLead,
   type AdminLeadKeyword,
   type AdminLeadListResponse,
+  type DiscoveryKeywordDiagnostic,
+  type DiscoveryResultResponse,
   type LeadPipelineSettings,
   useAddLeadKeywordsMutation,
   useDeleteLeadKeywordMutation,

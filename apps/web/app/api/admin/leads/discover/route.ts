@@ -13,6 +13,7 @@ export const maxDuration = 60;
 
 /**
  * POST /api/admin/leads/discover — Manually trigger one discovery cycle.
+ * Returns full per-keyword diagnostics so the UI can show search health.
  */
 export async function POST() {
   const entitlements = await getCurrentUserEntitlements();
@@ -48,6 +49,14 @@ export async function POST() {
     if (keywords.length === 0) {
       return NextResponse.json(
         { error: 'No keywords configured. Add keywords first.' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const enabledKeywords = keywords.filter(k => k.enabled);
+    if (enabledKeywords.length === 0) {
+      return NextResponse.json(
+        { error: 'All keywords are disabled. Enable at least one.' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }

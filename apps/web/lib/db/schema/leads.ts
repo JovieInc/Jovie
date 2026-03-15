@@ -155,6 +155,7 @@ export const discoveryKeywords = pgTable(
     enabled: boolean('enabled').default(true).notNull(),
     lastUsedAt: timestamp('last_used_at'),
     resultsFoundTotal: integer('results_found_total').default(0).notNull(),
+    searchOffset: integer('search_offset').default(1).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({

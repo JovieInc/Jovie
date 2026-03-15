@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 
 const PREFIX = '[OutreachPipeline]';
@@ -6,7 +7,7 @@ type LogData = Record<string, unknown>;
 
 /**
  * Structured info log for the outreach pipeline.
- * Always writes to console so logs are visible in Vercel/server output.
+ * Writes to console and adds a Sentry breadcrumb for traceability.
  */
 export function pipelineLog(
   stage: string,
@@ -15,6 +16,14 @@ export function pipelineLog(
 ): void {
   const payload = data ? ` ${JSON.stringify(data)}` : '';
   console.log(`${PREFIX}[${stage}] ${message}${payload}`);
+
+  // Add Sentry breadcrumb so info logs appear in error traces
+  Sentry.addBreadcrumb({
+    category: `pipeline.${stage}`,
+    message,
+    level: 'info',
+    data,
+  });
 }
 
 /**
@@ -26,6 +35,15 @@ export function pipelineWarn(
   data?: LogData
 ): void {
   const fullMessage = `${PREFIX}[${stage}] ${message}`;
+  console.warn(fullMessage, data ?? '');
+
+  Sentry.addBreadcrumb({
+    category: `pipeline.${stage}`,
+    message,
+    level: 'warning',
+    data,
+  });
+
   captureWarning(fullMessage, undefined, {
     route: `leads/${stage}`,
     ...data,
