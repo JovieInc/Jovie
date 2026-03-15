@@ -17,10 +17,8 @@ export function ArtistContactsButton({
 }: ArtistContactsButtonProps) {
   const {
     available,
-    performAction,
     onIconClick,
     primaryChannel,
-    buildTerritoryLabel,
     isEnabled,
   } = useArtistContacts({ contacts, artistHandle, onNavigate });
 
