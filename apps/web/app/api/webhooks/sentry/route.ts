@@ -27,7 +27,7 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const DEDUPE_TTL_SECONDS = 60;
-const DISPATCH_TIMEOUT_MS = 5000;
+const DISPATCH_TIMEOUT_MS = 10000;
 
 /** Stack frame from Sentry payload */
 interface SentryFrame {
