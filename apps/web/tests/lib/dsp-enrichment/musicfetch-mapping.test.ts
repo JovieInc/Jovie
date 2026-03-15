@@ -150,7 +150,7 @@ describe('extractMusicFetchLinks', () => {
       SIGNAL
     );
     for (const link of links) {
-      expect(link.evidence.signals).toContain(SIGNAL);
+      expect(link.evidence?.signals).toContain(SIGNAL);
     }
   });
 
