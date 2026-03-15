@@ -16,8 +16,19 @@ function mockMatchMedia(matches: boolean) {
 }
 
 describe('DesktopQrOverlay', () => {
+  let imageSrcSetter: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.stubGlobal('matchMedia', mockMatchMedia(true));
+    imageSrcSetter = vi.fn();
+    vi.stubGlobal(
+      'Image',
+      class {
+        set src(value: string) {
+          imageSrcSetter(value);
+        }
+      }
+    );
     localStorage.clear();
   });
 
@@ -29,6 +40,15 @@ describe('DesktopQrOverlay', () => {
     render(<DesktopQrOverlay handle='tim' />);
     expect(screen.getByLabelText('View on mobile')).toBeInTheDocument();
     expect(screen.queryByAltText('Scan to view on mobile')).toBeNull();
+  });
+
+  it('preloads the QR image URL on mount', () => {
+    render(<DesktopQrOverlay handle='tim' />);
+    expect(imageSrcSetter).toHaveBeenCalledWith(
+      expect.stringContaining(
+        encodeURIComponent(`${globalThis.location.origin}/tim`)
+      )
+    );
   });
 
   it('opens QR code when icon is clicked', async () => {
