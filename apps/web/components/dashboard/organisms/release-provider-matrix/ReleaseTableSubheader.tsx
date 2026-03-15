@@ -13,6 +13,7 @@ import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { DrawerToggleButton } from '@/components/dashboard/atoms/DrawerToggleButton';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -297,6 +298,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
+      className='border-b border-(--linear-app-frame-seam)/80 bg-(--linear-app-content-surface)/95 backdrop-blur supports-[backdrop-filter]:bg-(--linear-app-content-surface)/90'
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons
@@ -336,6 +338,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
+            className='h-7 w-7 rounded-[6px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+          />
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
             className='h-7 w-7 rounded-[6px] px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>

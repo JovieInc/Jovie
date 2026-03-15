@@ -57,6 +57,7 @@ export interface TrackSidebarData {
 export interface TrackSidebarProps {
   readonly track: TrackSidebarData | null;
   readonly isOpen: boolean;
+  readonly width?: number;
   readonly onClose: () => void;
   readonly onBackToRelease?: (releaseId: string) => void;
 }
@@ -64,6 +65,7 @@ export interface TrackSidebarProps {
 export function TrackSidebar({
   track,
   isOpen,
+  width,
   onClose,
   onBackToRelease,
 }: TrackSidebarProps) {
@@ -153,6 +155,7 @@ export function TrackSidebar({
   return (
     <EntitySidebarShell
       isOpen={isOpen}
+      width={width}
       ariaLabel='Track details'
       data-testid='track-sidebar'
       title={track?.title ?? 'No track selected'}
