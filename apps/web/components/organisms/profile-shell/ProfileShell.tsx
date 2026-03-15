@@ -1,7 +1,7 @@
 'use client';
 
 import { Calendar, DollarSign } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
@@ -58,6 +58,7 @@ export function ProfileShell({
   });
 
   const isMobile = useBreakpointDown('md');
+  const router = useRouter();
   const [tipDrawerOpen, setTipDrawerOpen] = useState(false);
 
   // Fire tip_page_view pixel event when tip mode is active on page load
@@ -216,11 +217,11 @@ export function ProfileShell({
                               ? 'border-subtle bg-surface-1 text-primary-token'
                               : 'border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
                           }`}
-                          asChild
+                          onClick={() => {
+                            router.push(`/${artist.handle}?mode=tour`);
+                          }}
                         >
-                          <Link href={`/${artist.handle}?mode=tour`}>
-                            <Calendar className='h-4 w-4' aria-hidden='true' />
-                          </Link>
+                          <Calendar className='h-4 w-4' aria-hidden='true' />
                         </CircleIconButton>
                       )}
 
@@ -266,14 +267,14 @@ export function ProfileShell({
                             className={`border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token${isTipModeActive ? ' invisible' : ''}`}
                             aria-hidden={isTipModeActive || undefined}
                             tabIndex={isTipModeActive ? -1 : undefined}
-                            asChild
+                            onClick={() => {
+                              router.push(`/${artist.handle}?mode=tip`);
+                            }}
                           >
-                            <Link href={`/${artist.handle}?mode=tip`}>
-                              <DollarSign
-                                className='h-4 w-4'
-                                aria-hidden='true'
-                              />
-                            </Link>
+                            <DollarSign
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
                           </CircleIconButton>
                         ))}
                       {(!mode || mode === 'profile') &&
