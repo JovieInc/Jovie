@@ -286,24 +286,24 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-5xl gap-8 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-12'
+      className='mx-auto grid w-full max-w-[1020px] gap-6 pb-6 lg:grid-cols-[170px_minmax(0,700px)] lg:justify-center lg:gap-10'
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-5 lg:self-start'>
         <SettingsSidebar groups={sectionGroups} />
       </div>
 
-      <div className='space-y-10'>
+      <div className='space-y-8'>
         {sectionGroups.map(group => (
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
-            className='px-1'
+            className='mx-auto w-full max-w-[700px] px-1'
           >
-            <h3 className='mb-5 px-1 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <h3 className='mb-4 px-1 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </h3>
-            <div className='space-y-8'>
+            <div className='space-y-6'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

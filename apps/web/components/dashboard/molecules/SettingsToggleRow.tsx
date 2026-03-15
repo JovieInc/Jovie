@@ -38,11 +38,11 @@ export function SettingsToggleRow({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4 sm:gap-8',
+        'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 py-1.5 sm:gap-x-6',
         className
       )}
     >
-      <div className='flex-1 min-w-0'>
+      <div className='min-w-0'>
         <h3
           id={titleId}
           className={cn(
@@ -65,7 +65,7 @@ export function SettingsToggleRow({
         ) : null}
       </div>
 
-      <div className='shrink-0 pt-0.5'>
+      <div className='flex min-h-8 items-center justify-end'>
         {gated ? (
           <SettingsPlanGateLabel planName={gatePlanName} />
         ) : (
