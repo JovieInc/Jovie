@@ -288,6 +288,7 @@ export function ReleaseSidebar({
   release,
   mode,
   isOpen,
+  width,
   providerConfig,
   artistName,
   onClose,
@@ -445,6 +446,7 @@ export function ReleaseSidebar({
   return (
     <EntitySidebarShell
       isOpen={isOpen}
+      width={width}
       ariaLabel='Release details'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
