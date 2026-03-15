@@ -19,7 +19,7 @@ const MUSIC_PLATFORM_IDS = new Set([
 function inferPlatformType(
   platformType: string | null | undefined,
   platform: string | null | undefined
-): 'music' | 'social' | string {
+): string {
   const normalizedPlatformType = platformType?.toLowerCase();
   if (normalizedPlatformType) {
     return normalizedPlatformType;
