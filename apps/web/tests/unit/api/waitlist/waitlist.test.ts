@@ -12,6 +12,12 @@ const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockDbExecute = vi.hoisted(() => vi.fn());
 const mockDbTransaction = vi.hoisted(() => vi.fn());
+const mockSendNotification = vi.hoisted(() => vi.fn());
+const mockBuildWaitlistInviteEmail = vi.hoisted(() => vi.fn());
+const mockTryReserveAutoAcceptSlot = vi.hoisted(() => vi.fn());
+const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
+const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
+const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -41,6 +47,33 @@ vi.mock('@/lib/error-tracking', () => ({
     debugMessage: debug,
     ...opts,
   })),
+  captureError: vi.fn().mockResolvedValue(undefined),
+  captureCriticalError: mockCaptureCriticalError,
+}));
+
+vi.mock('@/lib/notifications/service', () => ({
+  sendNotification: mockSendNotification,
+}));
+
+vi.mock('@/lib/waitlist/invite', () => ({
+  buildWaitlistInviteEmail: mockBuildWaitlistInviteEmail,
+}));
+
+vi.mock('@/lib/waitlist/settings', () => ({
+  tryReserveAutoAcceptSlot: mockTryReserveAutoAcceptSlot,
+}));
+
+vi.mock('@/lib/ingestion/session', () => ({
+  withSystemIngestionSession: mockWithSystemIngestionSession,
+}));
+
+vi.mock('@/lib/waitlist/approval', () => ({
+  approveWaitlistEntryInTx: vi.fn(),
+  finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
+}));
+
+vi.mock('@/lib/notifications/providers/slack', () => ({
+  notifySlackWaitlist: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/onboarding/rate-limit', () => ({
@@ -113,6 +146,23 @@ describe('Waitlist API', () => {
         selectResult: [],
         insertReturn: [{ id: 'entry_123' }],
       })
+    );
+
+    // Default: no auto-accept slot available
+    mockTryReserveAutoAcceptSlot.mockResolvedValue({ shouldAutoAccept: false });
+    mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
+    mockCaptureCriticalError.mockResolvedValue(undefined);
+    mockBuildWaitlistInviteEmail.mockReturnValue({
+      message: {
+        id: 'waitlist_welcome:profile_auto',
+        subject: "You're off the waitlist!",
+      },
+      target: { email: 'test@example.com' },
+      inviteUrl: 'https://example.com/signin',
+    });
+    mockSendNotification.mockResolvedValue({ delivered: ['email'] });
+    mockWithSystemIngestionSession.mockImplementation(
+      async (fn: (tx: unknown) => unknown) => fn({})
     );
   });
 
@@ -264,6 +314,194 @@ describe('Waitlist API', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.status).toBe('new');
+    });
+
+    it('sends welcome email when auto-approval succeeds', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_auto' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'auto@example.com' }],
+        fullName: 'Auto User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+
+      // No existing entry
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+      // Insert entry returns an id
+      const mockReturning = vi.fn().mockResolvedValue([{ id: 'entry_auto' }]);
+      const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+      mockDbInsert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: mockReturning,
+          onConflictDoUpdate: mockOnConflict,
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      // Auto-accept slot available
+      mockTryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+      });
+
+      // Approval succeeds
+      mockWithSystemIngestionSession.mockResolvedValue({
+        outcome: 'approved',
+        profileId: 'profile_auto',
+        email: 'auto@example.com',
+        fullName: 'Auto User',
+        clerkId: 'clerk_auto',
+      });
+
+      const { POST } = await import('@/app/api/waitlist/route');
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/autouser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('claimed');
+      expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
+
+      // Allow fire-and-forget to settle
+      await vi.waitFor(() => {
+        expect(mockSendNotification).toHaveBeenCalled();
+      });
+      expect(mockBuildWaitlistInviteEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'auto@example.com',
+          fullName: 'Auto User',
+          dedupKey: 'waitlist_welcome:profile_auto',
+        })
+      );
+    });
+
+    it('does not send welcome email when auto-approval slot is not available', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_no_slot' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'noslot@example.com' }],
+        fullName: 'No Slot User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+      const mockReturning = vi.fn().mockResolvedValue([{ id: 'entry_noslot' }]);
+      const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+      mockDbInsert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: mockReturning,
+          onConflictDoUpdate: mockOnConflict,
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      // No auto-accept slot
+      mockTryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: false,
+      });
+
+      const { POST } = await import('@/app/api/waitlist/route');
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/noslotuser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('new');
+      expect(mockSendNotification).not.toHaveBeenCalled();
+      expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    });
+
+    it('captures critical error and returns new status when auto-approval yields no_profile', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_noprofile' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'noprofile@example.com' }],
+        fullName: 'No Profile User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+      const mockReturning = vi
+        .fn()
+        .mockResolvedValue([{ id: 'entry_noprofile' }]);
+      const mockOnConflict = vi.fn().mockResolvedValue(undefined);
+      mockDbInsert.mockReturnValue({
+        values: vi.fn().mockReturnValue({
+          returning: mockReturning,
+          onConflictDoUpdate: mockOnConflict,
+        }),
+      });
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue(undefined),
+        }),
+      });
+
+      mockTryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+      });
+      mockWithSystemIngestionSession.mockResolvedValue({
+        outcome: 'no_profile',
+      });
+
+      const { POST } = await import('@/app/api/waitlist/route');
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/noprofileuser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.status).toBe('new');
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        expect.stringContaining('no_profile'),
+        expect.any(Error),
+        expect.any(Object)
+      );
+      expect(mockSendNotification).not.toHaveBeenCalled();
     });
 
     it.skip('sets users.userStatus to waitlist_pending after submission', async () => {
