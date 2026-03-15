@@ -12,7 +12,9 @@ type ConfidenceSignal =
   | 'youtube_official_artist'
   | 'instagram_bio'
   | 'spotify_presence'
-  | 'handle_similarity';
+  | 'handle_similarity'
+  | 'musicfetch_artist_lookup'
+  | 'onboarding_enrichment';
 
 const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   manual_user: 0.6,
@@ -27,6 +29,10 @@ const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   instagram_bio: 0.25,
   spotify_presence: 0.3,
   handle_similarity: 0.15,
+  // MusicFetch authoritative enrichment — links from verified Spotify artist lookup
+  // are high-confidence and should be immediately active in the drawer
+  musicfetch_artist_lookup: 0.8,
+  onboarding_enrichment: 0.8,
 };
 
 const SOURCE_BONUS = 0.15;
