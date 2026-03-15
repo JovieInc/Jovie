@@ -1,4 +1,4 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -69,12 +69,38 @@ export async function approveWaitlistEntryInTx(
     );
   }
 
+  const [existingClaimedProfile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.userId, user.id),
+        eq(creatorProfiles.isClaimed, true),
+        ne(creatorProfiles.id, profile.id)
+      )
+    )
+    .for('update')
+    .limit(1);
+
+  if (existingClaimedProfile) {
+    await tx
+      .update(creatorProfiles)
+      .set({
+        userId: null,
+        isClaimed: false,
+        onboardingCompletedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(creatorProfiles.id, existingClaimedProfile.id));
+  }
+
   await tx
     .update(creatorProfiles)
     .set({
       userId: user.id,
       isClaimed: true,
       isPublic: true,
+      claimedAt: now,
       onboardingCompletedAt: now,
       updatedAt: now,
     })
