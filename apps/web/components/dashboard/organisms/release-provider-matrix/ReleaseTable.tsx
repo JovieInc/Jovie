@@ -137,10 +137,10 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_56%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_68%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_48%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_52%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_80%,var(--linear-bg-surface-0))]';
       } else {
         baseClassName =
           'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_75%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
@@ -155,7 +155,7 @@ export function ReleaseTable({
 
       return [
         'rounded-none',
-        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_38%,transparent)]',
+        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_26%,transparent)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
