@@ -137,7 +137,7 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_56%,transparent)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_56%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_64%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_68%,transparent)]';
       } else if (isRowExpanded) {
         baseClassName =
           'bg-(--linear-bg-surface-1) hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1)';
