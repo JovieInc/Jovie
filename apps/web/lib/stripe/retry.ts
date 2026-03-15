@@ -72,7 +72,7 @@ export function isTransientStripeError(error: unknown): boolean {
 
 function jitteredDelay(baseMs: number): Promise<void> {
   // Add +-25% jitter to prevent thundering herd on concurrent retries
-  const jitter = baseMs * 0.25 * (2 * Math.random() - 1);
+  const jitter = baseMs * 0.25 * (2 * Math.random() - 1); // NOSONAR (S2245) - Non-security use: retry backoff jitter (±25%) to prevent thundering herd
   const ms = Math.max(0, Math.round(baseMs + jitter));
   return new Promise(resolve => globalThis.setTimeout(resolve, ms));
 }

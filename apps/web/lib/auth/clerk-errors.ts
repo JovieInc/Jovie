@@ -8,7 +8,7 @@ import * as Sentry from '@sentry/nextjs';
 const CLERK_ERROR_MESSAGES: Record<string, string> = {
   // Sign-in errors
   form_identifier_not_found: "We couldn't find an account with that email.",
-  form_password_incorrect: 'Incorrect password. Please try again.',
+  form_password_incorrect: 'Incorrect password. Please try again.', // NOSONAR (S2068) - Not a credential: Clerk API error code mapped to a user-facing message string
   form_code_incorrect: 'That code is incorrect. Please check and try again.',
   verification_expired:
     'Your verification code has expired. Please request a new one.',

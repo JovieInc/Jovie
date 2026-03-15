@@ -48,7 +48,7 @@ function makeTempId(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return crypto.randomUUID();
   }
-  return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `temp-${Date.now()}-${Math.random().toString(16).slice(2)}`; // NOSONAR (S2245) - Non-security use: fallback temp ID when crypto.randomUUID() unavailable (SSR)
 }
 
 /**

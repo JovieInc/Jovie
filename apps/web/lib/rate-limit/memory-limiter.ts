@@ -66,6 +66,7 @@ export class MemoryRateLimiter {
 
     // Probabilistic cleanup (10% chance per request)
     if (Math.random() < 0.1) {
+      // NOSONAR (S2245) - Non-security use: probabilistic in-memory cleanup (10% chance per request)
       cleanupExpiredEntries();
     }
 

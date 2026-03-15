@@ -211,7 +211,7 @@ async function uploadAvatarFile(
  */
 function backoffDelay(attempt: number): Promise<void> {
   const baseDelay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-  const jitter = Math.floor(Math.random() * baseDelay * 0.3);
+  const jitter = Math.floor(Math.random() * baseDelay * 0.3); // NOSONAR (S2245) - Non-security use: retry backoff jitter (30%) to prevent thundering herd
   return new Promise(resolve => setTimeout(resolve, baseDelay + jitter));
 }
 

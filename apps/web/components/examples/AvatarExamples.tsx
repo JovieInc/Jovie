@@ -55,7 +55,7 @@ export function DashboardAvatarExample() {
           clearInterval(progressInterval);
           return 90;
         }
-        return prev + Math.random() * 15;
+        return prev + Math.random() * 15; // NOSONAR (S2245) - Non-security use: simulated upload progress bar animation
       });
     }, 100);
 

@@ -153,7 +153,7 @@ function PlatformSuggestionItem({
   );
 }
 
-const randomWaveformLevel = () => 0.3 + Math.random() * 0.7;
+const randomWaveformLevel = () => 0.3 + Math.random() * 0.7; // NOSONAR (S2245) - Non-security use: audio waveform visual bar height randomization
 
 export const UniversalLinkInput = forwardRef<
   UniversalLinkInputRef,

@@ -63,7 +63,7 @@ const ROLE_PREFIXES = [
   'no-reply',
 ];
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // NOSONAR (S5852) - ReDoS bounded by email.length > 254 check applied before this regex
 
 const CONSONANTS_AND_DIGITS = /[^aeiou\s@.]/gi;
 
