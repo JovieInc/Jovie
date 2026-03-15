@@ -34,8 +34,8 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     return (
       <div
         className={cn(
-          'flex h-[28px] items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
-          'text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-tertiary) select-none transition-[background-color,border-color,color] duration-150'
+          'flex h-[28px] items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,transparent)] px-2.5',
+          'text-[11px] font-[430] tracking-[-0.01em] text-(--linear-text-tertiary) select-none transition-[background-color,border-color,color] duration-150'
         )}
         title={
           isScheduled
@@ -61,7 +61,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
       url={smartLinkUrl}
       displayValue={release.smartLinkPath}
       size='sm'
-      className='w-full min-w-0 max-w-[172px] md:max-w-[188px] lg:max-w-[216px] xl:max-w-[246px]'
+      className='w-full min-w-0 max-w-[188px] md:max-w-[214px] lg:max-w-[248px] xl:max-w-[294px]'
       onCopySuccess={handleCopySuccess}
       copyButtonTitle='Copy smart link'
       openButtonTitle='Open smart link'
