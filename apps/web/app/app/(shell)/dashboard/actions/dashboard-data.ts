@@ -561,8 +561,8 @@ async function fetchTippingStatsWithSession(
       () =>
         tx
           .select({
-            qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
-            link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
+            qr: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'qr')`,
+            link: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'link')`,
           })
           .from(clickEvents)
           .where(
