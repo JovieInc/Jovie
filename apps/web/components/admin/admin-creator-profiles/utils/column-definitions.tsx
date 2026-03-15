@@ -18,7 +18,6 @@ import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   renderAvatarCell,
   renderCreatedDateCell,
-  renderMusicLinksCell,
   renderSocialLinksCell,
 } from './column-renderers';
 
@@ -86,7 +85,7 @@ export function createCreatorProfileColumns({
       id: 'avatar',
       header: 'Creator',
       cell: renderAvatarCell,
-      size: 280,
+      size: 420,
     }),
 
     // Social Media Links column
@@ -94,23 +93,14 @@ export function createCreatorProfileColumns({
       id: 'social',
       header: 'Social',
       cell: renderSocialLinksCell,
-      size: 220,
+      size: 150,
     }),
-
-    // Music Streaming Links column
-    columnHelper.accessor('socialLinks', {
-      id: 'music',
-      header: 'Music',
-      cell: renderMusicLinksCell,
-      size: 220,
-    }),
-
     // Created Date column
     columnHelper.accessor('createdAt', {
       id: 'created',
       header: 'Created',
       cell: renderCreatedDateCell,
-      size: 180,
+      size: 120,
     }),
 
     // Actions column - shows ellipsis menu with SAME items as right-click context menu
@@ -128,7 +118,7 @@ export function createCreatorProfileColumns({
           </div>
         );
       },
-      size: 48,
+      size: 64,
     }),
   ] as ColumnDef<AdminCreatorProfileRow, unknown>[];
 }

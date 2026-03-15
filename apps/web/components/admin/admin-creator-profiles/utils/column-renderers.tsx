@@ -1,5 +1,5 @@
 import type { CellContext } from '@tanstack/react-table';
-import { CalendarDays, Copy, ExternalLink } from 'lucide-react';
+import { Copy, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
@@ -104,11 +104,7 @@ export function renderCreatedDateCell({
   const createdAt = row.original.createdAt;
 
   return (
-    <span className='inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-[450] tabular-nums text-(--linear-text-secondary)'>
-      <CalendarDays
-        className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
-        aria-hidden='true'
-      />
+    <span className='whitespace-nowrap text-[11px] font-[450] tabular-nums text-(--linear-text-tertiary)'>
       {createdAt
         ? createdAt.toLocaleDateString('en-US', {
             month: 'short',
