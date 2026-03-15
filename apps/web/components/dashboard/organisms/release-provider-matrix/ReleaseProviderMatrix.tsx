@@ -105,7 +105,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   // Apple Music connection state
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
-  const [_amArtistName, setAmArtistName] = useState(appleMusicArtistName);
+
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
 
   const {
@@ -375,7 +375,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         });
         if (result.success) {
           setIsAmConnected(true);
-          setAmArtistName(result.artistName);
           toast.success(result.message);
         } else {
           toast.error(result.message);
@@ -392,9 +391,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   );
 
   const handleMatchStatusChange = useCallback(
-    (connected: boolean, name: string | null) => {
+    (connected: boolean, _name: string | null) => {
       setIsAmConnected(connected);
-      setAmArtistName(name);
     },
     []
   );
