@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 import { discoveryKeywords, leadPipelineSettings } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
-import { runDiscovery } from '@/lib/leads/discovery';
+import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -43,6 +43,9 @@ export async function POST() {
         .values({ id: 1 })
         .returning();
     }
+
+    // Reset daily query budget if past reset time (or never initialized)
+    settings = await resetBudgetIfNeeded(settings);
 
     const keywords = await db.select().from(discoveryKeywords);
 

@@ -94,6 +94,49 @@ async function insertCandidates(
  */
 const GOOGLE_CSE_MAX_START_INDEX = 91;
 
+/**
+ * Resets the daily query budget if the reset time has passed (or was never set).
+ * Returns a fresh copy of settings with zeroed counters if a reset occurred.
+ *
+ * Uses UTC midnight so the reset time is deterministic regardless of server timezone.
+ */
+export async function resetBudgetIfNeeded(
+  settings: LeadPipelineSettings
+): Promise<LeadPipelineSettings> {
+  const now = new Date();
+
+  // Compute next UTC midnight
+  const nextMidnightUtc = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1)
+  );
+
+  const needsReset =
+    !settings.queryBudgetResetsAt || now > settings.queryBudgetResetsAt;
+
+  if (!needsReset) return settings;
+
+  pipelineLog('discovery', 'Resetting daily query budget', {
+    previousUsed: settings.queriesUsedToday,
+    previousResetAt: settings.queryBudgetResetsAt?.toISOString() ?? null,
+    newResetAt: nextMidnightUtc.toISOString(),
+  });
+
+  await db
+    .update(leadPipelineSettings)
+    .set({
+      queriesUsedToday: 0,
+      queryBudgetResetsAt: nextMidnightUtc,
+      updatedAt: now,
+    })
+    .where(eq(leadPipelineSettings.id, 1));
+
+  return {
+    ...settings,
+    queriesUsedToday: 0,
+    queryBudgetResetsAt: nextMidnightUtc,
+  };
+}
+
 export interface KeywordDiagnostic {
   keywordId: string;
   query: string;
