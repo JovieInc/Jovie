@@ -115,7 +115,7 @@ describe('GET /api/admin/outreach', () => {
                 offset: vi
                   .fn()
                   .mockRejectedValue(
-                    new Error('column "spotify_popularity" does not exist')
+                    new Error('column "music_tools_detected" does not exist')
                   ),
               })),
             })),
