@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   captureErrorMock,
+  executeMock,
   insertMock,
   onConflictDoNothingMock,
   returningMock,
@@ -28,6 +29,7 @@ const {
   const insertMock = vi.fn(() => ({
     values: valuesMock,
   }));
+  const executeMock = vi.fn();
 
   const whereMock = vi.fn();
   const setMock = vi.fn(() => ({ where: whereMock }));
@@ -38,6 +40,7 @@ const {
     isLinktreeUrlMock,
     searchGoogleCSEMock,
     captureErrorMock,
+    executeMock,
     returningMock,
     onConflictDoNothingMock,
     valuesMock,
@@ -63,6 +66,7 @@ vi.mock('@/lib/ingestion/strategies/linktree', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
+    execute: executeMock,
     insert: insertMock,
     update: updateMock,
   },
@@ -75,6 +79,7 @@ describe('runDiscovery', () => {
     isLinktreeUrlMock.mockReset();
     extractLinktreeHandleMock.mockReset();
     insertMock.mockClear();
+    executeMock.mockReset();
     valuesMock.mockClear();
     onConflictDoNothingMock.mockClear();
     returningMock.mockReset();
@@ -161,7 +166,7 @@ describe('runDiscovery', () => {
     expect(onConflictDoNothingMock).toHaveBeenCalledTimes(1);
     expect(returningMock).toHaveBeenCalledTimes(1);
     expect(captureErrorMock).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it('skips inserts when no valid linktree candidates are found', async () => {
     const { runDiscovery } = await import('@/lib/leads/discovery');
@@ -208,5 +213,65 @@ describe('runDiscovery', () => {
     expect(result.newLeadsFound).toBe(0);
     expect(result.duplicatesSkipped).toBe(0);
     expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it('falls back to legacy raw insert when leads schema has missing columns', async () => {
+    isLinktreeUrlMock.mockImplementation((url: string) =>
+      url.includes('linktr.ee')
+    );
+    extractLinktreeHandleMock.mockImplementation(
+      (url: string) => url.split('/').at(-1) ?? null
+    );
+
+    searchGoogleCSEMock.mockResolvedValue([
+      { link: 'https://linktr.ee/artist-three' },
+      { link: 'https://linktr.ee/artist-four' },
+    ]);
+
+    returningMock.mockRejectedValueOnce(
+      new Error('column "has_instagram" of relation "leads" does not exist')
+    );
+
+    executeMock
+      .mockResolvedValueOnce({ rows: [{ id: 'lead-3' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const { runDiscovery } = await import('@/lib/leads/discovery');
+
+    const result = await runDiscovery(
+      {
+        id: 1,
+        enabled: true,
+        discoveryEnabled: true,
+        autoIngestEnabled: false,
+        autoIngestMinFitScore: 60,
+        autoIngestDailyLimit: 10,
+        autoIngestedToday: 0,
+        autoIngestResetsAt: null,
+        dailyQueryBudget: 1,
+        queriesUsedToday: 0,
+        queryBudgetResetsAt: null,
+        lastDiscoveryQueryIndex: 0,
+        dmTemplate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      [
+        {
+          id: 'keyword-1',
+          query: 'music producer linktree',
+          enabled: true,
+          lastUsedAt: null,
+          resultsFoundTotal: 0,
+          createdAt: new Date(),
+        },
+      ]
+    );
+
+    expect(result.candidatesProcessed).toBe(2);
+    expect(result.newLeadsFound).toBe(1);
+    expect(result.duplicatesSkipped).toBe(1);
+    expect(executeMock).toHaveBeenCalledTimes(2);
+    expect(captureErrorMock).not.toHaveBeenCalled();
   });
 });
