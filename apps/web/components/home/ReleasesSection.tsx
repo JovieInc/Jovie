@@ -80,7 +80,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
         </div>
-        <div className='flex-1 text-center text-[11px] text-[var(--linear-text-tertiary)]'>
+        <div className='flex-1 text-center text-xs text-[var(--linear-text-tertiary)]'>
           Jovie - Releases
         </div>
         <div className='w-[52px]' />
@@ -127,7 +127,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
 
             <div className='min-w-0'>
               <div className='flex items-center gap-2'>
-                <p className='truncate text-[13px] font-medium text-[var(--linear-text-primary)]'>
+                <p className='truncate text-sm font-medium text-[var(--linear-text-primary)]'>
                   {release.title}
                 </p>
                 {release.isNew && (
@@ -136,7 +136,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
                   </span>
                 )}
               </div>
-              <p className='text-[11px] text-[var(--linear-text-tertiary)]'>
+              <p className='text-xs text-[var(--linear-text-tertiary)]'>
                 {release.type} - {release.year}
               </p>
             </div>
@@ -166,7 +166,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
                 <path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' />
               </svg>
               <span
-                className='font-mono text-[11px] transition-colors duration-300'
+                className='font-mono text-xs transition-colors duration-300'
                 style={{
                   color: isActive
                     ? 'var(--linear-text-secondary)'
@@ -181,7 +181,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
       })}
 
       <div className='flex items-center justify-center px-5 py-3'>
-        <p className='text-[11px] text-[var(--linear-text-quaternary)]'>
+        <p className='text-xs text-[var(--linear-text-quaternary)]'>
           + every past and future release, automatically
         </p>
       </div>
@@ -226,7 +226,7 @@ function ReleasePhone({
         <p className='text-[15px] font-semibold tracking-tight text-[var(--linear-text-primary)]'>
           {release.title}
         </p>
-        <p className='mt-0.5 text-[12px] text-[var(--linear-text-tertiary)]'>
+        <p className='mt-0.5 text-xs text-[var(--linear-text-tertiary)]'>
           Tim White
         </p>
       </div>
@@ -280,7 +280,7 @@ export function ReleasesSection() {
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           <div className='reveal-on-scroll flex flex-col gap-5'>
-            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-[var(--linear-border-subtle)] px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)]'>
+            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-[var(--linear-border-subtle)] px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)]'>
               <Zap className='h-3 w-3' aria-hidden='true' />
               Automatic
             </span>
@@ -290,9 +290,8 @@ export function ReleasesSection() {
                 Every release gets a smart link and a built-in launch flow.
               </h2>
               <p className='max-w-md marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Connect Spotify once and Jovie creates smart links for your
-                catalog, updates new releases automatically, and notifies fans
-                when something drops.
+                Connect Spotify once. Jovie handles the rest — smart links,
+                release updates, and fan notifications.
               </p>
             </div>
           </div>
@@ -304,7 +303,7 @@ export function ReleasesSection() {
             {RELEASE_PROOF_POINTS.map(point => (
               <span
                 key={point}
-                className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-3 py-1.5 text-[12px] font-medium text-[var(--linear-text-secondary)]'
+                className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-3 py-1.5 text-xs font-medium text-[var(--linear-text-secondary)]'
               >
                 {point}
               </span>
@@ -320,7 +319,7 @@ export function ReleasesSection() {
                 key={release.id}
                 type='button'
                 onClick={() => setActiveIndex(i)}
-                className='flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition-all duration-300'
+                className='flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300'
                 style={{
                   backgroundColor:
                     i === activeIndex
@@ -338,7 +337,7 @@ export function ReleasesSection() {
                 )}
                 {release.title}
                 <span
-                  className='text-[11px]'
+                  className='text-xs'
                   style={{
                     color:
                       i === activeIndex
@@ -381,10 +380,10 @@ export function ReleasesSection() {
                 />
               </div>
               <div>
-                <p className='text-[13px] font-medium text-[var(--linear-text-primary)]'>
+                <p className='text-sm font-medium text-[var(--linear-text-primary)]'>
                   Launch without rebuilding assets every release.
                 </p>
-                <p className='text-[12px] text-[var(--linear-text-tertiary)]'>
+                <p className='text-xs text-[var(--linear-text-tertiary)]'>
                   Smart links, release pages, and fan notifications stay ready
                   for every drop.
                 </p>
@@ -398,10 +397,10 @@ export function ReleasesSection() {
                   aria-hidden='true'
                 />
               </span>
-              <span className='text-[13px] font-medium text-emerald-400/90'>
+              <span className='text-sm font-medium text-emerald-400/90'>
                 4,218 fans notified
               </span>
-              <span className='text-[12px] text-[var(--linear-text-quaternary)]'>
+              <span className='text-xs text-[var(--linear-text-quaternary)]'>
                 captured from your profile
               </span>
             </div>

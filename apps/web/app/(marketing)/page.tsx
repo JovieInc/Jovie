@@ -18,7 +18,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
   const description =
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.';
+    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -140,7 +140,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
+    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -169,7 +169,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'A conversion-first profile platform for artists to capture fan contacts and drive clear next actions.',
+    'A conversion-first profile platform for artists to grow their audience and drive clear next actions.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -207,7 +207,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie gives artists one smart profile that captures fan emails, routes each visitor to the right next step, and keeps release growth working automatically.',
+    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -241,33 +241,31 @@ export default function HomePage() {
 
       <AudienceCRMSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
       <DeeplinksGrid />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
+      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
+        <hr
+          className='mx-auto max-w-lg border-0 h-px'
+          style={{
+            background:
+              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+          }}
+        />
+      )}
 
-      <ReleasesSection />
+      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
+        <ReleasesSection />
+      )}
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
+      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
+        <hr
+          className='mx-auto max-w-lg border-0 h-px'
+          style={{
+            background:
+              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+          }}
+        />
+      )}
 
       <PricingSection />
 
@@ -280,14 +278,6 @@ export default function HomePage() {
       />
 
       <SeeItInAction />
-
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
 
       <FinalCTASection />
 
