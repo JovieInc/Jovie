@@ -203,7 +203,7 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-9 w-9 items-center justify-center rounded-[8px] bg-surface-1/30',
+            'mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-surface-1/30',
             styles.iconWrapper
           )}
           aria-hidden='true'

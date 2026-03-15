@@ -38,6 +38,9 @@ describe('EmptyState', () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/add content/i)).toBeInTheDocument();
     expect(screen.getByTestId('test-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('test-icon').parentElement?.className).toContain(
+      'h-8'
+    );
   });
 
   it('invokes primary action callback when clicked', () => {

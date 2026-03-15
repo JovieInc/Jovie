@@ -17,6 +17,9 @@ describe('StarterEmptyState', () => {
     expect(
       screen.getByText('Add your first item to get started.')
     ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('starter-empty').querySelector('svg')
+    ).toHaveClass('h-5');
   });
 
   it('handles primary and secondary actions', () => {
