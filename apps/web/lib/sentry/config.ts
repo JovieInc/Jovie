@@ -190,6 +190,16 @@ const SENSITIVE_QUERY_PARAMS =
 const DEPLOYMENT_TRANSITION_PATTERN = /^.+ is not defined$/;
 
 /**
+ * Pattern matching stale server action IDs after deployment.
+ *
+ * When a deployment changes server action manifests, clients with stale
+ * JavaScript can reference an old action hash and trigger
+ * `UnrecognizedActionError` until refresh.
+ */
+const STALE_SERVER_ACTION_PATTERN =
+  /unrecognizedactionerror: server action ".+" was not found on the server\.?$/;
+
+/**
  * React/Next.js internal error patterns that are framework noise.
  *
  * These errors originate from React's concurrent rendering scheduler or
@@ -267,6 +277,10 @@ function isDeploymentTransitionError(event: SentryEvent): boolean {
     message.includes('loading chunk') ||
     message.includes('loading css chunk')
   ) {
+    return true;
+  }
+
+  if (STALE_SERVER_ACTION_PATTERN.test(message)) {
     return true;
   }
 

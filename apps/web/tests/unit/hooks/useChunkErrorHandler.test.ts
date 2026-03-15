@@ -135,6 +135,7 @@ describe('useChunkErrorHandler', () => {
     'Loading CSS chunk abc failed',
     "Couldn't find required dependency",
     'Failed to fetch dynamically imported module /foo.js',
+    'UnrecognizedActionError: Server Action "005a331209a8ea5b575bfbb0957bc1531f71788fae" was not found on the server.',
   ])('detects chunk error pattern: "%s"', async message => {
     renderHook(() => useChunkErrorHandler());
 
