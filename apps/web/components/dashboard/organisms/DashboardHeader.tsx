@@ -37,13 +37,13 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) supports-[backdrop-filter]:backdrop-blur-md',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)/95 supports-[backdrop-filter]:backdrop-blur-md',
         className
       )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
-      <div className='flex items-center justify-between px-4 pt-4 pb-2.5 sm:hidden'>
-        <h1 className='text-[22px] font-[590] tracking-[-0.022em] text-primary-token leading-tight'>
+      <div className='flex items-center justify-between px-4 pt-3 pb-2 sm:hidden'>
+        <h1 className='text-[20px] font-[570] tracking-[-0.018em] text-primary-token leading-tight'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
@@ -57,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1.5 px-[var(--linear-app-header-padding-x)] sm:flex'>
+      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1 px-[var(--linear-app-header-padding-x)] sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -72,21 +72,21 @@ export function DashboardHeader({
         {/* Desktop: Simplified breadcrumb - just current page */}
         <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.01em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[13.5px] font-[510] tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-[13px] font-[510] tracking-[-0.01em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[12px] text-(--linear-text-tertiary)'>
+              <span className='shrink-0 text-[11.5px] text-(--linear-text-tertiary)'>
                 {rootLabel}
               </span>
               <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
               {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-[12.5px] text-(--linear-text-secondary)'>
+                <div className='min-w-0 truncate text-[12px] text-(--linear-text-secondary)'>
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-[12.5px] font-[510] text-primary-token'>
+                <span className='truncate text-[12px] font-[510] text-primary-token'>
                   {currentLabel}
                 </span>
               )}
