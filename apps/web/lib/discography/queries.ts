@@ -780,9 +780,7 @@ export async function upsertTrack(input: {
       return result;
     }
 
-    if (
-      !isUniqueConstraintViolation(error, 'discog_tracks_release_isrc_unique')
-    ) {
+    if (!isUniqueConstraintViolation(error, 'discog_tracks_isrc_unique')) {
       throw error;
     }
 

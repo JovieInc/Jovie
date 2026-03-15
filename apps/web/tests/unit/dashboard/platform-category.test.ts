@@ -64,7 +64,7 @@ describe('getPlatformCategory', () => {
   });
 
   describe('MusicFetch-enriched platform routing (11 platforms)', () => {
-    it('routes all 9 MusicFetch DSP platforms to the Music tab', () => {
+    it('routes all 8 MusicFetch DSP platforms to the Music tab', () => {
       const dspFromMusicFetch = [
         'spotify',
         'apple_music',
