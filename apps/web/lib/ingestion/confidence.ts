@@ -13,6 +13,9 @@ type ConfidenceSignal =
   | 'instagram_bio'
   | 'spotify_presence'
   | 'handle_similarity'
+  | 'instagram_profile_link'
+  | 'tiktok_profile_link'
+  | 'twitter_profile_link'
   | 'musicfetch_artist_lookup'
   | 'onboarding_enrichment';
 
@@ -29,6 +32,11 @@ const SIGNAL_WEIGHTS: Record<ConfidenceSignal, number> = {
   instagram_bio: 0.25,
   spotify_presence: 0.3,
   handle_similarity: 0.15,
+  // Social profile scrapers — links extracted from an artist's own profile bio.
+  // Artist-authored but scraped, so suggested (not active) without additional signals.
+  instagram_profile_link: 0.3,
+  tiktok_profile_link: 0.3,
+  twitter_profile_link: 0.3,
   // MusicFetch authoritative enrichment — links from verified Spotify artist lookup
   // are high-confidence and should be immediately active in the drawer
   musicfetch_artist_lookup: 0.8,

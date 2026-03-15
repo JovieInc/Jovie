@@ -97,6 +97,26 @@ describe('computeLinkConfidence', () => {
     expect(result.confidence).toBeGreaterThanOrEqual(0.7);
   });
 
+  it.each([
+    ['instagram_profile_link', 'instagram', 'https://linktr.ee/artist'],
+    ['tiktok_profile_link', 'tiktok', 'https://open.spotify.com/artist/abc'],
+    ['twitter_profile_link', 'twitter', 'https://linktr.ee/artist'],
+  ])(
+    'scores %s links as suggested (artist-authored bio links)',
+    (signal, source, url) => {
+      const result = computeLinkConfidence({
+        sourceType: 'ingested',
+        signals: [signal],
+        sources: [source],
+        url,
+      });
+
+      expect(result.state).toBe('suggested');
+      expect(result.confidence).toBeGreaterThanOrEqual(0.3);
+      expect(result.confidence).toBeLessThan(0.7);
+    }
+  );
+
   it('unknown signals produce rejected state (no score boost)', () => {
     const result = computeLinkConfidence({
       sourceType: 'ingested',
