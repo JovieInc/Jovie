@@ -7,6 +7,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- Added `borders.focus`, `surfaces.tooltip`, and `text.tooltip` to typed design token objects in `@jovie/ui`
+- Re-exported all design token objects (`surfaces`, `text`, `borders`, `accent`, `buttons`, `interactive`, `status`, `featureAccents`, `sidebar`, `shadows`, `radii`, `spacing`, `typography`, `animation`) from `@jovie/ui` package index
+
 ### Fixed
 
 - Fixed infinite retry loop in `useProfileVisitTracking` and `useTipPageTracking` hooks where unstable `useMutation` references in `useEffect` dependency arrays caused 1000+ API requests per profile page load 
