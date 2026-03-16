@@ -71,6 +71,7 @@ export function useSpotifyConnect({
           spotifyArtistUrl: artistUrl,
           artistName: '',
           includeTracks,
+          skipMusicFetchEnrichment: true,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });
@@ -136,6 +137,7 @@ export function useSpotifyConnect({
           spotifyArtistUrl: artist.url,
           artistName: artist.name,
           includeTracks,
+          skipMusicFetchEnrichment: true,
         }).catch(() => {
           // Import failure is non-critical during onboarding
         });

@@ -21,6 +21,12 @@ export interface ProviderLink {
   provider_id?: string;
 }
 
+export interface ResolvedProviderLinks {
+  links: ProviderLink[];
+  /** Track lyrics from MusicFetch, if available */
+  lyrics?: string;
+}
+
 export interface TrackDescriptor {
   title: string;
   artistName: string;
@@ -263,8 +269,10 @@ async function runIsrcLookups(
   seenProviders: Set<ProviderKey>,
   links: ProviderLink[],
   options: { storefront: string; fetcher: typeof fetch }
-): Promise<void> {
-  if (!track.isrc) return;
+): Promise<string | undefined> {
+  if (!track.isrc) return undefined;
+
+  let discoveredLyrics: string | undefined;
 
   const lookupPromises: Promise<void>[] = [];
 
@@ -308,8 +316,12 @@ async function runIsrcLookups(
   // Musicfetch ISRC lookup (supplementary — resolves all other DSPs in one call)
   if (isMusicfetchAvailable()) {
     lookupPromises.push(
-      musicfetchLookupByIsrc(track.isrc).then(result => {
+      musicfetchLookupByIsrc(track.isrc, { withLyrics: true }).then(result => {
         if (!result) return;
+
+        if (result.lyrics) {
+          discoveredLyrics = result.lyrics;
+        }
 
         for (const [providerKey, url] of Object.entries(result.links)) {
           const key = providerKey as ProviderKey;
@@ -339,12 +351,14 @@ async function runIsrcLookups(
       });
     }
   }
+
+  return discoveredLyrics;
 }
 
 export async function resolveProviderLinks(
   track: TrackDescriptor,
   options: ResolveProviderLinksOptions = {}
-): Promise<ProviderLink[]> {
+): Promise<ResolvedProviderLinks> {
   const providers = options.providers ?? DEFAULT_PROVIDERS;
   const storefront = options.storefront ?? DEFAULT_APPLE_STOREFRONT;
   const fetcher = options.fetcher ?? fetch;
@@ -356,7 +370,7 @@ export async function resolveProviderLinks(
   processManualOverrides(options.overrides, links, seenProviders);
 
   // Run ISRC lookups in parallel for speed
-  await runIsrcLookups(track, providers, seenProviders, links, {
+  const lyrics = await runIsrcLookups(track, providers, seenProviders, links, {
     storefront,
     fetcher,
   });
@@ -373,5 +387,5 @@ export async function resolveProviderLinks(
     seenProviders.add(provider);
   }
 
-  return links;
+  return { links, lyrics };
 }

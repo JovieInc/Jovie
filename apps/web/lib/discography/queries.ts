@@ -700,6 +700,7 @@ export async function upsertTrack(input: {
   previewUrl?: string | null;
   audioUrl?: string | null;
   audioFormat?: string | null;
+  lyrics?: string | null;
   sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
 }): Promise<typeof discogTracks.$inferSelect> {
@@ -715,6 +716,7 @@ export async function upsertTrack(input: {
     previewUrl: input.previewUrl ?? null,
     audioUrl: input.audioUrl ?? null,
     audioFormat: input.audioFormat ?? null,
+    lyrics: input.lyrics ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     updatedAt: now,
@@ -733,6 +735,7 @@ export async function upsertTrack(input: {
     previewUrl: input.previewUrl ?? null,
     audioUrl: input.audioUrl ?? null,
     audioFormat: input.audioFormat ?? null,
+    lyrics: input.lyrics ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     createdAt: now,
@@ -807,6 +810,19 @@ export async function upsertTrack(input: {
 
     return result;
   }
+}
+
+/**
+ * Update lyrics for a track by ID
+ */
+export async function updateTrackLyrics(
+  trackId: string,
+  lyrics: string
+): Promise<void> {
+  await db
+    .update(discogTracks)
+    .set({ lyrics, updatedAt: new Date() })
+    .where(eq(discogTracks.id, trackId));
 }
 
 /**
