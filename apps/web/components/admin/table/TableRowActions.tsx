@@ -24,7 +24,7 @@ export function TableRowActions({
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
   const rowActionClassName =
-    'h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
+    'h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) active:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
   return (
     <div className='flex items-center justify-end gap-1'>
