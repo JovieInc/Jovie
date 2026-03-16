@@ -40,6 +40,7 @@ export function OnboardingProfileReviewStep({
   // Auto-dismiss loading state after timeout
   useEffect(() => {
     if (isEnriching && !enrichedProfile) {
+      setEnrichmentTimedOut(false);
       timeoutRef.current = globalThis.setTimeout(() => {
         setEnrichmentTimedOut(true);
       }, ENRICHMENT_TIMEOUT_MS);
@@ -74,7 +75,7 @@ export function OnboardingProfileReviewStep({
       if (enrichedProfile) {
         await Promise.race([
           updateOnboardingProfile({
-            displayName: enrichedProfile.name?.trim() || handle,
+            displayName: enrichedProfile.name?.trim() || undefined,
             bio: enrichedProfile.bio?.trim() || undefined,
           }),
           new Promise((_, reject) => {
@@ -91,7 +92,7 @@ export function OnboardingProfileReviewStep({
     } finally {
       setIsSaving(false);
     }
-  }, [enrichedProfile, handle, onGoToDashboard]);
+  }, [enrichedProfile, onGoToDashboard]);
 
   return (
     <div className='flex flex-col items-center justify-center h-full'>

@@ -89,6 +89,15 @@ function renderMessageCell({ getValue }: { getValue: () => any }) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
+function renderSubmittedCell({ getValue }: { getValue: () => any }) {
+  return (
+    <span className='whitespace-nowrap'>
+      {new Date(getValue()).toLocaleString()}
+    </span>
+  );
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: TanStack Table cell renderers require any for getValue typing
 function renderStatusCell({ getValue }: { getValue: () => any }) {
   const status = getValue() as FeedbackRow['status'];
   return (
@@ -159,11 +168,7 @@ export function AdminFeedbackTable({
       columnHelper.accessor('createdAtIso', {
         id: 'submitted',
         header: 'Submitted',
-        cell: ({ getValue }) => (
-          <span className='whitespace-nowrap'>
-            {new Date(getValue()).toLocaleString()}
-          </span>
-        ),
+        cell: renderSubmittedCell,
         size: 180,
       }),
       columnHelper.accessor('user', {
