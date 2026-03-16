@@ -22,11 +22,13 @@ export function DevToolbar({
   version: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useFeatureFlagOverrides();
 
-  // Restore open state from localStorage
+  // Restore open state from localStorage and mark as mounted
   useEffect(() => {
+    setMounted(true);
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
   }, []);
 
@@ -69,7 +71,7 @@ export function DevToolbar({
                   key={value}
                   onClick={() => setTheme(value)}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors flex-1 justify-center ${
-                    theme === value
+                    mounted && theme === value
                       ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
                       : 'border-[var(--color-border-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)]'
                   }`}
