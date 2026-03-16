@@ -45,9 +45,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast path: Dependabot PRs are internal (not forks) but cannot access
+  # GitHub App secrets. Use GITHUB_TOKEN to set the commit status directly.
+  dependabot-gate:
+    name: Fork PR Gate
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    permissions:
+      statuses: write
+    steps:
+      - name: Auto-pass for Dependabot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+          echo "Dependabot PR — auto-passing gate."
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Dependabot PR — no approval required" \
+            -f context="Fork PR Gate"
+
   fork-gate:
     name: Fork PR Gate
-    if: github.actor != 'copilot-swe-agent[bot]'
+    if: github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
