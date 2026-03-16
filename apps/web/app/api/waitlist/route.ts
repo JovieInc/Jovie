@@ -14,7 +14,7 @@ import {
 import { RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { notifySlackWaitlist } from '@/lib/notifications/providers/slack';
-import { sendNotification } from '@/lib/notifications/service';
+
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -29,7 +29,7 @@ import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
 } from '@/lib/waitlist/approval';
-import { buildWaitlistInviteEmail } from '@/lib/waitlist/invite';
+
 import { tryReserveAutoAcceptSlot } from '@/lib/waitlist/settings';
 
 export const runtime = 'nodejs';
@@ -527,20 +527,6 @@ async function processValidatedRequest(params: {
 
   if (approvalResult.outcome === 'approved') {
     await finalizeWaitlistApproval(approvalResult);
-
-    // Send welcome email (fire-and-forget)
-    const { message, target } = buildWaitlistInviteEmail({
-      email: approvalResult.email,
-      fullName: approvalResult.fullName,
-      dedupKey: `waitlist_welcome:${approvalResult.profileId}`,
-    });
-    sendNotification(message, target).catch(error => {
-      captureCriticalError(
-        'Failed to send auto-approve waitlist welcome email',
-        error instanceof Error ? error : new Error(String(error)),
-        { profileId: approvalResult.profileId, email: approvalResult.email }
-      );
-    });
 
     return successResponse({ status: 'claimed' });
   }
