@@ -11,6 +11,7 @@ const inputVariants = cva(
     'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-(--linear-text-tertiary)',
+    'hover:border-(--linear-border-default)',
     'focus-visible:outline-none focus-visible:border-(--linear-border-focus)',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-colors duration-normal',

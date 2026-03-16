@@ -49,6 +49,14 @@ describe('Input', () => {
       expect(input.className).toContain('bg-(--linear-bg-surface-1)');
     });
 
+    it('applies hover border class', () => {
+      render(<Input data-testid='input' />);
+      const input = screen.getByTestId('input');
+      expect(input.className).toContain(
+        'hover:border-(--linear-border-default)'
+      );
+    });
+
     it('applies error variant classes', () => {
       render(<Input variant='error' data-testid='input' />);
       const input = screen.getByTestId('input');
