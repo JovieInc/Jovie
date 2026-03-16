@@ -304,7 +304,7 @@ describe('SegmentControl', () => {
       const root = container.firstChild;
       expect((root as HTMLElement).className).toContain('inline-flex');
       expect((root as HTMLElement).className).toContain(
-        'rounded-[var(--linear-app-control-radius)]'
+        'rounded-(--linear-app-control-radius)'
       );
     });
 

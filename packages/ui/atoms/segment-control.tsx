@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const segmentControlVariants = cva(
-  'inline-flex items-center rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5 shadow-none',
+  'inline-flex items-center rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5 shadow-none',
   {
     variants: {
       variant: {
