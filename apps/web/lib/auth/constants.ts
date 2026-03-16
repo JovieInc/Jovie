@@ -20,9 +20,9 @@ export const AUTH_STORAGE_KEYS = {
 export const FORM_LAYOUT = {
   /** Title styling - consistent across all auth/onboarding/waitlist screens */
   title:
-    'text-[22px] font-[510] text-[var(--linear-text-primary)] text-center tracking-[-0.019em] leading-[1.2] [font-feature-settings:"cv01","ss03","rlig"_1,"calt"_1]',
+    'text-[22px] font-[510] text-(--linear-text-primary) text-center tracking-[-0.019em] leading-[1.2] [font-feature-settings:"cv01","ss03","rlig"_1,"calt"_1]',
   /** Hint/prompt text below titles */
-  hint: 'text-[15px] font-[400] text-[var(--linear-text-secondary)] text-center tracking-[-0.011em] leading-[1.5] mt-2',
+  hint: 'text-[15px] font-[400] text-(--linear-text-secondary) text-center tracking-[-0.011em] leading-[1.5] mt-2',
   /** Container for title + optional hint with consistent spacing */
   headerSection: 'flex flex-col items-center justify-center mb-8',
   /** Main form container with spacing between header and form elements */
@@ -31,7 +31,7 @@ export const FORM_LAYOUT = {
   formInner: 'space-y-3 w-full',
   /** Footer hint text below the main CTA button - prevents layout shift */
   footerHint:
-    'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-[var(--linear-text-tertiary)] text-center px-2 mt-6',
+    'min-h-[40px] w-full max-w-full flex flex-wrap items-center justify-center gap-1 text-[13px] font-[450] text-(--linear-text-tertiary) text-center px-2 mt-6',
   /** Reserved space for error messages to prevent layout shift */
   errorContainer: 'min-h-[24px] flex items-center justify-center mb-4',
 } as const;

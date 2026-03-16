@@ -52,11 +52,11 @@ export default function AdminPage() {
                     Expand
                   </span>
                 }
-                className='min-h-0 cursor-pointer px-[var(--linear-app-header-padding-x)] py-3'
+                className='min-h-0 cursor-pointer px-(--linear-app-header-padding-x) py-3'
                 actionsClassName='shrink-0'
               />
             </summary>
-            <div className='space-y-4 border-t border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-4'>
+            <div className='space-y-4 border-t border-(--linear-border-subtle) px-(--linear-app-header-padding-x) py-4'>
               <p className='text-app text-secondary-token'>
                 Secondary platform stats are intentionally below the fold so
                 core business KPIs stay front and center.

@@ -51,21 +51,21 @@ export default function DemoAudienceSection() {
   return (
     <AudienceTableStableProvider value={stableContextValue}>
       <AudienceTableVolatileProvider value={volatileContextValue}>
-        <div className='flex h-full min-h-0 flex-col bg-[var(--linear-bg-surface-0)]'>
+        <div className='flex h-full min-h-0 flex-col bg-(--linear-bg-surface-0)'>
           {/* Summary bar */}
-          <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-2.5'>
+          <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-5 py-2.5'>
             <div className='flex items-center gap-4 text-[13px]'>
-              <span className='font-medium text-[var(--linear-text-primary)]'>
+              <span className='font-medium text-(--linear-text-primary)'>
                 {DEMO_AUDIENCE_MEMBERS.length} visitors
               </span>
-              <span className='text-[var(--linear-text-tertiary)]'>
+              <span className='text-(--linear-text-tertiary)'>
                 {
                   DEMO_AUDIENCE_MEMBERS.filter(m => m.intentLevel === 'high')
                     .length
                 }{' '}
                 high intent
               </span>
-              <span className='text-[var(--linear-text-tertiary)]'>
+              <span className='text-(--linear-text-tertiary)'>
                 {DEMO_AUDIENCE_MEMBERS.filter(m => m.email).length} with email
               </span>
             </div>
@@ -75,8 +75,8 @@ export default function DemoAudienceSection() {
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors',
                 analyticsOpen
-                  ? 'bg-[var(--linear-bg-surface-2)] text-[var(--linear-text-primary)]'
-                  : 'text-[var(--linear-text-tertiary)] hover:text-[var(--linear-text-secondary)] hover:bg-[var(--linear-bg-hover)]'
+                  ? 'bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+                  : 'text-(--linear-text-tertiary) hover:text-(--linear-text-secondary) hover:bg-(--linear-bg-hover)'
               )}
               aria-label='Toggle analytics panel'
             >
