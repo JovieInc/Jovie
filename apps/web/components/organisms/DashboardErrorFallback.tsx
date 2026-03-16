@@ -19,7 +19,7 @@ export function DashboardErrorFallback({
     <PageErrorState
       title='Unable to load dashboard'
       message={
-        error?.message ||
+        errorWithDigest.message ||
         'An unexpected error occurred while loading your dashboard.'
       }
       error={errorWithDigest}
