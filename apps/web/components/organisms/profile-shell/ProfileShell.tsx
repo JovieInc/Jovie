@@ -139,6 +139,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
+        id='main-content'
         className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
@@ -185,7 +186,7 @@ export function ProfileShell({
                   hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
-                      className='flex flex-wrap items-center justify-center gap-3 px-1 py-1'
+                      className='flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-1 py-1'
                       data-testid='social-links'
                     >
                       {/* Mail (contacts) — left */}
