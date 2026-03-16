@@ -154,7 +154,8 @@ export const ServerEnvSchema = z.object({
   INSTANTLY_API_KEY: z.string().optional(),
   INSTANTLY_CAMPAIGN_ID: z.string().optional(),
 
-  // Google Custom Search Engine (lead discovery)
+  // Search APIs (lead discovery)
+  SERPAPI_API_KEY: z.string().optional(),
   GOOGLE_CSE_API_KEY: z.string().optional(),
   GOOGLE_CSE_ENGINE_ID: z.string().optional(),
 
@@ -243,6 +244,7 @@ export const ENV_KEYS = [
   'JOVIE_DEV_MEMORY_MONITOR',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
+  'SERPAPI_API_KEY',
   'GOOGLE_CSE_API_KEY',
   'GOOGLE_CSE_ENGINE_ID',
   'JOVIE_FACEBOOK_PIXEL_ID',
