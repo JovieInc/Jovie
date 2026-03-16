@@ -9,6 +9,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Made code-level feature flags (`THREADS_ENABLED`, `SHOW_REPLACES_SECTION`, `PWA_INSTALL_BANNER`) toggleable in the dev toolbar via localStorage overrides
+- Added `useCodeFlag` hook for reactive code-level flag consumption with dev toolbar override support
+- Added "Dev Toolbar" toggle in Admin settings so admins can enable the toolbar in production without manually setting a cookie
+
+### Changed
+
+- Code-level flag consumers (`DashboardNav`, `SidebarInstallBanner`) now use `useCodeFlag` hook instead of static constants
+
 - Added SerpAPI as primary search provider for lead discovery, with Google CSE as legacy fallback (Google deprecated the Custom Search JSON API for new customers)
 - Added "Already claimed" visual treatment for Spotify artists already linked to another Jovie account in search results
 - Added `isClaimed` field to Spotify search API response with 30s-cached DB lookup
