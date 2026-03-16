@@ -26,6 +26,7 @@ export const surfaces = {
   input: 'var(--color-bg-input)',
   active: 'var(--color-bg-active)',
   button: 'var(--color-bg-button)',
+  tooltip: 'var(--color-bg-tooltip)',
 } as const;
 
 // ============================================
@@ -37,6 +38,7 @@ export const text = {
   tertiary: 'var(--color-text-tertiary-token)',
   quaternary: 'var(--color-text-quaternary-token)',
   disabled: 'var(--color-text-disabled-token)',
+  tooltip: 'var(--color-text-tooltip)',
 } as const;
 
 // ============================================
@@ -46,6 +48,7 @@ export const borders = {
   subtle: 'var(--color-border-subtle)',
   default: 'var(--color-border-default)',
   strong: 'var(--color-border-strong)',
+  focus: 'var(--color-border-focus)',
 } as const;
 
 // ============================================
