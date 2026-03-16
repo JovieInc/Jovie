@@ -38,6 +38,7 @@ const RadioGroupItem = React.forwardRef<
         'aspect-square h-4 w-4 rounded-full border border-primary text-primary',
         'ring-offset-background',
         'hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)',
+        'active:scale-95 active:transition-transform',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         'disabled:cursor-not-allowed disabled:opacity-50',
         className
