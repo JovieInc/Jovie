@@ -208,7 +208,7 @@ const nextConfig = {
 
     securityHeaders.push({
       key: 'Permissions-Policy',
-      value: 'camera=(), microphone=(), geolocation=()',
+      value: 'camera=(), microphone=(), geolocation=(self)',
     });
 
     // Cache control header helpers
