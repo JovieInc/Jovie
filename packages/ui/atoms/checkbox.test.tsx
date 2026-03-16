@@ -124,6 +124,15 @@ describe('Checkbox', () => {
   });
 
   describe('Styling', () => {
+    it('applies hover styles on checkbox indicator', () => {
+      render(<Checkbox aria-label='Test' data-testid='checkbox' />);
+      const checkbox = screen.getByTestId('checkbox');
+      expect(checkbox.className).toContain(
+        'hover:border-(--linear-border-focus)'
+      );
+      expect(checkbox.className).toContain('hover:bg-(--linear-bg-surface-1)');
+    });
+
     it('applies focus-visible ring styles', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');

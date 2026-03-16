@@ -198,6 +198,17 @@ describe('RadioGroup', () => {
       expect(radio.className).toContain('border');
     });
 
+    it('applies hover styles to radio item', () => {
+      render(
+        <RadioGroup>
+          <RadioGroupItem value='test' data-testid='radio' />
+        </RadioGroup>
+      );
+      const radio = screen.getByTestId('radio');
+      expect(radio.className).toContain('hover:border-(--linear-border-focus)');
+      expect(radio.className).toContain('hover:bg-(--linear-bg-surface-1)');
+    });
+
     it('applies focus-visible ring styles', () => {
       render(
         <RadioGroup>

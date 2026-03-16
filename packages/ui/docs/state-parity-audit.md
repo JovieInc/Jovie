@@ -11,10 +11,10 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 |-----------|-------|--------|----------|---------------|----------|---------|
 | **Button** | Y | Y | - | Y | Y | Y |
 | **Input** | Y | - | - | Y | Y | Y |
-| **Textarea** | **M** | - | - | Y | Y | - |
+| **Textarea** | Y | - | - | Y | Y | - |
 | **Select (trigger)** | Y | - | - | Y | Y | - |
-| **Checkbox** | **M** | - | Y | Y | Y | - |
-| **RadioGroup** | **M** | - | Y | Y | Y | - |
+| **Checkbox** | Y | - | Y | Y | Y | - |
+| **RadioGroup** | Y | - | Y | Y | Y | - |
 | **Switch** | Y | - | Y | Y | Y | - |
 | **SegmentControl** | Y | Y | Y | Y | Y | - |
 | **Badge** | - | - | - | Y | - | - |
@@ -35,9 +35,9 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 ## Priority Gaps
 
 ### P1 — Form control hover feedback (high user impact)
-- **Textarea**: Add `hover:border-(--linear-border-default)` (same pattern as Input)
-- **Checkbox**: Add hover highlight on the checkbox indicator
-- **RadioGroup**: Add hover highlight on the radio indicator
+- ~~**Textarea**: Add `hover:border-(--linear-border-default)`~~ Done in Lane B2
+- ~~**Checkbox**: Add hover highlight on the checkbox indicator~~ Done in Lane B2
+- ~~**RadioGroup**: Add hover highlight on the radio indicator~~ Done in Lane B2
 
 ### P2 — Interactive affordance
 - **Card** (hoverable variant): Add `focus-visible` ring for keyboard users
@@ -55,3 +55,6 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 | Switch | hover (checked) | `data-[state=checked]:hover:bg-indigo-600` |
 | Badge | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1` |
 | Select trigger | hover | `hover:border-(--linear-border-default)` |
+| Textarea | hover | `hover:border-(--linear-border-default)` |
+| Checkbox | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |
+| RadioGroupItem | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |

@@ -10,6 +10,7 @@ const textareaVariants = cva(
     'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3 py-2',
     'text-[13px] ring-offset-background',
     'placeholder:text-tertiary-token',
+    'hover:border-(--linear-border-default)',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-all duration-normal ease-interactive',
