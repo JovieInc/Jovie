@@ -203,14 +203,11 @@ function buildEnrichmentUpdates(
   }
 
   // Display name from MusicFetch first, then Spotify fallback.
+  // During onboarding, always overwrite unless user explicitly locked it.
+  // The displayName at this point is either the handle or a Clerk-derived
+  // name — neither is the artist's real name.
   const enrichedName = musicFetch?.name ?? artist?.name;
-  if (
-    enrichedName &&
-    !profile.displayNameLocked &&
-    (!profile.displayName ||
-      profile.displayName === profile.usernameNormalized ||
-      profile.displayName === profile.username)
-  ) {
+  if (enrichedName && !profile.displayNameLocked) {
     profileUpdates.displayName = enrichedName;
     result.name = enrichedName;
   }
@@ -329,12 +326,11 @@ export async function enrichProfileFromDsp(
     followers: null,
   };
 
-  const musicFetch = await loadMusicFetchData(spotifyUrl);
-  const artist = await loadSpotifyArtistIfNeeded(
-    spotifyArtistId,
-    profile,
-    musicFetch
-  );
+  // Fetch MusicFetch and Spotify data in parallel for speed
+  const [musicFetch, artist] = await Promise.all([
+    loadMusicFetchData(spotifyUrl),
+    loadSpotifyArtistIfNeeded(spotifyArtistId, profile, null),
+  ]);
 
   // Build profile updates
   const profileUpdates: Partial<typeof creatorProfiles.$inferInsert> = {};
@@ -348,6 +344,10 @@ export async function enrichProfileFromDsp(
     profileUpdates
   );
 
+  // Remove raw avatarUrl from mapping — onboarding handles avatar
+  // separately via applyImageEnrichmentIfNeeded (upload to blob storage).
+  delete profileUpdates.avatarUrl;
+
   // Upload profile image from MusicFetch first, then Spotify fallback.
   await applyImageEnrichmentIfNeeded(
     profile,
@@ -358,18 +358,32 @@ export async function enrichProfileFromDsp(
     profileUpdates
   );
 
-  // Apply profile updates
-  if (Object.keys(profileUpdates).length > 0) {
-    profileUpdates.updatedAt = new Date();
-    await db
-      .update(creatorProfiles)
-      .set(profileUpdates)
-      .where(eq(creatorProfiles.id, profile.id));
-  }
+  // Apply profile updates — wrapped in try/catch so we still return
+  // enriched data to the client even if the DB write fails.
+  try {
+    if (Object.keys(profileUpdates).length > 0) {
+      profileUpdates.updatedAt = new Date();
+      await db
+        .update(creatorProfiles)
+        .set(profileUpdates)
+        .where(eq(creatorProfiles.id, profile.id));
+    }
 
-  // Process social links from MusicFetch
-  if (musicFetch) {
-    await processMusicFetchSocialLinks(profile, musicFetch, spotifyUrl, result);
+    // Process social links from MusicFetch
+    if (musicFetch) {
+      await processMusicFetchSocialLinks(
+        profile,
+        musicFetch,
+        spotifyUrl,
+        result
+      );
+    }
+  } catch (error) {
+    await captureError(
+      'Failed to persist enrichment updates during onboarding',
+      error,
+      { profileId: profile.id, spotifyArtistId }
+    );
   }
 
   return result;

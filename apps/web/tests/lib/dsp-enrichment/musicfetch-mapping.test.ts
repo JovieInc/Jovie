@@ -4,7 +4,7 @@
  * Covers:
  * - extractMusicFetchLinks: all 11 platforms produce ExtractedLink entries
  * - mapMusicFetchProfileFields: profile field updates + skip-if-existing logic
- * - avatarUrl saved from MusicFetch image.url (bug fix)
+ * - avatarUrl NOT set (raw URLs must go through upload flow)
  */
 
 // We test the pure mapping functions directly — no server-only imports involved.
@@ -323,7 +323,7 @@ describe('mapMusicFetchProfileFields', () => {
     expect(updates.bio).toBeUndefined();
   });
 
-  it('sets avatarUrl from image.url when profile has no avatar', () => {
+  it('sets avatarUrl when profile has none and image is available', () => {
     const updates = mapMusicFetchProfileFields(
       makeFullArtistResult({
         image: { url: 'https://i.scdn.co/image/artist-photo.jpg' },
@@ -334,21 +334,12 @@ describe('mapMusicFetchProfileFields', () => {
     expect(updates.avatarUrl).toBe('https://i.scdn.co/image/artist-photo.jpg');
   });
 
-  it('does not set avatarUrl when profile already has one', () => {
+  it('does not overwrite existing avatarUrl', () => {
     const updates = mapMusicFetchProfileFields(
       makeFullArtistResult({
         image: { url: 'https://i.scdn.co/image/new-photo.jpg' },
       }),
-      makeEmptyProfile({ avatarUrl: 'https://existing-avatar.com/photo.jpg' }),
-      SPOTIFY_URL
-    );
-    expect(updates.avatarUrl).toBeUndefined();
-  });
-
-  it('does not set avatarUrl when image.url is missing', () => {
-    const updates = mapMusicFetchProfileFields(
-      makeFullArtistResult({ image: undefined }),
-      makeEmptyProfile({ avatarUrl: null }),
+      makeEmptyProfile({ avatarUrl: 'https://existing.com/avatar.jpg' }),
       SPOTIFY_URL
     );
     expect(updates.avatarUrl).toBeUndefined();
