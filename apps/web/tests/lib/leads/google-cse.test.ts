@@ -27,7 +27,8 @@ describe('searchGoogleCSE', () => {
     vi.unstubAllEnvs();
   });
 
-  it('returns an empty list when Google CSE env vars are missing', async () => {
+  it('returns an empty list when search API env vars are missing', async () => {
+    vi.stubEnv('SERPAPI_API_KEY', '');
     vi.stubEnv('GOOGLE_CSE_API_KEY', '');
     vi.stubEnv('GOOGLE_CSE_ENGINE_ID', '');
 
@@ -41,8 +42,14 @@ describe('searchGoogleCSE', () => {
 
     expect(pipelineWarnMock).toHaveBeenCalledWith(
       'discovery',
-      'Google CSE not configured',
-      { missing: ['GOOGLE_CSE_API_KEY', 'GOOGLE_CSE_ENGINE_ID'] }
+      'Search API not configured',
+      {
+        missing: [
+          'SERPAPI_API_KEY',
+          'GOOGLE_CSE_API_KEY',
+          'GOOGLE_CSE_ENGINE_ID',
+        ],
+      }
     );
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(captureErrorMock).not.toHaveBeenCalled();
