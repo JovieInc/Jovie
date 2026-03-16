@@ -131,7 +131,7 @@ describe('RightDrawer', () => {
       'border-l',
       'transition-[width,opacity]',
       'lg:rounded-l-[18px]',
-      'shadow-[var(--linear-shadow-card)]'
+      'shadow-(--linear-shadow-card)'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
