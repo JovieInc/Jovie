@@ -67,22 +67,19 @@ export async function ingestLeadAsCreator(
       avatarUrl: hostedAvatarUrl ?? extraction.avatarUrl ?? null,
     };
 
-    let response: Response;
-
-    if (existingCheck.isReingest && existingCheck.existing) {
-      response = await handleReingestProfile({
-        existing: existingCheck.existing,
-        extraction: extractionWithHostedAvatar,
-        displayName,
-      });
-    } else {
-      response = await handleNewProfileIngest({
-        finalHandle: existingCheck.finalHandle,
-        displayName,
-        hostedAvatarUrl,
-        extraction: extractionWithHostedAvatar,
-      });
-    }
+    const response =
+      existingCheck.isReingest && existingCheck.existing
+        ? await handleReingestProfile({
+            existing: existingCheck.existing,
+            extraction: extractionWithHostedAvatar,
+            displayName,
+          })
+        : await handleNewProfileIngest({
+            finalHandle: existingCheck.finalHandle,
+            displayName,
+            hostedAvatarUrl,
+            extraction: extractionWithHostedAvatar,
+          });
 
     const body = (await response.json()) as {
       ok?: boolean;

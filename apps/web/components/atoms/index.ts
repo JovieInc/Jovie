@@ -32,23 +32,6 @@ export type { DividerProps } from './Divider';
 export { Divider } from './Divider';
 export type { DotBadgeProps, DotBadgeVariant } from './DotBadge';
 export { DotBadge } from './DotBadge';
-export {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from './DropdownMenu';
 export type { DSPButtonProps } from './DSPButton';
 export { DSPButton } from './DSPButton';
 export { DSP_LOGO_CONFIG, DspLogo, VIDEO_LOGO_CONFIG } from './DspLogo';
@@ -91,12 +74,6 @@ export { LogoLoader } from './LogoLoader';
 export type { NavLinkProps } from './NavLink';
 export { NavLink } from './NavLink';
 export { PlaceholderImage } from './PlaceholderImage';
-export {
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-  PopoverTrigger,
-} from './Popover';
 export { ProgressIndicator } from './ProgressIndicator';
 export { ProviderIcon } from './ProviderIcon';
 export { ReleaseArtworkThumb } from './ReleaseArtworkThumb';
@@ -104,19 +81,6 @@ export type { SectionHeadingProps } from './SectionHeading';
 export { SectionHeading } from './SectionHeading';
 export { Select } from './Select';
 export { Separator } from './Separator';
-export type { SheetContentProps } from './Sheet';
-export {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetOverlay,
-  SheetPortal,
-  SheetTitle,
-  SheetTrigger,
-} from './Sheet';
 export type { SkipToContentProps } from './SkipToContent';
 export { SkipToContent } from './SkipToContent';
 export {
@@ -130,11 +94,5 @@ export { StatusBadge } from './StatusBadge';
 export type { SwipeToRevealProps } from './SwipeToReveal';
 export { SwipeToReveal, SwipeToRevealGroup } from './SwipeToReveal';
 export { TableErrorFallback } from './TableErrorFallback';
-export {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from './Tooltip';
 export { TruncatedText } from './TruncatedText';
 export { VerifiedBadge } from './VerifiedBadge';
