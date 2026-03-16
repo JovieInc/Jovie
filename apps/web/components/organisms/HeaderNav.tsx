@@ -91,7 +91,7 @@ export function HeaderNav({
 
         {/* Divider between nav and auth - desktop only */}
         <div
-          className='hidden md:block mx-3 h-4 w-px bg-[var(--linear-border-subtle)]'
+          className='hidden md:block mx-3 h-4 w-px bg-(--linear-border-subtle)'
           aria-hidden='true'
         />
 

@@ -115,7 +115,7 @@ export function PageHeader({
         ) : undefined
       }
       actions={action}
-      actionsClassName='flex shrink-0 items-center gap-[var(--linear-app-toolbar-gap)]'
+      actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}
       bodyClassName='min-w-0'
     />
@@ -161,7 +161,7 @@ export function PageContent({
       className={cn(
         'flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden',
         !noPadding &&
-          'px-[var(--linear-app-content-padding-x)] py-[var(--linear-app-content-padding-y)]',
+          'px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
         className
       )}
     >

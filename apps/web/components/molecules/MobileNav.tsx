@@ -150,11 +150,11 @@ export function MobileNav({
         className={cn(
           'relative z-[101] inline-flex items-center justify-center size-11',
           'rounded-lg border-0 bg-transparent cursor-pointer',
-          'text-[var(--linear-text-primary)]',
+          'text-(--linear-text-primary)',
           'transition-all duration-200 ease-out',
           '[-webkit-tap-highlight-color:transparent]',
-          'hover:bg-[var(--linear-bg-hover)]',
-          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--linear-accent)]'
+          'hover:bg-(--linear-bg-hover)',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--linear-accent)'
         )}
         aria-label={isOpen ? 'Close menu' : 'Open menu'}
         aria-expanded={isOpen}
@@ -230,10 +230,10 @@ export function MobileNav({
                     className={cn(
                       'flex items-center h-[52px] px-4 rounded-xl',
                       'text-[17px] font-medium',
-                      'text-[var(--linear-text-primary)]',
+                      'text-(--linear-text-primary)',
                       'transition-all duration-150 ease-out',
                       'active:scale-[0.98]',
-                      'hover:bg-[var(--linear-bg-hover)]',
+                      'hover:bg-(--linear-bg-hover)',
                       'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                     )}
                     style={{
@@ -264,7 +264,7 @@ export function MobileNav({
                 <div
                   className={cn(
                     'mx-4 mt-4 pt-4',
-                    'border-t border-[var(--linear-border-subtle)]',
+                    'border-t border-(--linear-border-subtle)',
                     'animate-[mobile-nav-item-in_400ms_ease-out_both]'
                   )}
                   style={{

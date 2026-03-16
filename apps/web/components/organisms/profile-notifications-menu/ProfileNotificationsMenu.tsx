@@ -336,7 +336,7 @@ export function ProfileNotificationsMenu({
           }
         }}
       >
-        <AlertDialogContent className='max-w-md rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-bg-surface-0) shadow-[var(--linear-app-drawer-shadow)]'>
+        <AlertDialogContent className='max-w-md rounded-[12px] border border-(--linear-app-shell-border) bg-(--linear-bg-surface-0) shadow-(--linear-app-drawer-shadow)'>
           <AlertDialogHeader className='gap-2'>
             <AlertDialogTitle className='text-base font-semibold text-(--linear-text-primary)'>
               {confirmChannel
