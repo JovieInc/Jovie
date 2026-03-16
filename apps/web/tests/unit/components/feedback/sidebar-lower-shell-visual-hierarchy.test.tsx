@@ -33,11 +33,17 @@ vi.mock('@/hooks/usePWAInstall', () => ({
   }),
 }));
 
-vi.mock('@/lib/feature-flags/shared', () => ({
-  FEATURE_FLAGS: {
-    PWA_INSTALL_BANNER: true,
-  },
-}));
+vi.mock('@/lib/feature-flags/shared', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      PWA_INSTALL_BANNER: true,
+    },
+  };
+});
 
 vi.mock('@/lib/hooks/useVersionMonitor', () => ({
   useVersionMonitor: vi.fn(),
