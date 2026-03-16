@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTrackingMutation } from '@/lib/queries';
 
 export function useTipPageTracking({
@@ -15,19 +15,23 @@ export function useTipPageTracking({
   const trackTip = useTrackingMutation({
     endpoint: '/api/track',
   });
+  const trackTipRef = useRef(trackTip);
+  useEffect(() => {
+    trackTipRef.current = trackTip;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (!artistHandle) return;
     if (mode !== 'tip') return;
 
-    trackTip.mutate({
+    trackTipRef.current.mutate({
       handle: artistHandle,
       linkType: 'tip',
       target: 'tip_page',
       source,
     });
-  }, [artistHandle, mode, source, trackTip]);
+  }, [artistHandle, mode, source]);
 }
 
 /**
@@ -68,6 +72,10 @@ export function useProfileVisitTracking(
   const trackVisit = useTrackingMutation({
     endpoint: '/api/audience/visit',
   });
+  const trackVisitRef = useRef(trackVisit);
+  useEffect(() => {
+    trackVisitRef.current = trackVisit;
+  });
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -76,13 +84,13 @@ export function useProfileVisitTracking(
     const utmParams = extractUtmParams();
     const referrer = document.referrer || undefined;
 
-    trackVisit.mutate({
+    trackVisitRef.current.mutate({
       profileId: artistId,
       referrer,
       ...(utmParams && { utmParams }),
       ...(trackingToken && { trackingToken }),
     });
-  }, [artistId, trackingToken, trackVisit]);
+  }, [artistId, trackingToken]);
 }
 
 export function usePopstateReset(callback: () => void) {

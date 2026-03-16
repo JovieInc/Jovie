@@ -7,17 +7,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-### Added
-
-- 
-
-### Changed
-
-- 
-
 ### Fixed
 
-- 
+- Fixed infinite retry loop in `useProfileVisitTracking` and `useTipPageTracking` hooks where unstable `useMutation` references in `useEffect` dependency arrays caused 1000+ API requests per profile page load 
 
 ## [26.2.0] - 2026-02-12
 

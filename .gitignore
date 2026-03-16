@@ -89,3 +89,4 @@ package-lock.json
 logs/security/
 output/
 .audit/
+.gstack/
