@@ -14,7 +14,7 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useReleasesQuery } from '@/lib/queries';
 import {
@@ -56,6 +56,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const router = useRouter();
+  const threadsEnabled = useCodeFlag('THREADS_ENABLED');
   const { isOpen: isPreviewOpen, open: openPreviewPanel } =
     usePreviewPanelState();
 
@@ -176,7 +177,7 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroup>
       )}
 
-      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && !env.IS_E2E && (
+      {!isInSettings && threadsEnabled && !env.IS_E2E && (
         <div className='mt-3'>
           <RecentChats />
         </div>
