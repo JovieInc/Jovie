@@ -20,6 +20,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Replaced editable profile form in final onboarding step with progress bar (10s timeout) followed by read-only profile card preview
 - Artist display name now overwrites placeholder names (handle/username) during MusicFetch enrichment on both onboarding and async job paths
+- Migrated organism and molecule components from `[var(--linear-*)]` bracket syntax to Tailwind v4 `(--linear-*)` parenthesis syntax (10 files: PageShell, HeaderNav, RightDrawer, MobileNav, DrawerLoadingSkeleton, DrawerSettingsToggle, DialogLoadingSkeleton, PageToolbar, ActionBar, ProfileNotificationsMenu)
 
 ### Fixed
 
