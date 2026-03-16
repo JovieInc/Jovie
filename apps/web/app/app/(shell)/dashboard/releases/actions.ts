@@ -1089,6 +1089,7 @@ export async function connectSpotifyArtist(params: {
   spotifyArtistUrl: string;
   artistName: string;
   includeTracks?: boolean;
+  skipMusicFetchEnrichment?: boolean;
 }): Promise<{
   success: boolean;
   importing: boolean;
@@ -1209,20 +1210,22 @@ export async function connectSpotifyArtist(params: {
       });
 
       // Auto-trigger MusicFetch enrichment
-      const spotifyUrlForEnrichment = normalizeSpotifyArtistUrl(
-        params.spotifyArtistUrl,
-        params.spotifyArtistId
-      );
+      if (!params.skipMusicFetchEnrichment) {
+        const spotifyUrlForEnrichment = normalizeSpotifyArtistUrl(
+          params.spotifyArtistUrl,
+          params.spotifyArtistId
+        );
 
-      void enqueueMusicFetchEnrichmentJob({
-        creatorProfileId: profile.id,
-        spotifyUrl: spotifyUrlForEnrichment,
-      }).catch(err => {
-        void captureError('MusicFetch enrichment enqueue failed', err, {
-          action: 'connectSpotifyArtist',
+        void enqueueMusicFetchEnrichmentJob({
           creatorProfileId: profile.id,
+          spotifyUrl: spotifyUrlForEnrichment,
+        }).catch(err => {
+          void captureError('MusicFetch enrichment enqueue failed', err, {
+            action: 'connectSpotifyArtist',
+            creatorProfileId: profile.id,
+          });
         });
-      });
+      }
     }
   };
 
