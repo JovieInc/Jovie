@@ -28,7 +28,7 @@ function DefaultErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   return (
     <PageErrorState
       title='Something went wrong'
-      message={error?.message || 'An unexpected error occurred'}
+      message={errorWithDigest.message || 'An unexpected error occurred'}
       error={errorWithDigest}
       actionLabel='Try again'
       onRetry={resetErrorBoundary}

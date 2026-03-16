@@ -19,7 +19,7 @@ export function TableErrorFallback({
     <PageErrorState
       title='Unable to load table data'
       message={
-        error?.message ||
+        errorWithDigest.message ||
         'An unexpected error occurred while loading the table.'
       }
       error={errorWithDigest}

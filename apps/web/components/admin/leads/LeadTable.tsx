@@ -203,103 +203,109 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
             </tr>
           </thead>
           <tbody>
-            {renderLeadRows(leadsQuery.isLoading, loadError, leads, lead => (
-              <tr
-                key={lead.id}
-                className='border-b border-subtle/50 hover:bg-white/[0.02]'
-              >
-                <td className='py-2.5 pr-3'>
-                  <div className='flex flex-col'>
-                    <span className='font-medium text-primary-token'>
-                      {lead.displayName || lead.linktreeHandle}
-                    </span>
-                    <a
-                      href={lead.linktreeUrl}
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-                    >
-                      @{lead.linktreeHandle}
-                      <ExternalLink className='h-3 w-3' />
-                    </a>
-                  </div>
-                </td>
-                <td className='py-2.5 pr-3'>
-                  <Badge variant={STATUS_VARIANT[lead.status] ?? 'secondary'}>
-                    {lead.status}
-                  </Badge>
-                </td>
-                <td className='py-2.5 pr-3 tabular-nums'>
-                  {lead.fitScore ?? '-'}
-                </td>
-                <td className='py-2.5 pr-3'>
-                  <div className='flex gap-1'>
-                    {lead.hasSpotifyLink && (
-                      <Badge variant='secondary' className='text-2xs'>
-                        Spotify
-                      </Badge>
-                    )}
-                    {lead.hasPaidTier && (
-                      <Badge variant='secondary' className='text-2xs'>
-                        Paid
-                      </Badge>
-                    )}
-                    {lead.hasInstagram && (
-                      <Badge variant='secondary' className='text-2xs'>
-                        IG
-                      </Badge>
-                    )}
-                    {lead.contactEmail && (
-                      <Badge variant='secondary' className='text-2xs'>
-                        Email
-                      </Badge>
-                    )}
-                  </div>
-                </td>
-                <td className='py-2.5 pr-3'>
-                  {lead.musicToolsDetected.length > 0 ? (
-                    <span className='text-secondary-token'>
-                      {lead.musicToolsDetected.join(', ')}
-                    </span>
-                  ) : (
-                    <span className='text-tertiary-token'>-</span>
-                  )}
-                </td>
-                <td className='py-2.5'>
-                  {(lead.status === 'qualified' ||
-                    lead.status === 'discovered') && (
-                    <div className='flex gap-1'>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          void updateLeadStatus(lead.id, 'approved')
-                        }
-                        disabled={actioningId === lead.id}
-                        className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
-                        title='Approve & ingest'
+            {renderLeadRows(
+              leadsQuery.isLoading ||
+                (leadsQuery.isFetching && !leadsQuery.data),
+              loadError,
+              leads,
+              lead => (
+                <tr
+                  key={lead.id}
+                  className='border-b border-subtle/50 hover:bg-white/[0.02]'
+                >
+                  <td className='py-2.5 pr-3'>
+                    <div className='flex flex-col'>
+                      <span className='font-medium text-primary-token'>
+                        {lead.displayName || lead.linktreeHandle}
+                      </span>
+                      <a
+                        href={lead.linktreeUrl}
+                        target='_blank'
+                        rel='noopener noreferrer'
+                        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
                       >
-                        {actioningId === lead.id ? (
-                          <Loader2 className='h-4 w-4 animate-spin' />
-                        ) : (
-                          <Check className='h-4 w-4' />
-                        )}
-                      </button>
-                      <button
-                        type='button'
-                        onClick={() =>
-                          void updateLeadStatus(lead.id, 'rejected')
-                        }
-                        disabled={actioningId === lead.id}
-                        className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
-                        title='Reject'
-                      >
-                        <X className='h-4 w-4' />
-                      </button>
+                        @{lead.linktreeHandle}
+                        <ExternalLink className='h-3 w-3' />
+                      </a>
                     </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    <Badge variant={STATUS_VARIANT[lead.status] ?? 'secondary'}>
+                      {lead.status}
+                    </Badge>
+                  </td>
+                  <td className='py-2.5 pr-3 tabular-nums'>
+                    {lead.fitScore ?? '-'}
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    <div className='flex gap-1'>
+                      {lead.hasSpotifyLink && (
+                        <Badge variant='secondary' className='text-2xs'>
+                          Spotify
+                        </Badge>
+                      )}
+                      {lead.hasPaidTier && (
+                        <Badge variant='secondary' className='text-2xs'>
+                          Paid
+                        </Badge>
+                      )}
+                      {lead.hasInstagram && (
+                        <Badge variant='secondary' className='text-2xs'>
+                          IG
+                        </Badge>
+                      )}
+                      {lead.contactEmail && (
+                        <Badge variant='secondary' className='text-2xs'>
+                          Email
+                        </Badge>
+                      )}
+                    </div>
+                  </td>
+                  <td className='py-2.5 pr-3'>
+                    {lead.musicToolsDetected.length > 0 ? (
+                      <span className='text-secondary-token'>
+                        {lead.musicToolsDetected.join(', ')}
+                      </span>
+                    ) : (
+                      <span className='text-tertiary-token'>-</span>
+                    )}
+                  </td>
+                  <td className='py-2.5'>
+                    {(lead.status === 'qualified' ||
+                      lead.status === 'discovered') && (
+                      <div className='flex gap-1'>
+                        <button
+                          type='button'
+                          onClick={() =>
+                            void updateLeadStatus(lead.id, 'approved')
+                          }
+                          disabled={actioningId === lead.id}
+                          className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
+                          title='Approve & ingest'
+                        >
+                          {actioningId === lead.id ? (
+                            <Loader2 className='h-4 w-4 animate-spin' />
+                          ) : (
+                            <Check className='h-4 w-4' />
+                          )}
+                        </button>
+                        <button
+                          type='button'
+                          onClick={() =>
+                            void updateLeadStatus(lead.id, 'rejected')
+                          }
+                          disabled={actioningId === lead.id}
+                          className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                          title='Reject'
+                        >
+                          <X className='h-4 w-4' />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>

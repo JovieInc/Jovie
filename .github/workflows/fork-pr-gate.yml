@@ -45,9 +45,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fast path: Dependabot PRs are internal (not forks) but cannot access
+  # GitHub App secrets. Use GITHUB_TOKEN to set the commit status directly.
+  dependabot-gate:
+    name: Fork PR Gate
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    permissions:
+      statuses: write
+    steps:
+      - name: Auto-pass for Dependabot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha }}"
+          echo "Dependabot PR — auto-passing gate."
+          gh api repos/${{ github.repository }}/statuses/$SHA \
+            -f state="success" \
+            -f target_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            -f description="Dependabot PR — no approval required" \
+            -f context="Fork PR Gate"
+
   fork-gate:
     name: Fork PR Gate
-    if: github.actor != 'copilot-swe-agent[bot]'
+    if: github.actor != 'copilot-swe-agent[bot]' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
@@ -57,7 +79,7 @@ jobs:
     steps:
       - name: Generate Jovie Bot token
         id: app-token
-        uses: actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf # v2.2.1
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}

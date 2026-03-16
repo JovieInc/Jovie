@@ -16,11 +16,11 @@ export function DevToolbar({
   env,
   sha,
   version,
-}: {
+}: Readonly<{
   env: string;
   sha: string;
   version: string;
-}) {
+}>) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -40,12 +40,12 @@ export function DevToolbar({
     });
   }
 
+  const ENV_COLORS: Record<string, string> = {
+    production: 'bg-red-500/20 text-red-400 border-red-500/30',
+    preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+  };
   const envColor =
-    env === 'production'
-      ? 'bg-red-500/20 text-red-400 border-red-500/30'
-      : env === 'preview'
-        ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-        : 'bg-green-500/20 text-green-400 border-green-500/30';
+    ENV_COLORS[env] ?? 'bg-green-500/20 text-green-400 border-green-500/30';
 
   return (
     <div className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'>
@@ -106,7 +106,7 @@ export function DevToolbar({
                   return (
                     <FlagRow
                       key={key}
-                      label={name.toLowerCase().replace(/_/g, ' ')}
+                      label={name.toLowerCase().replaceAll('_', ' ')}
                       isOverridden={isOverridden}
                       checked={value}
                       onCheckedChange={checked =>
@@ -129,7 +129,7 @@ export function DevToolbar({
                   className='flex items-center justify-between py-0.5'
                 >
                   <span className='text-[var(--color-text-tertiary)] truncate flex-1 mr-2'>
-                    {name.toLowerCase().replace(/_/g, ' ')}
+                    {name.toLowerCase().replaceAll('_', ' ')}
                   </span>
                   <span
                     className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
@@ -194,12 +194,12 @@ function Section({
   subtitle,
   action,
   children,
-}: {
+}: Readonly<{
   label: string;
   subtitle?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
-}) {
+}>) {
   return (
     <div className='px-4 py-2.5 border-b md:border-b-0 md:border-r border-[var(--color-border-subtle)] last:border-b-0 last:border-r-0 flex-1 min-w-0'>
       <div className='flex items-center justify-between mb-2'>
@@ -226,13 +226,13 @@ function FlagRow({
   checked,
   onCheckedChange,
   onClear,
-}: {
+}: Readonly<{
   label: string;
   isOverridden: boolean;
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   onClear: () => void;
-}) {
+}>) {
   return (
     <div className='flex items-center gap-2 py-0.5'>
       <Switch.Root

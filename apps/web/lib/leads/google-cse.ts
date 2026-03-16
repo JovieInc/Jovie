@@ -12,6 +12,80 @@ export interface GoogleCSEResult {
   snippet: string;
 }
 
+// ---------------------------------------------------------------------------
+// SerpAPI integration
+// ---------------------------------------------------------------------------
+
+interface SerpAPIResponse {
+  organic_results?: Array<{
+    link: string;
+    title: string;
+    snippet: string;
+  }>;
+  error?: string;
+}
+
+async function searchSerpAPI(
+  query: string,
+  startIndex: number,
+  apiKey: string
+): Promise<GoogleCSEResult[]> {
+  const url = new URL('https://serpapi.com/search.json');
+  url.searchParams.set('api_key', apiKey);
+  url.searchParams.set('engine', 'google');
+  url.searchParams.set('q', query);
+  url.searchParams.set('start', String(startIndex - 1)); // SerpAPI uses 0-based
+  url.searchParams.set('num', '10');
+
+  pipelineLog('discovery', 'SerpAPI search started', { query, startIndex });
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GOOGLE_CSE_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url.toString(), {
+      signal: controller.signal,
+    });
+    const data = (await response.json()) as SerpAPIResponse;
+
+    if (!response.ok || data.error) {
+      const errorMsg = data.error || `SerpAPI returned ${response.status}`;
+      pipelineWarn('discovery', 'SerpAPI error', { error: errorMsg, query });
+      await captureError('SerpAPI error', new Error(errorMsg), {
+        route: 'leads/google-cse',
+        contextData: { query, startIndex, status: response.status },
+      });
+      return [];
+    }
+
+    const results = (data.organic_results ?? []).map(item => ({
+      link: item.link,
+      title: item.title,
+      snippet: item.snippet ?? '',
+    }));
+
+    pipelineLog('discovery', 'SerpAPI search complete', {
+      query,
+      resultCount: results.length,
+    });
+
+    return results;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(
+        `SerpAPI request timed out after ${GOOGLE_CSE_TIMEOUT_MS}ms`
+      );
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Google CSE integration (legacy — deprecated by Google for new customers)
+// ---------------------------------------------------------------------------
+
 interface GoogleCSEResponse {
   items?: Array<{
     link: string;
@@ -44,30 +118,17 @@ async function handleCSEApiError(
   return 'empty';
 }
 
-/**
- * Searches Google Custom Search Engine for results.
- * @param query - Search query string (e.g. "site:linktr.ee musician spotify")
- * @param startIndex - 1-based offset for pagination (1, 11, 21, ...)
- */
-export async function searchGoogleCSE(
+async function searchGoogleCSEInternal(
   query: string,
-  startIndex = 1
+  startIndex: number,
+  apiKey: string,
+  engineId: string
 ): Promise<GoogleCSEResult[]> {
-  const apiKey = process.env.GOOGLE_CSE_API_KEY;
-  const engineId = process.env.GOOGLE_CSE_ENGINE_ID;
-
-  if (!apiKey || !engineId) {
-    const missing = [
-      !apiKey && 'GOOGLE_CSE_API_KEY',
-      !engineId && 'GOOGLE_CSE_ENGINE_ID',
-    ].filter(Boolean);
-    pipelineWarn('discovery', 'Google CSE not configured', { missing });
-    return [];
-  }
-
   pipelineLog('discovery', 'CSE search started', { query, startIndex });
 
-  const url = new URL('https://www.googleapis.com/customsearch/v1');
+  const url = new URL(
+    'https://www.googleapis.com/customsearch/v1/siterestrict'
+  );
   url.searchParams.set('key', apiKey);
   url.searchParams.set('cx', engineId);
   url.searchParams.set('q', query);
@@ -80,7 +141,7 @@ export async function searchGoogleCSE(
     const isLastAttempt = attempt === lastAttempt;
 
     try {
-      const data = await fetchGoogleCSEWithTimeout(url.toString());
+      const data = await fetchWithTimeout(url.toString());
 
       if (data.error) {
         const action = await handleCSEApiError(
@@ -112,17 +173,48 @@ export async function searchGoogleCSE(
 
       await captureError('Google CSE request failed', error, {
         route: 'leads/google-cse',
-        contextData: {
-          query,
-          startIndex,
-          attempts: attempt,
-        },
+        contextData: { query, startIndex, attempts: attempt },
       });
       return [];
     }
   }
 
   return [];
+}
+
+// ---------------------------------------------------------------------------
+// Public API — delegates to SerpAPI (preferred) or Google CSE (legacy)
+// ---------------------------------------------------------------------------
+
+/**
+ * Searches for results using SerpAPI (preferred) or Google CSE (legacy).
+ * @param query - Search query string (e.g. "site:linktr.ee musician spotify")
+ * @param startIndex - 1-based offset for pagination (1, 11, 21, ...)
+ */
+export async function searchGoogleCSE(
+  query: string,
+  startIndex = 1
+): Promise<GoogleCSEResult[]> {
+  const serpApiKey = process.env.SERPAPI_API_KEY;
+  if (serpApiKey) {
+    return searchSerpAPI(query, startIndex, serpApiKey);
+  }
+
+  // Fall back to Google CSE (deprecated for new customers)
+  const apiKey = process.env.GOOGLE_CSE_API_KEY;
+  const engineId = process.env.GOOGLE_CSE_ENGINE_ID;
+
+  if (!apiKey || !engineId) {
+    const missing = [
+      !serpApiKey && 'SERPAPI_API_KEY',
+      !apiKey && 'GOOGLE_CSE_API_KEY',
+      !engineId && 'GOOGLE_CSE_ENGINE_ID',
+    ].filter(Boolean);
+    pipelineWarn('discovery', 'Search API not configured', { missing });
+    return [];
+  }
+
+  return searchGoogleCSEInternal(query, startIndex, apiKey, engineId);
 }
 
 function isRetryableStatus(statusCode: number): boolean {
@@ -133,9 +225,7 @@ function calculateRetryDelayMs(attempt: number): number {
   return GOOGLE_CSE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1);
 }
 
-async function fetchGoogleCSEWithTimeout(
-  url: string
-): Promise<GoogleCSEResponse> {
+async function fetchWithTimeout(url: string): Promise<GoogleCSEResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), GOOGLE_CSE_TIMEOUT_MS);
 
