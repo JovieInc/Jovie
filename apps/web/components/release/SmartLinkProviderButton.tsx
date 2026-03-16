@@ -54,7 +54,12 @@ export function SmartLinkProviderButton({
   if (!href) {
     if (onClick) {
       return (
-        <button type='button' onClick={onClick} className={sharedClassName}>
+        <button
+          type='button'
+          onClick={onClick}
+          className={sharedClassName}
+          aria-label={`Open ${label}`}
+        >
           {content}
         </button>
       );
@@ -70,6 +75,7 @@ export function SmartLinkProviderButton({
       rel='noopener noreferrer'
       onClick={onClick}
       className={sharedClassName}
+      aria-label={`Open ${label}`}
     >
       {content}
     </a>
