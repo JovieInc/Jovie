@@ -68,7 +68,7 @@ export function RangeToggle({
     <div
       role='tablist'
       aria-label='Select analytics range'
-      className='inline-flex items-center rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'
+      className='inline-flex items-center rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'
     >
       {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
