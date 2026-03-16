@@ -21,7 +21,7 @@ import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
-import { applyVipBoost, parseLimit } from './helpers';
+import { annotateClaimedStatus, applyVipBoost, parseLimit } from './helpers';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
@@ -124,7 +124,8 @@ export async function GET(request: NextRequest) {
   if (q.length === 1 && /^[a-zA-Z]$/.test(q)) {
     const alphabetResults = await getAlphabetResults(q.toLowerCase());
     if (alphabetResults && alphabetResults.length > 0) {
-      return NextResponse.json(alphabetResults, { headers: rateLimitHeaders });
+      const annotated = await annotateClaimedStatus(alphabetResults);
+      return NextResponse.json(annotated, { headers: rateLimitHeaders });
     }
     // No cached results — return empty rather than hitting Spotify with a 1-char query
     return NextResponse.json([], { headers: rateLimitHeaders });
@@ -133,7 +134,7 @@ export async function GET(request: NextRequest) {
   try {
     // Multi-layer cache (in-memory LRU + Redis) wrapping Spotify API
     const cacheKey = `spotify:search:${q.toLowerCase()}:${limit}`;
-    const results = await cacheQuery<SpotifyArtistResult[]>(
+    const cachedResults = await cacheQuery<SpotifyArtistResult[]>(
       cacheKey,
       async () => {
         // Use the hardened Spotify client with circuit breaker and retry
@@ -158,6 +159,9 @@ export async function GET(request: NextRequest) {
       },
       { ttlSeconds: SEARCH_CACHE_TTL_SECONDS, useRedis: true }
     );
+
+    // Post-cache: annotate claimed status (not cached with search results, always fresh-ish)
+    const results = await annotateClaimedStatus(cachedResults);
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {

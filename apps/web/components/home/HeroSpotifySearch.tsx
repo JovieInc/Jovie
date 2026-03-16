@@ -439,11 +439,11 @@ export function HeroSpotifySearch() {
                     <div className='font-medium truncate text-sm text-primary-token'>
                       {artist.name}
                     </div>
-                    {artist.followers && (
+                    {artist.followers ? (
                       <div className='text-xs text-tertiary-token'>
                         {formatFollowers(artist.followers)}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   {artist.verified && (
                     <div

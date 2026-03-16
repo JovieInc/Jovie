@@ -92,7 +92,7 @@ function handleEnterInResults(
   const isArtistSelected = activeIndex >= 0 && activeIndex < results.length;
   if (isArtistSelected) {
     const artist = results[activeIndex];
-    if (artist) onArtistSelect(artist);
+    if (artist && !artist.isClaimed) onArtistSelect(artist);
     return;
   }
   if (activeIndex === pasteUrlIndex) {
@@ -567,14 +567,22 @@ export function SpotifyConnectDialog({
                     <button
                       key={artist.id}
                       type='button'
-                      tabIndex={0}
+                      tabIndex={artist.isClaimed ? -1 : 0}
+                      disabled={artist.isClaimed}
                       className={cn(
-                        'flex w-full cursor-pointer items-center gap-3 border-0 bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                        'flex w-full items-center gap-3 border-0 bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
                         index === formState.activeResultIndex &&
-                          'bg-(--linear-bg-surface-1)'
+                          !artist.isClaimed &&
+                          'bg-(--linear-bg-surface-1)',
+                        artist.isClaimed
+                          ? 'opacity-50 cursor-not-allowed'
+                          : 'cursor-pointer'
                       )}
-                      onClick={() => handleArtistSelect(artist)}
+                      onClick={() =>
+                        !artist.isClaimed && handleArtistSelect(artist)
+                      }
                       onKeyDown={event =>
+                        !artist.isClaimed &&
                         handleActivationKeyDown(event, () =>
                           handleArtistSelect(artist)
                         )
@@ -609,11 +617,15 @@ export function SpotifyConnectDialog({
                         <div className='truncate text-[13px] font-[510] text-(--linear-text-primary)'>
                           {artist.name}
                         </div>
-                        {artist.followers && (
+                        {artist.isClaimed ? (
+                          <div className='text-[11px] text-(--linear-text-tertiary)'>
+                            Already claimed
+                          </div>
+                        ) : artist.followers ? (
                           <div className='text-[11px] text-(--linear-text-tertiary)'>
                             {formatFollowers(artist.followers)}
                           </div>
-                        )}
+                        ) : null}
                       </div>
                       {artist.verified && (
                         <div
