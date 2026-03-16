@@ -208,7 +208,7 @@ export function LeadPipelineControls() {
     }
   }
 
-  if (settingsQuery.isLoading) {
+  if (settingsQuery.isLoading || (settingsQuery.isFetching && !settings)) {
     return (
       <div className='border-b border-subtle px-4 py-4 text-sm text-secondary-token'>
         Loading pipeline settings...
@@ -217,9 +217,12 @@ export function LeadPipelineControls() {
   }
 
   if (!settings) {
+    const errorMsg =
+      settingsQuery.error?.message ||
+      'Unable to load pipeline settings. Please refresh.';
     return (
       <div className='border-b border-subtle px-4 py-4 text-sm text-destructive'>
-        Unable to load pipeline settings. Please refresh.
+        {errorMsg}
       </div>
     );
   }
