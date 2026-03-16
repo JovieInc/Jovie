@@ -59,6 +59,31 @@ export function unwrapPgError(error: unknown, depth = 0): PgErrorFields {
  * Check whether an error (possibly Drizzle-wrapped) is a PostgreSQL
  * unique_violation (23505), optionally on a specific constraint.
  */
+/**
+ * Get the deepest error message from a possibly-wrapped error chain.
+ * Drizzle wraps PG errors so the outer `.message` says "Failed query: ..."
+ * while the actual PG message (e.g. "column X does not exist") is on `.cause`.
+ */
+export function getDeepErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object') return String(error ?? '');
+
+  const messages: string[] = [];
+  let current: unknown = error;
+  let depth = 0;
+
+  while (current && typeof current === 'object' && depth < MAX_UNWRAP_DEPTH) {
+    const rec = current as Record<string, unknown>;
+    if (typeof rec.message === 'string' && rec.message) {
+      messages.push(rec.message);
+    }
+    // Walk the same chain as unwrapPgError
+    current = rec.cause ?? rec.sourceError ?? rec.error ?? null;
+    depth++;
+  }
+
+  return messages.join(' | ');
+}
+
 export function isUniqueViolation(
   error: unknown,
   constraint?: string
