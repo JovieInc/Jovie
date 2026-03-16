@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -42,8 +43,9 @@ function getLeadSortColumn(sortBy: string) {
 }
 
 function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  const normalized = message.toLowerCase();
+  // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
+  // the actual PG "column X does not exist" lives on .cause, not the outer error.
+  const normalized = getDeepErrorMessage(error).toLowerCase();
 
   return (
     normalized.includes('column "spotify_popularity" does not exist') ||
@@ -57,8 +59,8 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
 }
 
 function isMissingLeadInsertColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  const normalized = message.toLowerCase();
+  // Use getDeepErrorMessage to unwrap Drizzle's error wrapping
+  const normalized = getDeepErrorMessage(error).toLowerCase();
 
   return (
     normalized.includes(
