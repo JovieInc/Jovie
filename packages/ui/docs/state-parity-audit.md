@@ -13,12 +13,12 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 | **Input** | Y | - | - | Y | Y | Y |
 | **Textarea** | Y | - | - | Y | Y | - |
 | **Select (trigger)** | Y | - | - | Y | Y | - |
-| **Checkbox** | Y | - | Y | Y | Y | - |
-| **RadioGroup** | Y | - | Y | Y | Y | - |
+| **Checkbox** | Y | Y | Y | Y | Y | - |
+| **RadioGroup** | Y | Y | Y | Y | Y | - |
 | **Switch** | Y | - | Y | Y | Y | - |
 | **SegmentControl** | Y | Y | Y | Y | Y | - |
 | **Badge** | - | - | - | Y | - | - |
-| **Card** | Y (variant) | - | - | - | - | - |
+| **Card** | Y (variant) | - | - | Y (hoverable) | - | - |
 | **CloseButton** | Y | - | - | Y | Y | - |
 | **Dialog** | Y (close) | - | - | Y (close) | - | - |
 | **Sheet** | Y (close) | - | - | Y (close) | - | - |
@@ -40,8 +40,8 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 - ~~**RadioGroup**: Add hover highlight on the radio indicator~~ Done in Lane B2
 
 ### P2 — Interactive affordance
-- **Card** (hoverable variant): Add `focus-visible` ring for keyboard users
-- **Checkbox/RadioGroup**: Consider subtle `active` press feedback
+- ~~**Card** (hoverable variant): Add `focus-visible` ring for keyboard users~~ Done in P2 fixes
+- ~~**Checkbox/RadioGroup**: Consider subtle `active` press feedback~~ Done in P2 fixes
 
 ### No action needed
 - Popover, Tooltip, Skeleton, Separator, Label, Field, Avatar, Kbd: These are display/layout-only or non-interactive containers. State handling is N/A.
@@ -58,3 +58,6 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 | Textarea | hover | `hover:border-(--linear-border-default)` |
 | Checkbox | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |
 | RadioGroupItem | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |
+| Card (hoverable) | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1` |
+| Checkbox | active | `active:scale-95 active:transition-transform` |
+| RadioGroupItem | active | `active:scale-95 active:transition-transform` |
