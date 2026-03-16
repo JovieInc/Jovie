@@ -9,6 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Added deterministic Playwright e2e QA harness for `/demo` page — covers page render, release table, drawer interaction, and sidebar accessibility
 - Added `borders.focus`, `surfaces.tooltip`, and `text.tooltip` to typed design token objects in `@jovie/ui`
 - Re-exported all design token objects (`surfaces`, `text`, `borders`, `accent`, `buttons`, `interactive`, `status`, `featureAccents`, `sidebar`, `shadows`, `radii`, `spacing`, `typography`, `animation`) from `@jovie/ui` package index
 
