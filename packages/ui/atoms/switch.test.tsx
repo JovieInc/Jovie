@@ -110,6 +110,22 @@ describe('Switch', () => {
       );
     });
 
+    it('applies hover state for unchecked track', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const switchElement = screen.getByTestId('switch');
+      expect(switchElement.className).toContain(
+        'data-[state=unchecked]:hover:bg-white/[0.12]'
+      );
+    });
+
+    it('applies hover state for checked track', () => {
+      render(<Switch aria-label='Toggle' data-testid='switch' />);
+      const switchElement = screen.getByTestId('switch');
+      expect(switchElement.className).toContain(
+        'data-[state=checked]:hover:bg-indigo-600'
+      );
+    });
+
     it('applies checked background and matching border', () => {
       render(
         <Switch defaultChecked aria-label='Toggle' data-testid='switch' />

@@ -260,6 +260,7 @@ export const SELECT_TRIGGER_BASE =
   'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'transition-colors duration-normal ' +
+  'hover:border-(--linear-border-default) ' +
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
