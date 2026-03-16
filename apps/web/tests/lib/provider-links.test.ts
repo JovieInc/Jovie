@@ -109,7 +109,7 @@ describe('provider link discovery', () => {
         }),
       } as unknown as Response);
 
-      const links = await resolveProviderLinks(baseTrack, {
+      const { links } = await resolveProviderLinks(baseTrack, {
         providers: ['apple_music', 'spotify'],
         fetcher: fetchMock,
       });
@@ -140,7 +140,7 @@ describe('provider link discovery', () => {
         json: async () => ({ resultCount: 0, results: [] }),
       } as unknown as Response);
 
-      const links = await resolveProviderLinks(baseTrack, {
+      const { links } = await resolveProviderLinks(baseTrack, {
         providers: ['apple_music', 'spotify'],
         fetcher: fetchMock,
       });
@@ -154,7 +154,7 @@ describe('provider link discovery', () => {
     });
 
     it('respects manual overrides and skips lookup', async () => {
-      const links = await resolveProviderLinks(baseTrack, {
+      const { links } = await resolveProviderLinks(baseTrack, {
         providers: ['apple_music', 'spotify'],
         overrides: {
           apple_music: {

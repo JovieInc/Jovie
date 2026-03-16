@@ -27,6 +27,7 @@ import {
 import {
   getReleaseById,
   getTracksForRelease,
+  updateTrackLyrics,
   upsertProviderLink,
 } from './queries';
 import type { ProviderKey } from './types';
@@ -308,9 +309,14 @@ export async function discoverLinksForRelease(
   // Musicfetch lookup (supplementary — resolves all other DSPs in one call)
   if (isMusicfetchAvailable()) {
     lookupPromises.push(
-      musicfetchLookupByIsrc(isrc)
+      musicfetchLookupByIsrc(isrc, { withLyrics: true })
         .then(async musicfetchResult => {
           if (!musicfetchResult) return;
+
+          // Persist lyrics to the track if returned
+          if (musicfetchResult.lyrics && trackWithIsrc.id) {
+            await updateTrackLyrics(trackWithIsrc.id, musicfetchResult.lyrics);
+          }
 
           for (const [providerKey, url] of Object.entries(
             musicfetchResult.links

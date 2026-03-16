@@ -456,6 +456,13 @@
       "when": 1773820800000,
       "tag": "0065_add_keyword_search_offset",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1773907200000,
+      "tag": "0066_add_discog_tracks_lyrics",
+      "breakpoints": true
     }
   ]
 }

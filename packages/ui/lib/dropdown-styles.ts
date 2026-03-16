@@ -52,7 +52,7 @@ export const DROPDOWN_SLIDE_ANIMATIONS =
  * Border uses --linear-border-default (slightly more opaque than --linear-border-subtle used by separators)
  */
 export const DROPDOWN_CONTENT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle)/70 bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Shadow effect for elevated appearance
@@ -260,6 +260,7 @@ export const SELECT_TRIGGER_BASE =
   'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'transition-colors duration-normal ' +
+  'hover:border-(--linear-border-default) ' +
   'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
@@ -287,7 +288,7 @@ export const subMenuContentClasses = [
  * Compact base — same surface/border/animation but tighter padding
  */
 export const DROPDOWN_CONTENT_COMPACT_BASE =
-  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]';
+  'z-[70] min-w-[184px] overflow-hidden rounded-(--linear-app-radius-menu) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-0.5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)';
 
 /**
  * Complete compact DropdownMenu content classes

@@ -34,7 +34,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    'fixed z-[65] gap-4 bg-surface-1 p-5 text-primary-token shadow-[var(--linear-shadow-card-elevated)]',
+    'fixed z-[65] gap-4 bg-surface-1 p-5 text-primary-token shadow-(--linear-shadow-card-elevated)',
     'transition ease-in-out',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
     'data-[state=closed]:duration-300 data-[state=open]:duration-500',

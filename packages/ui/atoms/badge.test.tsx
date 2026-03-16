@@ -122,6 +122,13 @@ describe('Badge', () => {
       expect(badge.className).toContain('font-[510]');
     });
 
+    it('applies focus-visible ring for accessibility', () => {
+      render(<Badge data-testid='badge'>New</Badge>);
+      const badge = screen.getByTestId('badge');
+      expect(badge.className).toContain('focus-visible:ring-2');
+      expect(badge.className).toContain('focus-visible:outline-none');
+    });
+
     it('merges custom className', () => {
       render(
         <Badge className='custom-class' data-testid='badge'>

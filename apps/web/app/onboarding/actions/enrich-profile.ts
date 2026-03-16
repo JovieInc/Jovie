@@ -180,6 +180,8 @@ function buildEnrichmentUpdates(
   profile: MusicFetchProfileFieldState & {
     displayNameLocked: boolean | null;
     displayName: string | null;
+    usernameNormalized: string;
+    username: string;
   },
   musicFetch: MusicFetchArtistResult | null,
   artist: Awaited<ReturnType<typeof getSpotifyArtistProfile>> | null,
@@ -202,7 +204,13 @@ function buildEnrichmentUpdates(
 
   // Display name from MusicFetch first, then Spotify fallback.
   const enrichedName = musicFetch?.name ?? artist?.name;
-  if (enrichedName && !profile.displayNameLocked && !profile.displayName) {
+  if (
+    enrichedName &&
+    !profile.displayNameLocked &&
+    (!profile.displayName ||
+      profile.displayName === profile.usernameNormalized ||
+      profile.displayName === profile.username)
+  ) {
     profileUpdates.displayName = enrichedName;
     result.name = enrichedName;
   }
@@ -293,6 +301,7 @@ export async function enrichProfileFromDsp(
       spotifyFollowers: creatorProfiles.spotifyFollowers,
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      username: creatorProfiles.username,
       spotifyUrl: creatorProfiles.spotifyUrl,
       spotifyId: creatorProfiles.spotifyId,
       appleMusicUrl: creatorProfiles.appleMusicUrl,

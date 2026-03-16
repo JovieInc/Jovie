@@ -81,10 +81,10 @@ export function AnalyticsFunnel({
               <ContentSurfaceCard
                 className={`
                   relative overflow-hidden rounded-xl
-                  bg-gradient-to-r from-[var(--linear-bg-surface-1)] to-[var(--linear-bg-surface-2)]
+                  bg-gradient-to-r from-(--linear-bg-surface-1) to-(--linear-bg-surface-2)
                   px-6 py-5 text-center
                   ${isLast ? '' : 'hover:border-(--linear-border-default)'}
-                  ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-[var(--linear-bg-surface-1)]' : ''}
+                  ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-(--linear-bg-surface-1)' : ''}
                   transition-all duration-200
                 `}
               >

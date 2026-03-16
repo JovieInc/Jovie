@@ -30,7 +30,7 @@ export const centeredContentStyles = {
   position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
   layout: 'grid w-full max-w-lg gap-4',
   surface:
-    'border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-(--linear-text-primary) shadow-[var(--linear-shadow-card-elevated)]',
+    'border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-6 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
   // fade + zoom only; slide animations conflict with the translate centering
   // because tw-animate-css slide uses transform: translate3d() in keyframes
   animation:

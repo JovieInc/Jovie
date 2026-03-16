@@ -51,6 +51,8 @@ export function AppleStyleOnboardingForm({
     });
   const validateHandleRef = useRef(validateHandle);
 
+  const [isDspEnriching, setIsDspEnriching] = useState(false);
+
   const {
     state,
     handleSubmit,
@@ -59,6 +61,7 @@ export function AppleStyleOnboardingForm({
     autoSubmitClaimed,
     enrichedProfile,
     setEnrichedProfile,
+    isEnriching: isAutoConnectEnriching,
   } = useOnboardingSubmit({
     userId,
     userEmail,
@@ -214,11 +217,13 @@ export function AppleStyleOnboardingForm({
 
       // Fire-and-forget: enrich profile in background (JOV-1340)
       if (spotifyArtistId && spotifyUrl) {
+        setIsDspEnriching(true);
         void enrichProfileFromDsp(spotifyArtistId, spotifyUrl)
           .then(enriched => setEnrichedProfile(enriched))
           .catch(() => {
             // Enrichment failure is non-critical — user can fill in manually
-          });
+          })
+          .finally(() => setIsDspEnriching(false));
       }
 
       goToNextStep();
@@ -273,6 +278,7 @@ export function AppleStyleOnboardingForm({
             enrichedProfile={enrichedProfile}
             handle={profileReadyHandle || handle}
             onGoToDashboard={goToDashboard}
+            isEnriching={isDspEnriching || isAutoConnectEnriching}
           />
         );
 

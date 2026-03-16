@@ -21,7 +21,7 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex min-h-[34px] shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-transparent px-[var(--linear-app-header-padding-x)] py-0.5',
+        'flex min-h-[34px] shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-transparent px-(--linear-app-header-padding-x) py-0.5',
         className
       )}
     >

@@ -52,6 +52,7 @@ interface SpotifyImportState {
 function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
   setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>,
+  setIsEnriching: Dispatch<SetStateAction<boolean>>,
   signal: AbortSignal,
   userId: string
 ): void {
@@ -110,6 +111,7 @@ function tryAutoConnectSpotify(
         });
 
       // Fire-and-forget: enrich profile data in background
+      if (!signal.aborted) setIsEnriching(true);
       void enrichProfileFromDsp(artistId, normalizedUrl)
         .then(enriched => {
           if (!signal.aborted) {
@@ -118,6 +120,9 @@ function tryAutoConnectSpotify(
         })
         .catch(() => {
           // Enrichment failure is non-critical — user can fill in manually
+        })
+        .finally(() => {
+          if (!signal.aborted) setIsEnriching(false);
         });
     }
 
@@ -152,6 +157,7 @@ interface UseOnboardingSubmitReturn {
   autoSubmitClaimed: boolean;
   enrichedProfile: EnrichedProfileData | null;
   setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>;
+  isEnriching: boolean;
 }
 
 const AUTO_SUBMIT_CONFIRMATION_DELAY_MS = 1400;
@@ -190,6 +196,7 @@ export function useOnboardingSubmit({
   const [autoSubmitClaimed, setAutoSubmitClaimed] = useState(false);
   const [enrichedProfile, setEnrichedProfile] =
     useState<EnrichedProfileData | null>(null);
+  const [isEnriching, setIsEnriching] = useState(false);
 
   // Abort controller to clean up Spotify import on unmount
   const spotifyAbortRef = useRef<AbortController | null>(null);
@@ -376,6 +383,7 @@ export function useOnboardingSubmit({
         tryAutoConnectSpotify(
           setSpotifyImportState,
           setEnrichedProfile,
+          setIsEnriching,
           controller.signal,
           userId
         );
@@ -459,5 +467,6 @@ export function useOnboardingSubmit({
     autoSubmitClaimed,
     enrichedProfile,
     setEnrichedProfile,
+    isEnriching,
   };
 }

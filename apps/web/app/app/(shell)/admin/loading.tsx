@@ -19,11 +19,11 @@ export default function AdminLoading() {
           <AdminBraggingRightsSectionSkeleton />
           <AdminKpiSectionSkeleton />
           <div className='overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0'>
-            <div className='border-b border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-3'>
+            <div className='border-b border-(--linear-border-subtle) px-(--linear-app-header-padding-x) py-3'>
               <div className='h-4 w-40 rounded skeleton' />
               <div className='mt-2 h-3 w-56 rounded skeleton' />
             </div>
-            <div className='border-t border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-4'>
+            <div className='border-t border-(--linear-border-subtle) px-(--linear-app-header-padding-x) py-4'>
               <AdminPlatformStatsSectionSkeleton />
             </div>
           </div>

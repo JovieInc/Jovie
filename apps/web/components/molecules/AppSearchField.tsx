@@ -36,7 +36,7 @@ export function AppSearchField({
   return (
     <div
       className={cn(
-        'flex h-[var(--linear-app-control-height-sm)] items-center gap-2 rounded-[var(--linear-app-control-radius)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2.5 text-(--linear-text-primary) transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-0) focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
+        'flex h-(--linear-app-control-height-sm) items-center gap-2 rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2.5 text-(--linear-text-primary) transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-0) focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
         className
       )}
     >

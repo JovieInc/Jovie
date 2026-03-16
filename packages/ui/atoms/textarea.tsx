@@ -10,6 +10,7 @@ const textareaVariants = cva(
     'flex w-full rounded-[var(--radius-md)] border border-default bg-surface-input px-3 py-2',
     'text-[13px] ring-offset-background',
     'placeholder:text-tertiary-token',
+    'hover:border-(--linear-border-default)',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:border-focus',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-all duration-normal ease-interactive',
@@ -20,9 +21,9 @@ const textareaVariants = cva(
       variant: {
         default: '',
         error:
-          'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
+          'border-destructive hover:border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
         success:
-          'border-success focus-visible:ring-success focus-visible:border-success',
+          'border-success hover:border-success focus-visible:ring-success focus-visible:border-success',
       },
       textareaSize: {
         sm: 'px-2 py-1.5 text-xs min-h-[60px]',

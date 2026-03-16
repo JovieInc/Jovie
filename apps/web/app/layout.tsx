@@ -335,12 +335,14 @@ export default async function RootLayout({
         >
           Skip to content
         </a>
-        <CoreProviders>{children}</CoreProviders>
+        <CoreProviders>
+          {children}
+          {DevToolbar && (
+            <DevToolbar env={devEnv} sha={devSha} version={devVersion} />
+          )}
+        </CoreProviders>
 
         <CookieBannerSection />
-        {DevToolbar && (
-          <DevToolbar env={devEnv} sha={devSha} version={devVersion} />
-        )}
       </body>
     </html>
   );

@@ -7,17 +7,29 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Suppressed "You're off the waitlist!" email for users who bypassed the waitlist (gate disabled or auto-accept threshold)
+
 ### Added
 
-- 
+- Added lyrics support via MusicFetch `/isrc` `withLyrics` parameter — lyrics are now fetched and persisted to `discog_tracks.lyrics` during link discovery
+- Added MusicFetch enrichment and DSP discovery job triggers after lead ingestion when Spotify data is available
+- Added `skipMusicFetchEnrichment` flag to `connectSpotifyArtist` to prevent duplicate enrichment during onboarding
+- Added deterministic Playwright e2e QA harness for `/demo` page — covers page render, release table, drawer interaction, and sidebar accessibility
+- Added `borders.focus`, `surfaces.tooltip`, and `text.tooltip` to typed design token objects in `@jovie/ui`
+- Re-exported all design token objects (`surfaces`, `text`, `borders`, `accent`, `buttons`, `interactive`, `status`, `featureAccents`, `sidebar`, `shadows`, `radii`, `spacing`, `typography`, `animation`) from `@jovie/ui` package index
 
 ### Changed
 
-- 
+- Replaced editable profile form in final onboarding step with progress bar (10s timeout) followed by read-only profile card preview
+- Artist display name now overwrites placeholder names (handle/username) during MusicFetch enrichment on both onboarding and async job paths
+- Migrated organism and molecule components from `[var(--linear-*)]` bracket syntax to Tailwind v4 `(--linear-*)` parenthesis syntax (10 files: PageShell, HeaderNav, RightDrawer, MobileNav, DrawerLoadingSkeleton, DrawerSettingsToggle, DialogLoadingSkeleton, PageToolbar, ActionBar, ProfileNotificationsMenu)
 
 ### Fixed
 
-- 
+- Fixed duplicate Spotify social links created during onboarding by skipping async MusicFetch job when sync enrichment already handles it
+- Fixed artist name not being set during onboarding enrichment when display name was auto-populated with the handle
 
 ## [26.2.0] - 2026-02-12
 

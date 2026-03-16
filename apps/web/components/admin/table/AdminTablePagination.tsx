@@ -76,7 +76,7 @@ export function AdminTablePagination({
   );
 
   return (
-    <div className='flex flex-wrap items-center justify-between gap-3 border-t border-(--linear-border-subtle) px-[var(--linear-app-header-padding-x)] py-2.5 text-[12px] text-(--linear-text-secondary)'>
+    <div className='flex flex-wrap items-center justify-between gap-3 border-t border-(--linear-border-subtle) px-(--linear-app-header-padding-x) py-2.5 text-[12px] text-(--linear-text-secondary)'>
       {/* Page info */}
       <div className='flex items-center gap-2'>
         <span className='tabular-nums'>

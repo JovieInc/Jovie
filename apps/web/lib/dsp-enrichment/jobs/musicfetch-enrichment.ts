@@ -93,6 +93,7 @@ export async function processMusicFetchEnrichmentJob(
     .select({
       id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
+      username: creatorProfiles.username,
       displayName: creatorProfiles.displayName,
       displayNameLocked: creatorProfiles.displayNameLocked,
       avatarUrl: creatorProfiles.avatarUrl,
@@ -130,12 +131,25 @@ export async function processMusicFetchEnrichmentJob(
     spotifyUrl
   );
 
+  // Set displayName from artist data if profile still has a placeholder name
+  let enrichedDisplayName: string | undefined;
+  if (
+    artistData.name &&
+    !profile.displayNameLocked &&
+    (!profile.displayName ||
+      profile.displayName === profile.usernameNormalized ||
+      profile.displayName === profile.username)
+  ) {
+    enrichedDisplayName = artistData.name;
+  }
+
   // Respect user's explicit avatar lock — don't overwrite a manually set photo
   if (profile.avatarLockedByUser) {
     delete dspUpdates.avatarUrl;
   }
 
   const dspFieldNames = Object.keys(dspUpdates);
+  if (enrichedDisplayName) dspFieldNames.push('displayName');
 
   // Apply profile DSP updates
   if (dspFieldNames.length > 0) {
@@ -143,6 +157,7 @@ export async function processMusicFetchEnrichmentJob(
       .update(creatorProfiles)
       .set({
         ...dspUpdates,
+        ...(enrichedDisplayName ? { displayName: enrichedDisplayName } : {}),
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, creatorProfileId));

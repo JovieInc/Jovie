@@ -37,7 +37,7 @@ export function DialogLoadingSkeleton({
           </div>
         </div>
 
-        <div className='rounded-xl border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-[var(--linear-shadow-card-elevated)]'>
+        <div className='rounded-xl border border-(--linear-border-default) bg-(--linear-bg-surface-0) p-3 shadow-(--linear-shadow-card-elevated)'>
           <div className='space-y-1.5'>
             {rowIds.map(rowId => (
               <DrawerSurfaceCard

@@ -21,15 +21,15 @@ interface AuthInputProps
 
 const authInputClasses = cn(
   // Base styling - subtle borders for premium feel
-  'border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] text-[var(--linear-text-primary)]',
-  'placeholder:text-[var(--linear-text-tertiary)]',
-  'rounded-[var(--linear-radius-sm)]',
+  'border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary)',
+  'placeholder:text-(--linear-text-tertiary)',
+  'rounded-(--linear-radius-sm)',
   // Focus ring
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-border-focus)]/40 focus-visible:ring-offset-2',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
   // Mobile-optimized sizing
-  'h-[var(--linear-button-height-md)] sm:h-[var(--linear-button-height-md)] min-h-[40px] px-3',
+  'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px] px-3',
   // Typography
-  'text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)]',
+  'text-(--linear-caption-size) font-(--linear-caption-weight)',
   // Touch optimizations
   'touch-manipulation',
   '[-webkit-tap-highlight-color:transparent]',

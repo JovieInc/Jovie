@@ -57,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-[var(--linear-app-header-height)] w-full items-center gap-1 px-[var(--linear-app-header-padding-x)] sm:flex'>
+      <div className='relative hidden h-(--linear-app-header-height) w-full items-center gap-1 px-(--linear-app-header-padding-x) sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -94,7 +94,7 @@ export function DashboardHeader({
           )}
         </div>
         {action ? (
-          <div className='ml-auto flex items-center gap-[var(--linear-app-toolbar-gap)]'>
+          <div className='ml-auto flex items-center gap-(--linear-app-toolbar-gap)'>
             {action}
           </div>
         ) : null}
