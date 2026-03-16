@@ -228,7 +228,7 @@ describe('resolveProviderLinks with Deezer', () => {
       } as unknown as Response;
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['deezer', 'spotify'],
       fetcher: fetchMock,
     });
@@ -263,7 +263,7 @@ describe('resolveProviderLinks with Deezer', () => {
       } as unknown as Response;
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['deezer'],
       fetcher: fetchMock,
     });
@@ -283,7 +283,7 @@ describe('resolveProviderLinks with Deezer', () => {
       json: async () => ({ resultCount: 0, results: [] }),
     } as unknown as Response);
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['apple_music'],
       fetcher: fetchMock,
     });
@@ -316,7 +316,7 @@ describe('resolveProviderLinks with Deezer', () => {
       } as unknown as Response;
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['deezer'],
       fetcher: fetchMock,
     });
