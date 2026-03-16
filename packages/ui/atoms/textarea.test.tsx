@@ -32,6 +32,14 @@ describe('Textarea', () => {
       expect(textarea.className).toContain('bg-surface-input');
     });
 
+    it('applies hover border class', () => {
+      render(<Textarea data-testid='textarea' />);
+      const textarea = screen.getByTestId('textarea');
+      expect(textarea.className).toContain(
+        'hover:border-(--linear-border-default)'
+      );
+    });
+
     it('applies error variant classes', () => {
       render(<Textarea variant='error' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
