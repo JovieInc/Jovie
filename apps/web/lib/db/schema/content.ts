@@ -105,6 +105,7 @@ export const discogTracks = pgTable(
     audioUrl: text('audio_url'),
     audioFormat: text('audio_format'),
     previewUrl: text('preview_url'),
+    lyrics: text('lyrics'),
     sourceType: ingestionSourceTypeEnum('source_type')
       .default('manual')
       .notNull(),

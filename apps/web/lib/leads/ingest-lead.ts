@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { type Lead, leads } from '@/lib/db/schema/leads';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { resolveHostedAvatarUrl } from '@/lib/ingestion/flows/avatar-hosting';
 import { fetchFullExtractionProfile } from '@/lib/ingestion/flows/full-extraction-flow';
@@ -9,6 +10,10 @@ import {
   handleNewProfileIngest,
   handleReingestProfile,
 } from '@/lib/ingestion/flows/reingest-flow';
+import {
+  enqueueDspArtistDiscoveryJob,
+  enqueueMusicFetchEnrichmentJob,
+} from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
 
 export interface LeadIngestionResult {
@@ -103,6 +108,38 @@ export async function ingestLeadAsCreator(
           updatedAt: new Date(),
         })
         .where(eq(leads.id, lead.id));
+
+      // Enqueue MusicFetch enrichment and DSP discovery for the new profile
+      const [createdProfile] = await db
+        .select({
+          spotifyUrl: creatorProfiles.spotifyUrl,
+          spotifyId: creatorProfiles.spotifyId,
+        })
+        .from(creatorProfiles)
+        .where(eq(creatorProfiles.id, body.profile.id))
+        .limit(1);
+
+      if (createdProfile?.spotifyUrl) {
+        void enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: body.profile.id,
+          spotifyUrl: createdProfile.spotifyUrl,
+        }).catch(err =>
+          captureError('MusicFetch enrichment enqueue failed for lead', err, {
+            leadId: lead.id,
+          })
+        );
+      }
+      if (createdProfile?.spotifyId) {
+        void enqueueDspArtistDiscoveryJob({
+          creatorProfileId: body.profile.id,
+          spotifyArtistId: createdProfile.spotifyId,
+          targetProviders: ['apple_music'],
+        }).catch(err =>
+          captureError('DSP discovery enqueue failed for lead', err, {
+            leadId: lead.id,
+          })
+        );
+      }
     }
 
     logger.info('Lead auto-ingested as creator', {

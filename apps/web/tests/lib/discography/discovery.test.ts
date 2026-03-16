@@ -661,7 +661,9 @@ describe('discovery', () => {
       await discoverLinksForRelease('release-1');
 
       // MusicFetch should be called with the ISRC from track 2
-      expect(mockMusicfetchLookupByIsrc).toHaveBeenCalledWith('GBAYE0200185');
+      expect(mockMusicfetchLookupByIsrc).toHaveBeenCalledWith('GBAYE0200185', {
+        withLyrics: true,
+      });
     });
   });
 

@@ -88,6 +88,7 @@ export interface MusicfetchIsrcResult {
   services: Record<string, MusicfetchServiceResult>;
   artists?: Array<{ name: string }>;
   albums?: Array<{ name: string }>;
+  lyrics?: string;
 }
 
 interface MusicfetchResponse {
@@ -99,6 +100,8 @@ export interface MusicfetchLookupResult {
   links: Record<string, string>;
   /** Raw result for debugging/metadata */
   raw: MusicfetchIsrcResult;
+  /** Track lyrics, if requested and available */
+  lyrics?: string;
 }
 
 // ============================================================================
@@ -149,7 +152,7 @@ export function isMusicfetchAvailable(): boolean {
  */
 export async function lookupByIsrc(
   isrc: string,
-  options?: { services?: string[] }
+  options?: { services?: string[]; withLyrics?: boolean }
 ): Promise<MusicfetchLookupResult | null> {
   const token = env.MUSICFETCH_API_TOKEN;
   if (!token) return null;
@@ -163,6 +166,10 @@ export async function lookupByIsrc(
         isrc,
         services: servicesParam,
       });
+
+      if (options?.withLyrics) {
+        params.set('withLyrics', 'true');
+      }
 
       try {
         return await musicfetchRequest<MusicfetchResponse>('/isrc', params, {
@@ -200,7 +207,11 @@ export async function lookupByIsrc(
       data: { isrc, providersFound: Object.keys(links) },
     });
 
-    return { links, raw: result.result };
+    return {
+      links,
+      raw: result.result,
+      lyrics: result.result.lyrics ?? undefined,
+    };
   } catch (error) {
     Sentry.addBreadcrumb({
       category: 'musicfetch',

@@ -62,7 +62,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
       raw: {},
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['youtube', 'tidal', 'amazon_music', 'soundcloud', 'pandora'],
       fetcher: fetchMock,
     });
@@ -87,7 +87,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
   it('providers get search_fallback URLs when MusicFetch is unavailable', async () => {
     mockIsMusicfetchAvailable.mockReturnValue(false);
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['youtube', 'tidal', 'soundcloud'],
       fetcher: fetchMock,
     });
@@ -153,7 +153,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
       raw: {},
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['apple_music', 'deezer', 'youtube'],
       fetcher: fetchMock,
     });
@@ -182,7 +182,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
       raw: {},
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['youtube', 'tidal', 'soundcloud'],
       fetcher: fetchMock,
     });
@@ -211,7 +211,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
       raw: {},
     });
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['youtube'], // Only requesting YouTube
       fetcher: fetchMock,
     });
@@ -223,7 +223,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
   it('all 15 default providers get at least a search_fallback', async () => {
     mockIsMusicfetchAvailable.mockReturnValue(false);
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       fetcher: fetchMock,
     });
 
@@ -254,7 +254,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
     // not found), providers should still get search fallback URLs.
     mockMusicfetchLookupByIsrc.mockResolvedValue(null);
 
-    const links = await resolveProviderLinks(baseTrack, {
+    const { links } = await resolveProviderLinks(baseTrack, {
       providers: ['youtube', 'tidal'],
       fetcher: fetchMock,
     });
@@ -272,7 +272,7 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
       artistName: 'Unknown Artist',
     };
 
-    const links = await resolveProviderLinks(trackWithoutIsrc, {
+    const { links } = await resolveProviderLinks(trackWithoutIsrc, {
       providers: ['youtube'],
       fetcher: fetchMock,
     });
