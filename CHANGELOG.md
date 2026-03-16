@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Suppressed "You're off the waitlist!" email for users who bypassed the waitlist (gate disabled or auto-accept threshold)
+
 ### Added
 
 - Added lyrics support via MusicFetch `/isrc` `withLyrics` parameter — lyrics are now fetched and persisted to `discog_tracks.lyrics` during link discovery

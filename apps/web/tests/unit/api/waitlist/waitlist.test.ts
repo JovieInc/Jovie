@@ -316,7 +316,7 @@ describe('Waitlist API', () => {
       expect(data.status).toBe('new');
     });
 
-    it('sends welcome email when auto-approval succeeds', async () => {
+    it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: 'auto@example.com' }],
@@ -379,17 +379,9 @@ describe('Waitlist API', () => {
       expect(data.status).toBe('claimed');
       expect(mockFinalizeWaitlistApproval).toHaveBeenCalled();
 
-      // Allow fire-and-forget to settle
-      await vi.waitFor(() => {
-        expect(mockSendNotification).toHaveBeenCalled();
-      });
-      expect(mockBuildWaitlistInviteEmail).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'auto@example.com',
-          fullName: 'Auto User',
-          dedupKey: 'waitlist_welcome:profile_auto',
-        })
-      );
+      // Auto-approved users should NOT get the "off the waitlist" email
+      expect(mockSendNotification).not.toHaveBeenCalled();
+      expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
     });
 
     it('does not send welcome email when auto-approval slot is not available', async () => {
