@@ -13,6 +13,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fixed Spotify artist connect showing cryptic "Server Components render" error instead of friendly "already linked" message — Drizzle ORM wraps PG errors in `.cause`, breaking unique constraint detection (JOVIE-WEB-EY)
+- Fixed 5 locations with the same Drizzle error-wrapping bug (releases, referrals, ingestion, discography queries)
+- Added pre-check query in `connectSpotifyArtist` to detect already-claimed artists before hitting the constraint
+- Added diagnostic Sentry logging for Spotify state inconsistency (artistName set but spotifyId null)
 - Fixed admin leads page showing premature "Unable to load pipeline settings" error during TanStack Query retries
 - Fixed admin leads table showing error state during initial data fetch retries
 - Suppressed "You're off the waitlist!" email for users who bypassed the waitlist (gate disabled or auto-accept threshold)
