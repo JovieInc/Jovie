@@ -716,7 +716,7 @@ export async function upsertTrack(input: {
     previewUrl: input.previewUrl ?? null,
     audioUrl: input.audioUrl ?? null,
     audioFormat: input.audioFormat ?? null,
-    lyrics: input.lyrics ?? null,
+    ...('lyrics' in input ? { lyrics: input.lyrics ?? null } : {}),
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
     updatedAt: now,
