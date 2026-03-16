@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
+import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
   artists,
   type DiscogRelease,
@@ -106,23 +107,7 @@ function isUniqueConstraintViolation(
   error: unknown,
   constraint: string
 ): boolean {
-  const getField = (value: unknown, key: string): unknown =>
-    typeof value === 'object' && value !== null && key in value
-      ? (value as Record<string, unknown>)[key]
-      : undefined;
-
-  const code = getField(error, 'code');
-  const actualConstraint = getField(error, 'constraint');
-  const sourceError = getField(error, 'sourceError');
-  const sourceCode = getField(sourceError, 'code');
-  const sourceConstraint = getField(sourceError, 'constraint');
-  const message = getField(error, 'message');
-
-  return (
-    (code === '23505' && actualConstraint === constraint) ||
-    (sourceCode === '23505' && sourceConstraint === constraint) ||
-    (typeof message === 'string' && message.includes(constraint))
-  );
+  return isUniqueViolationUtil(error, constraint);
 }
 
 /**

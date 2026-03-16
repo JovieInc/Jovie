@@ -1,6 +1,6 @@
 'use server';
 
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, ne } from 'drizzle-orm';
 import {
   unstable_noStore as noStore,
   revalidatePath,
@@ -13,6 +13,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -73,19 +74,7 @@ const SPOTIFY_ALREADY_CLAIMED_MESSAGE =
   'This Spotify artist is already linked to another Jovie account. Please sign in with the original account or choose a different artist.';
 
 function isSpotifyIdUniqueViolation(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-
-  const dbError = error as Error & { code?: string; constraint?: string };
-  const message = dbError.message.toLowerCase();
-
-  return (
-    dbError.code === '23505' &&
-    (dbError.constraint === 'creator_profiles_spotify_id_unique' ||
-      message.includes('creator_profiles_spotify_id_unique') ||
-      (message.includes('spotify_id') && message.includes('duplicate')))
-  );
+  return isUniqueViolation(error, 'creator_profiles_spotify_id_unique');
 }
 
 function normalizeSpotifyArtistUrl(rawUrl: string, spotifyArtistId: string) {
@@ -975,6 +964,20 @@ export async function checkSpotifyConnection(): Promise<{
       return { connected: true, spotifyId: profile.spotifyId, artistName };
     }
 
+    // Diagnostic: spotifyArtistName in settings but no spotifyId indicates
+    // a state inconsistency — the user previously connected but the ID is missing.
+    if (artistName) {
+      void captureError(
+        '[checkSpotifyConnection] Spotify state inconsistency: artistName set but spotifyId is null',
+        new Error('Spotify state inconsistency'),
+        {
+          profileId: profile.id,
+          artistName,
+          spotifyImportStatus: String(settings?.spotifyImportStatus ?? 'none'),
+        }
+      );
+    }
+
     // Fallback: check dspArtistMatches for a confirmed Spotify match.
     // Keeps this consistent with ConnectedDspList which checks both sources.
     const [spotifyMatch] = await db
@@ -1118,6 +1121,31 @@ export async function connectSpotifyArtist(params: {
     unknown
   >;
   const shouldRunInlineImport = process.env.E2E_FAST_ONBOARDING === '1';
+
+  // Pre-check: detect if another profile already claims this Spotify artist ID.
+  // This gives a clean error path for the common case; the catch block below
+  // remains as a safety net for rare concurrent-write races.
+  const [existingClaim] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.spotifyId, params.spotifyArtistId),
+        ne(creatorProfiles.id, profile.id)
+      )
+    )
+    .limit(1);
+
+  if (existingClaim) {
+    return {
+      success: false,
+      importing: false,
+      message: SPOTIFY_ALREADY_CLAIMED_MESSAGE,
+      imported: 0,
+      releases: [],
+      artistName: params.artistName,
+    };
+  }
 
   // Update the profile with Spotify ID and mark import as in-progress
   try {
@@ -1868,8 +1896,7 @@ export async function createRelease(formData: {
     throwIfRedirect(error);
 
     // Handle duplicate slug
-    const dbError = error as Error & { code?: string };
-    if (dbError.code === '23505') {
+    if (isUniqueViolation(error)) {
       return {
         success: false,
         message: `A release with the slug "${slug}" already exists. Please choose a different title.`,
