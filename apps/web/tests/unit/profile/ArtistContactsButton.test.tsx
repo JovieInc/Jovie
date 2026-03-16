@@ -152,9 +152,8 @@ describe('ArtistContactsButton', () => {
       />
     );
 
-    fireEvent.click(screen.getByTestId('contacts-trigger'));
-
-    expect(pushMock).toHaveBeenCalledWith('/test?mode=contact');
+    const trigger = screen.getByTestId('contacts-trigger');
+    expect(trigger).toHaveAttribute('href', '/test?mode=contact');
   });
 
   it('opens drawer when multiple contacts are provided', () => {
