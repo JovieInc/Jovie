@@ -12,6 +12,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Added lyrics support via MusicFetch `/isrc` `withLyrics` parameter — lyrics are now fetched and persisted to `discog_tracks.lyrics` during link discovery
 - Added MusicFetch enrichment and DSP discovery job triggers after lead ingestion when Spotify data is available
 - Added `skipMusicFetchEnrichment` flag to `connectSpotifyArtist` to prevent duplicate enrichment during onboarding
+- Added deterministic Playwright e2e QA harness for `/demo` page — covers page render, release table, drawer interaction, and sidebar accessibility
+- Added `borders.focus`, `surfaces.tooltip`, and `text.tooltip` to typed design token objects in `@jovie/ui`
+- Re-exported all design token objects (`surfaces`, `text`, `borders`, `accent`, `buttons`, `interactive`, `status`, `featureAccents`, `sidebar`, `shadows`, `radii`, `spacing`, `typography`, `animation`) from `@jovie/ui` package index
 
 ### Changed
 
