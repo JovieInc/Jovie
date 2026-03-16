@@ -9,12 +9,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Added `borders.focus`, `surfaces.tooltip`, and `text.tooltip` to typed design token objects in `@jovie/ui`
-- Re-exported all design token objects (`surfaces`, `text`, `borders`, `accent`, `buttons`, `interactive`, `status`, `featureAccents`, `sidebar`, `shadows`, `radii`, `spacing`, `typography`, `animation`) from `@jovie/ui` package index
+- Added lyrics support via MusicFetch `/isrc` `withLyrics` parameter — lyrics are now fetched and persisted to `discog_tracks.lyrics` during link discovery
+- Added MusicFetch enrichment and DSP discovery job triggers after lead ingestion when Spotify data is available
+- Added `skipMusicFetchEnrichment` flag to `connectSpotifyArtist` to prevent duplicate enrichment during onboarding
+
+### Changed
+
+- Replaced editable profile form in final onboarding step with progress bar (10s timeout) followed by read-only profile card preview
+- Artist display name now overwrites placeholder names (handle/username) during MusicFetch enrichment on both onboarding and async job paths
 
 ### Fixed
 
-- Fixed infinite retry loop in `useProfileVisitTracking` and `useTipPageTracking` hooks where unstable `useMutation` references in `useEffect` dependency arrays caused 1000+ API requests per profile page load 
+- Fixed duplicate Spotify social links created during onboarding by skipping async MusicFetch job when sync enrichment already handles it
+- Fixed artist name not being set during onboarding enrichment when display name was auto-populated with the handle
 
 ## [26.2.0] - 2026-02-12
 
