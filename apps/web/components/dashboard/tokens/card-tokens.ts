@@ -129,7 +129,7 @@ export const cardTokens = {
       transition-[background-color,border-color,box-shadow,transform] ${timing.normal} ${timing.easing}
       hover:bg-(--linear-bg-surface-0)
       hover:border-(--linear-border-default)
-      hover:shadow-[var(--linear-shadow-card-elevated)]
+      hover:shadow-(--linear-shadow-card-elevated)
       hover:-translate-y-0.5
       active:translate-y-0
       active:shadow-[0_1px_0_rgba(0,0,0,0.03)]
