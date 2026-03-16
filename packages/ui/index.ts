@@ -260,3 +260,21 @@ export {
   selectContentClasses,
   subMenuContentClasses,
 } from './lib/dropdown-styles';
+
+// Design tokens
+export {
+  accent,
+  animation,
+  borders,
+  buttons,
+  featureAccents,
+  interactive,
+  radii,
+  shadows,
+  sidebar,
+  spacing,
+  status,
+  surfaces,
+  text,
+  typography,
+} from './theme/tokens';
