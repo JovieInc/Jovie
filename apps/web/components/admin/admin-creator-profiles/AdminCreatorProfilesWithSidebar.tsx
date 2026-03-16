@@ -400,9 +400,10 @@ export function AdminCreatorProfilesWithSidebar({
               <table className='w-full table-fixed border-separate border-spacing-0 text-[13px]'>
                 <colgroup>
                   <col className='w-14' />
-                  <col className='w-[320px]' />
-                  <col className='w-[160px]' />
-                  <col className='w-[200px]' />
+                  <col className='w-[380px]' />
+                  <col className='w-[180px]' />
+                  <col className='w-[132px]' />
+                  <col className='w-[112px]' />
                 </colgroup>
                 <AdminCreatorsTableHeader
                   sort={sort}

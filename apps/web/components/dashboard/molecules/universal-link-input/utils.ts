@@ -262,7 +262,7 @@ export function filterPlatformsBySection(
  * List of unsafe URL prefixes that should be blocked.
  */
 export const UNSAFE_URL_PREFIXES = [
-  'javascript:',
+  'javascript:', // NOSONAR (S5334) - Security blocklist: explicitly blocks javascript: URIs to prevent XSS
   'data:',
   'vbscript:',
   'file:',

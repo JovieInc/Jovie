@@ -34,7 +34,7 @@ import {
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { runDiscovery } from '@/lib/leads/discovery';
+import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
@@ -138,39 +138,8 @@ export async function GET(request: Request) {
       return { skipped: true, reason: 'pipeline_disabled' };
     }
 
-    // Reset daily counters if past reset time
-    const now = new Date();
-    if (settings.queryBudgetResetsAt && now > settings.queryBudgetResetsAt) {
-      await db
-        .update(leadPipelineSettings)
-        .set({
-          queriesUsedToday: 0,
-          queryBudgetResetsAt: new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate() + 1
-          ),
-          updatedAt: now,
-        })
-        .where(eq(leadPipelineSettings.id, 1));
-      settings = {
-        ...settings,
-        queriesUsedToday: 0,
-      };
-    }
-
-    // Initialize reset time if not set
-    if (!settings.queryBudgetResetsAt) {
-      const tomorrow = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate() + 1
-      );
-      await db
-        .update(leadPipelineSettings)
-        .set({ queryBudgetResetsAt: tomorrow, updatedAt: now })
-        .where(eq(leadPipelineSettings.id, 1));
-    }
+    // Reset daily query budget if past reset time (or never initialized)
+    settings = await resetBudgetIfNeeded(settings);
 
     const keywords = await db.select().from(discoveryKeywords);
     const discoveryResult = await runDiscovery(settings, keywords);

@@ -63,7 +63,7 @@ function computeDelayMs(attempt: number, policy: RetryPolicy): number {
     policy.baseDelayMs * Math.pow(backoffMultiplier, attempt - 1);
 
   const jitterRange = exponentialDelay * jitterRatio;
-  const jitter = Math.random() * jitterRange * 2 - jitterRange;
+  const jitter = Math.random() * jitterRange * 2 - jitterRange; // NOSONAR (S2245) - Non-security use: exponential backoff jitter to prevent thundering herd
 
   return Math.max(0, Math.min(exponentialDelay + jitter, maxDelayMs));
 }

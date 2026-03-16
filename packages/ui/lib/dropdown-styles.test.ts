@@ -50,14 +50,17 @@ describe('dropdown-styles', () => {
 
   describe('content base styles', () => {
     it('DROPDOWN_CONTENT_BASE includes z-index, border, and background', () => {
-      expect(DROPDOWN_CONTENT_BASE).toContain('z-50');
+      expect(DROPDOWN_CONTENT_BASE).toContain('z-[70]');
       expect(DROPDOWN_CONTENT_BASE).toContain('border');
       expect(DROPDOWN_CONTENT_BASE).toContain('bg-');
       expect(DROPDOWN_CONTENT_BASE).toContain('rounded-');
     });
 
-    it('default base uses p-1 padding', () => {
-      expect(DROPDOWN_CONTENT_BASE).toContain('p-1');
+    it('default base uses subtle border opacity and p-0.5 padding', () => {
+      expect(DROPDOWN_CONTENT_BASE).toContain(
+        'border-(--linear-border-subtle)/70'
+      );
+      expect(DROPDOWN_CONTENT_BASE).toContain('p-0.5');
     });
 
     it('compact base uses p-0.5 padding', () => {
@@ -125,10 +128,11 @@ describe('dropdown-styles', () => {
 
   describe('menu item styles', () => {
     it('MENU_ITEM_BASE includes default sizing', () => {
-      expect(MENU_ITEM_BASE).toContain('text-[13px]');
-      expect(MENU_ITEM_BASE).toContain('leading-5');
+      expect(MENU_ITEM_BASE).toContain('text-[12.5px]');
+      expect(MENU_ITEM_BASE).toContain('leading-4');
       expect(MENU_ITEM_BASE).toContain('font-[450]');
-      expect(MENU_ITEM_BASE).toContain('py-1.5');
+      expect(MENU_ITEM_BASE).toContain('py-1');
+      expect(MENU_ITEM_BASE).toContain('gap-1.5');
     });
 
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
@@ -147,8 +151,8 @@ describe('dropdown-styles', () => {
     });
 
     it('CHECKBOX_RADIO_ITEM_BASE has left padding for indicator', () => {
-      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pl-8');
-      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('leading-5');
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('pl-7');
+      expect(CHECKBOX_RADIO_ITEM_BASE).toContain('leading-4');
     });
 
     it('SELECT_ITEM_BASE has left padding for check indicator', () => {
@@ -165,6 +169,7 @@ describe('dropdown-styles', () => {
 
     it('MENU_SEPARATOR_BASE styles a horizontal rule', () => {
       expect(MENU_SEPARATOR_BASE).toContain('h-px');
+      expect(MENU_SEPARATOR_BASE).toContain('my-px');
     });
 
     it('MENU_SHORTCUT_BASE uses ml-auto alignment', () => {

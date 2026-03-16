@@ -50,7 +50,7 @@ const buildErrorResult = (
 
 /**
  * Build the "From" address with dynamic sender name.
- * Implements the Laylo pattern: "Artist Name via Jovie <notifications@notify.jov.ie>"
+ * Implements the Laylo pattern: "Artist Name via Jovie <notifications@send.jov.ie>"
  */
 function buildFromAddress(senderContext?: SenderContext): string {
   return formatSystemSender(senderContext?.displayName);

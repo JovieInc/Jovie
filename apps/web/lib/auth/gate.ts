@@ -457,8 +457,13 @@ export async function resolveUserState(
     return emptyResult;
   }
 
-  // Get email from Clerk user
-  const email = clerkUser?.emailAddresses?.[0]?.emailAddress ?? null;
+  // Get the primary verified email — verified emails are the source of truth for identity.
+  // Prefer a verified address over index [0] which may be unverified.
+  const email =
+    clerkUser?.emailAddresses?.find(e => e.verification?.status === 'verified')
+      ?.emailAddress ??
+    clerkUser?.primaryEmailAddress?.emailAddress ??
+    null;
 
   // 2. Query DB user AND profile in a single JOIN query (performance optimization)
   // This reduces database round trips from 2 to 1
@@ -511,14 +516,11 @@ export async function resolveUserState(
   };
 
   // Sync email from Clerk if different (Clerk is source of truth for identity)
-  // Only sync verified emails to prevent hijacking
-  const verifiedClerkEmail = clerkUser?.emailAddresses?.find(
-    e => e.verification?.status === 'verified'
-  )?.emailAddress;
-
-  if (dbUser && verifiedClerkEmail && dbUser.email !== verifiedClerkEmail) {
+  // Only sync verified emails to prevent hijacking. `email` is already the
+  // verified address resolved above, so reuse it directly.
+  if (dbUser && email && dbUser.email !== email) {
     // Best-effort sync - don't block auth on sync failure
-    await syncEmailFromClerk(dbUser.id, verifiedClerkEmail).catch(err => {
+    await syncEmailFromClerk(dbUser.id, email).catch(err => {
       Sentry.addBreadcrumb({
         category: 'auth-gate',
         message: 'Email sync failed',

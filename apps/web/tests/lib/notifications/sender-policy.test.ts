@@ -21,36 +21,36 @@ afterEach(() => {
 });
 
 describe('sender policy', () => {
-  it('resolves founder sender to notify.jov.ie with reply-to at jov.ie', async () => {
+  it('resolves founder sender to send.jov.ie with reply-to at jov.ie', async () => {
     const policy = await loadSenderPolicy();
     expect(policy.getSenderPolicy('founder')).toEqual({
-      fromEmail: 'tim@notify.jov.ie',
+      fromEmail: 'tim@send.jov.ie',
       replyToEmail: 'tim@jov.ie',
     });
   });
 
-  it('resolves system sender to notifications@notify.jov.ie by default', async () => {
+  it('resolves system sender to notifications@send.jov.ie by default', async () => {
     const policy = await loadSenderPolicy();
     expect(policy.getSenderPolicy('system')).toEqual({
-      fromEmail: 'notifications@notify.jov.ie',
-      replyToEmail: 'notifications@notify.jov.ie',
+      fromEmail: 'notifications@send.jov.ie',
+      replyToEmail: 'notifications@send.jov.ie',
     });
   });
 
   it('formats dynamic "via Jovie" senders with system mailbox', async () => {
     const policy = await loadSenderPolicy();
     expect(policy.formatSystemSender('Artist Name')).toBe(
-      'Artist Name via Jovie <notifications@notify.jov.ie>'
+      'Artist Name via Jovie <notifications@send.jov.ie>'
     );
   });
 
   it('honors system env overrides for from/reply-to', async () => {
     const policy = await loadSenderPolicy({
-      resendFromEmail: 'notifications@notify.jov.ie',
+      resendFromEmail: 'custom@example.com',
       resendReplyToEmail: 'support@jov.ie',
     });
     expect(policy.getSenderPolicy('system')).toEqual({
-      fromEmail: 'notifications@notify.jov.ie',
+      fromEmail: 'custom@example.com',
       replyToEmail: 'support@jov.ie',
     });
   });

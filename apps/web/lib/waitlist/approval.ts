@@ -1,4 +1,4 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -8,6 +8,8 @@ import { waitlistEntries } from '@/lib/db/schema/waitlist';
 export type WaitlistApprovalResult =
   | { outcome: 'not_found' }
   | { outcome: 'already_processed'; status: string }
+  | { outcome: 'no_profile' }
+  | { outcome: 'no_user' }
   | {
       outcome: 'approved';
       profileId: string;
@@ -52,9 +54,7 @@ export async function approveWaitlistEntryInTx(
     .limit(1);
 
   if (!profile) {
-    throw new Error(
-      'Profile not found for waitlist entry. User must submit waitlist form to auto-create profile.'
-    );
+    return { outcome: 'no_profile' };
   }
 
   const [user] = await tx
@@ -64,9 +64,32 @@ export async function approveWaitlistEntryInTx(
     .limit(1);
 
   if (!user) {
-    throw new Error(
-      'User not found for email. User may need to sign in first to create auth record.'
-    );
+    return { outcome: 'no_user' };
+  }
+
+  const [existingClaimedProfile] = await tx
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(
+      and(
+        eq(creatorProfiles.userId, user.id),
+        eq(creatorProfiles.isClaimed, true),
+        ne(creatorProfiles.id, profile.id)
+      )
+    )
+    .for('update')
+    .limit(1);
+
+  if (existingClaimedProfile) {
+    await tx
+      .update(creatorProfiles)
+      .set({
+        userId: null,
+        isClaimed: false,
+        onboardingCompletedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(creatorProfiles.id, existingClaimedProfile.id));
   }
 
   await tx
@@ -75,6 +98,7 @@ export async function approveWaitlistEntryInTx(
       userId: user.id,
       isClaimed: true,
       isPublic: true,
+      claimedAt: now,
       onboardingCompletedAt: now,
       updatedAt: now,
     })
@@ -143,6 +167,7 @@ export async function disapproveWaitlistEntryInTx(
       .set({
         userId: null,
         isClaimed: false,
+        isPublic: false,
         onboardingCompletedAt: null,
         updatedAt: now,
       })

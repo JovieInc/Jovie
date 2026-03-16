@@ -160,6 +160,72 @@ describe('Admin Waitlist Approve API', () => {
     expect(mockSendNotification).toHaveBeenCalledWith(mockMessage, mockTarget);
   });
 
+  it('returns 422 when no profile is found for the entry', async () => {
+    const entryId = '44444444-4444-4444-8444-444444444444';
+
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'no_profile',
+    });
+
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(data.success).toBe(false);
+    expect(data.error).toMatch(/profile/i);
+    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 when user has not signed in yet', async () => {
+    const entryId = '55555555-5555-4555-8555-555555555555';
+
+    mockWithSystemIngestionSession.mockResolvedValueOnce({
+      outcome: 'no_user',
+    });
+
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryId }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(data.success).toBe(false);
+    expect(data.error).toMatch(/sign in/i);
+    expect(mockBuildWaitlistInviteEmail).not.toHaveBeenCalled();
+    expect(mockSendNotification).not.toHaveBeenCalled();
+  });
+
   it('does not send email when entry is already processed', async () => {
     const entryId = '33333333-3333-4333-8333-333333333333';
 

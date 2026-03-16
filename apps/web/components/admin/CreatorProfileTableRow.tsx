@@ -42,7 +42,7 @@ const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   if (isChecked || isSelected) {
     return cn(
       baseClasses,
-      'bg-(--linear-row-selected) shadow-[inset_2px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
+      'bg-[color-mix(in_srgb,var(--linear-row-selected)_68%,transparent)] shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-[color-mix(in_srgb,var(--linear-row-selected)_78%,transparent)]'
     );
   }
   return cn(baseClasses, 'bg-transparent hover:bg-(--linear-row-hover)');
@@ -267,7 +267,7 @@ function CreatorProfileTableRowComponent({
           </div>
         </div>
       </td>
-      <td className='px-4 py-3 align-middle'>
+      <td className='px-4 py-2.5 align-middle'>
         <div className='flex items-center gap-3'>
           <CreatorAvatarCell
             profileId={profile.id}
@@ -297,16 +297,16 @@ function CreatorProfileTableRowComponent({
           </div>
         </div>
       </td>
-      <td className='px-4 py-3 align-middle hidden lg:table-cell'>
-        <div className='flex max-w-[230px] justify-end overflow-hidden'>
+      <td className='px-4 py-2.5 align-middle hidden lg:table-cell'>
+        <div className='flex max-w-[230px] justify-start overflow-hidden'>
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='hidden whitespace-nowrap px-4 py-3 text-center align-middle text-[12px] text-(--linear-text-tertiary) md:table-cell'>
+      <td className='hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-(--linear-text-tertiary) md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td
-        className='px-4 py-3 align-middle text-right'
+        className='px-4 py-2.5 align-middle text-right'
         onClick={e => e.stopPropagation()}
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())

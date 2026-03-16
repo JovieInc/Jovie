@@ -4,7 +4,6 @@ import { Mail } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { getProfileModeHref } from '@/components/profile/registry';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { ContactDrawer } from './ContactDrawer';
 import type { ArtistContactsButtonProps } from './types';
@@ -65,7 +64,7 @@ export function ArtistContactsButton({
       className='border border-subtle/50 bg-transparent text-secondary-token hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
       asChild
     >
-      <Link href={getProfileModeHref(artistHandle, 'contact')}>
+      <Link href={`/${artistHandle}?mode=contact`}>
         <Mail className='h-4 w-4' aria-hidden='true' />
       </Link>
     </CircleIconButton>

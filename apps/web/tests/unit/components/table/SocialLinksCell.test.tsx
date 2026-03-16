@@ -92,4 +92,32 @@ describe('SocialLinksCell', () => {
 
     openSpy.mockRestore();
   });
+
+  it('falls back to inferred social platform when platformType is missing', () => {
+    const openSpy = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
+
+    render(
+      <SocialLinksCell
+        links={[
+          {
+            id: 'fb-1',
+            url: 'https://facebook.com/artist',
+            platform: 'facebook',
+            platformType: null,
+            displayText: 'Artist Page',
+          },
+        ]}
+      />
+    );
+
+    screen.getByRole('button', { name: 'Select Facebook' }).click();
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://facebook.com/artist',
+      '_blank',
+      'noopener,noreferrer'
+    );
+
+    openSpy.mockRestore();
+  });
 });

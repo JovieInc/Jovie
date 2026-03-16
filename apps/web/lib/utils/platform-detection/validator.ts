@@ -9,7 +9,7 @@ import type { PlatformInfo } from './types';
  * Dangerous URL schemes that should be rejected
  */
 const DANGEROUS_SCHEMES = [
-  'javascript:',
+  'javascript:', // NOSONAR (S5334) - Security blocklist: explicitly blocks javascript: URIs to prevent XSS
   'data:',
   'vbscript:',
   'file:',

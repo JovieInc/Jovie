@@ -203,7 +203,7 @@ export function EmptyState({
       {icon && (
         <div
           className={cn(
-            'mb-4 flex h-10 w-10 items-center justify-center',
+            'mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-surface-1/30',
             styles.iconWrapper
           )}
           aria-hidden='true'
@@ -214,7 +214,7 @@ export function EmptyState({
 
       <h3
         id={headingId}
-        className={cn('mb-1 text-[13px] font-medium', styles.heading)}
+        className={cn('mb-1 text-[13px] font-[510]', styles.heading)}
       >
         {heading}
       </h3>
@@ -222,7 +222,10 @@ export function EmptyState({
       {description && (
         <p
           id={descriptionId}
-          className={cn('mb-6 max-w-sm text-[13px]', styles.description)}
+          className={cn(
+            'mb-5 max-w-sm text-[13px] leading-[1.45]',
+            styles.description
+          )}
         >
           {description}
         </p>

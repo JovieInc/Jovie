@@ -315,12 +315,12 @@ export function AdminCreatorProfilesUnified({
 
     if (isChecked || isSelected) {
       return cn(
-        'group bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.24)] hover:bg-(--linear-bg-surface-1)'
+        'group bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
       );
     }
 
     return cn(
-      'group bg-transparent hover:bg-(--linear-bg-surface-1) transition-colors duration-100 ease-out'
+      'group bg-transparent hover:bg-(--linear-row-hover) transition-colors duration-100 ease-out'
     );
   }, []);
 
@@ -395,7 +395,7 @@ export function AdminCreatorProfilesUnified({
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px]'
+              className='text-[13px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={() => {

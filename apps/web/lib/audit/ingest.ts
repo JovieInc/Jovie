@@ -129,7 +129,7 @@ function sanitizeMetadata(
   const sensitiveKeys = [
     'token',
     'secret',
-    'password',
+    'password', // NOSONAR (S2068) - Not a credential: key name in a redaction list used to scrub sensitive fields from audit logs
     'key',
     'authorization',
     'accessToken',

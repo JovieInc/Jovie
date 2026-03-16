@@ -29,8 +29,9 @@ export const selection = {
   unchecked:
     'hover:bg-(--linear-row-hover) focus-within:bg-(--linear-row-hover) transition-[background-color,box-shadow] duration-150',
   checked:
-    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected)',
-  selected: 'bg-(--linear-row-selected)',
+    'bg-(--linear-row-selected) hover:bg-(--linear-row-selected) focus-within:bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)]',
+  selected:
+    'bg-(--linear-row-selected) shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]',
   hover: 'hover:bg-(--linear-row-hover)',
 } as const;
 
@@ -135,7 +136,7 @@ export const presets = {
     borders.cell,
     selection.unchecked,
     'last:border-b-0',
-    'focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+    'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
   ),
   tableCell: cn(alignment.cellPadding, typography.cellPrimary),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),

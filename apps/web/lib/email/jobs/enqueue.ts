@@ -15,7 +15,7 @@ import type { SendClaimInvitePayload } from './send-claim-invite';
  */
 function randomDelay(minMs: number, maxMs: number): number {
   const range = maxMs - minMs;
-  return Math.floor(minMs + Math.random() * range);
+  return Math.floor(minMs + Math.random() * range); // NOSONAR (S2245) - Non-security use: random send-time variance to avoid spam filter clustering
 }
 
 /**

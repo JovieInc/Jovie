@@ -39,7 +39,7 @@ export const INTERNAL_DOMAIN_SUFFIXES = [
 ] as const;
 
 export const METADATA_HOSTNAMES = new Set([
-  '169.254.169.254',
+  '169.254.169.254', // NOSONAR (S1313) - SSRF protection: blocks AWS/GCP/Azure Instance Metadata Service endpoint
   'metadata.google.internal',
 ]);
 

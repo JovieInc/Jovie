@@ -12,7 +12,7 @@ import {
 
 // Dangerous protocols that should never be allowed
 const DANGEROUS_PROTOCOLS = new Set([
-  'javascript:',
+  'javascript:', // NOSONAR (S5334) - Security blocklist: explicitly blocks javascript: URIs to prevent XSS
   'data:',
   'vbscript:',
   'file:',

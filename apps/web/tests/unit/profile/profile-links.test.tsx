@@ -303,6 +303,43 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
       expect(screen.queryByTestId('social-icon-spotify')).toBeNull();
     });
+
+    it('keeps social and DSP sections stable when platform metadata drifts', async () => {
+      const { ProfileLinkList } = await import(
+        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+      );
+
+      const driftedLinks: PreviewPanelLink[] = [
+        createPreviewLink({
+          id: '1',
+          platform: 'spotify',
+          platformType: 'social',
+          category: 'music',
+          url: 'https://open.spotify.com/artist/123',
+        }),
+        createPreviewLink({
+          id: '2',
+          platform: 'instagram',
+          platformType: 'dsp',
+          category: 'social',
+          url: 'https://instagram.com/testartist',
+        }),
+      ];
+
+      const { unmount } = render(
+        <ProfileLinkList links={driftedLinks} selectedCategory='social' />
+      );
+
+      expect(screen.getByTestId('social-icon-instagram')).toBeDefined();
+      expect(screen.queryByTestId('social-icon-spotify')).toBeNull();
+
+      unmount();
+
+      render(<ProfileLinkList links={driftedLinks} selectedCategory='dsp' />);
+
+      expect(screen.getByTestId('social-icon-spotify')).toBeDefined();
+      expect(screen.queryByTestId('social-icon-instagram')).toBeNull();
+    });
   });
 
   describe('mixed links', () => {

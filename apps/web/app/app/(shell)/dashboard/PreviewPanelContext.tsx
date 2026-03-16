@@ -14,6 +14,8 @@ export interface PreviewPanelLink {
   title: string;
   url: string;
   platform: string;
+  platformType?: 'social' | 'dsp' | 'earnings' | 'custom' | 'websites';
+  category?: 'social' | 'music' | 'commerce' | 'other';
   isVisible: boolean;
   verificationStatus?: 'unverified' | 'pending' | 'verified';
 }

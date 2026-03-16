@@ -42,9 +42,9 @@ const sidebarMenuButtonVariants = cva(
     // Transitions — Linear: instant for background, colors
     'transition-[background-color,color] duration-0 ease-interactive',
     // Default text color — keep non-active rows quiet
-    'text-sidebar-item-icon',
+    'text-sidebar-item-icon/75',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:bg-sidebar-accent hover:text-sidebar-foreground',
+    'hover:bg-sidebar-accent/70 hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
     'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-item-foreground',
     // Focus state - subtle bg like Linear (no rings)
@@ -60,10 +60,10 @@ const sidebarMenuButtonVariants = cva(
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
     // Icon styling — intentionally compact to reduce visual dominance
     '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
-    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
-    'hover:[&>svg]:text-sidebar-item-foreground',
-    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
+    '[&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon/65 [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
+    '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon/65 [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
+    'hover:[&>svg]:text-sidebar-item-foreground/85',
+    'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground/85',
     'data-[active=true]:[&>svg]:text-sidebar-item-foreground',
     'data-[active=true]:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground',
   ].join(' '),
@@ -219,7 +219,7 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon select-none pointer-events-none',
+      'absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon/70 select-none pointer-events-none',
       'peer-hover/menu-button:text-sidebar-item-foreground peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
       'peer-data-[size=sm]/menu-button:text-[10px]',
       'peer-data-[size=default]/menu-button:text-[11px]',
@@ -240,7 +240,7 @@ export const SidebarMenuSkeleton = React.forwardRef<
 >(({ className, showIcon = false, ...props }, ref) => {
   // Random width between 50 to 90%.
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
+    return `${Math.floor(Math.random() * 40) + 50}%`; // NOSONAR (S2245) - Non-security use: UI skeleton loading width randomization
   }, []);
 
   return (

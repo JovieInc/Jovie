@@ -41,7 +41,7 @@ export function calculateBackoff(
     reason === 'rate_limited' ? RATE_LIMIT_MAX_BACKOFF_MS : MAX_BACKOFF_MS;
   const exponentialDelay = base * Math.pow(2, attempt - 1);
   const jitterRange = reason === 'rate_limited' ? 5000 : 1000;
-  const jitter = Math.random() * jitterRange;
+  const jitter = Math.random() * jitterRange; // NOSONAR (S2245) - Non-security use: exponential backoff jitter to prevent thundering herd
   return Math.min(exponentialDelay + jitter, cap);
 }
 

@@ -148,13 +148,24 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-  // Vercel Toolbar: visible only to authenticated Vercel team members in non-production.
-  // Disabled in production to avoid showing floating button to team members visiting jov.ie.
-  const enableToolbar =
-    process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
-  const VercelToolbar = enableToolbar
-    ? (await import('@vercel/toolbar/next')).VercelToolbar
+
+  // Dev toolbar: shown in dev/preview, or in production when __dev_toolbar cookie is set.
+  // Dynamic import means zero bundle cost for production users without the cookie.
+  const { cookies } = await import('next/headers');
+  const devCookieSet = (await cookies()).get('__dev_toolbar')?.value === '1';
+  const isProductionEnv =
+    process.env.NODE_ENV === 'production' &&
+    process.env.VERCEL_ENV === 'production';
+  const showDevToolbar =
+    (!isProductionEnv || devCookieSet) && !isE2EClientRuntime;
+  const DevToolbar = showDevToolbar
+    ? (await import('@/components/dev/DevToolbar')).DevToolbar
     : null;
+  const devEnv =
+    process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
+  const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
+  const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
+
   const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
@@ -327,7 +338,9 @@ export default async function RootLayout({
         <CoreProviders>{children}</CoreProviders>
 
         <CookieBannerSection />
-        {VercelToolbar && <VercelToolbar />}
+        {DevToolbar && (
+          <DevToolbar env={devEnv} sha={devSha} version={devVersion} />
+        )}
       </body>
     </html>
   );

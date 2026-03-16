@@ -159,7 +159,11 @@ export function AdminFeedbackTable({
       columnHelper.accessor('createdAtIso', {
         id: 'submitted',
         header: 'Submitted',
-        cell: ({ getValue }) => new Date(getValue()).toLocaleString(),
+        cell: ({ getValue }) => (
+          <span className='whitespace-nowrap'>
+            {new Date(getValue()).toLocaleString()}
+          </span>
+        ),
         size: 180,
       }),
       columnHelper.accessor('user', {

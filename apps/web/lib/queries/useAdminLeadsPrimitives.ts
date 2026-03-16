@@ -178,6 +178,29 @@ export function useUpdateLeadPipelineSettingsMutation() {
   });
 }
 
+export interface DiscoveryKeywordDiagnostic {
+  keywordId: string;
+  query: string;
+  rawResultCount: number;
+  linktreeUrlsFound: number;
+  newLeadsInserted: number;
+  duplicatesSkipped: number;
+  error: string | null;
+  durationMs: number;
+  searchOffset: number;
+}
+
+export interface DiscoveryResultResponse {
+  queriesUsed: number;
+  candidatesProcessed: number;
+  newLeadsFound: number;
+  duplicatesSkipped: number;
+  diagnostics: DiscoveryKeywordDiagnostic[];
+  budgetRemaining: number;
+  keywordRotationIndex: number;
+  totalEnabledKeywords: number;
+}
+
 export function useRunLeadDiscoveryMutation() {
   return useMutation({
     mutationFn: async () => {
@@ -185,7 +208,7 @@ export function useRunLeadDiscoveryMutation() {
         method: 'POST',
       });
       return parseJsonWithError<{
-        result: { queriesUsed: number; newLeadsFound: number };
+        result: DiscoveryResultResponse;
       }>(response);
     },
   });

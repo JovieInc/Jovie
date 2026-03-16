@@ -519,9 +519,9 @@ async function fetchTippingStatsWithSession(
     startOfMonth.setUTCHours(0, 0, 0, 0);
     const startOfMonthISO = startOfMonth.toISOString();
 
-    // Use a 12-month lookback for totalReceived to avoid full table scans.
+    // Use a 12-month lookback for click events to avoid full table scans.
     // This leverages the idx_tips_created_at index (creator_profile_id, created_at).
-    // For all-time totals, a materialized view or periodic rollup is preferred.
+    // Tip totals (tipsSubmitted, totalReceivedCents) are lifetime values — no date filter.
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setUTCMonth(twelveMonthsAgo.getUTCMonth() - 12);
     twelveMonthsAgo.setUTCDate(1);
@@ -552,12 +552,7 @@ async function fetchTippingStatsWithSession(
           `,
           })
           .from(tips)
-          .where(
-            and(
-              eq(tips.creatorProfileId, profileId),
-              drizzleSql`${tips.createdAt} >= ${twelveMonthsAgoISO}::timestamp`
-            )
-          ),
+          .where(eq(tips.creatorProfileId, profileId)),
       'Tipping stats query'
     );
 
@@ -566,8 +561,8 @@ async function fetchTippingStatsWithSession(
       () =>
         tx
           .select({
-            qr: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'qr' then 1 else 0 end), 0)`,
-            link: drizzleSql<number>`coalesce(sum(case when ${clickEvents.metadata}->>'source' = 'link' then 1 else 0 end), 0)`,
+            qr: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'qr')`,
+            link: drizzleSql<number>`count(*) filter (where (${clickEvents.metadata}->>'source') = 'link')`,
           })
           .from(clickEvents)
           .where(

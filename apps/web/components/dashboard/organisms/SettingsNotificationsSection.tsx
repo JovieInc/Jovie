@@ -1,9 +1,9 @@
 'use client';
 
-import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/components/dashboard/hooks/useOptimisticToggle';
 import { SettingsToggleRow } from '@/components/dashboard/molecules/SettingsToggleRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotificationSettingsMutation } from '@/lib/queries';
 
 interface SettingsNotificationsSectionProps {
@@ -24,17 +24,13 @@ export function SettingsNotificationsSection({
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
+    <ContentSurfaceCard className='overflow-hidden bg-surface-0/95'>
       <ContentSectionHeader
         title='Notifications'
         subtitle='Control how subscriber confirmation behaves in Jovie.'
-        className='min-h-0 px-4 py-3'
+        className='min-h-0 px-4 py-3.5'
       />
-      <div className='px-4 py-3'>
+      <div className='border-t border-subtle/60 px-4 py-2.5'>
         <SettingsToggleRow
           title='Double opt-in email confirmation'
           description='Subscriber emails use double opt-in by default to prevent spam. On Growth, you can disable this if you use a separate provider (for example, Mailchimp or webhooks).'
@@ -46,6 +42,6 @@ export function SettingsNotificationsSection({
           gatePlanName='Growth'
         />
       </div>
-    </DashboardCard>
+    </ContentSurfaceCard>
   );
 }

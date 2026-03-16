@@ -16,6 +16,7 @@ import { DrawerHeaderActions } from '@/components/molecules/drawer-header/Drawer
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { getProfileModePath } from '@/components/profile/registry';
 import { BASE_URL } from '@/constants/domains';
+import { downloadBlob } from '@/lib/utils/download';
 
 interface UseProfileHeaderResult {
   title: ReactNode;
@@ -98,12 +99,21 @@ export function useProfileHeaderParts({
     toast.success('vCard downloaded');
   };
 
-  const handleDownloadQRCode = () => {
-    const link = document.createElement('a');
-    link.href = getQrCodeUrl(profileUrl, 420);
-    link.download = `${username}-qr.png`;
-    link.click();
-    toast.success('QR code downloaded');
+  const handleDownloadQRCode = async () => {
+    try {
+      const qrUrl = getQrCodeUrl(profileUrl, 420);
+      const response = await fetch(qrUrl);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch QR code image');
+      }
+
+      const qrBlob = await response.blob();
+      downloadBlob(qrBlob, `${username}-qr.png`);
+      toast.success('QR code downloaded');
+    } catch {
+      toast.error('Unable to download QR code');
+    }
   };
 
   const primaryActions: DrawerHeaderAction[] = [
@@ -134,7 +144,7 @@ export function useProfileHeaderParts({
       id: 'qr',
       label: 'Download QR code',
       icon: QrCode,
-      onClick: handleDownloadQRCode,
+      onClick: () => void handleDownloadQRCode(),
     },
   ];
 

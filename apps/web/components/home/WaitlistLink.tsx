@@ -29,7 +29,7 @@ export function WaitlistLink() {
 
       {/* Help Text */}
       <div className='text-center'>
-        <p className='text-sm text-white/60'>
+        <p className='text-sm text-white/70'>
           Be the first to know when Jovie launches for all artists.
         </p>
       </div>

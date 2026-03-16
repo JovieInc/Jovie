@@ -49,6 +49,8 @@ export interface ReleaseSidebarProps {
   readonly release: Release | null;
   readonly mode: ReleaseSidebarMode;
   readonly isOpen: boolean;
+  /** Optional drawer width override in pixels */
+  readonly width?: number;
   readonly providerConfig: Record<
     ProviderKey,
     { label: string; accent: string }

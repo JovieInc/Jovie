@@ -155,6 +155,22 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should filter stale server action lookup errors', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value:
+              'UnrecognizedActionError: Server Action "005a331209a8ea5b575bfbb0957bc1531f71788fae" was not found on the server.',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should filter hydration mismatch errors from exception text', () => {
     const event = {
       exception: {

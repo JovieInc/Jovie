@@ -1,9 +1,9 @@
 import { APP_NAME } from '@/constants/app';
 import { env } from '@/lib/env-server';
 
-export const FOUNDER_FROM_EMAIL = 'tim@notify.jov.ie';
+export const FOUNDER_FROM_EMAIL = 'tim@send.jov.ie';
 export const SYSTEM_FROM_EMAIL =
-  env.RESEND_FROM_EMAIL ?? 'notifications@notify.jov.ie';
+  env.RESEND_FROM_EMAIL ?? 'notifications@send.jov.ie';
 
 export const FOUNDER_REPLY_TO_EMAIL = 'tim@jov.ie';
 export const SYSTEM_REPLY_TO_EMAIL =

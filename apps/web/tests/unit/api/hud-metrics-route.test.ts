@@ -7,7 +7,7 @@ const mockGetHudMetrics = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/hud/auth', () => ({
+vi.mock('@/lib/auth/hud', () => ({
   authorizeHud: mockAuthorizeHud,
 }));
 

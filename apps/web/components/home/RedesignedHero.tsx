@@ -4,7 +4,7 @@ import { HeroPhonePreview } from './HeroPhonePreview';
 
 const DEMO_HANDLES = ['tim', 'tiesto', 'x'];
 const HERO_PROOF_POINTS = [
-  'Capture emails and fan intent',
+  'Grow your email list automatically',
   'Send fans to listen, tip, tour, or follow',
   'Auto-create links for every release',
 ] as const;
@@ -17,7 +17,7 @@ export async function RedesignedHero() {
       .map(c => c.handle)
       .filter(h => h && h.length <= 20 && /^[a-z0-9-]+$/.test(h))
       .slice(0, 3);
-    if (cleanHandles.length > 0) {
+    if (cleanHandles.length >= 2) {
       previewHandles = cleanHandles;
     }
   } catch {
@@ -40,18 +40,18 @@ export async function RedesignedHero() {
       <div className='relative z-10 w-full max-w-[var(--linear-content-max)]'>
         <div className='flex flex-col lg:flex-row lg:items-center lg:gap-12 xl:gap-20'>
           <div className='hero-stagger mx-auto flex max-w-2xl flex-col items-center text-center lg:mx-0 lg:max-w-[36rem] lg:flex-1 lg:items-start lg:text-left'>
-            <span className='mb-5 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-1.5 text-[11px] font-medium tracking-[0.01em] text-[color:var(--linear-text-tertiary)] backdrop-blur-sm'>
+            <span className='mb-5 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] px-3.5 py-1.5 text-xs font-medium tracking-[0.01em] text-[color:var(--linear-text-tertiary)] backdrop-blur-sm'>
               Built for artists
             </span>
 
             <h1 className='marketing-h1-linear max-w-[18rem] text-balance text-[var(--linear-text-primary)] sm:max-w-[28rem] lg:max-w-none'>
-              The link your <br className='hidden sm:block' />
-              music deserves.
+              One link that <br className='hidden sm:block' />
+              captures every fan.
             </h1>
 
             <p className='marketing-lead-linear mt-4 max-w-[19rem] px-1 text-balance text-[var(--linear-text-secondary)] sm:mt-5 sm:max-w-[31rem] sm:px-0'>
-              Connect your Spotify, capture every fan, and keep marketing your
-              music automatically — forever.
+              Connect Spotify, grow your audience automatically, and own every
+              fan relationship.
             </p>
 
             <div className='mt-6 w-full max-w-[35rem] sm:mt-8 lg:max-w-full'>
@@ -62,7 +62,7 @@ export async function RedesignedHero() {
               {HERO_PROOF_POINTS.map(point => (
                 <div
                   key={point}
-                  className='flex items-center gap-2 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] px-3.5 py-3 text-left text-[12px] font-medium text-[var(--linear-text-secondary)]'
+                  className='flex items-center gap-2 rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.025)] px-3.5 py-3 text-left text-xs font-medium text-[var(--linear-text-secondary)]'
                 >
                   <span
                     aria-hidden='true'

@@ -84,7 +84,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
             showLink={false}
             as='p'
           />
-          <p className='mt-0.5 text-[11px] text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
+          <p className='mt-0.5 text-xs text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
             Artist
           </p>
         </div>
@@ -181,7 +181,7 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
         {mode.description}
       </p>
       <div className='mt-4 flex items-center justify-end'>
-        <span className='font-mono text-[12px] text-[var(--linear-text-tertiary)]'>
+        <span className='font-mono text-xs text-[var(--linear-text-tertiary)]'>
           jov.ie/tim{mode.slug ? `/${mode.slug}` : ''}
         </span>
       </div>
@@ -278,12 +278,13 @@ export function DeeplinksGrid() {
             <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='flex flex-col gap-6'>
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                    One profile, many conversion paths
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                    One profile. Every way fans support you.
                   </span>
 
                   <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                    Jovie changes the CTA based on what the fan wants next.
+                    Every fan sees the right next step — stream, tip, tour, or
+                    follow.
                   </h2>
 
                   <CrossfadeBlock activeIndex={activeIndex}>
@@ -298,7 +299,7 @@ export function DeeplinksGrid() {
                     {MODES.map((mode, i) => (
                       <span
                         key={mode.id}
-                        className='rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors duration-300'
+                        className='rounded-full border px-2.5 py-1 text-xs font-medium transition-colors duration-300'
                         style={{
                           borderColor:
                             i === activeIndex
@@ -342,7 +343,7 @@ export function DeeplinksGrid() {
                     href='https://jov.ie/tim'
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-medium transition-colors duration-[var(--linear-duration-normal)]'
+                    className='inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
                     style={{
                       color: 'var(--linear-text-tertiary)',
                       border: '1px solid var(--linear-border-subtle)',
@@ -393,7 +394,7 @@ export function DeeplinksGrid() {
                             'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                         }}
                       >
-                        <span className='mr-2 text-[11px] uppercase tracking-[0.12em] text-[var(--linear-text-quaternary)]'>
+                        <span className='mr-2 text-xs uppercase tracking-[0.12em] text-[var(--linear-text-quaternary)]'>
                           {mode.outcome}
                         </span>
                         jov.ie/tim
@@ -432,11 +433,12 @@ export function DeeplinksGrid() {
 
           <div className='mx-auto max-w-[var(--linear-content-max)]'>
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
-              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
-                One profile, many conversion paths
+              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                One profile. Every way fans support you.
               </span>
               <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                Jovie changes the CTA based on what the fan wants next.
+                Every fan sees the right next step — stream, tip, tour, or
+                follow.
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Every visitor sees the action most likely to convert in that

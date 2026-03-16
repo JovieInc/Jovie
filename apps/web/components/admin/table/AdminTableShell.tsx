@@ -127,9 +127,9 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface)/95 backdrop-blur supports-backdrop-filter:bg-(--linear-app-content-surface)/85',
+              'sticky top-0 z-30 border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface)/90 backdrop-blur-sm supports-backdrop-filter:bg-(--linear-app-content-surface)/80',
               headerElevated &&
-                'shadow-[0_1px_0_rgba(0,0,0,0.05)] dark:shadow-[0_1px_0_rgba(255,255,255,0.04)]'
+                'shadow-[0_1px_0_rgba(0,0,0,0.035)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'
             )}
           >
             {toolbar}
