@@ -23,7 +23,9 @@ import {
   useUpdateLeadPipelineSettingsMutation,
 } from '@/lib/queries';
 
-function DiagnosticPanel({ result }: { result: DiscoveryResultResponse }) {
+function DiagnosticPanel({
+  result,
+}: Readonly<{ result: DiscoveryResultResponse }>) {
   const hasErrors = result.diagnostics.some(d => d.error);
   const totalRawResults = result.diagnostics.reduce(
     (sum, d) => sum + d.rawResultCount,
@@ -96,16 +98,16 @@ function DiagnosticPanel({ result }: { result: DiscoveryResultResponse }) {
 
 function KeywordDiagnosticRow({
   diagnostic: d,
-}: {
+}: Readonly<{
   diagnostic: DiscoveryKeywordDiagnostic;
-}) {
+}>) {
   return (
     <div className='flex items-center gap-2 rounded border border-subtle px-2 py-1.5 text-xs'>
-      {d.error ? (
-        <XCircle className='h-3.5 w-3.5 shrink-0 text-red-400' />
-      ) : d.rawResultCount === 0 ? (
+      {d.error && <XCircle className='h-3.5 w-3.5 shrink-0 text-red-400' />}
+      {!d.error && d.rawResultCount === 0 && (
         <AlertTriangle className='h-3.5 w-3.5 shrink-0 text-yellow-400' />
-      ) : (
+      )}
+      {!d.error && d.rawResultCount > 0 && (
         <CheckCircle2 className='h-3.5 w-3.5 shrink-0 text-green-400' />
       )}
       <code className='min-w-0 flex-1 truncate text-secondary-token'>
