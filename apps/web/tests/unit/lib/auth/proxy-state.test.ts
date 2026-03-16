@@ -99,6 +99,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: true,
         needsOnboarding: false,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -119,6 +120,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: true,
         needsOnboarding: false,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -146,6 +148,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: true,
         needsOnboarding: false,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -173,6 +176,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: false,
         needsOnboarding: true,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -200,6 +204,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: false,
         needsOnboarding: true,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -232,6 +237,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: false,
         needsOnboarding: false,
         isActive: true,
+        isBanned: false,
       });
     });
 
@@ -264,6 +270,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: false,
         needsOnboarding: true,
         isActive: false,
+        isBanned: false,
       });
     });
 
@@ -374,6 +381,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: true,
         needsOnboarding: false,
         isActive: false,
+        isBanned: false,
       });
 
       consoleSpy.mockRestore();
@@ -436,6 +444,7 @@ describe('proxy-state.ts', () => {
         needsWaitlist: true,
         needsOnboarding: false,
         isActive: false,
+        isBanned: false,
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(

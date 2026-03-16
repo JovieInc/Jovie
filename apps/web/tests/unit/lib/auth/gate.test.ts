@@ -301,7 +301,12 @@ describe('gate.ts', () => {
     it('returns admin context correctly', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue({
-        emailAddresses: [{ emailAddress: 'admin@example.com' }],
+        emailAddresses: [
+          {
+            emailAddress: 'admin@example.com',
+            verification: { status: 'verified' },
+          },
+        ],
       });
 
       // Single JOIN query: admin user with complete profile
