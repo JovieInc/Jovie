@@ -17,7 +17,7 @@ export async function RedesignedHero() {
       .map(c => c.handle)
       .filter(h => h && h.length <= 20 && /^[a-z0-9-]+$/.test(h))
       .slice(0, 3);
-    if (cleanHandles.length > 0) {
+    if (cleanHandles.length >= 2) {
       previewHandles = cleanHandles;
     }
   } catch {

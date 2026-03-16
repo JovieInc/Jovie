@@ -107,7 +107,7 @@ export function FinalCTASection() {
               <span
                 aria-hidden='true'
                 className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-              />{' '}
+              />
               Live in 60 seconds
             </p>
             <span

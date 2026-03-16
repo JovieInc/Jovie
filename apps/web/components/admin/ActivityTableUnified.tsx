@@ -110,6 +110,7 @@ export function ActivityTableUnified({
         header: 'Timestamp',
         cell: renderTimestampCell,
         size: 180,
+        minSize: 150,
       }),
 
       // Status column
