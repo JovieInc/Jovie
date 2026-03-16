@@ -79,19 +79,19 @@ function SignUpClaimDataPersistence() {
   if (!handle || !availability) return null;
 
   return (
-    <div className='mb-4 rounded-[var(--linear-radius-sm)] border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-4 py-3 text-center'>
+    <div className='mb-4 rounded-(--linear-radius-sm) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-4 py-3 text-center'>
       {availability === 'checking' && (
-        <p className='text-[13px] font-[450] text-[var(--linear-text-secondary)]'>
+        <p className='text-[13px] font-[450] text-(--linear-text-secondary)'>
           Checking if @{normalizedHandle} is available...
         </p>
       )}
       {availability === 'available' && (
-        <p className='text-[13px] font-[450] text-[var(--linear-text-primary)]'>
+        <p className='text-[13px] font-[450] text-(--linear-text-primary)'>
           @{normalizedHandle} is available. Sign up to claim it.
         </p>
       )}
       {availability === 'taken' && (
-        <p className='text-[13px] font-[450] text-[var(--linear-text-secondary)]'>
+        <p className='text-[13px] font-[450] text-(--linear-text-secondary)'>
           @{normalizedHandle} is already taken. You can pick another handle
           after signing up.
         </p>
