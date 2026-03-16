@@ -10,6 +10,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - Added SerpAPI as primary search provider for lead discovery, with Google CSE as legacy fallback (Google deprecated the Custom Search JSON API for new customers)
+- Added "Already claimed" visual treatment for Spotify artists already linked to another Jovie account in search results
+- Added `isClaimed` field to Spotify search API response with 30s-cached DB lookup
+
+### Fixed
+
+- Fixed VIP priority feature creating duplicate search results by filtering same-name non-VIP artists when a featured creator matches
+- Fixed React rendering bug showing literal "0" instead of nothing when a Spotify artist has zero followers (affected all 3 search components)
 
 ### Fixed
 
