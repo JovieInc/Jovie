@@ -45,6 +45,12 @@ const SMART_LINK_DSPS = [
   'amazon_music',
 ] as const;
 
+const DSP_LABELS: Record<string, string> = {
+  apple_music: 'Apple Music',
+  youtube_music: 'YouTube Music',
+  amazon_music: 'Amazon Music',
+};
+
 const RELEASE_PROOF_POINTS = [
   'Catalog sync',
   'Smart links per release',
@@ -238,15 +244,7 @@ function ReleasePhone({
           return (
             <SmartLinkProviderButton
               key={key}
-              label={
-                key === 'apple_music'
-                  ? 'Apple Music'
-                  : key === 'youtube_music'
-                    ? 'YouTube Music'
-                    : key === 'amazon_music'
-                      ? 'Amazon Music'
-                      : 'Spotify'
-              }
+              label={DSP_LABELS[key] ?? 'Spotify'}
               iconPath={config.iconPath}
               className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
             />
