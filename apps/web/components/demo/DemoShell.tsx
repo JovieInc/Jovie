@@ -328,7 +328,7 @@ export function DemoShell({
         }
         header={
           <>
-            <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-[var(--linear-app-header-padding-x)]'>
+            <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
               <div className='flex min-w-0 items-center gap-1 text-[13px]'>
                 <span className='truncate text-(--linear-text-tertiary)'>
                   Sora Vale

@@ -8,11 +8,11 @@ import { cn } from '@/lib/utils';
 const authButtonVariants = cva(
   [
     // Base styles
-    'w-full rounded-[var(--linear-radius-sm)] flex items-center justify-center gap-[var(--linear-gap-buttons)]',
+    'w-full rounded-(--linear-radius-sm) flex items-center justify-center gap-(--linear-gap-buttons)',
     'disabled:opacity-70 disabled:cursor-not-allowed',
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-border-focus)]/40 focus-visible:ring-offset-2',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
     // Mobile-optimized height matching Linear
-    'h-[var(--linear-button-height-md)] sm:h-[var(--linear-button-height-md)] min-h-[40px]',
+    'h-(--linear-button-height-md) sm:h-(--linear-button-height-md) min-h-[40px]',
     // Touch-optimized transitions
     'transition-all duration-150 ease-out',
     // Active press state for mobile
@@ -26,24 +26,24 @@ const authButtonVariants = cva(
     variants: {
       variant: {
         primary: [
-          'bg-[var(--linear-btn-primary-bg)] border border-[var(--linear-btn-primary-border)] px-[14px] text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)] text-[var(--linear-btn-primary-fg)] shadow-[var(--linear-shadow-button)]',
+          'bg-(--linear-btn-primary-bg) border border-(--linear-btn-primary-border) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button)',
           'hover:opacity-90',
         ].join(' '),
         primaryLight: [
-          'bg-[var(--linear-btn-secondary-bg)] border border-[var(--linear-border-subtle)] px-[14px] text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)] text-[var(--linear-text-primary)]',
-          'hover:bg-[var(--linear-btn-secondary-hover)]',
+          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         oauthPrimary: [
-          'bg-[var(--linear-btn-secondary-bg)] border border-[var(--linear-border-subtle)] px-[14px] text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)] text-[var(--linear-text-primary)]',
-          'hover:bg-[var(--linear-btn-secondary-hover)]',
+          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         secondary: [
-          'bg-[var(--linear-btn-secondary-bg)] border border-[var(--linear-border-subtle)] px-[14px] text-[var(--linear-caption-size)] font-[var(--linear-caption-weight)] text-[var(--linear-text-primary)]',
-          'hover:bg-[var(--linear-btn-secondary-hover)]',
+          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-[var(--linear-text-secondary)]',
-          'hover:text-[var(--linear-text-primary)]',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-(--linear-text-secondary)',
+          'hover:text-(--linear-text-primary)',
           'active:scale-100 active:opacity-70',
         ].join(' '),
       },
