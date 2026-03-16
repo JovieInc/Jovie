@@ -58,8 +58,8 @@ const Checkbox = React.forwardRef<
         'hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus) focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)',
         'disabled:cursor-not-allowed disabled:opacity-50',
-        'data-[state=checked]:bg-(--linear-btn-primary-bg) data-[state=checked]:border-(--linear-btn-primary-bg) data-[state=checked]:text-(--linear-btn-primary-fg)',
-        'data-[state=indeterminate]:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:border-(--linear-btn-primary-bg) data-[state=indeterminate]:text-(--linear-btn-primary-fg)',
+        'data-[state=checked]:bg-(--linear-btn-primary-bg) data-[state=checked]:border-(--linear-btn-primary-bg) data-[state=checked]:text-(--linear-btn-primary-fg) data-[state=checked]:hover:bg-(--linear-btn-primary-bg) data-[state=checked]:hover:border-(--linear-btn-primary-bg)',
+        'data-[state=indeterminate]:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:border-(--linear-btn-primary-bg) data-[state=indeterminate]:text-(--linear-btn-primary-fg) data-[state=indeterminate]:hover:bg-(--linear-btn-primary-bg) data-[state=indeterminate]:hover:border-(--linear-btn-primary-bg)',
         className
       )}
       {...props}

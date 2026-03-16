@@ -21,9 +21,9 @@ const textareaVariants = cva(
       variant: {
         default: '',
         error:
-          'border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
+          'border-destructive hover:border-destructive focus-visible:ring-destructive focus-visible:border-destructive',
         success:
-          'border-success focus-visible:ring-success focus-visible:border-success',
+          'border-success hover:border-success focus-visible:ring-success focus-visible:border-success',
       },
       textareaSize: {
         sm: 'px-2 py-1.5 text-xs min-h-[60px]',

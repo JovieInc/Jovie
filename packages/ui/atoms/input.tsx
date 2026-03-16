@@ -20,8 +20,10 @@ const inputVariants = cva(
     variants: {
       variant: {
         default: '',
-        error: 'border-(--linear-error) focus-visible:border-(--linear-error)',
-        success: 'border-success focus-visible:border-success',
+        error:
+          'border-(--linear-error) hover:border-(--linear-error) focus-visible:border-(--linear-error)',
+        success:
+          'border-success hover:border-success focus-visible:border-success',
       },
       inputSize: {
         sm: 'h-7 px-2 py-1 text-xs',
