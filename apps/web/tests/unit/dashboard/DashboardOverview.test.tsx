@@ -188,8 +188,8 @@ describe('DashboardOverview', () => {
     const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
     const btnClass = viewProfileLink.className;
 
-    expect(btnClass).toContain('h-[var(--linear-app-control-height-sm)]');
-    expect(btnClass).toContain('w-[var(--linear-app-control-height-sm)]');
+    expect(btnClass).toContain('h-(--linear-app-control-height-sm)');
+    expect(btnClass).toContain('w-(--linear-app-control-height-sm)');
     expect(btnClass).not.toContain('sm:h-11');
     expect(btnClass).not.toContain('sm:w-11');
   });
