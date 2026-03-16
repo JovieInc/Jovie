@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- Added deterministic Playwright e2e QA harness for `/demo` page — covers page render, release table, drawer interaction, and sidebar accessibility
+
 ### Fixed
 
 - Fixed infinite retry loop in `useProfileVisitTracking` and `useTipPageTracking` hooks where unstable `useMutation` references in `useEffect` dependency arrays caused 1000+ API requests per profile page load 
