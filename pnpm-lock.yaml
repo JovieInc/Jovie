@@ -253,8 +253,8 @@ importers:
         specifier: ^1.5.0
         version: 1.6.1(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4)
       '@vercel/blob':
-        specifier: ^2.3.0
-        version: 2.3.0
+        specifier: ^2.3.1
+        version: 2.3.1
       '@vercel/toolbar':
         specifier: ^0.2.2
         version: 0.2.2(@vercel/analytics@1.6.1(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4))(@vercel/speed-insights@1.3.1(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4))(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))
@@ -4623,8 +4623,8 @@ packages:
       vue-router:
         optional: true
 
-  '@vercel/blob@2.3.0':
-    resolution: {integrity: sha512-oYWiJbWRQ7gz9Mj0X/NHFJ3OcLMOBzq/2b3j6zeNrQmtFo6dHwU8FAwNpxVIYddVMd+g8eqEi7iRueYx8FtM0Q==}
+  '@vercel/blob@2.3.1':
+    resolution: {integrity: sha512-6f9oWC+DbWxIgBLOdqjjn2/REpFrPDB7y5B5HA1ptYkzZaBgL6E34kWrptJvJ7teApJdbAs3I1a5A7z1y8SDHw==}
     engines: {node: '>=20.0.0'}
 
   '@vercel/microfrontends@2.0.1':
@@ -10382,8 +10382,8 @@ packages:
   undici-types@7.18.2:
     resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
 
-  undici@6.23.0:
-    resolution: {integrity: sha512-VfQPToRA5FZs/qJxLIinmU59u0r7LXqoJkCzinq3ckNJp3vKEh7jTWN589YQ5+aoAC/TGRLyJLCPKcLQbM8r9g==}
+  undici@6.24.1:
+    resolution: {integrity: sha512-sC+b0tB1whOCzbtlx20fx3WgCXwkW627p4EA9uM+/tNNPkSS+eSEld6pAs9nDv7WbY1UUljBMYPtu9BCOrCWKA==}
     engines: {node: '>=18.17'}
 
   unified@11.0.5:
@@ -15308,13 +15308,13 @@ snapshots:
       next: 16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
 
-  '@vercel/blob@2.3.0':
+  '@vercel/blob@2.3.1':
     dependencies:
       async-retry: 1.3.3
       is-buffer: 2.0.5
       is-node-process: 1.2.0
       throttleit: 2.1.0
-      undici: 6.23.0
+      undici: 6.24.1
 
   '@vercel/microfrontends@2.0.1(@vercel/analytics@1.6.1(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4))(@vercel/speed-insights@1.3.1(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react@19.2.4))(next@16.1.5(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.2)(babel-plugin-react-compiler@19.1.0-rc.1-rc-af1b7da-20250421)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vite@6.4.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(terser@5.46.0)(tsx@4.21.0)(yaml@2.8.2))':
     dependencies:
@@ -22377,7 +22377,7 @@ snapshots:
 
   undici-types@7.18.2: {}
 
-  undici@6.23.0: {}
+  undici@6.24.1: {}
 
   unified@11.0.5:
     dependencies:
