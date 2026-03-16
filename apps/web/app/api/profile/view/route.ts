@@ -89,11 +89,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await incrementProfileViews(handle);
+    try {
+      await incrementProfileViews(handle);
+    } catch (error) {
+      // View counting is non-critical — log the failure but return 200.
+      // Returning 500 for a view counter failure creates unnecessary Sentry noise
+      // and degrades the client experience (JOVIE-WEB-DZ).
+      await captureError('Profile view recording failed', error, {
+        route: '/api/profile/view',
+        method: 'POST',
+        handle,
+      });
+    }
 
     return NextResponse.json({ success: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
-    await captureError('Profile view recording failed', error, {
+    // This outer catch handles validation/rate-limit errors, not view counting
+    await captureError('Profile view request failed', error, {
       route: '/api/profile/view',
       method: 'POST',
     });

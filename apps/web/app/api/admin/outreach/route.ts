@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, isNotNull } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
@@ -15,8 +16,9 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 export const runtime = 'nodejs';
 
 function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  const normalized = message.toLowerCase();
+  // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
+  // the actual PG "column X does not exist" lives on .cause, not the outer error.
+  const normalized = getDeepErrorMessage(error).toLowerCase();
 
   return (
     normalized.includes('column "spotify_popularity" does not exist') ||

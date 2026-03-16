@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isUniqueViolation, unwrapPgError } from '@/lib/db/errors';
+import {
+  getDeepErrorMessage,
+  isUniqueViolation,
+  unwrapPgError,
+} from '@/lib/db/errors';
 
 describe('unwrapPgError', () => {
   it('extracts fields from a raw PG error', () => {
@@ -70,6 +74,52 @@ describe('unwrapPgError', () => {
   it('handles null/undefined gracefully', () => {
     expect(unwrapPgError(null).code).toBeNull();
     expect(unwrapPgError(undefined).code).toBeNull();
+  });
+});
+
+describe('getDeepErrorMessage', () => {
+  it('concatenates messages from Drizzle-wrapped errors', () => {
+    const pgError = new Error('column "spotify_popularity" does not exist');
+    const drizzleError = new Error(
+      'Failed query: select "id", "spotify_popularity"...'
+    );
+    drizzleError.cause = pgError;
+
+    const message = getDeepErrorMessage(drizzleError);
+    expect(message).toContain('Failed query');
+    expect(message).toContain('column "spotify_popularity" does not exist');
+  });
+
+  it('handles deeply nested cause chains', () => {
+    const inner = new Error('column "release_count" does not exist');
+    const mid = new Error('wrapper');
+    mid.cause = inner;
+    const outer = new Error('Failed query: select...');
+    outer.cause = mid;
+
+    const message = getDeepErrorMessage(outer);
+    expect(message).toContain('column "release_count" does not exist');
+  });
+
+  it('handles sourceError wrapper (Neon pattern)', () => {
+    const pgError = new Error('column "priority_score" does not exist');
+    const wrapper = Object.assign(new Error('query failed'), {
+      sourceError: pgError,
+    });
+
+    const message = getDeepErrorMessage(wrapper);
+    expect(message).toContain('column "priority_score" does not exist');
+  });
+
+  it('returns string for non-error values', () => {
+    expect(getDeepErrorMessage(null)).toBe('');
+    expect(getDeepErrorMessage(undefined)).toBe('');
+    expect(getDeepErrorMessage('raw string')).toBe('raw string');
+  });
+
+  it('returns plain message for unwrapped errors', () => {
+    const error = new Error('something broke');
+    expect(getDeepErrorMessage(error)).toBe('something broke');
   });
 });
 
