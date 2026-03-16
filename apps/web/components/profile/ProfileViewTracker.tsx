@@ -24,6 +24,10 @@ export function ProfileViewTracker({
   const trackView = useTrackingMutation<{ handle: string }>({
     endpoint: '/api/profile/view',
   });
+  const trackViewRef = useRef(trackView);
+  useEffect(() => {
+    trackViewRef.current = trackView;
+  });
 
   useEffect(() => {
     // Only track once per mount
@@ -43,8 +47,8 @@ export function ProfileViewTracker({
       if (sent) return;
     }
 
-    trackView.mutate({ handle });
-  }, [handle, artistId, source, trackView]);
+    trackViewRef.current.mutate({ handle });
+  }, [handle, artistId, source]);
 
   // This component renders nothing - it's purely for tracking
   return null;
