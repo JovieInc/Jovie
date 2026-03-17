@@ -141,6 +141,10 @@ export default function AdminOutreachEmailPage() {
     }
   }, [fetchQueue, queueLimit]);
 
+  const handleQueuePendingEmails = useCallback(() => {
+    queuePendingEmails();
+  }, [queuePendingEmails]);
+
   const totalPages = Math.ceil(total / limit);
   const hasPreviousPage = page > 1;
   const hasNextPage = page < totalPages;
@@ -165,7 +169,7 @@ export default function AdminOutreachEmailPage() {
               />
               <Button
                 size='sm'
-                onClick={() => void queuePendingEmails()}
+                onClick={handleQueuePendingEmails}
                 disabled={queueing || loading || pendingTotal === 0}
               >
                 {queueing ? 'Queueing...' : 'Queue Next Batch'}

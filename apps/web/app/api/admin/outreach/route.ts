@@ -35,6 +35,27 @@ const queueOutreachBodySchema = z.object({
 
 const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
 
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    { status, headers: NO_STORE_HEADERS }
+  );
+}
+
+async function requireAdminAccess() {
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated) {
+    return jsonError('Unauthorized', 401);
+  }
+
+  if (!entitlements.isAdmin) {
+    return jsonError('Forbidden', 403);
+  }
+
+  return null;
+}
+
 function getOutreachRouteWhereClause(
   queue: 'email' | 'dm' | 'manual_review' | 'all'
 ) {
@@ -88,18 +109,9 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
   }
 
   try {
@@ -239,18 +251,9 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/outreach — Queue a limited batch of pending outreach emails.
  */
 export async function POST(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
   }
 
   try {
