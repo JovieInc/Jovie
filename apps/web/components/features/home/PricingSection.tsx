@@ -157,7 +157,7 @@ export function PricingSection() {
                 asChild
                 variant='accent'
                 size='xl'
-                className='mt-8 w-full'
+                className='mt-8 w-full text-[rgb(8,9,10)] hover:text-[rgb(8,9,10)]'
               >
                 <Link href='/signup?plan=founding'>Choose Founding Member</Link>
               </Button>
