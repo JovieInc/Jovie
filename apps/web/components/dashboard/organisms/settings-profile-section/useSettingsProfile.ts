@@ -145,8 +145,7 @@ export function useSettingsProfile({
         const message =
           error instanceof Error ? error.message : 'Failed to update profile';
         setProfileSaveStatus({ saving: false, success: false, error: message });
-        notifications.error(message);
-        // Re-throw so useAutoSave knows the save failed
+        // Re-throw so useAutoSave calls onError (which shows the toast)
         throw error;
       }
 
