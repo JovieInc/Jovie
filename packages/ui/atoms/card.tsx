@@ -12,7 +12,7 @@ const cardVariants = cva(
       variant: {
         default: '',
         hoverable:
-          'hover:bg-surface-2 hover:shadow-card-elevated cursor-pointer motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1',
+          'hover:bg-surface-2 hover:shadow-card-elevated cursor-pointer motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1',
       },
     },
     defaultVariants: {

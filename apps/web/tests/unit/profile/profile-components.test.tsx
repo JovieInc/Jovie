@@ -41,6 +41,7 @@ const mockUseUserSafe = vi.hoisted(() =>
 
 vi.mock('@/hooks/useClerkSafe', () => ({
   useUserSafe: mockUseUserSafe,
+  useAuthSafe: () => ({ isSignedIn: false }),
 }));
 
 // --- Mock Next.js ---

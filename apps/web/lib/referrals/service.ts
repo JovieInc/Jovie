@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import {
   referralCodes,
@@ -23,11 +24,7 @@ import {
 const MAX_UNIQUE_RETRIES = 3;
 
 function isUniqueConstraintViolation(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error as { code: string }).code === '23505'
-  );
+  return isUniqueViolation(error);
 }
 
 /**

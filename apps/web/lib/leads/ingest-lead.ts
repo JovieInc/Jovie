@@ -23,6 +23,39 @@ export interface LeadIngestionResult {
   error?: string;
 }
 
+async function enqueuePostIngestionJobs(profileId: string, leadId: string) {
+  const [createdProfile] = await db
+    .select({
+      spotifyUrl: creatorProfiles.spotifyUrl,
+      spotifyId: creatorProfiles.spotifyId,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+
+  if (createdProfile?.spotifyUrl) {
+    void enqueueMusicFetchEnrichmentJob({
+      creatorProfileId: profileId,
+      spotifyUrl: createdProfile.spotifyUrl,
+    }).catch(err =>
+      captureError('MusicFetch enrichment enqueue failed for lead', err, {
+        leadId,
+      })
+    );
+  }
+  if (createdProfile?.spotifyId) {
+    void enqueueDspArtistDiscoveryJob({
+      creatorProfileId: profileId,
+      spotifyArtistId: createdProfile.spotifyId,
+      targetProviders: ['apple_music'],
+    }).catch(err =>
+      captureError('DSP discovery enqueue failed for lead', err, {
+        leadId,
+      })
+    );
+  }
+}
+
 /**
  * Ingests a lead as a creator profile using the same flow as admin creator-ingest.
  * Called when a lead is approved.
@@ -109,36 +142,7 @@ export async function ingestLeadAsCreator(
       // Enqueue MusicFetch enrichment and DSP discovery for the new profile.
       // Wrapped in try/catch so failures don't flip the ingestion result.
       try {
-        const [createdProfile] = await db
-          .select({
-            spotifyUrl: creatorProfiles.spotifyUrl,
-            spotifyId: creatorProfiles.spotifyId,
-          })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.id, body.profile.id))
-          .limit(1);
-
-        if (createdProfile?.spotifyUrl) {
-          void enqueueMusicFetchEnrichmentJob({
-            creatorProfileId: body.profile.id,
-            spotifyUrl: createdProfile.spotifyUrl,
-          }).catch(err =>
-            captureError('MusicFetch enrichment enqueue failed for lead', err, {
-              leadId: lead.id,
-            })
-          );
-        }
-        if (createdProfile?.spotifyId) {
-          void enqueueDspArtistDiscoveryJob({
-            creatorProfileId: body.profile.id,
-            spotifyArtistId: createdProfile.spotifyId,
-            targetProviders: ['apple_music'],
-          }).catch(err =>
-            captureError('DSP discovery enqueue failed for lead', err, {
-              leadId: lead.id,
-            })
-          );
-        }
+        await enqueuePostIngestionJobs(body.profile.id, lead.id);
       } catch (err) {
         await captureError(
           'Post-ingestion enrichment enqueue failed for lead',

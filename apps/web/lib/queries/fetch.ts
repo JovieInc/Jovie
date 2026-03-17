@@ -71,11 +71,24 @@ export async function fetchWithTimeoutResponse(
     });
 
     if (!response.ok) {
-      throw new FetchError(
-        getFetchErrorMessage(response),
-        response.status,
-        response
-      );
+      let message = getFetchErrorMessage(response);
+      let parsedBody: Record<string, unknown> | undefined;
+
+      // For client errors, try to extract the user-facing error from the body.
+      // Clone the response first so the original body remains readable by
+      // downstream error handlers (e.g. useSocialsForm).
+      if (response.status >= 400 && response.status < 500) {
+        try {
+          parsedBody = await response.clone().json();
+          if (parsedBody?.error && typeof parsedBody.error === 'string') {
+            message = parsedBody.error;
+          }
+        } catch {
+          // Keep default message if body isn't parseable
+        }
+      }
+
+      throw new FetchError(message, response.status, response, parsedBody);
     }
 
     return response;
@@ -118,11 +131,14 @@ function getFetchErrorMessage(response: Response): string {
 export class FetchError extends Error {
   public readonly response?: Response;
   public readonly body?: string;
+  /** Parsed JSON body from the error response (available for 4xx errors). */
+  public readonly parsedBody?: Record<string, unknown>;
 
   constructor(
     message: string,
     public readonly status: number,
-    responseOrBody?: Response | string
+    responseOrBody?: Response | string,
+    parsedBody?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'FetchError';
@@ -131,6 +147,7 @@ export class FetchError extends Error {
     } else {
       this.response = responseOrBody;
     }
+    this.parsedBody = parsedBody;
   }
 
   /**

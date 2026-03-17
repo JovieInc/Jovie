@@ -214,7 +214,9 @@ export async function getAppleMusicToken(): Promise<string> {
  */
 export function isAppleMusicConfigured(): boolean {
   return Boolean(
-    APPLE_MUSIC_KEY_ID && APPLE_MUSIC_TEAM_ID && APPLE_MUSIC_PRIVATE_KEY
+    env.APPLE_MUSIC_KEY_ID &&
+      env.APPLE_MUSIC_TEAM_ID &&
+      env.APPLE_MUSIC_PRIVATE_KEY
   );
 }
 

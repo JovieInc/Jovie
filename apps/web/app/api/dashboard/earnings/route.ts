@@ -51,7 +51,10 @@ export async function GET() {
 
       // Set a PostgreSQL-level statement timeout to prevent long-running queries
       // from holding Neon WebSocket connections (JOVIE-WEB-8D / JOVIE-WEB-DP).
-      await tx.execute(drizzleSql`SET LOCAL statement_timeout = '5s'`);
+      // Use SET (session-scoped) instead of SET LOCAL — SET LOCAL is a no-op
+      // outside a transaction block and the Neon HTTP driver does not support
+      // transactions. See lib/db/query-timeout.ts for documentation.
+      await tx.execute(drizzleSql`SET statement_timeout = '5000ms'`);
 
       // Fetch aggregated stats for completed tips
       const [statsRow] = await tx

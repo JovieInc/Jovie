@@ -36,6 +36,11 @@ vi.mock('@/lib/dsp-enrichment/providers/musicfetch', () => ({
     const m = /channel\/(UC[a-zA-Z0-9_-]+)/.exec(url);
     return m?.[1] ?? null;
   },
+  getMusicFetchServiceUrl: (
+    service: { link?: string; url?: string } | undefined
+  ) => {
+    return service?.link ?? service?.url;
+  },
 }));
 
 import {
@@ -170,6 +175,42 @@ describe('extractMusicFetchLinks', () => {
     // Spotify always present (from spotifyUrl arg)
     expect(platformIds).toContain('spotify');
     expect(platformIds).toContain('apple_music');
+  });
+
+  it('extracts links when API returns link field instead of url (real API format)', () => {
+    const artistData: MusicFetchArtistResult = {
+      type: 'artist',
+      name: 'Dua Lipa',
+      services: {
+        appleMusic: {
+          id: '1031397873',
+          link: 'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music',
+        },
+        deezer: {
+          id: '8706544',
+          link: 'https://www.deezer.com/artist/8706544',
+        },
+        instagram: { link: 'https://instagram.com/DuaLipa' },
+        tidal: {
+          id: '7985446',
+          link: 'https://tidal.com/browse/artist/7985446',
+        },
+        soundcloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
+        youtube: { link: 'https://www.youtube.com/channel/UCabc' },
+      },
+    };
+    const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
+    const platformIds = links.map(l => l.platformId);
+    expect(platformIds).toContain('spotify');
+    expect(platformIds).toContain('apple_music');
+    expect(platformIds).toContain('deezer');
+    expect(platformIds).toContain('instagram');
+    expect(platformIds).toContain('tidal');
+    expect(platformIds).toContain('soundcloud');
+    expect(platformIds).toContain('youtube');
+    expect(links.find(l => l.platformId === 'apple_music')?.url).toBe(
+      'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music'
+    );
   });
 
   it('deduplicates links when the same URL appears twice', () => {
@@ -343,6 +384,46 @@ describe('mapMusicFetchProfileFields', () => {
       SPOTIFY_URL
     );
     expect(updates.avatarUrl).toBeUndefined();
+  });
+
+  it('maps profile fields when API returns link field instead of url (real API format)', () => {
+    const artistData: MusicFetchArtistResult = {
+      type: 'artist',
+      name: 'Dua Lipa',
+      image: { url: 'https://i.scdn.co/image/abc123' },
+      bio: 'Pop artist',
+      services: {
+        appleMusic: {
+          id: '1031397873',
+          link: 'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music',
+        },
+        deezer: {
+          id: '8706544',
+          link: 'https://www.deezer.com/artist/8706544',
+        },
+        tidal: {
+          id: '7985446',
+          link: 'https://tidal.com/browse/artist/7985446',
+        },
+        soundcloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
+        youtube: { link: 'https://www.youtube.com/channel/UCabc' },
+        youtubeMusic: { link: 'https://music.youtube.com/channel/UCabc' },
+      },
+    };
+    const updates = mapMusicFetchProfileFields(
+      artistData,
+      makeEmptyProfile(),
+      SPOTIFY_URL
+    );
+    expect(updates.appleMusicUrl).toBe(
+      'https://music.apple.com/us/artist/dua-lipa/1031397873?app=music'
+    );
+    expect(updates.appleMusicId).toBe('1031397873');
+    expect(updates.deezerId).toBe('8706544');
+    expect(updates.tidalId).toBe('7985446');
+    expect(updates.soundcloudId).toBe('dualipa');
+    expect(updates.youtubeUrl).toBe('https://www.youtube.com/channel/UCabc');
+    expect(updates.youtubeMusicId).toBe('UCabc');
   });
 
   it('returns empty updates when all profile fields are already populated', () => {

@@ -239,7 +239,7 @@ export function ReleaseMetadata({
                 <DrawerButton
                   tone='ghost'
                   size='sm'
-                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[450] leading-[14px] text-(--linear-text-secondary)'
+                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-(--linear-text-secondary)'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown

@@ -6,6 +6,7 @@ export interface SpotifyArtistResult {
   followers?: number;
   popularity: number;
   verified?: boolean;
+  isClaimed?: boolean;
 }
 
 export interface AppleMusicArtistResult {

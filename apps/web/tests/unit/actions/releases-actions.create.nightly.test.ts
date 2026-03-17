@@ -475,6 +475,7 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
 
     it('connects Spotify artist and starts background import', async () => {
       setupDbSelectChain([{ settings: {} }]);
+      setupDbSelectChain([]); // pre-check: no existing claim
       setupDbUpdateChain();
       // Background fire-and-forget calls sync; set up mock to prevent unhandled rejection
       mockSyncReleasesFromSpotify.mockResolvedValue({
@@ -509,6 +510,7 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
 
     it('returns importing state even when sync would fail (fire-and-forget)', async () => {
       setupDbSelectChain([{ settings: {} }]);
+      setupDbSelectChain([]); // pre-check: no existing claim
       setupDbUpdateChain();
       // Even with a failing sync, connectSpotifyArtist returns immediately
       mockSyncReleasesFromSpotify.mockResolvedValue({
@@ -529,8 +531,27 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       expect(result.imported).toBe(0);
     });
 
-    it('handles unique constraint race conflicts gracefully', async () => {
+    it('handles pre-check detection of already-claimed artist', async () => {
       setupDbSelectChain([{ settings: {} }]);
+      setupDbSelectChain([{ id: 'other_profile_id' }]); // pre-check: another profile has this artist
+
+      const { connectSpotifyArtist } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await connectSpotifyArtist(connectParams);
+
+      expect(result.success).toBe(false);
+      expect(result.imported).toBe(0);
+      expect(result.message).toMatch(
+        /already linked to another jovie account/i
+      );
+      // Should not attempt the update at all
+      expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it('handles unique constraint race conflicts gracefully (raw PG error)', async () => {
+      setupDbSelectChain([{ settings: {} }]);
+      setupDbSelectChain([]); // pre-check: no existing claim (race condition)
       mockDbUpdate.mockReturnValue({
         set: vi.fn().mockReturnValue({
           where: vi.fn().mockRejectedValue(
@@ -544,6 +565,44 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
               }
             )
           ),
+        }),
+      });
+
+      const { connectSpotifyArtist } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await connectSpotifyArtist(connectParams);
+
+      expect(result.success).toBe(false);
+      expect(result.imported).toBe(0);
+      expect(result.message).toMatch(
+        /already linked to another jovie account/i
+      );
+    });
+
+    it('handles Drizzle-wrapped unique constraint errors gracefully', async () => {
+      setupDbSelectChain([{ settings: {} }]);
+      setupDbSelectChain([]); // pre-check: no existing claim (race condition)
+
+      // Simulate Drizzle wrapping: outer error has no code/constraint,
+      // but .cause is the original PG error
+      const pgError = Object.assign(
+        new Error(
+          'duplicate key value violates unique constraint "creator_profiles_spotify_id_unique"'
+        ),
+        {
+          code: '23505',
+          constraint: 'creator_profiles_spotify_id_unique',
+        }
+      );
+      const drizzleError = new Error(
+        'Failed query: update "creator_profiles" set "spotify_url" = $1, "spotify_id" = $2'
+      );
+      drizzleError.cause = pgError;
+
+      mockDbUpdate.mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockRejectedValue(drizzleError),
         }),
       });
 

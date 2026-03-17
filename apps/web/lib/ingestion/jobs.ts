@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/db/errors';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
 import {
   canonicalIdentity,
@@ -54,11 +55,7 @@ async function insertJobWithDedup(
     }
   } catch (error: unknown) {
     // PostgreSQL unique_violation (23505) from the partial index race condition
-    const isUniqueViolation =
-      error instanceof Error &&
-      'code' in error &&
-      (error as { code: string }).code === '23505';
-    if (!isUniqueViolation) {
+    if (!isUniqueViolation(error)) {
       throw error;
     }
     caughtUniqueViolation = error as Error;

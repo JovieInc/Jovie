@@ -106,7 +106,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[450] leading-[1.3] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='text-[12.5px] font-[400] leading-[1.3] tracking-[-0.01em] text-(--linear-text-secondary)'
           >
             {artistLine}
           </TruncatedText>

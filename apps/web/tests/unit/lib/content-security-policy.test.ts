@@ -67,6 +67,37 @@ describe('buildContentSecurityPolicy', () => {
     expect(csp).not.toContain('report-uri');
     expect(csp).not.toContain('report-to');
   });
+
+  it('includes all major platform CDN domains in img-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const imgSrc = findDirective(csp, 'img-src');
+
+    // Social networks
+    expect(imgSrc).toContain('https://*.fbcdn.net');
+    expect(imgSrc).toContain('https://*.twimg.com');
+    expect(imgSrc).toContain('https://*.tiktokcdn.com');
+    expect(imgSrc).toContain('https://*.ytimg.com');
+    expect(imgSrc).toContain('https://*.licdn.com');
+    expect(imgSrc).toContain('https://*.googleusercontent.com');
+
+    // Music DSPs
+    expect(imgSrc).toContain('https://i.scdn.co');
+    expect(imgSrc).toContain('https://*.mzstatic.com');
+    expect(imgSrc).toContain('https://*.dzcdn.net');
+    expect(imgSrc).toContain('https://*.sndcdn.com');
+    expect(imgSrc).toContain('https://*.bcbits.com');
+
+    // Creator platforms
+    expect(imgSrc).toContain('https://cdn.discordapp.com');
+    expect(imgSrc).toContain('https://avatars.githubusercontent.com');
+
+    // Infrastructure
+    expect(imgSrc).toContain('https://*.blob.vercel-storage.com');
+    expect(imgSrc).toContain('https://img.clerk.com');
+  });
 });
 
 describe('buildContentSecurityPolicyReportOnly', () => {

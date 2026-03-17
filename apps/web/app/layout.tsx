@@ -176,7 +176,8 @@ export default async function RootLayout({
   const headContent = (
     <head>
       {isE2EClientRuntime ? null : (
-        <Script src='/theme-init.js' strategy='beforeInteractive' />
+        // eslint-disable-next-line @next/next/no-sync-scripts -- blocking theme script prevents FOUC; nonce hydration mismatch requires native <script> with suppressHydrationWarning
+        <script src='/theme-init.js' suppressHydrationWarning />
       )}
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
@@ -328,13 +329,6 @@ export default async function RootLayout({
     <html lang='en' className='dark' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
-        {/* Skip to main content link for keyboard accessibility (WCAG 2.4.1) */}
-        <a
-          href='#main-content'
-          className='sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-surface-1 focus:px-4 focus:py-2 focus:text-sm focus:text-primary-token focus:shadow-lg focus:ring-2 focus:ring-accent'
-        >
-          Skip to content
-        </a>
         <CoreProviders>
           {children}
           {DevToolbar && (

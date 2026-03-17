@@ -84,12 +84,12 @@ export const REFERRER_POLICY: SecurityHeader = {
  * Permissions-Policy (formerly Feature-Policy) controls which browser features
  * the page can use.
  *
- * @value Disables camera, microphone, and geolocation access
+ * @value Disables camera and microphone; allows geolocation for own origin (used by tour geo-sorting)
  * @see https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Permissions-Policy
  */
 export const PERMISSIONS_POLICY: SecurityHeader = {
   key: 'Permissions-Policy',
-  value: 'camera=(), microphone=(), geolocation=()',
+  value: 'camera=(), microphone=(), geolocation=(self)',
 };
 
 /**

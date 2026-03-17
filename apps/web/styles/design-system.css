@@ -112,14 +112,15 @@
   --color-border-subtle: oklch(0% 0 0 / 6%);
   --color-border-default: oklch(0% 0 0 / 10%);
   --color-border-strong: oklch(0% 0 0 / 18%);
-  --color-border-focus: lch(47.918% 59.303 288.421);
+  --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421) */
-  --color-accent: lch(47.918% 59.303 288.421);
-  /* #5e6ad2 — Linear exact */
-  --color-accent-hover: lch(42% 59.303 288.421);
-  --color-accent-active: lch(37% 59.303 288.421);
+  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
+  --color-accent: #7170ff;
+  /* #7170ff — Linear exact */
+  --color-accent-hover: #828fff;
+  /* Linear: --color-accent-hover */
+  --color-accent-active: #5a59e6;
   --color-accent-subtle: lch(92% 20 288.421);
   --color-accent-foreground: oklch(100% 0 0);
 
@@ -179,7 +180,7 @@
   );
   --color-skeleton-shimmer: oklch(100% 0 0);
 
-  /* Focus ring — Linear: lch(47.918% 59.303 288.421) = #5e6ad2 */
+  /* Focus ring — Linear: #7170ff (extracted 2026-03-16) */
   --color-focus-ring: var(--color-accent);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
@@ -192,7 +193,7 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces — matched to Linear's exact Hex values */
-  --color-bg-base: #090909;
+  --color-bg-base: #08090a;
   /* sidebar/page bg */
   --color-bg-surface-0: #101012;
   /* primary app surface */
@@ -204,7 +205,7 @@
   /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #090909;
+  --color-bg-page: #08090a;
   /* Same as base */
   --color-bg-hover: rgba(255, 255, 255, 0.04);
   /* Row/item hover */
@@ -238,8 +239,8 @@
   /* #E3E4E6 — Linear exact */
   --color-text-tertiary-token: lch(62.6% 1.35 272);
   /* #969799 — Linear exact */
-  --color-text-quaternary-token: lch(51% 1.35 272);
-  /* ~#7a7b7d — bumped from 38.29% for WCAG AA 4.5:1 contrast on dark bg */
+  --color-text-quaternary-token: #62666d;
+  /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
   --color-text-disabled-token: oklch(28% 0.006 272);
   --color-text-tooltip: lch(100% 0 272);
   /* White text on dark tooltips */
@@ -255,21 +256,20 @@
   --color-border-subtle: rgba(255, 255, 255, 0.05);
   --color-border-default: rgba(255, 255, 255, 0.08);
   --color-border-strong: rgba(255, 255, 255, 0.1);
-  --color-border-focus: lch(47.918% 59.303 288.421);
+  --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
-  /* Accent — Linear's exact purple-blue: #5e6ad2 = lch(47.918% 59.303 288.421)
-     Focus ring uses same accent color */
-  --color-accent: lch(47.918% 59.303 288.421);
-  /* #5e6ad2 — Linear exact */
-  --color-accent-hover: lch(55% 59.303 288.421);
-  --color-accent-active: lch(42% 59.303 288.421);
+  /* Accent — Linear's purple: #7170ff (extracted 2026-03-16) */
+  --color-accent: #7170ff;
+  /* #7170ff — Linear exact */
+  --color-accent-hover: #828fff;
+  --color-accent-active: #5a59e6;
   --color-accent-subtle: lch(20% 30 288.421);
 
-  /* Primary button - inverted for dark mode */
-  --color-btn-primary-bg: oklch(100% 0 0);
-  --color-btn-primary-fg: oklch(10% 0 0);
-  --color-btn-primary-hover: oklch(92% 0 0);
+  /* Primary button - inverted for dark mode (Linear: rgb(230,230,230)) */
+  --color-btn-primary-bg: #e6e6e6;
+  --color-btn-primary-fg: #08090a;
+  --color-btn-primary-hover: #f0f0f0;
 
   /* Secondary button */
   --color-btn-secondary-bg: oklch(
@@ -668,8 +668,8 @@
     "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
 
-  /* Linear-style font features */
-  --font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
+  /* Linear font features (extracted 2026-03-16: --font-settings: "cv01","ss03") */
+  --font-features: "cv01", "ss03";
   --font-optical-sizing: 28;
 
   /* Font weights — Linear uses Inter Variable axis with non-standard stops
@@ -678,19 +678,19 @@
        --font-weight-medium: 510
        --font-weight-semibold: 600
        --font-weight-bold: 700 */
-  --font-weight-normal: 450;
-  /* Linear default — "book" weight, not standard 400 */
-  --font-weight-book: 450;
+  --font-weight-normal: 400;
+  /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
+  --font-weight-book: 400;
   /* Alias for normal */
   --font-weight-medium: 510;
-  /* Linear's extracted medium = 510, not standard 500 */
+  /* Linear: --font-weight-medium = 510 */
   --font-weight-nav: 510;
   /* Linear sidebar nav = --font-weight-medium */
-  --font-weight-semibold: 600;
-  /* Linear: 600, not our old 538 */
-  --font-weight-bold: 700;
-  /* Linear: 700, not our old 590 */
-  --font-weight-heavy: 700;
+  --font-weight-semibold: 590;
+  /* Linear: --font-weight-semibold = 590 (extracted 2026-03-16) */
+  --font-weight-bold: 680;
+  /* Linear: --font-weight-bold = 680 (extracted 2026-03-16) */
+  --font-weight-heavy: 680;
 
   /* Type scale - based on 16px base
      KEY: Linear uses 13px (0.8125rem) as the primary app UI size */
@@ -777,13 +777,13 @@
   --radius-xs: 2px;
   /* Tags/badges — extracted: 2px on issue labels */
   --radius-sm: 4px;
-  /* Sidebar items */
+  /* Sidebar items, buttons (Linear: 4px border-radius on buttons) */
   --radius-md: 6px;
   /* Input fields — extracted: 6px on inputs & sidebar buttons */
-  --radius-default: 8px;
-  /* Buttons, dropdowns — extracted: 8px on nav buttons & cards */
+  --radius-default: 4px;
+  /* Buttons — Linear uses 4px (extracted 2026-03-16) */
   --radius-lg: 8px;
-  /* Cards — extracted: 8px on marketing cards */
+  /* Cards, menus — extracted: 8px on marketing cards */
   --radius-xl: 12px;
   /* Large cards, panels — extracted: 12px on feature sections */
   --radius-2xl: 16px;

@@ -439,12 +439,17 @@ export function HeroSpotifySearch() {
                     <div className='font-medium truncate text-sm text-primary-token'>
                       {artist.name}
                     </div>
-                    {artist.followers && (
+                    {artist.followers ? (
                       <div className='text-xs text-tertiary-token'>
                         {formatFollowers(artist.followers)}
                       </div>
-                    )}
+                    ) : null}
                   </div>
+                  {artist.isClaimed && (
+                    <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-[10px] font-semibold text-brand-spotify'>
+                      On Jovie
+                    </span>
+                  )}
                   {artist.verified && (
                     <div
                       className='shrink-0 text-brand-spotify'

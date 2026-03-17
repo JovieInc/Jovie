@@ -141,7 +141,7 @@ describe('Switch', () => {
       const switchElement = screen.getByTestId('switch');
       expect(switchElement.className).toContain('focus-visible:ring-2');
       expect(switchElement.className).toContain(
-        'focus-visible:ring-(--linear-border-focus)'
+        'focus-visible:ring-(--color-accent)'
       );
     });
 

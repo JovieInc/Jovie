@@ -205,7 +205,7 @@ describe('RadioGroup', () => {
         </RadioGroup>
       );
       const radio = screen.getByTestId('radio');
-      expect(radio.className).toContain('hover:border-(--linear-border-focus)');
+      expect(radio.className).toContain('hover:border-(--color-accent)');
       expect(radio.className).toContain('hover:bg-(--linear-bg-surface-1)');
     });
 

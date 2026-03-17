@@ -222,7 +222,7 @@ function EditableDisplayName({
       <Input
         ref={inputRef}
         type='text'
-        aria-label='Display name'
+        aria-label='Edit display name'
         value={value}
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}

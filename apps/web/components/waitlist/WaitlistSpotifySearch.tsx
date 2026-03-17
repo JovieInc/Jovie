@@ -450,11 +450,11 @@ export function WaitlistSpotifySearch({
                     <div className='font-medium text-primary-token truncate'>
                       {artist.name}
                     </div>
-                    {artist.followers && (
+                    {artist.followers ? (
                       <div className='text-xs text-tertiary-token'>
                         {formatFollowers(artist.followers)}
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   {artist.verified && (
                     <div className='shrink-0 text-brand-spotify'>

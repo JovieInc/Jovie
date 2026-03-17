@@ -45,7 +45,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
 
   if (!value) {
     return (
-      <span className='text-[11px] font-[450] text-(--linear-text-tertiary)'>
+      <span className='text-[11px] font-[400] text-(--linear-text-tertiary)'>
         —
       </span>
     );

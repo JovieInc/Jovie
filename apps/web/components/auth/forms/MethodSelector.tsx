@@ -57,7 +57,7 @@ export function MethodSelector({
       <div className={FORM_LAYOUT.errorContainer}>
         {error && (
           <p
-            className='text-[13px] font-[450] text-destructive text-center animate-in fade-in-0 duration-200'
+            className='text-[13px] font-[400] text-destructive text-center animate-in fade-in-0 duration-200'
             role='alert'
           >
             {error}

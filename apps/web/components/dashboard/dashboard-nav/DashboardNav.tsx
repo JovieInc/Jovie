@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import {
@@ -14,7 +15,7 @@ import {
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
 import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
-import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useReleasesQuery } from '@/lib/queries';
 import {
@@ -56,6 +57,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const router = useRouter();
+  const threadsEnabled = useCodeFlag('THREADS_ENABLED');
   const { isOpen: isPreviewOpen, open: openPreviewPanel } =
     usePreviewPanelState();
 
@@ -90,6 +92,7 @@ export function DashboardNav(_: DashboardNavProps) {
     });
   }, [artistName, releaseCount]);
 
+  const isDemo = pathname === APP_ROUTES.DEMO;
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
 
   // Settings nav: "General" (user) and artist name (or "Artist") groups
@@ -113,14 +116,23 @@ export function DashboardNav(_: DashboardNavProps) {
     }
   }, [pathname, openPreviewPanel, router]);
 
+  // In demo mode, intercept nav clicks for tabs without demo data
+  const handleDemoNavClick = useCallback((item: NavItem) => {
+    toast.info(`${item.name} is not available in demo mode`);
+  }, []);
+
   // Memoize renderNavItem to prevent creating new functions on every render
   const renderNavItem = useCallback(
     (item: NavItem, _index: number) => {
       const isProfileItem = item.id === 'profile';
+      const isReleasesItem = item.id === 'releases';
       const isActive = isProfileItem
         ? isPreviewOpen && pathname.startsWith(APP_ROUTES.CHAT)
         : isItemActive(pathname, item);
       const shortcut = NAV_SHORTCUTS[item.id];
+
+      // In demo mode, only Releases has real content — intercept all other nav clicks
+      const demoUnavailable = isDemo && !isReleasesItem;
 
       return (
         <NavMenuItem
@@ -129,11 +141,24 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-          onClick={isProfileItem ? handleProfileClick : undefined}
+          onClick={
+            demoUnavailable
+              ? () => handleDemoNavClick(item)
+              : isProfileItem
+                ? handleProfileClick
+                : undefined
+          }
         />
       );
     },
-    [pathname, profileActions, handleProfileClick, isPreviewOpen]
+    [
+      pathname,
+      profileActions,
+      handleProfileClick,
+      handleDemoNavClick,
+      isPreviewOpen,
+      isDemo,
+    ]
   );
 
   // Memoize renderSection to prevent creating new functions on every render
@@ -176,7 +201,7 @@ export function DashboardNav(_: DashboardNavProps) {
         </SidebarGroup>
       )}
 
-      {!isInSettings && FEATURE_FLAGS.THREADS_ENABLED && !env.IS_E2E && (
+      {!isInSettings && threadsEnabled && !env.IS_E2E && (
         <div className='mt-3'>
           <RecentChats />
         </div>

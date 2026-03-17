@@ -512,7 +512,10 @@ async function fetchTippingStatsWithSession(
     // Set a PostgreSQL-level statement timeout to prevent long-running queries
     // from holding Neon WebSocket connections open past the idle timeout.
     // This is a safety net in addition to the JS-level timeout.
-    await tx.execute(drizzleSql`SET LOCAL statement_timeout = '5s'`);
+    // Use SET (session-scoped) instead of SET LOCAL — SET LOCAL is a no-op
+    // outside a transaction block and the Neon HTTP driver does not support
+    // transactions. See lib/db/query-timeout.ts for documentation.
+    await tx.execute(drizzleSql`SET statement_timeout = '5000ms'`);
 
     const startOfMonth = new Date();
     startOfMonth.setUTCDate(1);

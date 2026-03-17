@@ -9,12 +9,13 @@ import {
 import { memo, useCallback, useMemo, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
-import { InlineIconButton } from '@/components/atoms/InlineIconButton';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   type ContextMenuItemType,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
@@ -204,29 +205,6 @@ const ActionsHeader = memo(function ActionsHeader({
   );
 });
 
-const ActionsCell = memo(function ActionsCell({
-  tourDate,
-  onEdit,
-}: {
-  tourDate: TourDateViewModel;
-  onEdit: (tourDate: TourDateViewModel) => void;
-}) {
-  return (
-    <div className='flex items-center justify-end'>
-      <InlineIconButton
-        aria-label={`Edit ${tourDate.venueName} tour date`}
-        onClick={event => {
-          event.stopPropagation();
-          onEdit(tourDate);
-        }}
-        className='rounded-full p-1 text-(--linear-text-tertiary)'
-      >
-        <Icon name='MoreHorizontal' className='h-4 w-4' />
-      </InlineIconButton>
-    </div>
-  );
-});
-
 /** Standalone cell renderer for Location column (avoids defining inside parent component). */
 function LocationCellRenderer({
   row,
@@ -242,15 +220,22 @@ function LocationCellRenderer({
   );
 }
 
-/** Standalone cell renderer for Actions column (avoids defining inside parent component). */
+/** Standalone cell renderer for Actions column — renders kebab menu from shared action builder. */
 function ActionsCellRenderer({
   row,
-  onEdit,
+  getContextMenuItems,
 }: {
   readonly row: { readonly original: TourDateViewModel };
-  readonly onEdit: (tourDate: TourDateViewModel) => void;
+  readonly getContextMenuItems: (
+    tourDate: TourDateViewModel
+  ) => ContextMenuItemType[];
 }) {
-  return <ActionsCell tourDate={row.original} onEdit={onEdit} />;
+  const items = convertContextMenuItems(getContextMenuItems(row.original));
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
 }
 
 export function TourDatesTable({
@@ -339,11 +324,16 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => <ActionsCellRenderer row={row} onEdit={onEdit} />, // NOSONAR - TanStack Table render prop
+        cell: ({ row }) => (
+          <ActionsCellRenderer
+            row={row}
+            getContextMenuItems={getContextMenuItems}
+          />
+        ), // NOSONAR - TanStack Table render prop
         size: 80,
       }),
     ];
-  }, [onSync, isSyncing, onEdit]);
+  }, [onSync, isSyncing, getContextMenuItems]);
 
   return (
     <UnifiedTable

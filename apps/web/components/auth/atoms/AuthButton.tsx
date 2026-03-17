@@ -42,7 +42,7 @@ const authButtonVariants = cva(
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[450] text-(--linear-text-secondary)',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[400] text-(--linear-text-secondary)',
           'hover:text-(--linear-text-primary)',
           'active:scale-100 active:opacity-70',
         ].join(' '),

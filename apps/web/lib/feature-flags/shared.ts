@@ -52,3 +52,11 @@ export const FEATURE_FLAGS = {
    */
   PWA_INSTALL_BANNER: false,
 } as const;
+
+export type CodeFlagName = keyof typeof FEATURE_FLAGS;
+
+export const CODE_FLAG_KEYS = {
+  THREADS_ENABLED: 'code:THREADS_ENABLED',
+  SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
+  PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
+} as const satisfies Record<CodeFlagName, string>;

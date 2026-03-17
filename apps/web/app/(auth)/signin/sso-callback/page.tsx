@@ -9,7 +9,7 @@ import { APP_ROUTES } from '@/constants/routes';
  */
 export default function SignInSsoCallbackPage() {
   return (
-    <div className='flex items-center justify-center min-h-[200px]'>
+    <div className='min-h-dvh grid place-items-center bg-base'>
       <SsoCallbackHandler
         signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
         signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}

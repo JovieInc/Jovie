@@ -18,6 +18,13 @@
  * - `CATEGORY_LABELS` - Human-readable labels for each category
  * - `CATEGORY_ORDER` - Ordered array of categories for UI display
  *
+ * **CDN Domains:**
+ * - `PLATFORM_CDN_DOMAINS` - CDN domain patterns keyed by platform ID
+ * - `INFRASTRUCTURE_IMAGE_DOMAINS` - Non-platform image domains (storage, auth, etc.)
+ * - `getAllImageDomainPatterns()` - Flat deduplicated list of all image domain patterns
+ * - `getCspImgSrcDomains()` - Domains formatted for CSP img-src directive
+ * - `getDspCdnDomains()` - Base domains for music DSP image bypass
+ *
  * **Functions:**
  * - `isValidPlatform(value)` - Type guard for validating platform IDs
  * - `getPlatformsByCategory()` - Get platforms grouped by category
@@ -29,6 +36,16 @@
 
 // Categories
 export { CATEGORY_LABELS, CATEGORY_ORDER } from './categories';
+
+// CDN Domains
+export {
+  getAllImageDomainPatterns,
+  getCspImgSrcDomains,
+  getDspCdnDomains,
+  getImageServingPlatformIds,
+  INFRASTRUCTURE_IMAGE_DOMAINS,
+  PLATFORM_CDN_DOMAINS,
+} from './cdn-domains';
 
 // Data
 export { ALL_PLATFORMS } from './data';

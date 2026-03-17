@@ -25,6 +25,30 @@ Skip any Linear issue labeled `human-review-required` or containing "This issue 
 
 ---
 
+## gstack
+
+This project includes [gstack](https://github.com/garrytan/gstack) vendored at `.claude/skills/gstack/`.
+
+**Web browsing:** Always use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude-in-chrome__*` tools.
+
+**Available skills:**
+
+| Skill | Purpose |
+|-------|---------|
+| `/plan-ceo-review` | CEO/founder-mode plan review — rethink from first principles |
+| `/plan-eng-review` | Eng manager-mode plan review — architecture, edge cases, test coverage |
+| `/review` | Pre-landing PR review for SQL safety, trust boundaries, side effects |
+| `/ship` | Automated release: merge main, test, review, bump version, PR |
+| `/browse` | Fast headless browser (~100ms/cmd) for QA and site verification |
+| `/qa` | Systematic QA testing (diff-aware, full, quick, regression modes) |
+| `/setup-browser-cookies` | Import authenticated browser sessions for testing |
+| `/retro` | Weekly engineering retrospective with commit analysis |
+| `/document-release` | Document a release |
+
+**Troubleshooting:** If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+
+---
+
 > **Full Guidelines:** See `AGENTS.md` at repo root for complete AI agent rules, engineering guardrails, and architecture guidance.
 
 This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
