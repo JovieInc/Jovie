@@ -1950,7 +1950,7 @@ export default async function LaunchPage() {
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-[var(--linear-bg-surface-1)] border border-subtle hover:bg-white/[0.04]'
+              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-surface-1 border border-subtle hover:bg-white/[0.04]'
             >
               Contact us
             </a>

@@ -19,7 +19,7 @@ export function LogoBar() {
       />
 
       <div className='mx-auto flex max-w-[var(--linear-content-max)] flex-col items-center gap-5'>
-        <p className='max-w-xl text-center text-xs font-[number:var(--linear-font-weight-medium)] uppercase tracking-[0.16em] text-[color:var(--linear-text-tertiary)]'>
+        <p className='max-w-xl text-center text-xs font-[number:var(--linear-font-weight-medium)] uppercase tracking-[0.16em] text-tertiary-token'>
           Artists on these labels use Jovie
         </p>
         <div
@@ -29,10 +29,10 @@ export function LogoBar() {
             boxShadow: 'var(--linear-shadow-card)',
           }}
         >
-          <AwalLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
-          <TheOrchardLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
-          <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[12px]' />
-          <ArmadaMusicLogo className='h-[12px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[14px]' />
+          <AwalLogo className='h-[14px] w-auto select-none text-primary-token opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
+          <TheOrchardLogo className='h-[14px] w-auto select-none text-primary-token opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />
+          <UniversalMusicGroupLogo className='h-[10px] w-auto select-none text-primary-token opacity-76 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[12px]' />
+          <ArmadaMusicLogo className='h-[12px] w-auto select-none text-primary-token opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[14px]' />
         </div>
       </div>
     </section>

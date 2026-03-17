@@ -80,13 +80,13 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
         }}
       />
 
-      <div className='flex h-11 items-center border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-5'>
+      <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-5'>
         <div className='flex gap-2'>
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
         </div>
-        <div className='flex-1 text-center text-xs text-[var(--linear-text-tertiary)]'>
+        <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie - Releases
         </div>
         <div className='w-[52px]' />
@@ -96,11 +96,11 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
         className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'
         style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
       >
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--linear-text-quaternary)]'>
+        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Release
         </span>
         <span />
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--linear-text-quaternary)]'>
+        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
           Smart link
         </span>
       </div>
@@ -133,7 +133,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
 
             <div className='min-w-0'>
               <div className='flex items-center gap-2'>
-                <p className='truncate text-sm font-medium text-[var(--linear-text-primary)]'>
+                <p className='truncate text-sm font-medium text-primary-token'>
                   {release.title}
                 </p>
                 {release.isNew && (
@@ -142,7 +142,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
                   </span>
                 )}
               </div>
-              <p className='text-xs text-[var(--linear-text-tertiary)]'>
+              <p className='text-xs text-tertiary-token'>
                 {release.type} - {release.year}
               </p>
             </div>
@@ -165,7 +165,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
                 strokeWidth='2.5'
                 strokeLinecap='round'
                 strokeLinejoin='round'
-                className='text-[var(--linear-text-tertiary)]'
+                className='text-tertiary-token'
                 aria-hidden='true'
               >
                 <path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' />
@@ -187,7 +187,7 @@ function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
       })}
 
       <div className='flex items-center justify-center px-5 py-3'>
-        <p className='text-xs text-[var(--linear-text-quaternary)]'>
+        <p className='text-xs text-quaternary-token'>
           + every past and future release, automatically
         </p>
       </div>
@@ -203,10 +203,10 @@ function ReleasePhone({
   return (
     <PhoneFrame>
       <div
-        className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-[var(--linear-bg-surface-1)] px-3 py-1.5'
+        className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-surface-1 px-3 py-1.5'
         style={{ border: '1px solid var(--linear-border-subtle)' }}
       >
-        <span className='truncate text-[10px] text-[var(--linear-text-tertiary)]'>
+        <span className='truncate text-[10px] text-tertiary-token'>
           jov.ie/{release.slug}
         </span>
       </div>
@@ -229,12 +229,10 @@ function ReleasePhone({
       </div>
 
       <div className='px-6 pb-4 text-center'>
-        <p className='text-[15px] font-semibold tracking-tight text-[var(--linear-text-primary)]'>
+        <p className='text-[15px] font-semibold tracking-tight text-primary-token'>
           {release.title}
         </p>
-        <p className='mt-0.5 text-xs text-[var(--linear-text-tertiary)]'>
-          Tim White
-        </p>
+        <p className='mt-0.5 text-xs text-tertiary-token'>Tim White</p>
       </div>
 
       <div className='flex flex-col gap-2 px-5'>
@@ -246,14 +244,14 @@ function ReleasePhone({
               key={key}
               label={DSP_LABELS[key] ?? 'Spotify'}
               iconPath={config.iconPath}
-              className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
+              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
             />
           );
         })}
       </div>
 
       <div className='pb-3 pt-3 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
           Powered by Jovie
         </p>
       </div>
@@ -266,7 +264,7 @@ export function ReleasesSection() {
   const activeRelease = RELEASES[activeIndex];
 
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2'
@@ -282,16 +280,16 @@ export function ReleasesSection() {
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           <div className='reveal-on-scroll flex flex-col gap-5'>
-            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-[var(--linear-border-subtle)] px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)]'>
+            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
               <Zap className='h-3 w-3' aria-hidden='true' />
               Automatic
             </span>
 
             <div className='grid gap-5 md:grid-cols-2 md:items-start md:gap-8'>
-              <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+              <h2 className='marketing-h2-linear text-primary-token'>
                 Every release gets a smart link and a built-in launch flow.
               </h2>
-              <p className='max-w-md marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              <p className='max-w-md marketing-lead-linear text-secondary-token'>
                 Connect Spotify once. Jovie handles the rest — smart links,
                 release updates, and fan notifications.
               </p>
@@ -305,7 +303,7 @@ export function ReleasesSection() {
             {RELEASE_PROOF_POINTS.map(point => (
               <span
                 key={point}
-                className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-3 py-1.5 text-xs font-medium text-[var(--linear-text-secondary)]'
+                className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'
               >
                 {point}
               </span>
@@ -375,17 +373,17 @@ export function ReleasesSection() {
             data-delay='160'
           >
             <div className='flex items-start gap-3 sm:items-center'>
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--linear-bg-surface-2)]'>
+              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                 <Zap
-                  className='h-4 w-4 text-[var(--linear-text-secondary)]'
+                  className='h-4 w-4 text-secondary-token'
                   aria-hidden='true'
                 />
               </div>
               <div>
-                <p className='text-sm font-medium text-[var(--linear-text-primary)]'>
+                <p className='text-sm font-medium text-primary-token'>
                   Launch without rebuilding assets every release.
                 </p>
-                <p className='text-xs text-[var(--linear-text-tertiary)]'>
+                <p className='text-xs text-tertiary-token'>
                   Smart links, release pages, and fan notifications stay ready
                   for every drop.
                 </p>
@@ -402,7 +400,7 @@ export function ReleasesSection() {
               <span className='text-sm font-medium text-emerald-400/90'>
                 4,218 fans notified
               </span>
-              <span className='text-xs text-[var(--linear-text-quaternary)]'>
+              <span className='text-xs text-quaternary-token'>
                 captured from your profile
               </span>
             </div>

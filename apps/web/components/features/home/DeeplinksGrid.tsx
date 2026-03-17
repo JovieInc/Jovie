@@ -84,7 +84,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
             showLink={false}
             as='p'
           />
-          <p className='mt-0.5 text-xs text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
+          <p className='mt-0.5 text-xs text-tertiary-token tracking-[0.2em] uppercase'>
             Artist
           </p>
         </div>
@@ -126,7 +126,7 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
       </div>
 
       <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
+        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
           Powered by Jovie
         </p>
       </div>
@@ -170,18 +170,18 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
       }}
     >
       <div className='flex items-center justify-between gap-3'>
-        <h3 className='text-lg font-semibold tracking-tight text-[var(--linear-text-primary)]'>
+        <h3 className='text-lg font-semibold tracking-tight text-primary-token'>
           {mode.headline}
         </h3>
-        <span className='shrink-0 rounded-full border border-[var(--linear-border-subtle)] px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--linear-text-secondary)]'>
+        <span className='shrink-0 rounded-full border border-subtle px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-secondary-token'>
           {mode.outcome}
         </span>
       </div>
-      <p className='mt-2 text-[14px] leading-[1.6] text-[var(--linear-text-secondary)]'>
+      <p className='mt-2 text-[14px] leading-[1.6] text-secondary-token'>
         {mode.description}
       </p>
       <div className='mt-4 flex items-center justify-end'>
-        <span className='font-mono text-xs text-[var(--linear-text-tertiary)]'>
+        <span className='font-mono text-xs text-tertiary-token'>
           jov.ie/tim{mode.slug ? `/${mode.slug}` : ''}
         </span>
       </div>
@@ -224,7 +224,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => (
         <h3
           key={mode.id}
-          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-[var(--linear-text-secondary)]'
+          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
         >
           {mode.headline}
         </h3>
@@ -237,7 +237,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => (
         <p
           key={mode.id}
-          className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'
+          className='max-w-[400px] marketing-lead-linear text-secondary-token'
         >
           {mode.description}
         </p>
@@ -249,7 +249,7 @@ export function DeeplinksGrid() {
     <>
       <section
         ref={sectionRef}
-        className='relative hidden lg:block bg-[var(--linear-bg-page)]'
+        className='relative hidden lg:block bg-page'
         style={{ height: `${MODES.length * 75}vh` }}
       >
         <div className='sticky top-0 flex h-dvh items-center justify-center overflow-hidden'>
@@ -277,11 +277,11 @@ export function DeeplinksGrid() {
             <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
               <div className='grid items-center grid-cols-[1fr_auto_1fr] gap-8 xl:gap-16'>
                 <div className='flex flex-col gap-6'>
-                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+                  <span className='inline-flex items-center gap-1.5 self-start rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                     One profile. Every way fans support you.
                   </span>
 
-                  <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+                  <h2 className='marketing-h2-linear text-primary-token'>
                     The right action for every fan.
                   </h2>
 
@@ -392,7 +392,7 @@ export function DeeplinksGrid() {
                             'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                         }}
                       >
-                        <span className='mr-2 text-xs uppercase tracking-[0.12em] text-[var(--linear-text-quaternary)]'>
+                        <span className='mr-2 text-xs uppercase tracking-[0.12em] text-quaternary-token'>
                           {mode.outcome}
                         </span>
                         jov.ie/tim
@@ -418,7 +418,7 @@ export function DeeplinksGrid() {
         </div>
       </section>
 
-      <section className='lg:hidden section-spacing-linear bg-[var(--linear-bg-page)]'>
+      <section className='lg:hidden section-spacing-linear bg-page'>
         <Container size='homepage'>
           <div
             aria-hidden='true'
@@ -431,13 +431,13 @@ export function DeeplinksGrid() {
 
           <div className='mx-auto max-w-[var(--linear-content-max)]'>
             <div className='flex flex-col items-center text-center gap-6 mb-12'>
-              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 One profile. Every way fans support you.
               </span>
-              <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
+              <h2 className='marketing-h2-linear text-primary-token'>
                 The right action for every fan.
               </h2>
-              <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              <p className='max-w-[400px] marketing-lead-linear text-secondary-token'>
                 Every visitor sees the action most likely to convert in that
                 moment: listen, tip, tour, or subscribe.
               </p>

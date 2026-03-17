@@ -22,7 +22,7 @@ export const MOCK_ARTIST = {
 } as const;
 
 export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-[color:var(--linear-text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
+  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-primary-token shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 export const FALLBACK_CITY = 'Los Angeles';
@@ -132,7 +132,7 @@ function ListenContent() {
           key={dsp.key}
           label={dsp.label}
           iconPath={DSP_LOGO_CONFIG[dsp.key]?.iconPath}
-          className='px-3 py-2.5 text-[13px] bg-[var(--linear-bg-surface-2)] border border-[var(--linear-border-subtle)] ring-0 backdrop-blur-none hover:bg-[var(--linear-bg-hover)]'
+          className='px-3 py-2.5 text-[13px] bg-surface-2 border border-subtle ring-0 backdrop-blur-none hover:bg-hover'
         />
       ))}
     </div>
@@ -142,7 +142,7 @@ function ListenContent() {
 function TipContent() {
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-[color:var(--linear-text-tertiary)]'>
+      <p className='text-[10px] font-medium uppercase tracking-[0.15em] text-tertiary-token'>
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
@@ -151,15 +151,13 @@ function TipContent() {
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
               i === 1
-                ? 'border-[var(--linear-border-default)] bg-[var(--linear-bg-surface-2)] text-[color:var(--linear-text-primary)] shadow-sm'
-                : 'border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] text-[color:var(--linear-text-primary)]'
+                ? 'border-default bg-surface-2 text-primary-token shadow-sm'
+                : 'border-subtle bg-surface-1 text-primary-token'
             }`}
           >
             <span
               className={`text-[10px] font-medium uppercase tracking-wider ${
-                i === 1
-                  ? 'text-[color:var(--linear-text-secondary)]'
-                  : 'text-[color:var(--linear-text-tertiary)]'
+                i === 1 ? 'text-secondary-token' : 'text-tertiary-token'
               }`}
             >
               USD
@@ -178,22 +176,20 @@ function TourContent() {
   const show = MOCK_TOUR_DATES[0];
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-[var(--linear-bg-surface-1)] border border-[var(--linear-border-subtle)]'>
+      <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-surface-1 border border-subtle'>
         <div className='min-w-0'>
-          <p className='text-[13px] font-medium text-[color:var(--linear-text-primary)] truncate'>
+          <p className='text-[13px] font-medium text-primary-token truncate'>
             {show.venue}
           </p>
-          <p className='text-[11px] text-[color:var(--linear-text-tertiary)]'>
-            {show.city}
-          </p>
+          <p className='text-[11px] text-tertiary-token'>{show.city}</p>
         </div>
-        <span className='shrink-0 text-[11px] font-medium text-[color:var(--linear-text-secondary)]'>
+        <span className='shrink-0 text-[11px] font-medium text-secondary-token'>
           {show.date}
         </span>
       </div>
       <button
         type='button'
-        className='text-[12px] font-medium text-[color:var(--linear-text-tertiary)] hover:text-[color:var(--linear-text-secondary)] transition-colors'
+        className='text-[12px] font-medium text-tertiary-token hover:text-secondary-token transition-colors'
       >
         See more dates
       </button>
@@ -226,7 +222,7 @@ function ProfileContent() {
         {platforms.map(p => (
           <span
             key={p}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-[color:var(--linear-text-tertiary)]'
+            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token'
             style={{ backgroundColor: 'rgba(255,255,255,0.015)' }}
           >
             <SocialIcon platform={p} size={18} aria-hidden />

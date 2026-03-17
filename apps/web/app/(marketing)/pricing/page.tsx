@@ -298,7 +298,7 @@ export default function PricingPage() {
               }}
             >
               {/* Free Tier */}
-              <div className='border-b md:border-b-0 md:border-r border-[var(--linear-border-default)]'>
+              <div className='border-b md:border-b-0 md:border-r border-default'>
                 <PricingTier
                   name={ENTITLEMENT_REGISTRY.free.marketing.displayName}
                   billingLabel={ENTITLEMENT_REGISTRY.free.marketing.tagline}
@@ -325,7 +325,7 @@ export default function PricingPage() {
               />
 
               {growthPlanEnabled && (
-                <div className='border-t md:border-t-0 md:border-l border-[var(--linear-border-default)]'>
+                <div className='border-t md:border-t-0 md:border-l border-default'>
                   <PricingTier
                     name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
                     badge='Early Access'

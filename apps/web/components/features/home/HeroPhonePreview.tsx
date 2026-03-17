@@ -71,7 +71,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
                 showLink={false}
                 as='p'
               />
-              <p className='mt-0.5 text-[11px] text-[var(--linear-text-tertiary)] tracking-[0.2em] uppercase'>
+              <p className='mt-0.5 text-[11px] text-tertiary-token tracking-[0.2em] uppercase'>
                 Artist
               </p>
             </div>
@@ -89,7 +89,7 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
 
           {/* Branding */}
           <div className='pb-3 pt-1 text-center'>
-            <p className='text-[9px] uppercase tracking-[0.15em] text-[var(--linear-text-quaternary)]'>
+            <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
               Powered by Jovie
             </p>
           </div>
@@ -97,10 +97,10 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
       </div>
 
       <div className='flex flex-col items-center gap-1.5 text-center'>
-        <p className='text-[12px] font-medium text-[var(--linear-text-secondary)]'>
+        <p className='text-[12px] font-medium text-secondary-token'>
           Smart artist profile
         </p>
-        <p className='max-w-[15rem] text-[11px] leading-5 text-[var(--linear-text-tertiary)]'>
+        <p className='max-w-[15rem] text-[11px] leading-5 text-tertiary-token'>
           New fans can subscribe fast. Returning fans get the next best action.
         </p>
       </div>
@@ -116,9 +116,9 @@ export function HeroPhonePreview({ handle }: HeroPhonePreviewProps) {
             'inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.18)',
         }}
       >
-        <span className='text-[12px] text-[var(--linear-text-tertiary)]'>
+        <span className='text-[12px] text-tertiary-token'>
           {'jov.ie/'}
-          <span className='font-semibold text-[var(--linear-text-secondary)]'>
+          <span className='font-semibold text-secondary-token'>
             {displayHandle}
           </span>
         </span>

@@ -21,13 +21,13 @@ export function SeeItInActionCarousel({ creators }: Props) {
   const displayed = creators.slice(0, 3);
 
   return (
-    <section className='section-spacing-linear-sm bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear-sm bg-page'>
       <div className='w-full px-5 sm:px-6 lg:px-[var(--linear-container-padding)] max-w-[var(--linear-content-max)] mx-auto'>
         <div className='flex flex-col items-center text-center gap-5'>
-          <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
+          <h2 className='marketing-h2-linear text-primary-token'>
             See it in action
           </h2>
-          <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
+          <p className='max-w-md marketing-lead-linear text-secondary-token'>
             See how artists use one Jovie profile for listening, touring, and
             fan capture.
           </p>
@@ -56,13 +56,13 @@ export function SeeItInActionCarousel({ creators }: Props) {
                   className='object-cover'
                 />
               </div>
-              <p className='text-[15px] font-medium text-[color:var(--linear-text-primary)]'>
+              <p className='text-[15px] font-medium text-primary-token'>
                 {creator.name}
               </p>
-              <p className='mt-1 text-[13px] text-[color:var(--linear-text-tertiary)] font-mono'>
+              <p className='mt-1 text-[13px] text-tertiary-token font-mono'>
                 jov.ie/{creator.handle}
               </p>
-              <span className='mt-3 rounded-full border border-[var(--linear-border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] font-medium text-[color:var(--linear-text-secondary)]'>
+              <span className='mt-3 rounded-full border border-subtle bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] font-medium text-secondary-token'>
                 {CREATOR_LABELS[index] ?? 'Artist growth profile'}
               </span>
               <span

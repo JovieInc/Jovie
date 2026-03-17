@@ -53,7 +53,7 @@ export function FloatingClaimBar() {
       />
 
       <div
-        className='relative w-full max-w-[560px] overflow-hidden rounded-2xl p-2 backdrop-blur-2xl supports-[backdrop-filter]:bg-[var(--linear-bg-surface-0)]/85'
+        className='relative w-full max-w-[560px] overflow-hidden rounded-2xl p-2 backdrop-blur-2xl supports-[backdrop-filter]:bg-surface-0/85'
         style={{
           backgroundColor: 'var(--linear-bg-surface-0)',
           border: '1px solid var(--linear-border-default)',

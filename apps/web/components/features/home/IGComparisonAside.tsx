@@ -16,7 +16,7 @@ const jovieLinks: JovieLink[] = [
 
 export function IGComparisonAside() {
   return (
-    <section className='section-spacing-linear bg-[var(--linear-bg-page)] border-t border-[var(--linear-border-subtle)]'>
+    <section className='section-spacing-linear bg-page border-t border-subtle'>
       <Container size='homepage'>
         <div className='text-center heading-gap-linear'>
           <h2
@@ -44,26 +44,26 @@ export function IGComparisonAside() {
 
         <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-[10px]'>
           {/* Linktree side (dimmed) */}
-          <div className='flex flex-col gap-4 p-6 bg-[var(--linear-bg-surface-0)] opacity-50'>
-            <span className='text-xs font-medium uppercase tracking-wider text-[color:var(--linear-text-tertiary)]'>
+          <div className='flex flex-col gap-4 p-6 bg-surface-0 opacity-50'>
+            <span className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
               Linktree in your bio
             </span>
 
-            <div className='rounded-md px-3 py-2 font-mono text-sm bg-[var(--linear-bg-surface-1)] text-[color:var(--linear-text-tertiary)]'>
+            <div className='rounded-md px-3 py-2 font-mono text-sm bg-surface-1 text-tertiary-token'>
               linktr.ee/timwhite
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[color:var(--linear-text-tertiary)]'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-tertiary-token'>
               Fan taps → Linktree page → scrolls to find link → taps again
             </p>
 
-            <p className='font-medium text-[length:var(--linear-body-sm-size)] text-[color:var(--linear-text-secondary)]'>
+            <p className='font-medium text-[length:var(--linear-body-sm-size)] text-secondary-token'>
               2 extra clicks
             </p>
           </div>
 
           {/* Jovie side (bright) */}
-          <div className='flex flex-col gap-4 p-6 bg-[var(--linear-bg-surface-0)]'>
+          <div className='flex flex-col gap-4 p-6 bg-surface-0'>
             <span
               className='inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
               style={{
@@ -78,20 +78,20 @@ export function IGComparisonAside() {
               {jovieLinks.map(link => (
                 <div
                   key={link.url}
-                  className='flex items-center gap-2.5 rounded-md px-3 py-2 text-sm bg-[var(--linear-bg-surface-1)]'
+                  className='flex items-center gap-2.5 rounded-md px-3 py-2 text-sm bg-surface-1'
                 >
                   <span>{link.emoji}</span>
-                  <span className='text-[color:var(--linear-text-secondary)] text-[length:var(--linear-body-sm-size)]'>
+                  <span className='text-secondary-token text-[length:var(--linear-body-sm-size)]'>
                     {link.label}
                   </span>
-                  <span className='ml-auto font-mono text-xs text-[color:var(--linear-text-tertiary)]'>
+                  <span className='ml-auto font-mono text-xs text-tertiary-token'>
                     {link.url}
                   </span>
                 </div>
               ))}
             </div>
 
-            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-[color:var(--linear-text-tertiary)]'>
+            <p className='text-[length:var(--linear-body-sm-size)] leading-[var(--linear-body-sm-leading)] text-tertiary-token'>
               Fan taps → arrives exactly where they need to be
             </p>
 

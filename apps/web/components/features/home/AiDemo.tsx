@@ -204,7 +204,7 @@ export function AiDemo() {
     <figure
       ref={containerRef}
       aria-label='AI writing demo'
-      className='rounded-t-xl rounded-b-none overflow-hidden bg-[var(--linear-bg-surface-0)] shadow-[inset_0_0_0_1px_var(--linear-panel-ring)] font-sans'
+      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-[inset_0_0_0_1px_var(--linear-panel-ring)] font-sans'
     >
       <style>{`
         @keyframes segmentIn {
@@ -228,13 +228,13 @@ export function AiDemo() {
       `}</style>
 
       {/* Browser chrome */}
-      <div className='flex items-center gap-2 px-3.5 py-2.5 border-b border-[var(--linear-border-subtle)]'>
+      <div className='flex items-center gap-2 px-3.5 py-2.5 border-b border-subtle'>
         <div className='flex gap-[5px]'>
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
           <span className='w-2 h-2 rounded-full bg-[#2a2a2a]' />
         </div>
-        <div className='flex-1 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
+        <div className='flex-1 text-center text-xs text-tertiary-token'>
           Jovie AI
         </div>
         {/* Pause/Play toggle */}
@@ -242,7 +242,7 @@ export function AiDemo() {
           type='button'
           onClick={prefersReducedMotion ? showNextDemo : togglePause}
           aria-label={toggleLabel}
-          className='focus-ring w-6 h-6 flex items-center justify-center rounded text-[color:var(--linear-text-tertiary)] hover:text-[color:var(--linear-text-secondary)] transition-colors'
+          className='focus-ring w-6 h-6 flex items-center justify-center rounded text-tertiary-token hover:text-secondary-token transition-colors'
         >
           {prefersReducedMotion || isPaused ? (
             <svg
@@ -271,7 +271,7 @@ export function AiDemo() {
       <div className='px-5 pt-5 pb-6'>
         {/* Prompt */}
         {currentDemo && (
-          <div className='font-mono text-sm text-[color:var(--linear-text-tertiary)] mb-4'>
+          <div className='font-mono text-sm text-tertiary-token mb-4'>
             {currentDemo.prompt}
           </div>
         )}
@@ -279,7 +279,7 @@ export function AiDemo() {
         {/* Response */}
         <output
           aria-live='polite'
-          className='block text-sm leading-[1.7] text-[color:var(--linear-text-secondary)] min-h-[80px]'
+          className='block text-sm leading-[1.7] text-secondary-token min-h-[80px]'
         >
           {currentDemo?.segments.map((segment, i) => {
             if (i >= visibleCount) return null;
@@ -304,7 +304,7 @@ export function AiDemo() {
           {/* Blinking cursor */}
           {hasStarted && !prefersReducedMotion && (
             <span
-              className='ai-demo-cursor inline-block w-[7px] h-[15px] bg-[var(--linear-text-primary)] ml-0.5 align-text-bottom'
+              className='ai-demo-cursor inline-block w-[7px] h-[15px] bg-primary-token ml-0.5 align-text-bottom'
               style={{
                 animation: 'cursorBlink 1s step-end infinite',
               }}

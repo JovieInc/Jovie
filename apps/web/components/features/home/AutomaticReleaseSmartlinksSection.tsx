@@ -38,7 +38,7 @@ const SMART_LINK_DSPS = [
 
 function ReleasesTableSkeleton() {
   return (
-    <div className='bg-[var(--linear-bg-surface-0)] p-5'>
+    <div className='bg-surface-0 p-5'>
       {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const).map((id, i) => (
         <div
           key={id}
@@ -48,10 +48,10 @@ function ReleasesTableSkeleton() {
               i < 5 ? '1px solid var(--linear-border-subtle)' : undefined,
           }}
         >
-          <div className='h-10 w-10 shrink-0 rounded-md bg-[var(--linear-bg-surface-2)] animate-pulse' />
+          <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2 animate-pulse' />
           <div className='flex-1 space-y-2'>
-            <div className='h-3 w-32 rounded bg-[var(--linear-bg-surface-2)] animate-pulse' />
-            <div className='h-2.5 w-20 rounded bg-[var(--linear-bg-surface-2)] animate-pulse' />
+            <div className='h-3 w-32 rounded bg-surface-2 animate-pulse' />
+            <div className='h-2.5 w-20 rounded bg-surface-2 animate-pulse' />
           </div>
         </div>
       ))}
@@ -65,7 +65,7 @@ function ReleasesTableSkeleton() {
 
 export function AutomaticReleaseSmartlinksSection() {
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       {/* Ambient glow — large, soft, centered behind mockup */}
       <div
         aria-hidden='true'
@@ -83,17 +83,17 @@ export function AutomaticReleaseSmartlinksSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Two-column header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)]'>
+            <h2 className='max-w-md marketing-h2-linear text-primary-token'>
               New release?
               <br />
               Already live.
             </h2>
             <div className='max-w-lg'>
-              <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              <p className='marketing-lead-linear text-secondary-token'>
                 Connect Spotify once. Every new release gets a smart link across
                 every platform — automatically.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 Zero manual work
               </span>
             </div>
@@ -134,13 +134,13 @@ export function AutomaticReleaseSmartlinksSection() {
                 />
 
                 {/* Mac window chrome */}
-                <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
+                <div className='flex items-center px-5 h-12 border-b border-subtle bg-surface-1'>
                   <div className='flex gap-2'>
                     <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
                     <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
                   </div>
-                  <div className='flex-1 text-center text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
+                  <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
                     Jovie Dashboard
                   </div>
                   <div className='w-[52px]' />
@@ -217,10 +217,10 @@ export function AutomaticReleaseSmartlinksSection() {
                     <h3 className='text-lg font-[var(--linear-font-weight-semibold)] leading-snug tracking-tight'>
                       The Deep End
                     </h3>
-                    <p className='mt-1 text-sm text-[var(--linear-text-secondary)]'>
+                    <p className='mt-1 text-sm text-secondary-token'>
                       Tim White
                     </p>
-                    <p className='mt-0.5 text-2xs tracking-wide text-[var(--linear-text-tertiary)]'>
+                    <p className='mt-0.5 text-2xs tracking-wide text-tertiary-token'>
                       Feb 2017
                     </p>
                   </div>
@@ -238,7 +238,7 @@ export function AutomaticReleaseSmartlinksSection() {
                             DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG]
                               ?.iconPath
                           }
-                          className='bg-[var(--linear-bg-surface-1)] ring-[color:var(--linear-border-subtle)] hover:bg-[var(--linear-bg-hover)]'
+                          className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
                         />
                       );
                     })}
@@ -246,7 +246,7 @@ export function AutomaticReleaseSmartlinksSection() {
 
                   {/* Powered by Jovie */}
                   <div className='mt-3 pt-3 text-center'>
-                    <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-[var(--linear-text-tertiary)]'>
+                    <span className='inline-flex items-center gap-1 text-2xs uppercase tracking-widest text-tertiary-token'>
                       <span>Powered by</span>
                       <span className='font-[var(--linear-font-weight-semibold)]'>
                         Jovie

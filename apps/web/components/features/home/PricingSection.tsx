@@ -22,17 +22,17 @@ export function PricingSection() {
   const foundingPlan = ENTITLEMENT_REGISTRY.founding.marketing;
 
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
             <Badge variant='outline' size='xl'>
               Pricing
             </Badge>
-            <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
+            <h2 className='marketing-h2-linear text-primary-token'>
               Simple pricing.
             </h2>
-            <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
+            <p className='max-w-md marketing-lead-linear text-secondary-token'>
               Get live for free. Upgrade for deeper analytics and full control.
             </p>
           </div>
@@ -48,18 +48,16 @@ export function PricingSection() {
                 border: '1px solid var(--linear-border-subtle)',
               }}
             >
-              <p className='text-sm font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
+              <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
                 {freePlan.displayName}
               </p>
               <div className='mt-4 flex items-baseline gap-1'>
-                <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
+                <span className='text-4xl font-semibold tracking-tight text-primary-token'>
                   $0
                 </span>
-                <span className='text-[14px] text-[color:var(--linear-text-tertiary)]'>
-                  /mo
-                </span>
+                <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
-              <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
+              <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
                 Get live, build your email list, and prove it works — then
                 decide.
               </p>
@@ -68,19 +66,19 @@ export function PricingSection() {
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
-                    className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
+                    className='flex items-center gap-3 text-[14px] text-secondary-token'
                   >
-                    <Check className='h-4 w-4 shrink-0 text-[color:var(--linear-text-tertiary)]' />
+                    <Check className='h-4 w-4 shrink-0 text-tertiary-token' />
                     {feature}
                   </li>
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)]'>
+              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+                <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
-                <p className='mt-2 text-sm leading-6 text-[color:var(--linear-text-secondary)]'>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
                   {freePlan.features.slice(0, 4).join(' • ')}
                 </p>
               </div>
@@ -113,7 +111,7 @@ export function PricingSection() {
                 }}
               />
               <div className='flex items-center justify-between'>
-                <p className='text-sm font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
+                <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
                   {foundingPlan.displayName}
                 </p>
                 <Badge variant='default' size='lg'>
@@ -121,14 +119,12 @@ export function PricingSection() {
                 </Badge>
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
-                <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
+                <span className='text-4xl font-semibold tracking-tight text-primary-token'>
                   ${foundingPlan.price?.monthly ?? 0}
                 </span>
-                <span className='text-[14px] text-[color:var(--linear-text-tertiary)]'>
-                  /mo
-                </span>
+                <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
-              <p className='mt-3 text-[14px] leading-relaxed text-[color:var(--linear-text-secondary)]'>
+              <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
                 Unlock deeper analytics, remove branding, and scale once your
                 profile is working.
               </p>
@@ -137,19 +133,19 @@ export function PricingSection() {
                 {FOUNDING_OUTCOMES.map(feature => (
                   <li
                     key={feature}
-                    className='flex items-center gap-3 text-[14px] text-[color:var(--linear-text-secondary)]'
+                    className='flex items-center gap-3 text-[14px] text-secondary-token'
                   >
-                    <Check className='h-4 w-4 shrink-0 text-[color:var(--linear-text-tertiary)]' />
+                    <Check className='h-4 w-4 shrink-0 text-tertiary-token' />
                     {feature}
                   </li>
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] p-4'>
-                <p className='text-xs font-semibold uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)]'>
+              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+                <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
-                <p className='mt-2 text-sm leading-6 text-[color:var(--linear-text-secondary)]'>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
                   {foundingPlan.features
                     .filter(feature => !feature.endsWith('+'))
                     .slice(0, 4)

@@ -30,18 +30,18 @@ const BENEFITS = [
 
 function TableSkeleton() {
   return (
-    <div className='animate-pulse bg-[var(--linear-bg-surface-0)]'>
+    <div className='animate-pulse bg-surface-0'>
       {/* Table header skeleton */}
-      <div className='flex items-center justify-between border-b border-[var(--linear-border-subtle)] px-5 py-3'>
+      <div className='flex items-center justify-between border-b border-subtle px-5 py-3'>
         <div className='flex items-center gap-2'>
-          <div className='h-4 w-24 rounded bg-[var(--linear-bg-surface-2)]' />
-          <div className='h-4 w-8 rounded-full bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-4 w-24 rounded bg-surface-2' />
+          <div className='h-4 w-8 rounded-full bg-surface-2' />
         </div>
-        <div className='h-4 w-16 rounded bg-[var(--linear-bg-surface-2)]' />
+        <div className='h-4 w-16 rounded bg-surface-2' />
       </div>
 
       {/* Column headers skeleton */}
-      <div className='flex items-center gap-4 border-b border-[var(--linear-border-subtle)] px-5 py-2'>
+      <div className='flex items-center gap-4 border-b border-subtle px-5 py-2'>
         {[
           { key: 'col-name', width: 'w-16' },
           { key: 'col-city', width: 'w-12' },
@@ -50,10 +50,7 @@ function TableSkeleton() {
           { key: 'col-status', width: 'w-20' },
           { key: 'col-tips', width: 'w-10' },
         ].map(({ key, width }) => (
-          <div
-            key={key}
-            className={`h-3 ${width} rounded bg-[var(--linear-bg-surface-2)]`}
-          />
+          <div key={key} className={`h-3 ${width} rounded bg-surface-2`} />
         ))}
       </div>
 
@@ -74,14 +71,14 @@ function TableSkeleton() {
           }}
         >
           <div className='flex-1 space-y-1.5'>
-            <div className='h-3.5 w-28 rounded bg-[var(--linear-bg-surface-2)]' />
-            <div className='h-3 w-40 rounded bg-[var(--linear-bg-surface-2)] opacity-50' />
+            <div className='h-3.5 w-28 rounded bg-surface-2' />
+            <div className='h-3 w-40 rounded bg-surface-2 opacity-50' />
           </div>
-          <div className='h-3 w-14 rounded bg-[var(--linear-bg-surface-2)]' />
-          <div className='h-3 w-10 rounded bg-[var(--linear-bg-surface-2)]' />
-          <div className='h-5 w-16 rounded-full bg-[var(--linear-bg-surface-2)]' />
-          <div className='h-3 w-24 rounded bg-[var(--linear-bg-surface-2)]' />
-          <div className='h-5 w-12 rounded-full bg-[var(--linear-bg-surface-2)]' />
+          <div className='h-3 w-14 rounded bg-surface-2' />
+          <div className='h-3 w-10 rounded bg-surface-2' />
+          <div className='h-5 w-16 rounded-full bg-surface-2' />
+          <div className='h-3 w-24 rounded bg-surface-2' />
+          <div className='h-5 w-12 rounded-full bg-surface-2' />
         </div>
       ))}
     </div>
@@ -94,7 +91,7 @@ function TableSkeleton() {
 
 export function AudienceCRMSection() {
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       {/* Ambient glow behind the mockup */}
       <div
         aria-hidden='true'
@@ -111,15 +108,15 @@ export function AudienceCRMSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
+            <h2 className='max-w-md marketing-h2-linear text-primary-token reveal-on-scroll'>
               See every fan. Reach them again.
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
-              <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
+              <p className='marketing-lead-linear text-secondary-token'>
                 Profile traffic vanishes into streaming apps. Jovie captures who
                 visited, where they came from, and what they wanted.
               </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 Built-in fan CRM
               </span>
             </div>
@@ -132,7 +129,7 @@ export function AudienceCRMSection() {
             {BENEFITS.map(benefit => (
               <div
                 key={benefit}
-                className='rounded-2xl border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] px-4 py-3 text-sm font-medium text-[var(--linear-text-secondary)]'
+                className='rounded-2xl border border-subtle bg-surface-0 px-4 py-3 text-sm font-medium text-secondary-token'
               >
                 {benefit}
               </div>
@@ -158,13 +155,13 @@ export function AudienceCRMSection() {
                 className='pointer-events-none absolute inset-0 rounded-t-xl md:rounded-t-2xl rounded-b-none z-10'
               />
               {/* Mac window chrome */}
-              <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
+              <div className='flex items-center px-5 h-12 border-b border-subtle bg-surface-1'>
                 <div className='flex gap-2'>
                   <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                   <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
                   <div className='w-3 h-3 rounded-full bg-[#61C554] border border-black/10' />
                 </div>
-                <div className='flex-1 text-center text-[var(--linear-caption-size)] text-[var(--linear-text-tertiary)]'>
+                <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
                   Audience
                 </div>
                 <div className='w-[52px]' />
@@ -175,37 +172,37 @@ export function AudienceCRMSection() {
                 {STATS.map(stat => (
                   <div
                     key={stat.label}
-                    className='flex items-center gap-3 px-5 py-4 bg-[var(--linear-bg-surface-0)]'
+                    className='flex items-center gap-3 px-5 py-4 bg-surface-0'
                   >
-                    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--linear-bg-surface-2)]'>
+                    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                       <stat.icon
-                        className='h-4 w-4 text-[var(--linear-text-secondary)]'
+                        className='h-4 w-4 text-secondary-token'
                         aria-hidden='true'
                       />
                     </div>
                     <div className='min-w-0'>
-                      <p className='text-[var(--linear-label-size)] text-[var(--linear-text-tertiary)]'>
+                      <p className='text-[var(--linear-label-size)] text-tertiary-token'>
                         {stat.label}
                       </p>
-                      <p className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-[var(--linear-text-primary)]'>
+                      <p className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-primary-token'>
                         {stat.value}
                       </p>
                     </div>
                   </div>
                 ))}
               </div>
-              <p className='text-xs text-[var(--linear-text-quaternary)] mt-2 text-center'>
+              <p className='text-xs text-quaternary-token mt-2 text-center'>
                 Real data from a Jovie artist profile
               </p>
 
-              <div className='flex flex-wrap items-center gap-2 border-t border-[var(--linear-border-subtle)] px-5 py-3 text-xs text-[var(--linear-text-tertiary)]'>
-                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1 font-medium text-[var(--linear-text-secondary)]'>
+              <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-5 py-3 text-xs text-tertiary-token'>
+                <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
                   Captured from profile
                 </span>
-                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
                   Source tracked
                 </span>
-                <span className='rounded-full border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)] px-2.5 py-1'>
+                <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
                   High-intent fan scoring
                 </span>
               </div>

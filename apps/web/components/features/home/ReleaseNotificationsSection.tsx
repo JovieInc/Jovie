@@ -22,7 +22,7 @@ const OLD_WAY_STEPS = [
 
 export function ReleaseNotificationsSection() {
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-[var(--linear-bg-page)]'>
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
       {/* Ambient glow — warm tint for this section */}
       <div
         aria-hidden='true'
@@ -42,18 +42,18 @@ export function ReleaseNotificationsSection() {
           <div className='grid lg:grid-cols-[0.4fr_0.6fr] gap-12 lg:gap-16 lg:items-start'>
             {/* ─── Left column: copy + stat ─── */}
             <div className='flex flex-col reveal-on-scroll'>
-              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
+              <span className='inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 <Zap className='h-3 w-3' aria-hidden='true' />
                 Automatic
               </span>
 
-              <h2 className='mt-5 marketing-h2-linear text-[color:var(--linear-text-primary)]'>
+              <h2 className='mt-5 marketing-h2-linear text-primary-token'>
                 New release?
                 <br />
                 Your fans already know.
               </h2>
 
-              <p className='mt-5 marketing-lead-linear text-[color:var(--linear-text-secondary)] max-w-md'>
+              <p className='mt-5 marketing-lead-linear text-secondary-token max-w-md'>
                 Jovie watches your Spotify catalog. The moment a new song drops,
                 every fan on your list gets a beautiful email with one-tap
                 listen &mdash; automatically. No templates. No scheduling. No
@@ -68,17 +68,17 @@ export function ReleaseNotificationsSection() {
                   backgroundColor: 'var(--linear-bg-surface-0)',
                 }}
               >
-                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--linear-bg-surface-2)]'>
+                <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <Mail
-                    className='h-4 w-4 text-[color:var(--linear-text-secondary)]'
+                    className='h-4 w-4 text-secondary-token'
                     aria-hidden='true'
                   />
                 </div>
                 <div>
-                  <p className='text-[var(--linear-caption-size)] font-[number:var(--linear-font-weight-medium)] text-[color:var(--linear-text-primary)]'>
+                  <p className='text-[var(--linear-caption-size)] font-[number:var(--linear-font-weight-medium)] text-primary-token'>
                     4,218 fans notified
                   </p>
-                  <p className='text-[var(--linear-label-size)] text-[color:var(--linear-text-tertiary)]'>
+                  <p className='text-[var(--linear-label-size)] text-tertiary-token'>
                     Zero emails written
                   </p>
                 </div>
@@ -112,16 +112,16 @@ export function ReleaseNotificationsSection() {
                 />
                 {/* ── Left half: The Old Way (faded) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8 opacity-[0.38]'>
-                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)] mb-5'>
+                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
                     The old way
                   </p>
                   <div className='space-y-2.5'>
                     {OLD_WAY_STEPS.map((step, i) => (
                       <div key={step} className='flex items-center gap-2.5'>
-                        <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-medium text-[color:var(--linear-text-quaternary)] bg-[var(--linear-bg-surface-2)]'>
+                        <span className='flex h-5 w-5 shrink-0 items-center justify-center rounded-md text-[10px] font-medium text-quaternary-token bg-surface-2'>
                           {i + 1}
                         </span>
-                        <span className='text-[13px] text-[color:var(--linear-text-tertiary)] line-through decoration-[var(--linear-text-quaternary)]'>
+                        <span className='text-[13px] text-tertiary-token line-through decoration-[var(--linear-text-quaternary)]'>
                           {step}
                         </span>
                       </div>
@@ -138,14 +138,14 @@ export function ReleaseNotificationsSection() {
                         'linear-gradient(to bottom, transparent, var(--linear-border-default) 20%, var(--linear-border-default) 80%, transparent)',
                     }}
                   />
-                  <span className='absolute top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-wider text-[color:var(--linear-text-quaternary)] bg-[var(--linear-bg-surface-2)] border border-[var(--linear-border-subtle)]'>
+                  <span className='absolute top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold uppercase tracking-wider text-quaternary-token bg-surface-2 border border-subtle'>
                     vs
                   </span>
                 </div>
 
                 {/* ── Right half: Jovie auto-email (bright) ── */}
                 <div className='relative px-5 sm:px-6 py-6 sm:py-8'>
-                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-[color:var(--linear-text-tertiary)] mb-5'>
+                  <p className='text-[11px] font-medium uppercase tracking-[0.08em] text-tertiary-token mb-5'>
                     Jovie
                   </p>
 
@@ -158,7 +158,7 @@ export function ReleaseNotificationsSection() {
                     }}
                   >
                     {/* Email header */}
-                    <div className='flex items-center gap-2.5 px-4 py-3 border-b border-[var(--linear-border-subtle)]'>
+                    <div className='flex items-center gap-2.5 px-4 py-3 border-b border-subtle'>
                       <div className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/80 to-teal-500/60'>
                         <Zap
                           className='h-3 w-3 text-white'
@@ -166,10 +166,10 @@ export function ReleaseNotificationsSection() {
                         />
                       </div>
                       <div className='min-w-0 flex-1'>
-                        <p className='text-[12px] font-medium text-[color:var(--linear-text-primary)] truncate'>
+                        <p className='text-[12px] font-medium text-primary-token truncate'>
                           New Release from Tim White
                         </p>
-                        <p className='text-[10px] text-[color:var(--linear-text-quaternary)]'>
+                        <p className='text-[10px] text-quaternary-token'>
                           via Jovie &middot; just now
                         </p>
                       </div>
@@ -189,14 +189,14 @@ export function ReleaseNotificationsSection() {
                         />
                         <div className='min-w-0 flex-1'>
                           <div className='flex items-center gap-2'>
-                            <p className='text-[13px] font-semibold text-[color:var(--linear-text-primary)] truncate'>
+                            <p className='text-[13px] font-semibold text-primary-token truncate'>
                               The Deep End
                             </p>
                             <span className='shrink-0 rounded px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-400'>
                               New
                             </span>
                           </div>
-                          <p className='text-[12px] text-[color:var(--linear-text-tertiary)] mt-0.5'>
+                          <p className='text-[12px] text-tertiary-token mt-0.5'>
                             Tim White
                           </p>
                         </div>
@@ -221,8 +221,8 @@ export function ReleaseNotificationsSection() {
                     </div>
 
                     {/* Footer */}
-                    <div className='px-4 py-2.5 border-t border-[var(--linear-border-subtle)]'>
-                      <p className='text-[10px] text-[color:var(--linear-text-quaternary)] text-center'>
+                    <div className='px-4 py-2.5 border-t border-subtle'>
+                      <p className='text-[10px] text-quaternary-token text-center'>
                         Sent automatically by Jovie
                       </p>
                     </div>

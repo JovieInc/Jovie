@@ -17,12 +17,12 @@ export function FinalCTASection() {
         <div className='reveal-on-scroll relative mx-auto flex max-w-xl flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear text-[var(--linear-text-primary)]'
+            className='marketing-h2-linear text-primary-token'
           >
             Your fans are waiting.
           </h2>
 
-          <p className='mt-5 max-w-md marketing-lead-linear text-[var(--linear-text-secondary)]'>
+          <p className='mt-5 max-w-md marketing-lead-linear text-secondary-token'>
             Claim your handle and start growing today.
           </p>
 
@@ -43,20 +43,17 @@ export function FinalCTASection() {
 
           {/* Trust signals */}
           <div className='mt-6 flex items-center justify-center gap-4'>
-            <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-[color:var(--linear-text-tertiary)]'>
+            <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
               <span
                 aria-hidden='true'
                 className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
               />{' '}
               Live in 60 seconds
             </p>
-            <span
-              aria-hidden='true'
-              className='text-[color:var(--linear-text-quaternary)]'
-            >
+            <span aria-hidden='true' className='text-quaternary-token'>
               ·
             </span>
-            <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-[color:var(--linear-text-tertiary)]'>
+            <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
               No credit card required
             </p>
           </div>
