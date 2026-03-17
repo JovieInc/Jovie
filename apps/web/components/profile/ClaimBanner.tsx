@@ -3,7 +3,7 @@
 import { ArrowRight, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
-import { useUserSafe } from '@/hooks/useClerkSafe';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 
 export interface ClaimBannerProps {
@@ -22,13 +22,14 @@ export interface ClaimBannerProps {
  */
 export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
   const { isLoaded } = useUserSafe();
+  const { isSignedIn } = useAuthSafe();
   const hasTrackedImpression = useRef(false);
 
   const profilePath = `/${encodeURIComponent(profileHandle)}`;
   const signupUrl = `/signup?handle=${encodeURIComponent(profileHandle)}&redirect_url=${encodeURIComponent(profilePath)}`;
 
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || isSignedIn) return;
     if (hasTrackedImpression.current) return;
     hasTrackedImpression.current = true;
 
@@ -36,7 +37,10 @@ export function ClaimBanner({ profileHandle, displayName }: ClaimBannerProps) {
       profile_handle: profileHandle,
       auth_loaded: isLoaded,
     });
-  }, [isLoaded, profileHandle]);
+  }, [isLoaded, isSignedIn, profileHandle]);
+
+  // Don't show claim banner to signed-in users
+  if (isSignedIn) return null;
 
   const name = displayName || profileHandle;
 

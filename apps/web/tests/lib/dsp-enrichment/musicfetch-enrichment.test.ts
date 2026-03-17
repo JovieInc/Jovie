@@ -50,6 +50,11 @@ vi.mock('@/lib/dsp-enrichment/providers/musicfetch', () => ({
   extractTidalId: (url: string) => mockExtractTidalId(url),
   extractSoundcloudId: (url: string) => mockExtractSoundcloudId(url),
   extractYoutubeMusicId: (url: string) => mockExtractYoutubeMusicId(url),
+  getMusicFetchServiceUrl: (
+    service: { link?: string; url?: string } | undefined
+  ) => {
+    return service?.link ?? service?.url;
+  },
 }));
 
 // Ingestion merge
