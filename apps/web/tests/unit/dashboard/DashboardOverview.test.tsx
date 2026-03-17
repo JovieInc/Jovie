@@ -33,7 +33,6 @@ function makeProfile(
     isClaimed: false,
     claimToken: null,
     claimedAt: null,
-    lastLoginAt: null,
     profileViews: 0,
     onboardingCompletedAt: null,
     settings: {},

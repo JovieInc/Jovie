@@ -136,7 +136,6 @@ export const creatorProfiles = pgTable(
       .default('idle')
       .notNull(),
     lastIngestionError: text('last_ingestion_error'),
-    lastLoginAt: timestamp('last_login_at'),
     profileViews: integer('profile_views').default(0),
     onboardingCompletedAt: timestamp('onboarding_completed_at'),
     settings: jsonb('settings').$type<Record<string, unknown>>().default({}),
@@ -168,7 +167,6 @@ export const creatorProfiles = pgTable(
     outreachChannel: outreachChannelEnum('outreach_channel'),
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
-    outreachPriority: integer('outreach_priority'),
     // Stripe Connect fields for Express onboarding
     stripeAccountId: text('stripe_account_id'),
     stripeOnboardingComplete: boolean('stripe_onboarding_complete')
