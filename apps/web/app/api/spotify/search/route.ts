@@ -21,7 +21,12 @@ import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
-import { annotateClaimedStatus, applyVipBoost, parseLimit } from './helpers';
+import {
+  annotateClaimedStatus,
+  applyVipBoost,
+  boostClaimedArtists,
+  parseLimit,
+} from './helpers';
 
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
@@ -161,7 +166,9 @@ export async function GET(request: NextRequest) {
     );
 
     // Post-cache: annotate claimed status (not cached with search results, always fresh-ish)
-    const results = await annotateClaimedStatus(cachedResults);
+    const annotated = await annotateClaimedStatus(cachedResults);
+    // Boost claimed artists to top so users can easily find their own profile
+    const results = boostClaimedArtists(annotated);
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {
