@@ -1,5 +1,6 @@
 const nextConfig = require('eslint-config-next');
 const nextCoreWebVitals = require('eslint-config-next/core-web-vitals');
+const boundariesPlugin = require('eslint-plugin-boundaries');
 const iconUsageRule = require('./eslint-rules/icon-usage');
 const edgeRuntimeNodeImportsRule = require('./eslint-rules/edge-runtime-node-imports');
 const noHandlerInitializationRule = require('./eslint-rules/no-handler-initialization');
@@ -287,6 +288,73 @@ module.exports = [
     rules: {
       '@jovie/no-db-transaction': 'off',
       '@jovie/no-manual-db-pooling': 'off',
+    },
+  },
+  // Component dependency direction enforcement
+  // atoms → molecules → organisms → features (no reverse imports)
+  {
+    files: ['apps/web/components/**/*.{ts,tsx}'],
+    plugins: {
+      boundaries: boundariesPlugin,
+    },
+    settings: {
+      'boundaries/elements': [
+        {
+          type: 'ui-atoms',
+          pattern: ['packages/ui/atoms/**'],
+        },
+        {
+          type: 'atoms',
+          pattern: ['apps/web/components/atoms/**'],
+        },
+        {
+          type: 'molecules',
+          pattern: ['apps/web/components/molecules/**'],
+        },
+        {
+          type: 'organisms',
+          pattern: ['apps/web/components/organisms/**'],
+        },
+        {
+          type: 'features',
+          pattern: ['apps/web/components/features/*/**'],
+          capture: ['feature'],
+        },
+      ],
+    },
+    rules: {
+      // atoms cannot import from molecules, organisms, or features
+      'boundaries/element-types': [
+        'warn',
+        {
+          default: 'allow',
+          rules: [
+            {
+              from: ['atoms'],
+              disallow: ['molecules', 'organisms', 'features'],
+              message:
+                'Atoms cannot import from molecules, organisms, or features. Keep atoms props-driven.',
+            },
+            {
+              from: ['molecules'],
+              disallow: ['organisms', 'features'],
+              message:
+                'Molecules cannot import from organisms or features. Compose only from atoms.',
+            },
+            {
+              from: ['features'],
+              disallow: [
+                {
+                  type: 'features',
+                  feature: '!${feature}',
+                },
+              ],
+              message:
+                'Features cannot import from other features. Promote shared code to molecules/organisms.',
+            },
+          ],
+        },
+      ],
     },
   },
 ];
