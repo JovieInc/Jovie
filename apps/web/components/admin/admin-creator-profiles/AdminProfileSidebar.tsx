@@ -1,5 +1,6 @@
 'use client';
 
+import type { CommonDropdownItem } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import type { PreviewPanelLink } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -38,6 +39,7 @@ interface AdminProfileSidebarProps {
   readonly contact: Contact | null;
   readonly isOpen: boolean;
   readonly onClose: () => void;
+  readonly contextMenuItems?: CommonDropdownItem[];
 }
 
 export function AdminProfileSidebar({
@@ -45,6 +47,7 @@ export function AdminProfileSidebar({
   contact,
   isOpen,
   onClose,
+  contextMenuItems,
 }: AdminProfileSidebarProps) {
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
@@ -62,6 +65,7 @@ export function AdminProfileSidebar({
         ariaLabel='Creator profile'
         title='Creator profile'
         onClose={onClose}
+        contextMenuItems={contextMenuItems}
         isEmpty
         emptyMessage='Select a creator profile to view details.'
       >
@@ -72,6 +76,7 @@ export function AdminProfileSidebar({
 
   return (
     <EntitySidebarShell
+      contextMenuItems={contextMenuItems}
       isOpen={isOpen}
       ariaLabel='Creator profile'
       title='Creator profile'
