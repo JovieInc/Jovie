@@ -7,6 +7,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.3] - 2026-03-17
 
+### Added
+
+- Admin settings section in Settings sidebar with dedicated `/app/settings/admin` route
+- `CampaignSettingsPanel` — campaign targeting (fit score, batch size) and throttling controls moved from inline campaign manager to centralized settings
+- Dev toolbar on/off toggle under Admin > Developer tools
+- Waitlist settings panel embedded in admin settings
+
+### Changed
+
+- Campaign manager now reads settings from persisted config instead of inline controls, with "Change in Settings" link
+- Admin sidebar section renamed from "Admin" to "General" with restructured card layout (dev tools, waitlist, campaigns, quick links)
+
 ### Fixed
 
 - Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
