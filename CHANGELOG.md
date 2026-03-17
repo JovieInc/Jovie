@@ -9,6 +9,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Demo sidebar navigation no longer redirects unauthenticated users to sign-in when clicking Audience or Earnings tabs — shows toast notification instead
+- `isAppleMusicConfigured()` now reads env vars at call time instead of module load, fixing false positives when Doppler injects credentials
+- Google CSE tests now correctly stub SerpAPI key to exercise the Google CSE code path
 - Show user-facing error toast when username change fails (e.g., "Handle already taken") instead of silently reverting
 - Extract API error messages from 4xx response bodies in `fetchWithTimeout` so user-friendly errors propagate to the UI
 
