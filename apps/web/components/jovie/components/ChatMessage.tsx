@@ -9,11 +9,13 @@ import { useMemo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
+  type ChatInsightsToolResult,
   isToolInvocationPart,
   type MessagePart,
   type SocialLinkToolResult,
 } from '../types';
 import { getMessageText } from '../utils';
+import { ChatAnalyticsCard } from './ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
@@ -118,6 +120,25 @@ export function ChatMessage({
                   className={cn(messageText && 'mt-3')}
                 >
                   <ChatAvatarUploadCard />
+                </div>
+              );
+            }
+
+            if (
+              toolInvocation.toolName === 'showTopInsights' &&
+              toolInvocation.state === 'result' &&
+              toolInvocation.result?.success
+            ) {
+              return (
+                <div
+                  key={toolInvocation.toolInvocationId}
+                  className={cn(messageText && 'mt-3')}
+                >
+                  <ChatAnalyticsCard
+                    result={
+                      toolInvocation.result as unknown as ChatInsightsToolResult
+                    }
+                  />
                 </div>
               );
             }

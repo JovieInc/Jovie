@@ -30,4 +30,28 @@ describe('SuggestedPrompts', () => {
     expect(getByRole('button', { name: 'Preview my profile' })).toBeTruthy();
     expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
   });
+
+  it('renders insight-backed prompts when provided', () => {
+    const onSelect = vi.fn();
+    const { getByRole, queryByText } = fastRender(
+      <SuggestedPrompts
+        onSelect={onSelect}
+        suggestions={[
+          {
+            icon: 'MessageSquare',
+            label: 'Which release is getting traction right now?',
+            prompt: 'Which release is getting traction right now?',
+            accent: 'blue',
+          },
+        ]}
+      />
+    );
+
+    expect(
+      getByRole('button', {
+        name: 'Which release is getting traction right now?',
+      })
+    ).toBeTruthy();
+    expect(queryByText('Change profile photo')).toBeNull();
+  });
 });
