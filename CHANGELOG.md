@@ -19,6 +19,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Dashboard redirect now waits for `connectSpotifyArtist` DB writes to complete — fixes empty sidebar, missing DSPs, and missing social links after onboarding
 - Profile review CTA disabled while enrichment or Spotify connection is still in progress (with 10s timeout fallback)
 
+## [26.2.2] - 2026-03-17
+
+### Fixed
+
+- Show user-facing error toast when username change fails (e.g., "Handle already taken") instead of silently reverting
+- Extract API error messages from 4xx response bodies in `fetchWithTimeout` so user-friendly errors propagate to the UI
+
 ## [26.2.1] - 2026-03-17
 
 ### Changed
