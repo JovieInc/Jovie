@@ -7,14 +7,16 @@
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
-  renderIntentScoreCell,
   renderLastActionCell,
   renderLtvCell,
-  renderReturningCell,
-  renderSourceCell,
   renderUserCell,
 } from '@/components/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
 import type { AudienceMember } from '@/types';
+import {
+  renderDemoIntentCell,
+  renderDemoReturningCell,
+  renderDemoSourceCell,
+} from './demo-audience-cell-renderers';
 
 const columnHelper = createColumnHelper<AudienceMember>();
 
@@ -33,7 +35,7 @@ export const DEMO_AUDIENCE_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   columnHelper.accessor('intentLevel', {
     id: 'intentScore',
     header: 'Intent',
-    cell: renderIntentScoreCell,
+    cell: renderDemoIntentCell,
     size: 110,
   }),
   columnHelper.accessor('tipAmountTotalCents', {
@@ -45,13 +47,13 @@ export const DEMO_AUDIENCE_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   columnHelper.accessor('visits', {
     id: 'returning',
     header: 'Returning',
-    cell: renderReturningCell,
+    cell: renderDemoReturningCell,
     size: 100,
   }),
   columnHelper.accessor('referrerHistory', {
     id: 'source',
     header: 'Source',
-    cell: renderSourceCell,
+    cell: renderDemoSourceCell,
     size: 140,
   }),
   columnHelper.accessor('latestActions', {
