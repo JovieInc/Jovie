@@ -1,6 +1,6 @@
 'use client';
 
-import { TwoStepNotificationsCTA } from '@/components/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 interface Props {

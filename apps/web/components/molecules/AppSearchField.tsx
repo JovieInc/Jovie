@@ -36,11 +36,11 @@ export function AppSearchField({
   return (
     <div
       className={cn(
-        'flex h-(--linear-app-control-height-sm) items-center gap-2 rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2.5 text-(--linear-text-primary) transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-(--linear-bg-surface-0) focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
+        'flex h-(--linear-app-control-height-sm) items-center gap-2 rounded-(--linear-app-control-radius) border border-subtle bg-surface-0 px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
         className
       )}
     >
-      <Search className='h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)' />
+      <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
       <Input
         ref={inputRef}
         autoFocus={autoFocus}
@@ -61,7 +61,7 @@ export function AppSearchField({
         <AppIconButton
           type='button'
           ariaLabel='Clear search'
-          className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary)'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-secondary-token'
           onClick={() => {
             onChange('');
             onClear?.();

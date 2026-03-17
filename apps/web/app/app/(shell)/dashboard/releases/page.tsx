@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { ReleasesExperience } from '@/components/dashboard/organisms/release-provider-matrix';
 import { APP_ROUTES } from '@/constants/routes';
+import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';

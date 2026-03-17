@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProviderCell } from '@/components/dashboard/organisms/releases/cells/ProviderCell';
+import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/lib/utils/platform-detection', () => ({

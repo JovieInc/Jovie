@@ -30,7 +30,7 @@ vi.mock('next/navigation', () => ({
 // Mock fetch for handle checking
 global.fetch = mockFetch as unknown as typeof fetch;
 
-import { ClaimHandleForm } from '@/components/home/claim-handle';
+import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 function createTestQueryClient() {
   return new QueryClient({

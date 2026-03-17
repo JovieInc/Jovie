@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { renderStatusCell } from '@/components/admin/waitlist-table/utils/column-renderers';
+import { renderStatusCell } from '@/features/admin/waitlist-table/utils/column-renderers';
 
 describe('renderStatusCell', () => {
   it.each([

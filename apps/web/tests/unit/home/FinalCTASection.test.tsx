@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { FinalCTASection } from '@/components/home/FinalCTASection';
+import { FinalCTASection } from '@/features/home/FinalCTASection';
 
 vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({ isSignedIn: false }),

@@ -155,25 +155,25 @@ export function PlanComparisonSection({
 
               <div className='flex flex-1 flex-col px-4 py-4'>
                 <div>
-                  <h3 className='text-[15px] font-[590] tracking-[-0.018em] text-(--linear-text-primary)'>
+                  <h3 className='text-[15px] font-[590] tracking-[-0.018em] text-primary-token'>
                     {planData.name}
                   </h3>
-                  <p className='text-[13px] leading-[18px] text-(--linear-text-tertiary)'>
+                  <p className='text-[13px] leading-[18px] text-tertiary-token'>
                     {planData.tagline}
                   </p>
                 </div>
 
                 <div className='mt-4 flex items-baseline gap-1'>
                   {priceDisplay === null ? (
-                    <span className='text-[13px] font-[510] text-(--linear-text-tertiary)'>
+                    <span className='text-[13px] font-[510] text-tertiary-token'>
                       Coming soon
                     </span>
                   ) : (
                     <>
-                      <span className='text-[28px] font-[620] tracking-[-0.03em] text-(--linear-text-primary)'>
+                      <span className='text-[28px] font-[620] tracking-[-0.03em] text-primary-token'>
                         {priceDisplay}
                       </span>
-                      <span className='text-[13px] text-(--linear-text-secondary)'>
+                      <span className='text-[13px] text-secondary-token'>
                         {intervalLabel}
                       </span>
                     </>
@@ -200,10 +200,10 @@ export function PlanComparisonSection({
                       className='flex items-start gap-2.5 text-[13px]'
                     >
                       <Check className='mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400' />
-                      <span className='text-(--linear-text-secondary)'>
+                      <span className='text-secondary-token'>
                         {feature.label}
                         {'detail' in feature && feature.detail && (
-                          <span className='ml-1 text-(--linear-text-tertiary)'>
+                          <span className='ml-1 text-tertiary-token'>
                             ({feature.detail})
                           </span>
                         )}

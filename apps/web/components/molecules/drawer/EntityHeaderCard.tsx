@@ -43,13 +43,13 @@ export function EntityHeaderCard({
       {image ?? null}
       <div className={cn('min-w-0 flex-1 space-y-1', bodyClassName)}>
         <div className='flex items-center gap-1.5'>
-          <span className='truncate text-[16px] font-[590] leading-[19px] tracking-[-0.012em] text-(--linear-text-primary)'>
+          <span className='truncate text-[16px] font-[590] leading-[19px] tracking-[-0.012em] text-primary-token'>
             {title}
           </span>
           {badge}
         </div>
         {subtitle && (
-          <div className='truncate text-[13.5px] leading-[17px] text-(--linear-text-secondary)'>
+          <div className='truncate text-[13.5px] leading-[17px] text-secondary-token'>
             {subtitle}
           </div>
         )}

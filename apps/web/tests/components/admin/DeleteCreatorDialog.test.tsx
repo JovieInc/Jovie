@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DeleteCreatorDialog } from '@/components/admin/DeleteCreatorDialog';
+import { DeleteCreatorDialog } from '@/features/admin/DeleteCreatorDialog';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 function createProfile(

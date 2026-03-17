@@ -36,8 +36,7 @@ export function AppSegmentControl<T extends string>({
       size={size}
       variant={surface === 'ghost' ? 'ghost' : 'default'}
       className={cn(
-        surface === 'ghost' &&
-          'border-(--linear-border-subtle) bg-transparent shadow-none',
+        surface === 'ghost' && 'border-subtle bg-transparent shadow-none',
         className
       )}
       triggerClassName={cn('data-[state=active]:shadow-none', triggerClassName)}

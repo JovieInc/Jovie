@@ -3,7 +3,8 @@
 import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AuthBackButton, AuthButton, AuthLayout } from '@/components/auth';
+import { APP_ROUTES } from '@/constants/routes';
+import { AuthBackButton, AuthButton, AuthLayout } from '@/features/auth';
 import {
   ALLOWED_PLANS,
   clearWaitlistStorage,
@@ -16,13 +17,12 @@ import {
   SOCIAL_PLATFORM_OPTIONS,
   type SocialPlatform,
   WAITLIST_STORAGE_KEYS,
-} from '@/components/waitlist/types';
-import { WaitlistAdditionalInfoStep } from '@/components/waitlist/WaitlistAdditionalInfoStep';
-import { WaitlistPrimaryGoalStep } from '@/components/waitlist/WaitlistPrimaryGoalStep';
-import { WaitlistSkeleton } from '@/components/waitlist/WaitlistSkeleton';
-import { WaitlistSocialStep } from '@/components/waitlist/WaitlistSocialStep';
-import { WaitlistSuccessView } from '@/components/waitlist/WaitlistSuccessView';
-import { APP_ROUTES } from '@/constants/routes';
+} from '@/features/waitlist/types';
+import { WaitlistAdditionalInfoStep } from '@/features/waitlist/WaitlistAdditionalInfoStep';
+import { WaitlistPrimaryGoalStep } from '@/features/waitlist/WaitlistPrimaryGoalStep';
+import { WaitlistSkeleton } from '@/features/waitlist/WaitlistSkeleton';
+import { WaitlistSocialStep } from '@/features/waitlist/WaitlistSocialStep';
+import { WaitlistSuccessView } from '@/features/waitlist/WaitlistSuccessView';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   FetchError,

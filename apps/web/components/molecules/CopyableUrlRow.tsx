@@ -99,19 +99,19 @@ export function CopyableUrlRow({
       className={cn(
         'flex items-center transition-[background-color,border-color] duration-150',
         surface === 'boxed'
-          ? 'border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)'
-          : 'border border-transparent bg-(--linear-bg-surface-0) hover:bg-(--linear-bg-surface-1)',
+          ? 'border border-subtle bg-surface-1 hover:border-default hover:bg-surface-0'
+          : 'border border-transparent bg-surface-0 hover:bg-surface-1',
         styles.container,
         className
       )}
     >
       <Link2
-        className={cn(styles.icon, 'shrink-0 text-(--linear-text-tertiary)')}
+        className={cn(styles.icon, 'shrink-0 text-tertiary-token')}
         aria-hidden='true'
       />
       <span
         className={cn(
-          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-(--linear-text-secondary)',
+          'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
           styles.value,
           valueClassName
         )}
@@ -123,7 +123,7 @@ export function CopyableUrlRow({
         onClick={handleCopy}
         title={isCopied ? 'Copied!' : copyButtonTitle}
         className={cn(
-          'shrink-0 text-(--linear-text-tertiary)',
+          'shrink-0 text-tertiary-token',
           styles.button,
           isCopied && 'text-success'
         )}
@@ -134,7 +134,7 @@ export function CopyableUrlRow({
       <DrawerInlineIconButton
         onClick={handleOpen}
         title={openButtonTitle}
-        className={cn('shrink-0 text-(--linear-text-tertiary)', styles.button)}
+        className={cn('shrink-0 text-tertiary-token', styles.button)}
       >
         <ExternalLink className={styles.glyph} />
         <span className='sr-only'>Open</span>

@@ -92,9 +92,9 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
   const previewUrl = `${getAdCreativeUrl(variant.type, variant.size)}${cacheSuffix}`;
 
   return (
-    <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) p-4'>
+    <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 p-4'>
       <div
-        className={`relative overflow-hidden rounded-lg bg-(--linear-bg-surface-2) ${
+        className={`relative overflow-hidden rounded-lg bg-surface-2 ${
           variant.size === 'story' ? 'aspect-[9/16]' : 'aspect-square'
         }`}
       >
@@ -109,12 +109,10 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 
       <div className='flex items-center justify-between'>
         <div>
-          <p className='text-sm font-medium text-(--linear-text-primary)'>
+          <p className='text-sm font-medium text-primary-token'>
             {variant.label}
           </p>
-          <p className='text-xs text-(--linear-text-tertiary)'>
-            {variant.dimensions}
-          </p>
+          <p className='text-xs text-tertiary-token'>{variant.dimensions}</p>
         </div>
         <div className='flex items-center gap-2'>
           <Button
@@ -150,21 +148,21 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
 export default function RetargetingAdsPage() {
   return (
     <div className='mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6'>
-      <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-5 sm:p-6'>
-        <h1 className='text-xl font-semibold text-(--linear-text-primary)'>
+      <ContentSurfaceCard className='bg-surface-0 p-5 sm:p-6'>
+        <h1 className='text-xl font-semibold text-primary-token'>
           Retargeting Ads
         </h1>
-        <p className='mt-1 text-sm text-(--linear-text-secondary)'>
+        <p className='mt-1 text-sm text-secondary-token'>
           Download ad images to use in your Instagram and Facebook campaigns.
           Upload them to Meta Ads Manager to retarget profile visitors.
         </p>
       </ContentSurfaceCard>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-(--linear-text-tertiary)'>
+        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
           Fan retargeting
         </h2>
-        <p className='text-sm text-(--linear-text-secondary)'>
+        <p className='text-sm text-secondary-token'>
           Show these to fans who visited your profile but haven&apos;t turned on
           notifications yet.
         </p>
@@ -179,10 +177,10 @@ export default function RetargetingAdsPage() {
       </div>
 
       <div className='space-y-4'>
-        <h2 className='text-sm font-medium uppercase tracking-wide text-(--linear-text-tertiary)'>
+        <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>
           Profile claim
         </h2>
-        <p className='text-sm text-(--linear-text-secondary)'>
+        <p className='text-sm text-secondary-token'>
           Show these to artists who have an unclaimed profile to encourage them
           to claim it.
         </p>
@@ -196,11 +194,11 @@ export default function RetargetingAdsPage() {
         </div>
       </div>
 
-      <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
-        <h3 className='text-sm font-medium text-(--linear-text-primary)'>
+      <ContentSurfaceCard className='bg-surface-0 p-4'>
+        <h3 className='text-sm font-medium text-primary-token'>
           How to use these ads
         </h3>
-        <ol className='mt-2 list-inside list-decimal space-y-1 text-sm text-(--linear-text-secondary)'>
+        <ol className='mt-2 list-inside list-decimal space-y-1 text-sm text-secondary-token'>
           <li>Download the ad images above</li>
           <li>
             In Meta Ads Manager, create a new campaign with the Traffic

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import { AdminProfileSidebar } from '@/components/admin/admin-creator-profiles/AdminProfileSidebar';
+import { AdminProfileSidebar } from '@/features/admin/admin-creator-profiles/AdminProfileSidebar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { Contact } from '@/types';
 

@@ -3,7 +3,7 @@
 import { QueryErrorResetBoundary } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { ErrorBoundary, type FallbackProps } from 'react-error-boundary';
-import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 
 type CustomFallbackFn = (
   props: FallbackProps & { reset: () => void }

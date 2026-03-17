@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   type ProfileEditPreview,
   ProfileEditPreviewCard,
-} from '@/components/dashboard/organisms/ProfileEditPreviewCard';
+} from '@/features/dashboard/organisms/ProfileEditPreviewCard';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mutation mock

@@ -33,7 +33,7 @@ export function DrawerLoadingSkeleton({
       className={className}
     >
       <div className='flex h-full flex-col bg-(--linear-app-drawer-surface)'>
-        <div className='sticky top-0 z-10 flex min-h-(--linear-app-drawer-header-height) shrink-0 items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-(--linear-app-drawer-padding-x) py-1'>
+        <div className='sticky top-0 z-10 flex min-h-(--linear-app-drawer-header-height) shrink-0 items-center justify-between border-b border-subtle bg-(--linear-app-drawer-surface) px-(--linear-app-drawer-padding-x) py-1'>
           <div className='h-2.5 w-28 rounded skeleton' />
           <div className='flex items-center gap-px'>
             <div className='h-(--linear-app-control-height-sm) w-(--linear-app-control-height-sm) rounded-(--linear-app-control-radius) skeleton' />
@@ -41,7 +41,7 @@ export function DrawerLoadingSkeleton({
           </div>
         </div>
 
-        <div className='shrink-0 overflow-hidden border-b border-(--linear-border-subtle) px-(--linear-app-drawer-padding-x) pt-2.5 pb-2'>
+        <div className='shrink-0 overflow-hidden border-b border-subtle px-(--linear-app-drawer-padding-x) pt-2.5 pb-2'>
           <div className='space-y-2'>
             <div className='flex items-start gap-3'>
               <div className='h-[84px] w-[84px] shrink-0 rounded-[10px] skeleton' />
@@ -66,7 +66,7 @@ export function DrawerLoadingSkeleton({
                 <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
               </div>
-              <div className='space-y-1 border-l border-(--linear-border-subtle) pl-2'>
+              <div className='space-y-1 border-l border-subtle pl-2'>
                 <div className='h-[10px] w-14 rounded skeleton' />
                 <div className='h-4.5 w-10 rounded skeleton' />
                 <div className='h-[11px] w-10 rounded skeleton' />
@@ -76,8 +76,8 @@ export function DrawerLoadingSkeleton({
         </div>
 
         {showTabs ? (
-          <div className='shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-app-drawer-surface) px-(--linear-app-drawer-padding-x) py-1'>
-            <div className='flex w-full gap-1 rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'>
+          <div className='shrink-0 border-b border-subtle bg-(--linear-app-drawer-surface) px-(--linear-app-drawer-padding-x) py-1'>
+            <div className='flex w-full gap-1 rounded-(--linear-app-control-radius) border border-subtle bg-surface-1 p-0.5'>
               {['tab-1', 'tab-2', 'tab-3', 'tab-4'].map(tabId => (
                 <div
                   key={tabId}

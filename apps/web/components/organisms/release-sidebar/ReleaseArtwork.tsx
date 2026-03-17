@@ -18,7 +18,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
+} from '@/features/release/AlbumArtworkContextMenu';
 
 interface ReleaseArtworkProps {
   readonly artworkUrl: string | null | undefined;
@@ -67,7 +67,7 @@ export function ReleaseArtwork({
       fallback={
         <Icon
           name='Disc3'
-          className='h-6 w-6 text-(--linear-text-tertiary)'
+          className='h-6 w-6 text-tertiary-token'
           aria-hidden='true'
         />
       }

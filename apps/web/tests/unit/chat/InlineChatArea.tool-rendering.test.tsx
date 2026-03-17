@@ -47,7 +47,7 @@ vi.mock('@/components/atoms/BrandLogo', () => ({
   BrandLogo: () => React.createElement('span', { 'data-testid': 'brand-logo' }),
 }));
 
-vi.mock('@/components/dashboard/organisms/ProfileEditPreviewCard', () => ({
+vi.mock('@/features/dashboard/organisms/ProfileEditPreviewCard', () => ({
   ProfileEditPreviewCard: (props: { preview: { field: string } }) =>
     React.createElement('div', {
       'data-testid': 'profile-edit-preview-card',
@@ -70,7 +70,7 @@ vi.mock('@/components/jovie/components/ChatLinkConfirmationCard', () => ({
 
 // Lazy import after mocks are set up
 const { InlineChatArea } = await import(
-  '@/components/dashboard/organisms/InlineChatArea'
+  '@/features/dashboard/organisms/InlineChatArea'
 );
 
 function renderInlineChat(expanded = true) {

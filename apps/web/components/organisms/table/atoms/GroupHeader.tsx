@@ -76,9 +76,7 @@ export const GroupHeader = React.forwardRef<
         <div className='flex items-center gap-2 pl-5 pr-4 py-2'>
           <span className={cn(typography.groupHeader, labelClassName)}>
             {label}{' '}
-            <span
-              className={cn('text-(--linear-text-secondary)', countClassName)}
-            >
+            <span className={cn('text-secondary-token', countClassName)}>
               ({count})
             </span>
           </span>

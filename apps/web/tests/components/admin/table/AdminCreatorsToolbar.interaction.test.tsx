@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { AdminCreatorsToolbar } from '@/components/admin/table/AdminCreatorsToolbar';
+import { AdminCreatorsToolbar } from '@/features/admin/table/AdminCreatorsToolbar';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 vi.mock('@/components/organisms/table', () => ({

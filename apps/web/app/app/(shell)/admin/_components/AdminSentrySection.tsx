@@ -1,7 +1,7 @@
-import { SentryMetricsCard } from '@/components/admin/SentryMetricsCard';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { SentryMetricsCard } from '@/features/admin/SentryMetricsCard';
 import { getAdminSentryMetrics } from '@/lib/admin/sentry-metrics';
 
 const SENTRY_CARD_SKELETON_KEYS = ['issues', 'events', 'users', 'critical'];

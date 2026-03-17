@@ -10,8 +10,6 @@ import {
   useTransition,
 } from 'react';
 import { PreviewPanelProvider } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { HeaderChatUsageIndicator } from '@/components/dashboard/atoms/HeaderChatUsageIndicator';
-import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import {
   HeaderActionsProvider,
@@ -22,6 +20,8 @@ import {
   useKeyboardShortcuts,
 } from '@/contexts/KeyboardShortcutsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
+import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { useAuthRouteConfig } from '@/hooks/useAuthRouteConfig';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import { AuthShell } from './AuthShell';

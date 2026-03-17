@@ -1,4 +1,4 @@
-import { DashboardOverviewSkeleton } from '@/components/dashboard/organisms/DashboardOverviewSkeleton';
+import { DashboardOverviewSkeleton } from '@/features/dashboard/organisms/DashboardOverviewSkeleton';
 
 /**
  * Dashboard loading screen

@@ -31,7 +31,7 @@ function MenuSection({
 }) {
   return (
     <div className='mb-10'>
-      <p className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <p className='mb-3 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {label}
       </p>
       {children}
@@ -42,10 +42,10 @@ function MenuSection({
 export function DropdownShowcase() {
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>
         Dropdown Menu
       </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app — 8px radius, 4px item radius, font weight 450,
         near-white text in dark mode
       </p>
@@ -206,7 +206,7 @@ export function DropdownShowcase() {
                 tabIndex={0}
                 className={cn(
                   MENU_ITEM_BASE,
-                  'bg-(--linear-bg-surface-1) text-(--linear-text-primary) [&_svg]:text-(--linear-text-primary)'
+                  'bg-surface-1 text-primary-token [&_svg]:text-primary-token'
                 )}
               >
                 <Settings />
@@ -276,7 +276,7 @@ function SearchableMenu() {
     >
       <div className='relative px-2 pb-1 pt-1'>
         <svg
-          className='absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)'
+          className='absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
           fill='none'
           viewBox='0 0 24 24'
           stroke='currentColor'
@@ -291,11 +291,11 @@ function SearchableMenu() {
           placeholder='Search...'
           value={query}
           onChange={e => setQuery(e.target.value)}
-          className='w-full rounded-md border-0 border-b border-(--linear-border-subtle) bg-transparent py-1.5 pl-8 pr-3 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none focus-visible:ring-0'
+          className='w-full rounded-md border-0 border-b border-subtle bg-transparent py-1.5 pl-8 pr-3 text-[13px] text-primary-token placeholder:text-tertiary-token focus-visible:outline-none focus-visible:ring-0'
         />
       </div>
       {filtered.length === 0 ? (
-        <div className='py-6 text-center text-[13px] text-(--linear-text-tertiary)'>
+        <div className='py-6 text-center text-[13px] text-tertiary-token'>
           No results
         </div>
       ) : (

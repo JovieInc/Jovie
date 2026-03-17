@@ -25,9 +25,9 @@ import {
   MUSIC_FIRST_ORDER,
   SOCIAL_FIRST_ORDER,
   SUGGESTION_PILLS,
-} from '@/components/dashboard/organisms/links/config';
+} from '@/features/dashboard/organisms/links/config';
 // Import after mocks
-import { QuickAddSuggestions } from '@/components/dashboard/organisms/links/QuickAddSuggestions';
+import { QuickAddSuggestions } from '@/features/dashboard/organisms/links/QuickAddSuggestions';
 
 describe('QuickAddSuggestions', () => {
   const mockOnPlatformSelect = vi.fn();

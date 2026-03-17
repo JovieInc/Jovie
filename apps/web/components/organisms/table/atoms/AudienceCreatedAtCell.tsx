@@ -1,6 +1,6 @@
 'use client';
 
-import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
+import { AudienceRowActionsMenu } from '@/features/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatLongDate } from '@/lib/utils/audience';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';

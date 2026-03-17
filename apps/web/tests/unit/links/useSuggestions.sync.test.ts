@@ -3,7 +3,7 @@
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useSuggestions } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
+import { useSuggestions } from '@/features/dashboard/organisms/links/hooks/useSuggestions';
 import { track } from '@/lib/analytics';
 import { createMockSuggestion } from './useSuggestions.test-utils';
 

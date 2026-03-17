@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { DmQueueCard } from '@/components/admin/outreach/DmQueueCard';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { DmQueueCard } from '@/features/admin/outreach/DmQueueCard';
 
 interface DmQueueLead {
   id: string;

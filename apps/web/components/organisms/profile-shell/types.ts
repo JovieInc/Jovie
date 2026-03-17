@@ -2,7 +2,7 @@ import type {
   ProfileNotificationsHydrationStatus,
   ProfileNotificationsState,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
-import type { ProfileMode } from '@/components/profile/contracts';
+import type { ProfileMode } from '@/features/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';

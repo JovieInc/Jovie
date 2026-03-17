@@ -1,8 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
-import { DashboardTippingGate } from '@/components/dashboard/DashboardTippingGate';
-import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardTippingGate } from '@/features/dashboard/DashboardTippingGate';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';

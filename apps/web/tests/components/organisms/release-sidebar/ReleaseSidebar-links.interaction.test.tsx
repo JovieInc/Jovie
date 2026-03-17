@@ -136,7 +136,7 @@ vi.mock('@/components/atoms/Icon', () => ({
   Icon: () => <span data-testid='icon' />,
 }));
 
-vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
     <div data-testid='artwork-menu'>{children}</div>
   ),

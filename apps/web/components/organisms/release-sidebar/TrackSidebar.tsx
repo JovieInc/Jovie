@@ -187,7 +187,7 @@ export function TrackSidebar({
                 fallback={
                   <Icon
                     name='Music'
-                    className='h-7 w-7 text-(--linear-text-tertiary)'
+                    className='h-7 w-7 text-tertiary-token'
                     aria-hidden='true'
                   />
                 }
@@ -242,7 +242,7 @@ export function TrackSidebar({
                     icon={<Hash className='h-3.5 w-3.5' />}
                     label='Copy ISRC'
                     trailing={
-                      <span className='font-mono text-[10px] text-(--linear-text-tertiary)'>
+                      <span className='font-mono text-[10px] text-tertiary-token'>
                         {track.isrc}
                       </span>
                     }

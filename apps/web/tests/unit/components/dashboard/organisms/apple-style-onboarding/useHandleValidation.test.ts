@@ -37,7 +37,7 @@ vi.mock('@/lib/pacer/errors', () => ({
   isAbortError: () => false,
 }));
 
-import { useHandleValidation } from '@/components/dashboard/organisms/apple-style-onboarding/useHandleValidation';
+import { useHandleValidation } from '@/features/dashboard/organisms/apple-style-onboarding/useHandleValidation';
 
 describe('useHandleValidation', () => {
   beforeEach(() => {

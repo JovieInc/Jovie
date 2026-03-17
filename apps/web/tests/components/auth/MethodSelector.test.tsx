@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { MethodSelector } from '@/components/auth/forms/MethodSelector';
+import { MethodSelector } from '@/features/auth/forms/MethodSelector';
 
 describe('MethodSelector', () => {
   const commonProps = {

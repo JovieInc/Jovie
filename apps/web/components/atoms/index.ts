@@ -2,6 +2,8 @@
 // Basic building blocks that can't be broken down further
 // Named exports for tree-shaking (no `export *`)
 
+export type { CTAButtonProps } from '@/components/molecules/CTAButton';
+export { CTAButton } from '@/components/molecules/CTAButton';
 export { AmountSelector } from './AmountSelector';
 export { ArtistName } from './ArtistName';
 export type { Assignee } from './AssigneeAvatar';
@@ -26,8 +28,6 @@ export type {
 export { CircleIconButton } from './CircleIconButton';
 export { CopyableMonospaceCell } from './CopyableMonospaceCell';
 export { Copyright } from './Copyright';
-export type { CTAButtonProps } from './CTAButton';
-export { CTAButton } from './CTAButton';
 export type { DividerProps } from './Divider';
 export { Divider } from './Divider';
 export type { DotBadgeProps, DotBadgeVariant } from './DotBadge';

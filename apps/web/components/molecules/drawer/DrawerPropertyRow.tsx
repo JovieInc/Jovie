@@ -59,14 +59,14 @@ export function DrawerPropertyRow({
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&
-          'cursor-pointer border border-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'cursor-pointer border border-transparent hover:border-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
       style={gridStyle}
     >
       <span
         className={cn(
-          'font-[510] uppercase text-(--linear-text-tertiary)',
+          'font-[510] uppercase text-tertiary-token',
           styles.label,
           labelClassName
         )}
@@ -75,7 +75,7 @@ export function DrawerPropertyRow({
       </span>
       <span
         className={cn(
-          'min-w-0 text-(--linear-text-secondary)',
+          'min-w-0 text-secondary-token',
           styles.value,
           valueClassName
         )}

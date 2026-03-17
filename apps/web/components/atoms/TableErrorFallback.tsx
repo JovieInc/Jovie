@@ -1,7 +1,7 @@
 'use client';
 
 import type { FallbackProps } from 'react-error-boundary';
-import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 
 /**
  * Error fallback UI specifically for table components.

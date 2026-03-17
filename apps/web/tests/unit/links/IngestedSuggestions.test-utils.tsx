@@ -3,7 +3,7 @@
  */
 
 import { vi } from 'vitest';
-import type { SuggestedLink } from '@/components/dashboard/organisms/links/IngestedSuggestions';
+import type { SuggestedLink } from '@/features/dashboard/organisms/links/IngestedSuggestions';
 
 // Mock analytics
 vi.mock('@/lib/analytics', () => ({

@@ -9,8 +9,10 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import { Instagram, Link2, Mail, Music2, Share2, Twitter } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
-import type { ContextMenuItemType } from '@/components/organisms/table';
-import type { ContextMenuAction } from '@/components/organisms/table/molecules/TableContextMenu';
+import type {
+  ContextMenuAction,
+  ContextMenuItemType,
+} from '@/components/organisms/table';
 import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';

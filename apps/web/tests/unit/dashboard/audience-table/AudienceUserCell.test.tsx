@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AudienceUserCell } from '@/components/organisms/table/atoms/AudienceUserCell';
+import { AudienceUserCell } from '@/components/organisms/table';
 
 describe('AudienceUserCell', () => {
   it('renders anonymous visitors with device and city label', () => {

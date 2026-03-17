@@ -1,9 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { createRightMetaCellRenderer } from '@/components/dashboard/organisms/release-provider-matrix/utils/column-renderers';
+import { createRightMetaCellRenderer } from '@/features/dashboard/organisms/release-provider-matrix/utils/column-renderers';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-vi.mock('@/components/dashboard/organisms/releases/cells', () => ({
+vi.mock('@/features/dashboard/organisms/releases/cells', () => ({
   SmartLinkCell: ({ release }: { release: ReleaseViewModel }) => (
     <span data-testid='smart-link-cell'>{release.smartLinkPath}</span>
   ),

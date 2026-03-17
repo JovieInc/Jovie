@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getPopularityLevel,
   useReleaseFilterCounts,
-} from '@/components/dashboard/organisms/release-provider-matrix/hooks/useReleaseFilterCounts';
+} from '@/features/dashboard/organisms/release-provider-matrix/hooks/useReleaseFilterCounts';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 // ---------------------------------------------------------------------------

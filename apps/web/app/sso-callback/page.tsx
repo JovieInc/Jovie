@@ -1,6 +1,6 @@
 'use client';
 
-import { SsoCallbackHandler } from '@/components/auth/SsoCallbackHandler';
+import { SsoCallbackHandler } from '@/features/auth/SsoCallbackHandler';
 
 /**
  * Root SSO callback page for OAuth flows.

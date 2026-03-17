@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { AudienceRowActionsMenu } from '@/components/dashboard/AudienceRowActionsMenu';
+import { AudienceRowActionsMenu } from '@/features/dashboard/AudienceRowActionsMenu';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';

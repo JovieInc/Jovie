@@ -48,7 +48,7 @@ export default function AdminPage() {
                 title='Platform reach metrics'
                 subtitle='Secondary platform stats kept below the fold'
                 actions={
-                  <span className='text-[12px] font-[560] text-(--linear-text-tertiary)'>
+                  <span className='text-[12px] font-[560] text-tertiary-token'>
                     Expand
                   </span>
                 }
@@ -56,7 +56,7 @@ export default function AdminPage() {
                 actionsClassName='shrink-0'
               />
             </summary>
-            <div className='space-y-4 border-t border-(--linear-border-subtle) px-(--linear-app-header-padding-x) py-4'>
+            <div className='space-y-4 border-t border-subtle px-(--linear-app-header-padding-x) py-4'>
               <p className='text-app text-secondary-token'>
                 Secondary platform stats are intentionally below the fold so
                 core business KPIs stay front and center.

@@ -16,9 +16,11 @@ import { useUserButton } from './useUserButton';
 
 const DashboardFeedbackModal = dynamic(
   () =>
-    import('../../dashboard/organisms/DashboardFeedbackModal').then(mod => ({
-      default: mod.DashboardFeedbackModal,
-    })),
+    import('@/features/dashboard/organisms/DashboardFeedbackModal').then(
+      mod => ({
+        default: mod.DashboardFeedbackModal,
+      })
+    ),
   { ssr: false, loading: () => null }
 );
 

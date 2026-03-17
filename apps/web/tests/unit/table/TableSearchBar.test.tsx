@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { TableSearchBar } from '@/components/organisms/table/molecules/TableSearchBar';
+import { TableSearchBar } from '@/components/organisms/table';
 
 describe('TableSearchBar', () => {
   afterEach(() => {

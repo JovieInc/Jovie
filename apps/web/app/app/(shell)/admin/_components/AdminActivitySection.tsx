@@ -1,5 +1,5 @@
 import { Skeleton } from '@jovie/ui';
-import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
+import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 
 export async function AdminActivitySection() {
