@@ -28,11 +28,10 @@ export function PricingSection() {
               Pricing
             </span>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
-              Free to grow. Premium when you&apos;re ready.
+              Simple pricing.
             </h2>
             <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
-              Free gets an artist live, building an audience and proving demand.
-              Founding Member adds more leverage for analytics and growth.
+              Get live for free. Upgrade for deeper analytics and full control.
             </p>
           </div>
 
@@ -101,9 +100,9 @@ export function PricingSection() {
               className='relative flex flex-col overflow-hidden rounded-xl p-8'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                border: '1px solid rgba(94,106,210,0.4)',
+                border: '1px solid var(--linear-pricing-accent-border)',
                 boxShadow:
-                  'var(--linear-shadow-card-elevated), 0 0 0 1px rgba(94,106,210,0.15)',
+                  'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-pricing-accent-shadow)',
               }}
             >
               <div
@@ -111,7 +110,7 @@ export function PricingSection() {
                 className='absolute inset-x-0 top-0 h-px'
                 style={{
                   background:
-                    'linear-gradient(90deg, transparent, var(--color-accent) 40%, var(--color-accent) 60%, transparent)',
+                    'linear-gradient(90deg, transparent, var(--linear-pricing-accent) 40%, var(--linear-pricing-accent) 60%, transparent)',
                 }}
               />
               <div className='flex items-center justify-between'>
@@ -170,8 +169,8 @@ export function PricingSection() {
                 href='/signup?plan=founding'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
-                  backgroundColor: 'var(--color-accent)',
-                  color: '#ffffff',
+                  backgroundColor: 'var(--linear-pricing-accent)',
+                  color: 'var(--linear-btn-accent-fg)',
                 }}
               >
                 Choose Founding Member

@@ -60,7 +60,7 @@ export function MarketingHeader({
       navLinks={launchNavLinks}
       style={{
         backgroundColor: 'var(--linear-bg-header)',
-        borderBottomColor: 'var(--linear-border-subtle)',
+        borderBottomColor: 'var(--linear-border-default)',
         color: 'var(--linear-text-primary)',
       }}
     />

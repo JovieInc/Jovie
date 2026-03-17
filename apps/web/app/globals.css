@@ -111,6 +111,7 @@ body {
       "rlig" 1,
       "calt" 1;
     letter-spacing: -0.011em;
+    text-rendering: optimizelegibility;
   }
 }
 
@@ -366,38 +367,57 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Exact Linear.app values — measured live 2026-03-10:
-       font-size: 64px, weight: 510, letter-spacing: -1.408px, line-height: 64px */
-    font-size: clamp(
-      var(--linear-h1-size-sm),
-      5vw +
-      1rem,
-      var(--linear-h1-size-lg)
-    );
+    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
+       375px: 38px/1.1  |  768px: 56px/1.1  |  1280px: 64px/1.0 */
+    font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
-    /* -1.408px at 64px = -0.022em */
-    line-height: 1;
+    line-height: 1.1;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
+  @media (min-width: 768px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size-md);
+    }
+  }
+  @media (min-width: 1280px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size-lg);
+      line-height: 1;
+    }
+  }
   .marketing-h2-linear {
     /* Exact Linear.app values:
        font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
-    font-size: clamp(
-      var(--linear-h2-size-sm),
-      3vw +
-      1rem,
-      var(--linear-h2-size-lg)
-    );
+    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
+       375px: 24px/1.33  |  768px: 32px/1.125  |  1280px: 40px/1.1  |  1440px: 48px/1.0 */
+    font-size: var(--linear-h2-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
-    /* -1.056px at 48px = -0.022em */
-    line-height: 1.05;
+    line-height: 1.33;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
+  }
+  @media (min-width: 768px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-md);
+      line-height: 1.125;
+    }
+  }
+  @media (min-width: 1280px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-xl);
+      line-height: 1.1;
+    }
+  }
+  @media (min-width: 1440px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-lg);
+      line-height: 1;
+    }
   }
   /* Hero radial glow — dramatic depth cue behind heading */
   .hero-glow {
@@ -535,9 +555,9 @@ body {
     height: var(--linear-button-height-sm);
     padding: 0 var(--linear-space-3);
     font-size: var(--linear-caption-size);
-    font-weight: var(--linear-font-weight-normal);
+    font-weight: 400;
     line-height: var(--linear-caption-leading);
-    color: var(--linear-text-secondary);
+    color: var(--linear-text-tertiary);
     background-color: transparent;
     border: none;
     border-radius: var(--linear-radius-sm);

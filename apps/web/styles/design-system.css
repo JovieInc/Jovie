@@ -193,7 +193,7 @@
 /* Dark mode - same generation logic, inverted lightness */
 :root.dark {
   /* Dark mode surfaces — matched to Linear's exact Hex values */
-  --color-bg-base: #090909;
+  --color-bg-base: #08090a;
   /* sidebar/page bg */
   --color-bg-surface-0: #101012;
   /* primary app surface */
@@ -205,7 +205,7 @@
   /* modals, tooltips */
 
   /* Additional dark surface levels */
-  --color-bg-page: #090909;
+  --color-bg-page: #08090a;
   /* Same as base */
   --color-bg-hover: rgba(255, 255, 255, 0.04);
   /* Row/item hover */

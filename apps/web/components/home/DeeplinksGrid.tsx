@@ -28,7 +28,7 @@ const MODES: ModeData[] = [
     description:
       'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
     slug: '',
-    outcome: 'Grow audience',
+    outcome: 'Grow',
   },
   {
     id: 'tour',
@@ -100,8 +100,8 @@ function StickyPhone({ activeIndex }: { readonly activeIndex: number }) {
               height: 6,
               backgroundColor:
                 i === activeIndex
-                  ? 'rgb(247,248,248)'
-                  : 'rgba(255,255,255,0.2)',
+                  ? 'var(--linear-text-primary)'
+                  : 'var(--linear-border-default)',
             }}
           />
         ))}
@@ -165,8 +165,8 @@ function MobileCard({ mode }: { readonly mode: ModeData }) {
     <div
       className='rounded-xl px-6 py-6'
       style={{
-        backgroundColor: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        backgroundColor: 'var(--linear-bg-hover)',
+        border: '1px solid var(--linear-border-subtle)',
       }}
     >
       <div className='flex items-center justify-between gap-3'>
@@ -224,7 +224,7 @@ export function DeeplinksGrid() {
       MODES.map(mode => (
         <h3
           key={mode.id}
-          className='text-[2rem] font-semibold leading-tight tracking-[-0.03em] text-[var(--linear-text-primary)]'
+          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-[var(--linear-text-secondary)]'
         >
           {mode.headline}
         </h3>
@@ -260,8 +260,7 @@ export function DeeplinksGrid() {
               width: '600px',
               height: '600px',
               borderRadius: '50%',
-              background:
-                'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.15), transparent 60%)',
+              background: 'var(--linear-deeplinks-glow)',
             }}
           />
 
@@ -283,8 +282,7 @@ export function DeeplinksGrid() {
                   </span>
 
                   <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                    Every fan sees the right next step — stream, tip, tour, or
-                    follow.
+                    The right action for every fan.
                   </h2>
 
                   <CrossfadeBlock activeIndex={activeIndex}>
@@ -303,11 +301,11 @@ export function DeeplinksGrid() {
                         style={{
                           borderColor:
                             i === activeIndex
-                              ? 'rgba(255,255,255,0.12)'
+                              ? 'var(--linear-border-strong)'
                               : 'var(--linear-border-subtle)',
                           backgroundColor:
                             i === activeIndex
-                              ? 'rgba(255,255,255,0.08)'
+                              ? 'var(--linear-bg-hover)'
                               : 'transparent',
                           color:
                             i === activeIndex
@@ -330,7 +328,7 @@ export function DeeplinksGrid() {
                           backgroundColor:
                             i === activeIndex
                               ? 'var(--linear-text-primary)'
-                              : 'rgba(255,255,255,0.15)',
+                              : 'var(--linear-border-default)',
                         }}
                       />
                     ))}
@@ -437,8 +435,7 @@ export function DeeplinksGrid() {
                 One profile. Every way fans support you.
               </span>
               <h2 className='marketing-h2-linear text-[var(--linear-text-primary)]'>
-                Every fan sees the right next step — stream, tip, tour, or
-                follow.
+                The right action for every fan.
               </h2>
               <p className='max-w-[400px] marketing-lead-linear text-[var(--linear-text-secondary)]'>
                 Every visitor sees the action most likely to convert in that

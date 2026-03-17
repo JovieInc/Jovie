@@ -6,6 +6,7 @@ export interface ContactSocialLink {
   id?: string;
   label: string;
   url: string;
+  platform?: string;
   platformType?: SocialPlatform | string;
 }
 

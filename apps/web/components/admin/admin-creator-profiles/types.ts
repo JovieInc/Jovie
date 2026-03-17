@@ -23,6 +23,7 @@ export type AdminCreatorSocialLinksResponse =
         id: string;
         label: string;
         url: string;
+        platform: string;
         platformType: string;
       }>;
     }
