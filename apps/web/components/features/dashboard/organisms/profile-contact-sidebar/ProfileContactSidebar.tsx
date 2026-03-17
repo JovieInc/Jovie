@@ -29,6 +29,21 @@ import { useProfileHeaderParts } from './ProfileSidebarHeader';
 import { buildProfileShareDropdownItems } from './profileLinkShareMenu';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
+/** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
+function computeTargetCategory(
+  platformId: string,
+  currentCategory: CategoryOption
+): CategoryOption | null {
+  const raw = getPlatformCategory(platformId);
+  const mapped: CategoryOption =
+    raw === 'websites' || raw === 'custom' ? 'social' : (raw as CategoryOption);
+  if (mapped === currentCategory) return null;
+  if (mapped === 'social' || mapped === 'dsp' || mapped === 'earnings') {
+    return mapped;
+  }
+  return null;
+}
+
 /** Tab options for the profile sidebar categories */
 const PROFILE_TAB_OPTIONS = [
   { value: 'social' as const, label: 'Social' },
@@ -185,19 +200,11 @@ export function ProfileContactSidebar() {
       setIsAddingLink(false);
 
       // Auto-switch to the correct tab for the new link
-      const linkCategory = getPlatformCategory(link.platform.id);
-      const mappedCategory =
-        linkCategory === 'websites' || linkCategory === 'custom'
-          ? 'social'
-          : (linkCategory as CategoryOption);
-      if (
-        mappedCategory !== resolvedCategory &&
-        (mappedCategory === 'social' ||
-          mappedCategory === 'dsp' ||
-          mappedCategory === 'earnings')
-      ) {
-        setSelectedCategory(mappedCategory);
-      }
+      const targetCategory = computeTargetCategory(
+        link.platform.id,
+        resolvedCategory as CategoryOption
+      );
+      if (targetCategory) setSelectedCategory(targetCategory);
 
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
