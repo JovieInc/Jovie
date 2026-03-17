@@ -10,38 +10,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  Input,
 } from '@jovie/ui';
-import type { ChangeEvent, ComponentPropsWithoutRef, ReactNode } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ComponentPropsWithoutRef, ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Icon } from '@/components/atoms/Icon';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { APP_ROUTES } from '@/constants/routes';
 import {
+  DEFAULT_THROTTLING,
   type SendCampaignInvitesResponse,
+  type ThrottlingConfig,
   useCampaignInvitesQuery,
   useCampaignOverviewQuery,
   useCampaignPreviewQuery,
   useCampaignSettings,
   useCampaignStatsQuery,
-  useSaveCampaignSettings,
   useSendCampaignInvitesMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
-
-interface ThrottlingConfig {
-  minDelayMs: number;
-  maxDelayMs: number;
-  maxPerHour: number;
-}
-
-const DEFAULT_THROTTLING: ThrottlingConfig = {
-  minDelayMs: 30000, // 30 seconds
-  maxDelayMs: 120000, // 2 minutes
-  maxPerHour: 30,
-};
 
 /** Threshold for showing confirmation modal */
 const LARGE_BATCH_THRESHOLD = 25;
@@ -185,36 +174,16 @@ function CampaignTableCell({
 }
 
 export function InviteCampaignManager() {
-  const [fitScoreThreshold, setFitScoreThreshold] = useState(50);
-  const [limit, setLimit] = useState(20);
-  const [throttling, setThrottling] =
-    useState<ThrottlingConfig>(DEFAULT_THROTTLING);
   const [sendResult, setSendResult] =
     useState<SendCampaignInvitesResponse | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
-  const settingsSavedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load persisted settings on mount
+  // Read persisted settings (configured via Settings > Admin > General)
   const { data: savedSettings } = useCampaignSettings();
-  const saveCampaignSettings = useSaveCampaignSettings();
-
-  useEffect(() => {
-    if (savedSettings?.settings) {
-      const s = savedSettings.settings;
-      setFitScoreThreshold(s.fitScoreThreshold);
-      setLimit(s.batchLimit);
-      setThrottling(s.throttlingConfig);
-    }
-  }, [savedSettings]);
-
-  useEffect(() => {
-    return () => {
-      if (settingsSavedTimeoutRef.current) {
-        clearTimeout(settingsSavedTimeoutRef.current);
-      }
-    };
-  }, []);
+  const fitScoreThreshold = savedSettings?.settings?.fitScoreThreshold ?? 50;
+  const limit = savedSettings?.settings?.batchLimit ?? 20;
+  const throttling: ThrottlingConfig =
+    savedSettings?.settings?.throttlingConfig ?? DEFAULT_THROTTLING;
 
   // TanStack Query for preview data
   const {
@@ -242,23 +211,6 @@ export function InviteCampaignManager() {
   const handleRefreshClick = useCallback(() => {
     refetchPreview();
   }, [refetchPreview]);
-
-  const handleSaveSettings = useCallback(async () => {
-    setSettingsSaved(false);
-    await saveCampaignSettings.mutateAsync({
-      fitScoreThreshold,
-      batchLimit: limit,
-      throttlingConfig: throttling,
-    });
-    setSettingsSaved(true);
-    if (settingsSavedTimeoutRef.current) {
-      clearTimeout(settingsSavedTimeoutRef.current);
-    }
-    settingsSavedTimeoutRef.current = setTimeout(() => {
-      setSettingsSaved(false);
-      settingsSavedTimeoutRef.current = null;
-    }, 3000);
-  }, [saveCampaignSettings, fitScoreThreshold, limit, throttling]);
 
   const handleConfirmSend = useCallback(async () => {
     setShowConfirmModal(false);
@@ -417,176 +369,20 @@ export function InviteCampaignManager() {
         </CampaignSection>
       )}
 
-      <CampaignSection
-        title='Targeting'
-        subtitle='Tune who receives invites in each batch'
-        bodyClassName='grid gap-6 px-5 py-4 pt-3 md:grid-cols-2'
-      >
-        <div className='space-y-2'>
-          <label
-            htmlFor='fit-score-threshold'
-            className='text-sm font-medium text-primary-token'
+      <CampaignCallout tone='info' icon='Info'>
+        <p className='text-xs'>
+          Targeting: fit score {'>='} {fitScoreThreshold}, batch size {limit}.
+          Throttling: {Math.round(throttling.minDelayMs / 1000)}–
+          {Math.round(throttling.maxDelayMs / 1000)}s delay (~
+          {effectiveRatePerHour}/hour).{' '}
+          <a
+            href={APP_ROUTES.SETTINGS_ADMIN}
+            className='underline hover:text-primary-token'
           >
-            Minimum Fit Score
-          </label>
-          <div className='flex items-center gap-4'>
-            <input
-              id='fit-score-threshold'
-              type='range'
-              min={0}
-              max={100}
-              value={fitScoreThreshold}
-              onChange={e => setFitScoreThreshold(Number(e.target.value))}
-              className='flex-1'
-            />
-            <span className='w-12 text-right font-mono text-sm text-primary-token'>
-              {fitScoreThreshold}
-            </span>
-          </div>
-          <p className='text-xs text-secondary-token'>
-            Only invite profiles with fit score {'>='} {fitScoreThreshold}
-          </p>
-        </div>
-
-        <div className='space-y-2'>
-          <label
-            htmlFor='batch-size'
-            className='text-sm font-medium text-primary-token'
-          >
-            Batch Size
-          </label>
-          <Input
-            id='batch-size'
-            type='number'
-            min={1}
-            max={100}
-            value={limit}
-            onChange={(e: ChangeEvent<HTMLInputElement>) =>
-              setLimit(Number(e.target.value))
-            }
-            className='w-full'
-          />
-          <p className='text-xs text-secondary-token'>
-            Maximum invites to send in this batch
-          </p>
-        </div>
-      </CampaignSection>
-
-      <CampaignSection
-        title='Throttling & Anti-Spam'
-        subtitle='Control pacing so invite sends stay human-like'
-        actions={
-          <div className='flex flex-wrap items-center gap-3'>
-            <Button
-              variant='secondary'
-              size='sm'
-              onClick={handleSaveSettings}
-              disabled={saveCampaignSettings.isPending}
-            >
-              {saveCampaignSettings.isPending ? (
-                <>
-                  <Icon
-                    name='Loader2'
-                    className='mr-2 h-3.5 w-3.5 animate-spin'
-                  />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Icon name='Save' className='mr-2 h-3.5 w-3.5' />
-                  Save Settings
-                </>
-              )}
-            </Button>
-            {settingsSaved ? (
-              <output
-                className='flex items-center gap-1 text-xs text-success'
-                aria-live='polite'
-              >
-                <Icon name='CheckCircle' className='h-3.5 w-3.5' />
-                Settings saved
-              </output>
-            ) : null}
-          </div>
-        }
-      >
-        <div className='grid gap-6 md:grid-cols-3'>
-          <div className='space-y-2'>
-            <label
-              htmlFor='min-delay'
-              className='text-sm font-medium text-primary-token'
-            >
-              Min Delay (seconds)
-            </label>
-            <Input
-              id='min-delay'
-              type='number'
-              min={10}
-              max={300}
-              value={throttling.minDelayMs / 1000}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setThrottling(t => {
-                  const newMin = Number(e.target.value) * 1000;
-                  return {
-                    ...t,
-                    minDelayMs: newMin,
-                    maxDelayMs: Math.max(newMin, t.maxDelayMs),
-                  };
-                })
-              }
-              className='w-full'
-            />
-          </div>
-        </div>
-        <div className='grid gap-6 md:grid-cols-3'>
-          <div className='space-y-2'>
-            <label
-              htmlFor='max-delay'
-              className='text-sm font-medium text-primary-token'
-            >
-              Max Delay (seconds)
-            </label>
-            <Input
-              id='max-delay'
-              type='number'
-              min={30}
-              max={600}
-              value={throttling.maxDelayMs / 1000}
-              onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                setThrottling(t => {
-                  const newMax = Number(e.target.value) * 1000;
-                  return {
-                    ...t,
-                    minDelayMs: Math.min(t.minDelayMs, newMax),
-                    maxDelayMs: newMax,
-                  };
-                })
-              }
-              className='w-full'
-            />
-          </div>
-
-          <CampaignMetric
-            label='Effective Rate'
-            value={`~${effectiveRatePerHour}/hour`}
-            subtitle={`Avg delay: ${avgDelaySeconds}s`}
-            valueClassName='text-[24px]'
-          />
-        </div>
-
-        <CampaignCallout tone='warning' icon='AlertTriangle'>
-          <p className='text-xs'>
-            Delays are randomized between min and max to appear human-like. Stay
-            under 50/hour to avoid spam filters.
-          </p>
-        </CampaignCallout>
-
-        {saveCampaignSettings.error && (
-          <p className='text-xs text-destructive'>
-            {saveCampaignSettings.error.message}
-          </p>
-        )}
-      </CampaignSection>
+            Change in Settings
+          </a>
+        </p>
+      </CampaignCallout>
 
       <CampaignSection
         title='Claim Funnel'

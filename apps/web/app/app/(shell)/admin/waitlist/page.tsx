@@ -4,7 +4,6 @@ import type { SearchParams } from 'nuqs/server';
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { WaitlistMetrics } from '@/features/admin/WaitlistMetrics';
-import { WaitlistSettingsPanel } from '@/features/admin/WaitlistSettingsPanel';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
@@ -62,7 +61,6 @@ export default async function AdminWaitlistPage({
     <PageShell>
       <PageContent noPadding>
         <div className='flex flex-col h-full space-y-4 p-4 sm:p-6'>
-          <WaitlistSettingsPanel />
           <WaitlistMetrics metrics={metrics} />
           <div className='flex-1 min-h-0'>
             <AdminWaitlistTableWithViews
