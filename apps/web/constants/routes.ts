@@ -28,6 +28,7 @@ export const APP_ROUTES = {
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',
   INSIGHTS: '/app/insights',
+  PRESENCE: '/app/presence',
 
   // Settings
   SETTINGS: '/app/settings',
