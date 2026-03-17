@@ -2,23 +2,22 @@
  * DSP Image Utilities
  *
  * Shared utilities for handling images from Digital Service Provider (DSP) CDNs.
+ * Domain list sourced from the canonical CDN domain registry.
+ *
+ * @see constants/platforms/cdn-domains.ts
  */
+
+import { getDspCdnDomains } from '@/constants/platforms/cdn-domains';
 
 /**
  * Known DSP CDN domains that should bypass Next.js image optimization.
  *
  * These domains serve dynamically generated or already-optimized images
  * that don't benefit from additional optimization.
+ *
+ * Sourced from music-category platforms in PLATFORM_CDN_DOMAINS.
  */
-const DSP_CDN_DOMAINS = [
-  'i.scdn.co', // Spotify
-  'mzstatic.com', // Apple Music
-  'ytimg.com', // YouTube
-  'dzcdn.net', // Deezer
-  'sndcdn.com', // SoundCloud
-  'tidal.com', // Tidal
-  'images.genius.com', // Genius
-] as const;
+const DSP_CDN_DOMAINS = getDspCdnDomains();
 
 /**
  * Checks if an image URL is from a known DSP CDN.

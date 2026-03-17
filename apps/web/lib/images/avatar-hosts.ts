@@ -1,44 +1,13 @@
 /**
- * Canonical allowlist for remote avatar image hosts.
+ * Avatar host validation.
  *
- * Keep this list in sync with `apps/web/next.config.js` image `remotePatterns`
- * and server-side avatar URL validation used by onboarding/admin flows.
+ * Uses the canonical CDN domain registry as its data source.
+ * @see constants/platforms/cdn-domains.ts
  */
 
-const ALLOWED_AVATAR_HOST_PATTERNS = [
-  // Jovie-managed storage
-  'blob.vercel-storage.com',
-  '*.blob.vercel-storage.com',
-  '*.public.blob.vercel-storage.com',
+import { getAllImageDomainPatterns } from '@/constants/platforms/cdn-domains';
 
-  // Clerk / auth providers
-  'img.clerk.com',
-  'images.clerk.dev',
-
-  // Spotify and music CDNs
-  'i.scdn.co',
-  '*.scdn.co',
-  '*.spotifycdn.com',
-  '*.dzcdn.net',
-
-  // Linktree profile images
-  'linktr.ee',
-  '*.linktr.ee',
-
-  // Common social avatar CDNs
-  'avatars.githubusercontent.com',
-  '*.googleusercontent.com',
-  'gravatar.com',
-  'www.gravatar.com',
-  'secure.gravatar.com',
-  '*.fbcdn.net',
-  '*.fbsbx.com',
-  '*.twimg.com',
-  'cdn.discordapp.com',
-
-  // Existing trusted image sources
-  'images.unsplash.com',
-] as const;
+const ALLOWED_AVATAR_HOST_PATTERNS = getAllImageDomainPatterns();
 
 export function isAllowedAvatarHostname(hostname: string): boolean {
   const normalizedHostname = hostname.trim().toLowerCase();
