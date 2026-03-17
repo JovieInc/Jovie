@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.0] - 2026-03-17
+
+### Added
+
+- Tour date ticket click tracking — wired into audience analytics via `useTrackingMutation` on public profile and dedicated tour page
+- Tour date analytics sidebar card in dashboard — shows ticket clicks, top cities, and top referrers per show
+- API endpoint `GET /api/dashboard/tour-dates/[id]/analytics` with ownership verification and UUID validation
+- `useTourDateAnalyticsQuery` React Query hook for client-side analytics fetching
+- Comprehensive tour date seed data (12 venues across 7 countries) with diverse providers, statuses, and ticketing platforms
+
+### Fixed
+
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
+
 ## [26.3.4] - 2026-03-17
 
 ### Added
