@@ -8,10 +8,11 @@
 name: Security Scanning
 
 on:
+  pull_request:
+    branches: ['main']
+  merge_group:
   push:
     branches: ['main']
-  # Removed pull_request trigger — security scanning on push-to-main catches
-  # everything that merges, weekly schedule covers drift. Saves ~300 runs/month.
   schedule:
     - cron: '0 6 * * 1' # Weekly on Monday at 6:00 AM UTC
   workflow_dispatch:
@@ -43,6 +44,7 @@ jobs:
 
   trivy:
     name: Trivy Vulnerability Scanning
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -70,8 +72,8 @@ jobs:
   scorecard:
     name: OSSF Scorecard Supply Chain Security
     runs-on: ubuntu-latest
-    # Scorecard only runs on main branch push and schedule to avoid token issues on PRs
-    if: github.event_name != 'pull_request'
+    # Scorecard stays post-merge/scheduled to avoid unnecessary PR latency.
+    if: ${{ github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     permissions:
       contents: read
       security-events: write

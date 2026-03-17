@@ -1,0 +1,70 @@
+# SonarCloud analysis workflow
+#
+# This workflow makes the SonarCloud quality gate a hard blocker for internal
+# PRs, merge queue runs, and pushes to main. Fork PRs do not receive repo
+# secrets, so the job exits successfully there and relies on the existing
+# Fork PR Gate for human review.
+#
+name: SonarCloud
+
+on:
+  pull_request:
+    branches: ['main']
+  merge_group:
+  push:
+    branches: ['main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  sonarcloud-quality-gate:
+    name: SonarCloud Quality Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Determine whether SonarCloud can run
+        id: gate
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            echo "run_scan=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping SonarCloud for fork PRs because SONAR_TOKEN is not exposed to untrusted forks."
+            exit 0
+          fi
+
+          if [[ -z "${{ secrets.SONAR_TOKEN }}" ]]; then
+            echo "SONAR_TOKEN is required for SonarCloud analysis on internal PRs, merge queue, and main."
+            exit 1
+          fi
+
+          echo "run_scan=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        if: steps.gate.outputs.run_scan == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Run SonarCloud analysis
+        if: steps.gate.outputs.run_scan == 'true'
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9 # v7.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          args: >
+            -Dproject.settings=.sonarcloud.properties
+
+      - name: Enforce SonarCloud quality gate
+        if: steps.gate.outputs.run_scan == 'true'
+        uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+        with:
+          scanMetadataReportFile: .scannerwork/report-task.txt

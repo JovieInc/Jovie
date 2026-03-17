@@ -28,9 +28,11 @@ Recommended required checks for `main`:
 
 - `Fork PR Gate`
 - `PR Ready`
+- `Gitleaks Secret Scanning`
+- `SonarCloud Quality Gate`
 - `Migration Guard`
 
-These are already the active required checks as of March 7, 2026.
+These are the intended active required checks as of March 17, 2026.
 
 Recommended UI settings for the `main` ruleset:
 
@@ -41,6 +43,8 @@ Recommended UI settings for the `main` ruleset:
 5. Confirm `Require status checks to pass` is enabled with only:
    - `Fork PR Gate`
    - `PR Ready`
+   - `Gitleaks Secret Scanning`
+   - `SonarCloud Quality Gate`
    - `Migration Guard`
 6. Confirm `Require branches to be up to date before merging` is enabled.
 7. Confirm `Merge queue` is enabled with:
@@ -103,6 +107,7 @@ The workflow references these repository-level secrets or variables in GitHub Ac
   - `DATABASE_URL_MAIN`
   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
   - `CLERK_SECRET_KEY`
+  - `SONAR_TOKEN`
   - `VERCEL_TOKEN`
   - `VERCEL_ORG_ID`
   - `VERCEL_PROJECT_ID`
@@ -120,7 +125,7 @@ The workflow references these repository-level secrets or variables in GitHub Ac
 ## Operating Model
 
 1. Open an internal PR to `main`.
-2. Wait for `PR Ready` to pass.
+2. Wait for `PR Ready`, `Gitleaks Secret Scanning`, and `SonarCloud Quality Gate` to pass.
 3. Use the automatic `Preview Deploy (PR)` URL for QA.
 4. Merge once preview looks good.
 5. Let `main` deploy immediately to production.

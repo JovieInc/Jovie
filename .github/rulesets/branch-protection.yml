@@ -18,9 +18,11 @@
 #   automated quality gates that already provide stronger coverage:
 #
 #   Pre-merge:  CI fast lane (typecheck + lint + server boundaries + guardrails)
+#               + Gitleaks secret scanning
+#               + SonarCloud quality gate
 #               + scope-judge (LLM alignment check, agent PRs only)
 #               + sensitive-file detection (blocks auto-merge)
-#               + merge queue (re-runs ci-fast against latest main)
+#               + merge queue (re-runs required pre-merge checks against latest main)
 #
 #   Post-merge: build + smoke/E2E + canary health gate + Sentry error gate + auto-rollback
 #
@@ -39,11 +41,12 @@
 #    When agent-remediation pushes a fix, old informational approvals
 #    are dismissed. This keeps the audit trail accurate.
 #
-# 4. Simplified status checks: only PR Ready + Migration Guard
+# 4. Simplified status checks: PR Ready + focused blocking analysis checks
 #    PR Ready aggregates only the fast deterministic lane:
 #    ci-fast (typecheck + lint + server boundaries + guardrails).
-#    Slower checks run post-merge or in nightly/manual lanes, which keeps
-#    PR latency low and avoids "pending" states from optional jobs.
+#    Gitleaks and SonarCloud run separately because they need independent
+#    blocking contexts in branch protection. Slower checks remain post-merge
+#    or nightly/manual to keep PR latency predictable.
 #
 # 5. scope-judge is NOT a required status check here
 #    It only runs on agent branches. If required here, non-agent PRs
@@ -52,8 +55,8 @@
 #
 # 6. merge_queue enabled (lightweight)
 #    PRs enter the merge queue after checks pass. The queue reruns only
-#    ci-fast (merge_group trigger) against latest main to catch integration conflicts.
-#    Slower checks are intentionally kept out of the merge queue.
+#    the required pre-merge checks (ci-fast, gitleaks, SonarCloud) against
+#    latest main to catch integration conflicts. Slower checks stay out of queue.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -101,12 +104,18 @@ rules:
         # PR Ready: The single aggregate gate for the fast PR lane.
         # Internally aggregates:
         #   ci-fast (typecheck + biome lint + eslint boundaries + guardrails)
-        - context: 'CI / PR Ready'
+        - context: 'PR Ready'
+
+        # Gitleaks: Independent blocking secret scan for PRs and merge queue.
+        - context: 'Gitleaks Secret Scanning'
+
+        # SonarCloud: Independent blocking static-analysis quality gate.
+        - context: 'SonarCloud Quality Gate'
 
         # Migration Guard: Separate from PR Ready because it's independently
         # path-gated (only runs when DB/schema files change). Prevents
         # dangerous migration patterns from reaching production.
-        - context: 'CI / Migration Guard'
+        - context: 'Migration Guard'
 
         # Fork PR Gate: Auto-passes for non-fork PRs (agents + team).
         # Blocks fork PRs from external contributors until a human
@@ -132,10 +141,9 @@ rules:
       # 0 = process immediately when min_entries_to_merge is met.
       min_entries_to_merge_wait_minutes: 0
 
-      # Status checks that must pass in the merge queue context.
-      # The CI workflow triggers on merge_group events but only runs
-      # ci-fast (typecheck + lint + boundaries + guardrails).
-      # Slower checks are intentionally kept out of the merge queue.
+      # Status checks that must pass in the merge queue context are the
+      # required contexts above: ci-fast via PR Ready, Gitleaks, SonarCloud,
+      # Migration Guard, and Fork PR Gate.
       check_response_timeout_minutes: 10
 
   # ── Branch Integrity ───────────────────────────────────────────────────

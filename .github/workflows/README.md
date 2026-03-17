@@ -5,7 +5,7 @@
 This repository uses trunk-based development with a single long-lived branch:
 
 - **`main`** → deploys directly to **jov.ie** (production)
-- PRs run only the fast merge gate (typecheck, lint, boundaries, guardrails)
+- PRs must pass the fast merge gate plus blocking Gitleaks and SonarCloud checks
 - Optional heavyweight PR verification is label-gated via `testing`
 - Push to `main` runs post-merge verification (build, smoke, E2E) and then deploys to production
 - Post-deploy: canary health gate + production smoke tests
@@ -41,6 +41,8 @@ Vercel preview deployments for pull requests and feature branches are handled by
 The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 
 - **Fast PR gate** (typecheck, lint, boundaries, guardrails) - runs on all PRs and merge queue, required for merge
+- **Blocking secret scan** (`security.yml` / Gitleaks) - runs on PRs, merge queue, and `main`, required for merge
+- **Blocking SonarCloud quality gate** (`sonarcloud.yml`) - runs on internal PRs, merge queue, and `main`, required for merge
 - **Extended verification** (build, a11y, layout, smoke) - runs only for PRs labeled `testing`
 - **Post-merge verification** (build, smoke, E2E) - runs on pushes to `main` before deploy
 - **Production deploy** - automatic deployment from the `main` branch to jov.ie after post-merge verification passes
@@ -57,6 +59,12 @@ The `auto-merge.yml` workflow handles automatic merging for:
 - Dependabot PRs (patch/minor updates)
 - Codegen PRs
 - PRs with `auto-merge` label (after CI passes)
+
+## Security And Static Analysis
+
+- `security.yml` makes `Gitleaks Secret Scanning` a required pre-merge check.
+- `sonarcloud.yml` makes `SonarCloud Quality Gate` a required pre-merge check.
+- Fork PRs cannot access `SONAR_TOKEN`, so SonarCloud exits cleanly there and the existing `Fork PR Gate` remains the human-review blocker for untrusted contributors.
 
 ## Linear AI Automation
 
