@@ -17,7 +17,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} | Your Entire Music Career. One Intelligent Link.`;
   const description =
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.';
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -139,7 +139,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.',
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -168,7 +168,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'Your entire music career in one intelligent link — smart links, link-in-bio, fan capture, and audience growth for artists.',
+    'Your entire music career in one intelligent link — smart links, link-in-bio, fan notifications, and audience growth for artists.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -206,7 +206,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.',
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',

@@ -148,7 +148,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: 'Jovie Link in Bio',
   description:
-    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
+    'Notify fans automatically and direct every visitor to the right listening destination with one focused profile.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -177,7 +177,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
+    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -215,7 +215,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
+    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -358,7 +358,7 @@ export default async function LaunchPage() {
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
             <span className='text-secondary-token'>
-              Paste one Spotify link. Get smart links, fan capture, and a
+              Paste one Spotify link. Get smart links, fan notifications, and a
               link-in-bio that converts &mdash; all in seconds.
             </span>
           </h2>
@@ -1868,7 +1868,7 @@ export default async function LaunchPage() {
               {[
                 'Static list of links — same for every visitor',
                 'No smart links — manually create each one',
-                'No fan capture — zero emails, zero SMS',
+                'No fan notifications — zero emails, zero SMS',
                 'No AI — write your own bios and press kits',
                 'Linktree branding on your page',
                 'No deeplinks — one link does one thing',
@@ -1898,7 +1898,7 @@ export default async function LaunchPage() {
               {[
                 'Adaptive CTA — subscribe or listen, per visitor',
                 'Smart links auto-created for every release',
-                'Email fan capture built in',
+                'Fan notifications built in',
                 'AI assistant with 10 queries/mo',
                 'Your brand, your domain potential',
                 '/tip, /tour, /contact, /listen deeplinks included',

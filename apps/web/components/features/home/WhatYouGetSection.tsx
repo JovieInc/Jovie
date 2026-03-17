@@ -10,9 +10,9 @@ const features = [
   },
   {
     icon: Mail,
-    title: 'Built-in fan capture',
+    title: 'Built-in fan notifications',
     description:
-      'Capture email and SMS in a clean flow that respects fan attention.',
+      'Fans opt in to get notified — email and SMS in a clean flow that respects their attention.',
     iconColor: '#8b5cf6', // violet
   },
   {

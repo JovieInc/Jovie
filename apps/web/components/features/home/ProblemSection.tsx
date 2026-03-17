@@ -3,14 +3,14 @@ import { Container } from '@/components/site/Container';
 
 const benefits = [
   {
-    title: 'Capture fan contacts on every visit',
+    title: 'Fans opt in on every visit',
     description:
-      'Collect email and SMS with a flow that feels native to your profile, then sync to the tools you already use.',
+      'Email and SMS notifications in a flow that feels native to your profile — fans get notified when you release.',
   },
   {
     title: 'Guide fans to one clear next action',
     description:
-      'Prioritize the right click for the moment: stream the release, join your list, or take the next step you choose.',
+      'Prioritize the right click for the moment: stream the release, get notified, or take the next step you choose.',
   },
   {
     title: 'Improve performance with real signal',
