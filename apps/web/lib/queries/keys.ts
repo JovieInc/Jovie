@@ -200,6 +200,8 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.tourDates.all, 'detail', id] as const,
     connection: (profileId: string) =>
       [...queryKeys.tourDates.all, 'connection', profileId] as const,
+    analytics: (tourDateId: string) =>
+      [...queryKeys.tourDates.all, 'analytics', tourDateId] as const,
   },
 
   // Handle/username availability queries
