@@ -36,6 +36,7 @@ import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedSidebarProps {
@@ -111,7 +112,13 @@ function SettingsNavigation({
   section: string;
 }) {
   const { selectedProfile } = useDashboardData();
-  const artistName = selectedProfile?.displayName?.trim() || undefined;
+  // Prefer the TanStack Query cache (updated by profile mutations) over
+  // the server-rendered context so the sidebar reflects name edits immediately.
+  const { data: cachedProfile } = useDashboardProfileQuery();
+  const artistName =
+    cachedProfile?.displayName?.trim() ||
+    selectedProfile?.displayName?.trim() ||
+    undefined;
 
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {
