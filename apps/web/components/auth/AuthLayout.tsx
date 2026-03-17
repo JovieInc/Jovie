@@ -216,7 +216,7 @@ export function AuthLayout({
 
       {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}
       {showFooterPrompt && !isKeyboardVisible && (
-        <p className='mt-auto pt-8 text-[13px] font-[450] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
+        <p className='mt-auto pt-8 text-[13px] font-[400] text-tertiary-token text-center relative z-10 animate-in fade-in-0 duration-200'>
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}

@@ -50,7 +50,7 @@ export function ProviderCopyButton({
       tone={isCopied ? 'secondary' : 'ghost'}
       size='sm'
       className={cn(
-        'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[450]',
+        'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400]',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
           : 'text-(--linear-text-secondary)'

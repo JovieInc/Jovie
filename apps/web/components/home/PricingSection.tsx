@@ -111,7 +111,7 @@ export function PricingSection() {
                 className='absolute inset-x-0 top-0 h-px'
                 style={{
                   background:
-                    'linear-gradient(90deg, transparent, #5e6ad2 40%, #5e6ad2 60%, transparent)',
+                    'linear-gradient(90deg, transparent, var(--color-accent) 40%, var(--color-accent) 60%, transparent)',
                 }}
               />
               <div className='flex items-center justify-between'>
@@ -170,7 +170,7 @@ export function PricingSection() {
                 href='/signup?plan=founding'
                 className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
                 style={{
-                  backgroundColor: '#5e6ad2',
+                  backgroundColor: 'var(--color-accent)',
                   color: '#ffffff',
                 }}
               >
