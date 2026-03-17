@@ -2,8 +2,8 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import dynamic from 'next/dynamic';
-import { PublicProfileTemplate } from '@/components/profile/templates/PublicProfileTemplate';
-import { buildProfilePublicViewModel } from '@/components/profile/view-models';
+import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate';
+import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import {
   getFadeUpMotionProps,
   getPageWrapperMotionProps,
@@ -14,20 +14,20 @@ import { extractVenmoUsername, findVenmoLink, TIP_AMOUNTS } from './utils';
 
 const AnimatedListenInterface = dynamic(
   () =>
-    import('@/components/profile/animated-listen-interface').then(mod => ({
+    import('@/features/profile/animated-listen-interface').then(mod => ({
       default: mod.AnimatedListenInterface,
     })),
   { ssr: false }
 );
 
 const VenmoTipSelector = dynamic(
-  () => import('@/components/profile/VenmoTipSelector'),
+  () => import('@/features/profile/VenmoTipSelector'),
   { ssr: false }
 );
 
 const ArtistNotificationsCTA = dynamic(
   () =>
-    import('@/components/profile/artist-notifications-cta').then(mod => ({
+    import('@/features/profile/artist-notifications-cta').then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
   {

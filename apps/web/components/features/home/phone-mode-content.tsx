@@ -7,7 +7,7 @@
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                          */

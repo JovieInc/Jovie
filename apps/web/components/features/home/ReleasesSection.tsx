@@ -4,8 +4,8 @@ import { Check, Zap } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import { Container } from '@/components/site/Container';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { PhoneFrame } from './PhoneFrame';
 
 const RELEASES = [

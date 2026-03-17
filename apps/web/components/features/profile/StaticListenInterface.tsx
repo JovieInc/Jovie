@@ -2,12 +2,12 @@
 
 import React, { useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import {
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE,
   COUNTRY_CODE_COOKIE,
   LISTEN_COOKIE,
 } from '@/constants/app';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { track } from '@/lib/analytics';
 import {
   type AvailableDSP,

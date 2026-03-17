@@ -1,8 +1,8 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { ChannelIcon } from '@/components/profile/artist-contacts-button/ContactIcons';
-import { useArtistContacts } from '@/components/profile/artist-contacts-button/useArtistContacts';
+import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
+import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type { PublicContact } from '@/types/contacts';
 
 interface ContactSectionProps {

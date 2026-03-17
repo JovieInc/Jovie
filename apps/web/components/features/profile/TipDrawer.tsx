@@ -4,7 +4,7 @@ import { useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Drawer } from 'vaul';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
+import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
 

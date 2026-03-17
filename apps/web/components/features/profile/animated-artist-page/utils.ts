@@ -1,7 +1,7 @@
 export {
   extractVenmoUsername,
   findVenmoLink,
-} from '@/components/profile/utils/venmo';
+} from '@/features/profile/utils/venmo';
 
 /**
  * Default tip amounts

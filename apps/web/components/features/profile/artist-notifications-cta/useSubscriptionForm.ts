@@ -5,7 +5,7 @@ import { useProfileNotifications } from '@/components/organisms/profile-shell';
 import {
   COUNTRY_OPTIONS,
   type CountryOption,
-} from '@/components/profile/notifications';
+} from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';

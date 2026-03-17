@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
+import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 
 type VenmoTipSelectorProps = {

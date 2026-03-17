@@ -1,3 +1,5 @@
+import { Badge } from '@jovie/ui/atoms/badge';
+import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
@@ -24,9 +26,9 @@ export function PricingSection() {
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
-            <span className='inline-flex items-center gap-1.5 rounded-full border border-[var(--linear-border-subtle)] px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
+            <Badge variant='outline' size='xl'>
               Pricing
-            </span>
+            </Badge>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
               Simple pricing.
             </h2>
@@ -83,17 +85,14 @@ export function PricingSection() {
                 </p>
               </div>
 
-              <Link
-                href='/signup?plan=free'
-                className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
-                style={{
-                  backgroundColor: 'var(--linear-bg-surface-2)',
-                  border: '1px solid var(--linear-border-subtle)',
-                  color: 'var(--linear-text-primary)',
-                }}
+              <Button
+                asChild
+                variant='secondary'
+                size='xl'
+                className='mt-8 w-full'
               >
-                Launch for Free
-              </Link>
+                <Link href='/signup?plan=free'>Launch for Free</Link>
+              </Button>
             </div>
 
             <div
@@ -117,16 +116,9 @@ export function PricingSection() {
                 <p className='text-sm font-medium tracking-[-0.01em] text-[color:var(--linear-text-tertiary)]'>
                   {foundingPlan.displayName}
                 </p>
-                <span
-                  className='rounded-full px-2.5 py-0.5 text-xs font-medium'
-                  style={{
-                    backgroundColor: 'var(--linear-bg-surface-2)',
-                    border: '1px solid var(--linear-border-subtle)',
-                    color: 'var(--linear-text-secondary)',
-                  }}
-                >
+                <Badge variant='default' size='lg'>
                   Limited time
-                </span>
+                </Badge>
               </div>
               <div className='mt-4 flex items-baseline gap-1'>
                 <span className='text-4xl font-semibold tracking-tight text-[color:var(--linear-text-primary)]'>
@@ -165,16 +157,14 @@ export function PricingSection() {
                 </p>
               </div>
 
-              <Link
-                href='/signup?plan=founding'
-                className='mt-8 inline-flex items-center justify-center rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-[var(--linear-duration-normal)]'
-                style={{
-                  backgroundColor: 'var(--linear-pricing-accent)',
-                  color: 'var(--linear-btn-accent-fg)',
-                }}
+              <Button
+                asChild
+                variant='accent'
+                size='xl'
+                className='mt-8 w-full'
               >
-                Choose Founding Member
-              </Link>
+                <Link href='/signup?plan=founding'>Choose Founding Member</Link>
+              </Button>
             </div>
           </div>
         </div>

@@ -5,8 +5,8 @@ import Image from 'next/image';
 import { Suspense } from 'react';
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
 import { Container } from '@/components/site/Container';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { DSP_CONFIGS } from '@/lib/dsp';
 
 /* ------------------------------------------------------------------ */
@@ -15,7 +15,7 @@ import { DSP_CONFIGS } from '@/lib/dsp';
 
 const DemoRealReleasesPanel = dynamic(
   () =>
-    import('@/components/demo/DemoRealReleasesPanel').then(
+    import('@/features/demo/DemoRealReleasesPanel').then(
       m => m.DemoRealReleasesPanel
     ),
   { ssr: false }

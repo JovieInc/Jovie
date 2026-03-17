@@ -1,24 +1,24 @@
 import { Suspense } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { AboutSection } from '@/components/profile/AboutSection';
+import { AboutSection } from '@/features/profile/AboutSection';
 import {
   ArtistNotificationsCTA,
   TwoStepNotificationsCTA,
-} from '@/components/profile/artist-notifications-cta';
-import { ContactSection } from '@/components/profile/ContactSection';
+} from '@/features/profile/artist-notifications-cta';
+import { ContactSection } from '@/features/profile/ContactSection';
 import type {
   ProfileMode,
   ProfilePublicViewModel,
-} from '@/components/profile/contracts';
-import { LatestReleaseCard } from '@/components/profile/LatestReleaseCard';
-import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
-import { StaticListenInterface } from '@/components/profile/StaticListenInterface';
-import { SubscriptionConfirmedBanner } from '@/components/profile/SubscriptionConfirmedBanner';
-import { TourModePanel } from '@/components/profile/TourModePanel';
-import { PublicProfileTemplate } from '@/components/profile/templates/PublicProfileTemplate';
-import { extractVenmoUsername } from '@/components/profile/utils/venmo';
-import VenmoTipSelector from '@/components/profile/VenmoTipSelector';
-import { buildProfilePublicViewModel } from '@/components/profile/view-models';
+} from '@/features/profile/contracts';
+import { LatestReleaseCard } from '@/features/profile/LatestReleaseCard';
+import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
+import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
+import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
+import { TourModePanel } from '@/features/profile/TourModePanel';
+import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate';
+import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
+import { buildProfilePublicViewModel } from '@/features/profile/view-models';
 import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvailableDSP } from '@/lib/dsp';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';

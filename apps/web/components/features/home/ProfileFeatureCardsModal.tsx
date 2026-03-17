@@ -1,7 +1,7 @@
 import {
   ProfileFeatureCardsModalClient,
   type ProfileFeatureCardsModalClientProps,
-} from '@/components/home/ProfileFeatureCardsModalClient';
+} from '@/features/home/ProfileFeatureCardsModalClient';
 
 const FEATURES = [
   {

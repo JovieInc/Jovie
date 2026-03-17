@@ -1,9 +1,9 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { ArtistPageShell } from '@/components/profile/ArtistPageShell';
-import type { ProfilePublicViewModel } from '@/components/profile/contracts';
-import { getProfileModeDefinition } from '@/components/profile/registry';
+import { ArtistPageShell } from '@/features/profile/ArtistPageShell';
+import type { ProfilePublicViewModel } from '@/features/profile/contracts';
+import { getProfileModeDefinition } from '@/features/profile/registry';
 
 interface PublicProfileTemplateProps {
   readonly viewModel: ProfilePublicViewModel;

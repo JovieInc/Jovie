@@ -3,10 +3,10 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { CTAButton } from '@/components/atoms/CTAButton';
+import { CTAButton } from '@/components/molecules/CTAButton';
 import { useProfileNotifications } from '@/components/organisms/profile-shell';
-import { SubscriptionFormSkeleton } from '@/components/profile/artist-notifications-cta/shared';
 import { AUDIENCE_SPOTIFY_PREFERRED_COOKIE } from '@/constants/app';
+import { SubscriptionFormSkeleton } from '@/features/profile/artist-notifications-cta/shared';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import type { AvailableDSP } from '@/lib/dsp';
 import {
@@ -26,7 +26,7 @@ const ctaLoadingFallback = (
 
 const ArtistNotificationsCTA = dynamic(
   () =>
-    import('@/components/profile/artist-notifications-cta').then(mod => ({
+    import('@/features/profile/artist-notifications-cta').then(mod => ({
       default: mod.ArtistNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }
@@ -34,7 +34,7 @@ const ArtistNotificationsCTA = dynamic(
 
 const TwoStepNotificationsCTA = dynamic(
   () =>
-    import('@/components/profile/artist-notifications-cta').then(mod => ({
+    import('@/features/profile/artist-notifications-cta').then(mod => ({
       default: mod.TwoStepNotificationsCTA,
     })),
   { ssr: false, loading: () => ctaLoadingFallback }

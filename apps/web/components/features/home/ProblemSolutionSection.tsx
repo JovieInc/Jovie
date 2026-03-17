@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import { track } from '@/lib/analytics';
 
@@ -53,27 +54,30 @@ export function ProblemSolutionSection() {
 
         {/* Linear-inspired CTA button */}
         <div className='mt-8'>
-          <Link
-            href='/onboarding'
-            onClick={handleClick}
-            className='inline-flex items-center justify-center px-8 py-4 text-base font-semibold bg-btn-primary text-btn-primary-foreground hover:bg-btn-primary/90 rounded-lg transition-all duration-200 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 shadow-sm hover:shadow-md disabled:opacity-50 disabled:pointer-events-none group'
+          <Button
+            asChild
+            variant='primary'
+            size='hero'
+            className='group shadow-sm hover:shadow-md'
           >
-            <span>Request Early Access</span>
-            <svg
-              className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1'
-              fill='none'
-              viewBox='0 0 24 24'
-              stroke='currentColor'
-              strokeWidth={2}
-              aria-hidden='true'
-            >
-              <path
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                d='M13 7l5 5m0 0l-5 5m5-5H6'
-              />
-            </svg>
-          </Link>
+            <Link href='/onboarding' onClick={handleClick}>
+              <span>Request Early Access</span>
+              <svg
+                className='ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1'
+                fill='none'
+                viewBox='0 0 24 24'
+                stroke='currentColor'
+                strokeWidth={2}
+                aria-hidden='true'
+              >
+                <path
+                  strokeLinecap='round'
+                  strokeLinejoin='round'
+                  d='M13 7l5 5m0 0l-5 5m5-5H6'
+                />
+              </svg>
+            </Link>
+          </Button>
           <p className='mt-3 text-sm text-tertiary-token'>
             Go live in 60 seconds
           </p>

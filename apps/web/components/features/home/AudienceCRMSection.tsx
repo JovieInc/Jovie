@@ -5,7 +5,7 @@ import { lazy, Suspense } from 'react';
 import { Container } from '@/components/site/Container';
 
 const DemoAudienceSection = lazy(
-  () => import('@/components/demo/DemoAudienceSection')
+  () => import('@/features/demo/DemoAudienceSection')
 );
 
 /* ------------------------------------------------------------------ */

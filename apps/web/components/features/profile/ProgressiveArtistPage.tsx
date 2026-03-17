@@ -3,15 +3,15 @@
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import type { ProfileMode } from '@/components/profile/contracts';
-import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
+import type { ProfileMode } from '@/features/profile/contracts';
+import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
 
 // Lazy load the animated version
 const AnimatedArtistPage = dynamic(
   () =>
-    import('@/components/profile/animated-artist-page').then(mod => ({
+    import('@/features/profile/animated-artist-page').then(mod => ({
       default: mod.AnimatedArtistPage,
     })),
   {

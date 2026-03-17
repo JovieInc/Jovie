@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'motion/react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { containerVariants, itemVariants } from './animation-variants';
 import type { AnimatedListenInterfaceProps } from './types';
 import { useAnimatedListenInterface } from './useAnimatedListenInterface';

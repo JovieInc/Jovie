@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui/atoms/button';
 import { ArrowRight, MessagesSquare, Sparkles, Target } from 'lucide-react';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
@@ -38,13 +39,17 @@ export function EngagementEngineLanding() {
             </p>
 
             <div className='mt-10 flex flex-col items-center gap-3'>
-              <Link
-                href='/signup'
-                className='group inline-flex items-center justify-center gap-2 h-14 px-10 rounded-md bg-btn-primary text-btn-primary-foreground text-base font-medium transition-all duration-300 hover:scale-[1.02] hover:shadow-lg focus-ring-themed'
+              <Button
+                asChild
+                variant='primary'
+                size='hero'
+                className='group hover:scale-[1.02] hover:shadow-lg'
               >
-                Get started free
-                <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
-              </Link>
+                <Link href='/signup'>
+                  Get started free
+                  <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
+                </Link>
+              </Button>
               <Link
                 href='#system'
                 className='text-xs text-secondary-token hover:text-primary-token transition-colors'

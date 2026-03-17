@@ -1,5 +1,5 @@
 import type { Variants } from 'motion/react';
-import type { ProfileMode } from '@/components/profile/contracts';
+import type { ProfileMode } from '@/features/profile/contracts';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 

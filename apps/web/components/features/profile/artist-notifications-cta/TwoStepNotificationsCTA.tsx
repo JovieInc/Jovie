@@ -14,7 +14,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   type CountryOption,
   CountrySelector,
-} from '@/components/profile/notifications';
+} from '@/features/profile/notifications';
 import { useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
