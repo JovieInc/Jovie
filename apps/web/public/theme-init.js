@@ -3,7 +3,11 @@
     var root = document.documentElement;
     var pathname = globalThis.location?.pathname ?? '/';
     var isThemeEnabledRoute =
-      pathname.startsWith('/app') || pathname.startsWith('/onboarding');
+      pathname.startsWith('/app') ||
+      pathname.startsWith('/onboarding') ||
+      pathname.startsWith('/signin') ||
+      pathname.startsWith('/signup') ||
+      pathname.startsWith('/waitlist');
 
     if (isThemeEnabledRoute) {
       var storageValue =

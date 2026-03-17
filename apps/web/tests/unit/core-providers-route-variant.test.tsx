@@ -23,15 +23,17 @@ describe('getCoreProviderVariant', () => {
 });
 
 describe('isThemeEnabledRoute', () => {
-  it('enables theme preference for app and onboarding routes', () => {
+  it('enables theme preference for app, onboarding, auth, and waitlist routes', () => {
     expect(isThemeEnabledRoute('/app/dashboard')).toBe(true);
     expect(isThemeEnabledRoute('/onboarding/step-1')).toBe(true);
+    expect(isThemeEnabledRoute('/signin')).toBe(true);
+    expect(isThemeEnabledRoute('/signup')).toBe(true);
+    expect(isThemeEnabledRoute('/waitlist')).toBe(true);
   });
 
-  it('keeps public and auth surfaces dark', () => {
+  it('keeps marketing surfaces dark', () => {
     expect(isThemeEnabledRoute('/')).toBe(false);
-    expect(isThemeEnabledRoute('/signin')).toBe(false);
-    expect(isThemeEnabledRoute('/waitlist')).toBe(false);
     expect(isThemeEnabledRoute('/artistname')).toBe(false);
+    expect(isThemeEnabledRoute('/pricing')).toBe(false);
   });
 });
