@@ -113,7 +113,7 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
-              Turn listeners into contacts you own.
+              Know every fan by name.
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>

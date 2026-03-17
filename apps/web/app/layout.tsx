@@ -328,13 +328,6 @@ export default async function RootLayout({
     <html lang='en' className='dark' suppressHydrationWarning>
       {headContent}
       <body className={bodyClassName}>
-        {/* Skip to main content link for keyboard accessibility (WCAG 2.4.1) */}
-        <a
-          href='#main-content'
-          className='sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:rounded-md focus:bg-surface-1 focus:px-4 focus:py-2 focus:text-sm focus:text-primary-token focus:shadow-lg focus:ring-2 focus:ring-accent'
-        >
-          Skip to content
-        </a>
         <CoreProviders>
           {children}
           {DevToolbar && (

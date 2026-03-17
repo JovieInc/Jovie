@@ -16,9 +16,9 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
+  const title = `${APP_NAME} | Your Entire Music Career. One Intelligent Link.`;
   const description =
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.';
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -84,7 +84,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The link in bio that converts`,
+          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           type: 'image/png',
         },
       ],
@@ -96,7 +96,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The link in bio that converts`,
+          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           width: 1200,
           height: 630,
         },
@@ -140,7 +140,7 @@ const WEBSITE_SCHEMA = jsonLd({
   name: APP_NAME,
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.',
   url: APP_URL,
   inLanguage: 'en-US',
   potentialAction: {
@@ -169,7 +169,7 @@ const SOFTWARE_SCHEMA = jsonLd({
   '@type': 'SoftwareApplication',
   name: APP_NAME,
   description:
-    'A conversion-first profile platform for artists to grow their audience and drive clear next actions.',
+    'Your entire music career in one intelligent link — smart links, link-in-bio, fan capture, and audience growth for artists.',
   url: APP_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -207,7 +207,7 @@ const ORGANIZATION_SCHEMA = jsonLd({
   },
   image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that turns listeners into fans you actually own.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
   contactPoint: {
     '@type': 'ContactPoint',

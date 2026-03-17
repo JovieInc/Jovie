@@ -9,7 +9,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Upgraded homepage hero H1 to "Your entire music career. One intelligent link."
+- Updated homepage meta title, description, OG tags, and JSON-LD to match new positioning
+- Changed final CTA headline to "Your music deserves better than a list of links."
+- Changed Audience CRM section heading to "Know every fan by name."
+
 - Auth (`/signin`, `/signup`), waitlist, and onboarding pages now respect user theme preference instead of being forced dark — only marketing pages remain dark-only
+
+- Consolidated action menus across Admin Users, Admin Creator Profiles, and Contacts tables so right-click context menu, ellipsis menu, and drawer right-click menu all show the same actions
+- Migrated Admin User detail drawer from raw `RightDrawer` to `EntitySidebarShell` for consistency with other entity drawers
+- Extracted `buildAdminUserActions()` builder from inline context menu logic for reuse across table and drawer
 
 ### Added
 
@@ -42,6 +51,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fixed leads table query failures (JOVIE-WEB-E0/EJ/E3, 385 events) — Drizzle error wrapping hid "column does not exist" messages from fallback detection in admin leads and outreach routes
 - Fixed `SET LOCAL statement_timeout` being a no-op with Neon HTTP driver (JOVIE-WEB-EX/EV) — replaced with `SET` in dashboard earnings and tipping stats queries
 - Fixed profile view endpoint returning 500 on non-critical view counter failures (JOVIE-WEB-DZ, 24 events) — now logs to Sentry and returns 200
+
+### Removed
+
+- Deleted unused `UserActionsMenu.tsx` component (dead code, zero imports)
 
 ## [26.2.0] - 2026-02-12
 

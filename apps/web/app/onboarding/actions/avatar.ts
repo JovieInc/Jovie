@@ -238,6 +238,14 @@ function onFetchError(
     return null;
   }
 
+  if (err.message.includes('Avatar image host is not allowed')) {
+    Sentry.captureMessage('Avatar upload: host not in allowlist', {
+      level: 'warning',
+      extra: { errorMessage: err.message },
+    });
+    return null;
+  }
+
   if (attempt < maxRetries - 1) {
     Sentry.addBreadcrumb({
       category: 'avatar',
