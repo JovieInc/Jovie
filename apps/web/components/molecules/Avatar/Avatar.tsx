@@ -36,8 +36,6 @@ export interface AvatarProps {
   readonly priority?: boolean;
   /** Image quality */
   readonly quality?: number;
-  /** Fallback image URL */
-  readonly fallbackSrc?: string;
   /** Custom className */
   readonly className?: string;
   /** Custom styling */
@@ -144,7 +142,6 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     priority = false,
     quality = 85,
 
-    fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
     className,
     style,
   },
