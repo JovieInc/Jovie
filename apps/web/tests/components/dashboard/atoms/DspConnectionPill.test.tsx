@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { DspConnectionPill } from '@/components/dashboard/atoms/DspConnectionPill';
+import { DspConnectionPill } from '@/features/dashboard/atoms/DspConnectionPill';
 
-vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
+vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   DspProviderIcon: ({ provider }: { provider: string }) => (
     <span data-testid={`provider-icon-${provider}`} />
   ),

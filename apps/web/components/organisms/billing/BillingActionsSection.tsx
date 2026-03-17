@@ -114,7 +114,7 @@ export function BillingActionsSection({
                         </span>
                       </li>
                     </ul>
-                    <p className='text-(--linear-text-secondary)'>
+                    <p className='text-secondary-token'>
                       This takes effect immediately. You can re-subscribe at any
                       time.
                     </p>

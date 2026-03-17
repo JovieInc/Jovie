@@ -16,7 +16,7 @@ export default function CampaignsLoading() {
             titleWidth='w-40'
             descriptionWidth='w-48'
             actionWidths={['w-36']}
-            className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-6'
+            className='rounded-xl border border-subtle bg-(--linear-app-content-surface) px-6'
           />
 
           <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>

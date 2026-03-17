@@ -7,7 +7,7 @@ import {
   getProfileModeSubtitle,
   isProfileMode,
   profileModes,
-} from '@/components/profile/registry';
+} from '@/features/profile/registry';
 
 describe('profile registry', () => {
   it('exposes the full current mode set', () => {

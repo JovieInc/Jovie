@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsAdPixelsSection } from '@/components/dashboard/organisms/SettingsAdPixelsSection';
+import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock @jovie/ui with lightweight stubs instead of vi.importActual (which OOMs)

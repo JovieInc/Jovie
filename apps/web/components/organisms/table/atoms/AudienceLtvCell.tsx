@@ -17,8 +17,8 @@ export interface AudienceLtvCellProps {
 }
 
 const TIER_STYLES = {
-  none: 'text-(--linear-text-tertiary)',
-  low: 'text-(--linear-text-secondary)',
+  none: 'text-tertiary-token',
+  low: 'text-secondary-token',
   medium: 'text-amber-600 dark:text-amber-400 font-[510]',
   high: 'text-emerald-600 dark:text-emerald-400 font-[590]',
 } as const;
@@ -39,36 +39,34 @@ function LtvTooltipContent({
 }) {
   return (
     <div className='flex min-w-56 flex-col gap-1.5 text-[12px]'>
-      <div className='flex items-center justify-between gap-4 border-b border-(--linear-border-subtle) pb-1.5'>
-        <span className='font-[510] text-(--linear-text-primary)'>
-          Lifetime Value
-        </span>
-        <span className='font-[510] text-(--linear-text-primary)'>
+      <div className='flex items-center justify-between gap-4 border-b border-subtle pb-1.5'>
+        <span className='font-[510] text-primary-token'>Lifetime Value</span>
+        <span className='font-[510] text-primary-token'>
           {formatDollars(breakdown.totalValueCents)}
         </span>
       </div>
       <div className='flex justify-between gap-4'>
-        <span className='text-(--linear-text-tertiary)'>Streaming clicks</span>
-        <span className='text-(--linear-text-secondary)'>
+        <span className='text-tertiary-token'>Streaming clicks</span>
+        <span className='text-secondary-token'>
           {breakdown.streamingClicks} ·{' '}
           {formatDollars(breakdown.streamingValueCents)}
         </span>
       </div>
       <div className='flex justify-between gap-4'>
-        <span className='text-(--linear-text-tertiary)'>Tips</span>
-        <span className='text-(--linear-text-secondary)'>
+        <span className='text-tertiary-token'>Tips</span>
+        <span className='text-secondary-token'>
           {breakdown.tipCount} · {formatDollars(breakdown.tipClickValueCents)}
         </span>
       </div>
       <div className='flex justify-between gap-4'>
-        <span className='text-(--linear-text-tertiary)'>Merch sales</span>
-        <span className='text-(--linear-text-secondary)'>
+        <span className='text-tertiary-token'>Merch sales</span>
+        <span className='text-secondary-token'>
           {formatDollars(breakdown.merchSalesCents)}
         </span>
       </div>
       <div className='flex justify-between gap-4'>
-        <span className='text-(--linear-text-tertiary)'>Ticket sales</span>
-        <span className='text-(--linear-text-secondary)'>
+        <span className='text-tertiary-token'>Ticket sales</span>
+        <span className='text-secondary-token'>
           {formatDollars(breakdown.ticketSalesCents)}
         </span>
       </div>

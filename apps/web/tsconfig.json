@@ -27,6 +27,7 @@
       "@/atoms/*": ["./components/atoms/*"],
       "@/molecules/*": ["./components/molecules/*"],
       "@/organisms/*": ["./components/organisms/*"],
+      "@/features/*": ["./components/features/*"],
       "@/app/*": ["./app/*", "./app/app/*"],
       "@/lib/*": ["./lib/*"],
       "@/types/*": ["./types/*"],

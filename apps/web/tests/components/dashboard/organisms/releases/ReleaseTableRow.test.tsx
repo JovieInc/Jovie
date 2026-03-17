@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ReleaseTableRow } from '@/components/dashboard/organisms/releases/ReleaseTableRow';
+import { ReleaseTableRow } from '@/features/dashboard/organisms/releases/ReleaseTableRow';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/components/atoms/ReleaseArtworkThumb', () => ({
@@ -12,7 +12,7 @@ vi.mock('@/components/molecules/ConfirmDialog', () => ({
   ConfirmDialog: () => null,
 }));
 
-vi.mock('@/components/dashboard/organisms/releases/components', () => ({
+vi.mock('@/features/dashboard/organisms/releases/components', () => ({
   AddProviderUrlPopover: ({ children }: { children: ReactNode }) => (
     <>{children}</>
   ),

@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
+import { DashboardOverview } from '@/features/dashboard/organisms/DashboardOverview';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import { getDashboardData } from './actions';
 

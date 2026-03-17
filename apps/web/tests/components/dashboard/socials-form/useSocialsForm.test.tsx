@@ -42,7 +42,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
   }),
 }));
 
-import { useSocialsForm } from '@/components/dashboard/organisms/socials-form/useSocialsForm';
+import { useSocialsForm } from '@/features/dashboard/organisms/socials-form/useSocialsForm';
 
 describe('useSocialsForm - verification', () => {
   let queryClient: QueryClient;

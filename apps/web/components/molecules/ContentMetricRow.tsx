@@ -23,29 +23,26 @@ export function ContentMetricRow({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5',
+        'flex items-center justify-between gap-3 rounded-[10px] border border-subtle bg-surface-0 px-3 py-2.5',
         className
       )}
     >
       <div
         className={cn(
-          'flex min-w-0 items-center gap-2 text-[13px] font-[510] text-(--linear-text-primary)',
+          'flex min-w-0 items-center gap-2 text-[13px] font-[510] text-primary-token',
           labelClassName
         )}
       >
         {Icon ? (
           <Icon
-            className={cn(
-              'size-4 shrink-0 text-(--linear-text-tertiary)',
-              iconClassName
-            )}
+            className={cn('size-4 shrink-0 text-tertiary-token', iconClassName)}
           />
         ) : null}
         <span className='truncate'>{label}</span>
       </div>
       <span
         className={cn(
-          'shrink-0 text-[13px] font-[590] text-(--linear-text-primary) tabular-nums',
+          'shrink-0 text-[13px] font-[590] text-primary-token tabular-nums',
           valueClassName
         )}
       >

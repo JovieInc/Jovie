@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 // --- Mock all child components ---
-vi.mock('@/components/profile/ArtistPageShell', () => ({
+vi.mock('@/features/profile/ArtistPageShell', () => ({
   ArtistPageShell: ({
     children,
     ...props
@@ -26,27 +26,27 @@ vi.mock('@/components/profile/ArtistPageShell', () => ({
     ),
 }));
 
-vi.mock('@/components/profile/artist-notifications-cta', () => ({
+vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ArtistNotificationsCTA: (props: Record<string, unknown>) =>
     React.createElement('div', { 'data-testid': 'notifications-cta' }),
 }));
 
-vi.mock('@/components/profile/LatestReleaseCard', () => ({
+vi.mock('@/features/profile/LatestReleaseCard', () => ({
   LatestReleaseCard: (props: Record<string, unknown>) =>
     React.createElement('div', { 'data-testid': 'latest-release-card' }),
 }));
 
-vi.mock('@/components/profile/ProfilePrimaryCTA', () => ({
+vi.mock('@/features/profile/ProfilePrimaryCTA', () => ({
   ProfilePrimaryCTA: (props: Record<string, unknown>) =>
     React.createElement('div', { 'data-testid': 'profile-primary-cta' }),
 }));
 
-vi.mock('@/components/profile/StaticListenInterface', () => ({
+vi.mock('@/features/profile/StaticListenInterface', () => ({
   StaticListenInterface: (props: Record<string, unknown>) =>
     React.createElement('div', { 'data-testid': 'listen-interface' }),
 }));
 
-vi.mock('@/components/profile/VenmoTipSelector', () => ({
+vi.mock('@/features/profile/VenmoTipSelector', () => ({
   default: (props: Record<string, unknown>) =>
     React.createElement('div', { 'data-testid': 'venmo-tip-selector' }),
 }));
@@ -82,7 +82,7 @@ vi.mock('@/hooks/useUserLocation', () => ({
 // exhausts the 5 s testTimeout during the cold-start of the module tree
 // (TourModePanel → vaul Drawer, etc.).
 const { StaticArtistPage } = await import(
-  '@/components/profile/StaticArtistPage'
+  '@/features/profile/StaticArtistPage'
 );
 
 const mockArtist: Artist = {

@@ -1,0 +1,23 @@
+'use client';
+
+import { TooltipShortcut } from '@jovie/ui';
+import { PanelRight, PanelRightOpen } from 'lucide-react';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+
+export function PreviewToggleButton() {
+  const { isOpen, toggle } = usePreviewPanelState();
+  const label = isOpen ? 'Hide preview' : 'Show preview';
+  const Icon = isOpen ? PanelRightOpen : PanelRight;
+
+  return (
+    <TooltipShortcut label={label} shortcut='Space' side='bottom'>
+      <DashboardHeaderActionButton
+        ariaLabel={label}
+        pressed={isOpen}
+        onClick={toggle}
+        icon={<Icon className='h-3.5 w-3.5' aria-hidden='true' />}
+      />
+    </TooltipShortcut>
+  );
+}

@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
-
-import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getDashboardData } from '../../dashboard/actions';
 

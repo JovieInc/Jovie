@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
+import { ReliabilityCard } from '@/features/admin/ReliabilityCard';
 
 describe('ReliabilityCard', () => {
   it('shows Healthy status when there are no incidents and minimal errors', () => {

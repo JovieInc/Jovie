@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { AppSearchField } from '@/components/molecules/AppSearchField';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { cn } from '@/lib/utils';
 
 interface HiddenInput {
@@ -126,7 +126,7 @@ export function HeaderSearchAction({
           asChild
           ariaLabel='Clear search'
           tooltipLabel='Clear search'
-          className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
         >
           <Link href={clearHref}>
             <X className='h-4 w-4' />
@@ -137,7 +137,7 @@ export function HeaderSearchAction({
           type='button'
           ariaLabel={`Close ${tooltipLabel.toLowerCase()}`}
           tooltipLabel='Close search'
-          className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
           onClick={close}
         >
           <X className='h-4 w-4' />

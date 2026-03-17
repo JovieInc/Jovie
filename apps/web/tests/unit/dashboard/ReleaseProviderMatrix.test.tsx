@@ -125,7 +125,7 @@ vi.mock('@/lib/queries', () => ({
 
 // Mock heavy children
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable',
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
     ReleaseTable: ({ releases }: { releases: Array<{ id: string }> }) => (
       <div data-testid='release-table'>
@@ -136,7 +136,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
     ReleaseTableSubheader: (props: {
       onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
@@ -153,7 +153,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleasesEmptyState',
+  '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState',
   () => ({
     ReleasesEmptyState: () => (
       <div data-testid='releases-empty-state'>empty</div>
@@ -162,28 +162,28 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
+  '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
     SpotifyConnectDialog: () => null,
   })
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
+  '@/features/dashboard/organisms/release-provider-matrix/AppleMusicSyncBanner',
   () => ({
     AppleMusicSyncBanner: () => null,
   })
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner',
+  '@/features/dashboard/organisms/release-provider-matrix/SmartLinkGateBanner',
   () => ({
     SmartLinkGateBanner: () => null,
   })
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
+  '@/features/dashboard/organisms/release-provider-matrix/ImportProgressBanner',
   () => ({
     ImportProgressBanner: ({ visible = true }: { visible?: boolean }) => (
       <div
@@ -199,7 +199,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/hooks/useReleaseTablePreferences',
+  '@/features/dashboard/organisms/release-provider-matrix/hooks/useReleaseTablePreferences',
   () => ({
     useReleaseTablePreferences: () => ({
       columnVisibility: {},
@@ -214,7 +214,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/hooks/useReleaseFilterCounts',
+  '@/features/dashboard/organisms/release-provider-matrix/hooks/useReleaseFilterCounts',
   () => ({
     getPopularityLevel: () => null,
   })
@@ -245,7 +245,7 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
 
 // ── Import after mocks ──
 const { ReleaseProviderMatrix } = await import(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
 );
 
 interface ProviderConfigEntry {

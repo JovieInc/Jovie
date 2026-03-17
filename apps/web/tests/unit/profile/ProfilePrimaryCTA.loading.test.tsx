@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ProfilePrimaryCTA } from '@/components/profile/ProfilePrimaryCTA';
+import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import type { Artist, LegacySocialLink } from '@/types/db';
 
 vi.mock('next/dynamic', () => ({

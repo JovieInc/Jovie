@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ProfilePhotoContextMenu } from '@/components/profile/ProfilePhotoContextMenu';
+import { ProfilePhotoContextMenu } from '@/features/profile/ProfilePhotoContextMenu';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 
 const mockTrack = vi.fn();

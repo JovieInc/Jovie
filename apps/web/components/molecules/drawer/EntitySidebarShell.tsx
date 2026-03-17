@@ -99,7 +99,7 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='sticky top-0 z-20 shrink-0 border-b border-(--linear-border-subtle) bg-(--linear-bg-app)/96 backdrop-blur supports-[backdrop-filter]:bg-(--linear-bg-app)/88'>
+        <div className='sticky top-0 z-20 shrink-0 border-b border-subtle bg-(--linear-bg-app)/96 backdrop-blur supports-[backdrop-filter]:bg-(--linear-bg-app)/88'>
           {/* Header bar — close is in the overflow dropdown */}
           <DrawerHeader
             title={title}
@@ -126,7 +126,7 @@ export function EntitySidebarShell({
           {tabs && (
             <div
               className={[
-                'overflow-visible border-t border-(--linear-border-subtle) px-[18px] py-2 [&>*]:w-full',
+                'overflow-visible border-t border-subtle px-[18px] py-2 [&>*]:w-full',
                 tabsContainerClassName,
               ]
                 .filter(Boolean)
@@ -151,7 +151,7 @@ export function EntitySidebarShell({
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-(--linear-border-subtle) bg-(--linear-bg-app) px-[18px] py-3'>
+              <div className='shrink-0 border-t border-subtle bg-(--linear-bg-app) px-[18px] py-3'>
                 {footer}
               </div>
             )}

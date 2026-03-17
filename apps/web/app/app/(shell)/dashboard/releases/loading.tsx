@@ -65,7 +65,7 @@ export function ReleaseTableSkeleton() {
       <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
         <table className='w-full border-collapse'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'>
-            <tr className='border-b border-(--linear-border-subtle)'>
+            <tr className='border-b border-subtle'>
               <th className='w-14 px-4 py-3'>
                 <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />
               </th>
@@ -89,10 +89,7 @@ export function ReleaseTableSkeleton() {
           </thead>
           <tbody>
             {RELEASES_LOADING_ROW_KEYS.map(rowKey => (
-              <tr
-                key={rowKey}
-                className='border-b border-(--linear-border-subtle)'
-              >
+              <tr key={rowKey} className='border-b border-subtle'>
                 <td className='px-4 py-3'>
                   <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />
                 </td>
@@ -136,7 +133,7 @@ export function ReleaseTableSkeleton() {
       </div>
 
       {/* Footer */}
-      <div className='shrink-0 flex items-center justify-between border-t border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-3'>
+      <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-(--linear-app-content-surface) px-4 py-3'>
         <LoadingSkeleton height='h-4' width='w-24' />
         <div className='flex items-center gap-3'>
           <LoadingSkeleton

@@ -24,7 +24,7 @@ export function ContentMetricStat({
     <div className={cn('min-w-0 space-y-1', className)}>
       <p
         className={cn(
-          'truncate text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)',
+          'truncate text-[11px] font-[510] tracking-[0.04em] text-tertiary-token',
           labelClassName
         )}
       >
@@ -32,7 +32,7 @@ export function ContentMetricStat({
       </p>
       <p
         className={cn(
-          'text-[28px] font-[620] leading-none tracking-[-0.03em] text-(--linear-text-primary) tabular-nums',
+          'text-[28px] font-[620] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
           valueClassName
         )}
       >
@@ -41,7 +41,7 @@ export function ContentMetricStat({
       {subtitle ? (
         <p
           className={cn(
-            'text-[12px] leading-[17px] text-(--linear-text-secondary)',
+            'text-[12px] leading-[17px] text-secondary-token',
             subtitleClassName
           )}
         >

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getTourPersonalization } from '@/components/home/phone-mode-content';
+import { getTourPersonalization } from '@/features/home/phone-mode-content';
 
 describe('getTourPersonalization', () => {
   it('falls back to Los Angeles when city is unknown', () => {

@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
-
-import { DashboardSettings } from '@/components/dashboard/DashboardSettings';
-import { PreviewDataHydrator } from '@/components/dashboard/organisms/PreviewDataHydrator';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
+import { PreviewDataHydrator } from '@/features/dashboard/organisms/PreviewDataHydrator';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import {

@@ -233,7 +233,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'>
+              <SelectTrigger className='h-8 w-full rounded-[8px] border-subtle bg-surface-0 text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -263,7 +263,7 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
-              className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-[12px]'
+              className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormGridRow>
           <div className='flex justify-end gap-2 pt-1'>

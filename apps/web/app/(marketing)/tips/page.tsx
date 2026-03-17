@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { TipsLanding } from '@/components/tips/TipsLanding';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { TipsLanding } from '@/features/tips/TipsLanding';
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Turn Every Tip Into a Fan`;

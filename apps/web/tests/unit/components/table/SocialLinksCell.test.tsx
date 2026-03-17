@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SocialLinksCell } from '@/components/organisms/table/molecules/SocialLinksCell';
+import { SocialLinksCell } from '@/components/organisms/table';
 
 describe('SocialLinksCell', () => {
   it('shows icon rail summary count for social links', () => {

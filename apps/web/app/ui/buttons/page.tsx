@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { Archive, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
-import { TableIconButton } from '@/components/organisms/table/atoms/TableIconButton';
+import { TableIconButton } from '@/components/organisms/table';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function Section({
   title,
@@ -14,7 +14,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-3'>{children}</div>
@@ -23,11 +23,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <span className='text-[11px] text-(--linear-text-tertiary)'>
-      {children}
-    </span>
-  );
+  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
 }
 
 function Row({ children }: { readonly children: React.ReactNode }) {
@@ -52,10 +48,8 @@ function Stack({
 export default function ButtonsPage() {
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
-        Button
-      </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>Button</h1>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app — font weight 510, tracking -0.011em, 8px radius,
         32px default height
       </p>

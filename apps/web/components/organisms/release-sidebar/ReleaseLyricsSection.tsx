@@ -187,7 +187,7 @@ export function ReleaseLyricsSection({
         />
         {/* Auto-save status indicator */}
         {saveStatus !== 'idle' && (
-          <div className='flex items-center gap-1 text-2xs text-(--linear-text-tertiary)'>
+          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
             {saveStatus === 'saving' && (
               <>
                 <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
@@ -221,7 +221,7 @@ export function ReleaseLyricsSection({
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) shadow-none'>
+          <div className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-1 shadow-none'>
             {/* Primary format action — uses the most recently selected format */}
             <DrawerButton
               type='button'
@@ -267,7 +267,7 @@ export function ReleaseLyricsSection({
                   </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />
-                <div className='px-2 py-1.5 text-2xs text-(--linear-text-tertiary)'>
+                <div className='px-2 py-1.5 text-2xs text-tertiary-token'>
                   Formats lyrics for the selected platform
                 </div>
               </DropdownMenuContent>

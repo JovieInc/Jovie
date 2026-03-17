@@ -3,18 +3,18 @@ import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { ClaimBanner } from '@/components/profile/ClaimBanner';
-import type { ProfileMode } from '@/components/profile/contracts';
-import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
-import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
+import { BASE_URL } from '@/constants/app';
+import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { ClaimBanner } from '@/features/profile/ClaimBanner';
+import type { ProfileMode } from '@/features/profile/contracts';
+import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import {
   getProfileMode,
   getProfileModeSubtitle,
-} from '@/components/profile/registry';
-import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { JoviePixel } from '@/components/tracking';
-import { BASE_URL } from '@/constants/app';
+} from '@/features/profile/registry';
+import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
+import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types

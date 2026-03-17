@@ -1,8 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { ContactDetailSidebar } from '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar';
+import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { ContactDetailSidebar } from '@/features/dashboard/organisms/contacts-table/ContactDetailSidebar';
 
 vi.mock('@/components/molecules/drawer', async importOriginal => {
   const actual =

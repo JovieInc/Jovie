@@ -39,7 +39,7 @@ vi.mock('@/components/atoms/SocialIcon', () => {
 });
 
 // Import after mocks
-import { SortableLinkItem } from '@/components/dashboard/organisms/links/SortableLinkItem';
+import { SortableLinkItem } from '@/features/dashboard/organisms/links/SortableLinkItem';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 
 /**

@@ -12,7 +12,7 @@ vi.mock('@/lib/analytics', () => ({
 import {
   IngestedSuggestions,
   type SuggestedLink,
-} from '@/components/dashboard/organisms/links/IngestedSuggestions';
+} from '@/features/dashboard/organisms/links/IngestedSuggestions';
 import { track } from '@/lib/analytics';
 import {
   createMockCallbacks,

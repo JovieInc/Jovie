@@ -28,7 +28,7 @@ vi.mock('@/lib/nuqs/hooks', () => ({
 
 const runDemoAction = vi.fn(() => Promise.resolve());
 
-vi.mock('@/components/demo/demo-actions', () => ({
+vi.mock('@/features/demo/demo-actions', () => ({
   runDemoAction,
 }));
 
@@ -138,7 +138,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 }));
 
 const { DemoReleasesExperience } = await import(
-  '@/components/demo/DemoReleasesExperience'
+  '@/features/demo/DemoReleasesExperience'
 );
 
 function renderDemo() {

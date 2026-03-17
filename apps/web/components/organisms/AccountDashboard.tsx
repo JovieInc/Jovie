@@ -13,10 +13,10 @@ export function AccountDashboard() {
     <div className='space-y-6'>
       {/* Header */}
       <div>
-        <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-(--linear-text-primary)'>
+        <h1 className='text-[24px] font-[620] tracking-[-0.03em] text-primary-token'>
           Account Settings
         </h1>
-        <p className='mt-2 text-[13px] text-(--linear-text-secondary)'>
+        <p className='mt-2 text-[13px] text-secondary-token'>
           Manage your account preferences and settings
         </p>
       </div>
@@ -30,10 +30,10 @@ export function AccountDashboard() {
               <CreditCard className='h-7 w-7 text-[var(--accent-analytics)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
+              <h3 className='text-[15px] font-[560] text-primary-token'>
                 Billing & Subscription
               </h3>
-              <p className='text-[13px] text-(--linear-text-secondary)'>
+              <p className='text-[13px] text-secondary-token'>
                 Manage your subscription and payment methods
               </p>
             </div>
@@ -52,10 +52,10 @@ export function AccountDashboard() {
               <User className='h-7 w-7 text-[var(--accent-speed)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
+              <h3 className='text-[15px] font-[560] text-primary-token'>
                 Creator Profile
               </h3>
-              <p className='text-[13px] text-(--linear-text-secondary)'>
+              <p className='text-[13px] text-secondary-token'>
                 Update your public profile and links
               </p>
             </div>
@@ -76,10 +76,10 @@ export function AccountDashboard() {
               <Settings className='h-7 w-7 text-[var(--accent-conv)]' />
             </div>
             <div className='ml-4'>
-              <h3 className='text-[15px] font-[560] text-(--linear-text-primary)'>
+              <h3 className='text-[15px] font-[560] text-primary-token'>
                 General Settings
               </h3>
-              <p className='text-[13px] text-(--linear-text-secondary)'>
+              <p className='text-[13px] text-secondary-token'>
                 Configure app preferences and notifications
               </p>
             </div>
@@ -101,18 +101,18 @@ export function AccountDashboard() {
         />
         <div className='space-y-4 px-5 py-4'>
           <div>
-            <h4 className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            <h4 className='text-[13px] font-[510] text-primary-token'>
               Account Status
             </h4>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+            <p className='text-[13px] text-secondary-token'>
               Your account is active and in good standing
             </p>
           </div>
           <div>
-            <h4 className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            <h4 className='text-[13px] font-[510] text-primary-token'>
               Data & Privacy
             </h4>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+            <p className='text-[13px] text-secondary-token'>
               We protect your data according to our privacy policy
             </p>
           </div>

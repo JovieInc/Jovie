@@ -3,8 +3,8 @@
  */
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SuggestedLink } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
-import { useSuggestions } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
+import type { SuggestedLink } from '@/features/dashboard/organisms/links/hooks/useSuggestions';
+import { useSuggestions } from '@/features/dashboard/organisms/links/hooks/useSuggestions';
 import { createMockSuggestion } from './useSuggestions.test-utils';
 
 describe('useSuggestions - Initialization', () => {

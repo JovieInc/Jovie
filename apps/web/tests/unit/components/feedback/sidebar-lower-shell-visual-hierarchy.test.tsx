@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
-import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
+import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
 vi.mock('@/lib/env-client', () => ({
   env: {

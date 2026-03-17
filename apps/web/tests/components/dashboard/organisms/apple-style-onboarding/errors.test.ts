@@ -3,7 +3,7 @@ import {
   extractErrorCode,
   isDatabaseError,
   mapErrorToUserMessage,
-} from '@/components/dashboard/organisms/apple-style-onboarding/errors';
+} from '@/features/dashboard/organisms/apple-style-onboarding/errors';
 
 describe('apple-style onboarding error helpers', () => {
   it('extracts error codes even when prefixed by Error:', () => {
