@@ -100,6 +100,18 @@ interface DspInput {
   aliases?: string[];
 }
 
+type CompactDspOptions = Pick<DspInput, 'aliases' | 'textColor'>;
+
+type CompactDspInput = readonly [
+  key: string,
+  name: string,
+  musicfetchService: string,
+  color: string,
+  domains: string[],
+  searchUrlTemplate: string | null,
+  options?: CompactDspOptions,
+];
+
 /** Build a registry entry with sensible defaults for streaming DSPs. */
 function dsp(input: DspInput): DspRegistryEntry {
   const category = input.category ?? 'streaming';
@@ -117,6 +129,132 @@ function dsp(input: DspInput): DspRegistryEntry {
     aliases: input.aliases ?? [],
   };
 }
+
+function compactDsp([
+  key,
+  name,
+  musicfetchService,
+  color,
+  domains,
+  searchUrlTemplate,
+  options,
+]: CompactDspInput): DspRegistryEntry {
+  return dsp({
+    key,
+    name,
+    musicfetchService,
+    color,
+    domains,
+    searchUrlTemplate,
+    ...options,
+  });
+}
+
+const INTERNATIONAL_STREAMING_DSP_INPUTS: readonly CompactDspInput[] = [
+  [
+    'amazon',
+    'Amazon',
+    'amazon',
+    '#FF9900',
+    ['amazon.com', 'www.amazon.com'],
+    'https://www.amazon.com/s?k={query}&i=digital-music',
+    { textColor: '#0A0A0A' },
+  ],
+  [
+    'awa',
+    'AWA',
+    'awa',
+    '#FC5B11',
+    ['awa.fm', 'www.awa.fm'],
+    'https://s.awa.fm/search/{query}',
+  ],
+  [
+    'audius',
+    'Audius',
+    'audius',
+    '#CC0FE0',
+    ['audius.co', 'www.audius.co'],
+    'https://audius.co/search/{query}',
+  ],
+  [
+    'flo',
+    'FLO',
+    'flo',
+    '#00C3C1',
+    ['music-flo.com', 'www.music-flo.com'],
+    null,
+  ],
+  [
+    'gaana',
+    'Gaana',
+    'gaana',
+    '#E72C30',
+    ['gaana.com', 'www.gaana.com'],
+    'https://gaana.com/search/{query}',
+  ],
+  [
+    'jio_saavn',
+    'JioSaavn',
+    'jioSaavn',
+    '#2BC5B4',
+    ['jiosaavn.com', 'www.jiosaavn.com', 'saavn.com'],
+    'https://www.jiosaavn.com/search/{query}',
+    { aliases: ['saavn', 'jiosaavn'] },
+  ],
+  ['joox', 'JOOX', 'joox', '#00D96F', ['joox.com', 'www.joox.com'], null],
+  [
+    'kkbox',
+    'KKBOX',
+    'kkbox',
+    '#09CEF6',
+    ['kkbox.com', 'www.kkbox.com'],
+    'https://www.kkbox.com/search?q={query}',
+  ],
+  [
+    'line_music',
+    'LINE MUSIC',
+    'lineMusic',
+    '#00B900',
+    ['music.line.me'],
+    null,
+    { aliases: ['linemusic'] },
+  ],
+  [
+    'netease',
+    'NetEase Music',
+    'netEase',
+    '#C20C0C',
+    ['music.163.com', 'y.music.163.com'],
+    null,
+    { aliases: ['netease_music', 'neteasemusic'] },
+  ],
+  [
+    'qq_music',
+    'QQ Music',
+    'qqMusic',
+    '#31C27C',
+    ['y.qq.com', 'i.y.qq.com'],
+    null,
+    { aliases: ['qqmusic', 'tencent_music', 'tencentmusic'] },
+  ],
+  [
+    'trebel',
+    'Trebel',
+    'trebel',
+    '#8B5CF6',
+    ['trebel.io', 'www.trebel.io'],
+    null,
+  ],
+  [
+    'yandex',
+    'Yandex Music',
+    'yandex',
+    '#FFCC00',
+    ['music.yandex.ru', 'music.yandex.com'],
+    'https://music.yandex.ru/search?text={query}',
+    { aliases: ['yandexmusic'], textColor: '#0A0A0A' },
+  ],
+] as const;
 
 // ============================================================================
 // Registry
@@ -277,111 +415,7 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
   }),
 
   // ─── New International Streaming DSPs ──────────────────────────────────
-  dsp({
-    key: 'amazon',
-    name: 'Amazon',
-    musicfetchService: 'amazon',
-    color: '#FF9900',
-    textColor: '#0A0A0A',
-    domains: ['amazon.com', 'www.amazon.com'],
-    searchUrlTemplate: 'https://www.amazon.com/s?k={query}&i=digital-music',
-  }),
-  dsp({
-    key: 'awa',
-    name: 'AWA',
-    musicfetchService: 'awa',
-    color: '#FC5B11',
-    domains: ['awa.fm', 'www.awa.fm'],
-    searchUrlTemplate: 'https://s.awa.fm/search/{query}',
-  }),
-  dsp({
-    key: 'audius',
-    name: 'Audius',
-    musicfetchService: 'audius',
-    color: '#CC0FE0',
-    domains: ['audius.co', 'www.audius.co'],
-    searchUrlTemplate: 'https://audius.co/search/{query}',
-  }),
-  dsp({
-    key: 'flo',
-    name: 'FLO',
-    musicfetchService: 'flo',
-    color: '#00C3C1',
-    domains: ['music-flo.com', 'www.music-flo.com'],
-  }),
-  dsp({
-    key: 'gaana',
-    name: 'Gaana',
-    musicfetchService: 'gaana',
-    color: '#E72C30',
-    domains: ['gaana.com', 'www.gaana.com'],
-    searchUrlTemplate: 'https://gaana.com/search/{query}',
-  }),
-  dsp({
-    key: 'jio_saavn',
-    name: 'JioSaavn',
-    musicfetchService: 'jioSaavn',
-    color: '#2BC5B4',
-    domains: ['jiosaavn.com', 'www.jiosaavn.com', 'saavn.com'],
-    searchUrlTemplate: 'https://www.jiosaavn.com/search/{query}',
-    aliases: ['saavn', 'jiosaavn'],
-  }),
-  dsp({
-    key: 'joox',
-    name: 'JOOX',
-    musicfetchService: 'joox',
-    color: '#00D96F',
-    domains: ['joox.com', 'www.joox.com'],
-  }),
-  dsp({
-    key: 'kkbox',
-    name: 'KKBOX',
-    musicfetchService: 'kkbox',
-    color: '#09CEF6',
-    domains: ['kkbox.com', 'www.kkbox.com'],
-    searchUrlTemplate: 'https://www.kkbox.com/search?q={query}',
-  }),
-  dsp({
-    key: 'line_music',
-    name: 'LINE MUSIC',
-    musicfetchService: 'lineMusic',
-    color: '#00B900',
-    domains: ['music.line.me'],
-    aliases: ['linemusic'],
-  }),
-  dsp({
-    key: 'netease',
-    name: 'NetEase Music',
-    musicfetchService: 'netEase',
-    color: '#C20C0C',
-    domains: ['music.163.com', 'y.music.163.com'],
-    aliases: ['netease_music', 'neteasemusic'],
-  }),
-  dsp({
-    key: 'qq_music',
-    name: 'QQ Music',
-    musicfetchService: 'qqMusic',
-    color: '#31C27C',
-    domains: ['y.qq.com', 'i.y.qq.com'],
-    aliases: ['qqmusic', 'tencent_music', 'tencentmusic'],
-  }),
-  dsp({
-    key: 'trebel',
-    name: 'Trebel',
-    musicfetchService: 'trebel',
-    color: '#8B5CF6',
-    domains: ['trebel.io', 'www.trebel.io'],
-  }),
-  dsp({
-    key: 'yandex',
-    name: 'Yandex Music',
-    musicfetchService: 'yandex',
-    color: '#FFCC00',
-    textColor: '#0A0A0A',
-    domains: ['music.yandex.ru', 'music.yandex.com'],
-    searchUrlTemplate: 'https://music.yandex.ru/search?text={query}',
-    aliases: ['yandexmusic'],
-  }),
+  ...INTERNATIONAL_STREAMING_DSP_INPUTS.map(compactDsp),
 
   // ─── Video / Sound Platforms ───────────────────────────────────────────
   dsp({
