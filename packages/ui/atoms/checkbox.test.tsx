@@ -127,9 +127,7 @@ describe('Checkbox', () => {
     it('applies hover styles on checkbox indicator', () => {
       render(<Checkbox aria-label='Test' data-testid='checkbox' />);
       const checkbox = screen.getByTestId('checkbox');
-      expect(checkbox.className).toContain(
-        'hover:border-(--linear-border-focus)'
-      );
+      expect(checkbox.className).toContain('hover:border-(--color-accent)');
       expect(checkbox.className).toContain('hover:bg-(--linear-bg-surface-1)');
     });
 
@@ -138,7 +136,7 @@ describe('Checkbox', () => {
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('focus-visible:ring-2');
       expect(checkbox.className).toContain(
-        'focus-visible:ring-(--linear-border-focus)'
+        'focus-visible:ring-(--color-accent)'
       );
     });
 

@@ -59,8 +59,8 @@ module.exports = {
 
       // Border radius - Linear-extracted values
       borderRadius: {
-        xs: 'var(--radius-xs)', // 3px — tags, tiny elements
-        DEFAULT: 'var(--radius-default)', // 6px — buttons, dropdowns
+        xs: 'var(--radius-xs)', // 2px — tags, tiny elements
+        DEFAULT: 'var(--radius-default)', // 4px — buttons (Linear exact)
         xl: 'var(--radius-xl)', // 10px — large cards
         '3xl': 'var(--radius-3xl)', // 14px — large modals
         pill: 'var(--radius-pill)', // 48px — pill buttons

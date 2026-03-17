@@ -17,6 +17,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Removed force-light CSS override so marketing pages render in dark mode
 - Added `text-rendering: optimizelegibility` to Inter font stack
 
+### Changed
+
+- Updated design system tokens to match Linear's latest values: accent `#7170ff`, font weights (normal 400, semibold 590, bold 680), button radius 4px, text quaternary `#62666d`, font features `"cv01","ss03"`
+- Migrated all UI components from `--linear-border-focus` to `--color-accent` for focus rings (button, switch, checkbox, radio, card, dialog, input, badge, segment-control, dropdown)
+- Updated all `font-[450]` to `font-[400]` across UI atoms and app components (17 instances across 20 files)
+- Badge component now uses pill shape (`rounded-full`) and 12px font size to match Linear
+- Button component uses hardcoded `rounded-[4px]` instead of `--radius-default` variable
+- Replaced hardcoded `#5e6ad2` accent in PricingSection with `var(--color-accent)` token
+
 ### Fixed
 
 - Admin creator sidebar now displays DSP and social link icons (previously showed empty tabs because `platform` field was dropped during data hydration)
