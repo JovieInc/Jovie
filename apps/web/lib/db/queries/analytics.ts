@@ -17,6 +17,7 @@ import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
   DashboardAnalyticsView,
+  TourDateAnalyticsData,
 } from '@/types/analytics';
 
 type JsonArray<T> = T[] | string | null;
@@ -543,6 +544,77 @@ export async function getUserDashboardAnalytics(
       capture_rate: captureRate,
     };
   });
+}
+
+// ─── Tour Date Analytics ─────────────────────────────────────────────
+
+/**
+ * Get analytics for a specific tour date.
+ * Queries click events where metadata->>'contentType' = 'tour_date'
+ * and metadata->>'contentId' matches the tour date ID.
+ */
+export async function getTourDateAnalytics(
+  tourDateId: string,
+  creatorProfileId: string
+): Promise<TourDateAnalyticsData> {
+  const result = await apiQuery(
+    () =>
+      db
+        .execute<{
+          ticket_clicks: AggregateValue;
+          top_cities: JsonArray<{ city: string | null; count: number }>;
+          top_referrers: JsonArray<{ referrer: string | null; count: number }>;
+        }>(
+          drizzleSql`
+            with tour_clicks as (
+              select city, referrer
+              from ${clickEvents}
+              where ${clickEvents.creatorProfileId} = ${creatorProfileId}
+                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
+                and ${clickEvents.metadata}->>'contentType' = 'tour_date'
+                and ${clickEvents.metadata}->>'contentId' = ${tourDateId}
+            ),
+            top_cities as (
+              select city, count(*) as count
+              from tour_clicks
+              where city is not null
+              group by city
+              order by count desc
+              limit 5
+            ),
+            top_referrers as (
+              select referrer, count(*) as count
+              from tour_clicks
+              where referrer is not null
+              group by referrer
+              order by count desc
+              limit 3
+            )
+            select
+              (select count(*) from tour_clicks) as ticket_clicks,
+              coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
+              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
+            ;
+          `
+        )
+        .then(res => res.rows?.[0]),
+    'getTourDateAnalytics'
+  );
+
+  return {
+    ticketClicks: Number(result?.ticket_clicks ?? 0),
+    topCities: parseJsonArray<{ city: string | null; count: number }>(
+      result?.top_cities ?? []
+    )
+      .filter(row => Boolean(row.city))
+      .map(row => ({ city: row.city as string, count: Number(row.count) })),
+    topReferrers: parseJsonArray<{ referrer: string | null; count: number }>(
+      result?.top_referrers ?? []
+    ).map(row => ({
+      referrer: row.referrer ?? '',
+      count: Number(row.count),
+    })),
+  };
 }
 
 // Function to record a click event
