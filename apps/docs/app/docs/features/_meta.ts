@@ -2,7 +2,8 @@ export default {
   profile: 'Profile',
   releases: 'Releases & Smart Links',
   audience: 'Audience',
-  'chat-ai': 'Chat & AI',
-  tips: 'Tips',
   analytics: 'Analytics',
+  'chat-ai': 'AI Assistant',
+  tips: 'Tips & Payments',
+  'retargeting-ads': 'Retargeting Ads',
 };

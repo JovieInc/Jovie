@@ -1,24 +1,78 @@
 ---
-title: Releases and Smart Links
+title: Releases & Smart Links
 ---
 
-# Releases and Smart Links
+# Releases & Smart Links
 
-Manage your music releases and create smart links that route fans to their
-preferred streaming platform.
+Manage your music releases and share them with smart links that route every fan to their preferred streaming platform — no friction, no wasted clicks.
 
-## How it works
+## Smart links
 
-1. **Add a release** -- Enter your release details or let Jovie auto-detect them from connected DSPs.
-2. **Smart link generation** -- Jovie creates a single link that detects the listener's preferred platform and redirects them accordingly.
-3. **Share everywhere** -- Use your smart link in social bios, stories, emails, and more.
+Every release on Jovie gets a smart link: a single URL that detects the listener's device, preferred platform, and location, then routes them to the right place.
+
+- **One link, every platform** -- Share a single URL that works for Spotify, Apple Music, YouTube Music, Amazon Music, Tidal, Deezer, SoundCloud, and more.
+- **Deep links to native apps** -- Links open directly in the streaming app instead of a browser, reducing friction for the listener.
+- **Auto DSP detection** -- Jovie's MusicFetch integration automatically finds your release across all major platforms and creates the links.
+- **Short links** -- Compact URLs via `jov.ie/r/{slug}` for social media bios and posts.
+- **Vanity URLs** -- Custom slugs for your releases (e.g., `jov.ie/{username}/my-album`).
+- **Edit & customize** -- Reorder platforms, customize CTAs, and control the appearance of your smart link pages.
+
+## Release management
+
+- **Auto-sync from Spotify** -- Connect your Spotify and Jovie imports your entire catalog automatically.
+- **Manual release creation** -- Add releases that aren't on streaming platforms yet, or create entries for non-music content.
+- **Release pages** -- Each release gets a public page with album artwork, track listing, and listen buttons for every available DSP.
+- **Track-level detail** -- View duration, ISRC codes, and per-track smart links.
+
+## Pre-release features (Pro+)
+
+- **Countdown pages** -- Create landing pages for upcoming releases with a countdown timer.
+- **Pre-save campaigns** -- Let fans pre-save your release on Spotify and Apple Music before it drops. Jovie handles the OAuth flow and triggers the save on release day.
+- **Release notifications** -- Email your subscribers when a new release drops. Configure preview and release-day notifications separately.
+
+## "Use This Sound" pages
+
+Share your tracks with content creators and influencers. Each release has a sounds page at `/{username}/{release}/sounds` with direct links to:
+
+- **TikTok** -- "Use sound on TikTok"
+- **Instagram Reels** -- "Use audio on Instagram"
+- **YouTube Shorts** -- "Use sound on YouTube"
+
+Video provider links are populated automatically by MusicFetch. If no video links exist, the page redirects to the main smart link.
 
 ## Supported platforms
 
-Jovie supports all major streaming and download platforms, including Spotify,
-Apple Music, YouTube Music, Amazon Music, Tidal, Deezer, SoundCloud, and more.
+Jovie supports all major streaming and download platforms:
 
-## Pre-save campaigns
+| Platform | Listen links | Pre-save | Use This Sound |
+|---|---|---|---|
+| Spotify | Yes | Yes | -- |
+| Apple Music | Yes | Yes | -- |
+| YouTube Music | Yes | -- | -- |
+| Amazon Music | Yes | -- | -- |
+| Tidal | Yes | -- | -- |
+| Deezer | Yes | -- | -- |
+| SoundCloud | Yes | -- | -- |
+| TikTok | -- | -- | Yes |
+| Instagram Reels | -- | -- | Yes |
+| YouTube Shorts | -- | -- | Yes |
 
-Set up pre-save campaigns so fans can save your upcoming release before it drops.
-Jovie handles the OAuth flow and saves automatically on release day.
+## Plan availability
+
+| Capability | Free | Pro | Growth |
+|---|---|---|---|
+| Unlimited smart links | Yes | Yes | Yes |
+| Auto-sync from Spotify | Yes | Yes | Yes |
+| Deep links, short links, vanity URLs | Yes | Yes | Yes |
+| Manual release creation | Yes | Yes | Yes |
+| Release pages per DSP | Yes | Yes | Yes |
+| "Use This Sound" pages | Yes | Yes | Yes |
+| Release notifications | Yes | Yes | Yes |
+| Pre-release & countdown pages | -- | Yes | Yes |
+| Pre-save campaigns | -- | Yes | Yes |
+
+## Getting started
+
+1. [Connect your DSPs](/docs/self-serve-guide/connect-dsps) to auto-import your catalog.
+2. Your releases and smart links are created automatically.
+3. Share your smart links in social bios, stories, emails, and anywhere fans find you.
