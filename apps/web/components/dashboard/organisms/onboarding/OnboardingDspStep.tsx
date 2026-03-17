@@ -210,6 +210,11 @@ export function OnboardingDspStep({
                           </p>
                         )}
                       </div>
+                      {artist.isClaimed && (
+                        <span className='shrink-0 rounded-full bg-(--linear-accent)/10 px-2 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
+                          On Jovie
+                        </span>
+                      )}
                     </button>
                   </li>
                 ))}

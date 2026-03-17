@@ -46,7 +46,12 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { getFeaturedCreatorsForSearch } from '@/lib/featured-creators';
-import { annotateClaimedStatus, applyVipBoost, parseLimit } from '../helpers';
+import {
+  annotateClaimedStatus,
+  applyVipBoost,
+  boostClaimedArtists,
+  parseLimit,
+} from '../helpers';
 
 const mockGetFeatured = vi.mocked(getFeaturedCreatorsForSearch);
 
@@ -253,6 +258,49 @@ describe('annotateClaimedStatus', () => {
     const annotated = await annotateClaimedStatus(results);
 
     expect(annotated).toEqual(results);
+  });
+});
+
+describe('boostClaimedArtists', () => {
+  it('returns single-element array unchanged', () => {
+    const results = [makeResult({ id: 'a1', name: 'Solo' })];
+    expect(boostClaimedArtists(results)).toEqual(results);
+  });
+
+  it('boosts claimed artists to top', () => {
+    const results = [
+      makeResult({ id: 'a1', name: 'Unclaimed' }),
+      makeResult({ id: 'a2', name: 'Claimed', isClaimed: true }),
+      makeResult({ id: 'a3', name: 'Also Unclaimed' }),
+    ];
+
+    const boosted = boostClaimedArtists(results);
+
+    expect(boosted[0].id).toBe('a2');
+    expect(boosted[1].id).toBe('a1');
+    expect(boosted[2].id).toBe('a3');
+  });
+
+  it('preserves relative order within claimed and unclaimed groups', () => {
+    const results = [
+      makeResult({ id: 'u1', name: 'First Unclaimed' }),
+      makeResult({ id: 'c1', name: 'First Claimed', isClaimed: true }),
+      makeResult({ id: 'u2', name: 'Second Unclaimed' }),
+      makeResult({ id: 'c2', name: 'Second Claimed', isClaimed: true }),
+    ];
+
+    const boosted = boostClaimedArtists(results);
+
+    expect(boosted.map(r => r.id)).toEqual(['c1', 'c2', 'u1', 'u2']);
+  });
+
+  it('returns unchanged when no claimed artists', () => {
+    const results = [
+      makeResult({ id: 'a1', name: 'A' }),
+      makeResult({ id: 'a2', name: 'B' }),
+    ];
+
+    expect(boostClaimedArtists(results)).toEqual(results);
   });
 });
 

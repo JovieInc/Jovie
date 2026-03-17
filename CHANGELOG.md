@@ -5,11 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.2.3] - 2026-03-17
+## [26.3.1] - 2026-03-17
 
 ### Changed
 
 - Move phone carousel (DeeplinksGrid) above CRM section (AudienceCRMSection) on homepage
+
+## [26.3.0] - 2026-03-17
+
+### Added
+
+- "On Jovie" badge on search results for artists already claimed on the platform (homepage + onboarding DSP step)
+- `boostClaimedArtists()` helper to sort claimed artists to the top of Spotify search results
+- 5-second minimum display time on profile review step so users actually see their enriched profile before proceeding
+
+### Fixed
+
+- Claimed artists now appear first in search results so users can identify their own profile among duplicates
+- Dashboard redirect now waits for `connectSpotifyArtist` DB writes to complete — fixes empty sidebar, missing DSPs, and missing social links after onboarding
+- Profile review CTA disabled while enrichment or Spotify connection is still in progress (with 10s timeout fallback)
 
 ## [26.2.2] - 2026-03-17
 
