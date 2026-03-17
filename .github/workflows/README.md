@@ -42,7 +42,7 @@ The main CI workflow `ci.yml` is the gatekeeper for PRs to `main`. It includes:
 
 - **Fast PR gate** (typecheck, lint, boundaries, guardrails) - runs on all PRs and merge queue, required for merge
 - **Blocking secret scan** (`security.yml` / Gitleaks) - runs on PRs, merge queue, and `main`, required for merge
-- **Blocking SonarCloud quality gate** (`sonarcloud.yml`) - runs on internal PRs, merge queue, and `main`, required for merge
+- **Blocking SonarCloud quality gate** (`sonarcloud.yml`) - runs on internal PRs, merge queue, and `main` when `SONAR_TOKEN` is configured
 - **Extended verification** (build, a11y, layout, smoke) - runs only for PRs labeled `testing`
 - **Post-merge verification** (build, smoke, E2E) - runs on pushes to `main` before deploy
 - **Production deploy** - automatic deployment from the `main` branch to jov.ie after post-merge verification passes
@@ -63,8 +63,8 @@ The `auto-merge.yml` workflow handles automatic merging for:
 ## Security And Static Analysis
 
 - `security.yml` makes `Gitleaks Secret Scanning` a required pre-merge check.
-- `sonarcloud.yml` makes `SonarCloud Quality Gate` a required pre-merge check.
-- Fork PRs cannot access `SONAR_TOKEN`, so SonarCloud exits cleanly there and the existing `Fork PR Gate` remains the human-review blocker for untrusted contributors.
+- `sonarcloud.yml` makes `SonarCloud Quality Gate` a required pre-merge check when `SONAR_TOKEN` is configured.
+- Fork PRs cannot access `SONAR_TOKEN`, and repos without that secret provisioned skip the scan cleanly until SonarCloud is configured.
 
 ## Linear AI Automation
 

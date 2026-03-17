@@ -12,7 +12,7 @@ The following checks must pass before merging to `main`:
 
 1. **PR Ready** - Aggregated fast lane (`ci-fast`: typecheck, lint, boundaries, guardrails)
 2. **Gitleaks Secret Scanning** - Blocking secret scan on PRs and merge queue
-3. **SonarCloud Quality Gate** - Blocking SonarCloud quality gate on internal PRs and merge queue
+3. **SonarCloud Quality Gate** - Blocking SonarCloud quality gate on internal PRs and merge queue when `SONAR_TOKEN` is configured
 4. **Migration Guard** - Database migration validation
 5. **Fork PR Gate** - Human-review gate for external fork PRs
 
@@ -51,7 +51,7 @@ Full configuration is tracked in `/Users/timwhite/.claude/plans/glistening-dazzl
 
 - **2026-03-17**: Added blocking Gitleaks and SonarCloud checks to branch protection
   - `Gitleaks Secret Scanning` now runs on PRs and merge queue
-  - `SonarCloud Quality Gate` now blocks internal PRs and merge queue
+  - `SonarCloud Quality Gate` blocks internal PRs and merge queue when `SONAR_TOKEN` is configured
   - `Fork PR Gate` remains the human-review blocker for untrusted fork PRs
 - **2025-12-23**: Added 6 new required checks (Env Example Guard, Typecheck, Guardrails, ci-fast, Migration Guard, CodeQL)
   - Previously only required: Lint

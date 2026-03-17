@@ -125,7 +125,7 @@ The workflow references these repository-level secrets or variables in GitHub Ac
 ## Operating Model
 
 1. Open an internal PR to `main`.
-2. Wait for `PR Ready`, `Gitleaks Secret Scanning`, and `SonarCloud Quality Gate` to pass.
+2. Wait for `PR Ready`, `Gitleaks Secret Scanning`, and `SonarCloud Quality Gate` to pass. If `SONAR_TOKEN` is not configured yet, the Sonar check will no-op and pass.
 3. Use the automatic `Preview Deploy (PR)` URL for QA.
 4. Merge once preview looks good.
 5. Let `main` deploy immediately to production.

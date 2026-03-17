@@ -1,9 +1,9 @@
 # SonarCloud analysis workflow
 #
 # This workflow makes the SonarCloud quality gate a hard blocker for internal
-# PRs, merge queue runs, and pushes to main. Fork PRs do not receive repo
-# secrets, so the job exits successfully there and relies on the existing
-# Fork PR Gate for human review.
+# PRs, merge queue runs, and pushes to main when SONAR_TOKEN is configured.
+# Fork PRs do not receive repo secrets, and some environments may not have the
+# token provisioned yet, so the job exits successfully in those cases.
 #
 name: SonarCloud
 
@@ -36,8 +36,9 @@ jobs:
           fi
 
           if [[ -z "${{ secrets.SONAR_TOKEN }}" ]]; then
-            echo "SONAR_TOKEN is required for SonarCloud analysis on internal PRs, merge queue, and main."
-            exit 1
+            echo "run_scan=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping SonarCloud because SONAR_TOKEN is not configured in GitHub Actions secrets."
+            exit 0
           fi
 
           echo "run_scan=true" >> "$GITHUB_OUTPUT"
