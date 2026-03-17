@@ -9,6 +9,11 @@ import { PricingSection } from '@/features/home/PricingSection';
 import { RedesignedHero } from '@/features/home/RedesignedHero';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { SeeItInAction } from '@/features/home/SeeItInAction';
+import {
+  buildOrganizationSchema,
+  buildSoftwareSchema,
+  buildWebsiteSchema,
+} from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 
 // Marketing pages must remain fully static.
@@ -128,91 +133,22 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Helper to safely serialize JSON-LD with XSS protection
-const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
-
 // Pre-serialized JSON-LD structured data for static generation
-const WEBSITE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: APP_NAME,
+const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
     'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
-  url: APP_URL,
-  inLanguage: 'en-US',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-      width: 512,
-      height: 512,
-    },
-  },
 });
 
-const SOFTWARE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: APP_NAME,
-  description:
-    'Your entire music career in one intelligent link — smart links, link-in-bio, fan notifications, and audience growth for artists.',
-  url: APP_URL,
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    description: 'Free to start',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
-  author: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-  },
-});
+const SOFTWARE_SCHEMA = buildSoftwareSchema(
+  'Your entire music career in one intelligent link — smart links, link-in-bio, fan notifications, and audience growth for artists.'
+);
 
-const ORGANIZATION_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: APP_NAME,
+const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
-  url: APP_URL,
-  logo: {
-    '@type': 'ImageObject',
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-    width: 512,
-    height: 512,
-  },
-  image: `${APP_URL}/og/default.png`,
   description:
     'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    contactType: 'customer support',
-    url: `${APP_URL}/support`,
-  },
 });
 
 export default function HomePage() {

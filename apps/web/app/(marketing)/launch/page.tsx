@@ -7,6 +7,11 @@ import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
+import {
+  buildOrganizationSchema,
+  buildSoftwareSchema,
+  buildWebsiteSchema,
+} from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 import { captureWarning } from '@/lib/error-tracking';
 import { getProfileByUsername } from '@/lib/services/profile';
@@ -138,90 +143,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Helper to safely serialize JSON-LD with XSS protection
-const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
-
-const WEBSITE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: APP_NAME,
+const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: 'Jovie Link in Bio',
   description:
     'Notify fans automatically and direct every visitor to the right listening destination with one focused profile.',
-  url: APP_URL,
-  inLanguage: 'en-US',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-      width: 512,
-      height: 512,
-    },
-  },
 });
 
-const SOFTWARE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: APP_NAME,
-  description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
-  url: APP_URL,
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    description: 'Free to start',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
-  author: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-  },
-});
+const SOFTWARE_SCHEMA = buildSoftwareSchema(
+  'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.'
+);
 
-const ORGANIZATION_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: APP_NAME,
+const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Inc',
-  url: APP_URL,
-  logo: {
-    '@type': 'ImageObject',
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-    width: 512,
-    height: 512,
-  },
-  image: `${APP_URL}/og/default.png`,
   description:
     'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    contactType: 'customer support',
-    url: `${APP_URL}/support`,
-  },
 });
 
 /* ─── Shared inline style helpers ─── */
