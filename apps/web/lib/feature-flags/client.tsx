@@ -17,7 +17,7 @@ import {
 const FF_OVERRIDES_KEY = '__ff_overrides';
 
 function readOverrides(): Record<string, boolean> {
-  if (typeof globalThis.window === 'undefined') return {};
+  if (globalThis.window === undefined) return {};
   try {
     return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
   } catch {
