@@ -65,6 +65,12 @@ export function ProfileContactSidebar() {
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
 
+  // Track temp link IDs with pending server adds. If user deletes a temp link
+  // while its confirm-link request is in flight, we queue a server delete for
+  // after the add completes to avoid orphaned server records.
+  const pendingAddsRef = useRef<Set<string>>(new Set());
+  const deletedWhilePendingRef = useRef<Set<string>>(new Set());
+
   // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
     if (PROFILE_TAB_OPTIONS.some(tab => tab.value === selectedCategory)) {
@@ -194,6 +200,7 @@ export function ProfileContactSidebar() {
       }
 
       // Save to server via confirm-link endpoint
+      pendingAddsRef.current.add(optimisticLink.id);
       try {
         const response = await fetch('/api/chat/confirm-link', {
           method: 'POST',
@@ -212,6 +219,20 @@ export function ProfileContactSidebar() {
 
         // Replace the temp ID with the server-assigned ID so future deletes work
         const { linkId } = (await response.json()) as { linkId: string };
+
+        // If user deleted this link while the add was in flight, fire a server
+        // delete now that we have the real ID, and skip the UI update.
+        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+          deletedWhilePendingRef.current.delete(optimisticLink.id);
+          if (linkId && selectedProfile) {
+            removeLinkMutation.mutate({
+              profileId: selectedProfile.id,
+              linkId,
+            });
+          }
+          return;
+        }
+
         if (linkId) {
           const current = previewDataRef.current;
           if (current) {
@@ -226,15 +247,31 @@ export function ProfileContactSidebar() {
 
         toast.success(`${link.platform.name} link added`);
       } catch {
+        // If deleted while pending, the UI is already correct (link removed)
+        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+          deletedWhilePendingRef.current.delete(optimisticLink.id);
+          return;
+        }
         // Revert on failure
-        setPreviewData({
-          ...previewData,
-          links: previewData.links.filter(l => l.id !== optimisticLink.id),
-        });
+        const current = previewDataRef.current;
+        if (current) {
+          setPreviewData({
+            ...current,
+            links: current.links.filter(l => l.id !== optimisticLink.id),
+          });
+        }
         toast.error('Failed to add link');
+      } finally {
+        pendingAddsRef.current.delete(optimisticLink.id);
       }
     },
-    [selectedProfile, previewData, setPreviewData, resolvedCategory]
+    [
+      selectedProfile,
+      previewData,
+      setPreviewData,
+      resolvedCategory,
+      removeLinkMutation,
+    ]
   );
 
   // Handle removing a link
@@ -254,10 +291,15 @@ export function ProfileContactSidebar() {
         links: previewData.links.filter(l => l.id !== linkId),
       });
 
-      // Temp links may have been persisted server-side (via /api/chat/confirm-link)
-      // but still carry a temp-* ID locally. Always attempt the server delete —
-      // the server returns 400 for genuinely unsaved temp IDs, which we handle
-      // by accepting the local removal without rollback.
+      // If the add is still in flight, mark for server delete after it completes
+      if (linkId.startsWith('temp-') && pendingAddsRef.current.has(linkId)) {
+        deletedWhilePendingRef.current.add(linkId);
+        toast.success('Link removed');
+        return;
+      }
+
+      // For non-temp links (or temp links whose add already completed), fire
+      // the server delete. The server returns 400 for genuinely unsaved temp IDs.
       removeLinkMutation.mutate(
         { profileId: selectedProfile.id, linkId },
         {
@@ -265,8 +307,7 @@ export function ProfileContactSidebar() {
             toast.success('Link removed');
           },
           onError: error => {
-            // If server rejects the temp ID (not saved yet), the local removal is correct —
-            // the link was only optimistic and never persisted
+            // If server rejects an unsaved temp ID, the local removal is correct
             const isUnsavedTemp =
               linkId.startsWith('temp-') &&
               error instanceof Error &&

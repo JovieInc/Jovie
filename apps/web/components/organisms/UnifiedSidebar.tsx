@@ -124,10 +124,12 @@ function SettingsNavigation({
         profile?: { displayName?: string | null };
       }
     )?.profile?.displayName;
+  // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
+  // If cachedDisplayName is empty string, the user intentionally cleared it.
   const artistName =
-    cachedDisplayName?.trim() ||
-    selectedProfile?.displayName?.trim() ||
-    undefined;
+    cachedDisplayName != null
+      ? cachedDisplayName.trim() || undefined
+      : selectedProfile?.displayName?.trim() || undefined;
 
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {
