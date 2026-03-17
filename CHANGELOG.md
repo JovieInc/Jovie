@@ -7,6 +7,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Social links on artist profile now open in new tabs instead of navigating away from the page
+- "Log in" link now visible on mobile homepage navigation (was hidden below 380px)
+- Removed duplicate font declaration in auth layout that caused unused CSS preload warnings on every page
+
 ### Changed
 
 - SSO callback loading screens now match app dark theme with centered spinner and fade-in animation instead of plain white page with spinning logo
