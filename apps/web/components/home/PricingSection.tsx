@@ -28,7 +28,7 @@ export function PricingSection() {
               Pricing
             </span>
             <h2 className='marketing-h2-linear text-[color:var(--linear-text-primary)]'>
-              Free to grow. Premium when you're ready.
+              Free to grow. Premium when you&apos;re ready.
             </h2>
             <p className='max-w-md marketing-lead-linear text-[color:var(--linear-text-secondary)]'>
               Free gets an artist live, building an audience and proving demand.
@@ -176,16 +176,6 @@ export function PricingSection() {
               >
                 Choose Founding Member
               </Link>
-
-              <p className='mt-3 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
-                Need the full plan breakdown?{' '}
-                <Link
-                  href='/pricing'
-                  className='text-[color:var(--linear-text-secondary)] underline underline-offset-4'
-                >
-                  See all pricing
-                </Link>
-              </p>
             </div>
           </div>
         </div>
