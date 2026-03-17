@@ -9,6 +9,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Upgraded homepage hero H1 to "Your entire music career. One intelligent link."
+- Updated homepage meta title, description, OG tags, and JSON-LD to match new positioning
+- Changed final CTA headline to "Your music deserves better than a list of links."
+- Changed Audience CRM section heading to "Know every fan by name."
+
 - Auth (`/signin`, `/signup`), waitlist, and onboarding pages now respect user theme preference instead of being forced dark — only marketing pages remain dark-only
 
 ### Added

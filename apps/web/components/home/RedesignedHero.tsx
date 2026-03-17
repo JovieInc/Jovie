@@ -45,13 +45,12 @@ export async function RedesignedHero() {
             </span>
 
             <h1 className='marketing-h1-linear max-w-[18rem] text-balance text-[var(--linear-text-primary)] sm:max-w-[28rem] lg:max-w-none'>
-              One link that <br className='hidden sm:block' />
-              captures every fan.
+              Your entire music career. One intelligent link.
             </h1>
 
             <p className='marketing-lead-linear mt-4 max-w-[19rem] px-1 text-balance text-[var(--linear-text-secondary)] sm:mt-5 sm:max-w-[31rem] sm:px-0'>
-              Connect Spotify, grow your audience automatically, and own every
-              fan relationship.
+              Import your Spotify, grow your audience automatically, and own
+              every fan relationship.
             </p>
 
             <div className='mt-6 w-full max-w-[35rem] sm:mt-8 lg:max-w-full'>
