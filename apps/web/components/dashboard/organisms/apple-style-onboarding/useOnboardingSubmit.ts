@@ -53,6 +53,7 @@ function tryAutoConnectSpotify(
   setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
   setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>,
   setIsEnriching: Dispatch<SetStateAction<boolean>>,
+  setIsConnecting: Dispatch<SetStateAction<boolean>>,
   signal: AbortSignal,
   userId: string
 ): void {
@@ -91,7 +92,9 @@ function tryAutoConnectSpotify(
         });
       }
 
-      // Fire-and-forget: connect + enrich in background (JOV-1340)
+      // Connect Spotify artist in background — tracked so dashboard redirect
+      // waits for the DB write to complete (fixes empty sidebar/DSPs).
+      if (!signal.aborted) setIsConnecting(true);
       void connectSpotifyArtist({
         spotifyArtistId: artistId,
         spotifyArtistUrl: normalizedUrl,
@@ -108,6 +111,9 @@ function tryAutoConnectSpotify(
         })
         .catch(() => {
           // Import failure is non-critical during onboarding
+        })
+        .finally(() => {
+          if (!signal.aborted) setIsConnecting(false);
         });
 
       // Fire-and-forget: enrich profile data in background
@@ -158,6 +164,7 @@ interface UseOnboardingSubmitReturn {
   enrichedProfile: EnrichedProfileData | null;
   setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>;
   isEnriching: boolean;
+  isConnecting: boolean;
 }
 
 const AUTO_SUBMIT_CONFIRMATION_DELAY_MS = 1400;
@@ -197,6 +204,7 @@ export function useOnboardingSubmit({
   const [enrichedProfile, setEnrichedProfile] =
     useState<EnrichedProfileData | null>(null);
   const [isEnriching, setIsEnriching] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
 
   // Abort controller to clean up Spotify import on unmount
   const spotifyAbortRef = useRef<AbortController | null>(null);
@@ -384,6 +392,7 @@ export function useOnboardingSubmit({
           setSpotifyImportState,
           setEnrichedProfile,
           setIsEnriching,
+          setIsConnecting,
           controller.signal,
           userId
         );
@@ -468,5 +477,6 @@ export function useOnboardingSubmit({
     enrichedProfile,
     setEnrichedProfile,
     isEnriching,
+    isConnecting,
   };
 }

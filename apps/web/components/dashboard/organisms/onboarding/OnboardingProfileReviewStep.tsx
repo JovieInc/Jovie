@@ -19,6 +19,8 @@ interface OnboardingProfileReviewStepProps {
 
 const ENRICHMENT_TIMEOUT_MS = 10_000;
 const PROFILE_SAVE_TIMEOUT_MS = 5000;
+/** Minimum time the profile preview must display before CTA enables. */
+const MIN_DISPLAY_MS = 5000;
 
 /**
  * Profile review step in onboarding.
@@ -35,7 +37,17 @@ export function OnboardingProfileReviewStep({
 }: OnboardingProfileReviewStepProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [enrichmentTimedOut, setEnrichmentTimedOut] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Ensure user has time to review their profile before proceeding
+  useEffect(() => {
+    const timer = globalThis.setTimeout(
+      () => setMinTimeElapsed(true),
+      MIN_DISPLAY_MS
+    );
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auto-dismiss loading state after timeout
   useEffect(() => {
@@ -171,10 +183,16 @@ export function OnboardingProfileReviewStep({
             <div className={FORM_LAYOUT.formInner}>
               <AuthButton
                 onClick={handleContinue}
-                disabled={isSaving}
-                aria-busy={isSaving}
+                disabled={isSaving || !minTimeElapsed || isEnriching}
+                aria-busy={isSaving || isEnriching}
               >
-                {isSaving ? 'Saving...' : 'Continue to Dashboard'}
+                {isSaving
+                  ? 'Saving...'
+                  : isEnriching
+                    ? 'Finishing setup...'
+                    : !minTimeElapsed
+                      ? 'Reviewing your profile...'
+                      : 'Continue to Dashboard'}
               </AuthButton>
             </div>
           </>
