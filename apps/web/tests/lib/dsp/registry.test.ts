@@ -220,14 +220,14 @@ describe('buildSearchUrl', () => {
     expect(url).toContain('/gb/');
   });
 
-  it('returns encoded query for DSPs without templates', () => {
+  it('returns null for DSPs without templates', () => {
     const url = buildSearchUrl('flo', 'test query');
-    expect(url).toBe('test%20query');
+    expect(url).toBeNull();
   });
 
-  it('returns encoded query for unknown keys', () => {
+  it('returns null for unknown keys', () => {
     const url = buildSearchUrl('unknown_dsp', 'test');
-    expect(url).toBe('test');
+    expect(url).toBeNull();
   });
 });
 

@@ -68,7 +68,7 @@ export function buildSearchUrl(
   provider: ProviderKey,
   track: TrackDescriptor,
   options: { storefront?: string } = {}
-): string {
+): string | null {
   const query = buildSearchQuery(track);
   return registryBuildSearchUrl(provider, decodeURIComponent(query), {
     storefront: options.storefront ?? DEFAULT_APPLE_STOREFRONT,
@@ -333,9 +333,13 @@ export async function resolveProviderLinks(
   for (const provider of providers) {
     if (seenProviders.has(provider)) continue;
 
+    const searchUrl = buildSearchUrl(provider, track, { storefront });
+    // Skip providers without a search URL template (e.g. FLO, JOOX, LINE MUSIC)
+    if (!searchUrl) continue;
+
     links.push({
       provider,
-      url: buildSearchUrl(provider, track, { storefront }),
+      url: searchUrl,
       quality: 'search_fallback',
       discovered_from: 'search_url',
     });

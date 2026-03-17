@@ -83,6 +83,42 @@ const YOUTUBE_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20"
 const YOUTUBE_MUSIC_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><title>YouTube Music</title><path d="M12 0C5.376 0 0 5.376 0 12s5.376 12 12 12 12-5.376 12-12S18.624 0 12 0zm0 19.104c-3.924 0-7.104-3.18-7.104-7.104S8.076 4.896 12 4.896s7.104 3.18 7.104 7.104-3.18 7.104-7.104 7.104zm0-13.332c-3.432 0-6.228 2.796-6.228 6.228S8.568 18.228 12 18.228 18.228 15.432 18.228 12 15.432 5.772 12 5.772zM9.684 15.54V8.46L15.816 12l-6.132 3.54z"/></svg>`;
 
 // ============================================================================
+// Registry Builder — eliminates repetitive object literals
+// ============================================================================
+
+interface DspInput {
+  key: string;
+  name: string;
+  musicfetchService: string;
+  color: string;
+  domains: string[];
+  searchUrlTemplate?: string | null;
+  textColor?: string;
+  logoSvg?: string;
+  category?: DspCategory;
+  showOnListenPage?: boolean;
+  aliases?: string[];
+}
+
+/** Build a registry entry with sensible defaults for streaming DSPs. */
+function dsp(input: DspInput): DspRegistryEntry {
+  const category = input.category ?? 'streaming';
+  return {
+    key: input.key,
+    name: input.name,
+    musicfetchService: input.musicfetchService,
+    color: input.color,
+    textColor: input.textColor ?? 'white',
+    logoSvg: input.logoSvg ?? buildMonogramLogo(input.name),
+    domains: input.domains,
+    searchUrlTemplate: input.searchUrlTemplate ?? null,
+    category,
+    showOnListenPage: input.showOnListenPage ?? category === 'streaming',
+    aliases: input.aliases ?? [],
+  };
+}
+
+// ============================================================================
 // Registry
 // ============================================================================
 
@@ -94,25 +130,20 @@ const YOUTUBE_MUSIC_LOGO = `<svg role="img" viewBox="0 0 24 24" width="20" heigh
  */
 export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
   // ─── Major Streaming DSPs ──────────────────────────────────────────────
-  {
+  dsp({
     key: 'spotify',
     name: 'Spotify',
     musicfetchService: 'spotify',
     color: '#1DB954',
-    textColor: 'white',
     logoSvg: SPOTIFY_LOGO,
     domains: ['open.spotify.com', 'spotify.com', 'spotify.link'],
     searchUrlTemplate: 'https://open.spotify.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'apple_music',
     name: 'Apple Music',
     musicfetchService: 'appleMusic',
     color: '#FA243C',
-    textColor: 'white',
     logoSvg: APPLE_MUSIC_LOGO,
     domains: [
       'music.apple.com',
@@ -122,513 +153,337 @@ export const DSP_REGISTRY: readonly DspRegistryEntry[] = [
     ],
     searchUrlTemplate:
       'https://music.apple.com/{storefront}/search?term={query}',
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['itunes', 'applemusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'youtube_music',
     name: 'YouTube Music',
     musicfetchService: 'youtubeMusic',
     color: '#FF0000',
-    textColor: 'white',
     logoSvg: YOUTUBE_MUSIC_LOGO,
     domains: ['music.youtube.com'],
     searchUrlTemplate: 'https://music.youtube.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['youtubemusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'soundcloud',
     name: 'SoundCloud',
     musicfetchService: 'soundCloud',
     color: '#FF5500',
-    textColor: 'white',
     logoSvg: SOUNDCLOUD_LOGO,
     domains: ['soundcloud.com', 'on.soundcloud.com', 'm.soundcloud.com'],
     searchUrlTemplate: 'https://soundcloud.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'deezer',
     name: 'Deezer',
     musicfetchService: 'deezer',
     color: '#2F9AFF',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Deezer'),
     domains: ['deezer.com', 'www.deezer.com', 'deezer.page.link'],
     searchUrlTemplate: 'https://www.deezer.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'tidal',
     name: 'Tidal',
     musicfetchService: 'tidal',
     color: '#111111',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Tidal'),
     domains: ['tidal.com', 'listen.tidal.com'],
     searchUrlTemplate: 'https://tidal.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'amazon_music',
     name: 'Amazon Music',
     musicfetchService: 'amazonMusic',
     color: '#146EB4',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Amazon Music'),
-    domains: ['music.amazon.com', 'amazon.com'],
+    domains: ['music.amazon.com'],
     searchUrlTemplate: 'https://music.amazon.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['amazonmusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'bandcamp',
     name: 'Bandcamp',
     musicfetchService: 'bandcamp',
     color: '#629AA0',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Bandcamp'),
     domains: ['bandcamp.com'],
     searchUrlTemplate: 'https://bandcamp.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
+  }),
 
   // ─── Niche / Regional Streaming DSPs ───────────────────────────────────
-  {
+  dsp({
     key: 'pandora',
     name: 'Pandora',
     musicfetchService: 'pandora',
     color: '#224099',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Pandora'),
     domains: ['pandora.com', 'www.pandora.com'],
     searchUrlTemplate: 'https://www.pandora.com/search/{query}/tracks',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'napster',
     name: 'Napster',
     musicfetchService: 'napster',
     color: '#2259FF',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Napster'),
     domains: ['web.napster.com', 'napster.com', 'us.napster.com'],
     searchUrlTemplate: 'https://web.napster.com/search?query={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'audiomack',
     name: 'Audiomack',
     musicfetchService: 'audiomack',
     color: '#FFA200',
     textColor: '#0A0A0A',
-    logoSvg: buildMonogramLogo('Audiomack'),
     domains: ['audiomack.com', 'www.audiomack.com'],
     searchUrlTemplate: 'https://audiomack.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'qobuz',
     name: 'Qobuz',
     musicfetchService: 'qobuz',
     color: '#0070EF',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Qobuz'),
     domains: ['qobuz.com', 'www.qobuz.com', 'open.qobuz.com', 'play.qobuz.com'],
     searchUrlTemplate: 'https://www.qobuz.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'anghami',
     name: 'Anghami',
     musicfetchService: 'anghami',
     color: '#F300F9',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Anghami'),
     domains: ['anghami.com', 'play.anghami.com'],
     searchUrlTemplate: 'https://play.anghami.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'boomplay',
     name: 'Boomplay',
     musicfetchService: 'boomplay',
     color: '#0052FF',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Boomplay'),
     domains: ['boomplay.com', 'www.boomplay.com'],
     searchUrlTemplate: 'https://www.boomplay.com/search/default/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'iheartradio',
     name: 'iHeartRadio',
     musicfetchService: 'iHeartRadio',
     color: '#C6002B',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('iHeartRadio'),
     domains: ['iheart.com', 'www.iheart.com'],
     searchUrlTemplate: 'https://www.iheart.com/search/?query={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'beatport',
     name: 'Beatport',
     musicfetchService: 'beatport',
     color: '#A3E422',
     textColor: '#0A0A0A',
-    logoSvg: buildMonogramLogo('Beatport'),
     domains: ['beatport.com'],
     searchUrlTemplate: 'https://www.beatport.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
+  }),
+
   // ─── New International Streaming DSPs ──────────────────────────────────
-  {
+  dsp({
     key: 'amazon',
     name: 'Amazon',
     musicfetchService: 'amazon',
     color: '#FF9900',
     textColor: '#0A0A0A',
-    logoSvg: buildMonogramLogo('Amazon'),
     domains: ['amazon.com', 'www.amazon.com'],
     searchUrlTemplate: 'https://www.amazon.com/s?k={query}&i=digital-music',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'awa',
     name: 'AWA',
     musicfetchService: 'awa',
     color: '#FC5B11',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('AWA'),
     domains: ['awa.fm', 'www.awa.fm'],
     searchUrlTemplate: 'https://s.awa.fm/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'audius',
     name: 'Audius',
     musicfetchService: 'audius',
     color: '#CC0FE0',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Audius'),
     domains: ['audius.co', 'www.audius.co'],
     searchUrlTemplate: 'https://audius.co/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'flo',
     name: 'FLO',
     musicfetchService: 'flo',
     color: '#00C3C1',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('FLO'),
     domains: ['music-flo.com', 'www.music-flo.com'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'gaana',
     name: 'Gaana',
     musicfetchService: 'gaana',
     color: '#E72C30',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Gaana'),
     domains: ['gaana.com', 'www.gaana.com'],
     searchUrlTemplate: 'https://gaana.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'jio_saavn',
     name: 'JioSaavn',
     musicfetchService: 'jioSaavn',
     color: '#2BC5B4',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('JioSaavn'),
     domains: ['jiosaavn.com', 'www.jiosaavn.com', 'saavn.com'],
     searchUrlTemplate: 'https://www.jiosaavn.com/search/{query}',
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['saavn', 'jiosaavn'],
-  },
-  {
+  }),
+  dsp({
     key: 'joox',
     name: 'JOOX',
     musicfetchService: 'joox',
     color: '#00D96F',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('JOOX'),
     domains: ['joox.com', 'www.joox.com'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'kkbox',
     name: 'KKBOX',
     musicfetchService: 'kkbox',
     color: '#09CEF6',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('KKBOX'),
     domains: ['kkbox.com', 'www.kkbox.com'],
     searchUrlTemplate: 'https://www.kkbox.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'line_music',
     name: 'LINE MUSIC',
     musicfetchService: 'lineMusic',
     color: '#00B900',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('LINE MUSIC'),
     domains: ['music.line.me'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['linemusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'netease',
     name: 'NetEase Music',
     musicfetchService: 'netEase',
     color: '#C20C0C',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('NetEase'),
     domains: ['music.163.com', 'y.music.163.com'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['netease_music', 'neteasemusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'qq_music',
     name: 'QQ Music',
     musicfetchService: 'qqMusic',
     color: '#31C27C',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('QQ Music'),
     domains: ['y.qq.com', 'i.y.qq.com'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['qqmusic', 'tencent_music', 'tencentmusic'],
-  },
-  {
+  }),
+  dsp({
     key: 'trebel',
     name: 'Trebel',
     musicfetchService: 'trebel',
     color: '#8B5CF6',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Trebel'),
     domains: ['trebel.io', 'www.trebel.io'],
-    searchUrlTemplate: null,
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'yandex',
     name: 'Yandex Music',
     musicfetchService: 'yandex',
     color: '#FFCC00',
     textColor: '#0A0A0A',
-    logoSvg: buildMonogramLogo('Yandex'),
     domains: ['music.yandex.ru', 'music.yandex.com'],
     searchUrlTemplate: 'https://music.yandex.ru/search?text={query}',
-    category: 'streaming',
-    showOnListenPage: true,
     aliases: ['yandexmusic'],
-  },
+  }),
 
   // ─── Video / Sound Platforms ───────────────────────────────────────────
-  {
+  dsp({
     key: 'tiktok',
     name: 'TikTok',
     musicfetchService: 'tiktok',
     color: '#000000',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('TikTok'),
     domains: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
     searchUrlTemplate: 'https://www.tiktok.com/search?q={query}',
     category: 'video',
     showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'instagram',
     name: 'Instagram',
     musicfetchService: 'instagram',
     color: '#E4405F',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Instagram'),
     domains: ['instagram.com', 'www.instagram.com'],
-    searchUrlTemplate: null,
     category: 'video',
     showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'youtube_shorts',
     name: 'YouTube Shorts',
     musicfetchService: 'youtubeShorts',
     color: '#FF0000',
-    textColor: 'white',
     logoSvg: YOUTUBE_LOGO,
     domains: ['youtube.com', 'www.youtube.com', 'youtu.be'],
-    searchUrlTemplate: null,
     category: 'video',
     showOnListenPage: false,
-    aliases: [],
-  },
+  }),
 
-  // ─── YouTube (regular — classified as metadata, not a music DSP) ───────
-  {
+  // ─── YouTube (regular — streaming, shown on listen page) ───────────────
+  dsp({
     key: 'youtube',
     name: 'YouTube',
     musicfetchService: 'youtube',
     color: '#FF0000',
-    textColor: 'white',
     logoSvg: YOUTUBE_LOGO,
     domains: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'],
     searchUrlTemplate: 'https://music.youtube.com/search?q={query}',
-    category: 'streaming',
-    showOnListenPage: true,
-    aliases: [],
-  },
+  }),
 
   // ─── Metadata Services ─────────────────────────────────────────────────
-  {
+  dsp({
     key: 'genius',
     name: 'Genius',
     musicfetchService: 'genius',
     color: '#FFFF64',
     textColor: '#0A0A0A',
-    logoSvg: buildMonogramLogo('Genius'),
     domains: ['genius.com', 'www.genius.com'],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'discogs',
     name: 'Discogs',
     musicfetchService: 'discogs',
     color: '#333333',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Discogs'),
     domains: ['discogs.com', 'www.discogs.com'],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'musicbrainz',
     name: 'MusicBrainz',
     musicfetchService: 'musicBrainz',
     color: '#BA478F',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('MusicBrainz'),
     domains: ['musicbrainz.org'],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'shazam',
     name: 'Shazam',
     musicfetchService: 'shazam',
     color: '#0088FF',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Shazam'),
     domains: ['shazam.com', 'www.shazam.com'],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'seven_digital',
     name: '7digital',
     musicfetchService: 'sevenDigital',
     color: '#FF6600',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('7digital'),
     domains: ['7digital.com', 'www.7digital.com'],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
     aliases: ['sevendigital'],
-  },
-  {
+  }),
+  dsp({
     key: 'telmor_musik',
     name: 'Telmor Musik',
     musicfetchService: 'telmorMusik',
     color: '#666666',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('Telmor'),
     domains: [],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
-  {
+  }),
+  dsp({
     key: 'yousee_musik',
     name: 'YouSee Musik',
     musicfetchService: 'youSeeMusik',
     color: '#666666',
-    textColor: 'white',
-    logoSvg: buildMonogramLogo('YouSee'),
     domains: [],
-    searchUrlTemplate: null,
     category: 'metadata',
-    showOnListenPage: false,
-    aliases: [],
-  },
+  }),
 ] as const;
 
 // ============================================================================
@@ -787,16 +642,16 @@ export const MUSICFETCH_LINK_MAPPINGS: Array<{
 
 /**
  * Build a search URL for a DSP using the registry template.
- * Returns the encoded query string if no template exists for the DSP.
+ * Returns null if no template exists for the DSP.
  */
 export function buildSearchUrl(
   providerKey: string,
   query: string,
   options: { storefront?: string } = {}
-): string {
+): string | null {
   const entry = _byKey.get(providerKey);
   if (!entry?.searchUrlTemplate) {
-    return encodeURIComponent(query);
+    return null;
   }
 
   return entry.searchUrlTemplate

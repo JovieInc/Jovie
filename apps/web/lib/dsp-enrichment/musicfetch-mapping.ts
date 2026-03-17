@@ -7,6 +7,7 @@ import {
   getMusicFetchServiceUrl,
   type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
+import { MUSICFETCH_LINK_MAPPINGS } from '@/lib/dsp-registry';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
 /** Profile fields that can be enriched from MusicFetch. */
@@ -113,8 +114,6 @@ export function mapMusicFetchProfileFields(
 
   return updates;
 }
-
-import { MUSICFETCH_LINK_MAPPINGS } from '@/lib/dsp-registry';
 
 export function extractMusicFetchLinks(
   artistData: MusicFetchArtistResult,

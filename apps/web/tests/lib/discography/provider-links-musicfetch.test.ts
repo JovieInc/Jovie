@@ -220,15 +220,16 @@ describe('resolveProviderLinks — MusicFetch integration', () => {
     expect(links[0].provider).toBe('youtube');
   });
 
-  it('all 30 default providers get at least a search_fallback', async () => {
+  it('default providers with search templates get search_fallback', async () => {
     mockIsMusicfetchAvailable.mockReturnValue(false);
 
     const { links } = await resolveProviderLinks(baseTrack, {
       fetcher: fetchMock,
     });
 
-    // Default providers list = STREAMING_DSP_KEYS (all streaming DSPs)
-    expect(links.length).toBe(30);
+    // DSPs without search URL templates (flo, joox, line_music, netease, qq_music, trebel)
+    // are skipped in search_fallback — they can only get canonical links from MusicFetch
+    expect(links.length).toBe(24);
 
     // Spot-check key providers
     const providers = new Set(links.map(l => l.provider));
