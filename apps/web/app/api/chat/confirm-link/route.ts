@@ -132,7 +132,7 @@ export async function POST(req: Request) {
       linkId = existingLink.id;
     } else {
       // Insert new social link
-      const [inserted] = await db
+      const rows = await db
         .insert(socialLinks)
         .values({
           creatorProfileId: profileId,
@@ -148,7 +148,10 @@ export async function POST(req: Request) {
           version: 1,
         })
         .returning({ id: socialLinks.id });
-      linkId = inserted.id;
+      if (!rows[0]) {
+        throw new Error('Insert returned no rows');
+      }
+      linkId = rows[0].id;
     }
 
     await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);

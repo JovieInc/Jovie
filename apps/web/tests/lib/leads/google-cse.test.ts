@@ -58,6 +58,7 @@ describe('searchGoogleCSE', () => {
   });
 
   it('captures API errors and returns an empty array', async () => {
+    vi.stubEnv('SERPAPI_API_KEY', '');
     vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
     vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
 
@@ -91,6 +92,7 @@ describe('searchGoogleCSE', () => {
 
   it('retries transient failures and succeeds without capturing an error', async () => {
     vi.useFakeTimers();
+    vi.stubEnv('SERPAPI_API_KEY', '');
     vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
     vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
 
@@ -148,6 +150,7 @@ describe('searchGoogleCSE', () => {
 
   it('fails fast after retries are exhausted and captures request failure', async () => {
     vi.useFakeTimers();
+    vi.stubEnv('SERPAPI_API_KEY', '');
     vi.stubEnv('GOOGLE_CSE_API_KEY', 'test-api-key');
     vi.stubEnv('GOOGLE_CSE_ENGINE_ID', 'test-engine-id');
 
