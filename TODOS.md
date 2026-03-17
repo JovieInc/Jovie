@@ -49,3 +49,45 @@
 **Context:** Use the existing dashboard refresh button (which calls `enqueueMusicFetchEnrichmentJob()`) to manually trigger re-enrichment for each artist. With ~30 artists this is feasible manually. For larger scale, a batch script would be needed.
 
 **Depends on:** DSP registry PR must be deployed first.
+
+---
+
+## Post-checkout celebration redesign
+
+**What:** Replace the current `/billing/success` page (which shows "You're eligible for verification" + verification request button) with a proper celebration: animated effect, "Welcome to Pro" headline, 3 concrete unlocked features shown visually, then CTA to dashboard.
+
+**Why:** Users who just paid should feel great about their decision, not confused by a verification form. The current page is transactional rather than celebratory, which hurts post-purchase sentiment and increases early churn risk.
+
+**Context:** The existing success page is at `apps/web/app/billing/success/page.tsx`. It tracks `subscription_success` analytics and has a verification request flow. The redesign should keep the verification request option but make the celebration the primary experience. Use entitlements from `ENTITLEMENT_REGISTRY` to show what specifically unlocked.
+
+**Effort:** M (a few hours)
+**Priority:** P1
+**Depends on:** Onboarding checkout step PR (provides the funnel that leads here).
+
+---
+
+## Win-back emails for checkout skippers
+
+**What:** When a user has plan intent (clicked a paid pricing CTA) but clicks "Skip" on the onboarding checkout step, enqueue a follow-up email 24h later with their profile link + "Ready to unlock Pro?" CTA.
+
+**Why:** These users expressed purchase intent then bailed — they're warm leads. A well-timed email has high conversion potential. The `onboarding_checkout_skipped` analytics event from the funnel PR provides the trigger signal.
+
+**Context:** Requires email sending infrastructure (transactional email provider integration). The plan intent and skip event are tracked via analytics. Need to build: email template, scheduling/queue system, unsubscribe handling, and A/B test framework for subject lines.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Onboarding checkout step PR + email sending infrastructure.
+
+---
+
+## Admin dashboard funnel analytics
+
+**What:** Add a conversion funnel view to the admin dashboard showing the full signup-to-paid pipeline: `plan_intent_captured` → `signup_completed` → `onboarding_completed` → `onboarding_checkout_shown` → `onboarding_checkout_initiated` → `onboarding_checkout_completed`, with drop-off rates at each stage, skip rates, plan breakdown (founding vs pro), monthly/annual split, and time-to-convert metrics.
+
+**Why:** We're instrumenting 11+ analytics events in the conversion funnel but have no admin visibility into the data. Without a dashboard, we're flying blind on conversion rates and can't identify where users drop off.
+
+**Context:** All analytics events are tracked via `track()` from `apps/web/lib/analytics.ts` which sends to gtag. The admin dashboard likely lives under `/app/admin`. The funnel view should aggregate events by day/week and show stage-by-stage conversion rates with trend lines.
+
+**Effort:** M
+**Priority:** P1
+**Depends on:** Onboarding checkout step PR (provides the events to visualize).
