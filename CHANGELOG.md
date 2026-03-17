@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.2.2] - 2026-03-17
+
+### Fixed
+
+- Demo sidebar navigation no longer redirects unauthenticated users to sign-in when clicking Audience or Earnings tabs — shows toast notification instead
+- `isAppleMusicConfigured()` now reads env vars at call time instead of module load, fixing false positives when Doppler injects credentials
+- Google CSE tests now correctly stub SerpAPI key to exercise the Google CSE code path
+
 ## [26.2.1] - 2026-03-17
 
 ### Changed
