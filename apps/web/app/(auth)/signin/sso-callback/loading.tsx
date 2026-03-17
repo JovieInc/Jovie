@@ -1,19 +1,16 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 /**
  * SSO callback loading screen
- * Shows simple logo animation while processing OAuth callback
+ * Shows spinner with status text while processing OAuth callback
  */
 export default function SsoCallbackLoading() {
   return (
     <div className='min-h-dvh grid place-items-center bg-base'>
-      <BrandLogo
-        size={32}
-        tone='auto'
-        alt='Processing sign in...'
-        priority
-        className='animate-in fade-in duration-700 ease-out'
-      />
+      <div className='flex flex-col items-center gap-4 animate-in fade-in duration-500 ease-out'>
+        <LoadingSpinner size='md' tone='muted' label='Signing you in' />
+        <p className='text-[13px] text-tertiary-token'>Signing you in…</p>
+      </div>
     </div>
   );
 }
