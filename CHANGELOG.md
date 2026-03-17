@@ -5,51 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.3.4] - 2026-03-17
+## [26.4.0] - 2026-03-17
 
 ### Added
 
-- `docs/PRODUCT_CAPABILITIES.md` — canonical rich feature catalog for AI agents with 37+ features, consistent schema (one-line, plan tier, problem solved, how it works, benefits, routes)
-- "Use This Sound" feature documented in FEATURE_REGISTRY — influencer sharing pages at `/{username}/{slug}/sounds` for TikTok, Instagram Reels, YouTube Shorts
-- 7 new docs.jov.ie feature pages: Tour Dates, Verified Badge, AI Insights, Ad Pixels, Fan CRM, Retargeting Ads, Plans & Pricing
-- 4 new docs.jov.ie guides: Share Your First Smart Link, Set Up Tipping, Set Up Ad Pixels, Connect Bandsintown
-
-### Changed
-
-- Rewrote Chat & AI docs page → AI Assistant (was inaccurately describing fan messaging; now correctly documents AI career assistant)
-- Fixed Tips docs page (aligned with actual Venmo-based payments, not Stripe)
-- Expanded all 6 existing docs.jov.ie feature pages from ~20 lines to ~80-120 lines with plan availability tables and detailed capabilities
-- Updated FEATURE_REGISTRY.md change management process to include PRODUCT_CAPABILITIES.md and docs.jov.ie updates
-- Renamed "Self-Serve Guide" section to "Guides" in docs navigation
-
-## [26.3.3] - 2026-03-17
-
-### Added
-
-- Admin settings section in Settings sidebar with dedicated `/app/settings/admin` route
-- `CampaignSettingsPanel` — campaign targeting (fit score, batch size) and throttling controls moved from inline campaign manager to centralized settings
-- Dev toolbar on/off toggle under Admin > Developer tools
-- Waitlist settings panel embedded in admin settings
-
-### Changed
-
-- Campaign manager now reads settings from persisted config instead of inline controls, with "Change in Settings" link
-- Admin sidebar section renamed from "Admin" to "General" with restructured card layout (dev tools, waitlist, campaigns, quick links)
+- Tour date ticket click tracking — wired into audience analytics via `useTrackingMutation` on public profile and dedicated tour page
+- Tour date analytics sidebar card in dashboard — shows ticket clicks, top cities, and top referrers per show
+- API endpoint `GET /api/dashboard/tour-dates/[id]/analytics` with ownership verification and UUID validation
+- `useTourDateAnalyticsQuery` React Query hook for client-side analytics fetching
+- Comprehensive tour date seed data (12 venues across 7 countries) with diverse providers, statuses, and ticketing platforms
 
 ### Fixed
 
-- Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
-- Dashboard profile selector now prioritizes claimed profiles, preventing sidebar/panel username mismatch
-- Orphaned unclaimed profiles are deactivated on handle change to prevent stale public profile pages
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.2] - 2026-03-17
-
-### Added
-
-- Shopify shop redirect at `/[username]/shop` — redirects to creator's `*.myshopify.com` store with UTM attribution
-- Shopping bag icon in public profile nav bar when shop is enabled
-- Dashboard shop settings card in Earnings tab for connecting/disconnecting Shopify store URL
-- Shop click tracking via `/api/track` with `sendBeacon` for fire-and-forget analytics
 
 ### Removed
 
