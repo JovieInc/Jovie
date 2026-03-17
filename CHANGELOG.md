@@ -28,6 +28,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Sidebar display name now updates immediately after saving profile edits (was stale until full-page reload due to separate query cache)
+- Social link delete API no longer returns 500 on temp-* IDs — rejects with 400 before hitting the database
+- Social link optimistic rollback now properly reverts UI on server error (was using stale closure instead of snapshot)
+- Mobile settings page now shows "Links, music & more" trigger to access Social/Music/Earn/About tabs (were completely hidden below `lg` breakpoint)
+- Social link action labels now show platform name or @handle consistently instead of raw hostnames for X, Threads, Facebook, Twitch, Snapchat
+- Analytics "Last 30 days" container reserves min-height to prevent layout shift during lazy load
+- Theme-init script no longer causes hydration mismatch (nonce undefined vs empty string) on every page load
+- Display name inline editor now uses distinct aria-label ("Edit display name") to avoid screen reader confusion with the form field
 - Admin creator sidebar now displays DSP and social link icons (previously showed empty tabs because `platform` field was dropped during data hydration)
 - Fixed swapped `platformIcon`/`platformName` fields in `CreatorProfileSocialLinks` table component
 - CRM contact sidebar now correctly resolves platform icons from `platform` field before falling back to URL detection

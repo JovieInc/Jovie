@@ -47,6 +47,14 @@ export async function DELETE(req: Request) {
       const { profileId, linkId, action, expectedVersion } =
         validationResult.data;
 
+      // Reject temporary client-side IDs that haven't been persisted yet
+      if (linkId.startsWith('temp-')) {
+        return NextResponse.json(
+          { error: 'Cannot delete a link that has not been saved yet' },
+          { status: 400, headers: combinedHeaders }
+        );
+      }
+
       const profile = await getAuthenticatedProfile(tx, profileId, clerkUserId);
       if (!profile) {
         return NextResponse.json(

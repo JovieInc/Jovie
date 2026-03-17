@@ -85,8 +85,28 @@ const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
     hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
     requiresAtSymbol: true,
   },
+  x: {
+    hosts: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'],
+    requiresAtSymbol: false,
+  },
   linktree: {
     hosts: ['linktr.ee', 'www.linktr.ee'],
+    requiresAtSymbol: false,
+  },
+  threads: {
+    hosts: ['threads.net', 'www.threads.net'],
+    requiresAtSymbol: false,
+  },
+  facebook: {
+    hosts: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    requiresAtSymbol: false,
+  },
+  twitch: {
+    hosts: ['twitch.tv', 'www.twitch.tv'],
+    requiresAtSymbol: false,
+  },
+  snapchat: {
+    hosts: ['snapchat.com', 'www.snapchat.com'],
     requiresAtSymbol: false,
   },
 };
@@ -122,7 +142,13 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
       if (config.hosts.includes(host)) {
-        const seg = url.pathname.split('/').find(Boolean);
+        const segments = url.pathname.split('/').filter(Boolean);
+
+        // Snapchat uses /add/<username> — skip the "add" prefix
+        const seg =
+          host.includes('snapchat.com') && segments[0] === 'add'
+            ? segments[1]
+            : segments[0];
         if (!seg) return null;
 
         // YouTube requires @ symbol, others allow it optionally
