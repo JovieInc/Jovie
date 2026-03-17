@@ -53,7 +53,7 @@ export function TableCountBadge({
   return (
     <span
       className={cn(
-        'rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2.5 py-0.5 text-[11px] font-[510] tabular-nums text-primary-token',
+        'rounded-full border border-subtle bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] tabular-nums text-primary-token',
         className
       )}
     >

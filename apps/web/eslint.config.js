@@ -341,17 +341,8 @@ module.exports = [
               message:
                 'Molecules cannot import from organisms or features. Compose only from atoms.',
             },
-            {
-              from: ['features'],
-              disallow: [
-                {
-                  type: 'features',
-                  feature: '!${feature}',
-                },
-              ],
-              message:
-                'Features cannot import from other features. Promote shared code to molecules/organisms.',
-            },
+            // TODO: Add cross-feature import ban when eslint-plugin-boundaries
+            // supports capture-based disallow syntax in flat config
           ],
         },
       ],

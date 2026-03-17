@@ -67,7 +67,7 @@ export function ReleaseArtwork({
       fallback={
         <Icon
           name='Disc3'
-          className='h-6 w-6 text-(--linear-text-tertiary)'
+          className='h-6 w-6 text-tertiary-token'
           aria-hidden='true'
         />
       }

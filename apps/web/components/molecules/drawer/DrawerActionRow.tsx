@@ -23,9 +23,9 @@ export function DrawerActionRow({
       type='button'
       onClick={onClick}
       className={cn(
-        'flex min-h-8 w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-left text-[12px] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150',
-        'hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
-        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'flex min-h-8 w-full items-center gap-2 rounded-[8px] border border-transparent px-2 py-1.5 text-left text-[12px] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150',
+        'hover:border-subtle hover:bg-surface-1 hover:text-primary-token',
+        'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
     >

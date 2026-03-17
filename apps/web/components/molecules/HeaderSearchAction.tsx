@@ -126,7 +126,7 @@ export function HeaderSearchAction({
           asChild
           ariaLabel='Clear search'
           tooltipLabel='Clear search'
-          className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
         >
           <Link href={clearHref}>
             <X className='h-4 w-4' />
@@ -137,7 +137,7 @@ export function HeaderSearchAction({
           type='button'
           ariaLabel={`Close ${tooltipLabel.toLowerCase()}`}
           tooltipLabel='Close search'
-          className='border-transparent bg-transparent text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='border-transparent bg-transparent text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token'
           onClick={close}
         >
           <X className='h-4 w-4' />

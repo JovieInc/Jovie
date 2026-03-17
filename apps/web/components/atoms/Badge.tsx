@@ -12,8 +12,7 @@ export const Badge = React.forwardRef<HTMLSpanElement, AppBadgeProps>(
       <BaseBadge
         ref={ref}
         className={cn(
-          emphasis === 'subtle' &&
-            'bg-(--linear-bg-surface-1) text-(--linear-text-tertiary)',
+          emphasis === 'subtle' && 'bg-surface-1 text-tertiary-token',
           className
         )}
         {...props}

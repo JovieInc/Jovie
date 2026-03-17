@@ -67,16 +67,13 @@ export function TrackMetaSummary({
       <div className={cn('min-w-0 flex-1', styles.container)}>
         <div className='flex items-center gap-2'>
           <span
-            className={cn(
-              'tabular-nums text-(--linear-text-tertiary)',
-              styles.number
-            )}
+            className={cn('tabular-nums text-tertiary-token', styles.number)}
           >
             {trackLabel}.
           </span>
           <h3
             className={cn(
-              'min-w-0 truncate font-[590] text-(--linear-text-primary)',
+              'min-w-0 truncate font-[590] text-primary-token',
               styles.title
             )}
           >
@@ -85,7 +82,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0 text-[9px] font-[510] text-(--linear-text-tertiary) shadow-none'
+              className='shrink-0 rounded-[6px] border border-subtle bg-surface-1 px-1.5 py-0 text-[9px] font-[510] text-tertiary-token shadow-none'
             >
               E
             </Badge>
@@ -95,7 +92,7 @@ export function TrackMetaSummary({
         {durationMs != null || isrc ? (
           <div
             className={cn(
-              'flex items-center gap-3 text-(--linear-text-secondary)',
+              'flex items-center gap-3 text-secondary-token',
               styles.meta
             )}
           >
@@ -103,7 +100,7 @@ export function TrackMetaSummary({
               <span className='tabular-nums'>{formatDuration(durationMs)}</span>
             )}
             {isrc ? (
-              <span className='font-mono text-[9.5px] tracking-[0.02em] text-(--linear-text-tertiary)'>
+              <span className='font-mono text-[9.5px] tracking-[0.02em] text-tertiary-token'>
                 {isrc}
               </span>
             ) : null}

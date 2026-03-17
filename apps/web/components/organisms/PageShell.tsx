@@ -46,7 +46,7 @@ export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-(--linear-text-primary)',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-primary-token',
         className
       )}
     >

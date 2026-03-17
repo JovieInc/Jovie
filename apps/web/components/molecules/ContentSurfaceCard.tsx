@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
-  'border bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]',
+  'border bg-surface-0 shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]',
   {
     variants: {
       surface: {
@@ -21,7 +21,7 @@ const contentSurfaceCardVariants = cva(
 
 /** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
 export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+  'rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
 
 export interface ContentSurfaceCardProps
   extends VariantProps<typeof contentSurfaceCardVariants> {

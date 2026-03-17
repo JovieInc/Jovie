@@ -90,7 +90,7 @@ export function ReleaseTrackList({
         aria-controls={`release-tracklist-${release.id}`}
         className={cn(
           DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1)/75 hover:text-(--linear-text-secondary) focus-visible:bg-(--linear-bg-surface-1)/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-surface-1/75 hover:text-secondary-token focus-visible:bg-surface-1/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         )}
       >
         <span>Tracks ({release.totalTracks})</span>
@@ -231,8 +231,8 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1)/70 focus-within:bg-(--linear-bg-surface-1)/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
-      <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-(--linear-text-tertiary)'>
+    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
+      <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
 
@@ -245,7 +245,7 @@ function TrackItem({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[13.5px] font-[510] text-(--linear-text-primary)'
+              className='text-[13.5px] font-[510] text-primary-token'
               tooltipSide='top'
             >
               {track.title}
@@ -253,14 +253,14 @@ function TrackItem({
             {track.isExplicit && (
               <Badge
                 variant='secondary'
-                className='shrink-0 bg-(--linear-bg-surface-1) px-1 py-0 text-[8px] text-(--linear-text-tertiary)'
+                className='shrink-0 bg-surface-1 px-1 py-0 text-[8px] text-tertiary-token'
               >
                 E
               </Badge>
             )}
           </div>
 
-          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -269,7 +269,7 @@ function TrackItem({
             {track.isrc && (
               <>
                 {track.durationMs != null && (
-                  <span className='text-(--linear-text-quaternary)'>|</span>
+                  <span className='text-quaternary-token'>|</span>
                 )}
                 <span className='font-mono text-[11px]'>{track.isrc}</span>
               </>
@@ -286,7 +286,7 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
@@ -295,14 +295,14 @@ function TrackItem({
                   <Play className='h-3 w-3' />
                 )}
               </button>
-              <div className='h-0.5 flex-1 rounded-full bg-(--linear-bg-surface-1)'>
+              <div className='h-0.5 flex-1 rounded-full bg-surface-1'>
                 <div
                   className='h-full rounded-full bg-(--linear-accent) transition-[width]'
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-            <p className='text-[10.5px] text-(--linear-text-tertiary)'>
+            <p className='text-[10.5px] text-tertiary-token'>
               {track.audioFormat
                 ? `Audio preview · ${track.audioFormat.toUpperCase()}`
                 : 'Audio preview'}
@@ -339,7 +339,7 @@ function TrackActionsMenu({
           aria-label={`Actions for ${track.title}`}
           className='h-[22px] w-[22px] self-center group-hover:opacity-100'
         >
-          <MoreHorizontal className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
         </DrawerInlineIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>

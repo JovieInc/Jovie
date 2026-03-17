@@ -26,11 +26,11 @@ export function ContentSectionHeader({
       )}
     >
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
-        <h2 className='truncate text-[12px] font-[560] tracking-[-0.008em] text-(--linear-text-primary)'>
+        <h2 className='truncate text-[12px] font-[560] tracking-[-0.008em] text-primary-token'>
           {title}
         </h2>
         {subtitle ? (
-          <p className='text-[11.5px] leading-[16px] text-(--linear-text-secondary)'>
+          <p className='text-[11.5px] leading-[16px] text-secondary-token'>
             {subtitle}
           </p>
         ) : null}

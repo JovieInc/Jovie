@@ -130,8 +130,8 @@ function CompactSearchForm(
         </Button>
       </PopoverTrigger>
       <PopoverContent align='end' className='w-[320px] p-0'>
-        <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
-          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             {triggerLabel}
           </span>
           <AppIconButton
