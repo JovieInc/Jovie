@@ -32,6 +32,7 @@ import { profileIsPublishable } from './helpers';
 import {
   createProfileForExistingUser,
   createUserAndProfile,
+  deactivateOrphanedProfiles,
   fetchExistingProfile,
   fetchExistingUser,
   updateExistingProfile,
@@ -176,13 +177,24 @@ export async function completeOnboarding({
               existingProfile &&
               (needsPublish || handleChanged || needsClaim)
             ) {
-              return await updateExistingProfile(
+              const result = await updateExistingProfile(
                 tx,
                 existingProfile,
                 normalizedUsername,
                 trimmedDisplayName,
                 username
               );
+
+              // Deactivate orphaned unclaimed profiles to prevent stale public pages
+              if (result.profileId) {
+                await deactivateOrphanedProfiles(
+                  tx,
+                  existingUser.id,
+                  result.profileId
+                );
+              }
+
+              return result;
             }
 
             if (existingProfile) {
@@ -200,12 +212,23 @@ export async function completeOnboarding({
               await ensureEmailAvailable(tx, clerkUserId, userEmail);
             }
             await ensureHandleAvailable(tx, normalizedUsername, null);
-            return await createProfileForExistingUser(
+            const newProfile = await createProfileForExistingUser(
               tx,
               existingUser.id,
               normalizedUsername,
               trimmedDisplayName
             );
+
+            // Deactivate orphaned unclaimed profiles to prevent stale public pages
+            if (newProfile.profileId) {
+              await deactivateOrphanedProfiles(
+                tx,
+                existingUser.id,
+                newProfile.profileId
+              );
+            }
+
+            return newProfile;
           },
           { isolationLevel: 'serializable' }
         ),
