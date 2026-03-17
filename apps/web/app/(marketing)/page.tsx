@@ -3,7 +3,6 @@ import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
 import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
 import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
 import { LogoBar } from '@/components/home/LogoBar';
 import { PricingSection } from '@/components/home/PricingSection';
 import { RedesignedHero } from '@/components/home/RedesignedHero';
@@ -280,8 +279,6 @@ export default function HomePage() {
       <SeeItInAction />
 
       <FinalCTASection />
-
-      <FloatingClaimBar />
     </div>
   );
 }
