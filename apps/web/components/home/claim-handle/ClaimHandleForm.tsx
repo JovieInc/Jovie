@@ -112,19 +112,19 @@ export function ClaimHandleForm({
       e.preventDefault();
       setFormSubmitted(true);
 
-      // Store handle state if it exists, otherwise just direct to signup
-      if (handle) {
-        try {
-          sessionStorage.setItem(
-            'pendingClaim',
-            JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
-          );
-        } catch {}
+      if (!handle.trim()) {
+        inputRef.current?.focus();
+        return;
       }
 
-      const target = handle
-        ? `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`
-        : '/signup';
+      try {
+        sessionStorage.setItem(
+          'pendingClaim',
+          JSON.stringify({ handle: handle.toLowerCase(), ts: Date.now() })
+        );
+      } catch {}
+
+      const target = `/onboarding?handle=${encodeURIComponent(handle.toLowerCase())}`;
 
       setNavigating(true);
 
