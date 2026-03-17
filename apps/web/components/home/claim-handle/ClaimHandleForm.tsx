@@ -20,11 +20,14 @@ import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
 function getInputRowStyle(isHero: boolean, isAvailable: boolean) {
-  const borderColor = isAvailable
-    ? 'rgba(74,222,128,0.25)'
-    : isHero
-      ? 'rgba(255,255,255,0.1)'
-      : 'rgba(255,255,255,0.06)';
+  let borderColor: string;
+  if (isAvailable) {
+    borderColor = 'rgba(74,222,128,0.25)';
+  } else if (isHero) {
+    borderColor = 'rgba(255,255,255,0.1)';
+  } else {
+    borderColor = 'rgba(255,255,255,0.06)';
+  }
 
   const heroShadow = [
     '0 20px 50px rgba(0,0,0,0.22)',

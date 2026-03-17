@@ -11,6 +11,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Homepage claim button now validates handle input before submitting (previously navigated to self-referential `/signup` when empty)
 - CRM audience demo table now shows visible text labels for Intent, Returning, and Source columns instead of invisible icon-only cells
+- Social links on artist profile now open in new tabs instead of navigating away from the page
+- "Log in" link now visible on mobile homepage navigation (was hidden below 380px)
+- Removed duplicate font declaration in auth layout that caused unused CSS preload warnings on every page
 
 ### Changed
 
