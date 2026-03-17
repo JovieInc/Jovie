@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.4] - 2026-03-17
+
+### Added
+
+- `docs/PRODUCT_CAPABILITIES.md` — canonical rich feature catalog for AI agents with 37+ features, consistent schema (one-line, plan tier, problem solved, how it works, benefits, routes)
+- "Use This Sound" feature documented in FEATURE_REGISTRY — influencer sharing pages at `/{username}/{slug}/sounds` for TikTok, Instagram Reels, YouTube Shorts
+- 7 new docs.jov.ie feature pages: Tour Dates, Verified Badge, AI Insights, Ad Pixels, Fan CRM, Retargeting Ads, Plans & Pricing
+- 4 new docs.jov.ie guides: Share Your First Smart Link, Set Up Tipping, Set Up Ad Pixels, Connect Bandsintown
+
+### Changed
+
+- Rewrote Chat & AI docs page → AI Assistant (was inaccurately describing fan messaging; now correctly documents AI career assistant)
+- Fixed Tips docs page (aligned with actual Venmo-based payments, not Stripe)
+- Expanded all 6 existing docs.jov.ie feature pages from ~20 lines to ~80-120 lines with plan availability tables and detailed capabilities
+- Updated FEATURE_REGISTRY.md change management process to include PRODUCT_CAPABILITIES.md and docs.jov.ie updates
+- Renamed "Self-Serve Guide" section to "Guides" in docs navigation
+
 ## [26.3.3] - 2026-03-17
 
 ### Added
