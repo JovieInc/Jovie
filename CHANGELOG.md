@@ -11,6 +11,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Move phone carousel (DeeplinksGrid) above CRM section (AudienceCRMSection) on homepage
 
+### Fixed
+
+- `SettingsStatusPill` no longer shows "Save failed" alongside "Saving..." and "Saved" states due to operator precedence bug with `&&` and ternary
+- Audience segment filters now use OR (union) logic consistently between SSR and API routes — previously SSR used AND while the API used OR, causing inconsistent results when selecting multiple segments
+- `SettingsAdPixelsSection` uses safe optional chaining on `pixels` and `hasTokens` objects to prevent runtime crashes when data shape is partial
+
 ## [26.3.0] - 2026-03-17
 
 ### Added
