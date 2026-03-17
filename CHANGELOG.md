@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [Unreleased]
+## [26.2.1] - 2026-03-17
+
+### Changed
+
+- Migrated all marketing homepage components from hardcoded rgba/hex to CSS design tokens (`var(--linear-*)`)
+- Replaced fluid `clamp()` typography with discrete breakpoints matching Linear.app's exact values at 375/768/1280/1440px
+- Widened homepage content max-width from 984px to 1250px to match Linear.app layout
+- Darkened mockup panel surfaces and switched to rounded-top-only corners with inset ring shadow
+- Updated marketing copy across all homepage sections (hero, CRM, deeplinks, pricing, final CTA)
+- Removed force-light CSS override so marketing pages render in dark mode
+- Added `text-rendering: optimizelegibility` to Inter font stack
 
 ### Fixed
 
