@@ -8,11 +8,11 @@ import { cn } from '../lib/utils';
 const inputVariants = cva(
   [
     'flex w-full rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3',
-    'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary)',
+    'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary)',
     'file:border-0 file:bg-transparent file:text-sm file:font-medium',
     'placeholder:text-(--linear-text-tertiary)',
     'hover:border-(--linear-border-default)',
-    'focus-visible:outline-none focus-visible:border-(--linear-border-focus)',
+    'focus-visible:outline-none focus-visible:border-(--color-accent)',
     'disabled:cursor-not-allowed disabled:opacity-50',
     'transition-colors duration-normal',
   ],

@@ -53,11 +53,11 @@ Legend: Y = present, **M** = missing (should add), - = N/A for this component
 | Input | hover | `hover:border-(--linear-border-default)` |
 | Switch | hover (unchecked) | `data-[state=unchecked]:hover:bg-white/[0.12]` |
 | Switch | hover (checked) | `data-[state=checked]:hover:bg-indigo-600` |
-| Badge | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1` |
+| Badge | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1` |
 | Select trigger | hover | `hover:border-(--linear-border-default)` |
 | Textarea | hover | `hover:border-(--linear-border-default)` |
-| Checkbox | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |
-| RadioGroupItem | hover | `hover:border-(--linear-border-focus) hover:bg-(--linear-bg-surface-1)` |
-| Card (hoverable) | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1` |
+| Checkbox | hover | `hover:border-(--color-accent) hover:bg-(--linear-bg-surface-1)` |
+| RadioGroupItem | hover | `hover:border-(--color-accent) hover:bg-(--linear-bg-surface-1)` |
+| Card (hoverable) | focus-visible | `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1` |
 | Checkbox | active | `active:scale-95 active:transition-transform` |
 | RadioGroupItem | active | `active:scale-95 active:transition-transform` |

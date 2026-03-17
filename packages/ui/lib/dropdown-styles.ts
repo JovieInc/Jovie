@@ -163,7 +163,7 @@ export const selectContentClasses = [
  * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
  */
 export const MENU_ITEM_BASE =
-  'relative flex cursor-default select-none items-center gap-1.5 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[450] leading-4 outline-none ' +
+  'relative flex cursor-default select-none items-center gap-1.5 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
@@ -185,7 +185,7 @@ export const MENU_ITEM_DESTRUCTIVE =
  * Checkbox and radio item styles (with left indicator space)
  */
 export const CHECKBOX_RADIO_ITEM_BASE =
-  'relative flex cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1 pl-7 pr-2 text-[12.5px] font-[450] leading-4 outline-none ' +
+  'relative flex cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1 pl-7 pr-2 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
@@ -196,7 +196,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
  * Select item base — unified with MENU_ITEM_BASE hover/focus behavior
  */
 export const SELECT_ITEM_BASE =
-  'relative flex w-full cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1.5 pl-8 pr-2 text-[13px] font-[450] leading-5 outline-none ' +
+  'relative flex w-full cursor-default select-none items-center rounded-(--linear-app-radius-item) py-1.5 pl-8 pr-2 text-[13px] font-[400] leading-5 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) ' +
   'focus-visible:bg-(--linear-bg-surface-1) focus-visible:text-(--linear-text-primary) ' +
@@ -211,7 +211,7 @@ export const SELECT_ITEM_BASE =
  * Compact menu item — smaller padding & font for dense UIs (tables, sidebars)
  */
 export const MENU_ITEM_COMPACT =
-  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[450] leading-4 outline-none ' +
+  'relative flex cursor-default select-none items-center gap-2 rounded-(--linear-app-radius-item) px-2 py-1 text-[12.5px] font-[400] leading-4 outline-none ' +
   'transition-colors duration-normal ease-interactive ' +
   'text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) ' +
   'data-[highlighted]:bg-(--linear-bg-surface-1) data-[highlighted]:text-(--linear-text-primary) ' +
@@ -257,11 +257,11 @@ export const MENU_SHORTCUT_BASE =
  */
 export const SELECT_TRIGGER_BASE =
   'flex h-8 w-full items-center justify-between rounded-[var(--radius-md)] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1.5 ' +
-  'text-[13px] font-[450] tracking-[-0.011em] text-(--linear-text-primary) ' +
+  'text-[13px] font-[400] tracking-[-0.011em] text-(--linear-text-primary) ' +
   'placeholder:text-(--linear-text-tertiary) ' +
   'transition-colors duration-normal ' +
   'hover:border-(--linear-border-default) ' +
-  'focus-visible:outline-none focus-visible:border-(--linear-border-focus) ' +
+  'focus-visible:outline-none focus-visible:border-(--color-accent) ' +
   'disabled:cursor-not-allowed disabled:opacity-50 ' +
   '[&>span]:line-clamp-1';
 

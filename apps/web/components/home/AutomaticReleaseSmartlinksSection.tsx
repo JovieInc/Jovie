@@ -104,12 +104,11 @@ export function AutomaticReleaseSmartlinksSection() {
             <div className='flex flex-col md:flex-row gap-6 md:items-start'>
               {/* Dashboard window — real ReleaseTable */}
               <div
-                className='relative overflow-hidden rounded-xl md:rounded-2xl flex-1 min-w-0'
+                className='relative overflow-hidden rounded-t-xl md:rounded-t-2xl rounded-b-none flex-1 min-w-0'
                 style={{
-                  border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   boxShadow: [
-                    '0 0 0 1px rgba(255,255,255,0.03)',
+                    'var(--linear-panel-ring) 0px 0px 0px 1px inset',
                     '0 8px 40px rgba(0,0,0,0.35)',
                     '0 24px 80px rgba(0,0,0,0.25)',
                   ].join(', '),
@@ -118,7 +117,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 {/* Shine border */}
                 <div
                   aria-hidden='true'
-                  className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
+                  className='pointer-events-none absolute inset-0 rounded-t-xl md:rounded-t-2xl rounded-b-none z-10'
                   style={{
                     border: '1px solid rgba(255,255,255,0.04)',
                   }}
@@ -166,13 +165,12 @@ export function AutomaticReleaseSmartlinksSection() {
 
               {/* Smart Link Card — beside the table */}
               <div
-                className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-2xl'
+                className='hidden md:flex flex-col w-[272px] shrink-0 overflow-hidden rounded-t-2xl rounded-b-none'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                   color: 'var(--linear-text-primary)',
-                  border: '1px solid var(--linear-border-subtle)',
                   boxShadow: [
-                    '0 0 0 1px rgba(255,255,255,0.03)',
+                    'var(--linear-panel-ring) 0px 0px 0px 1px inset',
                     '0 8px 40px rgba(0,0,0,0.35)',
                     '0 24px 80px rgba(0,0,0,0.25)',
                   ].join(', '),
@@ -181,7 +179,7 @@ export function AutomaticReleaseSmartlinksSection() {
                 {/* Shine border */}
                 <div
                   aria-hidden='true'
-                  className='pointer-events-none absolute inset-0 rounded-2xl z-10'
+                  className='pointer-events-none absolute inset-0 rounded-t-2xl rounded-b-none z-10'
                   style={{ border: '1px solid rgba(255,255,255,0.05)' }}
                 />
 

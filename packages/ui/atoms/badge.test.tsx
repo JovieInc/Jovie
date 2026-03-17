@@ -85,7 +85,7 @@ describe('Badge', () => {
     it('applies md size by default', () => {
       render(<Badge data-testid='badge'>New</Badge>);
       const badge = screen.getByTestId('badge');
-      expect(badge.className).toContain('text-[11px]');
+      expect(badge.className).toContain('text-[12px]');
       expect(badge.className).toContain('px-2');
     });
 
@@ -118,7 +118,7 @@ describe('Badge', () => {
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('inline-flex');
       expect(badge.className).toContain('items-center');
-      expect(badge.className).toContain('rounded-sm');
+      expect(badge.className).toContain('rounded-full');
       expect(badge.className).toContain('font-[510]');
     });
 
@@ -137,7 +137,7 @@ describe('Badge', () => {
       );
       const badge = screen.getByTestId('badge');
       expect(badge.className).toContain('custom-class');
-      expect(badge.className).toContain('rounded-sm');
+      expect(badge.className).toContain('rounded-full');
     });
   });
 

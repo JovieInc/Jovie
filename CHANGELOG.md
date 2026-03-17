@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [Unreleased]
+## [26.2.1] - 2026-03-17
+
+### Changed
+
+- Migrated all marketing homepage components from hardcoded rgba/hex to CSS design tokens (`var(--linear-*)`)
+- Replaced fluid `clamp()` typography with discrete breakpoints matching Linear.app's exact values at 375/768/1280/1440px
+- Widened homepage content max-width from 984px to 1250px to match Linear.app layout
+- Darkened mockup panel surfaces and switched to rounded-top-only corners with inset ring shadow
+- Updated marketing copy across all homepage sections (hero, CRM, deeplinks, pricing, final CTA)
+- Removed force-light CSS override so marketing pages render in dark mode
+- Added `text-rendering: optimizelegibility` to Inter font stack
+
+### Changed
+
+- Updated design system tokens to match Linear's latest values: accent `#7170ff`, font weights (normal 400, semibold 590, bold 680), button radius 4px, text quaternary `#62666d`, font features `"cv01","ss03"`
+- Migrated all UI components from `--linear-border-focus` to `--color-accent` for focus rings (button, switch, checkbox, radio, card, dialog, input, badge, segment-control, dropdown)
+- Updated all `font-[450]` to `font-[400]` across UI atoms and app components (17 instances across 20 files)
+- Badge component now uses pill shape (`rounded-full`) and 12px font size to match Linear
+- Button component uses hardcoded `rounded-[4px]` instead of `--radius-default` variable
+- Replaced hardcoded `#5e6ad2` accent in PricingSection with `var(--color-accent)` token
 
 ### Fixed
 

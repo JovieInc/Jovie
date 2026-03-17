@@ -43,7 +43,7 @@ export function HeaderNav({
       )}
       style={{
         fontSynthesisWeight: 'none',
-        borderColor: 'var(--linear-border-subtle)',
+        borderColor: 'var(--linear-border-default)',
         backgroundColor: 'var(--linear-bg-header)',
         zIndex: 100,
         backdropFilter: `blur(var(--linear-blur-header))`,
@@ -57,7 +57,7 @@ export function HeaderNav({
     >
       {/* Linear-style full-width content container */}
       <nav
-        className='flex items-center h-[56px] w-full px-5 sm:px-6 lg:px-[77px]'
+        className='flex items-center h-[var(--linear-header-height)] w-full px-5 sm:px-6 lg:px-[77px]'
         aria-label='Primary navigation'
       >
         {/* Logo section - left aligned with Linear padding */}
