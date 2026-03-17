@@ -381,11 +381,9 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      // FetchError message includes status code and statusText
+      // FetchError message is extracted from the response body error field
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          expect.stringMatching(/Fetch failed: 400|Bad Request/)
-        );
+        expect(toast.error).toHaveBeenCalledWith('Invalid platform');
       });
     });
 

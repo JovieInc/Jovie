@@ -132,13 +132,23 @@ export function useSettingsProfile({
 
       setProfileSaveStatus({ saving: true, success: null, error: null });
 
-      // Use TanStack Query mutation via ref to get latest function
-      const response = await saveProfileMutationRef.current({
-        updates: {
-          username,
-          displayName,
-        },
-      });
+      let response;
+      try {
+        // Use TanStack Query mutation via ref to get latest function
+        response = await saveProfileMutationRef.current({
+          updates: {
+            username,
+            displayName,
+          },
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Failed to update profile';
+        setProfileSaveStatus({ saving: false, success: false, error: message });
+        notifications.error(message);
+        // Re-throw so useAutoSave knows the save failed
+        throw error;
+      }
 
       // Update cache
       lastProfileSavedRef.current = { displayName, username };
