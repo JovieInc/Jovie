@@ -88,7 +88,7 @@ export async function fetchWithTimeoutResponse(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-  linkSignal(controller, externalSignal);
+  linkSignal(controller, externalSignal ?? undefined);
 
   try {
     const response = await fetch(url, {

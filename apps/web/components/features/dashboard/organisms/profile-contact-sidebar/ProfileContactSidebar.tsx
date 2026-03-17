@@ -202,7 +202,7 @@ export function ProfileContactSidebar() {
       // Auto-switch to the correct tab for the new link
       const targetCategory = computeTargetCategory(
         link.platform.id,
-        resolvedCategory
+        resolvedCategory as CategoryOption
       );
       if (targetCategory) setSelectedCategory(targetCategory);
 
