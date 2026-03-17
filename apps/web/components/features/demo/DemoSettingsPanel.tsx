@@ -122,8 +122,8 @@ function SettingsRow({
 }) {
   return (
     <div className='flex items-start justify-between gap-4 text-[13px]'>
-      <span className='shrink-0 text-(--linear-text-tertiary)'>{label}</span>
-      <span className='text-right text-(--linear-text-primary)'>{value}</span>
+      <span className='shrink-0 text-tertiary-token'>{label}</span>
+      <span className='text-right text-primary-token'>{value}</span>
     </div>
   );
 }
@@ -140,15 +140,11 @@ function ToggleRow({
   return (
     <label
       aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) px-3 py-2.5'
+      className='flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'
     >
       <div>
-        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
-          {label}
-        </p>
-        <p className='text-[12px] text-(--linear-text-tertiary)'>
-          {description}
-        </p>
+        <p className='text-[13px] font-[510] text-primary-token'>{label}</p>
+        <p className='text-[12px] text-tertiary-token'>{description}</p>
       </div>
       <input
         type='checkbox'

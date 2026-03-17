@@ -93,10 +93,10 @@ export function ProfileEditPreviewCard({
       <ContentSurfaceCard className='p-4'>
         <div className='flex items-center justify-between gap-3'>
           <div className='min-w-0 space-y-1'>
-            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-[12px] text-(--linear-text-secondary)'>
+            <p className='text-[12px] text-secondary-token'>
               Updated successfully
             </p>
           </div>
@@ -115,14 +115,12 @@ export function ProfileEditPreviewCard({
       <ContentSurfaceCard className='p-4 opacity-70'>
         <div className='flex items-center justify-between gap-3'>
           <div className='min-w-0 space-y-1'>
-            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+            <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
-            <p className='text-[12px] text-(--linear-text-secondary)'>
-              Edit cancelled
-            </p>
+            <p className='text-[12px] text-secondary-token'>Edit cancelled</p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
+          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-subtle bg-surface-0 px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
             <X className='h-3.5 w-3.5' />
             Cancelled
           </span>
@@ -133,13 +131,13 @@ export function ProfileEditPreviewCard({
 
   return (
     <ContentSurfaceCard className='overflow-hidden'>
-      <div className='border-b border-(--linear-border-subtle) px-4 py-3'>
+      <div className='border-b border-subtle px-4 py-3'>
         <div className='space-y-0.5'>
-          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
             Update {preview.fieldLabel}
           </h4>
           {preview.reason && (
-            <p className='text-[11px] leading-[1.45] text-(--linear-text-secondary)'>
+            <p className='text-[11px] leading-[1.45] text-secondary-token'>
               {preview.reason}
             </p>
           )}
@@ -147,14 +145,14 @@ export function ProfileEditPreviewCard({
       </div>
 
       <div className='space-y-2 px-4 py-3'>
-        <div className='rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-3'>
-          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+        <div className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-3'>
+          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
             Current
           </div>
           <div
             className={cn(
-              'text-[13px] tracking-[-0.01em] text-(--linear-text-primary)',
-              !preview.currentValue && 'italic text-(--linear-text-tertiary)'
+              'text-[13px] tracking-[-0.01em] text-primary-token',
+              !preview.currentValue && 'italic text-tertiary-token'
             )}
           >
             {formatValue(preview.currentValue)}
@@ -164,13 +162,13 @@ export function ProfileEditPreviewCard({
           <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-accent)'>
             New
           </div>
-          <div className='text-[13px] tracking-[-0.01em] text-(--linear-text-primary)'>
+          <div className='text-[13px] tracking-[-0.01em] text-primary-token'>
             {formatValue(preview.newValue)}
           </div>
         </div>
       </div>
 
-      <div className='flex items-center gap-2 border-t border-(--linear-border-subtle) px-4 py-3'>
+      <div className='flex items-center gap-2 border-t border-subtle px-4 py-3'>
         <DrawerButton
           type='button'
           tone='primary'

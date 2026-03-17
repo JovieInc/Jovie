@@ -15,7 +15,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'block w-full rounded-[8px] border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export function SettingsProfileSection({
   artist,
@@ -62,8 +62,8 @@ export function SettingsProfileSection({
         actionsClassName='w-auto shrink-0'
       />
       <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-(--linear-bg-surface-0) px-4 py-3.5'>
-          <span className='text-[13px] text-(--linear-text-primary)'>
+        <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-surface-0 px-4 py-3.5'>
+          <span className='text-[13px] text-primary-token'>
             Profile picture
           </span>
           <AvatarUploadable
@@ -81,10 +81,10 @@ export function SettingsProfileSection({
           />
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
           <label
             htmlFor='displayName'
-            className='shrink-0 text-[13px] text-(--linear-text-primary)'
+            className='shrink-0 text-[13px] text-primary-token'
           >
             Display name
           </label>
@@ -100,20 +100,20 @@ export function SettingsProfileSection({
           />
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
           <div className='shrink-0'>
             <label
               htmlFor='username'
-              className='text-[13px] text-(--linear-text-primary)'
+              className='text-[13px] text-primary-token'
             >
               Username
             </label>
-            <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
               Used in your profile URL
             </p>
           </div>
           <div className='flex w-full rounded-[8px] sm:max-w-[280px]'>
-            <span className='inline-flex select-none items-center rounded-l-[8px] border border-r-0 border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-secondary)'>
+            <span className='inline-flex select-none items-center rounded-l-[8px] border border-r-0 border-subtle bg-surface-1 px-3 text-[13px] text-secondary-token'>
               {profileDomain}/
             </span>
             <Input

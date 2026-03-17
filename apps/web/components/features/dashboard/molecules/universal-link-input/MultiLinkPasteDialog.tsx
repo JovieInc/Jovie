@@ -40,12 +40,12 @@ export interface MultiLinkPasteDialogProps {
  */
 function getButtonStyles(isDisabled: boolean, isChecked: boolean): string {
   if (isDisabled) {
-    return 'cursor-not-allowed border-(--linear-border-default) bg-(--linear-bg-surface-1) opacity-60';
+    return 'cursor-not-allowed border-default bg-surface-1 opacity-60';
   }
   if (isChecked) {
     return 'border-accent bg-accent/5';
   }
-  return 'border-(--linear-border-default) bg-(--linear-bg-surface-2) hover:border-accent/50';
+  return 'border-default bg-surface-2 hover:border-accent/50';
 }
 
 /**
@@ -53,12 +53,12 @@ function getButtonStyles(isDisabled: boolean, isChecked: boolean): string {
  */
 function getCheckboxStyles(isDisabled: boolean, isChecked: boolean): string {
   if (isDisabled) {
-    return 'border-(--linear-border-default) bg-(--linear-bg-surface-3)';
+    return 'border-default bg-surface-3';
   }
   if (isChecked) {
     return 'border-accent bg-accent';
   }
-  return 'border-(--linear-border-default) bg-(--linear-bg-surface-1)';
+  return 'border-default bg-surface-1';
 }
 
 /**
@@ -114,7 +114,7 @@ function LinkItem({
       {/* URL and info */}
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             {platform.name}
           </span>
           {isDuplicate && (
@@ -124,7 +124,7 @@ function LinkItem({
             </span>
           )}
         </div>
-        <p className='truncate text-[13px] text-(--linear-text-tertiary)'>
+        <p className='truncate text-[13px] text-tertiary-token'>
           {normalizedUrl}
         </p>
       </div>

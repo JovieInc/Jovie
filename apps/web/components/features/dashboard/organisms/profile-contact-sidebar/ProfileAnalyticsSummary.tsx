@@ -50,7 +50,7 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
+      <DrawerSurfaceCard className='overflow-hidden bg-surface-0'>
         <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
@@ -73,7 +73,7 @@ export function ProfileAnalyticsSummary() {
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <DrawerSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
+    <DrawerSurfaceCard className='overflow-hidden bg-surface-0'>
       <DrawerStatGrid
         className={cn(
           'p-3.5 transition-opacity duration-150',
@@ -96,18 +96,18 @@ export function ProfileAnalyticsSummary() {
       </DrawerStatGrid>
 
       {/* Time range selector */}
-      <div className='flex justify-end border-t border-(--linear-border-subtle) px-3 py-1.5'>
+      <div className='flex justify-end border-t border-subtle px-3 py-1.5'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <DrawerButton
               type='button'
               tone='ghost'
-              className='h-6 rounded-[7px] border-transparent px-1.5 py-0.5 text-[11px] font-normal text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
+              className='h-6 rounded-[7px] border-transparent px-1.5 py-0.5 text-[11px] font-normal text-secondary-token hover:text-primary-token'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown
                 size={10}
-                className='text-(--linear-text-tertiary)'
+                className='text-tertiary-token'
                 aria-hidden='true'
               />
             </DrawerButton>
@@ -129,14 +129,14 @@ export function ProfileAnalyticsSummary() {
                     {option.requiresPro && (
                       <Lock
                         size={12}
-                        className='text-(--linear-text-tertiary)'
+                        className='text-tertiary-token'
                         aria-hidden='true'
                       />
                     )}
                     {isActive && !option.requiresPro && (
                       <Check
                         size={14}
-                        className='ml-auto text-(--linear-text-primary)'
+                        className='ml-auto text-primary-token'
                         aria-hidden='true'
                       />
                     )}

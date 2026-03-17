@@ -31,8 +31,7 @@ const STATUS_STYLES: Record<
   },
   rejected: {
     label: 'Rejected',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)',
+    className: 'border-subtle bg-surface-0 text-tertiary-token',
     dotClassName: 'bg-(--linear-text-tertiary)',
   },
 };

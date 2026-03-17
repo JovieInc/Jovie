@@ -72,11 +72,7 @@ export function DspConnectionPill({
   if (connected && !hasActions) {
     return (
       <span
-        className={cn(
-          BASE_PILL_CLASSNAME,
-          'text-(--linear-text-secondary)',
-          className
-        )}
+        className={cn(BASE_PILL_CLASSNAME, 'text-secondary-token', className)}
         style={{
           borderColor: `${accent}30`,
           backgroundColor: `${accent}10`,
@@ -103,7 +99,7 @@ export function DspConnectionPill({
             className={cn(
               BASE_PILL_CLASSNAME,
               INTERACTIVE_PILL_CLASSNAME,
-              'cursor-pointer text-(--linear-text-secondary)',
+              'cursor-pointer text-secondary-token',
               className
             )}
             style={
@@ -158,7 +154,7 @@ export function DspConnectionPill({
       className={cn(
         BASE_PILL_CLASSNAME,
         INTERACTIVE_PILL_CLASSNAME,
-        'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)',
+        'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token',
         className
       )}
       aria-label={`Connect ${label}`}

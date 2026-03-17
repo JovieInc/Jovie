@@ -39,9 +39,9 @@ function FunnelStep({
       label={label}
       value={value}
       subtitle={rate}
-      labelClassName='truncate text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'
-      valueClassName='text-[20px] font-[590] leading-none tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'
-      subtitleClassName='text-[11px] text-(--linear-text-tertiary) tabular-nums'
+      labelClassName='truncate text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'
+      valueClassName='text-[20px] font-[590] leading-none tracking-[-0.011em] text-primary-token tabular-nums'
+      subtitleClassName='text-[11px] text-tertiary-token tabular-nums'
     />
   );
 }

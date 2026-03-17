@@ -20,16 +20,14 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   if (compact) {
     return (
       <div
-        className='inline-flex h-8 items-center gap-2 rounded-full border border-[#1DB954]/18 bg-[#1DB954]/8 px-3 text-[12px] text-(--linear-text-primary)'
+        className='inline-flex h-8 items-center gap-2 rounded-full border border-[#1DB954]/18 bg-[#1DB954]/8 px-3 text-[12px] text-primary-token'
         aria-live='polite'
       >
         <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />
-        <span className='max-w-[180px] truncate text-(--linear-text-secondary)'>
+        <span className='max-w-[180px] truncate text-secondary-token'>
           {artistName ? `Importing ${artistName}` : 'Importing from Spotify'}
         </span>
-        <span className='shrink-0 text-(--linear-text-tertiary)'>
-          · {importedCount}
-        </span>
+        <span className='shrink-0 text-tertiary-token'>· {importedCount}</span>
       </div>
     );
   }
@@ -48,13 +46,13 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
       <DrawerSurfaceCard className='mx-4 mt-2 flex items-center gap-3 border-[#1DB954]/18 bg-[#1DB954]/6 px-4 py-3 transition-opacity duration-200'>
         <ProviderIcon provider='spotify' className='h-5 w-5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
-          <div className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+          <div className='flex items-center gap-2 text-[13px] text-primary-token'>
             <span className='truncate'>
               {artistName
                 ? `Importing releases from ${artistName}...`
                 : 'Importing releases from Spotify...'}
             </span>
-            <span className='shrink-0 text-[11px] text-(--linear-text-secondary)'>
+            <span className='shrink-0 text-[11px] text-secondary-token'>
               {importedCount} imported
             </span>
           </div>

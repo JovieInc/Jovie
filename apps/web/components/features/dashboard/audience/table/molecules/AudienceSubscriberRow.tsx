@@ -45,7 +45,7 @@ export function AudienceSubscriberRow({
       data-index={dataIndex}
       ref={measureRef}
       className={cn(
-        'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
         isSelected && 'bg-(--linear-row-selected)'
       )}
       style={
@@ -69,13 +69,13 @@ export function AudienceSubscriberRow({
         onToggle={onToggleSelect}
       />
 
-      <td className='px-4 py-3 align-middle text-[13px] text-(--linear-text-primary)'>
+      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
         {row.displayName && row.displayName !== row.phone
           ? row.displayName
           : 'Subscriber'}
       </td>
 
-      <td className='px-4 py-3 align-middle text-[13px] text-(--linear-text-primary)'>
+      <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
         {row.phone ?? '—'}
       </td>
 

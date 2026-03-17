@@ -63,15 +63,15 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-(--linear-text-primary)'>
+      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
         <Icon
           name='Link'
-          className='h-5 w-5 text-(--linear-text-secondary)'
+          className='h-5 w-5 text-secondary-token'
           aria-hidden='true'
         />
         Edit release links
       </DialogTitle>
-      <DialogDescription className='text-[13px] text-(--linear-text-secondary)'>
+      <DialogDescription className='text-[13px] text-secondary-token'>
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
@@ -82,7 +82,7 @@ export function ReleaseEditDialog({
             <DrawerSurfaceCard className='rounded-[12px] p-4'>
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-none'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-subtle bg-surface-0 shadow-none'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -98,7 +98,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='border border-(--linear-border-subtle) bg-transparent text-[11px] text-(--linear-text-secondary)'
+                    className='border border-subtle bg-transparent text-[11px] text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -132,7 +132,7 @@ export function ReleaseEditDialog({
                           className='h-4 w-4'
                           aria-hidden='true'
                         />
-                        <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                        <p className='text-[13px] font-[510] text-primary-token'>
                           {provider.label}
                         </p>
                       </div>

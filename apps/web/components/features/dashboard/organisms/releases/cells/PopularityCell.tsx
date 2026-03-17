@@ -31,7 +31,7 @@ export const PopularityCell = memo(function PopularityCell({
       <TooltipTrigger asChild>
         {isValidPopularity ? (
           <DrawerInlineIconButton
-            className='gap-1.5 rounded-[6px] px-1 py-0.5 text-(--linear-text-tertiary)'
+            className='gap-1.5 rounded-[6px] px-1 py-0.5 text-tertiary-token'
             aria-label={`Spotify popularity ${displayPopularity} out of 100`}
           >
             <div className='h-2 w-12 overflow-hidden rounded-full bg-(--linear-border-subtle)'>
@@ -42,15 +42,13 @@ export const PopularityCell = memo(function PopularityCell({
             </div>
           </DrawerInlineIconButton>
         ) : (
-          <span className='text-[11px] text-(--linear-text-tertiary)'>—</span>
+          <span className='text-[11px] text-tertiary-token'>—</span>
         )}
       </TooltipTrigger>
       {isValidPopularity && (
         <TooltipContent side='top' className='text-[11px]'>
           <span className='font-[510]'>{displayPopularity}</span>
-          <span className='text-(--linear-text-secondary)'>
-            /100 popularity
-          </span>
+          <span className='text-secondary-token'>/100 popularity</span>
         </TooltipContent>
       )}
     </Tooltip>

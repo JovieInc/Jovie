@@ -17,8 +17,8 @@ export function InsightEmptyState({
 
   return (
     <ContentSurfaceCard className='flex flex-col items-center justify-center p-8 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-        <Sparkles className='h-5 w-5 text-(--linear-text-secondary)' />
+      <div className='flex h-12 w-12 items-center justify-center rounded-[14px] border border-subtle bg-surface-0'>
+        <Sparkles className='h-5 w-5 text-secondary-token' />
       </div>
 
       <h3 className='mt-4 text-[13px] font-[590] text-primary-token'>

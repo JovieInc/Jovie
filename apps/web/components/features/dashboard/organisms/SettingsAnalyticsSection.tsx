@@ -68,7 +68,7 @@ export function SettingsAnalyticsSection({
           gated={!isPro}
         />
         {isPro && excludeSelf ? (
-          <ContentSurfaceCard className='flex items-start gap-3 bg-(--linear-bg-surface-0) p-3.5'>
+          <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
             <BarChart3 className='h-4 w-4 text-secondary-token mt-0.5 shrink-0' />
             <div>
               <p className='text-[13px] font-[510] text-primary-token'>

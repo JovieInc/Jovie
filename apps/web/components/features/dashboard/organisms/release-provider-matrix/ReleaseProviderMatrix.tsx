@@ -520,7 +520,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
             }
             tooltipLabel='Search'
-            className='h-7 text-[12px] text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+            className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
           />
           {canCreateManualReleases ? (
             <DashboardHeaderActionButton
@@ -532,7 +532,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               label='New Release'
               iconOnly
               tooltipLabel='New Release'
-              className='h-7 w-7 text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+              className='h-7 w-7 text-tertiary-token hover:text-primary-token'
             />
           ) : null}
         </DashboardHeaderActionGroup>
@@ -541,7 +541,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
-            className='h-7 w-7 text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
           />
         </div>
       </div>
@@ -794,17 +794,17 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             {/* Show "No releases" state when connected but no releases and not importing */}
             {isConnected && rows.length === 0 && !isImporting && (
               <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-subtle bg-surface-1'>
                   <Icon
                     name='Disc3'
-                    className='h-8 w-8 text-(--linear-text-tertiary)'
+                    className='h-8 w-8 text-tertiary-token'
                     aria-hidden='true'
                   />
                 </div>
-                <h3 className='mt-4 text-lg font-[590] text-(--linear-text-primary)'>
+                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
                   No releases yet
                 </h3>
-                <p className='mt-1 max-w-sm text-[13px] text-(--linear-text-secondary)'>
+                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
                   {canCreateManualReleases
                     ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
                     : 'Sync your releases from Spotify to start generating smart links.'}

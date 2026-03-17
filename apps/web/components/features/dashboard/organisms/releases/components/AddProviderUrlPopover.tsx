@@ -83,14 +83,14 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400] text-(--linear-text-tertiary)'
+          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400] text-tertiary-token'
         >
           <Icon
             name='Plus'
             className='h-3.5 w-3.5 opacity-0 transition-opacity group-hover/add:opacity-100 group-focus-visible/add:opacity-100'
             aria-hidden='true'
           />
-          <span className='line-clamp-1 text-(--linear-text-tertiary) group-hover/add:hidden group-focus-visible/add:hidden'>
+          <span className='line-clamp-1 text-tertiary-token group-hover/add:hidden group-focus-visible/add:hidden'>
             —
           </span>
           <span className='line-clamp-1 hidden group-hover/add:inline group-focus-visible/add:inline'>
@@ -114,7 +114,7 @@ export function AddProviderUrlPopover({
                 style={{ backgroundColor: accent }}
                 aria-hidden='true'
               />
-              <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              <span className='text-[13px] font-[510] text-primary-token'>
                 Add {providerLabel} link
               </span>
             </div>
@@ -122,9 +122,7 @@ export function AddProviderUrlPopover({
               label='URL'
               helperText={
                 validationError ? (
-                  <span className='text-(--linear-error)'>
-                    {validationError}
-                  </span>
+                  <span className='text-error'>{validationError}</span>
                 ) : undefined
               }
               className='space-y-2'
@@ -141,7 +139,7 @@ export function AddProviderUrlPopover({
                 }}
                 disabled={isSaving}
                 autoComplete='off'
-                className='h-8 rounded-[8px] border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[12px]'
+                className='h-8 rounded-[8px] border-subtle bg-surface-1 text-[12px]'
               />
             </DrawerFormField>
             <div className='flex justify-end gap-2'>

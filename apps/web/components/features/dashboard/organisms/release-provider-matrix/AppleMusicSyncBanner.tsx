@@ -129,7 +129,7 @@ export function AppleMusicSyncBanner({
       return (
         <div
           className={cn(
-            'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-3 text-[12px] text-(--linear-text-secondary)',
+            'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-3 text-[12px] text-secondary-token',
             className
           )}
         >
@@ -144,12 +144,12 @@ export function AppleMusicSyncBanner({
     return (
       <div
         className={cn(
-          'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-2 text-[12px] text-(--linear-text-primary)',
+          'inline-flex h-8 items-center gap-2 rounded-full border border-[#FA243C]/25 bg-[#FA243C]/10 px-2 text-[12px] text-primary-token',
           className
         )}
       >
         <DspProviderIcon provider='apple_music' size='sm' />
-        <span className='max-w-[160px] truncate text-(--linear-text-secondary)'>
+        <span className='max-w-[160px] truncate text-secondary-token'>
           Match: {match.externalArtistName}
         </span>
         <DrawerButton
@@ -180,12 +180,12 @@ export function AppleMusicSyncBanner({
     return (
       <DrawerSurfaceCard
         className={cn(
-          'flex items-center gap-3 px-4 py-3 text-(--linear-text-secondary)',
+          'flex items-center gap-3 px-4 py-3 text-secondary-token',
           className
         )}
       >
         <DspProviderIcon provider='apple_music' size='md' />
-        <p className='text-[13px] text-(--linear-text-secondary)'>
+        <p className='text-[13px] text-secondary-token'>
           No matching Apple Music artist found
         </p>
       </DrawerSurfaceCard>
@@ -209,7 +209,7 @@ export function AppleMusicSyncBanner({
 
       <div className='flex-1 min-w-0'>
         <div className='flex items-center gap-2'>
-          <span className='min-w-0 truncate text-[13px] font-[510] text-(--linear-text-primary)'>
+          <span className='min-w-0 truncate text-[13px] font-[510] text-primary-token'>
             {match.externalArtistName}
           </span>
           {externalArtistUrl && (
@@ -223,13 +223,13 @@ export function AppleMusicSyncBanner({
                   'noopener,noreferrer'
                 )
               }
-              className='p-0.5 text-(--linear-text-tertiary)'
+              className='p-0.5 text-tertiary-token'
             >
               <Icon name='ExternalLink' className='h-3 w-3' />
             </DrawerInlineIconButton>
           )}
         </div>
-        <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+        <p className='mt-0.5 text-[11px] text-secondary-token'>
           Confirm to link your Apple Music releases.
         </p>
       </div>

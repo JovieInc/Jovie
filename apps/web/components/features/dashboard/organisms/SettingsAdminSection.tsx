@@ -48,17 +48,12 @@ interface AdminLinkProps {
 
 function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
   return (
-    <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-4'>
+    <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
       <div className='flex min-w-0 items-center gap-3'>
-        <Icon
-          className='h-4 w-4 shrink-0 text-(--linear-text-secondary)'
-          aria-hidden
-        />
+        <Icon className='h-4 w-4 shrink-0 text-secondary-token' aria-hidden />
         <div>
-          <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
-            {title}
-          </p>
-          <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
+          <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
+          <p className='mt-0.5 text-[13px] text-secondary-token'>
             {description}
           </p>
         </div>
@@ -94,28 +89,28 @@ export function SettingsAdminSection() {
         className='min-h-0 px-4 py-3'
       />
       <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='flex items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5'>
+        <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 px-4 py-3.5'>
           <ShieldCheck
-            className='h-4 w-4 shrink-0 text-(--linear-text-secondary)'
+            className='h-4 w-4 shrink-0 text-secondary-token'
             aria-hidden
           />
-          <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+          <p className='text-[13px] leading-[18px] text-secondary-token'>
             These controls are only visible to admin accounts. Use them to
             manage platform operations without leaving the authenticated shell.
           </p>
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-4'>
+        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
           <div className='flex min-w-0 items-center gap-3'>
             <Terminal
-              className='h-4 w-4 shrink-0 text-(--linear-text-secondary)'
+              className='h-4 w-4 shrink-0 text-secondary-token'
               aria-hidden
             />
             <div>
-              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 Dev Toolbar
               </p>
-              <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
+              <p className='mt-0.5 text-[13px] text-secondary-token'>
                 Show the dev toolbar with feature flag overrides and environment
                 info.
               </p>

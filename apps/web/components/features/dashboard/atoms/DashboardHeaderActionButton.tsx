@@ -14,13 +14,13 @@ export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
-  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-subtle bg-surface-1 text-primary-token';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
-  'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)';
+  'border-subtle bg-surface-0';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS =
-  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-subtle bg-surface-1 text-primary-token';
 
 export interface DashboardHeaderActionButtonProps {
   readonly ariaLabel: string;

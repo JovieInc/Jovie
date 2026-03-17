@@ -105,7 +105,7 @@ function SearchInput({
   return (
     <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
       <div className='relative'>
-        <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)' />
+        <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
           ref={inputRef}
           type='text'
@@ -114,8 +114,8 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px]',
-            'text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary)',
+            'w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-8 pr-7 text-[13px]',
+            'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
           )}
@@ -124,7 +124,7 @@ function SearchInput({
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-(--linear-text-tertiary)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -156,22 +156,22 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-[7px] border border-subtle bg-surface-1 text-[11px]'>
       <div className='flex items-center gap-1.5 py-1 pl-2.5 pr-1'>
         {icon && (
-          <span className='flex h-3.5 w-3.5 items-center justify-center text-(--linear-text-tertiary)'>
+          <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
             {icon}
           </span>
         )}
-        <span className='text-(--linear-text-tertiary)'>{groupLabel}</span>
-        <span className='text-(--linear-text-tertiary)'>is</span>
+        <span className='text-tertiary-token'>{groupLabel}</span>
+        <span className='text-tertiary-token'>is</span>
         <span className='font-[510] text-(--linear-accent)'>
           {displayValue}
         </span>
       </div>
       <DrawerInlineIconButton
         onClick={onClear}
-        className='h-full rounded-r-[7px] px-1.5 py-1 text-(--linear-text-tertiary)'
+        className='h-full rounded-r-[7px] px-1.5 py-1 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -239,30 +239,26 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(
-        MENU_ITEM_BASE,
-        'w-full',
-        checked && 'text-(--linear-text-primary)'
-      )}
+      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
     >
       <span
         className={cn(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
           checked
             ? 'border-(--linear-accent) bg-(--linear-accent) text-white'
-            : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
+            : 'border-subtle bg-surface-1'
         )}
       >
         {checked && <Check className='h-3 w-3' />}
       </span>
       {icon && (
-        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-(--linear-text-tertiary)'>
+        <span className='flex h-4 w-4 shrink-0 items-center justify-center text-tertiary-token'>
           {icon}
         </span>
       )}
       <span className='flex-1 truncate text-left'>{label}</span>
       {count !== undefined && (
-        <span className='text-[10px] tabular-nums text-(--linear-text-tertiary)'>
+        <span className='text-[10px] tabular-nums text-tertiary-token'>
           {count}
         </span>
       )}
@@ -382,7 +378,7 @@ interface ReleaseFilterDropdownProps {
 }
 
 const FILTER_TRIGGER_ACTIVE_CLASS =
-  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-transparent bg-surface-1 text-primary-token';
 
 export function ReleaseFilterDropdown({
   filters,
@@ -586,7 +582,7 @@ export function ReleaseFilterDropdown({
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
-                          className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+                          className='h-3.5 w-3.5 text-tertiary-token'
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
@@ -634,7 +630,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+                  className='text-tertiary-token hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

@@ -58,10 +58,10 @@ function ContactListItem({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)'>
+        <ContentSurfaceCard className='group flex items-center justify-between gap-4 px-4 py-3 transition-[background-color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1'>
           <div className='min-w-0 flex-1'>
             <div className='flex items-center gap-2'>
-              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 {roleLabel}
               </p>
               {territorySummary !== 'General' && (
@@ -69,7 +69,7 @@ function ContactListItem({
               )}
             </div>
             {secondaryLabel && (
-              <p className='truncate text-[13px] text-(--linear-text-secondary)'>
+              <p className='truncate text-[13px] text-secondary-token'>
                 {secondaryLabel}
               </p>
             )}
@@ -82,7 +82,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
+                  className='h-8 w-8 p-0 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
                   title={`Email ${contact.email}`}
                 >
                   <a href={emailHref ?? '#'}>
@@ -96,7 +96,7 @@ function ContactListItem({
                   size='sm'
                   variant='ghost'
                   asChild
-                  className='h-8 w-8 p-0 text-(--linear-text-tertiary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary)'
+                  className='h-8 w-8 p-0 text-tertiary-token hover:bg-surface-2 hover:text-primary-token'
                   title={`Call ${contact.phone}`}
                 >
                   <a href={phoneHref ?? '#'}>
@@ -167,9 +167,7 @@ export function ContactMode({
   if (hasError) {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
-        <p className='text-(--linear-text-secondary)'>
-          Unable to load contacts
-        </p>
+        <p className='text-secondary-token'>Unable to load contacts</p>
         <Button size='sm' variant='secondary' onClick={() => router.refresh()}>
           Try again
         </Button>
@@ -180,7 +178,7 @@ export function ContactMode({
   if (activeContacts.length === 0) {
     return (
       <div className='flex h-full flex-col items-center justify-center gap-3 px-4 text-center'>
-        <p className='text-(--linear-text-secondary)'>No contacts yet</p>
+        <p className='text-secondary-token'>No contacts yet</p>
         <Button
           size='sm'
           variant='secondary'
@@ -218,7 +216,7 @@ export function ContactMode({
           size='sm'
           variant='ghost'
           onClick={() => router.push(APP_ROUTES.SETTINGS_CONTACTS)}
-          className='w-full text-[13px] text-(--linear-text-secondary)'
+          className='w-full text-[13px] text-secondary-token'
         >
           Manage contacts
         </Button>

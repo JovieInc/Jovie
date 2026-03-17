@@ -138,7 +138,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='rounded-[2px] border border-(--linear-border-default) bg-(--linear-bg-surface-2) px-1 py-px text-[10px] leading-none text-(--linear-text-secondary) [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-[2px] border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -319,7 +319,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm border border-(--linear-border-default) bg-(--linear-bg-surface-2) text-[13px] text-(--linear-text-secondary) transition-colors [font-weight:var(--font-weight-medium)] hover:bg-(--linear-bg-surface-3) hover:text-(--linear-text-primary)'
+                className='flex h-7 items-center justify-center rounded-sm border border-default bg-surface-2 text-[13px] text-secondary-token transition-colors [font-weight:var(--font-weight-medium)] hover:bg-surface-3 hover:text-primary-token'
               >
                 Sign up for Jovie
               </a>
@@ -330,11 +330,9 @@ export function DemoShell({
           <>
             <header className='flex h-[40px] shrink-0 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 md:px-(--linear-app-header-padding-x)'>
               <div className='flex min-w-0 items-center gap-1 text-[13px]'>
-                <span className='truncate text-(--linear-text-tertiary)'>
-                  Sora Vale
-                </span>
-                <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
-                <span className='truncate font-[510] text-(--linear-text-primary)'>
+                <span className='truncate text-tertiary-token'>Sora Vale</span>
+                <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
+                <span className='truncate font-[510] text-primary-token'>
                   {TAB_LABEL[activeTab]}
                 </span>
               </div>

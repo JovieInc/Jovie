@@ -277,7 +277,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       <DrawerPropertyRow
         label={label}
         value={
-          <span className='truncate text-[13px] text-(--linear-text-primary)'>
+          <span className='truncate text-[13px] text-primary-token'>
             {displayValue}
           </span>
         }
@@ -301,13 +301,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <div className='rounded-[10px] border border-(--linear-border-subtle)/75 bg-(--linear-bg-surface-0) px-3 py-2.5'>
-            <p className='text-[15px] font-[520] leading-5 text-(--linear-text-primary)'>
+          <div className='rounded-[10px] border border-subtle/75 bg-surface-0 px-3 py-2.5'>
+            <p className='text-[15px] font-[520] leading-5 text-primary-token'>
               {contactDisplayName}
             </p>
-            <p className='mt-1 text-[12px] text-(--linear-text-secondary)'>
-              {roleLabel}
-            </p>
+            <p className='mt-1 text-[12px] text-secondary-token'>{roleLabel}</p>
           </div>
         ) : undefined
       }
@@ -315,12 +313,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       {contact && (
         <>
           <DrawerSection title='Role' className='space-y-2'>
-            <div className='rounded-[10px] border border-(--linear-border-subtle)/75 bg-(--linear-bg-surface-0) p-2.5'>
-              <Label className='text-[13px] text-(--linear-text-secondary)'>
+            <div className='rounded-[10px] border border-subtle/75 bg-surface-0 p-2.5'>
+              <Label className='text-[13px] text-secondary-token'>
                 Contact type
               </Label>
               <Select value={contact.role} onValueChange={handleRoleChange}>
-                <SelectTrigger className='h-9 rounded-lg border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px]'>
+                <SelectTrigger className='h-9 rounded-lg border border-subtle bg-surface-1 px-3 text-[13px]'>
                   <SelectValue>{roleLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className='p-1'>
@@ -328,12 +326,12 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                     <SelectItem
                       key={option.value}
                       value={option.value}
-                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-(--linear-text-secondary) data-highlighted:bg-(--linear-bg-surface-0) data-highlighted:text-(--linear-text-primary)'
+                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                     >
                       <div className='flex items-center gap-2'>
                         <Icon
                           name={option.iconName}
-                          className='h-4 w-4 text-(--linear-text-tertiary)'
+                          className='h-4 w-4 text-tertiary-token'
                         />
                         <span>{option.label}</span>
                       </div>
@@ -346,7 +344,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           <DrawerSection
             title='Contact Info'
-            className='border-t border-(--linear-border-subtle)/65 pt-4'
+            className='border-t border-subtle/65 pt-4'
           >
             <div className='space-y-1'>
               {renderEditableField(
@@ -370,10 +368,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           {hasEmailAndPhone && (
             <DrawerSection
               title='Preferred Contact'
-              className='border-t border-(--linear-border-subtle)/65 pt-4'
+              className='border-t border-subtle/65 pt-4'
             >
               <div className='space-y-2'>
-                <Label className='text-[13px] text-(--linear-text-secondary)'>
+                <Label className='text-[13px] text-secondary-token'>
                   Default action
                 </Label>
                 <Select
@@ -396,7 +394,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           <DrawerSection
             title='Territories'
-            className='border-t border-(--linear-border-subtle)/65 pt-4'
+            className='border-t border-subtle/65 pt-4'
           >
             <div className='space-y-3'>
               <DrawerPropertyRow
@@ -416,8 +414,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       className={cn(
                         'rounded-[8px] border px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
                         isSelected
-                          ? 'border-(--linear-border-focus) bg-(--linear-bg-surface-1) text-(--linear-text-primary)'
-                          : 'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)'
+                          ? 'border-(--linear-border-focus) bg-surface-1 text-primary-token'
+                          : 'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1'
                       )}
                     >
                       {territory}
@@ -437,7 +435,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='text-center text-[13px] text-(--linear-text-tertiary)'>
+            <div className='text-center text-[13px] text-tertiary-token'>
               Saving...
             </div>
           )}

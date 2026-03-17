@@ -72,11 +72,8 @@ export function SettingsContactsSection({
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
-            <UserPlus
-              className='h-8 w-8 text-(--linear-text-tertiary)'
-              aria-hidden
-            />
+          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
+            <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
             <p className='text-[13px] text-secondary-token'>
               Failed to load contacts.
             </p>
@@ -235,11 +232,8 @@ function ContactsListInner({
         />
         <div className='px-4 py-3'>
           {isEmpty ? (
-            <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-10 text-center'>
-              <UserPlus
-                className='h-8 w-8 text-(--linear-text-tertiary)'
-                aria-hidden
-              />
+            <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-10 text-center'>
+              <UserPlus className='h-8 w-8 text-tertiary-token' aria-hidden />
               <p className='text-[13px] text-secondary-token'>
                 No contacts yet. Add your first contact to get started.
               </p>
@@ -295,8 +289,8 @@ function ContactRow({
       aria-pressed={isSelected}
       className={`flex w-full items-center gap-3 rounded-lg border px-3 py-3 text-left transition-[background-color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/35 ${
         isSelected
-          ? 'border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'
-          : 'border-transparent hover:bg-(--linear-bg-surface-0)'
+          ? 'border-subtle bg-surface-0'
+          : 'border-transparent hover:bg-surface-0'
       }`}
     >
       <div className='min-w-0 flex-1'>

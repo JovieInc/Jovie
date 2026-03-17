@@ -343,7 +343,7 @@ export function ProfileContactSidebar() {
       headerActions={headerActions}
       entityHeader={
         <div className='space-y-3.5'>
-          <div className='rounded-[10px] border border-(--linear-border-subtle)/75 bg-(--linear-bg-surface-0) p-3'>
+          <div className='rounded-[10px] border border-subtle/75 bg-surface-0 p-3'>
             <ProfileContactHeader
               displayName={displayName}
               username={username}
@@ -358,7 +358,7 @@ export function ProfileContactSidebar() {
           <ProfileAnalyticsSummary />
 
           {/* Profile URL */}
-          <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3 border-t border-(--linear-border-subtle)/65 pt-3'>
+          <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3 border-t border-subtle/65 pt-3'>
             <Label className='text-xs font-medium text-secondary-token'>
               Profile link
             </Label>
@@ -373,7 +373,7 @@ export function ProfileContactSidebar() {
                 type='button'
                 size='icon'
                 variant='ghost'
-                className='h-8 w-8 shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'
+                className='h-8 w-8 shrink-0 border border-subtle bg-surface-1'
                 onClick={() =>
                   globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                 }
@@ -418,7 +418,7 @@ export function ProfileContactSidebar() {
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-7 w-7 border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+                className='h-7 w-7 border-subtle bg-surface-1 text-tertiary-token hover:text-primary-token'
                 ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-4 w-4' />

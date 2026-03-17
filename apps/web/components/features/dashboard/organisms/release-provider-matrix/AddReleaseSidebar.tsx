@@ -154,7 +154,7 @@ export function AddReleaseSidebar({
               fallback={
                 <Icon
                   name='Disc3'
-                  className='h-5 w-5 text-(--linear-text-tertiary)'
+                  className='h-5 w-5 text-tertiary-token'
                   aria-hidden='true'
                 />
               }
@@ -235,7 +235,7 @@ export function AddReleaseSidebar({
         </DrawerFormField>
 
         <div className='space-y-3'>
-          <p className='text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
+          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
             Platform Links (optional)
           </p>
           {PROVIDER_FIELDS.map(provider => (

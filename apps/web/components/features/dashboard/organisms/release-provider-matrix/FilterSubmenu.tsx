@@ -61,7 +61,7 @@ function SearchInput({
       <div className='relative'>
         <Icon
           name='Search'
-          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-(--linear-text-tertiary)'
+          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
         />
         <input
           ref={inputRef}
@@ -70,12 +70,12 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-[8px] border border-transparent bg-(--linear-bg-surface-0) py-1.5 pl-8 pr-7 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-8 pr-7 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-(--linear-text-tertiary)'
+            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
           >
             <Icon name='X' className='h-3 w-3' />
           </DrawerInlineIconButton>
@@ -123,18 +123,16 @@ function SubmenuCheckboxItem({
       className={cn(
         MENU_ITEM_BASE,
         'w-full justify-between',
-        checked && 'bg-(--linear-accent-subtle) text-(--linear-text-primary)'
+        checked && 'bg-(--linear-accent-subtle) text-primary-token'
       )}
     >
       <div className='flex items-center gap-2'>
-        {icon && <span className='text-(--linear-text-tertiary)'>{icon}</span>}
+        {icon && <span className='text-tertiary-token'>{icon}</span>}
         <span className='text-[13px]'>{label}</span>
       </div>
       <div className='flex items-center gap-2'>
         {count > 0 && (
-          <span className='text-[10px] text-(--linear-text-tertiary)'>
-            {count}
-          </span>
+          <span className='text-[10px] text-tertiary-token'>{count}</span>
         )}
         {checked && (
           <Icon name='Check' className='h-3.5 w-3.5 text-(--linear-accent)' />
@@ -236,7 +234,7 @@ export function FilterSubmenu<T extends string = string>({
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
-            className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+            className='h-3.5 w-3.5 text-tertiary-token'
           />
           <span>{label}</span>
           {selectedCount > 0 && (

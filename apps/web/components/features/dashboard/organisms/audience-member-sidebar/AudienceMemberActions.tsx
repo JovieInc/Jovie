@@ -35,7 +35,7 @@ export function AudienceMemberActions({ member }: AudienceMemberActionsProps) {
           )}
         >
           <span
-            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-tertiary)'
+            className='mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
             aria-hidden='true'
           >
             <Icon

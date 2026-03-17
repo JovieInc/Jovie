@@ -248,7 +248,7 @@ export function ConnectedDspList({
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='flex items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
+          <ContentSurfaceCard className='flex items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
             <Loader2
               className='h-5 w-5 animate-spin text-secondary-token'
               aria-hidden
@@ -275,7 +275,7 @@ export function ConnectedDspList({
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='px-6 py-8 text-center bg-(--linear-bg-surface-0)'>
+          <ContentSurfaceCard className='px-6 py-8 text-center bg-surface-0'>
             <p className='text-[13px] text-secondary-token'>
               Failed to load platform connections. Please try again.
             </p>
@@ -410,12 +410,12 @@ function ConnectedDspListContent({
         className='min-h-0 px-4 py-3'
       />
       <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+        <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
           <div className='space-y-1'>
-            <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
+            <p className='text-[13px] font-[510] tracking-[-0.01em] text-primary-token'>
               Primary platforms
             </p>
-            <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+            <p className='text-[13px] leading-[18px] text-secondary-token'>
               Connect your Spotify and Apple Music artist profiles.
             </p>
           </div>
@@ -426,24 +426,21 @@ function ConnectedDspListContent({
         </ContentSurfaceCard>
 
         {hasNoConnections ? (
-          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-10 text-center'>
-            <Music
-              className='h-8 w-8 text-(--linear-text-tertiary)'
-              aria-hidden
-            />
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+          <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-10 text-center'>
+            <Music className='h-8 w-8 text-tertiary-token' aria-hidden />
+            <p className='text-[13px] text-secondary-token'>
               Click a platform above to connect your streaming profiles.
             </p>
           </ContentSurfaceCard>
         ) : null}
 
         {nonPrimaryMatches.length > 0 ? (
-          <ContentSurfaceCard className='space-y-3 bg-(--linear-bg-surface-0) p-4'>
+          <ContentSurfaceCard className='space-y-3 bg-surface-0 p-4'>
             <div className='space-y-1'>
-              <p className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'>
+              <p className='text-[13px] font-[510] tracking-[-0.01em] text-primary-token'>
                 Other platforms
               </p>
-              <p className='text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+              <p className='text-[13px] leading-[18px] text-secondary-token'>
                 Secondary DSP matches connected to this profile.
               </p>
             </div>

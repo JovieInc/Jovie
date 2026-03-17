@@ -52,10 +52,10 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
       <div className='min-w-0 flex-1'>
         {mode === 'soft-cap' ? (
           <>
-            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               You have {props.releasedCount} smart links
             </p>
-            <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>
               Need more than {props.softCap}? Request a higher limit.
             </p>
             <DrawerButton
@@ -71,11 +71,11 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
           </>
         ) : (
           <>
-            <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+            <p className='text-[13px] font-[510] text-primary-token'>
               You have {props.unreleasedCount} upcoming{' '}
               {props.unreleasedCount === 1 ? 'release' : 'releases'}
             </p>
-            <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+            <p className='mt-0.5 text-[11px] text-secondary-token'>
               Enable pre-release pages with countdowns and notify-me.
             </p>
             <DrawerButton

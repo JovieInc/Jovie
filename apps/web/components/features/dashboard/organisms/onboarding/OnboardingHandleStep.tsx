@@ -42,9 +42,7 @@ function ValidationIcon({
   readonly isValid: boolean;
 }) {
   if (checking) {
-    return (
-      <LoadingSpinner size='sm' className='text-(--linear-text-tertiary)' />
-    );
+    return <LoadingSpinner size='sm' className='text-tertiary-token' />;
   }
 
   if (hasError) {
@@ -206,10 +204,10 @@ export function OnboardingHandleStep({
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
           {isReservedHandle ? (
             <ContentSurfaceCard className='mt-4 flex flex-col items-center gap-2 px-5 py-5 text-center'>
-              <p className='text-2xl font-[590] tracking-[-0.022em] text-(--linear-text-primary) sm:text-3xl'>
+              <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
                 @{handleInput}
               </p>
-              <p className='text-[13px] text-(--linear-text-secondary)'>
+              <p className='text-[13px] text-secondary-token'>
                 We reserved this for you. Edit below if you prefer something
                 else.
               </p>
@@ -221,14 +219,14 @@ export function OnboardingHandleStep({
           <div>
             <div
               className={[
-                'flex w-full items-center gap-2 rounded-[8px] border bg-(--linear-bg-surface-1) px-4 py-2.5',
+                'flex w-full items-center gap-2 rounded-[8px] border bg-surface-1 px-4 py-2.5',
                 'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
                 stateError || handleValidation.error
                   ? 'border-error'
-                  : 'border-(--linear-border-subtle)',
+                  : 'border-subtle',
               ].join(' ')}
             >
-              <span className='text-[13px] whitespace-nowrap text-(--linear-text-tertiary)'>
+              <span className='text-[13px] whitespace-nowrap text-tertiary-token'>
                 @
               </span>
               <input
@@ -252,7 +250,7 @@ export function OnboardingHandleStep({
                 autoCorrect='off'
                 spellCheck={false}
                 aria-invalid={handleValidation.error ? 'true' : undefined}
-                className='min-w-0 flex-1 bg-transparent text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) focus-visible:outline-none'
+                className='min-w-0 flex-1 bg-transparent text-primary-token placeholder:text-tertiary-token focus-visible:outline-none'
               />
               <div className='h-5 w-5 flex items-center justify-center'>
                 <ValidationIcon
@@ -282,7 +280,7 @@ export function OnboardingHandleStep({
                         ? onSuggestionClick(suggestion)
                         : onHandleChange(suggestion)
                     }
-                    className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1 text-[11px] text-(--linear-text-secondary) transition-colors hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
+                    className='rounded-full border border-subtle bg-surface-1 px-3 py-1 text-[11px] text-secondary-token transition-colors hover:border-default hover:bg-surface-0 hover:text-primary-token'
                   >
                     @{suggestion}
                   </button>

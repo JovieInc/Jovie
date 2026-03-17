@@ -81,8 +81,8 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
     return (
       <ContentSurfaceCard className='overflow-hidden'>
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
+            <p className='text-[13px] text-secondary-token'>
               No connected accounts yet.
             </p>
           </ContentSurfaceCard>
@@ -102,17 +102,14 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           return (
             <ContentSurfaceCard
               key={account.id}
-              className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
+              className='flex items-center justify-between gap-3 bg-surface-0 p-3.5'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1)'>
-                  <Link2
-                    className='h-4 w-4 text-(--linear-text-secondary)'
-                    aria-hidden
-                  />
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                  <Link2 className='h-4 w-4 text-secondary-token' aria-hidden />
                 </div>
                 <div className='min-w-0'>
-                  <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+                  <p className='flex items-center gap-2 text-[13px] text-primary-token'>
                     {label}
                     {isVerified ? (
                       <span className='text-[11px] text-emerald-600'>
@@ -120,7 +117,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                       </span>
                     ) : null}
                   </p>
-                  <p className='mt-0.5 truncate text-[11px] text-(--linear-text-secondary)'>
+                  <p className='mt-0.5 truncate text-[11px] text-secondary-token'>
                     {identifier}
                   </p>
                 </div>

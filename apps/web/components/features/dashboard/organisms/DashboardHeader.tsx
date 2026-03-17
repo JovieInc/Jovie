@@ -48,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1.5 [&_button]:h-8 [&_button]:rounded-[8px] [&_button]:border [&_button]:border-(--linear-border-subtle) [&_button]:bg-(--linear-bg-surface-0) [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1.5 [&_button]:h-8 [&_button]:rounded-[8px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -77,12 +77,12 @@ export function DashboardHeader({
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[11.5px] text-(--linear-text-tertiary)'>
+              <span className='shrink-0 text-[11.5px] text-tertiary-token'>
                 {rootLabel}
               </span>
-              <ChevronRight className='size-3.5 shrink-0 text-(--linear-text-quaternary)' />
+              <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
               {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-[12px] text-(--linear-text-secondary)'>
+                <div className='min-w-0 truncate text-[12px] text-secondary-token'>
                   {breadcrumbSuffix}
                 </div>
               ) : (

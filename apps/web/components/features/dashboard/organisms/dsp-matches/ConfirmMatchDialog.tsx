@@ -100,7 +100,7 @@ export function ConfirmMatchDialog({
 
       <DialogBody className='space-y-4'>
         {/* Match Preview Card */}
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+        <ContentSurfaceCard className='bg-surface-0 p-4'>
           <div className='flex items-center gap-4'>
             {/* Artist Image */}
             {externalArtistImageUrl ? (
@@ -114,7 +114,7 @@ export function ConfirmMatchDialog({
                 unoptimized={isExternalDspImage(externalArtistImageUrl)}
               />
             ) : (
-              <div className='flex h-16 w-16 items-center justify-center rounded-full bg-(--linear-bg-surface-1)'>
+              <div className='flex h-16 w-16 items-center justify-center rounded-full bg-surface-1'>
                 <DspProviderIcon provider={providerId} size='lg' />
               </div>
             )}
@@ -122,7 +122,7 @@ export function ConfirmMatchDialog({
             {/* Artist Info */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <h3 className='truncate text-lg font-[590] text-(--linear-text-primary)'>
+                <h3 className='truncate text-lg font-[590] text-primary-token'>
                   {externalArtistName}
                 </h3>
                 {externalArtistUrl && (
@@ -130,7 +130,7 @@ export function ConfirmMatchDialog({
                     href={externalArtistUrl}
                     target='_blank'
                     rel='noopener noreferrer'
-                    className='shrink-0 text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-primary)'
+                    className='shrink-0 text-tertiary-token transition-colors hover:text-primary-token'
                   >
                     <Icon name='ExternalLink' className='h-4 w-4' />
                   </a>
@@ -143,7 +143,7 @@ export function ConfirmMatchDialog({
 
               <div className='mt-2 flex items-center gap-3'>
                 <ConfidenceBadge score={confidenceScore} size='md' showLabel />
-                <span className='text-xs text-(--linear-text-tertiary)'>
+                <span className='text-xs text-tertiary-token'>
                   {matchingIsrcCount} matching ISRCs
                 </span>
               </div>
@@ -153,8 +153,8 @@ export function ConfirmMatchDialog({
 
         {/* Confidence Breakdown */}
         {confidenceBreakdown && (
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
-            <h4 className='mb-3 text-[13px] font-[510] text-(--linear-text-primary)'>
+          <ContentSurfaceCard className='bg-surface-0 p-4'>
+            <h4 className='mb-3 text-[13px] font-[510] text-primary-token'>
               Match confidence breakdown
             </h4>
             <MatchConfidenceBreakdown

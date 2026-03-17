@@ -51,17 +51,13 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
 
   return (
     <ContentSurfaceCard className='flex flex-col items-center justify-center gap-4 px-4 py-12 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-tertiary)'>
+      <div className='flex h-12 w-12 items-center justify-center rounded-[10px] border border-subtle bg-surface-0 text-tertiary-token'>
         <Icon name={icon} className='h-6 w-6' />
       </div>
 
       <div className='space-y-1'>
-        <h3 className='text-[13px] font-[510] text-(--linear-text-primary)'>
-          {title}
-        </h3>
-        <p className='text-[13px] text-(--linear-text-secondary)'>
-          {description}
-        </p>
+        <h3 className='text-[13px] font-[510] text-primary-token'>{title}</h3>
+        <p className='text-[13px] text-secondary-token'>{description}</p>
       </div>
     </ContentSurfaceCard>
   );

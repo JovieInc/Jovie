@@ -49,7 +49,7 @@ export function renderDemoIntentCell({
 }: CellContext<AudienceMember, AudienceIntentLevel>) {
   const cfg = INTENT_CONFIG[row.original.intentLevel];
   return (
-    <span className='inline-flex items-center gap-1.5 text-xs text-(--linear-text-secondary)'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       {cfg.icon} {cfg.label}
     </span>
   );
@@ -98,36 +98,15 @@ const DOMAIN_MAP: Record<string, string> = {
 };
 
 const SOURCE_ICONS: Record<string, React.ReactElement> = {
-  X: (
-    <Twitter
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
-  ),
+  X: <Twitter className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Instagram: (
-    <Instagram
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
+    <Instagram className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
   ),
   YouTube: (
-    <Youtube
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
+    <Youtube className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
   ),
-  Spotify: (
-    <Music
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
-  ),
-  Google: (
-    <Search
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
-  ),
+  Spotify: <Music className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
+  Google: <Search className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
 };
 
 function resolveSourceLabel(
@@ -160,15 +139,10 @@ export function renderDemoSourceCell({
   );
   const icon = Object.entries(SOURCE_ICONS).find(([name]) =>
     label.startsWith(name)
-  )?.[1] ?? (
-    <Globe
-      className={`${ICON_CLS} text-(--linear-text-tertiary)`}
-      aria-hidden
-    />
-  );
+  )?.[1] ?? <Globe className={`${ICON_CLS} text-tertiary-token`} aria-hidden />;
 
   return (
-    <span className='inline-flex items-center gap-1.5 text-xs text-(--linear-text-secondary)'>
+    <span className='inline-flex items-center gap-1.5 text-xs text-secondary-token'>
       {icon} {label}
     </span>
   );

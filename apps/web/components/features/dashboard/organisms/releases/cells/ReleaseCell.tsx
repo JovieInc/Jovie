@@ -59,7 +59,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-4 w-4 rounded-[4px] p-0 text-(--linear-text-tertiary)'
+            className='h-4 w-4 rounded-[4px] p-0 text-tertiary-token'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -80,7 +80,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex min-w-0 items-center gap-1 leading-none'>
           <TruncatedText
             lines={1}
-            className='min-w-0 flex-1 text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-(--linear-text-primary)'
+            className='min-w-0 flex-1 text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -106,7 +106,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[400] leading-[1.3] tracking-[-0.01em] text-(--linear-text-secondary)'
+            className='text-[12.5px] font-[400] leading-[1.3] tracking-[-0.01em] text-secondary-token'
           >
             {artistLine}
           </TruncatedText>

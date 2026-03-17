@@ -110,7 +110,7 @@ export function LinkPill({
     <AppIconButton
       ariaLabel={menuButtonAria}
       ref={setReferenceRef}
-      className='-mr-2 h-10 w-10 rounded-lg border-transparent bg-(--linear-bg-surface-1)/55 text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-5 [&_svg]:w-5'
+      className='-mr-2 h-10 w-10 rounded-lg border-transparent bg-surface-1/55 text-quaternary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-5 [&_svg]:w-5'
       {...getReferenceProps()}
     >
       <Icon name='MoreHorizontal' className='h-5 w-5 opacity-90' />

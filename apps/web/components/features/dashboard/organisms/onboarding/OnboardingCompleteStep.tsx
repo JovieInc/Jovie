@@ -58,17 +58,17 @@ export function OnboardingCompleteStep({
           }}
         >
           <div className='mb-2 flex items-center gap-2'>
-            <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-(--linear-bg-surface-0)'>
+            <div className='h-1.5 flex-1 overflow-hidden rounded-full bg-surface-0'>
               <div
                 className='h-full rounded-full bg-(--linear-accent) transition-all duration-500'
                 style={{ width: `${((spotifyImportStage + 1) / 3) * 100}%` }}
               />
             </div>
-            <span className='text-[11px] text-(--linear-text-tertiary)'>
+            <span className='text-[11px] text-tertiary-token'>
               {spotifyImportStage + 1}/3
             </span>
           </div>
-          <p className='text-center text-[13px] text-(--linear-text-secondary)'>
+          <p className='text-center text-[13px] text-secondary-token'>
             {spotifyImportMessage}
           </p>
         </ContentSurfaceCard>

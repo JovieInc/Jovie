@@ -33,11 +33,11 @@ function TipsHero() {
       />
 
       <div className='relative z-10 flex w-full max-w-(--linear-content-max) flex-col items-center text-center heading-gap-linear'>
-        <h1 className='marketing-h1-linear max-w-(--linear-hero-h1-width) text-(--linear-text-primary)'>
+        <h1 className='marketing-h1-linear max-w-(--linear-hero-h1-width) text-primary-token'>
           Turn every tip into a fan.
         </h1>
 
-        <p className='marketing-lead-linear mx-auto mt-6 max-w-xl text-(--linear-text-secondary)'>
+        <p className='marketing-lead-linear mx-auto mt-6 max-w-xl text-secondary-token'>
           Scan. Tip. Stream. One QR code turns a stranger{' '}
           <br className='hidden sm:block' />
           into a superfan.
@@ -47,10 +47,10 @@ function TipsHero() {
           <ClaimHandleForm />
         </div>
 
-        <p className='mt-3 flex items-center justify-center gap-2 text-(--linear-label-size) font-(--linear-font-weight-medium) tracking-(--linear-tracking-wide) text-(--linear-text-tertiary)'>
+        <p className='mt-3 flex items-center justify-center gap-2 text-(--linear-label-size) font-(--linear-font-weight-medium) tracking-(--linear-tracking-wide) text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='inline-block h-1.5 w-1.5 rounded-full bg-(--linear-success) shadow-[0_0_8px_var(--linear-success)]'
+            className='inline-block h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_8px_var(--linear-success)]'
           />{' '}
           Free forever. No credit card.
         </p>
@@ -97,10 +97,10 @@ function HowItWorksSection() {
       <Container size='homepage'>
         <div className='mx-auto max-w-(--linear-content-max)'>
           <div className='text-center'>
-            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
               How it works
             </p>
-            <h2 className='marketing-h2-linear mt-4 text-(--linear-text-primary)'>
+            <h2 className='marketing-h2-linear mt-4 text-primary-token'>
               Three steps to your first fan.
             </h2>
           </div>
@@ -109,21 +109,21 @@ function HowItWorksSection() {
             {STEPS.map((step, i) => (
               <div
                 key={step.title}
-                className='relative flex flex-col items-center rounded-xl border border-(--linear-border-subtle) p-8 text-center'
+                className='relative flex flex-col items-center rounded-xl border border-subtle p-8 text-center'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                 }}
               >
                 <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
-                  <step.icon className='h-6 w-6 text-(--linear-text-secondary)' />
+                  <step.icon className='h-6 w-6 text-secondary-token' />
                 </div>
-                <span className='mt-5 text-(--linear-label-size) font-(--linear-font-weight-medium) text-(--linear-text-tertiary)'>
+                <span className='mt-5 text-(--linear-label-size) font-(--linear-font-weight-medium) text-tertiary-token'>
                   Step {i + 1}
                 </span>
-                <h3 className='mt-2 text-lg font-medium tracking-tight text-(--linear-text-primary)'>
+                <h3 className='mt-2 text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
-                <p className='mt-3 text-sm leading-relaxed text-(--linear-text-secondary)'>
+                <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                   {step.description}
                 </p>
               </div>
@@ -183,13 +183,13 @@ function BenefitsSection() {
           />
 
           <div className='text-center'>
-            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
               Why it matters
             </p>
-            <h2 className='marketing-h2-linear mt-4 text-(--linear-text-primary)'>
+            <h2 className='marketing-h2-linear mt-4 text-primary-token'>
               Tips are just the beginning.
             </h2>
-            <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-(--linear-text-secondary)'>
+            <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-secondary-token'>
               Every dollar someone drops in your jar is a signal. Jovie helps
               you act on it.
             </p>
@@ -199,18 +199,18 @@ function BenefitsSection() {
             {BENEFITS.map(benefit => (
               <div
                 key={benefit.title}
-                className='flex flex-col rounded-xl border border-(--linear-border-subtle) p-8'
+                className='flex flex-col rounded-xl border border-subtle p-8'
                 style={{
                   backgroundColor: 'var(--linear-bg-surface-0)',
                 }}
               >
                 <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
-                  <benefit.icon className='h-5 w-5 text-(--linear-text-secondary)' />
+                  <benefit.icon className='h-5 w-5 text-secondary-token' />
                 </div>
-                <h3 className='mt-5 text-base font-medium tracking-tight text-(--linear-text-primary)'>
+                <h3 className='mt-5 text-base font-medium tracking-tight text-primary-token'>
                   {benefit.title}
                 </h3>
-                <p className='mt-3 text-sm leading-relaxed text-(--linear-text-secondary)'>
+                <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
                   {benefit.description}
                 </p>
               </div>
@@ -245,13 +245,13 @@ function SocialProofSection() {
     >
       <Container size='homepage'>
         <div className='mx-auto max-w-3xl text-center'>
-          <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
             Built for real-world artists
           </p>
-          <h2 className='marketing-h2-linear mt-4 text-(--linear-text-primary)'>
+          <h2 className='marketing-h2-linear mt-4 text-primary-token'>
             Perfect for every stage.
           </h2>
-          <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-(--linear-text-secondary)'>
+          <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-secondary-token'>
             Whether you are playing a subway platform or a sold-out basement
             show, Jovie turns your audience into a reachable fan base.
           </p>
@@ -260,13 +260,13 @@ function SocialProofSection() {
             {USE_CASES.map(uc => (
               <div
                 key={uc.label}
-                className='flex flex-col items-center gap-3 rounded-xl border border-(--linear-border-subtle) p-6'
+                className='flex flex-col items-center gap-3 rounded-xl border border-subtle p-6'
                 style={{ backgroundColor: 'var(--linear-bg-surface-0)' }}
               >
                 <div className='flex h-11 w-11 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
-                  <uc.icon className='h-5 w-5 text-(--linear-text-secondary)' />
+                  <uc.icon className='h-5 w-5 text-secondary-token' />
                 </div>
-                <span className='text-sm font-medium text-(--linear-text-primary)'>
+                <span className='text-sm font-medium text-primary-token'>
                   {uc.label}
                 </span>
               </div>
@@ -304,11 +304,11 @@ function TipsFinalCTA() {
         />
 
         <div className='mx-auto flex max-w-2xl flex-col items-center text-center'>
-          <h2 className='marketing-h2-linear text-(--linear-text-primary)'>
+          <h2 className='marketing-h2-linear text-primary-token'>
             Claim your handle. <br className='hidden sm:block' />
             Start turning tips into fans.
           </h2>
-          <p className='mt-4 marketing-lead-linear text-(--linear-text-secondary)'>
+          <p className='mt-4 marketing-lead-linear text-secondary-token'>
             Free forever. No credit card required.
           </p>
 

@@ -68,7 +68,7 @@ export function RangeToggle({
     <div
       role='tablist'
       aria-label='Select analytics range'
-      className='inline-flex items-center rounded-(--linear-app-control-radius) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) p-0.5'
+      className='inline-flex items-center rounded-(--linear-app-control-radius) border border-subtle bg-surface-1 p-0.5'
     >
       {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
@@ -77,13 +77,13 @@ export function RangeToggle({
 
         let stateClass: string;
         if (disabled) {
-          stateClass = 'cursor-not-allowed text-(--linear-text-tertiary)/40';
+          stateClass = 'cursor-not-allowed text-tertiary-token/40';
         } else if (active) {
           stateClass =
-            'border-(--linear-border-default) bg-(--linear-bg-surface-0) text-(--linear-text-primary) shadow-[0_1px_0_rgba(255,255,255,0.02)]';
+            'border-default bg-surface-0 text-primary-token shadow-[0_1px_0_rgba(255,255,255,0.02)]';
         } else {
           stateClass =
-            'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-secondary)';
+            'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
         }
 
         return (

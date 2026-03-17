@@ -44,7 +44,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-[7px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[12px] font-[510] text-(--linear-text-tertiary)'>
+      <span className='inline-flex items-center rounded-[7px] border border-subtle bg-surface-0 px-2 py-0.5 text-[12px] font-[510] text-tertiary-token'>
         Past
       </span>
     );
@@ -191,7 +191,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-[8px] px-2.5 text-[13px] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
+          className='h-8 gap-1 rounded-[8px] px-2.5 text-[13px] text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'
@@ -219,7 +219,7 @@ const ActionsCell = memo(function ActionsCell({
           event.stopPropagation();
           onEdit(tourDate);
         }}
-        className='rounded-full p-1 text-(--linear-text-tertiary)'
+        className='rounded-full p-1 text-tertiary-token'
       >
         <Icon name='MoreHorizontal' className='h-4 w-4' />
       </InlineIconButton>
@@ -363,15 +363,10 @@ export function TourDatesTable({
       className='text-[13px]'
       emptyState={
         <div className='px-4 py-8'>
-          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-8 text-center text-[13px] text-(--linear-text-secondary)'>
-            <Icon
-              name='Calendar'
-              className='h-6 w-6 text-(--linear-text-tertiary)'
-            />
+          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-8 text-center text-[13px] text-secondary-token'>
+            <Icon name='Calendar' className='h-6 w-6 text-tertiary-token' />
             <div>
-              <div className='font-[510] text-(--linear-text-primary)'>
-                No tour dates
-              </div>
+              <div className='font-[510] text-primary-token'>No tour dates</div>
               <div className='text-[13px]'>
                 Add your first tour date to get started.
               </div>

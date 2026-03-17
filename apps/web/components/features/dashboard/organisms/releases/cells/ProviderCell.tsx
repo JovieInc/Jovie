@@ -34,14 +34,14 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center gap-1 rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-1'>
+    <div className='inline-flex items-center gap-1 rounded-[8px] border border-subtle bg-surface-1 px-1 py-1'>
       <DrawerInlineIconButton
         title='Open'
         onClick={event => {
           event.stopPropagation();
           globalThis.open(provider.url, '_blank', 'noopener,noreferrer');
         }}
-        className='p-1 text-(--linear-text-secondary)'
+        className='p-1 text-secondary-token'
       >
         <Icon name='ExternalLink' className='h-3.5 w-3.5' aria-hidden='true' />
         <span className='sr-only'>Open</span>
@@ -52,7 +52,7 @@ function ProviderActionButtons({
         data-url={provider.path ? `${getBaseUrl()}${provider.path}` : undefined}
         onClick={onCopyClick}
         className={cn(
-          'p-1 text-(--linear-text-secondary)',
+          'p-1 text-secondary-token',
           isCopied && 'text-success hover:text-success'
         )}
       >
@@ -198,7 +198,7 @@ export const ProviderCell = memo(function ProviderCell({
     }
 
     return (
-      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-(--linear-text-tertiary)'>
+      <span className='inline-flex items-center gap-1.5 px-2 py-1 text-[11px] text-tertiary-token'>
         —
       </span>
     );

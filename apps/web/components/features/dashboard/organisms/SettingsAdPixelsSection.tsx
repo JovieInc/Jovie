@@ -22,7 +22,7 @@ import { usePixelSettingsMutation, usePixelSettingsQuery } from '@/lib/queries';
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 const INPUT_CLASS =
-  'block w-full rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 text-[13px] text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'block w-full rounded-[8px] border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 interface PlatformSectionProps {
   readonly platform: string;
@@ -62,17 +62,17 @@ function PlatformSection({
   const [showToken, setShowToken] = useState(false);
 
   return (
-    <ContentSurfaceCard className='space-y-4 bg-(--linear-bg-surface-0) p-4'>
+    <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
             {platform}
           </h4>
-          <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+          <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
             {description}
           </p>
         </div>
-        <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-2 py-0.5 text-[11px] font-[560] uppercase tracking-[0.08em] text-(--linear-text-secondary)'>
+        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[11px] font-[560] uppercase tracking-[0.08em] text-secondary-token'>
           {isConfigured ? 'Configured' : 'Not configured'}
         </span>
       </div>
@@ -81,7 +81,7 @@ function PlatformSection({
         href={helpUrl}
         target='_blank'
         rel='noopener noreferrer'
-        className='inline-flex items-center gap-1.5 text-[12.5px] font-[510] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
+        className='inline-flex items-center gap-1.5 text-[12.5px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
       >
         {helpText}
         <ExternalLink className='h-3.5 w-3.5' />
@@ -91,7 +91,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-(--linear-text-tertiary)'
+            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -109,7 +109,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-(--linear-text-tertiary)'
+            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {tokenLabel}
           </label>
@@ -126,7 +126,7 @@ function PlatformSection({
             <button
               type='button'
               onClick={() => setShowToken(!showToken)}
-              className='absolute inset-y-0 right-0 flex items-center pr-3 text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-primary)'
+              className='absolute inset-y-0 right-0 flex items-center pr-3 text-tertiary-token transition-colors hover:text-primary-token'
               aria-label={showToken ? 'Hide token' : 'Show token'}
             >
               {showToken ? (
@@ -312,7 +312,7 @@ export function SettingsAdPixelsSection({
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <SettingsToggleRow
               title='Pixel tracking'
               description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
@@ -375,7 +375,7 @@ export function SettingsAdPixelsSection({
           actionsClassName='w-auto shrink-0'
           actions={
             <div className='flex items-center gap-2'>
-              <span className='text-[11px] font-[560] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+              <span className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
                 {pixelData.enabled ? 'Enabled' : 'Disabled'}
               </span>
               <Switch
@@ -391,7 +391,7 @@ export function SettingsAdPixelsSection({
 
         <div className='space-y-3 px-4 py-3'>
           {!hasAnyPixels && (
-            <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-6 py-5 text-center'>
+            <ContentSurfaceCard className='bg-surface-0 px-6 py-5 text-center'>
               <p className='text-[13px] leading-[18px] text-secondary-token'>
                 No tracking pixels configured yet. Add your first destination to
                 start tracking conversions.
@@ -399,7 +399,7 @@ export function SettingsAdPixelsSection({
             </ContentSurfaceCard>
           )}
 
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.
             </p>
@@ -482,7 +482,7 @@ export function SettingsAdPixelsSection({
             }
           />
 
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] leading-[18px] text-secondary-token'>
               Events are sent server-side for better accuracy. No third-party
               JavaScript is injected on your profile, and credentials are

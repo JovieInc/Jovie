@@ -106,11 +106,11 @@ export function OnboardingProfileReviewStep({
           /* Loading state with progress bar */
           <div className='flex flex-col items-center gap-6 py-12'>
             <div className='w-full max-w-xs'>
-              <div className='h-1.5 w-full overflow-hidden rounded-full bg-(--linear-bg-surface-1)'>
+              <div className='h-1.5 w-full overflow-hidden rounded-full bg-surface-1'>
                 <div className='h-full rounded-full bg-(--linear-accent) animate-[indeterminate_1.5s_ease-in-out_infinite]' />
               </div>
             </div>
-            <p className='text-[13px] text-(--linear-text-secondary) animate-pulse'>
+            <p className='text-[13px] text-secondary-token animate-pulse'>
               Setting up your profile...
             </p>
             <style>{`
@@ -136,17 +136,15 @@ export function OnboardingProfileReviewStep({
 
                 {/* Name + Handle */}
                 <div className='text-center'>
-                  <p className='text-[16px] font-[590] text-(--linear-text-primary)'>
+                  <p className='text-[16px] font-[590] text-primary-token'>
                     {displayName}
                   </p>
-                  <p className='text-[13px] text-(--linear-text-tertiary)'>
-                    @{handle}
-                  </p>
+                  <p className='text-[13px] text-tertiary-token'>@{handle}</p>
                 </div>
 
                 {/* Bio */}
                 {bio && (
-                  <p className='text-[13px] text-(--linear-text-secondary) text-center max-w-sm line-clamp-3'>
+                  <p className='text-[13px] text-secondary-token text-center max-w-sm line-clamp-3'>
                     {bio}
                   </p>
                 )}
@@ -157,7 +155,7 @@ export function OnboardingProfileReviewStep({
                     {genres.slice(0, 5).map(genre => (
                       <span
                         key={genre}
-                        className='rounded-full bg-(--linear-bg-surface-1) px-2.5 py-0.5 text-[11px] font-[510] text-(--linear-text-secondary)'
+                        className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token'
                       >
                         {genre}
                       </span>

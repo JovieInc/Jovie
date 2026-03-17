@@ -36,7 +36,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
         'group/btn h-7 gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400]',
         isCopied
           ? 'border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-          : 'text-(--linear-text-tertiary)'
+          : 'text-tertiary-token'
       )}
       onClick={() =>
         void onCopy(smartLinkPath, `${releaseTitle} smart link`, testId)
@@ -55,7 +55,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       <span
         className={cn(
           'line-clamp-1',
-          isCopied ? 'text-inherit' : 'text-(--linear-text-tertiary)'
+          isCopied ? 'text-inherit' : 'text-tertiary-token'
         )}
       >
         {isCopied ? 'Copied!' : '—'}

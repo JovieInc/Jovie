@@ -20,7 +20,7 @@ const INTENT_STYLE: Record<string, DotBadgeVariant> = {
   },
   Low: {
     className:
-      'border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+      'border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token',
     dotClassName: 'bg-(--linear-text-quaternary)',
   },
 };
@@ -52,7 +52,7 @@ export function DemoAudiencePanel() {
       {/* Member list */}
       <div>
         {/* Header */}
-        <div className='flex items-center gap-3 border-b border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) px-4 py-1.5 text-2xs font-medium text-(--linear-text-tertiary)'>
+        <div className='flex items-center gap-3 border-b border-(--linear-app-frame-seam) bg-surface-0 px-4 py-1.5 text-2xs font-medium text-tertiary-token'>
           <span className='flex-1'>Name</span>
           <span className='w-14 text-center'>Intent</span>
           <span className='hidden w-20 sm:block'>Source</span>
@@ -65,9 +65,9 @@ export function DemoAudiencePanel() {
           return (
             <div
               key={member.id}
-              className='flex items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 py-2 text-app transition-colors duration-fast hover:bg-(--linear-bg-surface-1)'
+              className='flex items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 py-2 text-app transition-colors duration-fast hover:bg-surface-1'
             >
-              <span className='flex-1 truncate text-(--linear-text-primary)'>
+              <span className='flex-1 truncate text-primary-token'>
                 {member.name}
               </span>
               <span className='w-14 text-center'>
@@ -78,13 +78,13 @@ export function DemoAudiencePanel() {
                   className='mx-auto'
                 />
               </span>
-              <span className='hidden w-20 truncate text-2xs text-(--linear-text-tertiary) sm:block'>
+              <span className='hidden w-20 truncate text-2xs text-tertiary-token sm:block'>
                 {member.source}
               </span>
-              <span className='hidden w-32 truncate text-2xs text-(--linear-text-tertiary) md:block'>
+              <span className='hidden w-32 truncate text-2xs text-tertiary-token md:block'>
                 {member.lastAction}
               </span>
-              <span className='w-10 text-right text-2xs text-(--linear-text-secondary)'>
+              <span className='w-10 text-right text-2xs text-secondary-token'>
                 {member.engagementScore}
               </span>
             </div>

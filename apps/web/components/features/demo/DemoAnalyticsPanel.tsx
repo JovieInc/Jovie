@@ -46,14 +46,14 @@ export function DemoAnalyticsPanel() {
               return (
                 <div key={platform.platform} className='space-y-1.5'>
                   <div className='flex items-center justify-between text-[13px]'>
-                    <span className='text-(--linear-text-primary)'>
+                    <span className='text-primary-token'>
                       {platform.platform}
                     </span>
-                    <span className='text-[12px] text-(--linear-text-tertiary)'>
+                    <span className='text-[12px] text-tertiary-token'>
                       {platform.clicks.toLocaleString()}
                     </span>
                   </div>
-                  <div className='h-2 w-full overflow-hidden rounded-full bg-(--linear-bg-surface-1)'>
+                  <div className='h-2 w-full overflow-hidden rounded-full bg-surface-1'>
                     <div
                       className='h-full rounded-full transition-all duration-slow'
                       style={{
@@ -76,10 +76,10 @@ export function DemoAnalyticsPanel() {
             className='px-4 py-3'
           />
           <div className='flex items-center justify-between px-4 py-3 text-[13px]'>
-            <span className='text-(--linear-text-primary)'>
+            <span className='text-primary-token'>
               {ANALYTICS_SUMMARY.topCountry}
             </span>
-            <span className='text-[12px] text-(--linear-text-tertiary)'>
+            <span className='text-[12px] text-tertiary-token'>
               {Math.round(
                 ANALYTICS_SUMMARY.totalClicks * 0.42
               ).toLocaleString()}{' '}

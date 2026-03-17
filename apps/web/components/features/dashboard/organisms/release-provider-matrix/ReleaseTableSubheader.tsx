@@ -160,11 +160,9 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1 py-1.5 transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:bg-(--linear-bg-surface-1)'
+      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
     >
-      <span className='text-[13px] text-(--linear-text-secondary)'>
-        {label}
-      </span>
+      <span className='text-[13px] text-secondary-token'>{label}</span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
@@ -237,8 +235,8 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent align='end' className='w-[260px]'>
         {/* Header */}
-        <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-3 py-2'>
-          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
           <PopoverPrimitive.Close asChild>
@@ -254,7 +252,7 @@ function LinearStyleDisplayMenu({
 
         {/* Release view toggle */}
         {onReleaseViewChange && (
-          <div className='border-b border-(--linear-border-subtle) px-3 py-2'>
+          <div className='border-b border-subtle px-3 py-2'>
             <ReleaseViewSegmentedControl
               value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
@@ -264,8 +262,8 @@ function LinearStyleDisplayMenu({
 
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-(--linear-border-subtle) px-3 py-1.5'>
-            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <div className='border-b border-subtle px-3 py-1.5'>
+            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
               List options
             </p>
             <ToggleSwitch

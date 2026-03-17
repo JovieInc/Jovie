@@ -19,10 +19,10 @@ export function ProfileLinkCard({ handle }: ProfileLinkCardProps) {
     >
       <div className='min-w-0 flex-1'>
         <div>
-          <h3 className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          <h3 className='text-[13px] font-[510] text-primary-token'>
             Your profile link
           </h3>
-          <p className='mt-1 truncate text-[13px] text-(--linear-text-secondary)'>
+          <p className='mt-1 truncate text-[13px] text-secondary-token'>
             {profileUrl}
           </p>
         </div>

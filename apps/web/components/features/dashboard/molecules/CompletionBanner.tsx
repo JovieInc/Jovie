@@ -39,19 +39,19 @@ export const CompletionBanner = memo(
     return (
       <ContentSurfaceCard className='flex items-start gap-3 p-4'>
         <div
-          className='shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-2'
+          className='shrink-0 rounded-full border border-subtle bg-surface-0 p-2'
           aria-hidden='true'
         >
           <CheckCircle className='h-5 w-5 text-success' />
         </div>
         <div className='min-w-0 flex-1 space-y-1'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
             Setup complete
           </p>
-          <p className='text-[14px] font-[590] leading-5 text-(--linear-text-primary)'>
+          <p className='text-[14px] font-[590] leading-5 text-primary-token'>
             Your profile is ready
           </p>
-          <p className='text-[14px] leading-5 text-(--linear-text-secondary)'>
+          <p className='text-[14px] leading-5 text-secondary-token'>
             You&apos;ve completed all the essential setup steps.
           </p>
         </div>
@@ -59,7 +59,7 @@ export const CompletionBanner = memo(
           type='button'
           onClick={handleDismiss}
           aria-label='Dismiss banner'
-          className='shrink-0 rounded-full border border-(--linear-border-subtle) bg-transparent p-1.5 text-(--linear-text-tertiary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='shrink-0 rounded-full border border-subtle bg-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           <X className='h-4 w-4' aria-hidden='true' />
         </button>

@@ -34,8 +34,8 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     return (
       <div
         className={cn(
-          'flex h-[28px] items-center gap-1.5 rounded-[8px] border border-(--linear-border-subtle) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,transparent)] px-2.5',
-          'text-[11px] font-[430] tracking-[-0.01em] text-(--linear-text-tertiary) select-none transition-[background-color,border-color,color] duration-150'
+          'flex h-[28px] items-center gap-1.5 rounded-[8px] border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,transparent)] px-2.5',
+          'text-[11px] font-[430] tracking-[-0.01em] text-tertiary-token select-none transition-[background-color,border-color,color] duration-150'
         )}
         title={
           isScheduled

@@ -112,18 +112,16 @@ function FunnelStage({
         <DrawerSurfaceCard
           className={cn(
             'relative overflow-hidden px-4 py-3 text-center',
-            isLast
-              ? 'border-(--linear-border-default) bg-(--linear-bg-surface-1)'
-              : 'bg-(--linear-bg-surface-1)'
+            isLast ? 'border-default bg-surface-1' : 'bg-surface-1'
           )}
         >
-          <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
             {label}
           </p>
-          <p className='text-2xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
+          <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
             {value}
           </p>
-          <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+          <p className='mt-0.5 text-[11px] text-secondary-token'>
             {description}
           </p>
         </DrawerSurfaceCard>
@@ -131,7 +129,7 @@ function FunnelStage({
 
       {!isLast && (
         <div className='flex min-h-[40px] flex-col items-center py-2'>
-          <ArrowDown className='h-3.5 w-3.5 text-(--linear-text-tertiary)/60' />
+          <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
           <span
             className={cn(
               'mt-0.5 min-h-[16px] text-[11px] font-[510] tabular-nums',
@@ -185,9 +183,7 @@ function RankedList({
   if (items.length === 0) {
     return (
       <div className='min-h-[196px]'>
-        <p className='py-4 text-[13px] text-(--linear-text-tertiary)'>
-          {emptyMessage}
-        </p>
+        <p className='py-4 text-[13px] text-tertiary-token'>{emptyMessage}</p>
       </div>
     );
   }
@@ -200,15 +196,15 @@ function RankedList({
           className='group flex h-8 items-center justify-between rounded-[7px] px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
-            <span className='w-3 text-[11px] font-[510] text-(--linear-text-tertiary) tabular-nums'>
+            <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
-            <IconComponent className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
-            <span className='truncate text-[13px] text-(--linear-text-secondary) transition-colors group-hover:text-(--linear-text-primary)'>
+            <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
+            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-[510] text-(--linear-text-primary) tabular-nums'>
+          <span className='ml-2 text-[13px] font-[510] text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>
@@ -242,12 +238,10 @@ function EngagementMetricCard({
         </>
       ) : (
         <>
-          <p className='text-xl font-[590] tracking-[-0.011em] text-(--linear-text-primary) tabular-nums'>
+          <p className='text-xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
             {value}
           </p>
-          <p className='mt-1 text-[11px] text-(--linear-text-tertiary)'>
-            {label}
-          </p>
+          <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
         </>
       )}
     </DrawerSurfaceCard>

@@ -319,7 +319,7 @@ export function SocialsForm({ artist }: Readonly<SocialsFormProps>) {
             {socialLinks.map((link, index) => (
               <div
                 key={link.id || `new-${index}`}
-                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-(--linear-bg-surface-0)/50'
+                className='flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-0/50'
               >
                 <CommonDropdown
                   variant='dropdown'

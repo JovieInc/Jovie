@@ -48,11 +48,11 @@ function ProfileIdentityFieldRow({
   return (
     <div
       className={cn(
-        'space-y-2 border-b border-(--linear-border-subtle) px-4 py-3.5 last:border-b-0 sm:px-5',
+        'space-y-2 border-b border-subtle px-4 py-3.5 last:border-b-0 sm:px-5',
         className
       )}
     >
-      <p className='text-center text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+      <p className='text-center text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         {label}
       </p>
       {editing ? (
@@ -61,10 +61,10 @@ function ProfileIdentityFieldRow({
         <button
           type='button'
           className={cn(
-            'w-full rounded-[10px] border border-transparent px-4 py-3 text-center transition-[background-color,border-color,box-shadow,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 active:bg-(--linear-bg-surface-2)',
+            'w-full rounded-[10px] border border-transparent px-4 py-3 text-center transition-[background-color,border-color,box-shadow,color] duration-150 hover:border-subtle hover:bg-surface-1 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 active:bg-surface-2',
             tone === 'primary'
-              ? 'min-h-[52px] text-[17px] font-[560] tracking-[-0.02em] text-(--linear-text-primary)'
-              : 'min-h-[44px] text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'
+              ? 'min-h-[52px] text-[17px] font-[560] tracking-[-0.02em] text-primary-token'
+              : 'min-h-[44px] text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'
           )}
           onClick={onEdit}
           aria-label={ariaLabel}
@@ -204,7 +204,7 @@ export function ProfileEditorSection({
                 onChange={e => onDisplayNameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'displayName')}
                 onBlur={onInputBlur}
-                className='min-h-[46px] rounded-[10px] border-(--linear-border-default) bg-(--linear-bg-surface-0) text-center text-[15px] font-[560] tracking-[-0.02em] text-(--linear-text-primary)'
+                className='min-h-[46px] rounded-[10px] border-default bg-surface-0 text-center text-[15px] font-[560] tracking-[-0.02em] text-primary-token'
               />
             }
           />
@@ -228,7 +228,7 @@ export function ProfileEditorSection({
                 onChange={e => onUsernameChange(e.target.value)}
                 onKeyDown={e => onInputKeyDown(e, 'username')}
                 onBlur={onInputBlur}
-                className='min-h-[42px] rounded-[10px] border-(--linear-border-default) bg-(--linear-bg-surface-0) text-center text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-primary)'
+                className='min-h-[42px] rounded-[10px] border-default bg-surface-0 text-center text-[13px] font-[510] tracking-[-0.01em] text-primary-token'
               />
             }
           />

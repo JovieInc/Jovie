@@ -83,7 +83,7 @@ function InsightsPanelContent({
   if (error) {
     return (
       <ContentSurfaceCard className='p-6 text-center'>
-        <p className='text-[13px] text-(--linear-text-secondary)'>
+        <p className='text-[13px] text-secondary-token'>
           Failed to load insights. Please try again.
         </p>
       </ContentSurfaceCard>
@@ -108,7 +108,7 @@ function InsightsPanelContent({
       />
       <PrioritySection
         label='Informational'
-        colorClass='text-(--linear-text-tertiary)'
+        colorClass='text-tertiary-token'
         insights={grouped.low}
       />
     </div>
@@ -161,10 +161,8 @@ export function InsightsPanel() {
       {/* Header */}
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <h2 className='text-lg font-[590] text-(--linear-text-primary)'>
-            AI Insights
-          </h2>
-          <p className='text-[13px] text-(--linear-text-secondary)'>
+          <h2 className='text-lg font-[590] text-primary-token'>AI Insights</h2>
+          <p className='text-[13px] text-secondary-token'>
             {getSubtitle(total)}
           </p>
         </div>
@@ -192,7 +190,7 @@ export function InsightsPanel() {
         aria-label='Filter insights by category'
         surface='ghost'
         className='flex flex-wrap gap-1.5 rounded-none border-0 bg-transparent p-0'
-        triggerClassName='min-h-8 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-1 text-[12.5px] text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary)'
+        triggerClassName='min-h-8 border border-subtle bg-surface-1 px-3 py-1 text-[12.5px] text-secondary-token hover:border-default hover:bg-surface-0 hover:text-primary-token data-[state=active]:border-default data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token'
       />
 
       {/* Content */}

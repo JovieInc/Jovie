@@ -60,19 +60,19 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           return (
             <ContentSurfaceCard
               key={email.id}
-              className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
+              className='flex items-center justify-between gap-3 bg-surface-0 p-3.5'
             >
               <div className='min-w-0 flex items-center gap-3'>
                 <div>
-                  <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+                  <p className='flex items-center gap-2 text-[13px] text-primary-token'>
                     {email.emailAddress}
                     {isPrimary ? (
-                      <span className='text-[11px] text-(--linear-text-secondary)'>
+                      <span className='text-[11px] text-secondary-token'>
                         Primary
                       </span>
                     ) : null}
                   </p>
-                  <p className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-secondary)'>
+                  <p className='mt-0.5 flex items-center gap-1.5 text-[11px] text-secondary-token'>
                     {isVerified ? (
                       <span className='inline-flex items-center gap-1 text-emerald-600'>
                         <CheckCircle className='h-3.5 w-3.5' aria-hidden />
@@ -115,7 +115,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
           );
         })}
 
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+        <ContentSurfaceCard className='bg-surface-0 p-3.5'>
           <form
             onSubmit={pendingEmail ? handleVerifyEmail : handleStartEmailUpdate}
             className='flex flex-col gap-3 sm:flex-row sm:items-end'
@@ -125,7 +125,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 <div>
                   <label
                     htmlFor='verify-code'
-                    className='mb-1.5 block text-[13px] text-(--linear-text-primary)'
+                    className='mb-1.5 block text-[13px] text-primary-token'
                   >
                     Verification code
                   </label>
@@ -144,7 +144,7 @@ export function EmailManagementCard({ user }: EmailManagementCardProps) {
                 <div>
                   <label
                     htmlFor='new-email'
-                    className='mb-1.5 block text-[13px] text-(--linear-text-primary)'
+                    className='mb-1.5 block text-[13px] text-primary-token'
                   >
                     Add email address
                   </label>

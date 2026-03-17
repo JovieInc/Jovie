@@ -38,7 +38,7 @@ export const ExpandButton = memo(function ExpandButton({
     <DrawerInlineIconButton
       onClick={onClick}
       disabled={isLoading}
-      className='h-[18px] w-[18px] rounded-[5px] p-0 text-(--linear-text-tertiary) disabled:cursor-not-allowed disabled:opacity-50'
+      className='h-[18px] w-[18px] rounded-[5px] p-0 text-tertiary-token disabled:cursor-not-allowed disabled:opacity-50'
       aria-expanded={isExpanded}
       aria-label={isExpanded ? 'Collapse tracks' : 'Expand tracks'}
     >

@@ -110,10 +110,8 @@ function PlatformSuggestionItem({
       data-option-id={optionId}
       type='button'
       className={cn(
-        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-[13px] text-(--linear-text-primary) transition',
-        active
-          ? 'bg-(--linear-bg-surface-2)'
-          : 'hover:bg-(--linear-bg-surface-2)',
+        'flex min-h-[44px] w-full items-center justify-between gap-2.5 px-3 py-2.5 text-left text-[13px] text-primary-token transition',
+        active ? 'bg-surface-2' : 'hover:bg-surface-2',
         'active:scale-[0.99]'
       )}
       onMouseEnter={onMouseEnter}
@@ -139,13 +137,11 @@ function PlatformSuggestionItem({
           matchIndices={option.matchIndices}
         />
         {/* Simplified hint */}
-        <span className='text-[13px] text-(--linear-text-tertiary)'>
-          {option.hint}
-        </span>
+        <span className='text-[13px] text-tertiary-token'>{option.hint}</span>
       </span>
       {/* Only show Enter hint on active item */}
       {active && (
-        <span className='hidden text-[13px] text-(--linear-text-tertiary) sm:inline'>
+        <span className='hidden text-[13px] text-tertiary-token sm:inline'>
           Enter
         </span>
       )}
@@ -515,7 +511,7 @@ export const UniversalLinkInput = forwardRef<
               <div
                 ref={refs.setFloating}
                 style={floatingStyles}
-                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-(--linear-bg-surface-1) py-1 shadow-[0_18px_48px_rgba(0,0,0,0.22)]'
+                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-[0_18px_48px_rgba(0,0,0,0.22)]'
                 onMouseDown={event => {
                   event.preventDefault();
                 }}
@@ -531,9 +527,9 @@ export const UniversalLinkInput = forwardRef<
                         <div key={group.category}>
                           {/* Divider between categories (not before first) */}
                           {groupIndex > 0 && (
-                            <div className='mx-3 my-1 border-t border-(--linear-border-default)' />
+                            <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+                          <div className='px-3 pb-1 pt-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

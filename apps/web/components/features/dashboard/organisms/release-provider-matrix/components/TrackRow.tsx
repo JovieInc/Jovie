@@ -55,8 +55,8 @@ export const TrackRow = memo(function TrackRow({
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const rowStateClassName = isSelected
-    ? 'bg-(--linear-bg-surface-1) shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-(--linear-bg-surface-1)'
-    : 'bg-transparent hover:bg-(--linear-bg-surface-1) transition-[background-color,box-shadow] duration-150 ease-out';
+    ? 'bg-surface-1 shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-surface-1'
+    : 'bg-transparent hover:bg-surface-1 transition-[background-color,box-shadow] duration-150 ease-out';
 
   const rowClassName = [
     'group rounded-[8px]',
@@ -122,7 +122,7 @@ export const TrackRow = memo(function TrackRow({
               <button
                 type='button'
                 onClick={handleTogglePlayback}
-                className='flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-6 w-6 items-center justify-center rounded-full border border-transparent text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={
                   isPlaying ? `Pause ${track.title}` : `Play ${track.title}`
                 }
@@ -143,7 +143,7 @@ export const TrackRow = memo(function TrackRow({
         <td className='py-2 pr-4'>
           <div className='flex items-center gap-2.5 pl-6'>
             {/* Track number */}
-            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-(--linear-text-tertiary)'>
+            <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
               {trackLabel}.
             </span>
 
@@ -152,7 +152,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-[13px] text-(--linear-text-primary)'
+                  className='text-[13px] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -161,7 +161,7 @@ export const TrackRow = memo(function TrackRow({
                 {track.isExplicit && (
                   <Badge
                     variant='secondary'
-                    className='shrink-0 border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1 py-0 text-[9px] text-(--linear-text-tertiary)'
+                    className='shrink-0 border border-subtle bg-surface-1 px-1 py-0 text-[9px] text-tertiary-token'
                   >
                     E
                   </Badge>
@@ -202,9 +202,7 @@ export const TrackRow = memo(function TrackRow({
                 railClassName='max-w-[132px] lg:max-w-[164px]'
               />
             ) : (
-              <span className='text-[11px] text-(--linear-text-tertiary)'>
-                —
-              </span>
+              <span className='text-[11px] text-tertiary-token'>—</span>
             )}
           </div>
         </td>
@@ -220,11 +218,11 @@ export const TrackRow = memo(function TrackRow({
       {isVisible('metrics') && (
         <td className='py-2'>
           {track.durationMs ? (
-            <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
+            <span className='text-[11px] tabular-nums text-secondary-token'>
               {formatDuration(track.durationMs)}
             </span>
           ) : (
-            <span className='text-[11px] text-(--linear-text-tertiary)'>—</span>
+            <span className='text-[11px] text-tertiary-token'>—</span>
           )}
         </td>
       )}
@@ -299,10 +297,10 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
 
   if (tracks.length === 0) {
     return (
-      <tr className='bg-(--linear-bg-surface-1)/60'>
+      <tr className='bg-surface-1/60'>
         <td
           colSpan={columnCount}
-          className='py-3 pl-20 text-[11px] text-(--linear-text-tertiary)'
+          className='py-3 pl-20 text-[11px] text-tertiary-token'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />

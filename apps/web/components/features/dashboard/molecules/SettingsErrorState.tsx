@@ -18,7 +18,7 @@ export function SettingsErrorState({
   return (
     <ContentSurfaceCard className='overflow-hidden'>
       <div className='px-4 py-3'>
-        <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-(--linear-bg-surface-0) px-6 py-8 text-center'>
+        <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 bg-surface-0 px-6 py-8 text-center'>
           <AlertCircle className='h-6 w-6 text-destructive' aria-hidden />
           <p className='text-[13px] font-[510] text-primary-token'>{title}</p>
           <p className='text-[13px] text-secondary-token'>{message}</p>

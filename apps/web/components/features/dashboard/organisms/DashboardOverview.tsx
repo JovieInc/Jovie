@@ -87,7 +87,7 @@ function SetupTaskItem({
       {!isComplete && (
         <Link
           href={actionHref}
-          className='text-[12.5px] font-[510] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
+          className='text-[12.5px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
         >
           {actionLabel} {GLYPH_ARROW_RIGHT}
         </Link>
@@ -143,7 +143,7 @@ export function DashboardOverview({
     <ContentSurfaceCard as='header' className='overflow-hidden'>
       <ContentSectionHeader
         title={
-          <span className='text-[15px] font-[590] tracking-[-0.01em] text-(--linear-text-primary)'>
+          <span className='text-[15px] font-[590] tracking-[-0.01em] text-primary-token'>
             Welcome back, {greetingName}
           </span>
         }

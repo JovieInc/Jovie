@@ -117,18 +117,18 @@ export const cardTokens = {
   variants: {
     // Default static card - responsive padding
     default: tw`
-      bg-(--linear-bg-surface-1)
+      bg-surface-1
       shadow-[0_1px_0_rgba(0,0,0,0.03)]
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
     // Interactive clickable card - full hover effects, responsive padding
     interactive: tw`
-      bg-(--linear-bg-surface-1)
+      bg-surface-1
       cursor-pointer
       transition-[background-color,border-color,box-shadow,transform] ${timing.normal} ${timing.easing}
-      hover:bg-(--linear-bg-surface-0)
-      hover:border-(--linear-border-default)
+      hover:bg-surface-0
+      hover:border-default
       hover:shadow-(--linear-shadow-card-elevated)
       hover:-translate-y-0.5
       active:translate-y-0
@@ -141,22 +141,22 @@ export const cardTokens = {
 
     // Settings card - elevated surface, no hover effects (Linear-style)
     settings: tw`
-      bg-(--linear-bg-surface-1)
+      bg-surface-1
       shadow-[0_1px_0_rgba(0,0,0,0.03)]
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
     // Analytics/metric card - minimal, data-focused
     analytics: tw`
-      bg-(--linear-bg-surface-1)
+      bg-surface-1
       transition-[background-color,border-color] ${timing.fast} ${timing.easing}
-      hover:bg-(--linear-bg-surface-0)
-      hover:border-(--linear-border-default)
+      hover:bg-surface-0
+      hover:border-default
     `,
 
     // Empty state card - centered content, responsive padding
     'empty-state': tw`
-      bg-(--linear-bg-surface-1)
+      bg-surface-1
       text-center
     `,
 

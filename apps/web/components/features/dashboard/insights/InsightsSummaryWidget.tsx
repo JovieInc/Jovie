@@ -41,19 +41,19 @@ export function InsightsSummaryWidget() {
       {/* Header */}
       <div className='flex items-center justify-between'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-            <Sparkles className='h-3.5 w-3.5 text-(--linear-text-secondary)' />
+          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-subtle bg-surface-0'>
+            <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
           </div>
           <span className='text-[13px] font-[510] text-primary-token'>
             AI Insights
           </span>
-          <span className='rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-text-secondary)'>
+          <span className='rounded-full border border-subtle bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
             {totalActive}
           </span>
         </div>
         <Link
           href={APP_ROUTES.INSIGHTS}
-          className='text-[11px] font-[510] text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)'
+          className='text-[11px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
         >
           View all &rarr;
         </Link>

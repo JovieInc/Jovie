@@ -163,8 +163,8 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
     <>
       <tr
         className={cn(
-          'group transition-[background-color,border-color] duration-150 hover:bg-(--linear-bg-surface-1)',
-          index !== totalRows - 1 && 'border-b border-(--linear-border-subtle)'
+          'group transition-[background-color,border-color] duration-150 hover:bg-surface-1',
+          index !== totalRows - 1 && 'border-b border-subtle'
         )}
       >
         {/* Release info cell */}
@@ -178,7 +178,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
             {/* Title and metadata */}
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-(--linear-text-primary)'>
+                <span className='line-clamp-1 text-[13px] font-[510] tracking-[-0.011em] text-primary-token'>
                   {release.title}
                 </span>
                 {manualOverrideCount > 0 && (
@@ -191,7 +191,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                 )}
               </div>
               {artistName && (
-                <div className='mt-0.5 line-clamp-1 text-[12px] font-[400] text-(--linear-text-secondary)'>
+                <div className='mt-0.5 line-clamp-1 text-[12px] font-[400] text-secondary-token'>
                   {artistName}
                 </div>
               )}
@@ -201,7 +201,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
         {/* Release date cell */}
         <td className='px-4 py-2.5 align-middle'>
-          <span className='line-clamp-1 text-[12px] font-[400] tabular-nums text-(--linear-text-secondary)'>
+          <span className='line-clamp-1 text-[12px] font-[400] tabular-nums text-secondary-token'>
             {release.releaseDate
               ? new Date(release.releaseDate).toLocaleDateString('en-US', {
                   month: 'short',

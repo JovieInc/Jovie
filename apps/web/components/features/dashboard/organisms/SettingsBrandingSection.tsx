@@ -73,7 +73,7 @@ export function SettingsBrandingSection({
           gated={!isPro}
         />
         {isPro && hideBranding ? (
-          <ContentSurfaceCard className='flex items-center gap-3 bg-(--linear-bg-surface-0) p-3.5'>
+          <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 p-3.5'>
             <Sparkles
               className='h-4 w-4 shrink-0 text-emerald-500'
               aria-hidden

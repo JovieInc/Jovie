@@ -84,10 +84,10 @@ export function SessionManagementCard({
     return (
       <ContentSurfaceCard className='overflow-hidden'>
         <div className='space-y-3 px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
             <LoadingSkeleton height='h-10' />
           </ContentSurfaceCard>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
             <LoadingSkeleton height='h-10' />
           </ContentSurfaceCard>
         </div>
@@ -99,7 +99,7 @@ export function SessionManagementCard({
     return (
       <ContentSurfaceCard className='overflow-hidden'>
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
             <p className='text-[13px] text-destructive'>{sessionsError}</p>
           </ContentSurfaceCard>
         </div>
@@ -111,8 +111,8 @@ export function SessionManagementCard({
     return (
       <ContentSurfaceCard className='overflow-hidden'>
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-3.5'>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
+            <p className='text-[13px] text-secondary-token'>
               No other active sessions.
             </p>
           </ContentSurfaceCard>
@@ -131,20 +131,20 @@ export function SessionManagementCard({
           return (
             <ContentSurfaceCard
               key={session.id}
-              className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-3.5'
+              className='flex items-center justify-between gap-3 bg-surface-0 p-3.5'
             >
               <div className='min-w-0'>
-                <p className='flex items-center gap-2 text-[13px] text-(--linear-text-primary)'>
+                <p className='flex items-center gap-2 text-[13px] text-primary-token'>
                   {isCurrent
                     ? 'This device'
                     : activity?.browserName || 'Unknown device'}
                   {isCurrent ? (
-                    <span className='text-[11px] text-(--linear-text-secondary)'>
+                    <span className='text-[11px] text-secondary-token'>
                       Current session
                     </span>
                   ) : null}
                 </p>
-                <p className='mt-0.5 text-[11px] text-(--linear-text-secondary)'>
+                <p className='mt-0.5 text-[11px] text-secondary-token'>
                   Last active {formatRelativeDate(session.lastActiveAt)}
                   {activity?.city && activity?.country
                     ? ` · ${activity.city}, ${activity.country}`

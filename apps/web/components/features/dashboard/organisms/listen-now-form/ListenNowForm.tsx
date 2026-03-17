@@ -85,7 +85,7 @@ function ConnectedArtistBadge({
           className='rounded-full object-cover'
         />
       )}
-      <span className='max-w-[140px] truncate text-xs text-(--linear-text-secondary)'>
+      <span className='max-w-[140px] truncate text-xs text-secondary-token'>
         {info.artistName}
       </span>
       <CheckCircle2 className='h-3.5 w-3.5 text-green-500 shrink-0' />
@@ -94,7 +94,7 @@ function ConnectedArtistBadge({
           href={info.externalUrl}
           target='_blank'
           rel='noopener noreferrer'
-          className='rounded-full p-1 text-(--linear-text-tertiary)'
+          className='rounded-full p-1 text-tertiary-token'
           aria-label='Open profile'
         >
           <ExternalLink className='h-3 w-3' />
@@ -187,11 +187,11 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
     >
       {/* ── Primary Streaming ─────────────────────────────── */}
       <div>
-        <h3 className='mb-3 text-sm font-medium text-(--linear-text-primary)'>
+        <h3 className='mb-3 text-sm font-medium text-primary-token'>
           Primary Streaming
         </h3>
 
-        <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden bg-(--linear-bg-surface-1) p-0'>
+        <ContentSurfaceCard className='divide-y divide-(--linear-border-subtle) overflow-hidden bg-surface-1 p-0'>
           {/* Spotify row */}
           <div className='flex items-center gap-3 px-4 py-3'>
             <div
@@ -208,7 +208,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-[13px] font-medium text-(--linear-text-primary)'>
+              <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
                 Spotify
               </span>
               {connectedDspInfo.spotify ? (
@@ -241,7 +241,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('spotify')}
-                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
+                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>
@@ -264,7 +264,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               />
             </div>
             <div className='flex flex-1 items-center gap-3 min-w-0'>
-              <span className='w-[100px] shrink-0 text-[13px] font-medium text-(--linear-text-primary)'>
+              <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
                 Apple Music
               </span>
               {connectedDspInfo.apple_music ? (
@@ -297,7 +297,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('apple_music')}
-                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-(--linear-text-secondary) transition-[background-color,color] duration-150 hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)'
+                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>
@@ -316,9 +316,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       {/* ── Video ─────────────────────────────────────────── */}
       <div>
-        <h3 className='mb-3 text-sm font-medium text-(--linear-text-primary)'>
-          Video
-        </h3>
+        <h3 className='mb-3 text-sm font-medium text-primary-token'>Video</h3>
 
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <div className='flex items-center gap-3 px-4 py-3'>
@@ -335,7 +333,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
                 aria-hidden
               />
             </div>
-            <span className='w-[100px] shrink-0 text-[13px] font-medium text-(--linear-text-primary)'>
+            <span className='w-[100px] shrink-0 text-[13px] font-medium text-primary-token'>
               YouTube
             </span>
             <Input
@@ -361,17 +359,17 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       {/* ── Other Platforms ────────────────────────────────── */}
       <div>
-        <h3 className='mb-3 text-sm font-medium text-(--linear-text-primary)'>
+        <h3 className='mb-3 text-sm font-medium text-primary-token'>
           Other Platforms
         </h3>
 
         {additionalLinks.length === 0 ? (
-          <ContentSurfaceCard className='border-dashed bg-(--linear-bg-surface-1) py-6 text-center'>
+          <ContentSurfaceCard className='border-dashed bg-surface-1 py-6 text-center'>
             <Music
-              className='mx-auto mb-2 h-5 w-5 text-(--linear-text-tertiary)'
+              className='mx-auto mb-2 h-5 w-5 text-tertiary-token'
               aria-hidden='true'
             />
-            <p className='mb-3 text-[13px] text-(--linear-text-secondary)'>
+            <p className='mb-3 text-[13px] text-secondary-token'>
               SoundCloud, Bandcamp, Tidal, and more
             </p>
             <Button
@@ -469,7 +467,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
                     <InlineIconButton
                       onClick={() => removeAdditionalLink(index)}
-                      className='shrink-0 rounded-full p-1 text-(--linear-text-tertiary) hover:text-red-500'
+                      className='shrink-0 rounded-full p-1 text-tertiary-token hover:text-red-500'
                       aria-label={`Remove ${meta?.name || link.platform}`}
                     >
                       <Trash2 className='h-4 w-4' />
@@ -496,7 +494,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
       </div>
 
       {/* ── Save ──────────────────────────────────────────── */}
-      <div className='border-t border-(--linear-border-subtle) pt-2'>
+      <div className='border-t border-subtle pt-2'>
         <Button
           type='submit'
           disabled={loading}

@@ -97,7 +97,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
           )}
         >
           {message.role === 'assistant' && (
-            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--linear-bg-surface-2)'>
+            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
               <BrandLogo size={14} tone='auto' />
             </div>
           )}
@@ -106,7 +106,7 @@ const InlineChatMessage = memo(function InlineChatMessage({
               'max-w-[85%] rounded-2xl px-3 py-2',
               message.role === 'user'
                 ? 'bg-accent text-accent-foreground'
-                : 'bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+                : 'bg-surface-2 text-primary-token'
             )}
           >
             <div className='whitespace-pre-wrap text-[13px] leading-relaxed'>
@@ -114,8 +114,8 @@ const InlineChatMessage = memo(function InlineChatMessage({
             </div>
           </div>
           {message.role === 'user' && (
-            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--linear-bg-surface-2)'>
-              <User className='h-3.5 w-3.5 text-(--linear-text-secondary)' />
+            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+              <User className='h-3.5 w-3.5 text-secondary-token' />
             </div>
           )}
         </div>
@@ -247,30 +247,30 @@ export const InlineChatArea = forwardRef<
       <button
         type='button'
         onClick={handleToggle}
-        className='flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-(--linear-bg-surface-2)'
+        className='flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-2'
         aria-expanded={expanded}
       >
         <div className='flex items-center gap-2'>
           <BrandLogo size={16} tone='auto' />
-          <span className='text-[13px] font-[510] text-(--linear-text-primary)'>
+          <span className='text-[13px] font-[510] text-primary-token'>
             Jovie
           </span>
           {messages.length > 0 && (
-            <span className='text-[11px] text-(--linear-text-tertiary)'>
+            <span className='text-[11px] text-tertiary-token'>
               ({messages.length} messages)
             </span>
           )}
         </div>
         {expanded ? (
-          <ChevronUp className='h-4 w-4 text-(--linear-text-secondary)' />
+          <ChevronUp className='h-4 w-4 text-secondary-token' />
         ) : (
-          <ChevronDown className='h-4 w-4 text-(--linear-text-secondary)' />
+          <ChevronDown className='h-4 w-4 text-secondary-token' />
         )}
       </button>
 
       {/* Messages area - collapsible */}
       {expanded && (
-        <div className='border-t border-(--linear-border-subtle)'>
+        <div className='border-t border-subtle'>
           <div
             ref={scrollContainerRef}
             className='max-h-80 overflow-y-auto px-4 py-4'
@@ -310,11 +310,11 @@ export const InlineChatArea = forwardRef<
             {/* Loading indicator — rendered outside virtualizer */}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className='flex gap-3 pb-4'>
-                <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-(--linear-bg-surface-2)'>
+                <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <BrandLogo size={14} tone='auto' />
                 </div>
-                <div className='rounded-2xl bg-(--linear-bg-surface-2) px-3 py-2'>
-                  <Loader2 className='h-4 w-4 animate-spin text-(--linear-text-secondary)' />
+                <div className='rounded-2xl bg-surface-2 px-3 py-2'>
+                  <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
                 </div>
               </div>
             )}
@@ -328,7 +328,7 @@ export const InlineChatArea = forwardRef<
                   <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
                 )}
                 <div className='flex-1'>
-                  <p className='text-[13px] text-(--linear-text-primary)'>
+                  <p className='text-[13px] text-primary-token'>
                     {chatError.message}
                   </p>
                   {chatError.failedMessage && !chatError.retryAfter && (

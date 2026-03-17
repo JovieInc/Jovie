@@ -14,8 +14,8 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
-        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-subtle bg-surface-1 px-3'>
+        <p className='text-[12px] leading-[17px] text-secondary-token'>
           No recent activity. Share your profile to see engagement here.
         </p>
       </div>
@@ -46,21 +46,17 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
     <>
       <span
         aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-base shadow-[0_0_0_3px_var(--linear-bg-surface-0)] group-hover:shadow-[0_0_0_3px_var(--linear-bg-surface-1)] group-focus-visible:shadow-[0_0_0_3px_var(--linear-bg-surface-1)]'
+        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-base shadow-[0_0_0_3px_var(--linear-bg-surface-0)] group-hover:shadow-[0_0_0_3px_var(--linear-bg-surface-1)] group-focus-visible:shadow-[0_0_0_3px_var(--linear-bg-surface-1)]'
       >
-        <span className='scale-90 text-(--linear-text-tertiary)'>
-          {activity.icon}
-        </span>
+        <span className='scale-90 text-tertiary-token'>{activity.icon}</span>
       </span>
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] leading-5 tracking-[-0.01em] text-(--linear-text-secondary)'>
-          <span className='tabular-nums text-(--linear-text-tertiary)'>
+        <p className='text-[13px] leading-5 tracking-[-0.01em] text-secondary-token'>
+          <span className='tabular-nums text-tertiary-token'>
             {formatTimeAgo(activity.timestamp)}
           </span>
-          <span className='text-(--linear-text-tertiary)'> - </span>
-          <span className='text-(--linear-text-primary)'>
-            {activity.description}
-          </span>
+          <span className='text-tertiary-token'> - </span>
+          <span className='text-primary-token'>{activity.description}</span>
         </p>
       </div>
     </>
@@ -75,7 +71,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         />
         <Link
           href={activity.href}
-          className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-visible:bg-(--linear-bg-surface-1) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
         >
           {content}
         </Link>
@@ -116,14 +112,14 @@ export function DashboardActivityFeed({
     <div className='space-y-3' data-testid='dashboard-activity-feed'>
       <div className='flex items-center justify-between gap-4'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
-            <Zap className='h-3.5 w-3.5 text-(--linear-text-tertiary)' />
+          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
+            <Zap className='h-3.5 w-3.5 text-tertiary-token' />
           </div>
-          <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)'>
+          <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>
             Activity
           </h3>
         </div>
-        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-[510] text-(--linear-text-tertiary)'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 text-[11px] font-[510] text-tertiary-token'>
           <span
             aria-hidden='true'
             className='h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse'

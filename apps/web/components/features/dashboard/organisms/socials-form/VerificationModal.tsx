@@ -99,7 +99,7 @@ export function VerificationModal({
               <p className='text-[13px] font-[510] text-success'>
                 Domain verified!
               </p>
-              <p className='mt-0.5 text-xs text-(--linear-text-secondary)'>
+              <p className='mt-0.5 text-xs text-secondary-token'>
                 {hostname} has been successfully verified.
               </p>
             </div>
@@ -107,23 +107,20 @@ export function VerificationModal({
         ) : (
           <div className='space-y-5'>
             {/* Step-by-step instructions */}
-            <ol className='list-inside list-decimal space-y-3 text-[13px] text-(--linear-text-secondary)'>
+            <ol className='list-inside list-decimal space-y-3 text-[13px] text-secondary-token'>
               <li>
                 Log in to your domain provider (DNS host) for{' '}
-                <strong className='text-(--linear-text-primary)'>
-                  {hostname}
-                </strong>
+                <strong className='text-primary-token'>{hostname}</strong>
               </li>
               <li>Navigate to the DNS settings for your domain</li>
               <li>
-                Add a new{' '}
-                <strong className='text-(--linear-text-primary)'>TXT</strong>{' '}
+                Add a new <strong className='text-primary-token'>TXT</strong>{' '}
                 record with the value below
               </li>
               <li>Wait for DNS propagation (can take up to 48 hours)</li>
               <li>
                 Click{' '}
-                <strong className='text-(--linear-text-primary)'>
+                <strong className='text-primary-token'>
                   Check Verification
                 </strong>{' '}
                 below
@@ -132,13 +129,13 @@ export function VerificationModal({
 
             {/* Token display with copy */}
             <div className='space-y-2'>
-              <span className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+              <span className='text-[13px] font-[510] text-secondary-token'>
                 TXT Record Value
               </span>
               <div className='flex items-center gap-2'>
-                <ContentSurfaceCard className='flex-1 bg-(--linear-bg-surface-0) px-3 py-2.5'>
+                <ContentSurfaceCard className='flex-1 bg-surface-0 px-3 py-2.5'>
                   <code
-                    className='block break-all select-all text-xs font-mono text-(--linear-text-primary)'
+                    className='block break-all select-all text-xs font-mono text-primary-token'
                     data-testid='verification-token'
                   >
                     {verificationToken}
@@ -169,11 +166,11 @@ export function VerificationModal({
             </div>
 
             {/* DNS provider help */}
-            <ContentSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0) p-0'>
+            <ContentSurfaceCard className='overflow-hidden bg-surface-0 p-0'>
               <button
                 type='button'
                 onClick={() => setShowProviders(prev => !prev)}
-                className='flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-[510] text-(--linear-text-secondary) transition-colors hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+                className='flex w-full items-center justify-between px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 aria-expanded={showProviders}
                 data-testid='provider-tips-toggle'
               >
@@ -186,7 +183,7 @@ export function VerificationModal({
               </button>
               {showProviders && (
                 <div
-                  className='space-y-1.5 border-t border-(--linear-border-subtle) px-3 py-2.5'
+                  className='space-y-1.5 border-t border-subtle px-3 py-2.5'
                   data-testid='provider-links'
                 >
                   {DNS_PROVIDER_LINKS.map(provider => (
@@ -206,7 +203,7 @@ export function VerificationModal({
             </ContentSurfaceCard>
 
             {/* Propagation note */}
-            <p className='text-xs text-(--linear-text-tertiary)'>
+            <p className='text-xs text-tertiary-token'>
               DNS changes can take up to 48 hours to propagate worldwide. If
               verification fails, wait and try again.
             </p>

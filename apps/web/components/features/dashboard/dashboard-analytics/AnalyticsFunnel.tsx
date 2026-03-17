@@ -65,7 +65,7 @@ export function AnalyticsFunnel({
           <div key={stage.label} className='w-full flex flex-col items-center'>
             {index > 0 && (
               <div className='flex flex-col items-center py-2'>
-                <ArrowDown className='h-4 w-4 text-(--linear-text-tertiary)' />
+                <ArrowDown className='h-4 w-4 text-tertiary-token' />
                 {conversionRate && (
                   <span className='mt-0.5 text-[11px] font-[510] tabular-nums text-primary'>
                     {conversionRate}
@@ -83,18 +83,18 @@ export function AnalyticsFunnel({
                   relative overflow-hidden rounded-xl
                   bg-gradient-to-r from-(--linear-bg-surface-1) to-(--linear-bg-surface-2)
                   px-6 py-5 text-center
-                  ${isLast ? '' : 'hover:border-(--linear-border-default)'}
+                  ${isLast ? '' : 'hover:border-default'}
                   ${isLast ? 'border-primary/20 ring-1 ring-primary/15 bg-gradient-to-r from-[color-mix(in_srgb,var(--linear-accent)_12%,var(--linear-bg-surface-1))] to-(--linear-bg-surface-1)' : ''}
                   transition-all duration-200
                 `}
               >
-                <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+                <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                   {stage.label}
                 </p>
-                <p className='text-4xl font-[590] tracking-[-0.022em] text-(--linear-text-primary) tabular-nums'>
+                <p className='text-4xl font-[590] tracking-[-0.022em] text-primary-token tabular-nums'>
                   {formatNumber(stage.value)}
                 </p>
-                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                <p className='mt-1 text-[13px] text-secondary-token'>
                   {stage.description}
                 </p>
               </ContentSurfaceCard>

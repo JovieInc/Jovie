@@ -101,8 +101,8 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
-            <p className='text-[13px] text-(--linear-text-secondary)'>
+          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+            <p className='text-[13px] text-secondary-token'>
               Loading payment settings...
             </p>
           </ContentSurfaceCard>
@@ -125,7 +125,7 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] text-error'>{error}</p>
           </ContentSurfaceCard>
         </div>
@@ -147,14 +147,14 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3 space-y-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+          <ContentSurfaceCard className='bg-surface-0 p-4'>
             <div className='flex items-start gap-3'>
-              <CreditCard className='mt-0.5 h-5 w-5 shrink-0 text-(--linear-text-secondary)' />
+              <CreditCard className='mt-0.5 h-5 w-5 shrink-0 text-secondary-token' />
               <div className='flex-1'>
-                <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                <p className='text-[13px] font-[510] text-primary-token'>
                   Connect with Stripe
                 </p>
-                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                <p className='mt-1 text-[13px] text-secondary-token'>
                   Set up Stripe Connect to receive payments directly from fans.
                   Stripe handles all payment processing, payouts, and tax
                   reporting.
@@ -191,14 +191,14 @@ export function SettingsPaymentsSection() {
           className='min-h-0 px-4 py-3'
         />
         <div className='px-4 py-3 space-y-3'>
-          <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+          <ContentSurfaceCard className='bg-surface-0 p-4'>
             <div className='flex items-start gap-3'>
               <AlertTriangle className='mt-0.5 h-5 w-5 shrink-0 text-warning' />
               <div className='flex-1'>
-                <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                <p className='text-[13px] font-[510] text-primary-token'>
                   Stripe setup incomplete
                 </p>
-                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                <p className='mt-1 text-[13px] text-secondary-token'>
                   Your Stripe account is connected but onboarding is not
                   complete. Finish setup to start receiving payments.
                 </p>
@@ -243,20 +243,20 @@ export function SettingsPaymentsSection() {
         className='min-h-0 px-4 py-3'
       />
       <div className='px-4 py-3 space-y-3'>
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) p-4'>
+        <ContentSurfaceCard className='bg-surface-0 p-4'>
           <div className='flex items-start gap-3'>
             <CheckCircle2 className='mt-0.5 h-5 w-5 shrink-0 text-success' />
             <div className='flex-1'>
-              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+              <p className='text-[13px] font-[510] text-primary-token'>
                 Stripe connected
               </p>
-              <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+              <p className='mt-1 text-[13px] text-secondary-token'>
                 {status.payoutsEnabled
                   ? 'Payouts are enabled. You are ready to receive payments.'
                   : 'Account connected. Payouts are being reviewed by Stripe.'}
               </p>
               {status.email && (
-                <p className='mt-1 text-[13px] text-(--linear-text-secondary)'>
+                <p className='mt-1 text-[13px] text-secondary-token'>
                   Payout email: {status.email}
                 </p>
               )}

@@ -256,7 +256,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
 
               <AppIconButton
                 ariaLabel={`Dismiss ${suggestion.platform.name} suggestion`}
-                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-full bg-(--linear-bg-surface-1) text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='absolute top-1/2 right-2 z-10 h-6 w-6 -translate-y-1/2 rounded-full bg-surface-1 text-quaternary-token hover:bg-surface-2 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={event => handleDismiss(suggestion, event)}
               >
                 <X className='h-3.5 w-3.5' aria-hidden />

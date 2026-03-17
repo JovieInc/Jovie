@@ -18,7 +18,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'dismissed' })}
-        className='h-8 gap-1.5 rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] tracking-[-0.01em] text-(--linear-text-tertiary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-secondary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+        className='h-8 gap-1.5 rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-secondary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
       >
         <X className='h-3 w-3' />
         Dismiss
@@ -28,7 +28,7 @@ export function InsightActions({ insightId }: InsightActionsProps) {
         size='sm'
         disabled={isPending}
         onClick={() => mutate({ insightId, status: 'acted_on' })}
-        className='h-8 gap-1.5 rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+        className='h-8 gap-1.5 rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] tracking-[-0.01em] text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
       >
         <Check className='h-3 w-3' />
         Done

@@ -53,11 +53,11 @@ function ErrorCards() {
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
             <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
           </div>
-          <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+          <p className='text-[13px] font-[510] text-secondary-token'>
             Profile views
           </p>
         </div>
-        <p className='text-[13px] text-(--linear-text-tertiary)'>
+        <p className='text-[13px] text-tertiary-token'>
           Temporarily unavailable
         </p>
       </div>
@@ -66,11 +66,11 @@ function ErrorCards() {
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
           </div>
-          <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
+          <p className='text-[13px] font-[510] text-secondary-token'>
             Unique visitors
           </p>
         </div>
-        <p className='text-[13px] text-(--linear-text-tertiary)'>
+        <p className='text-[13px] text-tertiary-token'>
           Temporarily unavailable
         </p>
       </div>
@@ -267,7 +267,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                 <TooltipTrigger asChild>
                   <button
                     type='button'
-                    className='text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary)'
+                    className='text-tertiary-token transition-colors hover:text-secondary-token'
                     aria-label='Learn more about profile views'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
@@ -294,7 +294,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
                 <TooltipTrigger asChild>
                   <button
                     type='button'
-                    className='text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-secondary)'
+                    className='text-tertiary-token transition-colors hover:text-secondary-token'
                     aria-label='Learn more about unique visitors'
                   >
                     <HelpCircle className='h-3.5 w-3.5' />
@@ -310,7 +310,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
             }
           >
             <div className='flex items-center justify-between'>
-              <p className='text-[13px] text-(--linear-text-tertiary)'>
+              <p className='text-[13px] text-tertiary-token'>
                 Identified audience
               </p>
               <Link
@@ -336,12 +336,10 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
             Overview
           </p>
-          <p className='text-[13px] text-(--linear-text-secondary)'>
-            {rangeLabel}
-          </p>
+          <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>
         </div>
         <Button
           type='button'
