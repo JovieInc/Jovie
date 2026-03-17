@@ -236,20 +236,25 @@ export function OnboardingCheckoutClient({
 
         {/* Annual toggle */}
         {hasAnnual ? (
-          <div className='mb-4 flex items-center justify-center gap-3'>
+          <fieldset
+            className='mb-4 flex items-center justify-center gap-3 border-none p-0 m-0'
+            aria-label='Billing interval'
+          >
             <button
               type='button'
+              aria-pressed={!isAnnual}
               onClick={() => setIsAnnual(false)}
               className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                !isAnnual
-                  ? 'bg-surface-1 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token'
+                isAnnual
+                  ? 'text-tertiary-token hover:text-secondary-token'
+                  : 'bg-surface-1 text-primary-token'
               }`}
             >
               Monthly
             </button>
             <button
               type='button'
+              aria-pressed={isAnnual}
               onClick={() => setIsAnnual(true)}
               className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
                 isAnnual
@@ -258,9 +263,11 @@ export function OnboardingCheckoutClient({
               }`}
             >
               Annual{' '}
-              <span className='text-(--linear-accent)'>−{savingsPercent}%</span>
+              <span aria-hidden='true' className='text-(--linear-accent)'>
+                −{savingsPercent}%
+              </span>
             </button>
-          </div>
+          </fieldset>
         ) : null}
 
         {/* Price display */}

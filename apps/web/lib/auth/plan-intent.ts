@@ -20,7 +20,9 @@ export type PlanIntentTier = 'free' | 'founding' | 'pro' | 'growth';
  * Validate that a string is a known plan tier.
  * Returns the validated plan or null if invalid.
  */
-function validatePlan(value: string | null | undefined): PlanIntentTier | null {
+export function validatePlan(
+  value: string | null | undefined
+): PlanIntentTier | null {
   if (!value || !VALID_PLANS.has(value)) return null;
   return value as PlanIntentTier;
 }
@@ -59,7 +61,7 @@ export function setPlanIntent(plan: string): void {
 export function getPlanIntent(): PlanIntentTier | null {
   // Try cookie first
   try {
-    const cookies = document.cookie.split('; ');
+    const cookies = document.cookie.split(';').map(c => c.trim());
     const match = cookies.find(c => c.startsWith(`${PLAN_INTENT_KEY}=`));
     if (match) {
       const value = match.split('=')[1];
@@ -95,7 +97,7 @@ export function getPlanIntent(): PlanIntentTier | null {
 export function getPlanIntentFromCookies(
   cookieHeader: string
 ): PlanIntentTier | null {
-  const cookies = cookieHeader.split('; ');
+  const cookies = cookieHeader.split(';').map(c => c.trim());
   const match = cookies.find(c => c.startsWith(`${PLAN_INTENT_KEY}=`));
   if (!match) return null;
   return validatePlan(match.split('=')[1]);

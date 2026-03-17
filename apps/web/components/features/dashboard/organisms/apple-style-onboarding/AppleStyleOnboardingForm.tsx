@@ -207,7 +207,7 @@ export function AppleStyleOnboardingForm({
     // If user expressed paid intent and checkout step is enabled, go to checkout
     const planIntent = getPlanIntent();
     if (checkoutStepEnabled && isPaidIntent(planIntent)) {
-      globalThis.location.href = '/onboarding/checkout';
+      globalThis.location.href = `/onboarding/checkout?plan=${planIntent}`;
       return;
     }
 

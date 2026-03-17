@@ -5,8 +5,14 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
 import { resolveUserState, UserState } from '@/lib/auth/gate';
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
-import { getPlanIntentFromCookies } from '@/lib/auth/plan-intent';
+import {
+  getPlanIntentFromCookies,
+  isPaidIntent,
+  validatePlan,
+} from '@/lib/auth/plan-intent';
 import { PRICING } from '@/lib/config/pricing';
+import { checkGate } from '@/lib/feature-flags/server';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -53,7 +59,11 @@ function resolvePriceIds(plan: PlanIntentTier): {
 
 export const dynamic = 'force-dynamic';
 
-export default async function OnboardingCheckoutPage() {
+export default async function OnboardingCheckoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   // Verify authentication
   const authResult = await resolveUserState();
   if (
@@ -63,16 +73,32 @@ export default async function OnboardingCheckoutPage() {
     redirect(APP_ROUTES.SIGNIN);
   }
 
-  // Read plan intent from cookie
+  // Enforce feature gate server-side (prevents direct URL access when flag is off)
+  const checkoutEnabled = await checkGate(
+    authResult.clerkUserId,
+    FEATURE_FLAG_KEYS.ONBOARDING_CHECKOUT_STEP
+  );
+  if (!checkoutEnabled) {
+    redirect(APP_ROUTES.DASHBOARD);
+  }
+
+  // Read plan intent from cookie, falling back to ?plan= query param
+  // (handles browsers where cookies are blocked but sessionStorage worked client-side)
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
     .map(c => `${c.name}=${c.value}`)
     .join('; ');
-  const planIntent = getPlanIntentFromCookies(cookieHeader);
+  let planIntent = getPlanIntentFromCookies(cookieHeader);
+
+  if (!planIntent) {
+    const params = await searchParams;
+    const planParam = typeof params.plan === 'string' ? params.plan : null;
+    planIntent = validatePlan(planParam);
+  }
 
   // No paid intent — go to dashboard
-  if (!planIntent || planIntent === 'free') {
+  if (!planIntent || !isPaidIntent(planIntent)) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

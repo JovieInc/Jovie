@@ -72,7 +72,7 @@
 
 **Why:** These users expressed purchase intent then bailed — they're warm leads. A well-timed email has high conversion potential. The `onboarding_checkout_skipped` analytics event from the funnel PR provides the trigger signal.
 
-**Context:** Requires email sending infrastructure (transactional email provider integration). The plan intent and skip event are tracked via analytics. Need to build: email template, scheduling/queue system, unsubscribe handling, and A/B test framework for subject lines.
+**Context:** Requires email-sending infrastructure (transactional email provider integration). The plan intent and skip event are tracked via analytics. Need to build: email template, scheduling/queue system, unsubscribe handling, and A/B test framework for subject lines.
 
 **Effort:** L
 **Priority:** P3

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { CopyToClipboardButton } from './CopyToClipboardButton';
 
@@ -21,6 +21,32 @@ const CONFETTI_COLORS = [
   '#06b6d4',
 ];
 
+interface ConfettiParticle {
+  id: string;
+  width: number;
+  height: number;
+  color: string;
+  left: string;
+  opacity: number;
+  animationDelay: string;
+  animationDuration: string;
+  rotation: string;
+}
+
+function generateParticles(): ConfettiParticle[] {
+  return Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
+    id: `confetti-${crypto.randomUUID()}`,
+    width: 4 + Math.random() * 6,
+    height: 4 + Math.random() * 6,
+    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+    left: `${Math.random() * 100}%`,
+    opacity: 0.9,
+    animationDelay: `${Math.random() * 0.8}s`,
+    animationDuration: `${2 + Math.random() * 2}s`,
+    rotation: `rotate(${Math.random() * 360}deg)`,
+  }));
+}
+
 /**
  * Celebration screen shown after onboarding step 3 completes.
  * Displays CSS confetti + "Your profile is live" with the user's URL.
@@ -33,11 +59,16 @@ export function ProfileLiveCelebration({
 }: ProfileLiveCelebrationProps) {
   const [isVisible, setIsVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const continueRef = useRef<HTMLButtonElement | null>(null);
   const profileUrl = `jov.ie/${username}`;
+  const particles = useMemo(() => generateParticles(), []);
 
   useEffect(() => {
     // Trigger entrance animation
     requestAnimationFrame(() => setIsVisible(true));
+
+    // Focus the continue button for keyboard/screen-reader users
+    continueRef.current?.focus();
 
     track('onboarding_celebration_shown', { username });
 
@@ -57,29 +88,29 @@ export function ProfileLiveCelebration({
   return (
     <div
       className='fixed inset-0 z-50 flex items-center justify-center bg-(--bg)/95 backdrop-blur-sm'
-      role='alert'
-      aria-live='polite'
+      role='dialog'
+      aria-modal='true'
+      aria-label='Profile live celebration'
     >
       {/* Confetti particles */}
       <div
         className='pointer-events-none absolute inset-0 overflow-hidden'
         aria-hidden='true'
       >
-        {Array.from({ length: CONFETTI_COUNT }, (_, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: static decorative confetti particles never reorder
+        {particles.map(p => (
           <span
-            key={`confetti-${i}`}
+            key={p.id}
             className='absolute block rounded-sm confetti-particle'
             style={{
-              width: `${4 + Math.random() * 6}px`,
-              height: `${4 + Math.random() * 6}px`,
-              backgroundColor: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-              left: `${Math.random() * 100}%`,
+              width: `${p.width}px`,
+              height: `${p.height}px`,
+              backgroundColor: p.color,
+              left: p.left,
               top: '-10px',
-              opacity: 0.9,
-              animationDelay: `${Math.random() * 0.8}s`,
-              animationDuration: `${2 + Math.random() * 2}s`,
-              transform: `rotate(${Math.random() * 360}deg)`,
+              opacity: p.opacity,
+              animationDelay: p.animationDelay,
+              animationDuration: p.animationDuration,
+              transform: p.rotation,
             }}
           />
         ))}
@@ -113,6 +144,7 @@ export function ProfileLiveCelebration({
         </div>
 
         <button
+          ref={continueRef}
           type='button'
           onClick={handleClick}
           className='mt-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
