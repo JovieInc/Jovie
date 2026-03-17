@@ -2,20 +2,83 @@
 
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Button, Input, Label } from '@jovie/ui';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Globe, MapPin } from 'lucide-react';
+import {
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerSection,
+  DrawerStatGrid,
+  DrawerSurfaceCard,
+  EntitySidebarShell,
+  StatTile,
+} from '@/components/molecules/drawer';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import {
   useDeleteTourDateMutation,
+  useTourDateAnalyticsQuery,
   useUpdateTourDateMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatISODate } from '@/lib/utils/date-formatting';
 import { buildTourDateActions } from './tour-date-actions';
+
+const numberFormatter = new Intl.NumberFormat();
+
+interface MiniRankedItem {
+  readonly key: string;
+  readonly label: string;
+  readonly value: string;
+}
+
+function MiniRankedList({
+  icon: IconComponent,
+  items,
+  emptyMessage,
+}: {
+  readonly icon: ComponentType<{ className?: string }>;
+  readonly items: readonly MiniRankedItem[];
+  readonly emptyMessage: string;
+}) {
+  if (items.length === 0) {
+    return (
+      <p className='py-2 text-[12px] text-tertiary-token'>{emptyMessage}</p>
+    );
+  }
+
+  return (
+    <ul className='space-y-1'>
+      {items.map((item, index) => (
+        <li
+          key={`${item.key}-${index}`}
+          className='flex h-7 items-center justify-between rounded-md px-1.5'
+        >
+          <div className='flex min-w-0 flex-1 items-center gap-1.5'>
+            <span className='w-3 text-[10px] font-[510] text-tertiary-token tabular-nums'>
+              {index + 1}
+            </span>
+            <IconComponent className='h-3 w-3 text-tertiary-token' />
+            <span className='truncate text-[12px] text-secondary-token'>
+              {item.label}
+            </span>
+          </div>
+          <span className='ml-2 text-[12px] font-[510] text-primary-token tabular-nums'>
+            {item.value}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 interface TourDateSidebarProps {
   readonly tourDate: TourDateViewModel | null;
@@ -46,6 +109,14 @@ export function TourDateSidebar({
 
   const updateMutation = useUpdateTourDateMutation(profileId);
   const deleteMutation = useDeleteTourDateMutation(profileId);
+  const {
+    data: analyticsData,
+    isLoading: analyticsLoading,
+    isError: analyticsError,
+  } = useTourDateAnalyticsQuery({
+    tourDateId: tourDate?.id ?? null,
+    enabled: Boolean(tourDate),
+  });
 
   useEffect(() => {
     if (tourDate) {
@@ -352,6 +423,73 @@ export function TourDateSidebar({
                   )
                 )}
               </div>
+            </div>
+
+            {/* Analytics */}
+            <div className='border-t border-subtle pt-4'>
+              <DrawerSection title='Analytics'>
+                {analyticsLoading ? (
+                  <DrawerSurfaceCard className='space-y-3 p-3'>
+                    <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
+                    <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
+                    <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
+                  </DrawerSurfaceCard>
+                ) : analyticsError ? (
+                  <p className='text-[12px] text-tertiary-token'>
+                    Unable to load analytics data.
+                  </p>
+                ) : (
+                  <div className='space-y-3'>
+                    <DrawerStatGrid>
+                      <StatTile
+                        label='Ticket Clicks'
+                        value={numberFormatter.format(
+                          analyticsData?.ticketClicks ?? 0
+                        )}
+                      />
+                      <StatTile
+                        label='Top Cities'
+                        value={String(analyticsData?.topCities?.length ?? 0)}
+                      />
+                    </DrawerStatGrid>
+
+                    {(analyticsData?.topCities?.length ?? 0) > 0 && (
+                      <DrawerSurfaceCard className='p-2'>
+                        <MiniRankedList
+                          icon={MapPin}
+                          items={(analyticsData?.topCities ?? []).map(c => ({
+                            key: c.city,
+                            label: c.city,
+                            value: numberFormatter.format(c.count),
+                          }))}
+                          emptyMessage='No city data yet'
+                        />
+                      </DrawerSurfaceCard>
+                    )}
+
+                    {(analyticsData?.topReferrers?.length ?? 0) > 0 && (
+                      <DrawerSurfaceCard className='p-2'>
+                        <MiniRankedList
+                          icon={Globe}
+                          items={(analyticsData?.topReferrers ?? []).map(r => ({
+                            key: r.referrer || 'direct',
+                            label: r.referrer || 'Direct',
+                            value: numberFormatter.format(r.count),
+                          }))}
+                          emptyMessage='No referrer data yet'
+                        />
+                      </DrawerSurfaceCard>
+                    )}
+
+                    {(analyticsData?.ticketClicks ?? 0) === 0 && (
+                      <p className='text-[12px] text-tertiary-token'>
+                        No ticket click data yet. Analytics will appear once
+                        fans click ticket links for this show.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </DrawerSection>
             </div>
           </div>
         )}
