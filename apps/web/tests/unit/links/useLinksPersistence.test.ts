@@ -362,12 +362,14 @@ describe('useLinksPersistence', () => {
 
   describe('error handling', () => {
     it('should show error toast on API error', async () => {
-      mockFetch.mockResolvedValue({
+      const mockResponse = {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
         json: async () => ({ error: 'Invalid platform' }),
-      });
+        clone: () => mockResponse,
+      };
+      mockFetch.mockResolvedValue(mockResponse);
 
       const { result } = renderHook(() =>
         useLinksPersistence({
