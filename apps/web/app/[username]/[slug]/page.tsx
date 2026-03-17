@@ -11,11 +11,11 @@ import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
+import { BASE_URL } from '@/constants/app';
 import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
-} from '@/components/release';
-import { BASE_URL } from '@/constants/app';
+} from '@/features/release';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,

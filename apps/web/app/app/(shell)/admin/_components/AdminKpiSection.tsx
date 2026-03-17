@@ -1,7 +1,7 @@
-import { FunnelMetricsStrip } from '@/components/admin/FunnelMetricsStrip';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { FunnelMetricsStrip } from '@/features/admin/FunnelMetricsStrip';
 import { getAdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 export async function AdminKpiSection() {

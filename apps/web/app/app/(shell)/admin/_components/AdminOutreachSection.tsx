@@ -1,8 +1,8 @@
-import { OutreachPipelineCard } from '@/components/admin/OutreachPipelineCard';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentMetricRowSkeleton } from '@/components/molecules/ContentMetricRowSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OutreachPipelineCard } from '@/features/admin/OutreachPipelineCard';
 import { getAdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 export async function AdminOutreachSection() {

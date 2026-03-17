@@ -4,7 +4,6 @@ import { Badge } from '@jovie/ui';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -18,6 +17,7 @@ import {
   ContentTableStateRow,
 } from '@/components/molecules/ContentTable';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
 import { cn } from '@/lib/utils';
 
 interface ReviewLead {

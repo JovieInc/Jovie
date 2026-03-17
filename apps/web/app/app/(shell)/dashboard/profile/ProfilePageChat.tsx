@@ -3,10 +3,10 @@
 import { AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function ProfilePageChatFallback() {
   return (

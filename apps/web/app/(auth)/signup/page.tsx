@@ -2,8 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { AuthLayout, SignUpForm } from '@/components/auth';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout, SignUpForm } from '@/features/auth';
 import {
   clearSignupClaimValue,
   persistSignupClaimValue,

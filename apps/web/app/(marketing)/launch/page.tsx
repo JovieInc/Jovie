@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { AiDemo } from '@/components/home/AiDemo';
-import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { HeroSpotifySearch } from '@/components/home/HeroSpotifySearch';
-import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { AiDemo } from '@/features/home/AiDemo';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { publicEnv } from '@/lib/env-public';
 import { captureWarning } from '@/lib/error-tracking';
 import { getProfileByUsername } from '@/lib/services/profile';

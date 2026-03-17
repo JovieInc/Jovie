@@ -1,10 +1,10 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { PricingComparisonChart } from '@/components/pricing/PricingComparisonChart';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { FinalCTASection } from '@/features/home/FinalCTASection';
+import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import {
   ENTITLEMENT_REGISTRY,
   getAllPlanIds,

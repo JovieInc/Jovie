@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OutreachKpis } from '@/features/admin/outreach/OutreachKpis';
 
 interface QueueResponse {
   items: unknown[];

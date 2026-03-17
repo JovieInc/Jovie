@@ -7,7 +7,7 @@ import { PageContent, PageShell } from '@/components/organisms/PageShell';
 
 const InviteCampaignManager = dynamic(
   () =>
-    import('@/components/admin/campaigns/InviteCampaignManager').then(mod => ({
+    import('@/features/admin/campaigns/InviteCampaignManager').then(mod => ({
       default: mod.InviteCampaignManager,
     })),
   {

@@ -1,8 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { OutreachStatusBadge } from '@/components/admin/outreach/OutreachStatusBadge';
-import { AdminTablePagination } from '@/components/admin/table/AdminTablePagination';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
@@ -14,6 +12,8 @@ import {
   ContentTable,
   ContentTableStateRow,
 } from '@/components/molecules/ContentTable';
+import { OutreachStatusBadge } from '@/features/admin/outreach/OutreachStatusBadge';
+import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
 import { cn } from '@/lib/utils';
 
 interface EmailQueueLead {

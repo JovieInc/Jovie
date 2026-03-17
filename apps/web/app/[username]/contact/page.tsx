@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getProfileModeHref } from '@/components/profile/registry';
+import { getProfileModeHref } from '@/features/profile/registry';
 
 interface Props {
   readonly params: Promise<{

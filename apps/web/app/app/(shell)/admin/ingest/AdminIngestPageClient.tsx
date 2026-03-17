@@ -9,13 +9,13 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { BatchIngestForm } from '@/components/admin/BatchIngestForm';
-import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
-import { IngestProfileDropdown } from '@/components/admin/ingest-profile-dropdown';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { BatchIngestForm } from '@/features/admin/BatchIngestForm';
+import type { IngestHistoryRow } from '@/features/admin/ingest-history.types';
+import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 import { cn } from '@/lib/utils';
 
 interface AdminIngestPageClientProps {

@@ -2,8 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import { Archive, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
 import { TableIconButton } from '@/components/organisms/table/atoms/TableIconButton';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function Section({
   title,

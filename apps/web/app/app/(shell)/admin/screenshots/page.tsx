@@ -13,7 +13,7 @@ const SKELETON_KEYS = Array.from({ length: 8 }, (_, i) => `ss-skel-${i}`);
 
 const ScreenshotGallery = dynamic(
   () =>
-    import('@/components/admin/ScreenshotGallery').then(mod => ({
+    import('@/features/admin/ScreenshotGallery').then(mod => ({
       default: mod.ScreenshotGallery,
     })),
   {

@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { LeadPipelineKpis } from '@/components/admin/leads/LeadPipelineKpis';
-import { LeadPipelineWorkspace } from '@/components/admin/leads/LeadPipelineWorkspace';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { LeadPipelineKpis } from '@/features/admin/leads/LeadPipelineKpis';
+import { LeadPipelineWorkspace } from '@/features/admin/leads/LeadPipelineWorkspace';
 
 export const metadata: Metadata = {
   title: 'Leads | Admin',

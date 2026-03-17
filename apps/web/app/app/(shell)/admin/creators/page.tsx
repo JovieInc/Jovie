@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import type { SearchParams } from 'nuqs/server';
-import { AdminCreatorsPageWrapper } from '@/components/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
+import { AdminCreatorsPageWrapper } from '@/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
 import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
 import { adminCreatorsSearchParams } from '@/lib/nuqs';
 

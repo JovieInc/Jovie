@@ -11,14 +11,14 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
-import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
-import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { PreviewToggleButton } from '@/features/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';

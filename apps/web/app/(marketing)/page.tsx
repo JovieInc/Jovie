@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
-import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
-import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
-import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { LogoBar } from '@/components/home/LogoBar';
-import { PricingSection } from '@/components/home/PricingSection';
-import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { ReleasesSection } from '@/components/home/ReleasesSection';
-import { SeeItInAction } from '@/components/home/SeeItInAction';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { DeeplinksGrid } from '@/features/home/DeeplinksGrid';
+import { FinalCTASection } from '@/features/home/FinalCTASection';
+import { LogoBar } from '@/features/home/LogoBar';
+import { PricingSection } from '@/features/home/PricingSection';
+import { RedesignedHero } from '@/features/home/RedesignedHero';
+import { ReleasesSection } from '@/features/home/ReleasesSection';
+import { SeeItInAction } from '@/features/home/SeeItInAction';
 import { publicEnv } from '@/lib/env-public';
 
 // Marketing pages must remain fully static.
