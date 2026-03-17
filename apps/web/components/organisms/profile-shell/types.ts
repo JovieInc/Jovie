@@ -48,6 +48,7 @@ export interface ProfileShellProps {
   readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
+  readonly showShopButton?: boolean;
   readonly maxWidthClass?: string;
   readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   readonly showGradientBlurs?: boolean;

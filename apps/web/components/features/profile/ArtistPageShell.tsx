@@ -23,6 +23,7 @@ type ArtistPageShellProps = {
   readonly showFooter?: boolean;
   readonly maxWidthClass?: string;
   readonly showNotificationButton?: boolean;
+  readonly showShopButton?: boolean;
   /** Available download sizes for profile photo */
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
@@ -48,6 +49,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
   showFooter = true,
   maxWidthClass = 'w-full max-w-md',
   showNotificationButton = false,
+  showShopButton = false,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
   visitTrackingToken,
@@ -67,6 +69,7 @@ const ArtistPageShell = React.memo(function ArtistPageShell({
       isTourModeActive={isTourModeActive}
       showFooter={showFooter}
       showNotificationButton={showNotificationButton}
+      showShopButton={showShopButton}
       maxWidthClass={maxWidthClass}
       backgroundPattern='gradient'
       showGradientBlurs={true}

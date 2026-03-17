@@ -30,6 +30,7 @@ import {
 } from '@/lib/feature-flags/server';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
+import { isShopEnabled } from '@/lib/profile/shop-settings';
 import {
   getProfileWithLinks as getCreatorProfileWithLinks,
   getProfileWithUser as getCreatorProfileWithUser,
@@ -701,6 +702,7 @@ export default async function ArtistPage({
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
+        showShopButton={isShopEnabled(profileSettings)}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />

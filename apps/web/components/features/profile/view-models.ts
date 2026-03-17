@@ -27,6 +27,7 @@ interface BuildProfilePublicViewModelInput {
   readonly tourDates?: TourDateViewModel[];
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
+  readonly showShopButton?: boolean;
   readonly showFooter?: boolean;
   readonly showBackButton?: boolean;
   readonly showTourButton?: boolean;
@@ -50,6 +51,7 @@ export function buildProfilePublicViewModel({
   tourDates = [],
   visitTrackingToken,
   showSubscriptionConfirmedBanner = true,
+  showShopButton = false,
   showFooter,
   showBackButton,
   showTourButton,
@@ -83,6 +85,7 @@ export function buildProfilePublicViewModel({
     tourDates,
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
+    showShopButton,
   };
 }
 

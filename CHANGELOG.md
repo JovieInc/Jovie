@@ -27,6 +27,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.2] - 2026-03-17
 
+### Added
+
+- Shopify shop redirect at `/[username]/shop` — redirects to creator's `*.myshopify.com` store with UTM attribution
+- Shopping bag icon in public profile nav bar when shop is enabled
+- Dashboard shop settings card in Earnings tab for connecting/disconnecting Shopify store URL
+- Shop click tracking via `/api/track` with `sendBeacon` for fire-and-forget analytics
+
 ### Removed
 
 - Unused DB tables `dsp_artist_enrichment` and `release_sync_status` — scaffolded but never queried or written to
