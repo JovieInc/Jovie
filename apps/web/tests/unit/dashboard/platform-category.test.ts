@@ -63,8 +63,8 @@ describe('getPlatformCategory', () => {
     });
   });
 
-  describe('MusicFetch-enriched platform routing (11 platforms)', () => {
-    it('routes all 8 MusicFetch DSP platforms to the Music tab', () => {
+  describe('MusicFetch-enriched platform routing', () => {
+    it('routes core MusicFetch DSP platforms to the Music tab', () => {
       const dspFromMusicFetch = [
         'spotify',
         'apple_music',
@@ -88,7 +88,7 @@ describe('getPlatformCategory', () => {
       expect(getPlatformCategory('youtube')).toBe('social');
     });
 
-    it('routes all 2 MusicFetch social platforms to the Social tab', () => {
+    it('routes MusicFetch social/video platforms to the Social tab', () => {
       expect(getPlatformCategory('instagram')).toBe('social');
       expect(getPlatformCategory('tiktok')).toBe('social');
     });

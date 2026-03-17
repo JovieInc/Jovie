@@ -11,6 +11,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { MUSICFETCH_ALL_SERVICES } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
 import {
   MusicfetchRequestError,
@@ -27,20 +28,9 @@ const REQUEST_TIMEOUT_MS = 15_000;
 
 /**
  * Services to request from MusicFetch when looking up an artist.
- * Covers major DSPs + social platforms.
+ * Derived from the canonical DSP registry (all 40 services).
  */
-const ARTIST_LOOKUP_SERVICES = [
-  'appleMusic',
-  'youtube',
-  'youtubeMusic',
-  'soundcloud',
-  'deezer',
-  'tidal',
-  'amazonMusic',
-  'bandcamp',
-  'instagram',
-  'tiktok',
-].join(',');
+const ARTIST_LOOKUP_SERVICES = MUSICFETCH_ALL_SERVICES.join(',');
 
 // ============================================================================
 // Types

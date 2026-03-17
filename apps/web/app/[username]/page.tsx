@@ -34,6 +34,7 @@ import {
   getProfileWithLinks as getCreatorProfileWithLinks,
   getProfileWithUser as getCreatorProfileWithUser,
 } from '@/lib/services/profile';
+import { getProfileSocialLinks } from '@/lib/services/profile/queries';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
@@ -478,12 +479,23 @@ async function renderListenMode(
     notFound();
   }
 
+  // Fetch social links for DSP resolution (~3ms on indexed columns)
+  const rawSocialLinks = await getProfileSocialLinks(profileResult.profile.id);
+  const socialLinks: LegacySocialLink[] = rawSocialLinks.map(link => ({
+    id: link.id,
+    artist_id: profileResult.profile.id,
+    platform: link.platform.toLowerCase(),
+    url: link.url,
+    clicks: link.clicks || 0,
+    created_at: toISOStringSafe(link.createdAt),
+  }));
+
   const artist = convertCreatorProfileToArtist(profileResult.profile);
   const subtitle = getProfileModeSubtitle('listen');
   const schemas = generateProfileStructuredData(
     profileResult.profile,
     profileResult.genres,
-    []
+    socialLinks
   );
 
   const body = (
@@ -500,7 +512,7 @@ async function renderListenMode(
       <StaticArtistPage
         mode='listen'
         artist={artist}
-        socialLinks={[]}
+        socialLinks={socialLinks}
         contacts={[]}
         subtitle={subtitle}
         showTipButton={profileResult.hasVenmoLink}

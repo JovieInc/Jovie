@@ -74,15 +74,40 @@ export type DSP = keyof typeof DSPS;
 
 // Global platform popularity ordering (lower index = more popular)
 // Used for initial/default ordering when personalized ranking is unavailable.
+// Streaming DSPs are listed first, followed by social platforms.
 export const GLOBAL_PLATFORM_POPULARITY = [
   'spotify',
   'apple_music',
   'youtube',
   'youtube_music',
-  'instagram',
-  'tiktok',
   'soundcloud',
   'bandcamp',
+  'deezer',
+  'tidal',
+  'amazon_music',
+  'amazon',
+  'pandora',
+  'napster',
+  'audiomack',
+  'yandex',
+  'qq_music',
+  'netease',
+  'jio_saavn',
+  'line_music',
+  'kkbox',
+  'flo',
+  'gaana',
+  'joox',
+  'awa',
+  'audius',
+  'trebel',
+  'beatport',
+  'qobuz',
+  'anghami',
+  'boomplay',
+  'iheartradio',
+  'instagram',
+  'tiktok',
   'x',
   'twitter',
   'facebook',
@@ -101,12 +126,18 @@ export const popularityIndex = (pid: string): number => {
 };
 
 const REGIONAL_DSP_POPULARITY: Record<string, readonly string[]> = {
-  BR: ['spotify', 'youtube', 'apple_music', 'soundcloud'],
-  DE: ['spotify', 'apple_music', 'youtube', 'soundcloud'],
-  IN: ['youtube', 'spotify', 'apple_music', 'soundcloud'],
-  JP: ['youtube', 'apple_music', 'spotify', 'soundcloud'],
-  MX: ['spotify', 'youtube', 'apple_music', 'soundcloud'],
-  US: ['spotify', 'apple_music', 'youtube', 'soundcloud'],
+  BR: ['spotify', 'youtube', 'apple_music', 'deezer', 'soundcloud'],
+  CN: ['qq_music', 'netease', 'youtube', 'spotify', 'apple_music'],
+  DE: ['spotify', 'apple_music', 'youtube', 'deezer', 'soundcloud'],
+  IN: ['youtube', 'spotify', 'jio_saavn', 'gaana', 'apple_music'],
+  JP: ['youtube', 'apple_music', 'spotify', 'line_music', 'awa'],
+  KR: ['youtube', 'spotify', 'apple_music', 'flo', 'kkbox'],
+  MX: ['spotify', 'youtube', 'apple_music', 'deezer', 'soundcloud'],
+  NG: ['boomplay', 'audiomack', 'spotify', 'apple_music', 'youtube'],
+  RU: ['yandex', 'spotify', 'youtube', 'apple_music', 'soundcloud'],
+  SA: ['anghami', 'spotify', 'apple_music', 'youtube', 'deezer'],
+  TW: ['kkbox', 'spotify', 'apple_music', 'youtube', 'line_music'],
+  US: ['spotify', 'apple_music', 'youtube', 'amazon_music', 'soundcloud'],
 };
 
 export const geoAwarePopularityIndex = (
