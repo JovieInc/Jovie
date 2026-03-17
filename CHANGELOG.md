@@ -9,7 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Sidebar display name now updates immediately after saving profile edits (was stale until full page reload due to separate query cache)
+- Sidebar display name now updates immediately after saving profile edits (was stale until full-page reload due to separate query cache)
 - Social link delete API no longer returns 500 on temp-* IDs — rejects with 400 before hitting the database
 - Social link optimistic rollback now properly reverts UI on server error (was using stale closure instead of snapshot)
 - Mobile settings page now shows "Links, music & more" trigger to access Social/Music/Earn/About tabs (were completely hidden below `lg` breakpoint)

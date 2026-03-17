@@ -2,7 +2,7 @@
 
 import { Button, CommonDropdown, Label } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -47,6 +47,10 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+
+  // Keep a ref to the latest previewData so async callbacks avoid stale closures
+  const previewDataRef = useRef(previewData);
+  previewDataRef.current = previewData;
 
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
@@ -253,11 +257,11 @@ export function ProfileContactSidebar() {
             toast.success('Link removed');
           },
           onError: () => {
-            // Revert on failure using the snapshot taken before removal
-            setPreviewData({
-              ...previewData,
-              links: previousLinks,
-            });
+            // Revert on failure — read current previewData from ref to avoid stale closure
+            const current = previewDataRef.current;
+            if (current) {
+              setPreviewData({ ...current, links: previousLinks });
+            }
             toast.error('Failed to remove link');
           },
         }
