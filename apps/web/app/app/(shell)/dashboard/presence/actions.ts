@@ -5,10 +5,7 @@ import { redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import type { DspMatchConfidenceBreakdown } from '@/lib/db/schema/dsp-enrichment';
-import {
-  dspArtistMatches,
-  releaseSyncStatus,
-} from '@/lib/db/schema/dsp-enrichment';
+import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import type { DspMatchStatus, DspProviderId } from '@/lib/dsp-enrichment/types';
 import { captureError } from '@/lib/error-tracking';
 import { getDashboardData } from '../actions';
@@ -28,10 +25,6 @@ export interface DspPresenceItem {
   readonly matchingIsrcCount: number;
   readonly status: DspMatchStatus;
   readonly confirmedAt: string | null;
-  // Release sync data (may be null if no sync has occurred)
-  readonly totalReleasesSynced: number | null;
-  readonly releasesWithMatches: number | null;
-  readonly lastSyncAt: string | null;
 }
 
 export interface DspPresenceData {
@@ -78,49 +71,21 @@ export async function loadDspPresence(): Promise<DspPresenceData> {
       'loadDspPresence:matches'
     );
 
-    // Fetch release sync status for the profile
-    const syncStatuses = await dashboardQuery(
-      () =>
-        db
-          .select({
-            providerId: releaseSyncStatus.providerId,
-            totalReleasesSynced: releaseSyncStatus.totalReleasesSynced,
-            releasesWithMatches: releaseSyncStatus.releasesWithMatches,
-            lastFullSyncAt: releaseSyncStatus.lastFullSyncAt,
-            lastIncrementalSyncAt: releaseSyncStatus.lastIncrementalSyncAt,
-          })
-          .from(releaseSyncStatus)
-          .where(eq(releaseSyncStatus.creatorProfileId, profile.id)),
-      'loadDspPresence:syncStatus'
-    );
-
-    // Index sync statuses by provider for quick lookup
-    const syncByProvider = new Map(syncStatuses.map(s => [s.providerId, s]));
-
-    // Filter out rejected matches and combine with sync data
+    // Filter out rejected matches
     const activeMatches = matches.filter(m => m.status !== 'rejected');
 
-    const items: DspPresenceItem[] = activeMatches.map(match => {
-      const sync = syncByProvider.get(match.providerId);
-      return {
-        matchId: match.matchId,
-        providerId: match.providerId as DspProviderId,
-        externalArtistName: match.externalArtistName,
-        externalArtistUrl: match.externalArtistUrl,
-        externalArtistImageUrl: match.externalArtistImageUrl,
-        confidenceScore: Number(match.confidenceScore) || 0,
-        confidenceBreakdown: match.confidenceBreakdown,
-        matchingIsrcCount: match.matchingIsrcCount,
-        status: match.status as DspMatchStatus,
-        confirmedAt: match.confirmedAt?.toISOString() ?? null,
-        totalReleasesSynced: sync?.totalReleasesSynced ?? null,
-        releasesWithMatches: sync?.releasesWithMatches ?? null,
-        lastSyncAt:
-          (
-            sync?.lastFullSyncAt ?? sync?.lastIncrementalSyncAt
-          )?.toISOString() ?? null,
-      };
-    });
+    const items: DspPresenceItem[] = activeMatches.map(match => ({
+      matchId: match.matchId,
+      providerId: match.providerId as DspProviderId,
+      externalArtistName: match.externalArtistName,
+      externalArtistUrl: match.externalArtistUrl,
+      externalArtistImageUrl: match.externalArtistImageUrl,
+      confidenceScore: Number(match.confidenceScore) || 0,
+      confidenceBreakdown: match.confidenceBreakdown,
+      matchingIsrcCount: match.matchingIsrcCount,
+      status: match.status as DspMatchStatus,
+      confirmedAt: match.confirmedAt?.toISOString() ?? null,
+    }));
 
     // Sort: confirmed first, then auto_confirmed, then suggested
     const statusOrder: Record<string, number> = {

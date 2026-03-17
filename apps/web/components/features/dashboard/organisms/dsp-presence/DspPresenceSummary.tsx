@@ -3,13 +3,11 @@
 interface DspPresenceSummaryProps {
   readonly confirmedCount: number;
   readonly suggestedCount: number;
-  readonly totalCount: number;
 }
 
 export function DspPresenceSummary({
   confirmedCount,
   suggestedCount,
-  totalCount,
 }: DspPresenceSummaryProps) {
   return (
     <div className='shrink-0 border-b border-(--linear-border-subtle) px-4 py-3 lg:px-6'>

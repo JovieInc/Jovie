@@ -28,7 +28,6 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
         <DspPresenceSummary
           confirmedCount={data.confirmedCount}
           suggestedCount={data.suggestedCount}
-          totalCount={data.items.length}
         />
 
         <div className='flex-1 min-h-0 overflow-y-auto p-4 lg:p-6'>

@@ -136,44 +136,6 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </DrawerSection>
       )}
 
-      {/* Release Sync */}
-      {(item.totalReleasesSynced != null || item.lastSyncAt != null) && (
-        <DrawerSection title='Release Sync'>
-          <div className='space-y-3'>
-            {item.totalReleasesSynced != null && (
-              <div className='flex items-center justify-between'>
-                <span className='text-[13px] text-(--linear-text-tertiary)'>
-                  Releases Synced
-                </span>
-                <span className='text-[13px] text-(--linear-text-primary)'>
-                  {item.totalReleasesSynced}
-                </span>
-              </div>
-            )}
-            {item.releasesWithMatches != null && (
-              <div className='flex items-center justify-between'>
-                <span className='text-[13px] text-(--linear-text-tertiary)'>
-                  With Matches
-                </span>
-                <span className='text-[13px] text-(--linear-text-primary)'>
-                  {item.releasesWithMatches}
-                </span>
-              </div>
-            )}
-            {item.lastSyncAt && (
-              <div className='flex items-center justify-between'>
-                <span className='text-[13px] text-(--linear-text-tertiary)'>
-                  Last Sync
-                </span>
-                <span className='text-[13px] text-(--linear-text-primary)'>
-                  {formatDate(item.lastSyncAt)}
-                </span>
-              </div>
-            )}
-          </div>
-        </DrawerSection>
-      )}
-
       {/* Actions */}
       <DrawerSection title='Actions'>
         <div className='space-y-2'>
