@@ -133,6 +133,9 @@ export function DashboardNav(_: DashboardNavProps) {
 
       // In demo mode, only Releases has real content — intercept all other nav clicks
       const demoUnavailable = isDemo && !isReleasesItem;
+      let onClick: (() => void) | undefined;
+      if (demoUnavailable) onClick = () => handleDemoNavClick(item);
+      else if (isProfileItem) onClick = handleProfileClick;
 
       return (
         <NavMenuItem
@@ -141,13 +144,7 @@ export function DashboardNav(_: DashboardNavProps) {
           isActive={isActive}
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
-          onClick={
-            demoUnavailable
-              ? () => handleDemoNavClick(item)
-              : isProfileItem
-                ? handleProfileClick
-                : undefined
-          }
+          onClick={onClick}
         />
       );
     },

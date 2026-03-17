@@ -26,7 +26,7 @@ export async function RedesignedHero() {
           <span
             aria-hidden='true'
             className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-          />
+          />{' '}
           Free forever · Live in 60 seconds
         </p>
       </div>

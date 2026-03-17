@@ -45,6 +45,41 @@ export async function fetchWithTimeout<T>(
  * Useful for call sites that need non-JSON response handling (e.g. blobs)
  * while preserving timeout/cancellation behavior and status normalization.
  */
+/** Link an external AbortSignal to a local AbortController. */
+function linkSignal(
+  controller: AbortController,
+  externalSignal: AbortSignal | undefined
+): void {
+  if (!externalSignal) return;
+  if (externalSignal.aborted) {
+    controller.abort();
+  } else {
+    externalSignal.addEventListener('abort', () => controller.abort(), {
+      once: true,
+    });
+  }
+}
+
+/** Try to extract a user-facing error message from a 4xx response body. */
+async function extractClientErrorMessage(response: Response): Promise<{
+  message: string | undefined;
+  parsedBody: Record<string, unknown> | undefined;
+}> {
+  try {
+    const parsedBody = (await response.clone().json()) as Record<
+      string,
+      unknown
+    >;
+    const message =
+      parsedBody?.error && typeof parsedBody.error === 'string'
+        ? parsedBody.error
+        : undefined;
+    return { message, parsedBody };
+  } catch {
+    return { message: undefined, parsedBody: undefined };
+  }
+}
+
 export async function fetchWithTimeoutResponse(
   url: string,
   options: FetchOptions = {}
@@ -53,16 +88,7 @@ export async function fetchWithTimeoutResponse(
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-  // Link external signal to our controller for proper cancellation
-  const onExternalAbort = () => controller.abort();
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      controller.abort();
-    } else {
-      externalSignal.addEventListener('abort', onExternalAbort, { once: true });
-    }
-  }
+  linkSignal(controller, externalSignal);
 
   try {
     const response = await fetch(url, {
@@ -74,18 +100,10 @@ export async function fetchWithTimeoutResponse(
       let message = getFetchErrorMessage(response);
       let parsedBody: Record<string, unknown> | undefined;
 
-      // For client errors, try to extract the user-facing error from the body.
-      // Clone the response first so the original body remains readable by
-      // downstream error handlers (e.g. useSocialsForm).
       if (response.status >= 400 && response.status < 500) {
-        try {
-          parsedBody = await response.clone().json();
-          if (parsedBody?.error && typeof parsedBody.error === 'string') {
-            message = parsedBody.error;
-          }
-        } catch {
-          // Keep default message if body isn't parseable
-        }
+        const extracted = await extractClientErrorMessage(response);
+        if (extracted.message) message = extracted.message;
+        parsedBody = extracted.parsedBody;
       }
 
       throw new FetchError(message, response.status, response, parsedBody);
@@ -93,17 +111,13 @@ export async function fetchWithTimeoutResponse(
 
     return response;
   } catch (error) {
-    if (error instanceof FetchError) {
-      throw error;
-    }
+    if (error instanceof FetchError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
       throw new FetchError('Request timeout', 408);
     }
     throw error;
   } finally {
     clearTimeout(timeoutId);
-    // Clean up external signal listener if we added one without { once: true }
-    // (not needed here since we use { once: true }, but good practice)
   }
 }
 
