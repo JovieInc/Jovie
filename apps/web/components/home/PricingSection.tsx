@@ -176,16 +176,6 @@ export function PricingSection() {
               >
                 Choose Founding Member
               </Link>
-
-              <p className='mt-3 text-center text-xs text-[color:var(--linear-text-tertiary)]'>
-                Need the full plan breakdown?{' '}
-                <Link
-                  href='/pricing'
-                  className='text-[color:var(--linear-text-secondary)] underline underline-offset-4'
-                >
-                  See all pricing
-                </Link>
-              </p>
             </div>
           </div>
         </div>
