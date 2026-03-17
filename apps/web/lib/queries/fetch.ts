@@ -71,11 +71,21 @@ export async function fetchWithTimeoutResponse(
     });
 
     if (!response.ok) {
-      throw new FetchError(
-        getFetchErrorMessage(response),
-        response.status,
-        response
-      );
+      let message = getFetchErrorMessage(response);
+
+      // For client errors, try to extract the user-facing error from the body
+      if (response.status >= 400 && response.status < 500) {
+        try {
+          const body = await response.json();
+          if (body?.error && typeof body.error === 'string') {
+            message = body.error;
+          }
+        } catch {
+          // Keep default message if body isn't parseable
+        }
+      }
+
+      throw new FetchError(message, response.status, response);
     }
 
     return response;
