@@ -463,6 +463,13 @@
       "when": 1773907200000,
       "tag": "0066_add_discog_tracks_lyrics",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1774000000000,
+      "tag": "0067_drop_unused_tables_and_columns",
+      "breakpoints": true
     }
   ]
 }
