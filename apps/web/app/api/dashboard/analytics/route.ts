@@ -72,20 +72,20 @@ export async function GET(request: Request) {
     // round-trips on every analytics fetch.
     const entitlementsTimer = 'db:dashboard-analytics:entitlementsRange';
     console.time(entitlementsTimer);
-    const range = await cacheQuery(
-      `analytics-range:${userId}`,
+    const retentionDays = await cacheQuery(
+      `analytics-retention:${userId}`,
       async () => {
-        let retentionDays = 7;
         try {
           const entitlements = await getCurrentUserEntitlements();
-          retentionDays = entitlements.analyticsRetentionDays;
+          return entitlements.analyticsRetentionDays;
         } catch {
           // Billing unavailable — use free-tier default (7 days)
+          return 7;
         }
-        return clampRange(rawRange, retentionDays);
       },
       { ttlSeconds: 5 * 60 }
     );
+    const range = clampRange(rawRange, retentionDays);
     console.timeEnd(entitlementsTimer);
 
     const key = `dashboard-analytics:${userId}:${view}:${range}`;
