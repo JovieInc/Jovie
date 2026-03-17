@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { mapProfileToContact } from '@/components/admin/admin-creator-profiles/utils';
-import { getNormalizedInputUrl } from '@/components/admin/ingest-profile-dropdown/useIngestProfile';
+import { mapProfileToContact } from '@/features/admin/admin-creator-profiles/utils';
+import { getNormalizedInputUrl } from '@/features/admin/ingest-profile-dropdown/useIngestProfile';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 describe('ingest profile input normalization', () => {

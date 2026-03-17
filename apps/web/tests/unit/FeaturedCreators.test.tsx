@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // Mock the entire FeaturedArtists module since it's a server component
-vi.mock('@/components/home/FeaturedArtists', () => ({
+vi.mock('@/features/home/FeaturedArtists', () => ({
   FeaturedArtists: () => {
     const MockFeaturedCreatorsSection = () => (
       <section aria-label='Featured creators' data-testid='featured-creators'>
@@ -66,7 +66,7 @@ vi.mock('@/components/home/FeaturedArtists', () => ({
 }));
 
 // Import the component after mocking
-import { FeaturedArtists } from '@/components/home/FeaturedArtists';
+import { FeaturedArtists } from '@/features/home/FeaturedArtists';
 
 describe('FeaturedCreators Component', () => {
   it('renders featured creators section with correct test ID', () => {

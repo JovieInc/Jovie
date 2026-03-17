@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { FunnelMetricsStrip } from '@/components/admin/FunnelMetricsStrip';
+import { FunnelMetricsStrip } from '@/features/admin/FunnelMetricsStrip';
 import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
 const defaultMetrics: AdminFunnelMetrics = {

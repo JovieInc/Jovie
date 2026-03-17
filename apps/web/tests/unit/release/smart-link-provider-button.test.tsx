@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 
 describe('SmartLinkProviderButton', () => {
   it('renders as a link when href is provided', () => {

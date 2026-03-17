@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { toast } from 'sonner';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useProfileHeaderParts } from '@/components/dashboard/organisms/profile-contact-sidebar/ProfileSidebarHeader';
+import { useProfileHeaderParts } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileSidebarHeader';
 import { downloadBlob } from '@/lib/utils/download';
 
 vi.mock('sonner', () => ({

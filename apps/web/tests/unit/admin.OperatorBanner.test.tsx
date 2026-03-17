@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { OperatorBanner } from '@/components/admin/OperatorBanner';
+import { OperatorBanner } from '@/features/admin/OperatorBanner';
 
 vi.mock('@/lib/queries/useEnvHealthQuery', () => ({
   useEnvHealthQuery: vi.fn().mockReturnValue({

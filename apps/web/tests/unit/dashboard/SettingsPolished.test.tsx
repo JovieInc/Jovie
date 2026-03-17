@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsPolished } from '@/components/dashboard/organisms/SettingsPolished';
+import { SettingsPolished } from '@/features/dashboard/organisms/SettingsPolished';
 import type { Artist } from '@/types/db';
 
 vi.mock('next/navigation', () => ({
@@ -10,47 +10,47 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-vi.mock('@/components/dashboard/atoms/DashboardCard', () => ({
+vi.mock('@/features/dashboard/atoms/DashboardCard', () => ({
   DashboardCard: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
 }));
 
-vi.mock('@/components/dashboard/organisms/account-settings', () => ({
+vi.mock('@/features/dashboard/organisms/account-settings', () => ({
   AccountSettingsSection: () => <div>Account Settings</div>,
 }));
-vi.mock('@/components/dashboard/organisms/DataPrivacySection', () => ({
+vi.mock('@/features/dashboard/organisms/DataPrivacySection', () => ({
   DataPrivacySection: () => <div>Data Privacy</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsAdminSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsAdminSection', () => ({
   SettingsAdminSection: () => <div>Admin Settings</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsAdPixelsSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsAdPixelsSection', () => ({
   SettingsAdPixelsSection: () => <div>Pixels</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsAnalyticsSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsAnalyticsSection', () => ({
   SettingsAnalyticsSection: () => <div>Analytics</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsAudienceSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsAudienceSection', () => ({
   SettingsAudienceSection: () => <div>Audience</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsBillingSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsBillingSection', () => ({
   SettingsBillingSection: () => <div>Billing</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsBrandingSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsBrandingSection', () => ({
   SettingsBrandingSection: () => <div>Branding</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsContactsSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsContactsSection', () => ({
   SettingsContactsSection: () => <div>Contacts</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsPaymentsSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsPaymentsSection', () => ({
   SettingsPaymentsSection: () => <div>Payments</div>,
 }));
-vi.mock('@/components/dashboard/organisms/SettingsTouringSection', () => ({
+vi.mock('@/features/dashboard/organisms/SettingsTouringSection', () => ({
   SettingsTouringSection: () => <div>Touring</div>,
 }));
 vi.mock(
-  '@/components/dashboard/organisms/settings-artist-profile-section',
+  '@/features/dashboard/organisms/settings-artist-profile-section',
   () => ({
     SettingsArtistProfileSection: () => <div>Profile</div>,
   })

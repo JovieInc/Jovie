@@ -139,7 +139,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
   describe('social links', () => {
     it('renders social links when category is social', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -169,7 +169,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('does not render social links when viewing dsp category', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -190,7 +190,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('shows empty state when no links exist in category', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       render(<ProfileLinkList links={[]} selectedCategory='social' />);
@@ -204,7 +204,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
   describe('music DSP links', () => {
     it('renders DSP links when category is dsp', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -234,7 +234,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('renders all supported DSP platforms', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const dspPlatforms = [
@@ -288,7 +288,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('does not render DSP links when viewing social category', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -306,7 +306,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('keeps social and DSP sections stable when platform metadata drifts', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const driftedLinks: PreviewPanelLink[] = [
@@ -345,7 +345,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
   describe('mixed links', () => {
     it('separates social and DSP links into correct categories', async () => {
       const { ProfileLinkList } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -396,7 +396,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
   describe('getCategoryCounts', () => {
     it('counts links by category correctly', async () => {
       const { getCategoryCounts } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const links: PreviewPanelLink[] = [
@@ -438,7 +438,7 @@ describe('ProfileLinkList (dashboard sidebar)', () => {
 
     it('returns zero counts for empty links', async () => {
       const { getCategoryCounts } = await import(
-        '@/components/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
+        '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList'
       );
 
       const counts = getCategoryCounts([]);
@@ -883,7 +883,7 @@ describe('Public profile link visibility', () => {
 
       // Sidebar: getPlatformCategory classifies 'instagram' as 'social'
       const { getPlatformCategory } = await import(
-        '@/components/dashboard/organisms/links/utils/platform-category'
+        '@/features/dashboard/organisms/links/utils/platform-category'
       );
       expect(getPlatformCategory('instagram')).toBe('social');
 
@@ -896,7 +896,7 @@ describe('Public profile link visibility', () => {
     it('DSP link set on a creator appears in sidebar and public profile', async () => {
       // Sidebar: getPlatformCategory classifies 'spotify' as 'dsp'
       const { getPlatformCategory } = await import(
-        '@/components/dashboard/organisms/links/utils/platform-category'
+        '@/features/dashboard/organisms/links/utils/platform-category'
       );
       expect(getPlatformCategory('spotify')).toBe('dsp');
 
@@ -925,7 +925,7 @@ describe('Public profile link visibility', () => {
 
       // Sidebar: getPlatformCategory classifies youtube as social
       const { getPlatformCategory } = await import(
-        '@/components/dashboard/organisms/links/utils/platform-category'
+        '@/features/dashboard/organisms/links/utils/platform-category'
       );
       expect(getPlatformCategory('youtube')).toBe('social');
       expect(getPlatformCategory('youtube_music')).toBe('dsp');

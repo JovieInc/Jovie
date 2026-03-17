@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   type BuildAdminUserActionsCallbacks,
   buildAdminUserActions,
-} from '@/components/admin/admin-users-table/admin-user-actions';
+} from '@/features/admin/admin-users-table/admin-user-actions';
 import type { AdminUserRow } from '@/lib/admin/users';
 
 function makeUser(overrides: Partial<AdminUserRow> = {}): AdminUserRow {

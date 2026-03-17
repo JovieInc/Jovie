@@ -3,9 +3,6 @@
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DashboardHeader } from '@/components/dashboard/organisms/DashboardHeader';
-import { DashboardMobileTabs } from '@/components/dashboard/organisms/DashboardMobileTabs';
-import { MobileProfileDrawer } from '@/components/dashboard/organisms/MobileProfileDrawer';
 import {
   SidebarProvider,
   SidebarTrigger,
@@ -13,6 +10,9 @@ import {
 } from '@/components/organisms/Sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { useRightPanel } from '@/contexts/RightPanelContext';
+import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
+import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
+import { MobileProfileDrawer } from '@/features/dashboard/organisms/MobileProfileDrawer';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
 import { AppShellFrame } from './AppShellFrame';
 

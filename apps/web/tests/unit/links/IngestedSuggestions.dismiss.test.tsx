@@ -9,7 +9,7 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { IngestedSuggestions } from '@/components/dashboard/organisms/links/IngestedSuggestions';
+import { IngestedSuggestions } from '@/features/dashboard/organisms/links/IngestedSuggestions';
 import { track } from '@/lib/analytics';
 import {
   createMockCallbacks,

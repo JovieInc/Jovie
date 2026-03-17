@@ -31,7 +31,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
+} from '@/features/release/AlbumArtworkContextMenu';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';

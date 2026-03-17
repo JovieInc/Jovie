@@ -101,7 +101,7 @@ describe('ClaimBanner', () => {
   });
 
   it('renders banner with profile name', async () => {
-    const { ClaimBanner } = await import('@/components/profile/ClaimBanner');
+    const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
       <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
     );
@@ -111,7 +111,7 @@ describe('ClaimBanner', () => {
   });
 
   it('has proper accessibility attributes', async () => {
-    const { ClaimBanner } = await import('@/components/profile/ClaimBanner');
+    const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(
       <ClaimBanner profileHandle='testartist' displayName='Test Artist' />
     );
@@ -132,7 +132,7 @@ describe('ClaimBanner', () => {
       user: null,
     });
 
-    const { ClaimBanner } = await import('@/components/profile/ClaimBanner');
+    const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(<ClaimBanner profileHandle='testartist' />);
 
     const cta = screen.getByTestId('claim-banner-cta');
@@ -144,7 +144,7 @@ describe('ClaimBanner', () => {
   });
 
   it('falls back to handle when displayName not provided', async () => {
-    const { ClaimBanner } = await import('@/components/profile/ClaimBanner');
+    const { ClaimBanner } = await import('@/features/profile/ClaimBanner');
     render(<ClaimBanner profileHandle='testartist' />);
 
     const cta = screen.getByTestId('claim-banner-cta');
@@ -180,7 +180,7 @@ describe('ProfileViewTracker', () => {
 
   it('tracks profile_view event on mount', async () => {
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
@@ -195,7 +195,7 @@ describe('ProfileViewTracker', () => {
 
   it('uses sendBeacon for view counting API', async () => {
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
@@ -212,7 +212,7 @@ describe('ProfileViewTracker', () => {
     mockFetch.mockResolvedValue(new Response('ok'));
 
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
@@ -230,7 +230,7 @@ describe('ProfileViewTracker', () => {
 
   it('only tracks once per mount (deduplication)', async () => {
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     const queryClient = createTestQueryClient();
     const { rerender } = render(
@@ -252,7 +252,7 @@ describe('ProfileViewTracker', () => {
 
   it('renders nothing (returns null)', async () => {
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     const { container } = renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
@@ -263,7 +263,7 @@ describe('ProfileViewTracker', () => {
 
   it('uses custom source when provided', async () => {
     const { ProfileViewTracker } = await import(
-      '@/components/profile/ProfileViewTracker'
+      '@/features/profile/ProfileViewTracker'
     );
     renderWithQueryClient(
       <ProfileViewTracker
@@ -308,7 +308,7 @@ describe('LatestReleaseCard', () => {
 
   it('renders release title and listen button', async () => {
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard
@@ -323,7 +323,7 @@ describe('LatestReleaseCard', () => {
 
   it('displays release type with proper capitalization', async () => {
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard
@@ -339,7 +339,7 @@ describe('LatestReleaseCard', () => {
   it('uppercases EP release type', async () => {
     const epRelease = { ...mockRelease, releaseType: 'ep' };
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard release={epRelease as any} artistHandle='testartist' />
@@ -350,7 +350,7 @@ describe('LatestReleaseCard', () => {
 
   it('shows release year when releaseDate is available', async () => {
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard
@@ -365,7 +365,7 @@ describe('LatestReleaseCard', () => {
   it('omits year when releaseDate is null', async () => {
     const noDateRelease = { ...mockRelease, releaseDate: null };
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     const { container } = render(
       <LatestReleaseCard
@@ -381,7 +381,7 @@ describe('LatestReleaseCard', () => {
 
   it('renders album artwork with correct alt text', async () => {
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard
@@ -397,7 +397,7 @@ describe('LatestReleaseCard', () => {
   it('shows music icon placeholder when no artwork', async () => {
     const noArtwork = { ...mockRelease, artworkUrl: null };
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard release={noArtwork as any} artistHandle='testartist' />
@@ -411,7 +411,7 @@ describe('LatestReleaseCard', () => {
 
   it('listen button links to /{handle}/{slug}', async () => {
     const { LatestReleaseCard } = await import(
-      '@/components/profile/LatestReleaseCard'
+      '@/features/profile/LatestReleaseCard'
     );
     render(
       <LatestReleaseCard

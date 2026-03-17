@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CreatorActionsMenu } from '@/components/admin/creator-actions-menu/CreatorActionsMenu';
+import { CreatorActionsMenu } from '@/features/admin/creator-actions-menu/CreatorActionsMenu';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 
 vi.mock('next/link', () => ({

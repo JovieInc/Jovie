@@ -5,7 +5,7 @@ import {
   type LinkSection,
   labelFor,
   suggestionIdentity,
-} from '@/components/dashboard/organisms/links/utils/link-display-utils';
+} from '@/features/dashboard/organisms/links/utils/link-display-utils';
 
 describe('link-display-utils', () => {
   describe('labelFor', () => {

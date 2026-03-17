@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DashboardOverviewSkeleton } from '@/components/dashboard/organisms/DashboardOverviewSkeleton';
+import { DashboardOverviewSkeleton } from '@/features/dashboard/organisms/DashboardOverviewSkeleton';
 
 describe('DashboardOverviewSkeleton', () => {
   it('renders the overview skeleton structure', () => {

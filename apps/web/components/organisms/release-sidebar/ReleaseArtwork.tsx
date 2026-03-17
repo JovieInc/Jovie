@@ -18,7 +18,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
+} from '@/features/release/AlbumArtworkContextMenu';
 
 interface ReleaseArtworkProps {
   readonly artworkUrl: string | null | undefined;

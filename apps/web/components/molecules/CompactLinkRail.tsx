@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { PlatformPill } from '@/components/dashboard/atoms/PlatformPill';
+import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import { cn } from '@/lib/utils';
 
 export interface CompactLinkRailItem {

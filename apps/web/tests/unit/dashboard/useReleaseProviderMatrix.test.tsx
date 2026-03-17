@@ -84,7 +84,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 
 // ── Import after mocks ──
 const { useReleaseProviderMatrix } = await import(
-  '@/components/dashboard/organisms/release-provider-matrix/useReleaseProviderMatrix'
+  '@/features/dashboard/organisms/release-provider-matrix/useReleaseProviderMatrix'
 );
 
 // ── Test data ──

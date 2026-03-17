@@ -77,15 +77,15 @@ vi.mock('@/components/organisms/AuthShell', () => ({
   ),
 }));
 
-vi.mock('@/components/dashboard/organisms/profile-contact-sidebar', () => ({
+vi.mock('@/features/dashboard/organisms/profile-contact-sidebar', () => ({
   ProfileContactSidebar: () => null,
 }));
 
-vi.mock('@/components/dashboard/atoms/HeaderProfileProgress', () => ({
+vi.mock('@/features/dashboard/atoms/HeaderProfileProgress', () => ({
   HeaderProfileProgress: () => null,
 }));
 
-vi.mock('@/components/dashboard/atoms/DrawerToggleButton', () => ({
+vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: () => null,
 }));
 

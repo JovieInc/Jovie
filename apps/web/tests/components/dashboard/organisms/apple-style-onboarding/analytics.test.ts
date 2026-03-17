@@ -3,7 +3,7 @@ import {
   getOnboardingCompletionMethod,
   getValidationFailureKey,
   toDurationMs,
-} from '@/components/dashboard/organisms/apple-style-onboarding/analytics';
+} from '@/features/dashboard/organisms/apple-style-onboarding/analytics';
 
 describe('apple-style onboarding analytics helpers', () => {
   it('returns non-negative durations', () => {

@@ -18,7 +18,7 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { UniversalLinkInput } from '@/components/dashboard/molecules/universal-link-input';
+import { UniversalLinkInput } from '@/features/dashboard/molecules/universal-link-input';
 
 const stopMock = vi.fn();
 

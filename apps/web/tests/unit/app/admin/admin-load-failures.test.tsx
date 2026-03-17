@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminOutreachPage from '@/app/app/(shell)/admin/outreach/page';
-import { LeadTable } from '@/components/admin/leads/LeadTable';
+import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 vi.mock('sonner', () => ({
