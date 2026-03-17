@@ -225,10 +225,13 @@ export function ProfileContactSidebar() {
         if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
           if (linkId && selectedProfile) {
-            removeLinkMutation.mutate({
-              profileId: selectedProfile.id,
-              linkId,
-            });
+            removeLinkMutation.mutate(
+              { profileId: selectedProfile.id, linkId },
+              {
+                // Suppress global onError — user already saw "Link removed"
+                onError: () => {},
+              }
+            );
           }
           return;
         }
@@ -298,24 +301,20 @@ export function ProfileContactSidebar() {
         return;
       }
 
-      // For non-temp links (or temp links whose add already completed), fire
-      // the server delete. The server returns 400 for genuinely unsaved temp IDs.
+      // Remaining temp-* IDs were never persisted (add failed or ID was
+      // already replaced with a real one). No server call needed.
+      if (linkId.startsWith('temp-')) {
+        toast.success('Link removed');
+        return;
+      }
+
       removeLinkMutation.mutate(
         { profileId: selectedProfile.id, linkId },
         {
           onSuccess: () => {
             toast.success('Link removed');
           },
-          onError: error => {
-            // If server rejects an unsaved temp ID, the local removal is correct
-            const isUnsavedTemp =
-              linkId.startsWith('temp-') &&
-              error instanceof Error &&
-              error.message.includes('has not been saved');
-            if (isUnsavedTemp) {
-              toast.success('Link removed');
-              return;
-            }
+          onError: () => {
             // Revert on failure — read current previewData from ref to avoid stale closure
             const current = previewDataRef.current;
             if (current) {

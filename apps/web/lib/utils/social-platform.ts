@@ -144,11 +144,16 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
       if (config.hosts.includes(host)) {
         const segments = url.pathname.split('/').filter(Boolean);
 
-        // Snapchat uses /add/<username> — skip the "add" prefix
-        const seg =
-          host.includes('snapchat.com') && segments[0] === 'add'
-            ? segments[1]
-            : segments[0];
+        // Skip known non-handle path prefixes for specific platforms
+        let seg = segments[0];
+        if (host.includes('snapchat.com') && seg === 'add') {
+          seg = segments[1];
+        } else if (
+          host.includes('facebook.com') &&
+          (seg === 'profile.php' || seg === 'pages')
+        ) {
+          return null; // Facebook legacy URLs don't have extractable handles
+        }
         if (!seg) return null;
 
         // YouTube requires @ symbol, others allow it optionally
