@@ -22,6 +22,7 @@ export interface AdminSocialLink {
   id: string;
   label: string;
   url: string;
+  platform: string;
   platformType: string;
 }
 

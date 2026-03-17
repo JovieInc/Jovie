@@ -17,6 +17,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Analytics "Last 30 days" container reserves min-height to prevent layout shift during lazy load
 - Theme-init script no longer causes hydration mismatch (nonce undefined vs empty string) on every page load
 - Display name inline editor now uses distinct aria-label ("Edit display name") to avoid screen reader confusion with the form field
+- Admin creator sidebar now displays DSP and social link icons (previously showed empty tabs because `platform` field was dropped during data hydration)
+- Fixed swapped `platformIcon`/`platformName` fields in `CreatorProfileSocialLinks` table component
+- CRM contact sidebar now correctly resolves platform icons from `platform` field before falling back to URL detection
 
 - Homepage claim button now validates handle input before submitting (previously navigated to self-referential `/signup` when empty)
 - CRM audience demo table now shows visible text labels for Intent, Returning, and Source columns instead of invisible icon-only cells

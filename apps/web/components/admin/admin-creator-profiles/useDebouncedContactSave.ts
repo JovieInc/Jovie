@@ -26,6 +26,7 @@ function buildContactSignature(contact: Contact): string {
       id: link.id ?? null,
       url: link.url,
       label: link.label ?? null,
+      platform: link.platform ?? null,
       platformType: link.platformType ?? null,
       sortOrder: index,
     })),
