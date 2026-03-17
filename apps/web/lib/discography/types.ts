@@ -16,7 +16,20 @@ export type ProviderKey =
   | 'anghami'
   | 'boomplay'
   | 'iheartradio'
-  | 'tiktok';
+  | 'tiktok'
+  | 'amazon'
+  | 'awa'
+  | 'audius'
+  | 'flo'
+  | 'gaana'
+  | 'jio_saavn'
+  | 'joox'
+  | 'kkbox'
+  | 'line_music'
+  | 'netease'
+  | 'qq_music'
+  | 'trebel'
+  | 'yandex';
 
 /** Short-form video provider keys for "Use this sound" feature */
 export type VideoProviderKey =

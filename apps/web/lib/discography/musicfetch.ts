@@ -12,6 +12,10 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 
+import {
+  MUSICFETCH_ALL_SERVICES,
+  SERVICE_TO_PROVIDER,
+} from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
 import {
   MusicfetchRequestError,
@@ -26,51 +30,8 @@ import { musicfetchCircuitBreaker } from './musicfetch-circuit-breaker';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/**
- * Maps musicfetch camelCase service names to Jovie snake_case ProviderKeys.
- * Only includes services we actively support.
- */
-const SERVICE_TO_PROVIDER: Record<string, string> = {
-  spotify: 'spotify',
-  appleMusic: 'apple_music',
-  youtubeMusic: 'youtube',
-  youtube: 'youtube',
-  soundcloud: 'soundcloud',
-  deezer: 'deezer',
-  tidal: 'tidal',
-  amazonMusic: 'amazon_music',
-  bandcamp: 'bandcamp',
-  beatport: 'beatport',
-  pandora: 'pandora',
-  napster: 'napster',
-  audiomack: 'audiomack',
-  qobuz: 'qobuz',
-  anghami: 'anghami',
-  boomplay: 'boomplay',
-  iHeartRadio: 'iheartradio',
-  tiktok: 'tiktok',
-};
-
 /** The musicfetch service IDs to request (camelCase, as the API expects) */
-const TARGET_SERVICES = [
-  'spotify',
-  'appleMusic',
-  'youtubeMusic',
-  'soundcloud',
-  'deezer',
-  'tidal',
-  'amazonMusic',
-  'bandcamp',
-  'beatport',
-  'pandora',
-  'napster',
-  'audiomack',
-  'qobuz',
-  'anghami',
-  'boomplay',
-  'iHeartRadio',
-  'tiktok',
-];
+const TARGET_SERVICES = MUSICFETCH_ALL_SERVICES;
 
 // ============================================================================
 // Types

@@ -372,6 +372,12 @@ export async function discoverLinksForRelease(
         { title: trackTitle, artistName, isrc },
         { storefront }
       );
+      if (!searchUrl) {
+        result.errors.push(
+          `Search fallback unavailable for provider: ${provider}`
+        );
+        continue;
+      }
 
       await upsertProviderLink({
         releaseId,

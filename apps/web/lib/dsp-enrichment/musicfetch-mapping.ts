@@ -7,6 +7,7 @@ import {
   getMusicFetchServiceUrl,
   type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
+import { MUSICFETCH_LINK_MAPPINGS } from '@/lib/dsp-registry';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
 /** Profile fields that can be enriched from MusicFetch. */
@@ -113,23 +114,6 @@ export function mapMusicFetchProfileFields(
 
   return updates;
 }
-
-const MUSICFETCH_LINK_MAPPINGS: Array<{
-  serviceKey: string;
-  platformId: string;
-}> = [
-  { serviceKey: 'spotify', platformId: 'spotify' },
-  { serviceKey: 'appleMusic', platformId: 'apple_music' },
-  { serviceKey: 'youtube', platformId: 'youtube' },
-  { serviceKey: 'youtubeMusic', platformId: 'youtube_music' },
-  { serviceKey: 'soundcloud', platformId: 'soundcloud' },
-  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
-  { serviceKey: 'amazonMusic', platformId: 'amazon_music' },
-  { serviceKey: 'tidal', platformId: 'tidal' },
-  { serviceKey: 'deezer', platformId: 'deezer' },
-  { serviceKey: 'instagram', platformId: 'instagram' },
-  { serviceKey: 'tiktok', platformId: 'tiktok' },
-] as const;
 
 export function extractMusicFetchLinks(
   artistData: MusicFetchArtistResult,

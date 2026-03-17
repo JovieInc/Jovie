@@ -380,9 +380,8 @@ describe('musicfetch-enrichment', () => {
           links: expect.arrayContaining([
             expect.objectContaining({ platformId: 'spotify' }),
             expect.objectContaining({ platformId: 'apple_music' }),
-            expect.objectContaining({ platformId: 'instagram' }),
-            expect.objectContaining({ platformId: 'tiktok' }),
             expect.objectContaining({ platformId: 'bandcamp' }),
+            // instagram and tiktok are category 'video', not included in streaming link mappings
           ]),
         })
       );

@@ -20,7 +20,7 @@ interface ProviderIconProps {
   readonly 'aria-label'?: string;
 }
 
-const PROVIDER_PLATFORM_MAP: Record<ProviderKey, string> = {
+const PROVIDER_PLATFORM_MAP: Record<string, string> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
   youtube: 'youtube',

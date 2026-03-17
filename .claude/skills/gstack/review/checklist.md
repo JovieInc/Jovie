@@ -5,21 +5,23 @@
 Review the `git diff origin/main` output for the issues listed below. Be specific — cite `file:line` and suggest fixes. Skip anything that's fine. Only flag real problems.
 
 **Two-pass review:**
-- **Pass 1 (CRITICAL):** Run SQL & Data Safety and LLM Output Trust Boundary first. These can block `/ship`.
-- **Pass 2 (INFORMATIONAL):** Run all remaining categories. These are included in the PR body but do not block.
+- **Pass 1 (CRITICAL):** Run SQL & Data Safety and LLM Output Trust Boundary first. Highest severity.
+- **Pass 2 (INFORMATIONAL):** Run all remaining categories. Lower severity but still actioned.
+
+All findings get action via Fix-First Review: obvious mechanical fixes are applied automatically,
+genuinely ambiguous issues are batched into a single user question.
 
 **Output format:**
 
 ```
 Pre-Landing Review: N issues (X critical, Y informational)
 
-**CRITICAL** (blocking /ship):
-- [file:line] Problem description
-  Fix: suggested fix
+**AUTO-FIXED:**
+- [file:line] Problem → fix applied
 
-**Issues** (non-blocking):
+**NEEDS INPUT:**
 - [file:line] Problem description
-  Fix: suggested fix
+  Recommended fix: suggested fix
 ```
 
 If no issues found: `Pre-Landing Review: No issues found.`
@@ -47,6 +49,13 @@ Be terse. For each issue: one line describing the problem, one line with the fix
 #### LLM Output Trust Boundary
 - LLM-generated values (emails, URLs, names) written to DB or passed to mailers without format validation. Add lightweight guards (`EMAIL_REGEXP`, `URI.parse`, `.strip`) before persisting.
 - Structured tool output (arrays, hashes) accepted without type/shape checks before database writes.
+
+#### Enum & Value Completeness
+When the diff introduces a new enum value, status string, tier name, or type constant:
+- **Trace it through every consumer.** Read (don't just grep — READ) each file that switches on, filters by, or displays that value. If any consumer doesn't handle the new value, flag it. Common miss: adding a value to the frontend dropdown but the backend model/compute method doesn't persist it.
+- **Check allowlists/filter arrays.** Search for arrays or `%w[]` lists containing sibling values (e.g., if adding "revise" to tiers, find every `%w[quick lfg mega]` and verify "revise" is included where needed).
+- **Check `case`/`if-elsif` chains.** If existing code branches on the enum, does the new value fall through to a wrong default?
+To do this: use Grep to find all references to the sibling values (e.g., grep for "lfg" or "mega" to find all tier consumers). Read each match. This step requires reading code OUTSIDE the diff.
 
 ### Pass 2 — INFORMATIONAL
 
@@ -95,20 +104,51 @@ Be terse. For each issue: one line describing the problem, one line with the fix
 
 ---
 
-## Gate Classification
+## Severity Classification
 
 ```
-CRITICAL (blocks /ship):          INFORMATIONAL (in PR body):
+CRITICAL (highest severity):      INFORMATIONAL (lower severity):
 ├─ SQL & Data Safety              ├─ Conditional Side Effects
 ├─ Race Conditions & Concurrency  ├─ Magic Numbers & String Coupling
-└─ LLM Output Trust Boundary      ├─ Dead Code & Consistency
-                                   ├─ LLM Prompt Issues
+├─ LLM Output Trust Boundary      ├─ Dead Code & Consistency
+└─ Enum & Value Completeness      ├─ LLM Prompt Issues
                                    ├─ Test Gaps
                                    ├─ Crypto & Entropy
                                    ├─ Time Window Safety
                                    ├─ Type Coercion at Boundaries
                                    └─ View/Frontend
+
+All findings are actioned via Fix-First Review. Severity determines
+presentation order and classification of AUTO-FIX vs ASK — critical
+findings lean toward ASK (they're riskier), informational findings
+lean toward AUTO-FIX (they're more mechanical).
 ```
+
+---
+
+## Fix-First Heuristic
+
+This heuristic is referenced by both `/review` and `/ship`. It determines whether
+the agent auto-fixes a finding or asks the user.
+
+```
+AUTO-FIX (agent fixes without asking):     ASK (needs human judgment):
+├─ Dead code / unused variables            ├─ Security (auth, XSS, injection)
+├─ N+1 queries (missing .includes())      ├─ Race conditions
+├─ Stale comments contradicting code       ├─ Design decisions
+├─ Magic numbers → named constants         ├─ Large fixes (>20 lines)
+├─ Missing LLM output validation           ├─ Enum completeness
+├─ Version/path mismatches                 ├─ Removing functionality
+├─ Variables assigned but never read       └─ Anything changing user-visible
+└─ Inline styles, O(n*m) view lookups        behavior
+```
+
+**Rule of thumb:** If the fix is mechanical and a senior engineer would apply it
+without discussion, it's AUTO-FIX. If reasonable engineers could disagree about
+the fix, it's ASK.
+
+**Critical findings default toward ASK** (they're inherently riskier).
+**Informational findings default toward AUTO-FIX** (they're more mechanical).
 
 ---
 

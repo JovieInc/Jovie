@@ -11,7 +11,7 @@ This document covers the command reference and internals of gstack's headless br
 | Snapshot | `snapshot [-i] [-c] [-d N] [-s sel] [-D] [-a] [-o] [-C]` | Get refs, diff, annotate |
 | Interact | `click`, `fill`, `select`, `hover`, `type`, `press`, `scroll`, `wait`, `viewport`, `upload` | Use the page |
 | Inspect | `js`, `eval`, `css`, `attrs`, `is`, `console`, `network`, `dialog`, `cookies`, `storage`, `perf` | Debug and verify |
-| Visual | `screenshot`, `pdf`, `responsive` | See what Claude sees |
+| Visual | `screenshot [--viewport] [--clip x,y,w,h] [sel\|@ref] [path]`, `pdf`, `responsive` | See what Claude sees |
 | Compare | `diff <url1> <url2>` | Spot differences between environments |
 | Dialogs | `dialog-accept [text]`, `dialog-dismiss` | Control alert/confirm/prompt handling |
 | Tabs | `tabs`, `tab`, `newtab`, `closetab` | Multi-page workflows |
@@ -87,10 +87,27 @@ The browser's key innovation is ref-based element selection, built on Playwright
 
 No DOM mutation. No injected scripts. Just Playwright's native accessibility API.
 
+**Ref staleness detection:** SPAs can mutate the DOM without navigation (React router, tab switches, modals). When this happens, refs collected from a previous `snapshot` may point to elements that no longer exist. To handle this, `resolveRef()` runs an async `count()` check before using any ref — if the element count is 0, it throws immediately with a message telling the agent to re-run `snapshot`. This fails fast (~5ms) instead of waiting for Playwright's 30-second action timeout.
+
 **Extended snapshot features:**
 - `--diff` (`-D`): Stores each snapshot as a baseline. On the next `-D` call, returns a unified diff showing what changed. Use this to verify that an action (click, fill, etc.) actually worked.
 - `--annotate` (`-a`): Injects temporary overlay divs at each ref's bounding box, takes a screenshot with ref labels visible, then removes the overlays. Use `-o <path>` to control the output path.
 - `--cursor-interactive` (`-C`): Scans for non-ARIA interactive elements (divs with `cursor:pointer`, `onclick`, `tabindex>=0`) using `page.evaluate`. Assigns `@c1`, `@c2`... refs with deterministic `nth-child` CSS selectors. These are elements the ARIA tree misses but users can still click.
+
+### Screenshot modes
+
+The `screenshot` command supports four modes:
+
+| Mode | Syntax | Playwright API |
+|------|--------|----------------|
+| Full page (default) | `screenshot [path]` | `page.screenshot({ fullPage: true })` |
+| Viewport only | `screenshot --viewport [path]` | `page.screenshot({ fullPage: false })` |
+| Element crop | `screenshot "#sel" [path]` or `screenshot @e3 [path]` | `locator.screenshot()` |
+| Region clip | `screenshot --clip x,y,w,h [path]` | `page.screenshot({ clip })` |
+
+Element crop accepts CSS selectors (`.class`, `#id`, `[attr]`) or `@e`/`@c` refs from `snapshot`. Auto-detection: `@e`/`@c` prefix = ref, `.`/`#`/`[` prefix = CSS selector, `--` prefix = flag, everything else = output path.
+
+Mutual exclusion: `--clip` + selector and `--viewport` + `--clip` both throw errors. Unknown flags (e.g. `--bogus`) also throw.
 
 ### Authentication
 
@@ -109,6 +126,18 @@ The `console`, `network`, and `dialog` commands read from the in-memory buffers,
 ### Dialog handling
 
 Dialogs (alert, confirm, prompt) are auto-accepted by default to prevent browser lockup. The `dialog-accept` and `dialog-dismiss` commands control this behavior. For prompts, `dialog-accept <text>` provides the response text. All dialogs are logged to the dialog buffer with type, message, and action taken.
+
+### JavaScript execution (`js` and `eval`)
+
+`js` runs a single expression, `eval` runs a JS file. Both support `await` — expressions containing `await` are automatically wrapped in an async context:
+
+```bash
+$B js "await fetch('/api/data').then(r => r.json())"  # works
+$B js "document.title"                                  # also works (no wrapping needed)
+$B eval my-script.js                                    # file with await works too
+```
+
+For `eval` files, single-line files return the expression value directly. Multi-line files need explicit `return` when using `await`. Comments containing "await" don't trigger wrapping.
 
 ### Multi-workspace support
 

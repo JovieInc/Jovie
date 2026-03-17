@@ -65,6 +65,7 @@ function makeFullArtistResult(
       appleMusic: { url: 'https://music.apple.com/us/artist/test/123456' },
       youtube: { url: 'https://www.youtube.com/channel/UCabc' },
       youtubeMusic: { url: 'https://music.youtube.com/channel/UCabc' },
+      soundCloud: { url: 'https://soundcloud.com/testartist' },
       soundcloud: { url: 'https://soundcloud.com/testartist' },
       deezer: { url: 'https://www.deezer.com/artist/789012' },
       tidal: { url: 'https://tidal.com/browse/artist/345678' },
@@ -100,11 +101,11 @@ const SPOTIFY_URL = 'https://open.spotify.com/artist/6M2wZ9GZgrQXHCFfjv46we';
 const SIGNAL = 'musicfetch_artist_lookup';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// extractMusicFetchLinks — all 11 platforms
+// extractMusicFetchLinks — streaming DSP platforms only
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('extractMusicFetchLinks', () => {
-  it('extracts all 11 expected platforms when all services are present', () => {
+  it('extracts all 9 expected streaming platforms when all services are present', () => {
     const artistData = makeFullArtistResult();
     const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
 
@@ -119,14 +120,15 @@ describe('extractMusicFetchLinks', () => {
     expect(platformIds).toContain('amazon_music');
     expect(platformIds).toContain('tidal');
     expect(platformIds).toContain('deezer');
-    expect(platformIds).toContain('instagram');
-    expect(platformIds).toContain('tiktok');
+    // instagram and tiktok are category 'video', not included in streaming link mappings
+    expect(platformIds).not.toContain('instagram');
+    expect(platformIds).not.toContain('tiktok');
   });
 
-  it('produces exactly 11 links (no duplicates) when all services are present', () => {
+  it('produces exactly 9 links (no duplicates) when all services are present', () => {
     const artistData = makeFullArtistResult();
     const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
-    expect(links).toHaveLength(11);
+    expect(links).toHaveLength(9);
   });
 
   it('always includes Spotify using the provided spotifyUrl even if not in services', () => {
@@ -195,7 +197,7 @@ describe('extractMusicFetchLinks', () => {
           id: '7985446',
           link: 'https://tidal.com/browse/artist/7985446',
         },
-        soundcloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
+        soundCloud: { id: '7444372', link: 'https://soundcloud.com/dualipa' },
         youtube: { link: 'https://www.youtube.com/channel/UCabc' },
       },
     };
@@ -204,7 +206,8 @@ describe('extractMusicFetchLinks', () => {
     expect(platformIds).toContain('spotify');
     expect(platformIds).toContain('apple_music');
     expect(platformIds).toContain('deezer');
-    expect(platformIds).toContain('instagram');
+    // instagram is category 'video', not included in streaming link mappings
+    expect(platformIds).not.toContain('instagram');
     expect(platformIds).toContain('tidal');
     expect(platformIds).toContain('soundcloud');
     expect(platformIds).toContain('youtube');
