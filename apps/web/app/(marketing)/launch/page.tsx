@@ -429,7 +429,7 @@ export default async function LaunchPage() {
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '1.1', title: 'Adaptive CTA' },
-                { num: '1.2', title: 'Email + SMS Capture' },
+                { num: '1.2', title: 'Email + SMS Notifications' },
                 { num: '1.3', title: 'Streaming Preference Memory' },
                 { num: '1.4', title: 'Custom Domains' },
               ].map(sf => (
@@ -1424,9 +1424,9 @@ export default async function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Most artists have zero data on their visitors. Jovie captures
-              every interaction and scores each fan by engagement &mdash; so you
-              know who your real fans are.
+              Most artists have zero data on their visitors. Jovie tracks every
+              interaction and scores each fan by engagement &mdash; so you know
+              who your real fans are.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1783,8 +1783,7 @@ export default async function LaunchPage() {
               },
               {
                 val: '$100',
-                label:
-                  'lifetime value of each email subscriber you capture through Jovie',
+                label: 'lifetime value of each fan who opts in through Jovie',
                 source: 'Internal estimate based on direct-to-fan sales',
               },
             ].map(s => (
