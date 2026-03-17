@@ -31,6 +31,7 @@ vi.mock('@/lib/spotify/circuit-breaker', () => ({
 
 vi.mock('@/app/api/spotify/search/helpers', () => ({
   applyVipBoost: vi.fn((results: unknown[]) => Promise.resolve(results)),
+  boostClaimedArtists: vi.fn((results: unknown[]) => results),
   parseLimit: vi.fn(
     (_param: string | null, defaultVal: number, _max: number) => defaultVal
   ),
