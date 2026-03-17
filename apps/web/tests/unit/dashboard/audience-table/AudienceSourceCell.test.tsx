@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { AudienceSourceCell } from '@/components/organisms/table/atoms/AudienceSourceCell';
+import { AudienceSourceCell } from '@/components/organisms/table';
 
 // SimpleTooltip requires TooltipProvider — mock it to render children directly
 vi.mock('@jovie/ui', () => ({

@@ -31,7 +31,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
+} from '@/features/release/AlbumArtworkContextMenu';
 import { formatReleaseArtistLine } from '@/lib/discography/formatting';
 import type { ReleaseSidebarTrack } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
@@ -101,7 +101,7 @@ function ReleaseEntityHeader({
 
   return (
     <div className='space-y-2'>
-      <div className='flex items-start gap-3 rounded-[10px] bg-(--linear-bg-surface-0)/70 px-1.5 py-1.5'>
+      <div className='flex items-start gap-3 rounded-[10px] bg-surface-0/70 px-1.5 py-1.5'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -132,7 +132,7 @@ function ReleaseEntityHeader({
                 fallback={
                   <Icon
                     name='Disc3'
-                    className='h-12 w-12 text-(--linear-text-tertiary)'
+                    className='h-12 w-12 text-tertiary-token'
                     aria-hidden='true'
                   />
                 }

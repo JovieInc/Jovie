@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { TableBadge } from '@/components/organisms/table/atoms/TableBadge';
+import { TableBadge } from '@/components/organisms/table';
 
 describe('TableBadge', () => {
   it('defaults to small size for table density consistency', () => {

@@ -83,7 +83,6 @@ export const ServerEnvSchema = z.object({
 
   // Security keys
   METADATA_HASH_KEY: z.string().optional(),
-  CONTACT_OBFUSCATION_KEY: z.string().optional(),
   PII_ENCRYPTION_KEY: z.string().optional(),
 
   // HUD (internal kiosk display)
@@ -206,7 +205,6 @@ export const ENV_KEYS = [
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',
-  'CONTACT_OBFUSCATION_KEY',
   'PII_ENCRYPTION_KEY',
   'HUD_KIOSK_TOKEN',
   'HUD_STARTUP_NAME',

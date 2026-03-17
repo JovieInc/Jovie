@@ -17,7 +17,7 @@ export interface AudienceMobileCardProps {
 const INTENT_STYLES: Record<AudienceIntentLevel, string> = {
   high: 'text-emerald-600 dark:text-emerald-400',
   medium: 'text-amber-600 dark:text-amber-400',
-  low: 'text-(--linear-text-tertiary)',
+  low: 'text-tertiary-token',
 };
 
 const INTENT_DOT_STYLES: Record<AudienceIntentLevel, string> = {
@@ -83,9 +83,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       type='button'
       className={cn(
         'flex w-full items-start gap-3 px-4 py-3.5 text-left transition-[background-color,color] duration-150',
-        isSelected
-          ? 'bg-(--linear-bg-surface-0)'
-          : 'active:bg-(--linear-bg-surface-0)',
+        isSelected ? 'bg-surface-0' : 'active:bg-surface-0',
         isHighIntent && 'font-[510]'
       )}
       onClick={() => onTap(member)}
@@ -94,10 +92,10 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       {/* Avatar circle with intent dot */}
       <div className='flex-shrink-0 relative mt-0.5'>
         <div
-          className='flex size-9 items-center justify-center rounded-full bg-(--linear-bg-surface-0)'
+          className='flex size-9 items-center justify-center rounded-full bg-surface-0'
           aria-hidden='true'
         >
-          <Icon name='User' className='size-4 text-(--linear-text-tertiary)' />
+          <Icon name='User' className='size-4 text-tertiary-token' />
         </div>
         <span
           className={cn(
@@ -114,12 +112,12 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
         <div className='flex items-baseline justify-between gap-2'>
           <TruncatedText
             lines={1}
-            className='text-[15px] font-[590] leading-tight text-(--linear-text-primary)'
+            className='text-[15px] font-[590] leading-tight text-primary-token'
           >
             {displayName}
           </TruncatedText>
           {mode === 'members' && member.lastSeenAt && (
-            <span className='flex-shrink-0 text-[11px] text-(--linear-text-tertiary) tabular-nums'>
+            <span className='flex-shrink-0 text-[11px] text-tertiary-token tabular-nums'>
               {formatTimeAgo(member.lastSeenAt)}
             </span>
           )}
@@ -136,7 +134,7 @@ export const AudienceMobileCard = React.memo(function AudienceMobileCard({
       <div className='flex-shrink-0 self-center'>
         <Icon
           name='ChevronRight'
-          className='size-4 text-(--linear-text-quaternary)'
+          className='size-4 text-quaternary-token'
           aria-hidden='true'
         />
       </div>
@@ -179,21 +177,17 @@ function MemberDetails({ member }: { readonly member: AudienceMember }) {
         </span>
         <DotSeparator />
         {isReturning ? (
-          <span className='font-[510] text-(--linear-text-secondary)'>
-            Returning
-          </span>
+          <span className='font-[510] text-secondary-token'>Returning</span>
         ) : (
-          <span className='text-(--linear-text-tertiary)'>New</span>
+          <span className='text-tertiary-token'>New</span>
         )}
         <DotSeparator />
-        <span className='text-(--linear-text-tertiary)'>{source}</span>
+        <span className='text-tertiary-token'>{source}</span>
       </p>
 
       {/* Last action */}
       {lastAction && (
-        <p className='truncate text-[11px] text-(--linear-text-tertiary)'>
-          {lastAction}
-        </p>
+        <p className='truncate text-[11px] text-tertiary-token'>{lastAction}</p>
       )}
     </div>
   );
@@ -218,12 +212,12 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
   return (
     <div className='mt-0.5 space-y-0.5'>
       {(member.email || member.phone) && (
-        <p className='truncate text-[13px] leading-snug text-(--linear-text-secondary)'>
+        <p className='truncate text-[13px] leading-snug text-secondary-token'>
           {subscriberLabel}
         </p>
       )}
       {member.lastSeenAt && (
-        <p className='text-[11px] text-(--linear-text-tertiary)'>
+        <p className='text-[11px] text-tertiary-token'>
           Subscribed {formatTimeAgo(member.lastSeenAt)}
         </p>
       )}
@@ -234,10 +228,7 @@ function SubscriberDetails({ member }: { readonly member: AudienceMember }) {
 /** Tiny dot separator for inline metadata */
 function DotSeparator() {
   return (
-    <span
-      className='select-none text-(--linear-text-quaternary)'
-      aria-hidden='true'
-    >
+    <span className='select-none text-quaternary-token' aria-hidden='true'>
       ·
     </span>
   );

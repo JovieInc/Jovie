@@ -15,8 +15,8 @@ import { describe, expect, it } from 'vitest';
 import type {
   PopularityLevel,
   ReleaseFilters,
-} from '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader';
-import { filterReleases } from '@/components/dashboard/organisms/release-provider-matrix/utils/filterReleases';
+} from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader';
+import { filterReleases } from '@/features/dashboard/organisms/release-provider-matrix/utils/filterReleases';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 
 // ---------------------------------------------------------------------------

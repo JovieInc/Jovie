@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { ErrorDetails } from '@/components/feedback/ErrorDetails';
+import { ErrorDetails } from '@/features/feedback/ErrorDetails';
 import { captureErrorInSentry } from '@/lib/errors/capture';
 
 interface ErrorBoundaryProps {

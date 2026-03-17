@@ -77,7 +77,6 @@ const PUBLIC_ROUTES = [
   '/go', // Short link redirects
   '/r', // Short link redirects (alternative)
   '/out', // Outbound link tracking
-  '/loader-preview', // Loader preview page
   '/sandbox', // Development sandbox
   '/sidebar-demo', // Demo pages
   '/spinner-test', // Test pages
@@ -98,11 +97,6 @@ const PUBLIC_ROUTE_GROUPS = [
  * API route prefix - server-side routes not relevant for client SDK
  */
 const API_ROUTE_PREFIX = '/api';
-
-/**
- * Ingest route prefix - special analytics ingestion endpoint
- */
-const INGEST_ROUTE_PREFIX = '/ingest';
 
 /**
  * Normalizes a pathname for consistent matching.
@@ -151,10 +145,7 @@ function matchesRoutePrefix(pathname: string, prefix: string): boolean {
  */
 export function isApiRoute(pathname: string): boolean {
   const normalized = normalizePathname(pathname);
-  return (
-    matchesRoutePrefix(normalized, API_ROUTE_PREFIX) ||
-    matchesRoutePrefix(normalized, INGEST_ROUTE_PREFIX)
-  );
+  return matchesRoutePrefix(normalized, API_ROUTE_PREFIX);
 }
 
 /**
@@ -248,7 +239,6 @@ export function isProfileRoute(pathname: string): boolean {
     ...DASHBOARD_ROUTES.map(r => r.slice(1).toLowerCase()),
     ...PUBLIC_ROUTES.map(r => r.slice(1).toLowerCase()),
     'api',
-    'ingest',
   ];
 
   // If the first segment is not a known prefix, it's likely a username
@@ -334,7 +324,7 @@ export function classifyRoute(pathname: string): RouteClassification {
       type: 'api',
       useFullSdk: false,
       useLiteSdk: false,
-      matchedPattern: normalized.startsWith('/api') ? '/api/*' : '/ingest/*',
+      matchedPattern: '/api/*',
       isDynamic: false,
       isRouteGroup: false,
     };
@@ -479,5 +469,4 @@ export const ROUTE_CONFIG = {
   publicRoutes: PUBLIC_ROUTES,
   publicRouteGroups: PUBLIC_ROUTE_GROUPS,
   apiPrefix: API_ROUTE_PREFIX,
-  ingestPrefix: INGEST_ROUTE_PREFIX,
 } as const;

@@ -47,7 +47,7 @@ export function BillingHistorySection({
         {!historyQuery.isLoading && historyQuery.error && (
           <Card className='border-0 shadow-none'>
             <CardContent className='p-4'>
-              <p className='text-[13px] text-(--linear-text-tertiary)'>
+              <p className='text-[13px] text-tertiary-token'>
                 Unable to load billing history.
               </p>
             </CardContent>
@@ -76,14 +76,14 @@ export function BillingHistorySection({
                             entry.maskedIdentifier ??
                             `${entry.eventType}-${entry.timestamp}`
                           }
-                          className='flex items-center justify-between px-4 py-3 transition-colors hover:bg-(--linear-bg-surface-1)'
+                          className='flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-1'
                         >
                           <div className='flex items-center gap-3'>
-                            <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1)'>
-                              <IconComponent className='h-4 w-4 text-(--linear-text-secondary)' />
+                            <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                              <IconComponent className='h-4 w-4 text-secondary-token' />
                             </div>
                             <div>
-                              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                              <p className='text-[13px] font-[510] text-primary-token'>
                                 {formatEventType(entry.eventType)}
                               </p>
                               <Badge
@@ -95,7 +95,7 @@ export function BillingHistorySection({
                               </Badge>
                             </div>
                           </div>
-                          <time className='shrink-0 text-[11px] text-(--linear-text-tertiary)'>
+                          <time className='shrink-0 text-[11px] text-tertiary-token'>
                             {formatDate(entry.timestamp)}
                           </time>
                         </div>
@@ -108,11 +108,11 @@ export function BillingHistorySection({
           ) : (
             <Card className='border-0 shadow-none'>
               <CardContent className='p-8 text-center'>
-                <Clock className='mx-auto h-8 w-8 text-(--linear-text-tertiary)' />
-                <p className='mt-3 text-[13px] text-(--linear-text-secondary)'>
+                <Clock className='mx-auto h-8 w-8 text-tertiary-token' />
+                <p className='mt-3 text-[13px] text-secondary-token'>
                   No billing events yet.
                 </p>
-                <p className='mt-1 text-[11px] text-(--linear-text-tertiary)'>
+                <p className='mt-1 text-[11px] text-tertiary-token'>
                   Events will appear here as your subscription activity changes.
                 </p>
               </CardContent>

@@ -79,10 +79,10 @@ export const layoutStability = {
 
 // Border Styles
 export const borders = {
-  cell: 'border-b border-(--linear-border-subtle)',
-  header: 'border-b border-(--linear-border-subtle)',
-  groupHeader: 'border-b-2 border-(--linear-border-subtle)',
-  subtle: 'border-(--linear-border-subtle)',
+  cell: 'border-b border-subtle',
+  header: 'border-b border-subtle',
+  groupHeader: 'border-b-2 border-subtle',
+  subtle: 'border-subtle',
 } as const;
 
 // Loading Skeleton Styles

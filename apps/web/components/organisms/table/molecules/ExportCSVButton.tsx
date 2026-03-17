@@ -236,7 +236,7 @@ export function ExportCSVButton<T extends object>({
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          <dl className='space-y-2 text-[13px] text-(--linear-text-secondary)'>
+          <dl className='space-y-2 text-[13px] text-secondary-token'>
             <div className='flex items-center justify-between gap-4'>
               <dt>Rows</dt>
               <dd className='font-[510] text-primary-token'>

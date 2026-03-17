@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { AiDemo } from '@/components/home/AiDemo';
-import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { HeroSpotifySearch } from '@/components/home/HeroSpotifySearch';
-import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { AiDemo } from '@/features/home/AiDemo';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { publicEnv } from '@/lib/env-public';
 import { captureWarning } from '@/lib/error-tracking';
 import { getProfileByUsername } from '@/lib/services/profile';
@@ -1950,7 +1950,7 @@ export default async function LaunchPage() {
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-[var(--linear-bg-surface-1)] border border-subtle hover:bg-white/[0.04]'
+              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-surface-1 border border-subtle hover:bg-white/[0.04]'
             >
               Contact us
             </a>

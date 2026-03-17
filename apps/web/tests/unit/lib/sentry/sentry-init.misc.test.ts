@@ -101,7 +101,6 @@ describe('Sentry Route and SDK Mode Integration', () => {
       // API routes -> no SDK
       { path: '/api/users', expectedMode: 'none', expectedType: 'api' },
       { path: '/api/health', expectedMode: 'none', expectedType: 'api' },
-      { path: '/ingest/events', expectedMode: 'none', expectedType: 'api' },
     ];
 
     for (const testCase of testCases) {

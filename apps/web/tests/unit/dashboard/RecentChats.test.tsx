@@ -3,8 +3,8 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { RecentChats } from '@/components/dashboard/dashboard-nav/RecentChats';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
+import { RecentChats } from '@/features/dashboard/dashboard-nav/RecentChats';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Controllable mocks

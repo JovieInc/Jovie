@@ -162,6 +162,10 @@ export default defineConfig({
         replacement: `${path.resolve(__dirname, './app/app')}/`,
       },
       {
+        find: /^@\/features\//,
+        replacement: `${path.resolve(__dirname, './components/features')}/`,
+      },
+      {
         find: /^@\//,
         replacement: `${path.resolve(__dirname, './')}/`,
       },

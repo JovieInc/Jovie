@@ -2,9 +2,9 @@ import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { AdminUsersTableUnified } from '@/components/admin/admin-users-table/AdminUsersTableUnified';
 import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
+import { AdminUsersTableUnified } from '@/features/admin/admin-users-table/AdminUsersTableUnified';
 
 const mockUseBreakpointDown = vi.fn<
   (breakpoint: 'md' | 'lg' | 'sm' | 'xl' | '2xl') => boolean
@@ -22,7 +22,7 @@ vi.mock('@/lib/queries/admin-infinite', () => ({
     mockUseAdminUsersInfiniteQuery(params),
 }));
 
-vi.mock('@/components/admin/table/AdminTableShell', () => ({
+vi.mock('@/features/admin/table/AdminTableShell', () => ({
   AdminTableShell: ({
     children,
     toolbar,

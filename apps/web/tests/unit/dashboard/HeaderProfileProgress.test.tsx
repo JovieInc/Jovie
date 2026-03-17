@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { HeaderProfileProgress } from '@/components/dashboard/atoms/HeaderProfileProgress';
+import { HeaderProfileProgress } from '@/features/dashboard/atoms/HeaderProfileProgress';
 import { fastRender } from '@/tests/utils/fast-render';
 
 vi.mock('next/navigation', () => ({

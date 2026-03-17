@@ -16,13 +16,13 @@ export function AudienceLocationCell({
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1.5 text-[13px] text-(--linear-text-secondary)',
+        'inline-flex items-center gap-1.5 text-[13px] text-secondary-token',
         className
       )}
     >
       <Icon
         name='MapPin'
-        className='h-3.5 w-3.5 text-(--linear-text-tertiary)'
+        className='h-3.5 w-3.5 text-tertiary-token'
         aria-hidden='true'
       />
       <TruncatedText lines={1}>{locationLabel || 'Unknown'}</TruncatedText>

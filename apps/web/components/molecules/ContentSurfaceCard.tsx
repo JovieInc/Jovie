@@ -1,10 +1,30 @@
+import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-0) shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+const contentSurfaceCardVariants = cva(
+  'border bg-surface-0 shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]',
+  {
+    variants: {
+      surface: {
+        default: 'rounded-[10px] border-(--linear-app-frame-seam)',
+        marketing: 'rounded-xl border-[var(--linear-border-subtle)]',
+        settings:
+          'rounded-[11px] border-subtle/55 bg-surface-0 px-4 py-4 sm:px-5',
+      },
+    },
+    defaultVariants: {
+      surface: 'default',
+    },
+  }
+);
 
-export interface ContentSurfaceCardProps {
+/** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
+export const CONTENT_SURFACE_CARD_CLASSNAME =
+  'rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 shadow-[0_1px_0_rgba(0,0,0,0.02)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]';
+
+export interface ContentSurfaceCardProps
+  extends VariantProps<typeof contentSurfaceCardVariants> {
   readonly children?: ReactNode;
   readonly as?: ElementType;
   readonly className?: string;
@@ -20,15 +40,18 @@ export interface ContentSurfaceCardProps {
 export function ContentSurfaceCard({
   children,
   as: Component = 'div',
+  surface,
   className,
   ...props
 }: Readonly<ContentSurfaceCardProps>) {
   return (
     <Component
-      className={cn(CONTENT_SURFACE_CARD_CLASSNAME, className)}
+      className={cn(contentSurfaceCardVariants({ surface }), className)}
       {...props}
     >
       {children}
     </Component>
   );
 }
+
+export { contentSurfaceCardVariants };

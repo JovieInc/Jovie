@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { JoviePixel } from '@/components/tracking';
+import { JoviePixel } from '@/features/tracking';
 
 interface ClaimPageContentProps {
   readonly profileId: string;

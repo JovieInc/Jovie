@@ -1,8 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-
-import { ActivityTableUnified } from '@/components/admin/ActivityTableUnified';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { getAdminActivityFeed } from '@/lib/admin/overview';
 import { AdminActivitySkeleton } from './loading';
 

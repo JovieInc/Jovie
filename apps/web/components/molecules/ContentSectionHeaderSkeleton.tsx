@@ -37,7 +37,7 @@ export function ContentSectionHeaderSkeleton({
   return (
     <div
       className={cn(
-        'flex min-h-(--linear-app-header-height) shrink-0 flex-wrap items-center justify-between gap-3 border-b border-(--linear-border-subtle) bg-transparent px-(--linear-app-header-padding-x) py-1.5',
+        'flex min-h-(--linear-app-header-height) shrink-0 flex-wrap items-center justify-between gap-3 border-b border-subtle bg-transparent px-(--linear-app-header-padding-x) py-1.5',
         className
       )}
       aria-hidden='true'

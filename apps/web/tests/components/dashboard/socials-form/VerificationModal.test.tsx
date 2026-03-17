@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VerificationError } from '@/components/dashboard/organisms/socials-form/types';
+import type { VerificationError } from '@/features/dashboard/organisms/socials-form/types';
 
 // Mock useClipboard
 const mockCopy = vi.fn().mockResolvedValue(true);
@@ -29,7 +29,7 @@ vi.mock('next-themes', () => ({
   }),
 }));
 
-import { VerificationModal } from '@/components/dashboard/organisms/socials-form/VerificationModal';
+import { VerificationModal } from '@/features/dashboard/organisms/socials-form/VerificationModal';
 
 const defaultProps = {
   open: true,

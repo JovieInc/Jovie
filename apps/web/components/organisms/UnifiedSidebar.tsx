@@ -13,14 +13,6 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { DashboardNav } from '@/components/dashboard/dashboard-nav';
-import {
-  artistSettingsNavigation,
-  userSettingsNavigation,
-} from '@/components/dashboard/dashboard-nav/config';
-import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
-import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +26,14 @@ import {
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardNav } from '@/features/dashboard/dashboard-nav';
+import {
+  artistSettingsNavigation,
+  userSettingsNavigation,
+} from '@/features/dashboard/dashboard-nav/config';
+import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
@@ -127,9 +127,9 @@ function SettingsNavigation({
   // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
   // If cachedDisplayName is empty string, the user intentionally cleared it.
   const artistName =
-    cachedDisplayName != null
-      ? cachedDisplayName.trim() || undefined
-      : selectedProfile?.displayName?.trim() || undefined;
+    cachedDisplayName == null
+      ? selectedProfile?.displayName?.trim() || undefined
+      : cachedDisplayName.trim() || undefined;
 
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {

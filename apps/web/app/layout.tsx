@@ -159,7 +159,7 @@ export default async function RootLayout({
   const showDevToolbar =
     (!isProductionEnv || devCookieSet) && !isE2EClientRuntime;
   const DevToolbar = showDevToolbar
-    ? (await import('@/components/dev/DevToolbar')).DevToolbar
+    ? (await import('@/features/dev/DevToolbar')).DevToolbar
     : null;
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';

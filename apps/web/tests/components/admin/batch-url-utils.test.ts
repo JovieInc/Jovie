@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseBatchUrls } from '@/components/admin/batch-url-utils';
+import { parseBatchUrls } from '@/features/admin/batch-url-utils';
 
 describe('parseBatchUrls', () => {
   it('parses newline and comma separated URLs in one payload', () => {

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { InsightsPanel } from '@/components/dashboard/insights/InsightsPanel';
-import { PageErrorState } from '@/components/feedback/PageErrorState';
 import { APP_ROUTES } from '@/constants/routes';
+import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';

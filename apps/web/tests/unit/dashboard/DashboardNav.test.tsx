@@ -2,9 +2,9 @@ import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import { SidebarProvider } from '@/components/organisms/Sidebar';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import { fastRender } from '@/tests/utils/fast-render';
 
 // Mock Next.js router with controllable return value

@@ -4,7 +4,7 @@ import {
   buildProfilePreviewLinks,
   buildProfilePublicViewModel,
   buildProfileSaveState,
-} from '@/components/profile/view-models';
+} from '@/features/profile/view-models';
 import type { Artist } from '@/types/db';
 
 const mockArtist: Artist = {

@@ -69,7 +69,7 @@ export function TrackDetailPanel({
               icon={<Copy className='h-3.5 w-3.5' />}
               label='Copy ISRC'
               trailing={
-                <span className='font-mono text-[10px] text-(--linear-text-tertiary)'>
+                <span className='font-mono text-[10px] text-tertiary-token'>
                   {track.isrc}
                 </span>
               }

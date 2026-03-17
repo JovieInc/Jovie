@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
+import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { fastRender } from '@/tests/utils/fast-render';
 
 vi.mock('@/lib/error-tracking', () => ({

@@ -25,7 +25,7 @@ export default function SettingsBillingLoading() {
               className='min-h-0 px-4 py-3'
             />
             <div className='space-y-3 px-4 py-3'>
-              <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3.5'>
+              <div className='rounded-xl border border-subtle bg-surface-0 p-3.5'>
                 <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
                 <LoadingSkeleton
                   height='h-4'

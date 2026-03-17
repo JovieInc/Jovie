@@ -8,7 +8,7 @@ import {
 import type {
   AudienceFilters,
   AudienceView,
-} from '@/components/dashboard/organisms/dashboard-audience-table/types';
+} from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import type { AudienceMember } from '@/types';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';

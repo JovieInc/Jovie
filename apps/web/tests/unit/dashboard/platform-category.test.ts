@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { getPlatformCategory } from '@/components/dashboard/organisms/links/utils/platform-category';
+import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 
 describe('getPlatformCategory', () => {
   describe('DSP platforms (Music tab)', () => {

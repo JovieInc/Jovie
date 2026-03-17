@@ -46,14 +46,14 @@ export function ContentMetricCard({
             {Icon ? (
               <Icon
                 className={cn(
-                  'size-3.5 shrink-0 text-(--linear-text-tertiary)',
+                  'size-3.5 shrink-0 text-tertiary-token',
                   iconClassName
                 )}
               />
             ) : null}
             <p
               className={cn(
-                'truncate text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)',
+                'truncate text-[11px] font-[510] tracking-[0.04em] text-tertiary-token',
                 labelClassName
               )}
             >
@@ -66,7 +66,7 @@ export function ContentMetricCard({
         </div>
         <p
           className={cn(
-            'text-[28px] font-[620] leading-none tracking-[-0.03em] text-(--linear-text-primary) tabular-nums',
+            'text-[28px] font-[620] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
             valueClassName
           )}
         >
@@ -75,7 +75,7 @@ export function ContentMetricCard({
         {subtitle ? (
           <div
             className={cn(
-              'text-[12px] leading-[17px] text-(--linear-text-secondary)',
+              'text-[12px] leading-[17px] text-secondary-token',
               subtitleClassName
             )}
           >

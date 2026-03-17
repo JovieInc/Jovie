@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getProfileModeSubtitle,
   profileModes,
-} from '@/components/profile/registry';
+} from '@/features/profile/registry';
 
 // --- Mock data used across tests ---
 

@@ -5,7 +5,7 @@ import {
   groupLinks,
   type LinkSection,
   sectionOf,
-} from '@/components/dashboard/organisms/links/utils/link-categorization';
+} from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { type DetectedLink } from '@/lib/utils/platform-detection';
 
 // Helper to create a mock DetectedLink

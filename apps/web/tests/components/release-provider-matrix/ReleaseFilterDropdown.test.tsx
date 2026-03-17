@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type {
   PopularityLevel,
   ReleaseFilters,
-} from '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader';
+} from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader';
 import type { ReleaseType } from '@/lib/discography/types';
 
 // ── Mock dependencies ──
@@ -150,7 +150,7 @@ vi.mock('@/components/atoms/Icon', () => ({
 }));
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/FilterSubmenu',
+  '@/features/dashboard/organisms/release-provider-matrix/FilterSubmenu',
   () => ({
     FilterSubmenu: ({
       label,
@@ -191,7 +191,7 @@ vi.mock(
 // ── Import after mocks ──
 
 const { ReleaseFilterDropdown } = await import(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
 );
 
 // ── Helpers ──

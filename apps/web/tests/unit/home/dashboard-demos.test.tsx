@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { DashboardLinksDemo } from '@/components/home/demo/DashboardLinksDemo';
-import { DashboardReleasesDemo } from '@/components/home/demo/DashboardReleasesDemo';
+import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
+import { DashboardReleasesDemo } from '@/features/home/demo/DashboardReleasesDemo';
 
 class MockIntersectionObserver {
   observe = vi.fn();

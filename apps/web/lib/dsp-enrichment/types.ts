@@ -11,18 +11,14 @@ export type {
 } from '@/lib/db/schema/analytics';
 // Re-export database types
 export type {
-  DspArtistEnrichment,
   DspArtistMatch,
   DspExternalUrls,
   DspImageUrls,
   DspMatchConfidenceBreakdown,
   FanReleaseNotification,
-  NewDspArtistEnrichment,
   NewDspArtistMatch,
   NewFanReleaseNotification,
-  NewReleaseSyncStatus,
   NewSocialLinkSuggestion,
-  ReleaseSyncStatus,
   SocialLinkSuggestion,
   SocialSuggestionConfidenceBreakdown,
 } from '@/lib/db/schema/dsp-enrichment';

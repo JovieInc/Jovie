@@ -26,8 +26,6 @@ export type {
 export { CircleIconButton } from './CircleIconButton';
 export { CopyableMonospaceCell } from './CopyableMonospaceCell';
 export { Copyright } from './Copyright';
-export type { CTAButtonProps } from './CTAButton';
-export { CTAButton } from './CTAButton';
 export type { DividerProps } from './Divider';
 export { Divider } from './Divider';
 export type { DotBadgeProps, DotBadgeVariant } from './DotBadge';

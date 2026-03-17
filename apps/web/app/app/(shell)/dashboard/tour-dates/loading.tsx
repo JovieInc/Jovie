@@ -11,7 +11,7 @@ export default function TourDatesLoading() {
   return (
     <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
       {/* Connection header placeholder */}
-      <div className='shrink-0 flex items-center justify-between border-b border-(--linear-border-subtle) bg-(--linear-app-content-surface) px-4 py-2'>
+      <div className='shrink-0 flex items-center justify-between border-b border-subtle bg-(--linear-app-content-surface) px-4 py-2'>
         <div className='flex items-center gap-2'>
           <LoadingSkeleton height='h-5' width='w-5' rounded='full' />
           <LoadingSkeleton height='h-4' width='w-40' rounded='md' />
@@ -62,7 +62,7 @@ export default function TourDatesLoading() {
       <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
         <table className='w-full border-collapse text-[13px]'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'>
-            <tr className='border-b border-(--linear-border-subtle)'>
+            <tr className='border-b border-subtle'>
               <th className='w-[120px] px-4 py-3 text-left'>
                 <LoadingSkeleton height='h-4' width='w-10' rounded='md' />
               </th>
@@ -88,7 +88,7 @@ export default function TourDatesLoading() {
             {ROW_KEYS.map(key => (
               <tr
                 key={key}
-                className='border-b border-(--linear-border-subtle)'
+                className='border-b border-subtle'
                 style={{ height: 52 }}
               >
                 <td className='px-4 py-3'>
