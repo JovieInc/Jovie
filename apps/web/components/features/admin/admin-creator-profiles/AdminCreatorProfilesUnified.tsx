@@ -1,0 +1,466 @@
+'use client';
+
+import type { RowSelectionState } from '@tanstack/react-table';
+import { UserCircle2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  convertToCommonDropdownItems,
+  UnifiedTable,
+  useRowSelection,
+} from '@/components/organisms/table';
+import { getProfileUrl } from '@/constants/domains';
+import { AdminCreatorsToolbar } from '@/features/admin/table/AdminCreatorsToolbar';
+import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
+import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
+import { useCreatorActions } from '@/features/admin/useCreatorActions';
+import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
+import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
+import { AdminProfileSidebar } from './AdminProfileSidebar';
+import { useBulkActions, useContextMenuItems, useDialogState } from './hooks';
+import type { AdminCreatorProfilesWithSidebarProps } from './types';
+import { useContactHydration } from './useContactHydration';
+import { useIngestRefresh } from './useIngestRefresh';
+import { createCreatorProfileColumns } from './utils/column-definitions';
+
+const DeleteCreatorDialog = dynamic(
+  () =>
+    import('@/features/admin/DeleteCreatorDialog').then(mod => ({
+      default: mod.DeleteCreatorDialog,
+    })),
+  { ssr: false }
+);
+
+const BulkDeleteCreatorDialog = dynamic(
+  () =>
+    import('@/features/admin/BulkDeleteCreatorDialog').then(mod => ({
+      default: mod.BulkDeleteCreatorDialog,
+    })),
+  { ssr: false }
+);
+
+const SendInviteDialog = dynamic(
+  () =>
+    import('@/features/admin/SendInviteDialog').then(mod => ({
+      default: mod.SendInviteDialog,
+    })),
+  { ssr: false }
+);
+
+export function AdminCreatorProfilesUnified({
+  profiles: initialProfiles,
+  pageSize,
+  total,
+  search,
+  sort,
+  mode: _mode = 'admin',
+}: Readonly<AdminCreatorProfilesWithSidebarProps>) {
+  const { profiles, toggleVerification } =
+    useCreatorVerification(initialProfiles);
+
+  const {
+    profiles: profilesWithActions,
+    toggleFeatured,
+    toggleMarketing,
+    deleteCreatorOrUser,
+  } = useCreatorActions(profiles);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteCount, setBulkDeleteCount] = useState(0);
+  const bulkDeleteResolverRef = React.useRef<
+    ((confirmed: boolean) => void) | null
+  >(null);
+
+  const {
+    deleteDialogOpen,
+    profileToDelete,
+    inviteDialogOpen,
+    profileToInvite,
+    openDeleteDialog,
+    closeDeleteDialog,
+    openInviteDialog,
+    closeInviteDialog,
+    clearDeleteProfile,
+    clearInviteProfile,
+  } = useDialogState();
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useAdminCreatorsInfiniteQuery({
+      sort,
+      search,
+      pageSize,
+      initialData: { rows: profilesWithActions, total },
+    });
+
+  const filteredProfiles = useMemo(
+    () => data?.pages.flatMap(page => page.rows) ?? profilesWithActions,
+    [data, profilesWithActions]
+  );
+
+  const from = filteredProfiles.length > 0 ? 1 : 0;
+  const to = filteredProfiles.length;
+
+  const rowIds = useMemo(
+    () => filteredProfiles.map(profile => profile.id),
+    [filteredProfiles]
+  );
+
+  const {
+    selectedIds,
+    headerCheckboxState,
+    toggleSelect,
+    toggleSelectAll,
+    clearSelection,
+  } = useRowSelection(rowIds);
+
+  // Refs for selection state to avoid column recreation on every selection change
+  const selectedIdsRef = useRef(selectedIds);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
+  selectedIdsRef.current = selectedIds;
+  const headerCheckboxStateRef = useRef(headerCheckboxState);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
+  headerCheckboxStateRef.current = headerCheckboxState;
+
+  const confirmBulkDelete = useCallback((count: number) => {
+    // Resolve any previous pending promise before creating a new one
+    bulkDeleteResolverRef.current?.(false);
+
+    setBulkDeleteCount(count);
+    setBulkDeleteDialogOpen(true);
+    return new Promise<boolean>(resolve => {
+      // Safety timeout: if dialog doesn't respond within 30s, resolve false
+      const timeout = setTimeout(() => {
+        if (bulkDeleteResolverRef.current === wrappedResolve) {
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
+          resolve(false);
+        }
+      }, 30_000);
+
+      const wrappedResolve = (confirmed: boolean) => {
+        clearTimeout(timeout);
+        resolve(confirmed);
+      };
+      bulkDeleteResolverRef.current = wrappedResolve;
+    });
+  }, []);
+
+  const { setDraftContact, effectiveContact, refetchSocialLinks } =
+    useContactHydration({
+      profiles: filteredProfiles,
+      selectedId,
+      enabled: sidebarOpen,
+    });
+
+  const { ingestRefreshStatuses, refreshIngest } = useIngestRefresh({
+    selectedId,
+    onRefreshComplete: refetchSocialLinks,
+  });
+
+  const { getContextMenuItems } = useContextMenuItems({
+    ingestRefreshStatuses,
+    refreshIngest,
+    toggleVerification,
+    toggleFeatured,
+    toggleMarketing,
+    openDeleteDialog,
+    openInviteDialog,
+  });
+
+  const {
+    handleBulkVerify,
+    handleBulkUnverify,
+    handleBulkFeature,
+    handleBulkRefreshMusicFetch,
+    handleBulkDelete,
+    handleClearSelection,
+  } = useBulkActions({
+    profiles: profilesWithActions,
+    selectedIds,
+    confirmBulkDelete,
+    toggleVerification,
+    toggleFeatured,
+    deleteCreatorOrUser,
+    clearSelection,
+  });
+
+  const handleRowClick = useCallback(
+    (profile: AdminCreatorProfileRow) => {
+      setSelectedId(profile.id);
+      setSidebarOpen(true);
+      setDraftContact(null);
+    },
+    [setDraftContact]
+  );
+
+  const handleOpenProfile = useCallback(() => {
+    const activeProfile = filteredProfiles.find(
+      profile => profile.id === selectedId
+    );
+    if (!activeProfile?.username) return;
+    globalThis.open(
+      getProfileUrl(activeProfile.username),
+      '_blank',
+      'noopener,noreferrer'
+    );
+  }, [filteredProfiles, selectedId]);
+
+  // Contact hydration now happens automatically via TanStack Query
+  // when selectedId changes and sidebarOpen is true (enabled prop)
+
+  const { handleKeyDown } = useAdminTableKeyboardNavigation({
+    items: filteredProfiles,
+    selectedId,
+    onSelect: setSelectedId,
+    onToggleSidebar: () => setSidebarOpen(open => !open),
+    onActivate: handleOpenProfile,
+    onCloseSidebar: () => setSidebarOpen(false),
+    isSidebarOpen: sidebarOpen,
+    getId: profile => profile.id,
+  });
+
+  const handleSidebarClose = useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (sidebarOpen && !selectedId && profilesWithActions.length > 0) {
+      setSelectedId(profilesWithActions[0]?.id);
+      setDraftContact(null);
+    }
+  }, [sidebarOpen, selectedId, profilesWithActions, setDraftContact]);
+
+  // Row selection state for TanStack Table
+  const rowSelection = useMemo(() => {
+    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+  }, [selectedIds]);
+
+  // Refs to avoid recreating handleRowSelectionChange when selection state changes
+  const rowSelectionRef = useRef(rowSelection);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  rowSelectionRef.current = rowSelection;
+  const filteredProfilesLengthRef = useRef(filteredProfiles.length);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  filteredProfilesLengthRef.current = filteredProfiles.length;
+  const selectedIdsSizeRef = useRef(selectedIds.size);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
+  selectedIdsSizeRef.current = selectedIds.size;
+
+  const handleRowSelectionChange = useCallback(
+    (
+      updaterOrValue:
+        | RowSelectionState
+        | ((old: RowSelectionState) => RowSelectionState)
+    ) => {
+      const newSelection =
+        typeof updaterOrValue === 'function'
+          ? updaterOrValue(rowSelectionRef.current)
+          : updaterOrValue;
+
+      // Update our custom row selection state
+      const newSelectedIds = new Set(
+        Object.entries(newSelection)
+          .filter(([, selected]) => selected)
+          .map(([id]) => id)
+      );
+
+      // Toggle all if all selected or all deselected
+      if (
+        newSelectedIds.size === filteredProfilesLengthRef.current ||
+        (newSelectedIds.size === 0 && selectedIdsSizeRef.current > 0)
+      ) {
+        toggleSelectAll();
+      }
+    },
+    [toggleSelectAll]
+  );
+
+  // Define columns using factory function
+  // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
+  /* eslint-disable react-hooks/refs -- stable ref read for TanStack Table column def */
+  const columns = useMemo(
+    () =>
+      createCreatorProfileColumns({
+        page: 1,
+        pageSize,
+        selectedIdsRef,
+        headerCheckboxStateRef,
+        toggleSelectAll,
+        toggleSelect,
+        getContextMenuItems,
+      }),
+    /* eslint-enable react-hooks/refs */
+    [
+      pageSize,
+      // Note: selectedIds and headerCheckboxState are intentionally excluded
+      // - they use refs to prevent column recreation on selection change
+      toggleSelectAll,
+      toggleSelect,
+      getContextMenuItems,
+    ]
+  );
+
+  // Ref for selectedId to prevent callback recreation
+  const selectedIdRef = useRef(selectedId);
+  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table column def
+  selectedIdRef.current = selectedId;
+
+  // Get row className based on selection state - uses unified tokens
+  // Uses refs to read current values at render time, preventing callback recreation on selection change
+  const getRowClassName = useCallback((profile: AdminCreatorProfileRow) => {
+    const isChecked = selectedIdsRef.current.has(profile.id);
+    const isSelected = profile.id === selectedIdRef.current;
+
+    if (isChecked || isSelected) {
+      return cn(
+        'group bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
+      );
+    }
+
+    return cn(
+      'group bg-transparent hover:bg-(--linear-row-hover) transition-colors duration-100 ease-out'
+    );
+  }, []);
+
+  // Register right panel with AuthShell instead of rendering inline.
+  // ContactSidebar already renders its own RightDrawer — no outer wrapper needed.
+  const selectedProfile = useMemo(
+    () => filteredProfiles.find(profile => profile.id === selectedId) ?? null,
+    [filteredProfiles, selectedId]
+  );
+
+  const sidebarContextMenuItems = useMemo(
+    () =>
+      selectedProfile
+        ? convertToCommonDropdownItems(getContextMenuItems(selectedProfile))
+        : undefined,
+    [selectedProfile, getContextMenuItems]
+  );
+
+  const sidebarPanel = useMemo(
+    () => (
+      <AdminProfileSidebar
+        profile={selectedProfile}
+        contact={effectiveContact}
+        isOpen={sidebarOpen && Boolean(effectiveContact)}
+        onClose={handleSidebarClose}
+        contextMenuItems={sidebarContextMenuItems}
+      />
+    ),
+    [
+      sidebarOpen,
+      selectedProfile,
+      effectiveContact,
+      handleSidebarClose,
+      sidebarContextMenuItems,
+    ]
+  );
+
+  useRegisterRightPanel(sidebarPanel);
+
+  return (
+    <>
+      <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
+        <AdminTableShell
+          testId='admin-creators-content'
+          className='rounded-none'
+          scrollContainerProps={{
+            tabIndex: 0,
+            onKeyDown: handleKeyDown,
+          }}
+          toolbar={
+            <AdminCreatorsToolbar
+              from={from}
+              to={to}
+              total={total}
+              profiles={profilesWithActions}
+              selectedIds={selectedIds}
+              onBulkVerify={handleBulkVerify}
+              onBulkUnverify={handleBulkUnverify}
+              onBulkFeature={handleBulkFeature}
+              onBulkRefreshMusicFetch={handleBulkRefreshMusicFetch}
+              onBulkDelete={handleBulkDelete}
+              onClearSelection={handleClearSelection}
+            />
+          }
+        >
+          {() => (
+            <UnifiedTable
+              data={filteredProfiles}
+              columns={columns}
+              isLoading={false}
+              emptyState={
+                <div className='px-4 py-10 text-center text-sm text-secondary-token flex flex-col items-center gap-3'>
+                  <UserCircle2 className='h-6 w-6' />
+                  <div>
+                    <div className='font-medium'>No creator profiles found</div>
+                    <div className='text-xs'>
+                      Creator profiles will appear here once created.
+                    </div>
+                  </div>
+                </div>
+              }
+              rowSelection={rowSelection}
+              onRowSelectionChange={handleRowSelectionChange}
+              getRowId={row => row.id}
+              getRowClassName={getRowClassName}
+              onRowClick={handleRowClick}
+              getContextMenuItems={getContextMenuItems}
+              enableVirtualization={true}
+              minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
+              className='text-[13px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              onLoadMore={() => {
+                fetchNextPage().catch(() => {});
+              }}
+            />
+          )}
+        </AdminTableShell>
+      </div>
+      <DeleteCreatorDialog
+        profile={profileToDelete}
+        open={deleteDialogOpen}
+        onOpenChange={closeDeleteDialog}
+        onConfirm={async () => {
+          if (!profileToDelete) return { success: false };
+          const result = await deleteCreatorOrUser(profileToDelete.id);
+          if (result.success) {
+            clearDeleteProfile();
+          }
+          return result;
+        }}
+      />
+      <BulkDeleteCreatorDialog
+        open={bulkDeleteDialogOpen}
+        count={bulkDeleteCount}
+        onOpenChange={open => {
+          setBulkDeleteDialogOpen(open);
+          if (!open) {
+            bulkDeleteResolverRef.current?.(false);
+            bulkDeleteResolverRef.current = null;
+          }
+        }}
+        onConfirm={() => {
+          bulkDeleteResolverRef.current?.(true);
+          bulkDeleteResolverRef.current = null;
+          setBulkDeleteDialogOpen(false);
+        }}
+      />
+      <SendInviteDialog
+        profile={profileToInvite}
+        open={inviteDialogOpen}
+        onOpenChange={closeInviteDialog}
+        onSuccess={() => {
+          clearInviteProfile();
+        }}
+      />
+    </>
+  );
+}
