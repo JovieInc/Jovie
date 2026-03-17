@@ -36,6 +36,54 @@ const SIZE_MAP = {
     dot: 'h-4 w-4',
     dotOffset: '-bottom-0.5 -right-0.5',
   },
+  '2xl': {
+    px: 96,
+    text: 'text-2xl',
+    dot: 'h-5 w-5',
+    dotOffset: '-bottom-1 -right-1',
+  },
+  'display-sm': {
+    px: 112,
+    text: 'text-xl',
+    dot: 'h-5 w-5',
+    dotOffset: '-bottom-1 -right-1',
+  },
+  'display-md': {
+    px: 128,
+    text: 'text-2xl',
+    dot: 'h-6 w-6',
+    dotOffset: '-bottom-1 -right-1',
+  },
+  'display-lg': {
+    px: 160,
+    text: 'text-3xl',
+    dot: 'h-6 w-6',
+    dotOffset: '-bottom-1.5 -right-1.5',
+  },
+  'display-xl': {
+    px: 192,
+    text: 'text-3xl',
+    dot: 'h-7 w-7',
+    dotOffset: '-bottom-1.5 -right-1.5',
+  },
+  'display-2xl': {
+    px: 224,
+    text: 'text-4xl',
+    dot: 'h-7 w-7',
+    dotOffset: '-bottom-2 -right-2',
+  },
+  'display-3xl': {
+    px: 256,
+    text: 'text-4xl',
+    dot: 'h-8 w-8',
+    dotOffset: '-bottom-2 -right-2',
+  },
+  'display-4xl': {
+    px: 384,
+    text: 'text-5xl',
+    dot: 'h-8 w-8',
+    dotOffset: '-bottom-2 -right-2',
+  },
 } as const;
 
 export type AvatarSize = keyof typeof SIZE_MAP;
