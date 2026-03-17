@@ -22,6 +22,17 @@ const PROFILE_SAVE_TIMEOUT_MS = 5000;
 /** Minimum time the profile preview must display before CTA enables. */
 const MIN_DISPLAY_MS = 5000;
 
+function getCtaLabel(
+  isSaving: boolean,
+  isEnriching: boolean,
+  minTimeElapsed: boolean
+): string {
+  if (isSaving) return 'Saving...';
+  if (isEnriching) return 'Finishing setup...';
+  if (!minTimeElapsed) return 'Reviewing your profile...';
+  return 'Continue to Dashboard';
+}
+
 /**
  * Profile review step in onboarding.
  * Shows a progress bar while enrichment loads, then a read-only profile card.
@@ -39,15 +50,26 @@ export function OnboardingProfileReviewStep({
   const [enrichmentTimedOut, setEnrichmentTimedOut] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Ensure user has time to review their profile before proceeding
+  const showLoading = isEnriching && !enrichedProfile && !enrichmentTimedOut;
+
+  // Start the minimum display timer when the profile card becomes visible,
+  // not on mount — so slow enrichments still get the full 5s review window.
   useEffect(() => {
-    const timer = globalThis.setTimeout(
-      () => setMinTimeElapsed(true),
-      MIN_DISPLAY_MS
-    );
-    return () => clearTimeout(timer);
-  }, []);
+    if (!showLoading && !minTimeElapsed) {
+      minTimeRef.current = globalThis.setTimeout(
+        () => setMinTimeElapsed(true),
+        MIN_DISPLAY_MS
+      );
+    }
+    return () => {
+      if (minTimeRef.current) {
+        clearTimeout(minTimeRef.current);
+        minTimeRef.current = null;
+      }
+    };
+  }, [showLoading, minTimeElapsed]);
 
   // Auto-dismiss loading state after timeout
   useEffect(() => {
@@ -73,8 +95,6 @@ export function OnboardingProfileReviewStep({
       timeoutRef.current = null;
     }
   }, [enrichedProfile]);
-
-  const showLoading = isEnriching && !enrichedProfile && !enrichmentTimedOut;
   const displayName = enrichedProfile?.name || handle;
   const bio = enrichedProfile?.bio || null;
   const avatarUrl = enrichedProfile?.imageUrl || null;
@@ -183,16 +203,18 @@ export function OnboardingProfileReviewStep({
             <div className={FORM_LAYOUT.formInner}>
               <AuthButton
                 onClick={handleContinue}
-                disabled={isSaving || !minTimeElapsed || isEnriching}
-                aria-busy={isSaving || isEnriching}
+                disabled={
+                  isSaving ||
+                  !minTimeElapsed ||
+                  (isEnriching && !enrichmentTimedOut)
+                }
+                aria-busy={isSaving || (isEnriching && !enrichmentTimedOut)}
               >
-                {isSaving
-                  ? 'Saving...'
-                  : isEnriching
-                    ? 'Finishing setup...'
-                    : !minTimeElapsed
-                      ? 'Reviewing your profile...'
-                      : 'Continue to Dashboard'}
+                {getCtaLabel(
+                  isSaving,
+                  isEnriching && !enrichmentTimedOut,
+                  minTimeElapsed
+                )}
               </AuthButton>
             </div>
           </>
