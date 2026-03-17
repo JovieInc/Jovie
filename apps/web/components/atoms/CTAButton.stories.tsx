@@ -1,5 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { CTAButton, type CTAButtonProps } from './CTAButton';
+import {
+  CTAButton,
+  type CTAButtonProps,
+} from '@/components/molecules/CTAButton';
 
 const meta: Meta<typeof CTAButton> = {
   title: 'UI/CTAButton',
