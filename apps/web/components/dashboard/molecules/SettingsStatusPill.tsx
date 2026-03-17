@@ -25,7 +25,7 @@ export function SettingsStatusPill({
   status,
   className,
 }: SettingsStatusPillProps) {
-  const resolvedState = resolveState({ state, status, className });
+  const resolvedState = resolveState({ state, status });
 
   if (!resolvedState) {
     return null;
@@ -42,9 +42,8 @@ export function SettingsStatusPill({
     >
       {resolvedState === 'saving' && 'Saving…'}
       {resolvedState === 'saved' && 'Saved'}
-      {resolvedState === 'error' && status?.error
-        ? status.error
-        : 'Save failed'}
+      {resolvedState === 'error' &&
+        (status?.error ? status.error : 'Save failed')}
     </div>
   );
 }

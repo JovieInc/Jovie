@@ -7,6 +7,7 @@ import {
   gt,
   gte,
   ne,
+  or,
   type SQL,
 } from 'drizzle-orm';
 import { unstable_noStore as noStore } from 'next/cache';
@@ -343,7 +344,9 @@ function segmentToCondition(segment: string) {
 
 /**
  * Build segment filter condition based on multiple segment filters.
- * When multiple segments are selected, they are combined with AND logic.
+ * When multiple segments are selected, they are combined with OR logic
+ * (union): selecting multiple segments shows members matching ANY of the
+ * selected segments, matching the behavior in the API route.
  */
 function buildSegmentFilter(segments: string[] | undefined) {
   if (!segments || segments.length === 0) return drizzleSql<boolean>`true`;
@@ -354,7 +357,7 @@ function buildSegmentFilter(segments: string[] | undefined) {
 
   if (conditions.length === 0) return drizzleSql<boolean>`true`;
   if (conditions.length === 1) return conditions[0];
-  return and(...conditions)!;
+  return or(...conditions)!;
 }
 
 /**
