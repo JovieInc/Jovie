@@ -1,5 +1,6 @@
 'use client';
 
+import { PartyPopper } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { track } from '@/lib/analytics';
 import { CopyToClipboardButton } from './CopyToClipboardButton';
@@ -33,17 +34,22 @@ interface ConfettiParticle {
   rotation: string;
 }
 
+function getSeededValue(index: number, salt: number): number {
+  const seed = ((index + 1) * 1664525 + salt * 1013904223) >>> 0;
+  return seed / 0x100000000;
+}
+
 function generateParticles(): ConfettiParticle[] {
   return Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
     id: `confetti-${crypto.randomUUID()}`,
-    width: 4 + Math.random() * 6,
-    height: 4 + Math.random() * 6,
+    width: 4 + getSeededValue(i, 1) * 6,
+    height: 4 + getSeededValue(i, 2) * 6,
     color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-    left: `${Math.random() * 100}%`,
+    left: `${getSeededValue(i, 3) * 100}%`,
     opacity: 0.9,
-    animationDelay: `${Math.random() * 0.8}s`,
-    animationDuration: `${2 + Math.random() * 2}s`,
-    rotation: `rotate(${Math.random() * 360}deg)`,
+    animationDelay: `${getSeededValue(i, 4) * 0.8}s`,
+    animationDuration: `${2 + getSeededValue(i, 5) * 2}s`,
+    rotation: `rotate(${getSeededValue(i, 6) * 360}deg)`,
   }));
 }
 
@@ -124,9 +130,10 @@ export function ProfileLiveCelebration({
             : 'opacity-0 translate-y-8 scale-95'
         }`}
       >
-        <div className='text-5xl' aria-hidden='true'>
-          🎉
-        </div>
+        <PartyPopper
+          className='h-12 w-12 text-primary-token'
+          aria-hidden='true'
+        />
 
         <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
           Your profile is live
@@ -147,7 +154,8 @@ export function ProfileLiveCelebration({
           ref={continueRef}
           type='button'
           onClick={handleClick}
-          className='mt-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
+          aria-label='Continue to the next step'
+          className='mt-2 text-[13px] text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
         >
           Continue →
         </button>
