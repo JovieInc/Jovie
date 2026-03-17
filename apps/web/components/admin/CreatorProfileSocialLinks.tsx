@@ -38,9 +38,9 @@ export const CreatorProfileSocialLinks = memo(
 
           return {
             id: link.id,
-            platformIcon: link.platformType,
+            platformIcon: link.platform,
             platformName: link.platform,
-            primaryText: displayUsername || link.platformType,
+            primaryText: displayUsername || link.platform,
             onClick: () => handleOpenLink(link.url),
           };
         })}

@@ -9,6 +9,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Admin creator sidebar now displays DSP and social link icons (previously showed empty tabs because `platform` field was dropped during data hydration)
+- Fixed swapped `platformIcon`/`platformName` fields in `CreatorProfileSocialLinks` table component
+- CRM contact sidebar now correctly resolves platform icons from `platform` field before falling back to URL detection
+
 - Homepage claim button now validates handle input before submitting (previously navigated to self-referential `/signup` when empty)
 - CRM audience demo table now shows visible text labels for Intent, Returning, and Source columns instead of invisible icon-only cells
 - Social links on artist profile now open in new tabs instead of navigating away from the page

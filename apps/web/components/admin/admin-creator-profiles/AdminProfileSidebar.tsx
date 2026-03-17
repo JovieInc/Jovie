@@ -29,7 +29,7 @@ function mapContactLinksToPreviewLinks(contact: Contact): PreviewPanelLink[] {
     id: link.id ?? `${contact.id}-${link.url}`,
     title: link.label,
     url: link.url,
-    platform: link.platformType ?? 'website',
+    platform: link.platform ?? link.platformType ?? 'website',
     isVisible: true,
   }));
 }

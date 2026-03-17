@@ -65,6 +65,7 @@ export const ContactSocialLinks = memo(function ContactSocialLinks({
               '';
             const displayUsername = formatUsername(username);
             const platformId =
+              link.platform ||
               link.platformType ||
               detectPlatform(link.url, fullName || contact.username).platform
                 .icon;
