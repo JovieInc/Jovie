@@ -12,6 +12,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Social links on artist profile now open in new tabs instead of navigating away from the page
 - "Log in" link now visible on mobile homepage navigation (was hidden below 380px)
 - Removed duplicate font declaration in auth layout that caused unused CSS preload warnings on every page
+- Reduced cognitive complexity in `ingest-lead.ts` by extracting `enqueuePostIngestionJobs` helper (SonarCloud S3776)
+- Replaced nested ternary operators in `ClaimHandleForm` and `SpotifyConnectDialog` with explicit conditionals (SonarCloud S3358)
+- Used direct `undefined` comparison instead of `typeof` in feature-flags client (SonarCloud S7741)
+- Used `globalThis` instead of `window` in `SettingsAdminSection` for portability (SonarCloud S7764)
 
 ### Changed
 
