@@ -27,7 +27,7 @@ const EVENT_LABELS: Record<string, { label: string; className: string }> = {
   ARTIST_CLAIM_FAILED: { label: 'Failed', className: 'text-error' },
   ARTIST_CLAIM_ATTEMPT: {
     label: 'Attempted',
-    className: 'text-(--linear-text-secondary)',
+    className: 'text-secondary-token',
   },
   ARTIST_DATA_REFRESH: { label: 'Refreshed', className: 'text-info' },
   ARTIST_DATA_REFRESH_FAILED: {
@@ -46,7 +46,7 @@ function EventIcon({ type }: { readonly type: string }) {
     case 'ARTIST_DATA_REFRESH':
       return <RefreshCw className='size-3.5 text-info' />;
     default:
-      return <Clock className='size-3.5 text-(--linear-text-secondary)' />;
+      return <Clock className='size-3.5 text-secondary-token' />;
   }
 }
 
@@ -114,7 +114,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                   {history.map(row => {
                     const config = EVENT_LABELS[row.type] ?? {
                       label: row.type,
-                      className: 'text-(--linear-text-secondary)',
+                      className: 'text-secondary-token',
                     };
                     return (
                       <li
@@ -130,7 +130,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                         >
                           {config.label}
                         </span>
-                        <span className='col-span-2 min-w-0 truncate text-(--linear-text-primary) sm:col-auto sm:flex-1'>
+                        <span className='col-span-2 min-w-0 truncate text-primary-token sm:col-auto sm:flex-1'>
                           {row.handle
                             ? `@${row.handle}`
                             : (row.spotifyId ?? '--')}
@@ -143,7 +143,7 @@ export function AdminIngestPageClient({ history }: AdminIngestPageClientProps) {
                             {row.failureReason}
                           </span>
                         )}
-                        <span className='col-start-3 row-start-1 shrink-0 text-right text-(--linear-text-tertiary) sm:ml-auto'>
+                        <span className='col-start-3 row-start-1 shrink-0 text-right text-tertiary-token sm:ml-auto'>
                           {formatTimeAgo(row.createdAt)}
                         </span>
                       </li>

@@ -82,14 +82,14 @@ export function DeleteCreatorDialog({
           </div>
 
           <div className='space-y-2 text-center'>
-            <AlertDialogTitle className='text-base font-semibold text-(--linear-text-primary)'>
+            <AlertDialogTitle className='text-base font-semibold text-primary-token'>
               {isClaimed ? 'Delete User Account' : 'Delete Creator Profile'}
             </AlertDialogTitle>
-            <AlertDialogDescription className='text-sm text-(--linear-text-secondary)'>
+            <AlertDialogDescription className='text-sm text-secondary-token'>
               {isClaimed
                 ? `This will permanently delete the user account for `
                 : `This will permanently delete `}
-              <span className='font-medium text-(--linear-text-primary)'>
+              <span className='font-medium text-primary-token'>
                 @{username}
               </span>
               {isClaimed ? '.' : "'s profile."}
@@ -98,15 +98,15 @@ export function DeleteCreatorDialog({
         </AlertDialogHeader>
 
         {/* Items list */}
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-1) p-4'>
-          <p className='mb-3 text-xs font-medium uppercase tracking-wider text-(--linear-text-tertiary)'>
+        <ContentSurfaceCard className='bg-surface-1 p-4'>
+          <p className='mb-3 text-xs font-medium uppercase tracking-wider text-tertiary-token'>
             Data to be deleted
           </p>
           <ul className='space-y-2'>
             {items.map(item => (
               <li key={item} className='flex items-center gap-2 text-sm'>
                 <Icon name='X' className='h-3.5 w-3.5 text-destructive/70' />
-                <span className='text-(--linear-text-secondary)'>{item}</span>
+                <span className='text-secondary-token'>{item}</span>
               </li>
             ))}
           </ul>

@@ -45,7 +45,7 @@ export function WaitlistSettingsPanel() {
 
   if (loading) {
     return (
-      <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-(--linear-text-secondary)'>
+      <ContentSurfaceCard className='flex items-center gap-2 px-4 py-3.5 text-[13px] text-secondary-token'>
         <Loader2 className='h-4 w-4 animate-spin' aria-hidden />
         Loading waitlist settings...
       </ContentSurfaceCard>
@@ -71,7 +71,7 @@ export function WaitlistSettingsPanel() {
       />
 
       <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
           <SettingsToggleRow
             title='Waitlist gate'
             description='When disabled, new submissions bypass manual approval.'
@@ -86,7 +86,7 @@ export function WaitlistSettingsPanel() {
           />
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='bg-(--linear-bg-surface-0) px-4 py-3.5'>
+        <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
           <SettingsToggleRow
             title='Auto-accept'
             description='Automatically approve a limited number of new submissions each day.'
@@ -101,7 +101,7 @@ export function WaitlistSettingsPanel() {
           />
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5'>
+        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 px-4 py-3.5'>
           <div className='min-w-0'>
             <p className='text-[13px] font-[510] text-primary-token'>
               Daily limit

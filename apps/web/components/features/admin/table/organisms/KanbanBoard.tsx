@@ -181,9 +181,9 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <ContentSurfaceCard className='flex min-w-[320px] max-w-[400px] flex-1 flex-col overflow-hidden bg-(--linear-bg-surface-1)'>
+    <ContentSurfaceCard className='flex min-w-[320px] max-w-[400px] flex-1 flex-col overflow-hidden bg-surface-1'>
       {/* Column Header */}
-      <div className='flex items-center justify-between border-b border-(--linear-border-subtle) px-4 py-3'>
+      <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
         <div className='flex items-center gap-2'>
           {accentStyle && (
             <span
@@ -192,11 +192,11 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+          <h3 className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
             {column.title}
           </h3>
         </div>
-        <span className='text-xs tabular-nums text-(--linear-text-tertiary)'>
+        <span className='text-xs tabular-nums text-tertiary-token'>
           {column.count}
         </span>
       </div>
@@ -212,8 +212,8 @@ function KanbanColumn<TData>({
         {(() => {
           if (column.items.length === 0) {
             return (
-              <div className='flex h-32 items-center justify-center rounded-[10px] border border-dashed border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-                <div className='text-sm text-(--linear-text-tertiary)'>
+              <div className='flex h-32 items-center justify-center rounded-[10px] border border-dashed border-subtle bg-surface-0'>
+                <div className='text-sm text-tertiary-token'>
                   {emptyState ?? 'No items'}
                 </div>
               </div>

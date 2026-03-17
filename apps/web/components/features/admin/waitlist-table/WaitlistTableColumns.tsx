@@ -39,7 +39,7 @@ export function useWaitlistColumns({
         id: 'name',
         header: 'Name',
         cell: entry => (
-          <span className='font-medium text-(--linear-text-primary)'>
+          <span className='font-medium text-primary-token'>
             {entry.fullName}
           </span>
         ),
@@ -51,7 +51,7 @@ export function useWaitlistColumns({
         cell: entry => (
           <a
             href={`mailto:${entry.email}`}
-            className='text-(--linear-text-secondary) hover:underline'
+            className='text-secondary-token hover:underline'
           >
             {entry.email}
           </a>
@@ -71,7 +71,7 @@ export function useWaitlistColumns({
               {primaryGoalLabel}
             </Badge>
           ) : (
-            <span className='text-(--linear-text-tertiary)'>—</span>
+            <span className='text-tertiary-token'>—</span>
           );
         },
         width: 'w-[140px]',
@@ -117,7 +117,7 @@ export function useWaitlistColumns({
               {entry.spotifyUrlNormalized.replace(/^https?:\/\//, '')}
             </a>
           ) : (
-            <span className='text-(--linear-text-tertiary)'>—</span>
+            <span className='text-tertiary-token'>—</span>
           ),
         width: 'w-[200px]',
         hideOnMobile: true,
@@ -127,14 +127,14 @@ export function useWaitlistColumns({
         header: 'Heard About',
         cell: entry => {
           if (!entry.heardAbout) {
-            return <span className='text-(--linear-text-tertiary)'>—</span>;
+            return <span className='text-tertiary-token'>—</span>;
           }
           if (entry.heardAbout.length > 30) {
             const heardAboutTruncated = entry.heardAbout.slice(0, 30) + '…';
             return (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className='cursor-help text-(--linear-text-secondary)'>
+                  <span className='cursor-help text-secondary-token'>
                     {heardAboutTruncated}
                   </span>
                 </TooltipTrigger>
@@ -145,9 +145,7 @@ export function useWaitlistColumns({
             );
           }
           return (
-            <span className='text-(--linear-text-secondary)'>
-              {entry.heardAbout}
-            </span>
+            <span className='text-secondary-token'>{entry.heardAbout}</span>
           );
         },
         width: 'w-[160px]',

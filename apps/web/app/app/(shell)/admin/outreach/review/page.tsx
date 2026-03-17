@@ -120,7 +120,7 @@ export default function AdminOutreachReviewPage() {
           title='Manual Review'
           subtitle='Leads requiring a human pass before outreach continues'
           actions={
-            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+            <span className='text-[12px] font-[560] tabular-nums text-secondary-token'>
               {total} queued
             </span>
           }
@@ -152,7 +152,7 @@ export default function AdminOutreachReviewPage() {
               leads.map(lead => (
                 <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-[560] text-(--linear-text-primary)'>
+                    <span className='font-[560] text-primary-token'>
                       {lead.displayName || '-'}
                     </span>
                   </td>
@@ -163,7 +163,7 @@ export default function AdminOutreachReviewPage() {
                     {lead.fitScore ?? '-'}
                   </td>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-(--linear-text-secondary)'>
+                    <span className='text-secondary-token'>
                       {lead.contactEmail || '-'}
                     </span>
                   </td>
@@ -173,13 +173,13 @@ export default function AdminOutreachReviewPage() {
                         href={`https://instagram.com/${lead.instagramHandle}`}
                         target='_blank'
                         rel='noopener noreferrer'
-                        className='flex items-center gap-1 text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
+                        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
                       >
                         @{lead.instagramHandle}
                         <ExternalLink className='size-3' aria-hidden='true' />
                       </a>
                     ) : (
-                      <span className='text-(--linear-text-tertiary)'>-</span>
+                      <span className='text-tertiary-token'>-</span>
                     )}
                   </td>
                   <td className={CONTENT_TABLE_CELL_CLASS}>

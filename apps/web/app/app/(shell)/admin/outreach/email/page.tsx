@@ -85,7 +85,7 @@ export default function AdminOutreachEmailPage() {
           title='Email Queue'
           subtitle='Highest-priority leads queued for email outreach'
           actions={
-            <span className='text-[12px] font-[560] tabular-nums text-(--linear-text-secondary)'>
+            <span className='text-[12px] font-[560] tabular-nums text-secondary-token'>
               {total} queued
             </span>
           }
@@ -116,7 +116,7 @@ export default function AdminOutreachEmailPage() {
               leads.map(lead => (
                 <tr key={lead.id} className={CONTENT_TABLE_ROW_CLASS}>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='font-[560] text-(--linear-text-primary)'>
+                    <span className='font-[560] text-primary-token'>
                       {lead.displayName || '-'}
                     </span>
                   </td>
@@ -127,7 +127,7 @@ export default function AdminOutreachEmailPage() {
                     {lead.fitScore ?? '-'}
                   </td>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-(--linear-text-secondary)'>
+                    <span className='text-secondary-token'>
                       {lead.contactEmail || '-'}
                     </span>
                   </td>
@@ -135,7 +135,7 @@ export default function AdminOutreachEmailPage() {
                     <OutreachStatusBadge status={lead.outreachStatus} />
                   </td>
                   <td className={CONTENT_TABLE_CELL_CLASS}>
-                    <span className='text-(--linear-text-secondary)'>
+                    <span className='text-secondary-token'>
                       {lead.outreachQueuedAt
                         ? new Date(lead.outreachQueuedAt).toLocaleDateString()
                         : '-'}

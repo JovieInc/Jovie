@@ -139,7 +139,7 @@ function CampaignMetric({
       label={label}
       value={value}
       subtitle={subtitle}
-      className='h-full bg-(--linear-bg-surface-0) shadow-none'
+      className='h-full bg-surface-0 shadow-none'
       labelClassName='tracking-[0.06em]'
       valueClassName={valueClassName}
     />
@@ -152,7 +152,7 @@ function CampaignDataTable({
   children: ReactNode;
 }>) {
   return (
-    <div className='overflow-hidden rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+    <div className='overflow-hidden rounded-[10px] border border-subtle bg-surface-0'>
       <table className='w-full text-sm'>{children}</table>
     </div>
   );
@@ -164,7 +164,7 @@ function CampaignTableHeaderCell({
   children: ReactNode;
 }>) {
   return (
-    <th className='px-4 py-2 text-left text-[11px] font-[560] uppercase tracking-[0.04em] text-(--linear-text-tertiary)'>
+    <th className='px-4 py-2 text-left text-[11px] font-[560] uppercase tracking-[0.04em] text-tertiary-token'>
       {children}
     </th>
   );
@@ -178,7 +178,7 @@ function CampaignTableCell({
   className?: string;
 }>) {
   return (
-    <td className={cn('px-4 py-2 text-(--linear-text-secondary)', className)}>
+    <td className={cn('px-4 py-2 text-secondary-token', className)}>
       {children}
     </td>
   );
@@ -314,7 +314,7 @@ export function InviteCampaignManager() {
           isLoadingStats ? (
             <Icon
               name='Loader2'
-              className='h-4 w-4 animate-spin text-(--linear-text-tertiary)'
+              className='h-4 w-4 animate-spin text-tertiary-token'
               aria-hidden='true'
             />
           ) : null
@@ -425,7 +425,7 @@ export function InviteCampaignManager() {
         <div className='space-y-2'>
           <label
             htmlFor='fit-score-threshold'
-            className='text-sm font-medium text-(--linear-text-primary)'
+            className='text-sm font-medium text-primary-token'
           >
             Minimum Fit Score
           </label>
@@ -439,11 +439,11 @@ export function InviteCampaignManager() {
               onChange={e => setFitScoreThreshold(Number(e.target.value))}
               className='flex-1'
             />
-            <span className='w-12 text-right font-mono text-sm text-(--linear-text-primary)'>
+            <span className='w-12 text-right font-mono text-sm text-primary-token'>
               {fitScoreThreshold}
             </span>
           </div>
-          <p className='text-xs text-(--linear-text-secondary)'>
+          <p className='text-xs text-secondary-token'>
             Only invite profiles with fit score {'>='} {fitScoreThreshold}
           </p>
         </div>
@@ -451,7 +451,7 @@ export function InviteCampaignManager() {
         <div className='space-y-2'>
           <label
             htmlFor='batch-size'
-            className='text-sm font-medium text-(--linear-text-primary)'
+            className='text-sm font-medium text-primary-token'
           >
             Batch Size
           </label>
@@ -466,7 +466,7 @@ export function InviteCampaignManager() {
             }
             className='w-full'
           />
-          <p className='text-xs text-(--linear-text-secondary)'>
+          <p className='text-xs text-secondary-token'>
             Maximum invites to send in this batch
           </p>
         </div>
@@ -514,7 +514,7 @@ export function InviteCampaignManager() {
           <div className='space-y-2'>
             <label
               htmlFor='min-delay'
-              className='text-sm font-medium text-(--linear-text-primary)'
+              className='text-sm font-medium text-primary-token'
             >
               Min Delay (seconds)
             </label>
@@ -542,7 +542,7 @@ export function InviteCampaignManager() {
           <div className='space-y-2'>
             <label
               htmlFor='max-delay'
-              className='text-sm font-medium text-(--linear-text-primary)'
+              className='text-sm font-medium text-primary-token'
             >
               Max Delay (seconds)
             </label>
@@ -626,7 +626,7 @@ export function InviteCampaignManager() {
           isLoadingInvites ? (
             <Icon
               name='Loader2'
-              className='h-4 w-4 animate-spin text-(--linear-text-tertiary)'
+              className='h-4 w-4 animate-spin text-tertiary-token'
               aria-hidden='true'
             />
           ) : null
@@ -634,7 +634,7 @@ export function InviteCampaignManager() {
       >
         {inviteList && inviteList.invites.length > 0 ? (
           <CampaignDataTable>
-            <thead className='bg-(--linear-bg-surface-1)'>
+            <thead className='bg-surface-1'>
               <tr>
                 <CampaignTableHeaderCell>Creator</CampaignTableHeaderCell>
                 <CampaignTableHeaderCell>Status</CampaignTableHeaderCell>
@@ -645,7 +645,7 @@ export function InviteCampaignManager() {
             <tbody className='divide-y divide-(--linear-border-subtle)'>
               {inviteList.invites.map(invite => (
                 <tr key={invite.id}>
-                  <CampaignTableCell className='text-(--linear-text-primary)'>
+                  <CampaignTableCell className='text-primary-token'>
                     @{invite.profile.username}
                   </CampaignTableCell>
                   <CampaignTableCell className='capitalize'>
@@ -659,7 +659,7 @@ export function InviteCampaignManager() {
                       className={
                         invite.profile.isClaimed
                           ? 'text-success'
-                          : 'text-(--linear-text-secondary)'
+                          : 'text-secondary-token'
                       }
                     >
                       {invite.profile.isClaimed ? 'Yes' : 'No'}
@@ -670,7 +670,7 @@ export function InviteCampaignManager() {
             </tbody>
           </CampaignDataTable>
         ) : (
-          <p className='text-sm text-(--linear-text-secondary)'>
+          <p className='text-sm text-secondary-token'>
             No invite activity yet.
           </p>
         )}
@@ -727,11 +727,11 @@ export function InviteCampaignManager() {
             {/* Sample Profiles */}
             {preview.sample.profiles.length > 0 && (
               <div>
-                <p className='mb-2 text-sm font-medium text-(--linear-text-primary)'>
+                <p className='mb-2 text-sm font-medium text-primary-token'>
                   Sample profiles to invite:
                 </p>
                 <CampaignDataTable>
-                  <thead className='bg-(--linear-bg-surface-1)'>
+                  <thead className='bg-surface-1'>
                     <tr>
                       <CampaignTableHeaderCell>
                         Username
@@ -745,7 +745,7 @@ export function InviteCampaignManager() {
                   <tbody className='divide-y divide-(--linear-border-subtle)'>
                     {preview.sample.profiles.map(profile => (
                       <tr key={profile.id}>
-                        <CampaignTableCell className='text-(--linear-text-primary)'>
+                        <CampaignTableCell className='text-primary-token'>
                           @{profile.username}
                         </CampaignTableCell>
                         <CampaignTableCell>
@@ -815,7 +815,7 @@ export function InviteCampaignManager() {
             )}
           </Button>
 
-          <p className='text-sm text-(--linear-text-secondary)'>
+          <p className='text-sm text-secondary-token'>
             Emails will be sent over ~
             {preview
               ? Math.ceil((preview.sample.withEmails * avgDelaySeconds) / 60)

@@ -86,7 +86,7 @@ export default function AdminOutreachPage() {
   return (
     <div className='flex flex-col gap-4'>
       {loadError && (
-        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-secondary-token'>
           <p>{loadError}</p>
         </ContentSurfaceCard>
       )}

@@ -12,10 +12,10 @@ function ProfilePageChatFallback() {
   return (
     <div className='flex h-full items-center justify-center'>
       <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-        <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-          <AlertCircle className='h-5 w-5 text-(--linear-text-tertiary)' />
+        <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-subtle bg-surface-0'>
+          <AlertCircle className='h-5 w-5 text-tertiary-token' />
         </div>
-        <p className='text-sm text-(--linear-text-secondary)'>
+        <p className='text-sm text-secondary-token'>
           Something went wrong loading chat. Please try again.
         </p>
         <DashboardHeaderActionButton
@@ -40,10 +40,10 @@ function ProfilePageChatInner() {
       return (
         <div className='flex h-full items-center justify-center'>
           <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
-              <AlertCircle className='h-5 w-5 text-(--linear-text-tertiary)' />
+            <div className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-subtle bg-surface-0'>
+              <AlertCircle className='h-5 w-5 text-tertiary-token' />
             </div>
-            <p className='text-sm text-(--linear-text-secondary)'>
+            <p className='text-sm text-secondary-token'>
               We hit a problem loading your profile. Please retry in a moment.
             </p>
             <DashboardHeaderActionButton
@@ -62,7 +62,7 @@ function ProfilePageChatInner() {
         {/* Empty message area skeleton */}
         <div className='flex flex-1 items-center justify-center'>
           <div className='flex flex-col items-center gap-3'>
-            <MessageSquare className='h-8 w-8 text-(--linear-text-tertiary) opacity-40' />
+            <MessageSquare className='h-8 w-8 text-tertiary-token opacity-40' />
             <div className='h-4 w-32 rounded skeleton' />
           </div>
         </div>

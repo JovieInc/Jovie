@@ -30,20 +30,20 @@ const authButtonVariants = cva(
           'hover:opacity-90',
         ].join(' '),
         primaryLight: [
-          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         oauthPrimary: [
-          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         secondary: [
-          'bg-(--linear-btn-secondary-bg) border border-(--linear-border-subtle) px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-(--linear-text-primary)',
+          'bg-(--linear-btn-secondary-bg) border border-subtle px-[14px] text-(--linear-caption-size) font-(--linear-caption-weight) text-primary-token',
           'hover:bg-(--linear-btn-secondary-hover)',
         ].join(' '),
         link: [
-          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[400] text-(--linear-text-secondary)',
-          'hover:text-(--linear-text-primary)',
+          'bg-transparent p-0 h-auto min-h-0 text-[13px] font-[400] text-secondary-token',
+          'hover:text-primary-token',
           'active:scale-100 active:opacity-70',
         ].join(' '),
       },

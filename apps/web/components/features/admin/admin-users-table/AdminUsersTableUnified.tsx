@@ -87,22 +87,22 @@ function AdminUserMobileCard({
   return (
     <ContentSurfaceCard
       as='article'
-      className='overflow-hidden bg-(--linear-bg-surface-0) p-0'
+      className='overflow-hidden bg-surface-0 p-0'
     >
-      <div className='flex items-start justify-between gap-3 border-b border-(--linear-border-subtle) px-4 py-3'>
+      <div className='flex items-start justify-between gap-3 border-b border-subtle px-4 py-3'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
           <input
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded-[4px] border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
+            className='mt-0.5 h-4 w-4 rounded-[4px] border-subtle bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
-            <p className='truncate text-[14px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+            <p className='truncate text-[14px] font-[560] tracking-[-0.01em] text-primary-token'>
               {user.name || 'Email Subscriber'}
             </p>
-            <p className='truncate text-[12px] text-(--linear-text-secondary)'>
+            <p className='truncate text-[12px] text-secondary-token'>
               {user.email ?? 'No email'}
             </p>
           </div>
@@ -126,7 +126,7 @@ function AdminUserMobileCard({
             Active
           </Badge>
         )}
-        <span className='text-(--linear-text-secondary)'>
+        <span className='text-secondary-token'>
           Joined {user.createdAt ? dateFormatter.format(user.createdAt) : '—'}
         </span>
       </div>
@@ -510,13 +510,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
               isMobile ? (
                 <div className='space-y-3 p-3'>
                   {users.length === 0 ? (
-                    <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
+                    <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
-                        <div className='text-[12px] text-(--linear-text-secondary)'>
+                        <div className='text-[12px] text-secondary-token'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}
@@ -557,13 +557,13 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   rowSelection={rowSelection}
                   isLoading={false}
                   emptyState={
-                    <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-10 text-center'>
+                    <ContentSurfaceCard className='mx-4 my-6 flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />
                       <div>
-                        <div className='text-sm font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+                        <div className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
                           No users found
                         </div>
-                        <div className='text-[12px] text-(--linear-text-secondary)'>
+                        <div className='text-[12px] text-secondary-token'>
                           {search
                             ? 'Try adjusting your search terms or clearing the filter.'
                             : 'Users will appear here once they sign up.'}

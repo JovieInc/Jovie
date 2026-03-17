@@ -69,11 +69,11 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             as='section'
             className='overflow-hidden'
           >
-            <div className='flex items-center justify-between gap-3 border-b border-(--linear-border-subtle) px-4 py-3'>
-              <h2 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-(--linear-text-primary)'>
+            <div className='flex items-center justify-between gap-3 border-b border-subtle px-4 py-3'>
+              <h2 className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
                 {sourceLabel}
               </h2>
-              <span className='shrink-0 text-[12px] text-(--linear-text-secondary)'>
+              <span className='shrink-0 text-[12px] text-secondary-token'>
                 {items.length}
               </span>
             </div>
@@ -83,7 +83,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 return (
                   <ContentSurfaceCard
                     key={ss.id}
-                    className='group overflow-hidden rounded-[10px] bg-(--linear-bg-surface-0)'
+                    className='group overflow-hidden rounded-[10px] bg-surface-0'
                   >
                     <button
                       type='button'
@@ -91,7 +91,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                       className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
                       aria-label={`View ${ss.name}`}
                     >
-                      <div className='relative aspect-video overflow-hidden bg-(--linear-bg-surface-1)'>
+                      <div className='relative aspect-video overflow-hidden bg-surface-1'>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={ss.url}
@@ -105,10 +105,10 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
 
                     <div className='flex items-center justify-between gap-3 p-3'>
                       <div className='min-w-0'>
-                        <p className='truncate text-[12px] font-[510] text-(--linear-text-primary)'>
+                        <p className='truncate text-[12px] font-[510] text-primary-token'>
                           {ss.filename}
                         </p>
-                        <p className='text-[11px] text-(--linear-text-secondary)'>
+                        <p className='text-[11px] text-secondary-token'>
                           {formatSize(ss.sizeBytes)}
                         </p>
                       </div>
@@ -164,7 +164,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
         <DialogBody>
           {selected && (
             <div className='space-y-4'>
-              <ContentSurfaceCard className='overflow-hidden bg-(--linear-bg-surface-0)'>
+              <ContentSurfaceCard className='overflow-hidden bg-surface-0'>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={selected.url}
@@ -172,12 +172,12 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   className='w-full h-auto'
                 />
               </ContentSurfaceCard>
-              <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-(--linear-bg-surface-0) p-3.5'>
+              <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-surface-0 p-3.5'>
                 <div>
-                  <p className='text-[13px] font-[560] text-(--linear-text-primary)'>
+                  <p className='text-[13px] font-[560] text-primary-token'>
                     {selected.filename}
                   </p>
-                  <p className='text-[12px] text-(--linear-text-secondary)'>
+                  <p className='text-[12px] text-secondary-token'>
                     {selected.sourceLabel} &middot;{' '}
                     {formatSize(selected.sizeBytes)}
                   </p>

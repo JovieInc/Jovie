@@ -62,7 +62,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         }
         className='px-5 py-3'
       />
-      <div className='space-y-3 p-5 text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+      <div className='space-y-3 p-5 text-[12px] leading-[17px] text-secondary-token'>
         <ContentMetricRow
           label='Error rate'
           value={errorRateLabel}
@@ -85,7 +85,7 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
         />
 
         {summary.lastIncidentAt && (
-          <p className='pt-1 text-[11px] text-(--linear-text-tertiary)'>
+          <p className='pt-1 text-[11px] text-tertiary-token'>
             Last incident on {lastIncidentLabel}.
             {tone.label !== 'Healthy' && (
               <> Review logs and alerts before shipping new changes.</>

@@ -127,7 +127,7 @@ export function ActivityTableUnified({
 
   return (
     <div
-      className='h-full border border-(--linear-border-subtle) bg-(--linear-app-content-surface)'
+      className='h-full border border-subtle bg-(--linear-app-content-surface)'
       data-testid='admin-activity-content'
     >
       <AdminTableHeader
@@ -143,13 +143,13 @@ export function ActivityTableUnified({
           columns={columns}
           isLoading={false}
           emptyState={
-            <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-(--linear-text-secondary)'>
+            <div className='flex flex-col items-center gap-3 px-4 py-10 text-center text-sm text-secondary-token'>
               <Activity className='h-6 w-6' />
               <div>
-                <div className='font-medium text-(--linear-text-primary)'>
+                <div className='font-medium text-primary-token'>
                   No recent activity
                 </div>
-                <div className='text-xs text-(--linear-text-secondary)'>
+                <div className='text-xs text-secondary-token'>
                   Activity from the last 7 days will appear here.
                 </div>
               </div>

@@ -44,20 +44,20 @@ export function WaitlistKanbanCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'bg-(--linear-bg-surface-0) p-3',
-        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1)',
+        'bg-surface-0 p-3',
+        'transition-[border-color,box-shadow,background-color] duration-150 hover:border-default hover:bg-surface-1',
         'cursor-grab active:cursor-grabbing'
       )}
     >
       {/* Header: Name + Status */}
       <div className='flex items-start justify-between gap-2 mb-2'>
         <div className='flex-1 min-w-0'>
-          <h4 className='truncate text-sm font-semibold text-(--linear-text-primary)'>
+          <h4 className='truncate text-sm font-semibold text-primary-token'>
             {entry.fullName}
           </h4>
           <a
             href={`mailto:${entry.email}`}
-            className='mt-0.5 flex items-center gap-1 text-xs text-(--linear-text-secondary) hover:text-(--linear-text-primary)'
+            className='mt-0.5 flex items-center gap-1 text-xs text-secondary-token hover:text-primary-token'
           >
             <Mail className='h-3 w-3' />
             <span className='truncate'>{entry.email}</span>
@@ -73,7 +73,7 @@ export function WaitlistKanbanCard({
         {/* Primary Goal */}
         {primaryGoalLabel && (
           <div>
-            <span className='text-(--linear-text-tertiary)'>Goal: </span>
+            <span className='text-tertiary-token'>Goal: </span>
             <Badge size='sm' variant='secondary'>
               {primaryGoalLabel}
             </Badge>
@@ -82,7 +82,7 @@ export function WaitlistKanbanCard({
 
         {/* Primary Social */}
         <div>
-          <span className='text-(--linear-text-tertiary)'>Platform: </span>
+          <span className='text-tertiary-token'>Platform: </span>
           <Badge size='sm' variant='secondary'>
             {platformLabel}
           </Badge>
@@ -103,7 +103,7 @@ export function WaitlistKanbanCard({
         {/* Spotify */}
         {entry.spotifyUrlNormalized && (
           <div>
-            <span className='text-(--linear-text-tertiary)'>Spotify: </span>
+            <span className='text-tertiary-token'>Spotify: </span>
             <a
               href={entry.spotifyUrlNormalized}
               target='_blank'
@@ -116,7 +116,7 @@ export function WaitlistKanbanCard({
         )}
 
         {/* Created Date */}
-        <div className='text-(--linear-text-tertiary)'>
+        <div className='text-tertiary-token'>
           <DateCell
             date={entry.createdAt}
             formatOptions={{
@@ -130,7 +130,7 @@ export function WaitlistKanbanCard({
 
       {/* Actions */}
       {onApprove && (
-        <div className='mt-3 border-t border-(--linear-border-subtle) pt-3'>
+        <div className='mt-3 border-t border-subtle pt-3'>
           <Button
             size='sm'
             variant='primary'

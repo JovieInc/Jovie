@@ -22,10 +22,10 @@ export function WaitlistTablePagination({
   nextHref,
 }: WaitlistTablePaginationProps) {
   return (
-    <div className='flex items-center justify-between gap-2 border-t border-(--linear-border-subtle) px-4 py-3 text-xs text-(--linear-text-secondary)'>
+    <div className='flex items-center justify-between gap-2 border-t border-subtle px-4 py-3 text-xs text-secondary-token'>
       <div className='flex items-center gap-1'>
         <span className='hidden sm:inline'>Page </span>
-        <span className='font-medium text-(--linear-text-primary)'>{page}</span>
+        <span className='font-medium text-primary-token'>{page}</span>
         <span> / {totalPages}</span>
       </div>
       <div className='flex items-center gap-1 sm:gap-2'>

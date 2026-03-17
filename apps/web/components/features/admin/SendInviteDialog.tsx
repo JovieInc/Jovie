@@ -114,7 +114,7 @@ export function SendInviteDialog({
       <DialogBody>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {/* Profile info */}
-          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-(--linear-bg-surface-0) p-3'>
+          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-surface-0 p-3'>
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}
@@ -126,18 +126,15 @@ export function SendInviteDialog({
                 unoptimized={profile.avatarUrl.includes('i.scdn.co')}
               />
             ) : (
-              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
-                <Icon
-                  name='User'
-                  className='h-5 w-5 text-(--linear-text-tertiary)'
-                />
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+                <Icon name='User' className='h-5 w-5 text-tertiary-token' />
               </div>
             )}
             <div>
-              <p className='text-sm font-medium text-(--linear-text-primary)'>
+              <p className='text-sm font-medium text-primary-token'>
                 {profile.displayName || profile.username}
               </p>
-              <p className='text-xs text-(--linear-text-secondary)'>
+              <p className='text-xs text-secondary-token'>
                 @{profile.username}
               </p>
             </div>

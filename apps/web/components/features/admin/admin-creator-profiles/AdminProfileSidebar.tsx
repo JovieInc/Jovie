@@ -89,7 +89,7 @@ export function AdminProfileSidebar({
             avatarUrl={profile.avatarUrl}
           />
           <div className='grid grid-cols-[74px,minmax(0,1fr)] items-center gap-2.5'>
-            <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-quaternary)'>
+            <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-quaternary-token'>
               Profile link
             </span>
             <div className='flex items-center gap-2'>
@@ -101,7 +101,7 @@ export function AdminProfileSidebar({
               />
               <AppIconButton
                 ariaLabel='Open public profile'
-                className='h-8 w-8 shrink-0 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/20 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='h-8 w-8 shrink-0 rounded-[8px] bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/20 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={() =>
                   globalThis.open(
                     `${BASE_URL}/${profile.username}`,
@@ -125,8 +125,8 @@ export function AdminProfileSidebar({
           }
           options={PROFILE_TAB_OPTIONS}
           ariaLabel='Creator profile sidebar view'
-          className='rounded-[10px] bg-(--linear-bg-surface-1)/80 p-0.5'
-          triggerClassName='h-7 px-2.5 text-[11px] text-(--linear-text-secondary)'
+          className='rounded-[10px] bg-surface-1/80 p-0.5'
+          triggerClassName='h-7 px-2.5 text-[11px] text-secondary-token'
         />
       }
     >

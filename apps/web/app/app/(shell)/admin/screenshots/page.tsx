@@ -22,7 +22,7 @@ const ScreenshotGallery = dynamic(
         {SKELETON_KEYS.map(key => (
           <ContentSurfaceCard
             key={key}
-            className='space-y-3 rounded-[12px] bg-(--linear-bg-surface-0) p-3.5'
+            className='space-y-3 rounded-[12px] bg-surface-0 p-3.5'
           >
             <Skeleton className='aspect-video w-full' rounded='lg' />
             <Skeleton className='h-4 w-3/4' />

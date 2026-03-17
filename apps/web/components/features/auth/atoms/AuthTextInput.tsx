@@ -5,7 +5,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 const authTextInputClasses =
-  'border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary) placeholder:text-(--linear-text-tertiary) rounded-(--linear-radius-sm) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2 h-(--linear-button-height-md) min-h-[40px] px-3 text-(--linear-caption-size) font-(--linear-caption-weight)';
+  'border border-subtle bg-surface-0 text-primary-token placeholder:text-tertiary-token rounded-(--linear-radius-sm) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2 h-(--linear-button-height-md) min-h-[40px] px-3 text-(--linear-caption-size) font-(--linear-caption-weight)';
 
 type AuthTextInputVariant = 'default' | 'otp';
 

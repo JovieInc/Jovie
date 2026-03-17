@@ -31,7 +31,7 @@ export function AdminOutreachSectionSkeleton() {
             <div className='h-4 w-4 rounded skeleton' />
             <ContentMetricCardSkeleton className='flex-1 p-3' />
           </div>
-          <div className='space-y-2 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) p-3'>
+          <div className='space-y-2 rounded-[10px] border border-subtle bg-surface-0 p-3'>
             <div className='h-3 w-24 rounded skeleton' />
             <ContentMetricRowSkeleton className='rounded-[8px] px-2.5 py-2' />
             <ContentMetricRowSkeleton className='rounded-[8px] px-2.5 py-2' />

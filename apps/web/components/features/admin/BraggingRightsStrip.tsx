@@ -33,14 +33,14 @@ function BadgeRow({
   return (
     <div className='space-y-2'>
       <div className='flex items-center gap-1.5'>
-        <Icon className='size-3.5 text-(--linear-text-tertiary)' />
-        <p className='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'>
+        <Icon className='size-3.5 text-tertiary-token' />
+        <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
           {title}
         </p>
       </div>
 
       {items.length === 0 ? (
-        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+        <p className='text-[12px] leading-[17px] text-secondary-token'>
           {emptyText}
         </p>
       ) : (
@@ -48,7 +48,7 @@ function BadgeRow({
           {visible.map(item => (
             <span
               key={item}
-              className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[11px] font-medium text-(--linear-text-secondary)'
+              className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-medium text-secondary-token'
             >
               {item}
             </span>
@@ -58,7 +58,7 @@ function BadgeRow({
               <TooltipTrigger asChild>
                 <button
                   type='button'
-                  className='inline-flex cursor-default items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-[11px] font-medium text-(--linear-text-tertiary) transition-colors hover:border-(--linear-border-default) hover:text-(--linear-text-secondary)'
+                  className='inline-flex cursor-default items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-default hover:text-secondary-token'
                   aria-label={`${overflow.length} more ${title.toLowerCase()}`}
                 >
                   +{overflow.length} others
@@ -68,14 +68,14 @@ function BadgeRow({
                 side='top'
                 className='w-[min(22rem,calc(100vw-2rem))] p-3'
               >
-                <p className='mb-2 text-[11px] font-semibold text-(--linear-text-tertiary)'>
+                <p className='mb-2 text-[11px] font-semibold text-tertiary-token'>
                   All {title}
                 </p>
                 <ul className='max-h-60 space-y-1 overflow-y-auto pr-1'>
                   {items.map(item => (
                     <li
                       key={item}
-                      className='truncate text-[11px] text-(--linear-text-primary)'
+                      className='truncate text-[11px] text-primary-token'
                     >
                       {item}
                     </li>

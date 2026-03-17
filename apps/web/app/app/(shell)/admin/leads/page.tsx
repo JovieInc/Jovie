@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 function KpisSkeleton() {
   return (
-    <section className='overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+    <section className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
       <ContentSectionHeaderSkeleton
         titleWidth='w-28'
         descriptionWidth='w-56'

@@ -20,8 +20,8 @@ function StatCard({ value, label }: Readonly<StatCardProps>) {
       value={value.toLocaleString('en-US')}
       className='p-3.5'
       bodyClassName='space-y-1'
-      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-(--linear-text-primary) tabular-nums'
-      labelClassName='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'
+      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-primary-token tabular-nums'
+      labelClassName='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'
     />
   );
 }
@@ -77,13 +77,13 @@ export function PlatformStatsStrip({
                 {stats.labelBadges.map(label => (
                   <span
                     key={label}
-                    className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-secondary-token'
+                    className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-medium text-secondary-token'
                   >
                     {label}
                   </span>
                 ))}
                 {stats.labelsOnPlatform > stats.labelBadges.length && (
-                  <span className='inline-flex items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-2 py-0.5 text-2xs font-medium text-secondary-token'>
+                  <span className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-medium text-secondary-token'>
                     +{stats.labelsOnPlatform - stats.labelBadges.length}
                   </span>
                 )}

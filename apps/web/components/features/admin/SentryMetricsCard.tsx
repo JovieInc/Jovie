@@ -29,7 +29,7 @@ function MetricBlock({
       icon={Icon}
       iconClassName={iconClassName}
       bodyClassName='space-y-1'
-      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.032em] text-(--linear-text-primary) tabular-nums'
+      valueClassName='text-[30px] font-[620] leading-none tracking-[-0.032em] text-primary-token tabular-nums'
     />
   );
 }
@@ -98,11 +98,11 @@ export function SentryMetricsCard({
         </div>
 
         <ContentSurfaceCard className='p-3.5'>
-          <p className='text-[11px] font-[510] tracking-[0.04em] text-(--linear-text-tertiary)'>
+          <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
             Top unresolved issue
           </p>
           <p
-            className='mt-1 truncate text-[12px] leading-[18px] text-(--linear-text-secondary)'
+            className='mt-1 truncate text-[12px] leading-[18px] text-secondary-token'
             title={topIssueLabel}
           >
             {topIssueLabel}

@@ -24,7 +24,7 @@ export function TableRowActions({
   const isVerificationLoading = verificationStatus === 'loading';
   const isRefreshLoading = refreshIngestStatus === 'loading';
   const rowActionClassName =
-    'h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) active:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
+    'h-8 w-8 rounded-[8px] bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token active:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5';
 
   return (
     <div className='flex items-center justify-end gap-1'>
@@ -52,7 +52,7 @@ export function TableRowActions({
           'cursor-default',
           isClaimed
             ? 'text-yellow-500 hover:bg-transparent hover:text-yellow-500'
-            : 'text-(--linear-text-quaternary)/40 hover:bg-transparent hover:text-(--linear-text-quaternary)/40'
+            : 'text-quaternary-token/40 hover:bg-transparent hover:text-quaternary-token/40'
         )}
         disabled
         title={isClaimed ? 'Claimed' : 'Not claimed'}
@@ -71,7 +71,7 @@ export function TableRowActions({
           rowActionClassName,
           isVerified
             ? 'text-info hover:text-info [&_svg]:fill-info [&_svg]:stroke-white'
-            : 'text-(--linear-text-quaternary)/40'
+            : 'text-quaternary-token/40'
         )}
         onClick={async (e: React.MouseEvent) => {
           e.stopPropagation();

@@ -312,11 +312,11 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               onItemMove={handleItemMove}
               cardHeight={200}
               emptyState={
-                <div className='text-center text-(--linear-text-secondary)'>
-                  <p className='text-sm font-medium text-(--linear-text-primary)'>
+                <div className='text-center text-secondary-token'>
+                  <p className='text-sm font-medium text-primary-token'>
                     No waitlist entries
                   </p>
-                  <p className='mt-1 text-xs text-(--linear-text-tertiary)'>
+                  <p className='mt-1 text-xs text-tertiary-token'>
                     Entries will appear here when added
                   </p>
                 </div>

@@ -19,7 +19,7 @@ function MetricCard({
   bgClass,
 }: MetricCardProps) {
   return (
-    <ContentSurfaceCard className='flex items-center gap-3 bg-(--linear-bg-surface-0) px-4 py-3.5'>
+    <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 px-4 py-3.5'>
       <div
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
@@ -29,7 +29,7 @@ function MetricCard({
         <Icon className={cn('h-4 w-4', colorClass)} aria-hidden />
       </div>
       <div className='min-w-0'>
-        <p className='text-[10px] font-[560] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+        <p className='text-[10px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
           {label}
         </p>
         <p className='text-[15px] font-[590] leading-tight tabular-nums text-primary-token'>

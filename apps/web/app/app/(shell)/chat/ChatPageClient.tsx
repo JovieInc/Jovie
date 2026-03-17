@@ -39,7 +39,7 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='block max-w-[240px] truncate font-[510] text-(--linear-text-primary)'>
+    <span className='block max-w-[240px] truncate font-[510] text-primary-token'>
       {title}
     </span>
   );
@@ -331,13 +331,11 @@ export function ChatPageClient({
           {isProfileSetupRace ? (
             <LoadingSpinner size='lg' tone='muted' />
           ) : (
-            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
           )}
-          <p className='text-sm text-(--linear-text-secondary)'>
-            {profileMessage}
-          </p>
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
           {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-(--linear-text-tertiary)'>
+            <p className='text-xs text-tertiary-token'>
               Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
             </p>
           )}
@@ -362,8 +360,8 @@ export function ChatPageClient({
       fallback={
         <div className='flex h-full items-center justify-center'>
           <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
-            <p className='text-sm text-(--linear-text-secondary)'>
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <p className='text-sm text-secondary-token'>
               Something went wrong loading chat. Please try again.
             </p>
             <Button

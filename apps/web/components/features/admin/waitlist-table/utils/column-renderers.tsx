@@ -21,9 +21,7 @@ import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
  * Renders a name cell with primary token styling
  */
 export function renderNameCell(value: string) {
-  return (
-    <span className='font-medium text-(--linear-text-primary)'>{value}</span>
-  );
+  return <span className='font-medium text-primary-token'>{value}</span>;
 }
 
 /**
@@ -33,7 +31,7 @@ export function renderEmailCell(value: string) {
   return (
     <a
       href={`mailto:${value}`}
-      className='text-(--linear-text-secondary) hover:underline'
+      className='text-secondary-token hover:underline'
     >
       {value}
     </a>
@@ -129,7 +127,7 @@ export function renderHeardAboutCell(value: string | null) {
   }
 
   return (
-    <TruncatedText lines={1} className='text-(--linear-text-secondary)'>
+    <TruncatedText lines={1} className='text-secondary-token'>
       {value}
     </TruncatedText>
   );

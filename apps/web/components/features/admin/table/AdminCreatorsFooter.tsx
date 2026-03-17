@@ -31,12 +31,12 @@ export function AdminCreatorsFooter({
   nextHref,
 }: Readonly<AdminCreatorsFooterProps>) {
   return (
-    <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-(--linear-text-secondary)'>
+    <div className='flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-xs text-secondary-token'>
       <div className='flex items-center gap-2'>
         <span className='tabular-nums'>
           Page {page} of {totalPages}
         </span>
-        <span className='tabular-nums text-(--linear-text-tertiary)'>
+        <span className='tabular-nums text-tertiary-token'>
           {from.toLocaleString()}–{to.toLocaleString()} of{' '}
           {total.toLocaleString()}
         </span>

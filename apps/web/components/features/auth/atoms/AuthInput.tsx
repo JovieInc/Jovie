@@ -21,8 +21,8 @@ interface AuthInputProps
 
 const authInputClasses = cn(
   // Base styling - subtle borders for premium feel
-  'border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-primary)',
-  'placeholder:text-(--linear-text-tertiary)',
+  'border border-subtle bg-surface-0 text-primary-token',
+  'placeholder:text-tertiary-token',
   'rounded-(--linear-radius-sm)',
   // Focus ring
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',

@@ -56,7 +56,7 @@ export default function AdminCampaignsPage() {
     <PageShell>
       <PageContent>
         <ContentSurfaceCard className='mb-6 p-4 sm:p-5'>
-          <p className='text-sm text-(--linear-text-secondary)'>
+          <p className='text-sm text-secondary-token'>
             Send claim invites to unclaimed creator profiles. Emails are
             throttled and randomized to avoid spam filters.
           </p>

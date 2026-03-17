@@ -38,7 +38,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 
 const getRowClassName = (isChecked: boolean, isSelected: boolean) => {
   const baseClasses =
-    'group cursor-pointer border-b border-(--linear-border-subtle) transition-[background-color,box-shadow] duration-150 last:border-b-0';
+    'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0';
   if (isChecked || isSelected) {
     return cn(
       baseClasses,
@@ -245,7 +245,7 @@ function CreatorProfileTableRowComponent({
         <div className='relative flex h-5 w-5 items-center justify-center border-0 bg-transparent p-0'>
           <span
             className={cn(
-              'select-none text-[11px] tabular-nums text-(--linear-text-tertiary) transition-opacity',
+              'select-none text-[11px] tabular-nums text-tertiary-token transition-opacity',
               isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
             )}
             aria-hidden='true'
@@ -262,7 +262,7 @@ function CreatorProfileTableRowComponent({
               aria-label={`Select ${profile.username}`}
               checked={isChecked}
               onCheckedChange={() => onToggleSelect(profile.id)}
-              className='border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-border-focus) data-[state=checked]:border-(--linear-border-focus) data-[state=checked]:bg-(--linear-border-focus) data-[state=checked]:text-white'
+              className='border-subtle bg-surface-1 text-(--linear-border-focus) data-[state=checked]:border-(--linear-border-focus) data-[state=checked]:bg-(--linear-border-focus) data-[state=checked]:text-white'
             />
           </div>
         </div>
@@ -278,17 +278,17 @@ function CreatorProfileTableRowComponent({
           />
           <div className='min-w-0'>
             {displayName ? (
-              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-[510] text-(--linear-text-primary)'>
+              <div className='line-clamp-1 overflow-hidden text-ellipsis text-[13px] font-[510] text-primary-token'>
                 {displayName}
               </div>
             ) : null}
             <Link
               href={`/${profile.username}`}
               className={cn(
-                'line-clamp-1 overflow-hidden text-ellipsis text-(--linear-text-secondary) transition-colors hover:text-(--linear-text-primary)',
+                'line-clamp-1 overflow-hidden text-ellipsis text-secondary-token transition-colors hover:text-primary-token',
                 displayName
                   ? 'text-[12px]'
-                  : 'text-[13px] font-[510] text-(--linear-text-primary)'
+                  : 'text-[13px] font-[510] text-primary-token'
               )}
               onClick={event => event.stopPropagation()}
             >
@@ -302,7 +302,7 @@ function CreatorProfileTableRowComponent({
           <CreatorProfileSocialLinks socialLinks={profile.socialLinks} />
         </div>
       </td>
-      <td className='hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-(--linear-text-tertiary) md:table-cell'>
+      <td className='hidden whitespace-nowrap px-4 py-2.5 text-center align-middle text-[12px] text-tertiary-token md:table-cell'>
         {profile.createdAt ? dateFormatter.format(profile.createdAt) : '—'}
       </td>
       <td

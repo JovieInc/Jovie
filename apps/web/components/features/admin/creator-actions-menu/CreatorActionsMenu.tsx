@@ -166,7 +166,7 @@ export function CreatorActionsMenu({
           <DropdownMenuTrigger asChild>
             <AppIconButton
               ariaLabel='Open creator actions'
-              className='h-8 w-8 rounded-[8px] bg-transparent text-(--linear-text-quaternary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+              className='h-8 w-8 rounded-[8px] bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
               disabled={isLoading}
             >
               <MoreVertical className='h-3.5 w-3.5' />
