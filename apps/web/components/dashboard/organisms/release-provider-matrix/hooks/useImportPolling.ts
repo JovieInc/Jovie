@@ -9,6 +9,8 @@ import {
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const POLL_INTERVAL_MS = 2000;
+/** Stop polling after 5 minutes to avoid infinite polling when background import silently fails. */
+const POLL_TIMEOUT_MS = 5 * 60 * 1000;
 
 function getSortTimestamp(releaseDate: string | null | undefined): number {
   if (!releaseDate) return Number.NEGATIVE_INFINITY;
@@ -71,8 +73,10 @@ export function useImportPolling({
   const [isComplete, setIsComplete] = useState(false);
   const queryClient = useQueryClient();
 
-  onReleasesUpdateRef.current = onReleasesUpdate;
-  onImportCompleteRef.current = onImportComplete;
+  useEffect(() => {
+    onReleasesUpdateRef.current = onReleasesUpdate;
+    onImportCompleteRef.current = onImportComplete;
+  });
 
   /**
    * Merge polled releases into the seen map, update count, and emit sorted list.
@@ -91,12 +95,16 @@ export function useImportPolling({
     []
   );
 
+  // Track when polling started for timeout detection
+  const pollStartRef = useRef<number>(0);
+
   // Reset when a new import starts
   useEffect(() => {
     if (enabled) {
       seenReleasesRef.current.clear();
       setImportedCount(0);
       setIsComplete(false);
+      pollStartRef.current = Date.now();
       // Remove stale poll data from previous imports
       queryClient.removeQueries({ queryKey: ['import-polling'] });
     }
@@ -123,7 +131,12 @@ export function useImportPolling({
       mergeAndEmit(data.releases, data.serverCount);
     }
 
-    if (data.status === 'complete' || data.status === 'failed') {
+    // Treat stuck imports as failed after POLL_TIMEOUT_MS
+    const timedOut =
+      pollStartRef.current > 0 &&
+      Date.now() - pollStartRef.current > POLL_TIMEOUT_MS;
+
+    if (data.status === 'complete' || data.status === 'failed' || timedOut) {
       if (data.status === 'complete') {
         // Final merge with latest data
         mergeAndEmit(data.releases, data.serverCount);

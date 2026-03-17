@@ -191,7 +191,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
                 )}
               </div>
               {artistName && (
-                <div className='mt-0.5 line-clamp-1 text-[12px] font-[450] text-(--linear-text-secondary)'>
+                <div className='mt-0.5 line-clamp-1 text-[12px] font-[400] text-(--linear-text-secondary)'>
                   {artistName}
                 </div>
               )}
@@ -201,7 +201,7 @@ export const ReleaseTableRow = memo(function ReleaseTableRow({
 
         {/* Release date cell */}
         <td className='px-4 py-2.5 align-middle'>
-          <span className='line-clamp-1 text-[12px] font-[450] tabular-nums text-(--linear-text-secondary)'>
+          <span className='line-clamp-1 text-[12px] font-[400] tabular-nums text-(--linear-text-secondary)'>
             {release.releaseDate
               ? new Date(release.releaseDate).toLocaleDateString('en-US', {
                   month: 'short',

@@ -16,6 +16,7 @@ import {
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
@@ -98,7 +99,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   return (
     <SidebarLinkRow
       icon={<SocialIcon platform={link.platform} className='h-4 w-4' />}
-      label={handle ? `@${handle}` : formatDisplayHost(link.url)}
+      label={
+        handle
+          ? `@${handle}`
+          : (PLATFORM_METADATA_MAP[link.platform]?.name ??
+            formatDisplayHost(link.url))
+      }
       url={link.url}
       deepLinkPlatform={link.platform}
       isVisible={link.isVisible}

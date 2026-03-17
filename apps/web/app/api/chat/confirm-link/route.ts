@@ -116,6 +116,8 @@ export async function POST(req: Request) {
       )
       .limit(1);
 
+    let linkId: string;
+
     if (existingLink) {
       // Update existing link URL instead of creating duplicate
       await db
@@ -127,21 +129,29 @@ export async function POST(req: Request) {
           updatedAt: new Date(),
         })
         .where(eq(socialLinks.id, existingLink.id));
+      linkId = existingLink.id;
     } else {
       // Insert new social link
-      await db.insert(socialLinks).values({
-        creatorProfileId: profileId,
-        platform: detected.platform.id,
-        platformType: detected.platform.category,
-        url: detected.normalizedUrl,
-        displayText: null,
-        sortOrder: 0,
-        isActive: true,
-        state: 'active',
-        confidence: '1.00',
-        sourceType: 'manual',
-        version: 1,
-      });
+      const rows = await db
+        .insert(socialLinks)
+        .values({
+          creatorProfileId: profileId,
+          platform: detected.platform.id,
+          platformType: detected.platform.category,
+          url: detected.normalizedUrl,
+          displayText: null,
+          sortOrder: 0,
+          isActive: true,
+          state: 'active',
+          confidence: '1.00',
+          sourceType: 'manual',
+          version: 1,
+        })
+        .returning({ id: socialLinks.id });
+      if (!rows[0]) {
+        throw new Error('Insert returned no rows');
+      }
+      linkId = rows[0].id;
     }
 
     await syncPrimaryMusicUrlsFromSocialLinks(db, profileId);
@@ -165,7 +175,7 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(
-      { success: true, platform: detected.platform.id },
+      { success: true, platform: detected.platform.id, linkId },
       { headers: NO_CACHE_HEADERS }
     );
   } catch (error) {

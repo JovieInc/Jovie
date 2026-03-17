@@ -1942,7 +1942,7 @@ export default async function LaunchPage() {
             id='cta-heading'
             className='marketing-h2-linear mx-auto max-w-[600px] mb-10 !text-[clamp(2.2rem,4.5vw,3.5rem)]'
           >
-            Your music deserves better than a list of links.
+            Your music deserves better than a stack of links.
           </h2>
           <div className='flex flex-col sm:flex-row gap-3 justify-center'>
             <Link href={APP_ROUTES.SIGNUP} className='marketing-cta focus-ring'>

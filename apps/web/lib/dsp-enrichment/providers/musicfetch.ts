@@ -47,10 +47,20 @@ const ARTIST_LOOKUP_SERVICES = [
 // ============================================================================
 
 export interface MusicFetchService {
+  /** URL for this service — MusicFetch API returns this as `link` */
   url?: string;
+  /** MusicFetch API returns the URL in the `link` field */
+  link?: string;
   id?: string;
   name?: string;
   [key: string]: unknown;
+}
+
+/** Get the URL from a MusicFetch service entry (API returns `link`, not `url`) */
+export function getMusicFetchServiceUrl(
+  service: MusicFetchService | undefined
+): string | undefined {
+  return service?.link ?? service?.url;
 }
 
 export interface MusicFetchArtistResult {

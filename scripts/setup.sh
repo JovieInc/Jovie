@@ -141,21 +141,24 @@ else
     if doppler run -- echo "doppler-ok" &>/dev/null 2>&1; then
       success "Doppler is authenticated and configured"
     else
-      # Try to check configure state without running a command
-      if doppler configure get token &>/dev/null 2>&1; then
-        warn "Doppler has a token but project config may be missing"
-        info "Run: doppler setup --project jovie-web --config dev"
+      # Try to auto-configure the project/config scope
+      info "Configuring Doppler project (jovie-web / dev)..."
+      if doppler setup --project jovie-web --config dev --no-interactive 2>/dev/null; then
+        success "Doppler configured (jovie-web / dev)"
       else
-        warn "Doppler is not authenticated"
-        echo ""
-        echo "  To authenticate:"
-        echo "    doppler login"
-        echo "    doppler setup --project jovie-web --config dev"
-        echo ""
-        echo "  Then prefix ALL commands with: doppler run --"
-        echo "    doppler run -- pnpm test"
-        echo "    doppler run -- pnpm run dev:local"
-        MISSING+=("Doppler auth (run: doppler login)")
+        # Auto-setup failed — likely not authenticated
+        if ! doppler configure get token &>/dev/null 2>&1; then
+          warn "Doppler is not authenticated"
+          echo ""
+          echo "  To authenticate:"
+          echo "    doppler login"
+          echo ""
+          echo "  Then re-run: ./scripts/setup.sh"
+          MISSING+=("Doppler auth (run: doppler login)")
+        else
+          warn "Could not auto-configure Doppler project. Run manually:"
+          info "doppler setup --project jovie-web --config dev"
+        fi
       fi
     fi
   fi

@@ -27,6 +27,7 @@ export function mapProfileToContact(
       id: link.id,
       label: link.displayText ?? link.platform,
       url: link.url,
+      platform: link.platform,
       platformType: link.platformType,
     })),
   };

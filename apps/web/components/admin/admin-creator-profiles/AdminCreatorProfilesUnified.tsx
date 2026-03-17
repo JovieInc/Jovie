@@ -9,7 +9,11 @@ import { AdminTableShell } from '@/components/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/components/admin/useCreatorActions';
 import { useCreatorVerification } from '@/components/admin/useCreatorVerification';
-import { UnifiedTable, useRowSelection } from '@/components/organisms/table';
+import {
+  convertToCommonDropdownItems,
+  UnifiedTable,
+  useRowSelection,
+} from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
@@ -331,6 +335,14 @@ export function AdminCreatorProfilesUnified({
     [filteredProfiles, selectedId]
   );
 
+  const sidebarContextMenuItems = useMemo(
+    () =>
+      selectedProfile
+        ? convertToCommonDropdownItems(getContextMenuItems(selectedProfile))
+        : undefined,
+    [selectedProfile, getContextMenuItems]
+  );
+
   const sidebarPanel = useMemo(
     () => (
       <AdminProfileSidebar
@@ -338,9 +350,16 @@ export function AdminCreatorProfilesUnified({
         contact={effectiveContact}
         isOpen={sidebarOpen && Boolean(effectiveContact)}
         onClose={handleSidebarClose}
+        contextMenuItems={sidebarContextMenuItems}
       />
     ),
-    [sidebarOpen, selectedProfile, effectiveContact, handleSidebarClose]
+    [
+      sidebarOpen,
+      selectedProfile,
+      effectiveContact,
+      handleSidebarClose,
+      sidebarContextMenuItems,
+    ]
   );
 
   useRegisterRightPanel(sidebarPanel);

@@ -24,13 +24,23 @@ export function applyPublicProfileLinkCaps(links: LegacySocialLink[]): {
   const modeLinks: LegacySocialLink[] = [];
   const socialLinks: LegacySocialLink[] = [];
 
+  const seenModePlatforms = new Set<string>();
+  const seenSocialPlatforms = new Set<string>();
+
   for (const link of links) {
     const group = getLinkGroup(link);
+    const detected = detectPlatform(link.url);
+    const platformId = detected.platform.id;
+
     if (group === 'mode') {
+      if (seenModePlatforms.has(platformId)) continue;
+      seenModePlatforms.add(platformId);
       modeLinks.push(link);
       continue;
     }
     if (group === 'social') {
+      if (seenSocialPlatforms.has(platformId)) continue;
+      seenSocialPlatforms.add(platformId);
       socialLinks.push(link);
     }
   }

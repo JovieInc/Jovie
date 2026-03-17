@@ -5,10 +5,14 @@ import { ChevronDown, ChevronUp, Monitor, Moon, Sun, X } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
-import { FEATURE_FLAG_KEYS, FEATURE_FLAGS } from '@/lib/feature-flags/shared';
+import {
+  CODE_FLAG_KEYS,
+  FEATURE_FLAG_KEYS,
+  FEATURE_FLAGS,
+} from '@/lib/feature-flags/shared';
 
 const STATSIG_FLAGS = Object.entries(FEATURE_FLAG_KEYS) as [string, string][];
-const CODE_FLAGS = Object.entries(FEATURE_FLAGS) as [string, boolean][];
+const CODE_FLAGS_ENTRIES = Object.entries(CODE_FLAG_KEYS) as [string, string][];
 
 const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 
@@ -120,30 +124,49 @@ export function DevToolbar({
             </Section>
           )}
 
-          {/* Code-level flags (read-only) */}
-          <Section label='Code Flags' subtitle='Edit source to change'>
-            <div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
-              {CODE_FLAGS.map(([name, value]) => (
-                <div
-                  key={name}
-                  className='flex items-center justify-between py-0.5'
-                >
-                  <span className='text-[var(--color-text-tertiary)] truncate flex-1 mr-2'>
-                    {name.toLowerCase().replaceAll('_', ' ')}
-                  </span>
-                  <span
-                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
-                      value
-                        ? 'text-green-400 bg-green-500/10'
-                        : 'text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)]'
-                    }`}
+          {/* Code-level flags */}
+          {overridesCtx && (
+            <Section
+              label='Code Flags'
+              action={
+                CODE_FLAGS_ENTRIES.some(
+                  ([, key]) => key in overridesCtx.overrides
+                ) ? (
+                  <button
+                    type='button'
+                    onClick={() => {
+                      for (const [, key] of CODE_FLAGS_ENTRIES) {
+                        overridesCtx.removeOverride(key);
+                      }
+                    }}
+                    className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline'
                   >
-                    {value ? 'on' : 'off'}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </Section>
+                    clear all
+                  </button>
+                ) : null
+              }
+            >
+              <div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
+                {CODE_FLAGS_ENTRIES.map(([name, key]) => {
+                  const isOverridden = key in overridesCtx.overrides;
+                  const checked = isOverridden
+                    ? overridesCtx.overrides[key]
+                    : FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS];
+                  return (
+                    <FlagRow
+                      key={key}
+                      label={name.toLowerCase().replaceAll('_', ' ')}
+                      isOverridden={isOverridden}
+                      checked={checked}
+                      onCheckedChange={v => overridesCtx.setOverride(key, v)}
+                      onClear={() => overridesCtx.removeOverride(key)}
+                      source='code'
+                    />
+                  );
+                })}
+              </div>
+            </Section>
+          )}
         </div>
       </div>
 
@@ -226,12 +249,14 @@ function FlagRow({
   checked,
   onCheckedChange,
   onClear,
+  source = 'statsig',
 }: Readonly<{
   label: string;
   isOverridden: boolean;
   checked: boolean;
   onCheckedChange: (v: boolean) => void;
   onClear: () => void;
+  source?: 'statsig' | 'code';
 }>) {
   return (
     <div className='flex items-center gap-2 py-0.5'>
@@ -263,7 +288,7 @@ function FlagRow({
       )}
       {!isOverridden && (
         <span className='shrink-0 text-[9px] text-[var(--color-text-quaternary-token)]'>
-          statsig
+          {source}
         </span>
       )}
     </div>

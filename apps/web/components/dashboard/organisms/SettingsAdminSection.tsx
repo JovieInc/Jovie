@@ -1,12 +1,43 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { ExternalLink, Send, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import * as Switch from '@radix-ui/react-switch';
+import {
+  ExternalLink,
+  Send,
+  ShieldCheck,
+  Terminal,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { DashboardCard } from '@/components/dashboard/atoms/DashboardCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
+
+const DEV_TOOLBAR_COOKIE = '__dev_toolbar';
+
+function useDevToolbarCookie() {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    setEnabled(document.cookie.includes(`${DEV_TOOLBAR_COOKIE}=1`));
+  }, []);
+
+  const toggle = (checked: boolean) => {
+    if (checked) {
+      document.cookie = `${DEV_TOOLBAR_COOKIE}=1; path=/; max-age=31536000; SameSite=Lax`;
+    } else {
+      document.cookie = `${DEV_TOOLBAR_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+    }
+    setEnabled(checked);
+    globalThis.location.reload();
+  };
+
+  return { enabled, toggle };
+}
 
 interface AdminLinkProps {
   readonly href: string;
@@ -49,6 +80,8 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
  * campaign targeting, creator management, and system activity.
  */
 export function SettingsAdminSection() {
+  const devToolbar = useDevToolbarCookie();
+
   return (
     <DashboardCard
       variant='settings'
@@ -71,6 +104,36 @@ export function SettingsAdminSection() {
             manage platform operations without leaving the authenticated shell.
           </p>
         </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-(--linear-bg-surface-0) p-4'>
+          <div className='flex min-w-0 items-center gap-3'>
+            <Terminal
+              className='h-4 w-4 shrink-0 text-(--linear-text-secondary)'
+              aria-hidden
+            />
+            <div>
+              <p className='text-[13px] font-[510] text-(--linear-text-primary)'>
+                Dev Toolbar
+              </p>
+              <p className='mt-0.5 text-[13px] text-(--linear-text-secondary)'>
+                Show the dev toolbar with feature flag overrides and environment
+                info.
+              </p>
+            </div>
+          </div>
+          <Switch.Root
+            checked={devToolbar.enabled}
+            onCheckedChange={devToolbar.toggle}
+            className={`relative w-9 h-5 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
+              devToolbar.enabled
+                ? 'bg-[var(--color-accent)]'
+                : 'bg-[var(--color-bg-surface-3,#333)]'
+            }`}
+          >
+            <Switch.Thumb className='block w-4 h-4 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[18px] shadow-sm' />
+          </Switch.Root>
+        </ContentSurfaceCard>
+
         <div className='space-y-2'>
           <AdminLink
             href={APP_ROUTES.ADMIN_WAITLIST}

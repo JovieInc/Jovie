@@ -64,6 +64,7 @@ describe('mapProfileToContact', () => {
         id: 'link-1',
         label: 'Instagram',
         url: 'https://instagram.com/timwhite',
+        platform: 'instagram',
         platformType: 'instagram',
       },
     ]);

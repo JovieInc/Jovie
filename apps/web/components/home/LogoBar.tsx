@@ -25,11 +25,8 @@ export function LogoBar() {
         <div
           className='flex w-full max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-6 rounded-[28px] px-6 py-5 sm:flex-nowrap sm:gap-16 sm:px-10'
           style={{
-            background:
-              'linear-gradient(180deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.02) 100%)',
-            border: '1px solid rgba(255,255,255,0.07)',
-            boxShadow:
-              'inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 40px rgba(0,0,0,0.18)',
+            border: '1px solid var(--linear-border-subtle)',
+            boxShadow: 'var(--linear-shadow-card)',
           }}
         >
           <AwalLogo className='h-[14px] w-auto select-none text-[color:var(--linear-text-primary)] opacity-72 transition-opacity duration-[var(--linear-duration-slow)] hover:opacity-95 sm:h-[16px]' />

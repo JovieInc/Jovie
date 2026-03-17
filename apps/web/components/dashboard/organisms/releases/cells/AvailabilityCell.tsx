@@ -208,7 +208,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-[7px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-1.5 py-1 text-[12px] font-[450] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-[7px] border border-(--linear-app-frame-seam) bg-(--linear-bg-surface-1) px-1.5 py-1 text-[12px] font-[400] tracking-[-0.01em] text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-2) hover:text-(--linear-text-primary) focus-visible:border-(--color-accent) focus-visible:bg-(--linear-bg-surface-2) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
         >
           <CompactLinkRail
             items={compactProviders.map(providerKey => ({
@@ -299,7 +299,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     className='h-4 w-4'
                     aria-label={config.label}
                   />
-                  <span className='truncate text-[12px] font-[450] text-(--linear-text-primary)'>
+                  <span className='truncate text-[12px] font-[400] text-(--linear-text-primary)'>
                     {config.label}
                   </span>
                 </div>

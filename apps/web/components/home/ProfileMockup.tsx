@@ -96,7 +96,7 @@ export function ProfileMockup({
   return (
     <figure
       aria-label='Profile preview showing adaptive CTA behavior'
-      className='rounded-xl overflow-hidden border border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-0)] font-sans'
+      className='rounded-t-xl rounded-b-none overflow-hidden bg-[var(--linear-bg-surface-0)] shadow-[inset_0_0_0_1px_var(--linear-panel-ring)] font-sans'
     >
       <style>{`
         @keyframes ctaFill {

@@ -2,7 +2,7 @@
 
 import { Button, CommonDropdown, Label } from '@jovie/ui';
 import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -48,6 +48,10 @@ export function ProfileContactSidebar() {
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
 
+  // Keep a ref to the latest previewData so async callbacks avoid stale closures
+  const previewDataRef = useRef(previewData);
+  previewDataRef.current = previewData;
+
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
     CategoryOption | 'about'
@@ -60,6 +64,12 @@ export function ProfileContactSidebar() {
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
+
+  // Track temp link IDs with pending server adds. If user deletes a temp link
+  // while its confirm-link request is in flight, we queue a server delete for
+  // after the add completes to avoid orphaned server records.
+  const pendingAddsRef = useRef<Set<string>>(new Set());
+  const deletedWhilePendingRef = useRef<Set<string>>(new Set());
 
   // Resolve category to ensure it's a valid tab value
   const resolvedCategory = useMemo(() => {
@@ -160,7 +170,7 @@ export function ProfileContactSidebar() {
 
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         title: link.suggestedTitle ?? link.platform.name,
         url: link.normalizedUrl,
         platform: link.platform.id,
@@ -190,6 +200,7 @@ export function ProfileContactSidebar() {
       }
 
       // Save to server via confirm-link endpoint
+      pendingAddsRef.current.add(optimisticLink.id);
       try {
         const response = await fetch('/api/chat/confirm-link', {
           method: 'POST',
@@ -206,17 +217,64 @@ export function ProfileContactSidebar() {
           throw new Error('Failed to add link');
         }
 
+        // Replace the temp ID with the server-assigned ID so future deletes work
+        const { linkId } = (await response.json()) as { linkId: string };
+
+        // If user deleted this link while the add was in flight, fire a server
+        // delete now that we have the real ID, and skip the UI update.
+        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+          deletedWhilePendingRef.current.delete(optimisticLink.id);
+          if (linkId && selectedProfile) {
+            removeLinkMutation.mutate(
+              { profileId: selectedProfile.id, linkId },
+              {
+                // Suppress global onError — user already saw "Link removed"
+                onError: () => {},
+              }
+            );
+          }
+          return;
+        }
+
+        if (linkId) {
+          const current = previewDataRef.current;
+          if (current) {
+            setPreviewData({
+              ...current,
+              links: current.links.map(l =>
+                l.id === optimisticLink.id ? { ...l, id: linkId } : l
+              ),
+            });
+          }
+        }
+
         toast.success(`${link.platform.name} link added`);
       } catch {
+        // If deleted while pending, the UI is already correct (link removed)
+        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+          deletedWhilePendingRef.current.delete(optimisticLink.id);
+          return;
+        }
         // Revert on failure
-        setPreviewData({
-          ...previewData,
-          links: previewData.links.filter(l => l.id !== optimisticLink.id),
-        });
+        const current = previewDataRef.current;
+        if (current) {
+          setPreviewData({
+            ...current,
+            links: current.links.filter(l => l.id !== optimisticLink.id),
+          });
+        }
         toast.error('Failed to add link');
+      } finally {
+        pendingAddsRef.current.delete(optimisticLink.id);
       }
     },
-    [selectedProfile, previewData, setPreviewData, resolvedCategory]
+    [
+      selectedProfile,
+      previewData,
+      setPreviewData,
+      resolvedCategory,
+      removeLinkMutation,
+    ]
   );
 
   // Handle removing a link
@@ -227,13 +285,29 @@ export function ProfileContactSidebar() {
       const removedLink = previewData.links.find(l => l.id === linkId);
       if (!removedLink) return;
 
+      // Snapshot current links before optimistic removal for rollback
+      const previousLinks = previewData.links;
+
       // Optimistically remove from sidebar
       setPreviewData({
         ...previewData,
         links: previewData.links.filter(l => l.id !== linkId),
       });
 
-      // Save to server
+      // If the add is still in flight, mark for server delete after it completes
+      if (linkId.startsWith('temp-') && pendingAddsRef.current.has(linkId)) {
+        deletedWhilePendingRef.current.add(linkId);
+        toast.success('Link removed');
+        return;
+      }
+
+      // Remaining temp-* IDs were never persisted (add failed or ID was
+      // already replaced with a real one). No server call needed.
+      if (linkId.startsWith('temp-')) {
+        toast.success('Link removed');
+        return;
+      }
+
       removeLinkMutation.mutate(
         { profileId: selectedProfile.id, linkId },
         {
@@ -241,12 +315,10 @@ export function ProfileContactSidebar() {
             toast.success('Link removed');
           },
           onError: () => {
-            // Revert on failure
-            if (previewData && removedLink) {
-              setPreviewData({
-                ...previewData,
-                links: [...previewData.links, removedLink],
-              });
+            // Revert on failure — read current previewData from ref to avoid stale closure
+            const current = previewDataRef.current;
+            if (current) {
+              setPreviewData({ ...current, links: previousLinks });
             }
             toast.error('Failed to remove link');
           },
