@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Changed
+
+- SSO callback loading screens now match app dark theme with centered spinner and fade-in animation instead of plain white page with spinning logo
+
 ### Added
 
 - Canonical CDN domain registry (`constants/platforms/cdn-domains.ts`) as single source of truth for all platform image domains
