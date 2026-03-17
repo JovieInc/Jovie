@@ -1,3 +1,4 @@
+import { getCspImgSrcDomains } from '@/constants/platforms/cdn-domains';
 import { isDevelopment } from '@/lib/utils/platform-detection/environment';
 import { CSP_REPORT_GROUP, getCspReportUri } from './csp-reporting';
 
@@ -79,22 +80,9 @@ const STATIC_CSP_PARTS = {
     'https://challenges.cloudflare.com',
   ].join(' '),
 
-  // Pre-computed img-src (fully static)
-  imgSrc: [
-    "img-src 'self' data: blob:",
-    'https://i.scdn.co',
-    'https://images.clerk.dev',
-    'https://img.clerk.com',
-    'https://images.unsplash.com',
-    'https://linktr.ee',
-    'https://api.qrserver.com',
-    'https://*.public.blob.vercel-storage.com',
-    'https://*.blob.vercel-storage.com',
-    'https://*.mzstatic.com',
-    'https://vercel.live',
-    'https://vercel.com',
-    'https://*.bcbits.com',
-  ].join(' '),
+  // Pre-computed img-src from canonical CDN domain registry
+  // @see constants/platforms/cdn-domains.ts
+  imgSrc: ["img-src 'self' data: blob:", ...getCspImgSrcDomains()].join(' '),
 
   // Pre-computed connect-src prefix (excludes dev-only localhost)
   connectSrcBase: [

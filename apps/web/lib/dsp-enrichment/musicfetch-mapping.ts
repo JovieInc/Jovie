@@ -4,6 +4,7 @@ import {
   extractSoundcloudId,
   extractTidalId,
   extractYoutubeMusicId,
+  getMusicFetchServiceUrl,
   type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
 import type { ExtractedLink } from '@/lib/ingestion/types';
@@ -83,19 +84,21 @@ export function mapMusicFetchProfileFields(
 
   applySpotifyUpdates(updates, existingProfile, spotifyUrl, spotifyArtistId);
 
-  const appleMusicUrl = services.appleMusic?.url;
+  const appleMusicUrl = getMusicFetchServiceUrl(services.appleMusic);
   if (appleMusicUrl) {
     applyAppleMusicUpdates(updates, existingProfile, appleMusicUrl);
   }
 
   for (const mapping of DSP_ID_MAPPINGS) {
-    const serviceUrl = services[mapping.serviceKey]?.url;
+    const serviceUrl = getMusicFetchServiceUrl(services[mapping.serviceKey]);
     if (existingProfile[mapping.idField] || !serviceUrl) continue;
     const id = mapping.extractor(serviceUrl);
     if (id) updates[mapping.idField] = id;
   }
 
-  const youtubeUrl = services.youtube?.url || services.youtubeMusic?.url;
+  const youtubeUrl =
+    getMusicFetchServiceUrl(services.youtube) ||
+    getMusicFetchServiceUrl(services.youtubeMusic);
   if (!existingProfile.youtubeUrl && youtubeUrl) {
     updates.youtubeUrl = youtubeUrl;
   }
@@ -139,7 +142,7 @@ export function extractMusicFetchLinks(
     const url =
       serviceKey === 'spotify'
         ? spotifyUrl
-        : artistData.services[serviceKey]?.url;
+        : getMusicFetchServiceUrl(artistData.services[serviceKey]);
     if (!url) continue;
 
     deduped.set(url, {

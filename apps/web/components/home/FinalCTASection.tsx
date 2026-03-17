@@ -54,7 +54,7 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-white'
           >
-            Own the next fan who finds your music.
+            Your music deserves better than a list of links.
           </h2>
 
           <p

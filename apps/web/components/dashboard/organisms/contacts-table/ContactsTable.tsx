@@ -9,6 +9,7 @@ import type { EditableContact } from '@/components/dashboard/hooks/useContactsMa
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { EmptyState } from '@/components/organisms/EmptyState';
 import {
+  convertToCommonDropdownItems,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
   UnifiedTable,
@@ -238,6 +239,11 @@ export const ContactsTable = memo(function ContactsTable({
         onUpdate={handleUpdate}
         onSave={handleSave}
         onDelete={handleDelete}
+        contextMenuItems={
+          selectedContact
+            ? convertToCommonDropdownItems(getContextMenuItems(selectedContact))
+            : undefined
+        }
       />
     </div>
   );
