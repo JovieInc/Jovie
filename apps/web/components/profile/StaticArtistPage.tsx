@@ -53,6 +53,7 @@ export interface StaticArtistPageProps {
   /** HMAC-signed tracking token for authenticating visit tracking requests */
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
+  readonly showShopButton?: boolean;
 }
 
 /**
@@ -186,6 +187,7 @@ export function StaticArtistPage({
   tourDates = [],
   visitTrackingToken,
   showSubscriptionConfirmedBanner = true,
+  showShopButton = false,
 }: StaticArtistPageProps) {
   const mergedDSPs = getMergedDSPs(artist);
   const viewModel = buildProfilePublicViewModel({
@@ -208,6 +210,7 @@ export function StaticArtistPage({
     tourDates,
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
+    showShopButton,
   });
 
   return (

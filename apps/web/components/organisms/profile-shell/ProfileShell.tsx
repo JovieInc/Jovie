@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, DollarSign } from 'lucide-react';
+import { Calendar, DollarSign, ShoppingBag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -36,6 +36,7 @@ export function ProfileShell({
   isTourModeActive = false,
   showFooter = true,
   showNotificationButton = false,
+  showShopButton = false,
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
@@ -223,6 +224,26 @@ export function ProfileShell({
                           }}
                         >
                           <Calendar className='h-4 w-4' aria-hidden='true' />
+                        </CircleIconButton>
+                      )}
+
+                      {/* Shop */}
+                      {showShopButton && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Shop'
+                          data-testid='shop-trigger'
+                          className='border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          onClick={() => {
+                            window.open(
+                              `/${artist.handle}/shop`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }}
+                        >
+                          <ShoppingBag className='h-4 w-4' aria-hidden='true' />
                         </CircleIconButton>
                       )}
 

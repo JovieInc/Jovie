@@ -32,6 +32,7 @@ export function PublicProfileTemplate({
         isTourModeActive={viewModel.isTourModeActive}
         showFooter={viewModel.showFooter}
         showNotificationButton={viewModel.showNotificationButton}
+        showShopButton={viewModel.showShopButton}
         photoDownloadSizes={viewModel.photoDownloadSizes}
         allowPhotoDownloads={viewModel.allowPhotoDownloads}
         visitTrackingToken={viewModel.visitTrackingToken}

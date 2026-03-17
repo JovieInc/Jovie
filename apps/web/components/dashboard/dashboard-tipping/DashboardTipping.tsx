@@ -25,6 +25,7 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { CopyToClipboardButton } from '@/components/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/components/dashboard/organisms/EarningsTab';
+import { ShopifyStoreCard } from '@/components/dashboard/organisms/shopify/ShopifyStoreCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   Dialog,
@@ -548,6 +549,14 @@ export function DashboardTipping() {
           <EarningsTab />
         </div>
       )}
+
+      {/* ── Shopify Store ────────────────────────────────── */}
+      <div className='flex flex-col gap-5'>
+        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          Shop
+        </p>
+        <ShopifyStoreCard />
+      </div>
     </div>
   );
 }

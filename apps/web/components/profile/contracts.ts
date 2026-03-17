@@ -54,6 +54,7 @@ export interface ProfilePublicViewModel {
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner: boolean;
+  readonly showShopButton: boolean;
 }
 
 export interface ProfileIdentityFields {
