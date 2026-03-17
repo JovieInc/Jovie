@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.2.2] - 2026-03-17
+
+### Fixed
+
+- Show user-facing error toast when username change fails (e.g., "Handle already taken") instead of silently reverting
+- Extract API error messages from 4xx response bodies in `fetchWithTimeout` so user-friendly errors propagate to the UI
+
 ## [26.2.1] - 2026-03-17
 
 ### Changed
