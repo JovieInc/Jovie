@@ -83,6 +83,7 @@ if [ "$LOCAL" = "$REMOTE" ]; then
   exit 0
 fi
 
-# Versions differ — upgrade available
+# Versions differ — advisory only for vendored installs
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE" > "$CACHE_FILE"
 echo "UPGRADE_AVAILABLE $LOCAL $REMOTE"
+echo "NOTE: This is a vendored copy. Update via PR, not /gstack-upgrade." >&2

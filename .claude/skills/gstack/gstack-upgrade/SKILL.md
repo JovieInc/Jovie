@@ -67,6 +67,16 @@ git reset --hard origin/main
 If `$STASH_OUTPUT` contains "Saved working directory", warn the user: "Note: local changes were stashed. Run `git stash pop` in the skill directory to restore them."
 
 **For vendored installs** (vendored, vendored-global):
+
+First, check if the vendored directory is inside a git repo:
+```bash
+cd "$INSTALL_DIR" && git rev-parse --is-inside-work-tree 2>/dev/null
+```
+If inside a git repo: do NOT replace in-place. Instead, tell the user:
+"This is a vendored copy tracked by git. To upgrade, create a branch, run `cp -Rf <new-gstack> .claude/skills/gstack/`, commit, and open a PR."
+Then stop — do not proceed with the replacement below.
+
+If NOT inside a git repo (standalone vendored):
 ```bash
 PARENT=$(dirname "$INSTALL_DIR")
 TMP_DIR=$(mktemp -d)

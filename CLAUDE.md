@@ -43,7 +43,6 @@ This project includes [gstack](https://github.com/garrytan/gstack) vendored at `
 | `/qa` | Systematic QA testing (diff-aware, full, quick, regression modes) |
 | `/setup-browser-cookies` | Import authenticated browser sessions for testing |
 | `/retro` | Weekly engineering retrospective with commit analysis |
-| `/document-release` | Document a release |
 
 **Troubleshooting:** If gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
 

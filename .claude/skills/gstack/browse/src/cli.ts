@@ -222,10 +222,11 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
 
     if (resp.status === 401) {
       // Token mismatch — server may have restarted
+      if (retries >= 1) throw new Error('Authentication failed after retry');
       console.error('[browse] Auth failed — server may have restarted. Retrying...');
       const newState = readState();
       if (newState && newState.token !== state.token) {
-        return sendCommand(newState, command, args);
+        return sendCommand(newState, command, args, retries + 1);
       }
       throw new Error('Authentication failed');
     }
