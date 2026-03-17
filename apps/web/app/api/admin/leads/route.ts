@@ -54,7 +54,10 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
     normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist')
+    normalized.includes('column "music_tools_detected" does not exist') ||
+    normalized.includes('column "email_invalid" does not exist') ||
+    normalized.includes('column "email_suspicious" does not exist') ||
+    normalized.includes('column "email_invalid_reason" does not exist')
   );
 }
 
@@ -264,9 +267,6 @@ export async function GET(request: NextRequest) {
             ingestedAt: leads.ingestedAt,
             rejectedAt: leads.rejectedAt,
             creatorProfileId: leads.creatorProfileId,
-            emailInvalid: leads.emailInvalid,
-            emailSuspicious: leads.emailSuspicious,
-            emailInvalidReason: leads.emailInvalidReason,
             hasRepresentation: leads.hasRepresentation,
             representationSignal: leads.representationSignal,
             outreachRoute: leads.outreachRoute,

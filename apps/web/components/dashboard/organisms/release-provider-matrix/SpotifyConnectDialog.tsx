@@ -617,15 +617,16 @@ export function SpotifyConnectDialog({
                         <div className='truncate text-[13px] font-[510] text-(--linear-text-primary)'>
                           {artist.name}
                         </div>
-                        {artist.isClaimed ? (
+                        {artist.isClaimed && (
                           <div className='text-[11px] text-(--linear-text-tertiary)'>
                             Already claimed
                           </div>
-                        ) : artist.followers ? (
+                        )}
+                        {!artist.isClaimed && artist.followers && (
                           <div className='text-[11px] text-(--linear-text-tertiary)'>
                             {formatFollowers(artist.followers)}
                           </div>
-                        ) : null}
+                        )}
                       </div>
                       {artist.verified && (
                         <div

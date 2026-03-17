@@ -23,10 +23,11 @@ const RANGE_OPTIONS: RangeOption[] = [
   { value: '30d', label: '30d' },
 ];
 
-type AnalyticsTab = 'cities' | 'sources' | 'links';
+type AnalyticsTab = 'cities' | 'countries' | 'sources' | 'links';
 
 const ANALYTICS_TAB_OPTIONS = [
   { value: 'cities' as const, label: 'Cities' },
+  { value: 'countries' as const, label: 'Countries' },
   { value: 'sources' as const, label: 'Sources' },
   { value: 'links' as const, label: 'Links' },
 ];
@@ -373,6 +374,18 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
                 value: numberFormatter.format(city.count),
               }))}
               emptyMessage='No city data yet'
+            />
+          )}
+          {activeTab === 'countries' && (
+            <RankedList
+              icon={Globe}
+              loading={loading}
+              items={(data?.top_countries ?? []).slice(0, 5).map(country => ({
+                key: country.country,
+                label: country.country,
+                value: numberFormatter.format(country.count),
+              }))}
+              emptyMessage='No country data yet'
             />
           )}
           {activeTab === 'sources' && (

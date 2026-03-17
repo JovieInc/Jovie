@@ -19,10 +19,7 @@ export function AuthActions() {
       ) : (
         <>
           {/* Login - Linear exact specs via CSS class */}
-          <Link
-            href='/signin'
-            className='btn-linear-login focus-ring-themed max-[380px]:hidden'
-          >
+          <Link href='/signin' className='btn-linear-login focus-ring-themed'>
             Log in
           </Link>
           {/* Signup - Linear exact specs via CSS class */}

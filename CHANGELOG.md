@@ -7,6 +7,38 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Homepage claim button now validates handle input before submitting (previously navigated to self-referential `/signup` when empty)
+- CRM audience demo table now shows visible text labels for Intent, Returning, and Source columns instead of invisible icon-only cells
+- Social links on artist profile now open in new tabs instead of navigating away from the page
+- "Log in" link now visible on mobile homepage navigation (was hidden below 380px)
+- Removed duplicate font declaration in auth layout that caused unused CSS preload warnings on every page
+- Reduced cognitive complexity in `ingest-lead.ts` by extracting `enqueuePostIngestionJobs` helper (SonarCloud S3776)
+- Replaced nested ternary operators in `ClaimHandleForm` and `SpotifyConnectDialog` with explicit conditionals (SonarCloud S3358)
+- Used direct `undefined` comparison instead of `typeof` in feature-flags client (SonarCloud S7741)
+- Used `globalThis` instead of `window` in `SettingsAdminSection` for portability (SonarCloud S7764)
+
+### Changed
+
+- Pricing CTA buttons now pass plan context (`?plan=free` / `?plan=founding`) to the signup page
+- Removed redundant FloatingClaimBar (third duplicate claim form) from homepage
+
+### Changed
+
+- SSO callback loading screens now match app dark theme with centered spinner and fade-in animation instead of plain white page with spinning logo
+
+### Added
+
+- Canonical CDN domain registry (`constants/platforms/cdn-domains.ts`) as single source of truth for all platform image domains
+- Comprehensive CDN coverage for all supported platforms: music DSPs (Spotify, Apple Music, YouTube Music, SoundCloud, Bandcamp, Tidal, Deezer, Amazon Music, Pandora, Beatport), social networks (Instagram, Twitter/X, TikTok, Facebook, YouTube, LinkedIn, Snapchat, Pinterest, Reddit), and creator platforms (Twitch, Discord, Patreon, Substack, Medium, GitHub, Behance, Dribbble)
+- Sync test to verify `next.config.js` remotePatterns stays in sync with the CDN registry
+
+### Changed
+
+- Avatar host validation, CSP img-src, and DSP image bypass now derive from the CDN registry instead of maintaining separate hardcoded lists
+- Consolidated `next.config.js` remotePatterns to include all platform CDN domains
+
 ### Changed
 
 - Upgraded homepage hero H1 to "Your entire music career. One intelligent link."
@@ -15,6 +47,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Changed Audience CRM section heading to "Know every fan by name."
 
 - Auth (`/signin`, `/signup`), waitlist, and onboarding pages now respect user theme preference instead of being forced dark — only marketing pages remain dark-only
+
+- Consolidated action menus across Admin Users, Admin Creator Profiles, and Contacts tables so right-click context menu, ellipsis menu, and drawer right-click menu all show the same actions
+- Migrated Admin User detail drawer from raw `RightDrawer` to `EntitySidebarShell` for consistency with other entity drawers
+- Extracted `buildAdminUserActions()` builder from inline context menu logic for reuse across table and drawer
 
 ### Added
 
@@ -47,6 +83,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fixed leads table query failures (JOVIE-WEB-E0/EJ/E3, 385 events) — Drizzle error wrapping hid "column does not exist" messages from fallback detection in admin leads and outreach routes
 - Fixed `SET LOCAL statement_timeout` being a no-op with Neon HTTP driver (JOVIE-WEB-EX/EV) — replaced with `SET` in dashboard earnings and tipping stats queries
 - Fixed profile view endpoint returning 500 on non-critical view counter failures (JOVIE-WEB-DZ, 24 events) — now logs to Sentry and returns 200
+
+### Removed
+
+- Deleted unused `UserActionsMenu.tsx` component (dead code, zero imports)
 
 ## [26.2.0] - 2026-02-12
 

@@ -4,7 +4,7 @@ import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LogoLoader } from '@/components/atoms/LogoLoader';
+import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 
 /** Seconds before showing stall message */
 const STALL_TIMEOUT_SECONDS = 10;
@@ -27,16 +27,16 @@ interface SsoCallbackHandlerProps {
 function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
   return (
     <output
-      className='flex flex-col items-center justify-center min-h-[200px] gap-4'
+      className='flex flex-col items-center justify-center gap-4 animate-in fade-in duration-500 ease-out'
       aria-busy='true'
       aria-live='polite'
     >
-      <LogoLoader size={32} variant='mono' aria-label='Signing you in' />
-      <p className='text-sm text-secondary-token'>
+      <LoadingSpinner size='md' tone='muted' label='Signing you in' />
+      <p className='text-[13px] text-tertiary-token'>
         {isStalled ? 'Still signing you in…' : 'Signing you in…'}
       </p>
       {isStalled && (
-        <p className='text-xs text-secondary-token/70 text-center max-w-xs'>
+        <p className='text-xs text-tertiary-token/70 text-center max-w-xs'>
           This is taking longer than expected. You can{' '}
           <Link
             href='/signin'

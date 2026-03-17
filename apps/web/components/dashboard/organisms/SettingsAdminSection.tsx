@@ -33,7 +33,7 @@ function useDevToolbarCookie() {
       document.cookie = `${DEV_TOOLBAR_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
     }
     setEnabled(checked);
-    window.location.reload();
+    globalThis.location.reload();
   };
 
   return { enabled, toggle };
