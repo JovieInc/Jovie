@@ -210,6 +210,20 @@ export function ProfileContactSidebar() {
           throw new Error('Failed to add link');
         }
 
+        // Replace the temp ID with the server-assigned ID so future deletes work
+        const { linkId } = (await response.json()) as { linkId: string };
+        if (linkId) {
+          const current = previewDataRef.current;
+          if (current) {
+            setPreviewData({
+              ...current,
+              links: current.links.map(l =>
+                l.id === optimisticLink.id ? { ...l, id: linkId } : l
+              ),
+            });
+          }
+        }
+
         toast.success(`${link.platform.name} link added`);
       } catch {
         // Revert on failure
@@ -228,15 +242,6 @@ export function ProfileContactSidebar() {
     (linkId: string) => {
       if (!previewData || !selectedProfile) return;
 
-      // Skip server call for unsaved temp links — just remove locally
-      if (linkId.startsWith('temp-')) {
-        setPreviewData({
-          ...previewData,
-          links: previewData.links.filter(l => l.id !== linkId),
-        });
-        return;
-      }
-
       const removedLink = previewData.links.find(l => l.id === linkId);
       if (!removedLink) return;
 
@@ -249,14 +254,27 @@ export function ProfileContactSidebar() {
         links: previewData.links.filter(l => l.id !== linkId),
       });
 
-      // Save to server
+      // Temp links may have been persisted server-side (via /api/chat/confirm-link)
+      // but still carry a temp-* ID locally. Always attempt the server delete —
+      // the server returns 400 for genuinely unsaved temp IDs, which we handle
+      // by accepting the local removal without rollback.
       removeLinkMutation.mutate(
         { profileId: selectedProfile.id, linkId },
         {
           onSuccess: () => {
             toast.success('Link removed');
           },
-          onError: () => {
+          onError: error => {
+            // If server rejects the temp ID (not saved yet), the local removal is correct —
+            // the link was only optimistic and never persisted
+            const isUnsavedTemp =
+              linkId.startsWith('temp-') &&
+              error instanceof Error &&
+              error.message.includes('has not been saved');
+            if (isUnsavedTemp) {
+              toast.success('Link removed');
+              return;
+            }
             // Revert on failure — read current previewData from ref to avoid stale closure
             const current = previewDataRef.current;
             if (current) {

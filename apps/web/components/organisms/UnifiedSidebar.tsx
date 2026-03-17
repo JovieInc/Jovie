@@ -114,9 +114,18 @@ function SettingsNavigation({
   const { selectedProfile } = useDashboardData();
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
-  const { data: cachedProfile } = useDashboardProfileQuery();
+  const { data: cachedProfileData } = useDashboardProfileQuery();
+  // Cache may hold either the unwrapped DashboardProfile (from optimistic updates)
+  // or the { profile: DashboardProfile } envelope (from server refetch).
+  const cachedDisplayName =
+    cachedProfileData?.displayName ??
+    (
+      cachedProfileData as unknown as {
+        profile?: { displayName?: string | null };
+      }
+    )?.profile?.displayName;
   const artistName =
-    cachedProfile?.displayName?.trim() ||
+    cachedDisplayName?.trim() ||
     selectedProfile?.displayName?.trim() ||
     undefined;
 

@@ -142,7 +142,13 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
       if (config.hosts.includes(host)) {
-        const seg = url.pathname.split('/').find(Boolean);
+        const segments = url.pathname.split('/').filter(Boolean);
+
+        // Snapchat uses /add/<username> — skip the "add" prefix
+        const seg =
+          host.includes('snapchat.com') && segments[0] === 'add'
+            ? segments[1]
+            : segments[0];
         if (!seg) return null;
 
         // YouTube requires @ symbol, others allow it optionally
