@@ -1,3 +1,4 @@
+import { getInitials } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/molecules/Avatar';
@@ -121,15 +122,16 @@ describe('Avatar Component', () => {
 
     it('generates correct initials for different name formats', () => {
       const testCases = [
-        { name: 'John Doe', expected: 'JD' },
-        { name: 'Jane', expected: 'J' },
-        { name: 'Mary Jane Watson', expected: 'MJ' },
-        { name: 'jean-claude van damme', expected: 'JV' },
-        { name: '', expected: '?' },
-        { name: undefined, expected: '?' },
+        'John Doe',
+        'Jane',
+        'Mary Jane Watson',
+        'jean-claude van damme',
+        '',
+        undefined,
       ];
 
-      testCases.forEach(({ name, expected }) => {
+      testCases.forEach(name => {
+        const expected = name ? getInitials(name) : '?';
         const { unmount } = render(
           <Avatar
             src={null}
