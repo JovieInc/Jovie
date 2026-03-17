@@ -129,7 +129,6 @@ describe('isPublicRoute', () => {
   it.each([
     '/api/users',
     '/api/health',
-    '/ingest/events',
   ])('should return false for API route: %s', pathname => {
     expect(isPublicRoute(pathname)).toBe(false);
   });
@@ -182,13 +181,6 @@ describe('isApiRoute', () => {
     '/api/health',
     '/api/track',
   ])('should return true for API route: %s', pathname => {
-    expect(isApiRoute(pathname)).toBe(true);
-  });
-
-  it.each([
-    '/ingest/events',
-    '/ingest/data',
-  ])('should return true for ingest route: %s', pathname => {
     expect(isApiRoute(pathname)).toBe(true);
   });
 
@@ -297,7 +289,6 @@ describe('getSdkMode', () => {
 
   it.each([
     ['/api/users', 'none'],
-    ['/ingest/events', 'none'],
   ] as const)('should return "none" for API route: %s', (pathname, expected) => {
     expect(getSdkMode(pathname)).toBe(expected);
   });
@@ -376,6 +367,5 @@ describe('ROUTE_CONFIG', () => {
 
   it('should export route prefixes', () => {
     expect(ROUTE_CONFIG.apiPrefix).toBe('/api');
-    expect(ROUTE_CONFIG.ingestPrefix).toBe('/ingest');
   });
 });
