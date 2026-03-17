@@ -18,6 +18,11 @@ const mockLimit = vi.hoisted(() => vi.fn());
 const mockDetectBot = vi.hoisted(() => vi.fn());
 const mockExtractClientIP = vi.hoisted(() => vi.fn());
 const mockShouldExcludeSelfByHandle = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
+}));
 
 vi.mock('@/lib/services/profile', () => ({
   incrementProfileViews: mockIncrementProfileViews,
@@ -169,18 +174,23 @@ describe('POST /api/profile/view', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns 500 when incrementProfileViews throws', async () => {
-    mockIncrementProfileViews.mockRejectedValue(
-      new Error('Database connection lost')
-    );
+  it('returns 200 and captures error when incrementProfileViews throws', async () => {
+    const dbError = new Error('Database connection lost');
+    mockIncrementProfileViews.mockRejectedValue(dbError);
+    mockCaptureError.mockResolvedValue(undefined);
 
     const { POST } = await import('@/app/api/profile/view/route');
     const request = createRequest({ handle: 'testartist' });
     const response = await POST(request);
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toBe('Failed to record view');
+    expect(body.success).toBe(true);
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Profile view recording failed',
+      dbError,
+      expect.objectContaining({ handle: 'testartist' })
+    );
   });
 
   it('includes no-store cache headers in all responses', async () => {

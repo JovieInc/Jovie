@@ -59,7 +59,7 @@ describe('Security Headers - Header Constants', () => {
     it('has the correct key and value', () => {
       expect(PERMISSIONS_POLICY.key).toBe('Permissions-Policy');
       expect(PERMISSIONS_POLICY.value).toBe(
-        'camera=(), microphone=(), geolocation=()'
+        'camera=(), microphone=(), geolocation=(self)'
       );
     });
 
@@ -71,8 +71,8 @@ describe('Security Headers - Header Constants', () => {
       expect(PERMISSIONS_POLICY.value).toContain('microphone=()');
     });
 
-    it('disables geolocation access', () => {
-      expect(PERMISSIONS_POLICY.value).toContain('geolocation=()');
+    it('allows geolocation for own origin only', () => {
+      expect(PERMISSIONS_POLICY.value).toContain('geolocation=(self)');
     });
 
     it('is a valid security header', () => {
