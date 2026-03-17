@@ -160,7 +160,7 @@ export function ProfileContactSidebar() {
 
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
         title: link.suggestedTitle ?? link.platform.name,
         url: link.normalizedUrl,
         platform: link.platform.id,
@@ -224,8 +224,20 @@ export function ProfileContactSidebar() {
     (linkId: string) => {
       if (!previewData || !selectedProfile) return;
 
+      // Skip server call for unsaved temp links — just remove locally
+      if (linkId.startsWith('temp-')) {
+        setPreviewData({
+          ...previewData,
+          links: previewData.links.filter(l => l.id !== linkId),
+        });
+        return;
+      }
+
       const removedLink = previewData.links.find(l => l.id === linkId);
       if (!removedLink) return;
+
+      // Snapshot current links before optimistic removal for rollback
+      const previousLinks = previewData.links;
 
       // Optimistically remove from sidebar
       setPreviewData({
@@ -241,13 +253,11 @@ export function ProfileContactSidebar() {
             toast.success('Link removed');
           },
           onError: () => {
-            // Revert on failure
-            if (previewData && removedLink) {
-              setPreviewData({
-                ...previewData,
-                links: [...previewData.links, removedLink],
-              });
-            }
+            // Revert on failure using the snapshot taken before removal
+            setPreviewData({
+              ...previewData,
+              links: previousLinks,
+            });
             toast.error('Failed to remove link');
           },
         }

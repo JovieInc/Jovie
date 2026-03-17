@@ -85,8 +85,28 @@ const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
     hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
     requiresAtSymbol: true,
   },
+  x: {
+    hosts: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'],
+    requiresAtSymbol: false,
+  },
   linktree: {
     hosts: ['linktr.ee', 'www.linktr.ee'],
+    requiresAtSymbol: false,
+  },
+  threads: {
+    hosts: ['threads.net', 'www.threads.net'],
+    requiresAtSymbol: false,
+  },
+  facebook: {
+    hosts: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    requiresAtSymbol: false,
+  },
+  twitch: {
+    hosts: ['twitch.tv', 'www.twitch.tv'],
+    requiresAtSymbol: false,
+  },
+  snapchat: {
+    hosts: ['snapchat.com', 'www.snapchat.com'],
     requiresAtSymbol: false,
   },
 };
