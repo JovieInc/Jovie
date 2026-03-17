@@ -13,6 +13,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - "Use This Sound" feature documented in FEATURE_REGISTRY — influencer sharing pages at `/{username}/{slug}/sounds` for TikTok, Instagram Reels, YouTube Shorts
 - 7 new docs.jov.ie feature pages: Tour Dates, Verified Badge, AI Insights, Ad Pixels, Fan CRM, Retargeting Ads, Plans & Pricing
 - 4 new docs.jov.ie guides: Share Your First Smart Link, Set Up Tipping, Set Up Ad Pixels, Connect Bandsintown
+- Signup-to-paid conversion funnel: capture `?plan=` intent at signup, persist through onboarding, present personalized checkout step before dashboard
+- Onboarding checkout page (`/onboarding/checkout`) with profile value preview, interactive branding toggle, monthly/annual Stripe pricing, and skip option
+- "Profile is live" confetti celebration after onboarding step 3 with profile URL and copy button
+- Contextual upgrade nudges on plan-gated settings features (branding, analytics, contacts, notifications)
+- Reusable `UsageLimitUpgradePrompt` component shown at 80%+ of plan limits with progress bar
+- `plan-intent.ts` utility for cookie + sessionStorage plan intent persistence across the funnel
+- `onboarding.checkoutStep` feature flag for safe rollout (server + client gated)
+- 11+ analytics events across the full conversion funnel
 
 ### Changed
 
@@ -21,6 +29,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Expanded all 6 existing docs.jov.ie feature pages from ~20 lines to ~80-120 lines with plan availability tables and detailed capabilities
 - Updated FEATURE_REGISTRY.md change management process to include PRODUCT_CAPABILITIES.md and docs.jov.ie updates
 - Renamed "Self-Serve Guide" section to "Guides" in docs navigation
+- `ChatUsageAlert` now shows direct upgrade button for free users and plan-specific messaging
+- `SettingsPlanGateLabel` enhanced with feature-specific copy and upgrade click tracking
 
 ## [26.3.3] - 2026-03-17
 
