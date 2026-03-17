@@ -211,7 +211,13 @@ const FULL_PROVIDER_PREFIXES = [
   '/onboarding',
 ] as const;
 
-const THEME_ENABLED_PREFIXES = ['/app', '/onboarding'] as const;
+const THEME_ENABLED_PREFIXES = [
+  '/app',
+  '/onboarding',
+  '/signin',
+  '/signup',
+  '/waitlist',
+] as const;
 
 type CoreProviderVariant = 'full' | 'public';
 
