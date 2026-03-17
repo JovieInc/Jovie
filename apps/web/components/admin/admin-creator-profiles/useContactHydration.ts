@@ -11,6 +11,7 @@ interface ComparableSocialLink {
   id?: string;
   url: string;
   label?: string;
+  platform?: string;
   platformType?: string;
 }
 
@@ -27,6 +28,7 @@ function areSocialLinksEqual<T extends ComparableSocialLink>(
       link.id === b[i].id &&
       link.url === b[i].url &&
       link.label === b[i].label &&
+      link.platform === b[i].platform &&
       link.platformType === b[i].platformType
   );
 }
@@ -91,6 +93,7 @@ export function useContactHydration({
             id: link.id,
             label: link.label,
             url: link.url,
+            platform: link.platform,
             platformType: link.platformType,
           }))
         : undefined;

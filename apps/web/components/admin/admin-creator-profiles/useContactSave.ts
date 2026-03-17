@@ -73,6 +73,7 @@ export function useContactSave({
             id: link.id,
             url: link.url,
             label: link.label,
+            platform: link.platform,
             platformType: link.platformType,
           })),
         };
