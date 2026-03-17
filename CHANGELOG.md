@@ -19,6 +19,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Campaign manager now reads settings from persisted config instead of inline controls, with "Change in Settings" link
 - Admin sidebar section renamed from "Admin" to "General" with restructured card layout (dev tools, waitlist, campaigns, quick links)
 
+### Fixed
+
+- Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
+- Dashboard profile selector now prioritizes claimed profiles, preventing sidebar/panel username mismatch
+- Orphaned unclaimed profiles are deactivated on handle change to prevent stale public profile pages
+
 ## [26.3.2] - 2026-03-17
 
 ### Removed
