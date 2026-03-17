@@ -1,11 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SettingsContactsSection } from '@/components/dashboard/organisms/SettingsContactsSection';
 import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
+import { SettingsContactsSection } from '@/features/dashboard/organisms/SettingsContactsSection';
 import type { Artist } from '@/types/db';
 
 const mockContacts = vi.hoisted(() => [
@@ -44,7 +44,7 @@ vi.mock('@/lib/queries/useContactsQuery', () => ({
 }));
 
 vi.mock(
-  '@/components/dashboard/organisms/contacts-table/ContactDetailSidebar',
+  '@/features/dashboard/organisms/contacts-table/ContactDetailSidebar',
   () => ({
     ContactDetailSidebar: ({ isOpen }: { isOpen: boolean }) => (
       <div data-testid='contact-detail-sidebar' data-open={isOpen} />

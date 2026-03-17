@@ -495,6 +495,42 @@ Jovie/
 └── turbo.json               # Monorepo task configuration
 ```
 
+### Component Architecture & Dependency Rules
+
+Components follow atomic design with feature-based grouping:
+
+```
+packages/ui/atoms/          → Pure design system (Radix + CVA, NO Next.js/app imports)
+apps/web/components/
+├── atoms/                  → App-level atoms (may use Next.js, hooks)
+├── molecules/              → Composed atoms
+├── organisms/              → Complex shared widgets (includes table/ subsystem)
+├── features/               → Feature modules (dashboard, admin, home, auth, etc.)
+│   └── {feature}/          → May have internal atoms/molecules/organisms
+├── providers/              → Context providers
+├── hooks/                  → Shared hooks
+├── site/                   → Site chrome
+├── seo/                    → SEO components
+└── effects/                → Visual effects
+```
+
+**Dependency direction (strictly enforced via eslint-plugin-boundaries):**
+
+| Layer | Can import from |
+|-------|----------------|
+| `@jovie/ui` | React, Radix, CVA, Tailwind only |
+| `atoms/` | `@jovie/ui` |
+| `molecules/` | `atoms/`, `@jovie/ui` |
+| `organisms/` | `molecules/`, `atoms/`, `@jovie/ui` |
+| `features/{x}/` | `organisms/`, `molecules/`, `atoms/`, `@jovie/ui`, own internals |
+
+**Forbidden imports:**
+- `atoms/` must NOT import from `molecules/` or `organisms/`
+- `molecules/` must NOT import from `organisms/`
+- `features/{x}/` must NOT import from `features/{y}/` — if a component is needed by 2+ features, **promote it** to the shared `atoms/`, `molecules/`, or `organisms/` layer
+
+**Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`).
+
 ### Tech Stack
 
 | Layer | Technology |

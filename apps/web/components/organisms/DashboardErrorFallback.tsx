@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import type { FallbackProps } from 'react-error-boundary';
-import { PageErrorState } from '@/components/feedback/PageErrorState';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 
 /**
  * Error fallback UI specifically for dashboard components.

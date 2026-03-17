@@ -9,7 +9,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -26,7 +26,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-(--linear-text-tertiary)'>{title}</span>
+      <span className='text-[11px] text-tertiary-token'>{title}</span>
       {children}
     </div>
   );
@@ -35,10 +35,8 @@ function Stack({
 export default function SwitchesPage() {
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
-        Switch
-      </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>Switch</h1>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app toggle — compact 28×16px track, smooth thumb
         transition
       </p>
@@ -70,7 +68,7 @@ export default function SwitchesPage() {
             <Switch id='notifications' aria-label='Enable notifications' />
             <label
               htmlFor='notifications'
-              className='text-[13px] font-[510] text-(--linear-text-primary)'
+              className='text-[13px] font-[510] text-primary-token'
             >
               Enable notifications
             </label>
@@ -85,7 +83,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='auto-assign'
-              className='text-[13px] font-[510] text-(--linear-text-primary)'
+              className='text-[13px] font-[510] text-primary-token'
             >
               Auto-assign issues
             </label>
@@ -100,7 +98,7 @@ export default function SwitchesPage() {
             />
             <label
               htmlFor='disabled-setting'
-              className='text-[13px] font-[510] text-(--linear-text-primary) opacity-50'
+              className='text-[13px] font-[510] text-primary-token opacity-50'
             >
               Disabled setting
             </label>
@@ -111,7 +109,7 @@ export default function SwitchesPage() {
       {/* In Context */}
       <Section title='In Context'>
         <Stack title='settings row'>
-          <div className='flex w-64 flex-col divide-y rounded-lg border border-(--linear-border-subtle)'>
+          <div className='flex w-64 flex-col divide-y rounded-lg border border-subtle'>
             {[
               { label: 'Slack notifications', checked: true },
               { label: 'Email digest', checked: false },
@@ -123,7 +121,7 @@ export default function SwitchesPage() {
               >
                 <label
                   htmlFor={`setting-${item.label}`}
-                  className='text-[13px] font-[450] text-(--linear-text-primary)'
+                  className='text-[13px] font-[450] text-primary-token'
                 >
                   {item.label}
                 </label>

@@ -1,5 +1,6 @@
 'use client';
 
+import { getInitials } from '@jovie/ui';
 import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
@@ -35,8 +36,6 @@ export interface AvatarProps {
   readonly priority?: boolean;
   /** Image quality */
   readonly quality?: number;
-  /** Fallback image URL */
-  readonly fallbackSrc?: string;
   /** Custom className */
   readonly className?: string;
   /** Custom styling */
@@ -114,18 +113,10 @@ const BLUR_DATA_URLS = {
   96: 'data:image/webp;base64,UklGRoQCAABXRUJQVlA4WAoAAAAgAAAAPwAAPwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAaSQBuAGMALgAgADIAMAAxADZWUDhUAAAALwAAAP8QEI0AAAAgHyAQg4CARGQ=',
 } as const;
 
-/**
- * Generate initials from a name string
- */
+/** Generate initials — delegates to @jovie/ui's shared getInitials. */
 function generateInitials(name?: string): string {
   if (!name) return '?';
-
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+  return getInitials(name);
 }
 
 /**
@@ -151,7 +142,6 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     priority = false,
     quality = 85,
 
-    fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
     className,
     style,
   },

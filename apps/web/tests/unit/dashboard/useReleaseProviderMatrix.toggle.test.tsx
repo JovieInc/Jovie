@@ -71,7 +71,7 @@ vi.mock('@/lib/utils/platform-detection', () => ({
 }));
 
 const { useReleaseProviderMatrix } = await import(
-  '@/components/dashboard/organisms/release-provider-matrix/useReleaseProviderMatrix'
+  '@/features/dashboard/organisms/release-provider-matrix/useReleaseProviderMatrix'
 );
 
 function makeRelease(id = 'release-1') {

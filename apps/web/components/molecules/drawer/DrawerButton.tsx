@@ -11,9 +11,9 @@ const TONE_CLASSNAMES: Record<DrawerButtonTone, string> = {
   primary:
     'border-(--linear-accent) bg-(--linear-accent) text-white hover:border-(--linear-accent) hover:bg-(--linear-accent-hover,rgba(91,111,255,0.92)) hover:text-white active:border-(--linear-accent) active:bg-(--linear-accent-hover,rgba(91,111,255,0.88))',
   secondary:
-    'border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) active:border-(--linear-border-default) active:bg-(--linear-bg-surface-2)',
+    'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token active:border-default active:bg-surface-2',
   ghost:
-    'border-transparent bg-transparent text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) active:bg-(--linear-bg-surface-2)',
+    'border-transparent bg-transparent text-secondary-token hover:bg-surface-1 hover:text-primary-token active:bg-surface-2',
 };
 
 const SIZE_CLASSNAMES: Record<DrawerButtonSize, string> = {

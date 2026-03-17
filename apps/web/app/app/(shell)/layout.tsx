@@ -1,10 +1,10 @@
 import * as Sentry from '@sentry/nextjs';
 import { cookies } from 'next/headers';
-import { ImpersonationBannerWrapper } from '@/components/admin/ImpersonationBannerWrapper';
-import { OperatorBanner } from '@/components/admin/OperatorBanner';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
+import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
+import { OperatorBanner } from '@/features/admin/OperatorBanner';
+import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';

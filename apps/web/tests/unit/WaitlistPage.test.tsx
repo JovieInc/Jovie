@@ -29,7 +29,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-vi.mock('@/components/auth', () => ({
+vi.mock('@/features/auth', () => ({
   AuthLayout: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -39,27 +39,27 @@ vi.mock('@/components/auth', () => ({
   AuthBackButton: () => <button type='button'>Back</button>,
 }));
 
-vi.mock('@/components/waitlist/WaitlistPrimaryGoalStep', () => ({
+vi.mock('@/features/waitlist/WaitlistPrimaryGoalStep', () => ({
   WaitlistPrimaryGoalStep: () => <div />,
 }));
 
-vi.mock('@/components/waitlist/WaitlistSocialStep', () => ({
+vi.mock('@/features/waitlist/WaitlistSocialStep', () => ({
   WaitlistSocialStep: () => <div />,
 }));
 
-vi.mock('@/components/waitlist/WaitlistAdditionalInfoStep', () => ({
+vi.mock('@/features/waitlist/WaitlistAdditionalInfoStep', () => ({
   WaitlistAdditionalInfoStep: () => <div />,
 }));
 
-vi.mock('@/components/waitlist/WaitlistSkeleton', () => ({
+vi.mock('@/features/waitlist/WaitlistSkeleton', () => ({
   WaitlistSkeleton: () => <div />,
 }));
 
-vi.mock('@/components/waitlist/WaitlistSuccessView', () => ({
+vi.mock('@/features/waitlist/WaitlistSuccessView', () => ({
   WaitlistSuccessView: () => <div>Waitlist success</div>,
 }));
 
-import { WAITLIST_STORAGE_KEYS } from '@/components/waitlist/types';
+import { WAITLIST_STORAGE_KEYS } from '@/features/waitlist/types';
 import WaitlistPage from '../../app/waitlist/page';
 
 global.fetch = mockFetch as unknown as typeof fetch;

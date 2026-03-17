@@ -13,12 +13,12 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
-import { APP_ROUTES } from '@/constants/routes';
+} from '@/features/release/AlbumArtworkContextMenu';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { ProviderKey } from '@/lib/discography/types';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 

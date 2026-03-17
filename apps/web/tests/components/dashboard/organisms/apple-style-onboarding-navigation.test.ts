@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { navigateToDashboard } from '@/components/dashboard/organisms/apple-style-onboarding/navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { navigateToDashboard } from '@/features/dashboard/organisms/apple-style-onboarding/navigation';
 
 describe('navigateToDashboard', () => {
   it('uses client-side navigation to dashboard route', () => {

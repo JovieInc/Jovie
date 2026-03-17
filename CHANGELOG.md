@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.2] - 2026-03-17
+
+### Removed
+
+- Unused DB tables `dsp_artist_enrichment` and `release_sync_status` — scaffolded but never queried or written to
+- Unused DB columns `creator_profiles.outreach_priority` and `creator_profiles.last_login_at` — never populated in application code
+- Dead route `/api/monitoring/performance` — stub returning 501, never implemented (JOV-480)
+- Dead route `/ingest/[...path]` — decommissioned tombstone returning 404
+- Dead route `/loader-preview` — page that immediately called `notFound()`
+- Unused environment variable `CONTACT_OBFUSCATION_KEY` — defined but never read
+- Unused `fallbackSrc` prop from Avatar component — accepted but never used in render logic
+
 ## [26.3.1] - 2026-03-17
 
 ### Changed

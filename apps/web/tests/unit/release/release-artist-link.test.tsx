@@ -29,16 +29,16 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-vi.mock('@/components/profile/artist-notifications-cta', () => ({
+vi.mock('@/features/profile/artist-notifications-cta', () => ({
   ArtistNotificationsCTA: () => null,
 }));
 
 // Mock heavy sub-trees to prevent module resolution hangs
-vi.mock('@/components/release/ReleaseCountdown', () => ({
+vi.mock('@/features/release/ReleaseCountdown', () => ({
   ReleaseCountdown: () => null,
 }));
 
-vi.mock('@/components/release/ReleaseNotificationsProvider', () => ({
+vi.mock('@/features/release/ReleaseNotificationsProvider', () => ({
   ReleaseNotificationsProvider: ({ children }: { children: React.ReactNode }) =>
     children,
 }));
@@ -57,7 +57,7 @@ vi.mock('@/components/atoms/DspLogo', async importOriginal => {
 });
 
 // Mock AlbumArtworkContextMenu to avoid QueryClient dependency
-vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
   ),
@@ -69,7 +69,7 @@ const { ReleaseLandingPage } = await import(
   '../../../app/r/[slug]/ReleaseLandingPage'
 );
 const { UnreleasedReleaseHero } = await import(
-  '@/components/release/UnreleasedReleaseHero'
+  '@/features/release/UnreleasedReleaseHero'
 );
 
 function renderWithQueryClient(ui: ReactElement) {

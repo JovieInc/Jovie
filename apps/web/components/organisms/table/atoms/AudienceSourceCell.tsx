@@ -34,7 +34,7 @@ const DOMAIN_MAP: Record<string, string> = {
   'l.instagram.com': 'Instagram',
 };
 
-const ICON_CLASS = 'h-3.5 w-3.5 shrink-0 text-(--linear-text-tertiary)';
+const ICON_CLASS = 'h-3.5 w-3.5 shrink-0 text-tertiary-token';
 
 /** Pre-allocated icon elements keyed by source name — avoids creating components during render. */
 const SOURCE_ICON_ELEMENTS: Record<string, React.ReactElement> = {

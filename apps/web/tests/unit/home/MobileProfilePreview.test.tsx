@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { MobileProfilePreview } from '@/components/home/MobileProfilePreview';
+import { MobileProfilePreview } from '@/features/home/MobileProfilePreview';
 import type { FeaturedCreator } from '@/lib/featured-creators';
 
 const creator: FeaturedCreator = {

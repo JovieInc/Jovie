@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DashboardOverview } from '@/components/dashboard/organisms/DashboardOverview';
 import { BASE_URL } from '@/constants/domains';
+import { DashboardOverview } from '@/features/dashboard/organisms/DashboardOverview';
 import type { CreatorProfile as DrizzleCreatorProfile } from '@/lib/db/schema/profiles';
 import { convertDrizzleCreatorProfileToArtist } from '@/types/db';
 
@@ -33,7 +33,6 @@ function makeProfile(
     isClaimed: false,
     claimToken: null,
     claimedAt: null,
-    lastLoginAt: null,
     profileViews: 0,
     onboardingCompletedAt: null,
     settings: {},

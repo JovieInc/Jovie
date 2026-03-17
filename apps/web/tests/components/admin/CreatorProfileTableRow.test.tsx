@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { CreatorProfileTableRow } from '@/components/admin/CreatorProfileTableRow';
+import { CreatorProfileTableRow } from '@/features/admin/CreatorProfileTableRow';
 
 vi.mock('next/link', () => ({
   __esModule: true,
@@ -12,22 +12,22 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-vi.mock('@/components/admin/CreatorAvatarCell', () => ({
+vi.mock('@/features/admin/CreatorAvatarCell', () => ({
   CreatorAvatarCell: ({ username }: { username: string }) => (
     <div>{username}</div>
   ),
 }));
 
-vi.mock('@/components/admin/CreatorProfileSocialLinks', () => ({
+vi.mock('@/features/admin/CreatorProfileSocialLinks', () => ({
   CreatorProfileSocialLinks: () => <div>social links</div>,
 }));
 
-vi.mock('@/components/admin/creator-actions-menu', () => ({
+vi.mock('@/features/admin/creator-actions-menu', () => ({
   CreatorActionsMenu: () => <button type='button'>Actions</button>,
 }));
 
 vi.mock(
-  '@/components/admin/creator-actions-menu/CreatorActionsMenuContent',
+  '@/features/admin/creator-actions-menu/CreatorActionsMenuContent',
   () => ({
     CreatorActionsMenuContent: () => <div>Actions content</div>,
   })

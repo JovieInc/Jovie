@@ -42,6 +42,7 @@ module.exports = [
       '**/actions/*.ts',
       // Exclude admin components (legacy patterns, being addressed separately)
       '**/components/admin/**',
+      '**/components/features/admin/**',
     ],
   },
   {

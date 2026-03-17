@@ -19,31 +19,31 @@ export const PAGE_TOOLBAR_END_GROUP_CLASS =
   'flex w-full flex-wrap items-center gap-0.5 sm:w-auto sm:flex-nowrap';
 
 export const PAGE_TOOLBAR_META_TEXT_CLASS =
-  'text-xs text-(--linear-text-tertiary) tabular-nums';
+  'text-xs text-tertiary-token tabular-nums';
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-8 rounded-[7px] border-(--linear-border-subtle) bg-transparent px-3 text-[12.5px] font-[510] text-(--linear-text-secondary) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-[7px] border-subtle bg-transparent px-3 text-[12.5px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-subtle bg-surface-1 text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-8 rounded-[6px] border border-transparent bg-transparent px-2 text-[12.5px] font-[510] text-(--linear-text-tertiary) hover:border-transparent hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:border-transparent focus-visible:bg-(--linear-bg-surface-1) active:border-transparent active:bg-(--linear-bg-surface-1) [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-[6px] border border-transparent bg-transparent px-2 text-[12.5px] font-[510] text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-1 active:border-transparent active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
-  'w-8 justify-center px-0 text-(--linear-text-tertiary)';
+  'w-8 justify-center px-0 text-tertiary-token';
 
 export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-  'min-w-[108px] justify-between gap-1.5 px-2.5 text-(--linear-text-secondary)'
+  'min-w-[108px] justify-between gap-1.5 px-2.5 text-secondary-token'
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
-  'border-transparent bg-(--linear-bg-surface-1) text-(--linear-text-primary)';
+  'border-transparent bg-surface-1 text-primary-token';
 
 export const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
 export const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;

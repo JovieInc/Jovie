@@ -343,7 +343,7 @@ export function setupComponentMocks() {
   }));
 
   // Mock FeaturedArtists component to handle async component
-  vi.mock('@/components/home/FeaturedArtists', () => ({
+  vi.mock('@/features/home/FeaturedArtists', () => ({
     FeaturedArtists: () =>
       React.createElement(
         'section',

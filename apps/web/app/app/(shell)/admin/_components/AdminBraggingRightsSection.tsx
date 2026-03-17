@@ -1,8 +1,8 @@
-import { BraggingRightsStrip } from '@/components/admin/BraggingRightsStrip';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { BraggingRightsStrip } from '@/features/admin/BraggingRightsStrip';
 import { getAdminBraggingRights } from '@/lib/admin/bragging-rights';
 
 const BRAGGING_BADGE_CARD_SKELETON_KEYS = ['labels', 'distributors'];

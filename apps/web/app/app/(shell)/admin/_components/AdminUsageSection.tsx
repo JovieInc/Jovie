@@ -1,7 +1,7 @@
-import { ReliabilityCard } from '@/components/admin/ReliabilityCard';
 import { ContentMetricRowSkeleton } from '@/components/molecules/ContentMetricRowSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ReliabilityCard } from '@/features/admin/ReliabilityCard';
 import { getAdminReliabilitySummary } from '@/lib/admin/overview';
 
 export async function AdminUsageSection() {

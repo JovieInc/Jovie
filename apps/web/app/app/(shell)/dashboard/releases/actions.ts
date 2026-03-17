@@ -973,7 +973,10 @@ export async function checkSpotifyConnection(): Promise<{
         {
           profileId: profile.id,
           artistName,
-          spotifyImportStatus: String(settings?.spotifyImportStatus ?? 'none'),
+          spotifyImportStatus:
+            typeof settings?.spotifyImportStatus === 'string'
+              ? settings.spotifyImportStatus
+              : 'none',
         }
       );
     }

@@ -1,7 +1,7 @@
 'use client';
 
-import { AuthLayout, SignInForm } from '@/components/auth';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout, SignInForm } from '@/features/auth';
 
 /**
  * Sign-in page using new Clerk Core API implementation.

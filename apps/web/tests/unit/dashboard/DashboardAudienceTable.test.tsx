@@ -3,9 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AudiencePanelProvider } from '@/components/dashboard/organisms/AudiencePanelContext';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
 import type { AudienceMember } from '@/types';
 
 /**
@@ -76,18 +76,17 @@ vi.mock('sonner', () => ({
   Toaster: () => null,
 }));
 
-vi.mock('@/components/dashboard/organisms/audience-member-sidebar', () => ({
+vi.mock('@/features/dashboard/organisms/audience-member-sidebar', () => ({
   AudienceMemberSidebar: () => null,
 }));
 
-vi.mock('@/components/dashboard/organisms/AnalyticsSidebar', () => ({
+vi.mock('@/features/dashboard/organisms/AnalyticsSidebar', () => ({
   AnalyticsSidebar: () => null,
 }));
 
-vi.mock(
-  '@/components/dashboard/audience/table/atoms/AudienceMobileCard',
-  () => ({ AudienceMobileCard: () => null })
-);
+vi.mock('@/features/dashboard/audience/table/atoms/AudienceMobileCard', () => ({
+  AudienceMobileCard: () => null,
+}));
 
 vi.mock('@/components/organisms/EmptyState', () => ({
   EmptyState: ({ heading }: { heading?: string }) => (
@@ -100,7 +99,7 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
 }));
 
 vi.mock(
-  '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableSubheader',
+  '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableSubheader',
   () => ({ AudienceTableSubheader: () => null })
 );
 
@@ -135,7 +134,7 @@ vi.mock('@tanstack/react-virtual', () => ({
 
 // ── Import component after mocks ──
 const { DashboardAudienceTable } = await import(
-  '@/components/dashboard/organisms/dashboard-audience-table'
+  '@/features/dashboard/organisms/dashboard-audience-table'
 );
 
 function renderWithProviders(

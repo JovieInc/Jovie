@@ -230,7 +230,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   ),
 }));
 
-vi.mock('@/components/dashboard/atoms/DspProviderIcon', () => ({
+vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   DspProviderIcon: () => <span data-testid='provider-icon' />,
 }));
 
@@ -243,7 +243,7 @@ vi.mock('next/image', () => ({
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: () => <span />,
 }));
-vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),

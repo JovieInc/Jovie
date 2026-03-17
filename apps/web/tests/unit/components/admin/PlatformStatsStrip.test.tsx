@@ -2,7 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { PlatformStatsStrip } from '@/components/admin/PlatformStatsStrip';
+import { PlatformStatsStrip } from '@/features/admin/PlatformStatsStrip';
 import type { AdminPlatformStats } from '@/lib/admin/platform-stats';
 
 const baseStats: AdminPlatformStats = {

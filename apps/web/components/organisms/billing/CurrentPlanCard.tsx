@@ -52,14 +52,14 @@ export function CurrentPlanCard({
             </div>
             <div className='min-w-0'>
               <div className='flex flex-wrap items-center gap-2'>
-                <h2 className='text-[15px] font-[590] tracking-[-0.018em] text-(--linear-text-primary)'>
+                <h2 className='text-[15px] font-[590] tracking-[-0.018em] text-primary-token'>
                   {planName} Plan
                 </h2>
                 <Badge variant={isPro ? 'success' : 'warning'} size='sm'>
                   {isPro ? 'Active' : 'Limited'}
                 </Badge>
               </div>
-              <p className='mt-1 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+              <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
                 {isPro
                   ? 'Full access to all features. Branding removed from your profile.'
                   : 'Upgrade to unlock branding removal, extended analytics, and more.'}

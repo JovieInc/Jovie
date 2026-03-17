@@ -1,7 +1,7 @@
 /**
  * Shared test utilities for useSuggestions tests
  */
-import type { SuggestedLink } from '@/components/dashboard/organisms/links/hooks/useSuggestions';
+import type { SuggestedLink } from '@/features/dashboard/organisms/links/hooks/useSuggestions';
 
 /**
  * Helper to create a mock SuggestedLink

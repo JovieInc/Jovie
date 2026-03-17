@@ -60,7 +60,7 @@ const igSocial = (overrides: Partial<DetectedLink> = {}): DetectedLink => ({
 // Dynamic mocked payload for UniversalLinkInput per test
 let nextAddPayload: DetectedLink | null = null;
 
-vi.mock('@/components/dashboard/molecules/UniversalLinkInput', async () => {
+vi.mock('@/features/dashboard/molecules/UniversalLinkInput', async () => {
   return {
     UniversalLinkInput: ({ onAdd }: { onAdd: (l: DetectedLink) => void }) => (
       <button
@@ -132,7 +132,7 @@ vi.mock('@/components/atoms/SocialIcon', () => {
 });
 
 // Import after mocks
-import { GroupedLinksManager } from '@/components/dashboard/organisms/GroupedLinksManager';
+import { GroupedLinksManager } from '@/features/dashboard/organisms/GroupedLinksManager';
 
 const renderWithProviders = (ui: React.ReactElement) => {
   return render(<TooltipProvider>{ui}</TooltipProvider>);

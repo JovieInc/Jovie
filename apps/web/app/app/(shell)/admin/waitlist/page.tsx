@@ -1,11 +1,10 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
-
-import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
-import { WaitlistSettingsPanel } from '@/components/admin/WaitlistSettingsPanel';
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { WaitlistMetrics } from '@/features/admin/WaitlistMetrics';
+import { WaitlistSettingsPanel } from '@/features/admin/WaitlistSettingsPanel';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
@@ -14,11 +13,11 @@ import { adminWaitlistSearchParams } from '@/lib/nuqs';
 
 const AdminWaitlistTableWithViews = dynamic(
   () =>
-    import(
-      '@/components/admin/waitlist-table/AdminWaitlistTableWithViews'
-    ).then(mod => ({
-      default: mod.AdminWaitlistTableWithViews,
-    })),
+    import('@/features/admin/waitlist-table/AdminWaitlistTableWithViews').then(
+      mod => ({
+        default: mod.AdminWaitlistTableWithViews,
+      })
+    ),
   {
     loading: () => (
       <div className='p-6 space-y-6'>

@@ -4,10 +4,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-
-import { AdminCreatorProfilesWithSidebar } from '@/components/admin/admin-creator-profiles';
 import { TableMetaProvider } from '@/components/organisms/AuthShellWrapper';
 import { ToastProvider } from '@/components/providers/ToastProvider';
+import { AdminCreatorProfilesWithSidebar } from '@/features/admin/admin-creator-profiles';
 import type {
   AdminCreatorProfileRow,
   AdminCreatorProfilesSort,
@@ -36,7 +35,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/app/admin',
 }));
 
-vi.mock('@/components/admin/CreatorAvatarCell', () => ({
+vi.mock('@/features/admin/CreatorAvatarCell', () => ({
   CreatorAvatarCell: ({
     username,
     verified,
@@ -53,14 +52,14 @@ vi.mock('@/components/admin/CreatorAvatarCell', () => ({
 
 const saveContactSpy = vi.fn(async contact => contact);
 
-vi.mock('@/components/admin/admin-creator-profiles/useContactSave', () => ({
+vi.mock('@/features/admin/admin-creator-profiles/useContactSave', () => ({
   useContactSave: () => ({
     isSaving: false,
     saveContact: saveContactSpy,
   }),
 }));
 
-vi.mock('@/components/admin/table/TableRowActions', () => ({
+vi.mock('@/features/admin/table/TableRowActions', () => ({
   TableRowActions: ({ isClaimed }: { isClaimed: boolean }) => (
     <button
       type='button'
@@ -72,7 +71,7 @@ vi.mock('@/components/admin/table/TableRowActions', () => ({
   ),
 }));
 
-vi.mock('@/components/admin/creator-actions-menu', () => ({
+vi.mock('@/features/admin/creator-actions-menu', () => ({
   CreatorActionsMenu: () => (
     <button type='button' aria-label='Creator actions'>
       ⋯

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { OnboardingCompleteStep } from '@/components/dashboard/organisms/onboarding/OnboardingCompleteStep';
+import { OnboardingCompleteStep } from '@/features/dashboard/organisms/onboarding/OnboardingCompleteStep';
 
 describe('OnboardingCompleteStep', () => {
   const baseProps = {

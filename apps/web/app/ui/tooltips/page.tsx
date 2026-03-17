@@ -11,7 +11,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -20,11 +20,7 @@ function Section({
 }
 
 function Label({ children }: { readonly children: React.ReactNode }) {
-  return (
-    <span className='text-[11px] text-(--linear-text-tertiary)'>
-      {children}
-    </span>
-  );
+  return <span className='text-[11px] text-tertiary-token'>{children}</span>;
 }
 
 function Stack({
@@ -45,10 +41,8 @@ function Stack({
 export default function TooltipsPage() {
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
-        Tooltip
-      </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>Tooltip</h1>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app — 4px radius, surface-0 bg, 12px font, instant 100ms
         animation
       </p>

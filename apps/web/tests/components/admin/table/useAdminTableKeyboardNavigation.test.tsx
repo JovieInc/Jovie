@@ -1,7 +1,7 @@
 import { fireEvent, render } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { useAdminTableKeyboardNavigation } from '@/components/admin/table/useAdminTableKeyboardNavigation';
+import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 
 function Harness({ onActivate }: Readonly<{ onActivate?: () => void }>) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
