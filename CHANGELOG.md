@@ -30,6 +30,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `CampaignSettingsPanel` — campaign targeting (fit score, batch size) and throttling controls moved from inline campaign manager to centralized settings
 - Dev toolbar on/off toggle under Admin > Developer tools
 - Waitlist settings panel embedded in admin settings
+- DSP Presence dashboard page at `/app/presence` — card grid showing all matched streaming platform profiles (Spotify, Apple Music, Deezer, etc.) with confidence scores, ISRC match counts, and confirm/reject actions for suggested matches
+- Detail sidebar for each DSP profile with match status, confidence breakdown, and external platform link
+- Navigation entry for Presence in the dashboard sidebar
+- Next.js rewrite rule mapping `/app/presence` to `/app/dashboard/presence`
 
 ### Changed
 
