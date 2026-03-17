@@ -103,8 +103,7 @@ export function AudienceCRMSection() {
           width: '700px',
           height: '500px',
           borderRadius: '50%',
-          background:
-            'radial-gradient(ellipse at center, oklch(18% 0.015 260 / 0.2), transparent 65%)',
+          background: 'var(--linear-crm-glow)',
         }}
       />
 
@@ -113,13 +112,12 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-[var(--linear-text-primary)] reveal-on-scroll'>
-              Know every fan by name.
+              See every fan. Reach them again.
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-[var(--linear-text-secondary)]'>
-                Most profile traffic disappears into Spotify, Instagram, and
-                ticketing pages. Jovie captures emails, source, city, and intent
-                so you can follow up later.
+                Profile traffic vanishes into streaming apps. Jovie captures who
+                visited, where they came from, and what they wanted.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-[var(--linear-text-tertiary)] border border-[var(--linear-border-subtle)]'>
                 Built-in fan CRM
@@ -148,18 +146,16 @@ export function AudienceCRMSection() {
           >
             {/* Dashboard window */}
             <div
-              className='relative overflow-hidden rounded-xl md:rounded-2xl'
+              className='relative overflow-hidden rounded-t-xl md:rounded-t-2xl rounded-b-none'
               style={{
-                border: '1px solid var(--linear-border-subtle)',
                 backgroundColor: 'var(--linear-bg-surface-0)',
-                boxShadow: 'var(--linear-shadow-card-elevated)',
+                boxShadow: 'var(--linear-panel-ring) 0px 0px 0px 1px inset',
               }}
             >
               {/* Shine border overlay */}
               <div
                 aria-hidden='true'
-                className='pointer-events-none absolute inset-0 rounded-xl md:rounded-2xl z-10'
-                style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+                className='pointer-events-none absolute inset-0 rounded-t-xl md:rounded-t-2xl rounded-b-none z-10'
               />
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-[var(--linear-border-subtle)] bg-[var(--linear-bg-surface-1)]'>
@@ -198,7 +194,7 @@ export function AudienceCRMSection() {
                   </div>
                 ))}
               </div>
-              <p className='text-xs text-white/50 mt-2 text-center'>
+              <p className='text-xs text-[var(--linear-text-quaternary)] mt-2 text-center'>
                 Real data from a Jovie artist profile
               </p>
 
