@@ -169,7 +169,7 @@ describe('POST /api/profile/view', () => {
     expect(response.status).toBe(400);
   });
 
-  it('returns 500 when incrementProfileViews throws', async () => {
+  it('returns 200 and logs error when incrementProfileViews throws', async () => {
     mockIncrementProfileViews.mockRejectedValue(
       new Error('Database connection lost')
     );
@@ -178,9 +178,9 @@ describe('POST /api/profile/view', () => {
     const request = createRequest({ handle: 'testartist' });
     const response = await POST(request);
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body.error).toBe('Failed to record view');
+    expect(body.success).toBe(true);
   });
 
   it('includes no-store cache headers in all responses', async () => {

@@ -34,6 +34,9 @@ vi.mock('@/app/api/spotify/search/helpers', () => ({
   parseLimit: vi.fn(
     (_param: string | null, defaultVal: number, _max: number) => defaultVal
   ),
+  annotateClaimedStatus: vi.fn((results: unknown[]) =>
+    Promise.resolve(results)
+  ),
 }));
 
 vi.mock('@/lib/spotify/alphabet-cache', () => ({

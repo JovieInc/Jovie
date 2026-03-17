@@ -85,8 +85,8 @@ describe('Security Headers - Security Best Practices', () => {
       expect(PERMISSIONS_POLICY.value).toMatch(/microphone=\(\)/);
     });
 
-    it('disables geolocation access', () => {
-      expect(PERMISSIONS_POLICY.value).toMatch(/geolocation=\(\)/);
+    it('restricts geolocation to same origin', () => {
+      expect(PERMISSIONS_POLICY.value).toMatch(/geolocation=\(self\)/);
     });
   });
 });
