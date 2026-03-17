@@ -1,10 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import type {
-  ColumnVisibility,
-  Density,
-} from '@/components/organisms/table/molecules/DisplayMenuDropdown';
+import type { ColumnVisibility, Density } from '@/components/organisms/table';
 
 const STORAGE_KEY = 'jovie:releases-table-preferences';
 

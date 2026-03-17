@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Archive, ChevronDown, Plus, Settings, Trash2 } from 'lucide-react';
-import { TableIconButton } from '@/components/organisms/table/atoms/TableIconButton';
+import { TableIconButton } from '@/components/organisms/table';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 
 function Section({
