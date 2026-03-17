@@ -31,8 +31,8 @@ async function fetchActivityFeed(
   signal?: AbortSignal
 ): Promise<Activity[]> {
   const params = new URLSearchParams({
-    profileId: encodeURIComponent(profileId),
-    range: encodeURIComponent(range),
+    profileId,
+    range,
   });
 
   const response = await fetchWithTimeout<ActivityFeedResponse>(

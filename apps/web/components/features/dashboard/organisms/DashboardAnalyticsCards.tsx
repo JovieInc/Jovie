@@ -332,7 +332,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     <div
       ref={containerRef}
       data-testid='dashboard-analytics-cards'
-      className='space-y-4'
+      className='space-y-4 min-h-[180px]'
     >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <div className='space-y-0.5'>

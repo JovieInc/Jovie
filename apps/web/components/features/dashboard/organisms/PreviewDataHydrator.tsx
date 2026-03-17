@@ -63,14 +63,16 @@ export function PreviewDataHydrator({
 
   useEffect(() => {
     if (!selectedProfile) return;
+    const canonicalUsername =
+      selectedProfile.usernameNormalized ?? selectedProfile.username;
     setPreviewData({
-      username: selectedProfile.username,
-      displayName: selectedProfile.displayName ?? selectedProfile.username,
+      username: canonicalUsername,
+      displayName: selectedProfile.displayName ?? canonicalUsername,
       avatarUrl: selectedProfile.avatarUrl ?? null,
       bio: selectedProfile.bio ?? null,
       genres: selectedProfile.genres ?? null,
       links: previewLinks,
-      profilePath: `/${selectedProfile.username}`,
+      profilePath: `/${canonicalUsername}`,
       dspConnections: {
         spotify: {
           connected: connectedDSPs.some(dsp => dsp.key === 'spotify'),

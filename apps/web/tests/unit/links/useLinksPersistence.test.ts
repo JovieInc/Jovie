@@ -362,12 +362,14 @@ describe('useLinksPersistence', () => {
 
   describe('error handling', () => {
     it('should show error toast on API error', async () => {
-      mockFetch.mockResolvedValue({
+      const mockResponse = {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
         json: async () => ({ error: 'Invalid platform' }),
-      });
+        clone: () => mockResponse,
+      };
+      mockFetch.mockResolvedValue(mockResponse);
 
       const { result } = renderHook(() =>
         useLinksPersistence({
@@ -381,11 +383,9 @@ describe('useLinksPersistence', () => {
         result.current.enqueueSave([]);
       });
 
-      // FetchError message includes status code and statusText
+      // FetchError message is extracted from the response body error field
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith(
-          expect.stringMatching(/Fetch failed: 400|Bad Request/)
-        );
+        expect(toast.error).toHaveBeenCalledWith('Invalid platform');
       });
     });
 

@@ -62,6 +62,7 @@ export function AppleStyleOnboardingForm({
     enrichedProfile,
     setEnrichedProfile,
     isEnriching: isAutoConnectEnriching,
+    isConnecting,
   } = useOnboardingSubmit({
     userId,
     userEmail,
@@ -278,7 +279,9 @@ export function AppleStyleOnboardingForm({
             enrichedProfile={enrichedProfile}
             handle={profileReadyHandle || handle}
             onGoToDashboard={goToDashboard}
-            isEnriching={isDspEnriching || isAutoConnectEnriching}
+            isEnriching={
+              isDspEnriching || isAutoConnectEnriching || isConnecting
+            }
           />
         );
 

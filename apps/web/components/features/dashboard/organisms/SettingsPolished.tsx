@@ -1,7 +1,9 @@
 'use client';
 
+import { PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, type ReactNode, useCallback, useMemo } from 'react';
+import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
@@ -76,6 +78,38 @@ const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
 ));
 
 SettingsSidebar.displayName = 'SettingsSidebar';
+
+/**
+ * Mobile-only trigger to open the profile panel (tabs, links, analytics, share).
+ * On desktop the panel is visible as an inline sidebar; on mobile the header
+ * (which normally contains the toggle) is hidden on settings pages, so this
+ * provides the only way to access the full profile editing experience.
+ */
+function MobileProfilePanelTrigger() {
+  const { open } = usePreviewPanelState();
+
+  return (
+    <button
+      type='button'
+      onClick={open}
+      className='flex w-full items-center justify-between rounded-[10px] border border-subtle/55 bg-surface-0 px-4 py-3.5 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
+    >
+      <div>
+        <p className='text-[14px] font-[510] text-primary-token'>
+          Links, music &amp; more
+        </p>
+        <p className='mt-0.5 text-[13px] text-secondary-token'>
+          Manage social links, music, earnings, and about info
+        </p>
+      </div>
+      <PanelRight
+        className='h-4 w-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
+      />
+    </button>
+  );
+}
+
 export function SettingsPolished({
   artist,
   onArtistUpdate,
@@ -279,6 +313,7 @@ export function SettingsPolished({
         >
           {section.render()}
         </SettingsSection>
+        {focusSection === 'artist-profile' && <MobileProfilePanelTrigger />}
       </div>
     );
   }

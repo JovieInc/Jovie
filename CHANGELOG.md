@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.1] - 2026-03-17
+
+### Changed
+
+- Move phone carousel (DeeplinksGrid) above CRM section (AudienceCRMSection) on homepage
+
+### Fixed
+
+- `SettingsStatusPill` no longer shows "Save failed" alongside "Saving..." and "Saved" states due to operator precedence bug with `&&` and ternary
+- Audience segment filters now use OR (union) logic consistently between SSR and API routes — previously SSR used AND while the API used OR, causing inconsistent results when selecting multiple segments
+- `SettingsAdPixelsSection` uses safe optional chaining on `pixels` and `hasTokens` objects to prevent runtime crashes when data shape is partial
+
+## [26.3.0] - 2026-03-17
+
+### Added
+
+- "On Jovie" badge on search results for artists already claimed on the platform (homepage + onboarding DSP step)
+- `boostClaimedArtists()` helper to sort claimed artists to the top of Spotify search results
+- 5-second minimum display time on profile review step so users actually see their enriched profile before proceeding
+- Unified row context menus across all data tables — kebab menu and right-click show the same actions
+
+### Fixed
+
+- Claimed artists now appear first in search results so users can identify their own profile among duplicates
+- Dashboard redirect now waits for `connectSpotifyArtist` DB writes to complete — fixes empty sidebar, missing DSPs, and missing social links after onboarding
+- Profile review CTA disabled while enrichment or Spotify connection is still in progress (with 10s timeout fallback)
+- Tour Dates table now shows complete menu (Edit, Open tickets, Delete) on both kebab and right-click
+- Feedback table now exposes Copy/Dismiss actions via both kebab menu and right-click context menu
+
+## [26.2.2] - 2026-03-17
+
+### Fixed
+
+- Demo sidebar navigation no longer redirects unauthenticated users to sign-in when clicking Audience or Earnings tabs — shows toast notification instead
+- `isAppleMusicConfigured()` now reads env vars at call time instead of module load, fixing false positives when Doppler injects credentials
+- Google CSE tests now correctly stub SerpAPI key to exercise the Google CSE code path
+- Show user-facing error toast when username change fails (e.g., "Handle already taken") instead of silently reverting
+- Extract API error messages from 4xx response bodies in `fetchWithTimeout` so user-friendly errors propagate to the UI
+
 ## [26.2.1] - 2026-03-17
 
 ### Changed
@@ -28,6 +67,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Sidebar display name now updates immediately after saving profile edits (was stale until full-page reload due to separate query cache)
+- Social link delete API no longer returns 500 on temp-* IDs — rejects with 400 before hitting the database
+- Social link optimistic rollback now properly reverts UI on server error (was using stale closure instead of snapshot)
+- Mobile settings page now shows "Links, music & more" trigger to access Social/Music/Earn/About tabs (were completely hidden below `lg` breakpoint)
+- Social link action labels now show platform name or @handle consistently instead of raw hostnames for X, Threads, Facebook, Twitch, Snapchat
+- Analytics "Last 30 days" container reserves min-height to prevent layout shift during lazy load
+- Theme-init script no longer causes hydration mismatch (nonce undefined vs empty string) on every page load
+- Display name inline editor now uses distinct aria-label ("Edit display name") to avoid screen reader confusion with the form field
 - Admin creator sidebar now displays DSP and social link icons (previously showed empty tabs because `platform` field was dropped during data hydration)
 - Fixed swapped `platformIcon`/`platformName` fields in `CreatorProfileSocialLinks` table component
 - CRM contact sidebar now correctly resolves platform icons from `platform` field before falling back to URL detection

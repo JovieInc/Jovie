@@ -1,10 +1,11 @@
 'use client';
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { ClipboardCopy, MessageSquareText } from 'lucide-react';
+import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
+import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import {
   DrawerButton,
   DrawerPropertyRow,
@@ -13,11 +14,13 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import {
+  type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbarActionButton,
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import {
   AdminTableHeader,
   AdminTableSubheader,
@@ -128,31 +131,53 @@ export function AdminFeedbackTable({
     [rows, selectedId]
   );
 
-  const dismissSelected = async () => {
-    if (!selected || selected.status === 'dismissed') return;
-    try {
-      await dismissFeedback(selected.id);
-      setRows(current =>
-        current.map(row =>
-          row.id === selected.id
-            ? {
-                ...row,
-                status: 'dismissed' as const,
-                dismissedAtIso: new Date().toISOString(),
-              }
-            : row
-        )
-      );
-    } catch {
-      // Error toast handled by mutation's onError callback
-    }
-  };
+  const dismissRow = useCallback(
+    async (item: FeedbackRow) => {
+      if (item.status === 'dismissed') return;
+      try {
+        await dismissFeedback(item.id);
+        setRows(current =>
+          current.map(row =>
+            row.id === item.id
+              ? {
+                  ...row,
+                  status: 'dismissed' as const,
+                  dismissedAtIso: new Date().toISOString(),
+                }
+              : row
+          )
+        );
+      } catch {
+        // Error toast handled by mutation's onError callback
+      }
+    },
+    [dismissFeedback]
+  );
 
-  const copySelectedAsMarkdown = useCallback(async () => {
-    if (!selected) return;
-    await navigator.clipboard.writeText(formatFeedbackAsMarkdown(selected));
+  const copyRowAsMarkdown = useCallback(async (item: FeedbackRow) => {
+    await navigator.clipboard.writeText(formatFeedbackAsMarkdown(item));
     toast.success('Copied to clipboard');
-  }, [selected]);
+  }, []);
+
+  const getContextMenuItems = useCallback(
+    (item: FeedbackRow): ContextMenuItemType[] => [
+      {
+        id: 'copy-markdown',
+        label: 'Copy as Markdown',
+        icon: <ClipboardCopy className='h-4 w-4' />,
+        onClick: () => copyRowAsMarkdown(item),
+      },
+      { type: 'separator' },
+      {
+        id: 'dismiss',
+        label: 'Dismiss',
+        icon: <XCircle className='h-4 w-4' />,
+        onClick: () => dismissRow(item),
+        disabled: item.status === 'dismissed',
+      },
+    ],
+    [copyRowAsMarkdown, dismissRow]
+  );
 
   const copyAllAsMarkdown = useCallback(async () => {
     const markdown = rows
@@ -189,8 +214,24 @@ export function AdminFeedbackTable({
         cell: renderStatusCell,
         size: 120,
       }),
+      columnHelper.display({
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => {
+          // NOSONAR - TanStack Table render prop
+          const items = convertContextMenuItems(
+            getContextMenuItems(row.original)
+          );
+          return (
+            <div className='flex items-center justify-end'>
+              <TableActionMenu items={items} align='end' />
+            </div>
+          );
+        },
+        size: 48,
+      }),
     ],
-    []
+    [getContextMenuItems]
   );
 
   const getRowClassName = useCallback(
@@ -234,6 +275,7 @@ export function AdminFeedbackTable({
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={row => setSelectedId(row.id)}
+              getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
               className='text-[13px]'
@@ -285,7 +327,7 @@ export function AdminFeedbackTable({
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  onClick={dismissSelected}
+                  onClick={() => dismissRow(selected)}
                   disabled={selected.status === 'dismissed'}
                   loading={isDismissing}
                 >
@@ -294,7 +336,7 @@ export function AdminFeedbackTable({
                 <DrawerButton
                   type='button'
                   tone='secondary'
-                  onClick={copySelectedAsMarkdown}
+                  onClick={() => copyRowAsMarkdown(selected)}
                 >
                   <ClipboardCopy className='mr-1.5 h-3.5 w-3.5' />
                   Copy as Markdown

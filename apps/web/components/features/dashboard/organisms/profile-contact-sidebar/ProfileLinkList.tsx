@@ -13,6 +13,7 @@ import {
   DrawerLinkSection,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -98,7 +99,12 @@ function LinkItem({ link, onRemove }: LinkItemProps) {
   return (
     <SidebarLinkRow
       icon={<SocialIcon platform={link.platform} className='h-4 w-4' />}
-      label={handle ? `@${handle}` : formatDisplayHost(link.url)}
+      label={
+        handle
+          ? `@${handle}`
+          : (PLATFORM_METADATA_MAP[link.platform]?.name ??
+            formatDisplayHost(link.url))
+      }
       url={link.url}
       deepLinkPlatform={link.platform}
       isVisible={link.isVisible}

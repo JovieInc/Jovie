@@ -189,10 +189,10 @@ export function SettingsAdPixelsSection({
 
   const baselineValues = useMemo(
     () => ({
-      facebookPixelId: existingSettings?.pixels.facebookPixelId ?? '',
-      googleMeasurementId: existingSettings?.pixels.googleMeasurementId ?? '',
-      tiktokPixelId: existingSettings?.pixels.tiktokPixelId ?? '',
-      enabled: existingSettings?.pixels.enabled ?? true,
+      facebookPixelId: existingSettings?.pixels?.facebookPixelId ?? '',
+      googleMeasurementId: existingSettings?.pixels?.googleMeasurementId ?? '',
+      tiktokPixelId: existingSettings?.pixels?.tiktokPixelId ?? '',
+      enabled: existingSettings?.pixels?.enabled ?? true,
     }),
     [existingSettings]
   );
@@ -420,8 +420,8 @@ export function SettingsAdPixelsSection({
             helpText='Get credentials'
             isConfigured={
               !!(
-                existingSettings?.pixels.facebookPixelId &&
-                existingSettings?.hasTokens.facebook
+                existingSettings?.pixels?.facebookPixelId &&
+                existingSettings?.hasTokens?.facebook
               )
             }
             onPixelIdChange={value =>
@@ -447,8 +447,8 @@ export function SettingsAdPixelsSection({
             helpText='Get credentials'
             isConfigured={
               !!(
-                existingSettings?.pixels.googleMeasurementId &&
-                existingSettings?.hasTokens.google
+                existingSettings?.pixels?.googleMeasurementId &&
+                existingSettings?.hasTokens?.google
               )
             }
             onPixelIdChange={value =>
@@ -472,8 +472,8 @@ export function SettingsAdPixelsSection({
             helpText='Get credentials'
             isConfigured={
               !!(
-                existingSettings?.pixels.tiktokPixelId &&
-                existingSettings?.hasTokens.tiktok
+                existingSettings?.pixels?.tiktokPixelId &&
+                existingSettings?.hasTokens?.tiktok
               )
             }
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}

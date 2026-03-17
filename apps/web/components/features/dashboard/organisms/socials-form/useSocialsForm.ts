@@ -257,18 +257,14 @@ export function useSocialsForm({
         }
       } catch (err) {
         // Try to extract structured error from FetchError response body
-        if (err instanceof FetchError && err.response) {
-          try {
-            const body = await err.response.clone().json();
-            if (body && typeof body === 'object' && 'code' in body) {
-              setVerificationError({
-                code: toVerificationErrorCode(body.code as string),
-                message: (body.error as string) ?? 'Verification failed.',
-              });
-              return;
-            }
-          } catch {
-            // JSON parse failed, fall through to generic error
+        if (err instanceof FetchError) {
+          const body = err.parsedBody;
+          if (body && 'code' in body) {
+            setVerificationError({
+              code: toVerificationErrorCode(body.code as string),
+              message: (body.error as string) ?? 'Verification failed.',
+            });
+            return;
           }
         }
         setVerificationError({

@@ -85,8 +85,28 @@ const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
     hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
     requiresAtSymbol: true,
   },
+  x: {
+    hosts: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'],
+    requiresAtSymbol: false,
+  },
   linktree: {
     hosts: ['linktr.ee', 'www.linktr.ee'],
+    requiresAtSymbol: false,
+  },
+  threads: {
+    hosts: ['threads.net', 'www.threads.net'],
+    requiresAtSymbol: false,
+  },
+  facebook: {
+    hosts: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    requiresAtSymbol: false,
+  },
+  twitch: {
+    hosts: ['twitch.tv', 'www.twitch.tv'],
+    requiresAtSymbol: false,
+  },
+  snapchat: {
+    hosts: ['snapchat.com', 'www.snapchat.com'],
     requiresAtSymbol: false,
   },
 };
@@ -122,7 +142,18 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
       if (config.hosts.includes(host)) {
-        const seg = url.pathname.split('/').find(Boolean);
+        const segments = url.pathname.split('/').filter(Boolean);
+
+        // Skip known non-handle path prefixes for specific platforms
+        let seg = segments[0];
+        if (host.includes('snapchat.com') && seg === 'add') {
+          seg = segments[1];
+        } else if (
+          host.includes('facebook.com') &&
+          (seg === 'profile.php' || seg === 'pages')
+        ) {
+          return null; // Facebook legacy URLs don't have extractable handles
+        }
         if (!seg) return null;
 
         // YouTube requires @ symbol, others allow it optionally

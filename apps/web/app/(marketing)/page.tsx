@@ -238,9 +238,9 @@ export default function HomePage() {
         <LogoBar />
       </div>
 
-      <AudienceCRMSection />
-
       <DeeplinksGrid />
+
+      <AudienceCRMSection />
 
       {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
         <hr
