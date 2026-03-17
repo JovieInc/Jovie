@@ -2,8 +2,6 @@
 // Basic building blocks that can't be broken down further
 // Named exports for tree-shaking (no `export *`)
 
-export type { CTAButtonProps } from '@/components/molecules/CTAButton';
-export { CTAButton } from '@/components/molecules/CTAButton';
 export { AmountSelector } from './AmountSelector';
 export { ArtistName } from './ArtistName';
 export type { Assignee } from './AssigneeAvatar';

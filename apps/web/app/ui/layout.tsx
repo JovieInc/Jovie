@@ -25,7 +25,7 @@ export default function UILayout({
   readonly children: ReactNode;
 }) {
   return (
-    <div className='flex min-h-screen bg-(--linear-bg-page) text-primary-token'>
+    <div className='flex min-h-screen bg-page text-primary-token'>
       {/* Left nav */}
       <aside className='sticky top-0 flex h-screen w-52 shrink-0 flex-col overflow-y-auto border-r border-subtle py-6'>
         <div className='px-4 pb-4'>

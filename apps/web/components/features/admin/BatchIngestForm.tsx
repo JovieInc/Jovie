@@ -83,6 +83,7 @@ export function BatchIngestForm({
       <div className='p-0'>
         <button
           type='button'
+          aria-expanded={isOpen}
           onClick={() => setIsOpen(open => !open)}
           className='flex w-full items-center gap-2 border-b border-subtle px-4 py-3 text-left'
         >

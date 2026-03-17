@@ -293,7 +293,7 @@ module.exports = [
   // Component dependency direction enforcement
   // atoms → molecules → organisms → features (no reverse imports)
   {
-    files: ['apps/web/components/**/*.{ts,tsx}'],
+    files: ['components/**/*.{ts,tsx}'],
     plugins: {
       boundaries: boundariesPlugin,
     },
@@ -301,23 +301,23 @@ module.exports = [
       'boundaries/elements': [
         {
           type: 'ui-atoms',
-          pattern: ['packages/ui/atoms/**'],
+          pattern: ['../../packages/ui/atoms/**'],
         },
         {
           type: 'atoms',
-          pattern: ['apps/web/components/atoms/**'],
+          pattern: ['components/atoms/**'],
         },
         {
           type: 'molecules',
-          pattern: ['apps/web/components/molecules/**'],
+          pattern: ['components/molecules/**'],
         },
         {
           type: 'organisms',
-          pattern: ['apps/web/components/organisms/**'],
+          pattern: ['components/organisms/**'],
         },
         {
           type: 'features',
-          pattern: ['apps/web/components/features/*/**'],
+          pattern: ['components/features/*/**'],
           capture: ['feature'],
         },
       ],
