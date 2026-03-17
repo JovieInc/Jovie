@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.3] - 2026-03-17
+
+### Fixed
+
+- Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
+- Dashboard profile selector now prioritizes claimed profiles, preventing sidebar/panel username mismatch
+- Orphaned unclaimed profiles are deactivated on handle change to prevent stale public profile pages
+
 ## [26.3.2] - 2026-03-17
 
 ### Removed
