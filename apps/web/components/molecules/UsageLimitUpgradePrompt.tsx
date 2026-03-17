@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { Rocket } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
@@ -94,10 +95,10 @@ export function UsageLimitUpgradePrompt({
         </div>
 
         <Button variant='secondary' size='sm' asChild className='shrink-0'>
-          <a href={APP_ROUTES.PRICING} onClick={handleUpgradeClick}>
+          <Link href={APP_ROUTES.PRICING} onClick={handleUpgradeClick}>
             <Rocket className='mr-1.5 h-3.5 w-3.5' />
             {ctaLabel}
-          </a>
+          </Link>
         </Button>
       </div>
     </div>

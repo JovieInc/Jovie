@@ -59,6 +59,7 @@
 **Why:** Users who just paid should feel great about their decision, not confused by a verification form. The current page is transactional rather than celebratory, which hurts post-purchase sentiment and increases early churn risk.
 
 **Context:** The existing success page is at `apps/web/app/billing/success/page.tsx`. It tracks `subscription_success` analytics and has a verification request flow. The redesign should keep the verification request option but make the celebration the primary experience. Use entitlements from `ENTITLEMENT_REGISTRY` to show what specifically unlocked.
+Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middleware, Clerk sync, proxy-state, onboarding flow, or leads pipeline must be manually reviewed and must not use auto-merge.
 
 **Effort:** M (a few hours)
 **Priority:** P1
@@ -72,7 +73,8 @@
 
 **Why:** These users expressed purchase intent then bailed — they're warm leads. A well-timed email has high conversion potential. The `onboarding_checkout_skipped` analytics event from the funnel PR provides the trigger signal.
 
-**Context:** Requires email-sending infrastructure (transactional email provider integration). The plan intent and skip event are tracked via analytics. Need to build: email template, scheduling/queue system, unsubscribe handling, and A/B test framework for subject lines.
+**Context:** Requires email-sending infrastructure (transactional email provider integration). The plan intent and skip event are tracked via analytics. Need to build: email template, scheduling/queue system, unsubscribe handling, and A/B test framework for subject lines. Scope must include GDPR/CCPA consent checks for marketing versus transactional email classification, opt-in versus opt-out rules by jurisdiction, privacy policy updates, retention and archival rules for `onboarding_checkout_skipped` events plus related profile-link data, unsubscribe and consent-flag enforcement before scheduling, and a compliance checkpoint for the A/B test framework and email templates.
+Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middleware, Clerk sync, proxy-state, onboarding flow, or leads pipeline must be manually reviewed and must not use auto-merge.
 
 **Effort:** L
 **Priority:** P3
@@ -87,6 +89,7 @@
 **Why:** We're instrumenting 11+ analytics events in the conversion funnel but have no admin visibility into the data. Without a dashboard, we're flying blind on conversion rates and can't identify where users drop off.
 
 **Context:** All analytics events are tracked via `track()` from `apps/web/lib/analytics.ts` which sends to gtag. The admin dashboard likely lives under `/app/admin`. The funnel view should aggregate events by day/week and show stage-by-stage conversion rates with trend lines.
+Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middleware, Clerk sync, proxy-state, onboarding flow, or leads pipeline must be manually reviewed and must not use auto-merge.
 
 **Effort:** M
 **Priority:** P1

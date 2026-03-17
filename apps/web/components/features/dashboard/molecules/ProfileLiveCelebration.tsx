@@ -64,38 +64,127 @@ export function ProfileLiveCelebration({
   autoAdvanceMs = 4000,
 }: ProfileLiveCelebrationProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const continueRef = useRef<HTMLButtonElement | null>(null);
+  const hasCompletedRef = useRef(false);
+  const hasTrackedRef = useRef(false);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCompleteRef = useRef(onComplete);
   const profileUrl = `jov.ie/${username}`;
   const particles = useMemo(() => generateParticles(), []);
 
   useEffect(() => {
-    // Trigger entrance animation
-    requestAnimationFrame(() => setIsVisible(true));
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
+  const completeCelebration = useCallback(() => {
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    if (dialogRef.current?.open) {
+      dialogRef.current.close();
+    }
+
+    onCompleteRef.current();
+  }, []);
+
+  useEffect(() => {
+    hasCompletedRef.current = false;
+
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) {
+      try {
+        dialog.showModal();
+      } catch {
+        dialog.setAttribute('open', '');
+      }
+    }
+
+    const animationFrame = requestAnimationFrame(() => setIsVisible(true));
+
+    previousFocusRef.current =
+      globalThis.document.activeElement instanceof HTMLElement
+        ? globalThis.document.activeElement
+        : null;
 
     // Focus the continue button for keyboard/screen-reader users
     continueRef.current?.focus();
 
-    track('onboarding_celebration_shown', { username });
+    if (!hasTrackedRef.current) {
+      track('onboarding_celebration_shown', { username });
+      hasTrackedRef.current = true;
+    }
 
-    // Auto-advance
-    timerRef.current = setTimeout(onComplete, autoAdvanceMs);
+    timerRef.current = setTimeout(completeCelebration, autoAdvanceMs);
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        completeCelebration();
+        return;
+      }
+
+      if (event.key !== 'Tab' || !dialog) {
+        return;
+      }
+
+      const tabbable = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+      ).filter(
+        element =>
+          !element.hasAttribute('disabled') &&
+          element.getAttribute('aria-hidden') !== 'true'
+      );
+
+      if (tabbable.length === 0) {
+        event.preventDefault();
+        continueRef.current?.focus();
+        return;
+      }
+
+      const first = tabbable[0];
+      const last = tabbable[tabbable.length - 1];
+
+      if (event.shiftKey && globalThis.document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        globalThis.document.activeElement === last
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    dialog?.addEventListener('keydown', handleKeyDown);
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cancelAnimationFrame(animationFrame);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      dialog?.removeEventListener('keydown', handleKeyDown);
+      if (dialog?.open) {
+        dialog.close();
+      }
+      previousFocusRef.current?.focus();
     };
-  }, [onComplete, autoAdvanceMs, username]);
-
-  const handleClick = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    onComplete();
-  }, [onComplete]);
+  }, [autoAdvanceMs, completeCelebration, username]);
 
   return (
-    <div
-      className='fixed inset-0 z-50 flex items-center justify-center bg-(--bg)/95 backdrop-blur-sm'
-      role='dialog'
-      aria-modal='true'
+    <dialog
+      ref={dialogRef}
+      className='fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center border-none bg-(--bg)/95 p-0 backdrop-blur-sm'
       aria-label='Profile live celebration'
     >
       {/* Confetti particles */}
@@ -153,7 +242,7 @@ export function ProfileLiveCelebration({
         <button
           ref={continueRef}
           type='button'
-          onClick={handleClick}
+          onClick={completeCelebration}
           aria-label='Continue to the next step'
           className='mt-2 text-[13px] text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2 focus-visible:ring-offset-surface-1'
         >
@@ -162,6 +251,9 @@ export function ProfileLiveCelebration({
       </div>
 
       <style>{`
+        dialog::backdrop {
+          background: transparent;
+        }
         @keyframes confetti-fall {
           0% {
             transform: translateY(0) rotate(0deg);
@@ -176,6 +268,6 @@ export function ProfileLiveCelebration({
           animation: confetti-fall ease-out forwards;
         }
       `}</style>
-    </div>
+    </dialog>
   );
 }

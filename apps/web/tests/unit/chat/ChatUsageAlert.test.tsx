@@ -4,14 +4,9 @@ import { ChatUsageAlert } from '@/components/jovie/components/ChatUsageAlert';
 import { fastRender } from '@/tests/utils/fast-render';
 
 const mockUseChatUsageQuery = vi.fn();
-const mockUsePlanGate = vi.fn();
 
 vi.mock('@/lib/queries/useChatUsageQuery', () => ({
   useChatUsageQuery: () => mockUseChatUsageQuery(),
-}));
-
-vi.mock('@/lib/queries/usePlanGate', () => ({
-  usePlanGate: () => mockUsePlanGate(),
 }));
 
 vi.mock('@/components/molecules/UpgradeButton', () => ({
@@ -22,13 +17,14 @@ vi.mock('@/components/molecules/UpgradeButton', () => ({
 
 describe('ChatUsageAlert', () => {
   beforeEach(() => {
-    mockUsePlanGate.mockReturnValue({ isPro: false });
+    mockUseChatUsageQuery.mockReset();
   });
 
   it('shows warning state when near limit', () => {
     mockUseChatUsageQuery.mockReturnValue({
       isLoading: false,
       data: {
+        plan: 'free',
         used: 9,
         remaining: 1,
         dailyLimit: 10,
@@ -47,6 +43,7 @@ describe('ChatUsageAlert', () => {
     mockUseChatUsageQuery.mockReturnValue({
       isLoading: false,
       data: {
+        plan: 'free',
         used: 100,
         remaining: 0,
         dailyLimit: 100,
@@ -62,10 +59,10 @@ describe('ChatUsageAlert', () => {
   });
 
   it('shows view plans button for pro users at limit', () => {
-    mockUsePlanGate.mockReturnValue({ isPro: true });
     mockUseChatUsageQuery.mockReturnValue({
       isLoading: false,
       data: {
+        plan: 'pro',
         used: 100,
         remaining: 0,
         dailyLimit: 100,

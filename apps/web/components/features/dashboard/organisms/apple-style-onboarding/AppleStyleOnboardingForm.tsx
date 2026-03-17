@@ -207,7 +207,7 @@ export function AppleStyleOnboardingForm({
     // If user expressed paid intent and checkout step is enabled, go to checkout
     const planIntent = getPlanIntent();
     if (checkoutStepEnabled && isPaidIntent(planIntent)) {
-      globalThis.location.href = `/onboarding/checkout?plan=${planIntent}`;
+      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${planIntent}`;
       return;
     }
 
@@ -222,9 +222,14 @@ export function AppleStyleOnboardingForm({
   }, [spotifyImportState.status, checkoutStepEnabled]);
 
   const goToDashboard = useCallback(() => {
+    if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {
+      navigateAfterOnboarding();
+      return;
+    }
+
     // Show celebration first, then navigate
     setShowCelebration(true);
-  }, []);
+  }, [navigateAfterOnboarding]);
 
   /**
    * JOV-1340: DSP connection handler is now non-blocking.
@@ -324,40 +329,42 @@ export function AppleStyleOnboardingForm({
           onComplete={navigateAfterOnboarding}
         />
       )}
-      <AuthBackButton onClick={goBack} ariaLabel='Go back' />
+      <div aria-hidden={showCelebration} inert={showCelebration}>
+        <AuthBackButton onClick={goBack} ariaLabel='Go back' />
 
-      <Link
-        href='#main-content'
-        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
-      >
-        Skip to main content
-      </Link>
-
-      <div className='sr-only' aria-live='polite' aria-atomic='true'>
-        Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}
-        {ONBOARDING_STEPS[currentStepIndex]?.title}
-      </div>
-
-      <main
-        className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
-        id='main-content'
-        aria-labelledby='step-heading'
-      >
-        <div id='step-heading' className='sr-only'>
-          {ONBOARDING_STEPS[currentStepIndex]?.title} step content
-        </div>
-        <div
-          key={currentStepIndex}
-          data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
-          className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
-            isTransitioning
-              ? 'opacity-0 translate-y-4'
-              : 'opacity-100 translate-y-0'
-          }`}
+        <Link
+          href='#main-content'
+          className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
         >
-          {renderStepContent()}
+          Skip to main content
+        </Link>
+
+        <div className='sr-only' aria-live='polite' aria-atomic='true'>
+          Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}
+          {ONBOARDING_STEPS[currentStepIndex]?.title}
         </div>
-      </main>
+
+        <main
+          className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
+          id='main-content'
+          aria-labelledby='step-heading'
+        >
+          <div id='step-heading' className='sr-only'>
+            {ONBOARDING_STEPS[currentStepIndex]?.title} step content
+          </div>
+          <div
+            key={currentStepIndex}
+            data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
+            className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
+              isTransitioning
+                ? 'opacity-0 translate-y-4'
+                : 'opacity-100 translate-y-0'
+            }`}
+          >
+            {renderStepContent()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

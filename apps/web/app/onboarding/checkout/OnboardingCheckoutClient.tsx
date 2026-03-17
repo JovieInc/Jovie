@@ -53,6 +53,151 @@ const PRO_HIGHLIGHTS = [
   },
 ] as const;
 
+interface ProfilePreviewCardProps {
+  readonly avatarUrl: string | null;
+  readonly displayName: string;
+  readonly planDisplayName: string;
+  readonly showBranding: boolean;
+  readonly spotifyFollowers: number | null;
+  readonly username: string;
+  readonly onToggleBranding: () => void;
+}
+
+function ProfilePreviewCard({
+  avatarUrl,
+  displayName,
+  planDisplayName,
+  showBranding,
+  spotifyFollowers,
+  username,
+  onToggleBranding,
+}: ProfilePreviewCardProps) {
+  return (
+    <>
+      <ContentSurfaceCard className='mb-6 p-5'>
+        <div className='flex flex-col items-center gap-4'>
+          <Avatar
+            src={avatarUrl}
+            alt={displayName || username}
+            name={displayName || username}
+            size='lg'
+          />
+
+          <div className='text-center'>
+            <p className='text-[15px] font-[590] text-primary-token'>
+              {displayName || username}
+            </p>
+            <p className='text-[12px] text-tertiary-token'>@{username}</p>
+          </div>
+
+          <div className='w-full'>
+            <button
+              type='button'
+              aria-pressed={!showBranding}
+              onClick={onToggleBranding}
+              className='group flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors hover:bg-surface-1'
+            >
+              <span className='text-[13px] text-secondary-token'>
+                Jovie branding
+              </span>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
+                  showBranding
+                    ? 'bg-surface-2 text-tertiary-token'
+                    : 'bg-(--linear-accent)/10 text-(--linear-accent)'
+                }`}
+              >
+                {showBranding ? 'Visible' : 'Hidden with Pro'}
+              </span>
+            </button>
+
+            <div
+              className={`mt-2 flex justify-center transition-all duration-300 ${
+                showBranding
+                  ? 'max-h-8 opacity-100'
+                  : 'max-h-0 overflow-hidden opacity-0'
+              }`}
+            >
+              <span className='rounded-full bg-surface-2 px-3 py-1 text-[10px] font-medium text-tertiary-token'>
+                Made with Jovie
+              </span>
+            </div>
+          </div>
+        </div>
+      </ContentSurfaceCard>
+
+      {spotifyFollowers && spotifyFollowers > 0 ? (
+        <div className='mb-4 flex items-start gap-2.5 rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
+          <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
+          <p className='text-[13px] text-secondary-token'>
+            You have{' '}
+            <span className='font-medium text-primary-token'>
+              {spotifyFollowers.toLocaleString()} Spotify followers
+            </span>
+            . {planDisplayName} analytics shows exactly where they&apos;re
+            listening from.
+          </p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+interface BillingIntervalSelectorProps {
+  readonly isAnnual: boolean;
+  readonly savingsPercent: number;
+  readonly onSelect: (isAnnual: boolean) => void;
+}
+
+function BillingIntervalSelector({
+  isAnnual,
+  savingsPercent,
+  onSelect,
+}: BillingIntervalSelectorProps) {
+  return (
+    <fieldset className='mb-4'>
+      <legend className='sr-only'>Billing interval</legend>
+      <div className='flex items-center justify-center gap-3'>
+        <label
+          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
+            isAnnual
+              ? 'text-tertiary-token hover:text-secondary-token'
+              : 'bg-surface-1 text-primary-token'
+          }`}
+        >
+          <input
+            type='radio'
+            name='billing-interval'
+            className='sr-only'
+            checked={!isAnnual}
+            onChange={() => onSelect(false)}
+          />
+          Monthly
+        </label>
+        <label
+          className={`cursor-pointer rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
+            isAnnual
+              ? 'bg-surface-1 text-primary-token'
+              : 'text-tertiary-token hover:text-secondary-token'
+          }`}
+        >
+          <input
+            type='radio'
+            name='billing-interval'
+            className='sr-only'
+            checked={isAnnual}
+            onChange={() => onSelect(true)}
+          />
+          Annual{' '}
+          <span aria-hidden='true' className='text-(--linear-accent)'>
+            -{savingsPercent}%
+          </span>
+        </label>
+      </div>
+    </fieldset>
+  );
+}
+
 export function OnboardingCheckoutClient({
   plan,
   monthlyPriceId,
@@ -73,15 +218,19 @@ export function OnboardingCheckoutClient({
     ENTITLEMENT_REGISTRY[plan]?.marketing ??
     ENTITLEMENT_REGISTRY.founding.marketing;
 
-  const hasAnnual = annualPriceId && annualAmount;
+  const hasAnnual = annualPriceId !== null && annualAmount !== null;
   const savingsPercent = hasAnnual
     ? getAnnualSavingsPercent(monthlyAmount, annualAmount)
     : 0;
 
   const currentPriceId =
-    isAnnual && annualPriceId ? annualPriceId : monthlyPriceId;
-  const currentAmount = isAnnual && annualAmount ? annualAmount : monthlyAmount;
+    isAnnual && annualPriceId !== null ? annualPriceId : monthlyPriceId;
+  const currentAmount =
+    isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
+  const handleToggleBranding = useCallback(() => {
+    setShowBranding(current => !current);
+  }, []);
 
   useEffect(() => {
     track('onboarding_checkout_shown', {
@@ -117,7 +266,6 @@ export function OnboardingCheckoutClient({
 
       const data = (await response.json()) as { url?: string };
       if (data.url) {
-        clearPlanIntent();
         globalThis.location.href = data.url;
       } else {
         throw new Error('No checkout URL returned.');
@@ -148,74 +296,15 @@ export function OnboardingCheckoutClient({
           </p>
         </div>
 
-        {/* Value preview: profile card with branding toggle */}
-        <ContentSurfaceCard className='mb-6 p-5'>
-          <div className='flex flex-col items-center gap-4'>
-            <Avatar
-              src={avatarUrl}
-              alt={displayName || username}
-              name={displayName || username}
-              size='lg'
-            />
-
-            <div className='text-center'>
-              <p className='text-[15px] font-[590] text-primary-token'>
-                {displayName || username}
-              </p>
-              <p className='text-[12px] text-tertiary-token'>@{username}</p>
-            </div>
-
-            {/* Branding toggle */}
-            <div className='w-full'>
-              <button
-                type='button'
-                onClick={() => setShowBranding(!showBranding)}
-                className='group flex w-full items-center justify-between rounded-lg border border-subtle px-3 py-2 transition-colors hover:bg-surface-1'
-              >
-                <span className='text-[13px] text-secondary-token'>
-                  Jovie branding
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-[11px] font-medium transition-all ${
-                    showBranding
-                      ? 'bg-surface-2 text-tertiary-token'
-                      : 'bg-(--linear-accent)/10 text-(--linear-accent)'
-                  }`}
-                >
-                  {showBranding ? 'Visible' : 'Hidden with Pro'}
-                </span>
-              </button>
-
-              {/* Simulated branding badge */}
-              <div
-                className={`mt-2 flex justify-center transition-all duration-300 ${
-                  showBranding
-                    ? 'opacity-100 max-h-8'
-                    : 'opacity-0 max-h-0 overflow-hidden'
-                }`}
-              >
-                <span className='rounded-full bg-surface-2 px-3 py-1 text-[10px] font-medium text-tertiary-token'>
-                  Made with Jovie
-                </span>
-              </div>
-            </div>
-          </div>
-        </ContentSurfaceCard>
-
-        {/* Spotify personalization */}
-        {spotifyFollowers && spotifyFollowers > 0 ? (
-          <div className='mb-4 flex items-start gap-2.5 rounded-lg border border-subtle bg-surface-1 px-4 py-3'>
-            <Sparkles className='mt-0.5 h-4 w-4 shrink-0 text-(--linear-accent)' />
-            <p className='text-[13px] text-secondary-token'>
-              You have{' '}
-              <span className='font-medium text-primary-token'>
-                {spotifyFollowers.toLocaleString()} Spotify followers
-              </span>
-              . {planMarketing.displayName} analytics shows exactly where
-              they&apos;re listening from.
-            </p>
-          </div>
-        ) : null}
+        <ProfilePreviewCard
+          avatarUrl={avatarUrl}
+          displayName={displayName}
+          planDisplayName={planMarketing.displayName}
+          showBranding={showBranding}
+          spotifyFollowers={spotifyFollowers}
+          username={username}
+          onToggleBranding={handleToggleBranding}
+        />
 
         {/* Pro highlights */}
         <div className='mb-6 space-y-2.5'>
@@ -236,38 +325,11 @@ export function OnboardingCheckoutClient({
 
         {/* Annual toggle */}
         {hasAnnual ? (
-          <fieldset
-            className='mb-4 flex items-center justify-center gap-3 border-none p-0 m-0'
-            aria-label='Billing interval'
-          >
-            <button
-              type='button'
-              aria-pressed={!isAnnual}
-              onClick={() => setIsAnnual(false)}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                isAnnual
-                  ? 'text-tertiary-token hover:text-secondary-token'
-                  : 'bg-surface-1 text-primary-token'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              type='button'
-              aria-pressed={isAnnual}
-              onClick={() => setIsAnnual(true)}
-              className={`rounded-full px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                isAnnual
-                  ? 'bg-surface-1 text-primary-token'
-                  : 'text-tertiary-token hover:text-secondary-token'
-              }`}
-            >
-              Annual{' '}
-              <span aria-hidden='true' className='text-(--linear-accent)'>
-                −{savingsPercent}%
-              </span>
-            </button>
-          </fieldset>
+          <BillingIntervalSelector
+            isAnnual={isAnnual}
+            savingsPercent={savingsPercent}
+            onSelect={setIsAnnual}
+          />
         ) : null}
 
         {/* Price display */}

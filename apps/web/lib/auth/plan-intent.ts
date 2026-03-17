@@ -16,6 +16,24 @@ const VALID_PLANS = new Set(['free', 'founding', 'pro', 'growth']);
 
 export type PlanIntentTier = 'free' | 'founding' | 'pro' | 'growth';
 
+function getSecureCookieAttribute(): string {
+  try {
+    return globalThis.location?.protocol === 'https:' ||
+      globalThis.isSecureContext
+      ? '; Secure'
+      : '';
+  } catch {
+    return '';
+  }
+}
+
+function readCookieTokens(cookieHeader: string): string[] {
+  return cookieHeader
+    .split(';')
+    .map(cookie => cookie.trim())
+    .filter(Boolean);
+}
+
 /**
  * Validate that a string is a known plan tier.
  * Returns the validated plan or null if invalid.
@@ -38,7 +56,7 @@ export function setPlanIntent(plan: string): void {
   // Set cookie with 30-min expiry
   try {
     const expires = new Date(Date.now() + PLAN_INTENT_TTL_MS).toUTCString();
-    document.cookie = `${PLAN_INTENT_KEY}=${validated}; path=/; expires=${expires}; SameSite=Lax`;
+    document.cookie = `${PLAN_INTENT_KEY}=${validated}; path=/; expires=${expires}; SameSite=Lax${getSecureCookieAttribute()}`;
   } catch {
     // SSR or restricted context
   }
@@ -61,7 +79,7 @@ export function setPlanIntent(plan: string): void {
 export function getPlanIntent(): PlanIntentTier | null {
   // Try cookie first
   try {
-    const cookies = document.cookie.split(';').map(c => c.trim());
+    const cookies = readCookieTokens(document.cookie);
     const match = cookies.find(c => c.startsWith(`${PLAN_INTENT_KEY}=`));
     if (match) {
       const value = match.split('=')[1];
@@ -97,7 +115,7 @@ export function getPlanIntent(): PlanIntentTier | null {
 export function getPlanIntentFromCookies(
   cookieHeader: string
 ): PlanIntentTier | null {
-  const cookies = cookieHeader.split(';').map(c => c.trim());
+  const cookies = readCookieTokens(cookieHeader);
   const match = cookies.find(c => c.startsWith(`${PLAN_INTENT_KEY}=`));
   if (!match) return null;
   return validatePlan(match.split('=')[1]);
@@ -110,7 +128,7 @@ export function getPlanIntentFromCookies(
 export function clearPlanIntent(): void {
   // Expire the cookie
   try {
-    document.cookie = `${PLAN_INTENT_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax`;
+    document.cookie = `${PLAN_INTENT_KEY}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${getSecureCookieAttribute()}`;
   } catch {
     // SSR or restricted context
   }

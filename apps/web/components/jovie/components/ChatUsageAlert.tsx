@@ -7,11 +7,10 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 import { env } from '@/lib/env-client';
-import { useChatUsageQuery, usePlanGate } from '@/lib/queries';
+import { useChatUsageQuery } from '@/lib/queries';
 
 export function ChatUsageAlert() {
   const { data, isLoading } = useChatUsageQuery({ enabled: !env.IS_E2E });
-  const { isPro } = usePlanGate();
 
   if (
     env.IS_E2E ||
@@ -23,6 +22,7 @@ export function ChatUsageAlert() {
   }
 
   const proLimit = ENTITLEMENT_REGISTRY.pro.limits.aiDailyMessageLimit;
+  const isPaidPlan = data.plan !== 'free';
 
   if (data.isExhausted) {
     return (
@@ -31,11 +31,11 @@ export function ChatUsageAlert() {
           <p>
             You&apos;ve used all {data.dailyLimit} AI messages included in your
             plan.
-            {isPro
+            {isPaidPlan
               ? ' Come back tomorrow when your quota refreshes.'
               : ` Upgrade to Pro for ${proLimit} messages/day.`}
           </p>
-          {isPro ? (
+          {isPaidPlan ? (
             <Button asChild size='sm' variant='secondary'>
               <Link href={APP_ROUTES.PRICING}>View plans</Link>
             </Button>
@@ -54,11 +54,11 @@ export function ChatUsageAlert() {
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <p>
           You&apos;ve sent {data.used} of {data.dailyLimit} daily messages.
-          {isPro
+          {isPaidPlan
             ? ` ${data.remaining} remaining today.`
             : ` Upgrade to Pro for ${proLimit}/day.`}
         </p>
-        {isPro ? (
+        {isPaidPlan ? (
           <Button asChild size='sm' variant='secondary'>
             <Link href={APP_ROUTES.PRICING}>View plans</Link>
           </Button>
