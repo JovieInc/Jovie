@@ -8,20 +8,17 @@ export function FinalCTASection() {
     <section
       className='relative z-10 overflow-hidden'
       style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        paddingTop: '7rem',
-        paddingBottom: '9rem',
+        backgroundColor: 'var(--linear-cta-bg)',
+        borderTop: '1px solid var(--linear-cta-border-top)',
+        paddingTop: 'var(--linear-cta-section-pt)',
+        paddingBottom: 'var(--linear-cta-section-pb)',
       }}
     >
       {/* Top edge highlight */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-x-0 top-0 h-px'
-        style={{
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.1) 70%, transparent)',
-        }}
+        style={{ background: 'var(--linear-cta-edge-highlight)' }}
       />
 
       {/* Primary glow — centered, wide */}
@@ -32,8 +29,7 @@ export function FinalCTASection() {
           width: '900px',
           height: '600px',
           borderRadius: '50%',
-          background:
-            'radial-gradient(ellipse at center, oklch(28% 0.07 270 / 0.5) 0%, oklch(20% 0.04 270 / 0.2) 45%, transparent 70%)',
+          background: 'var(--linear-cta-glow-primary)',
         }}
       />
 
@@ -43,8 +39,8 @@ export function FinalCTASection() {
           <span
             className='mb-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.08em]'
             style={{
-              borderColor: 'rgba(255,255,255,0.1)',
-              color: 'rgba(255,255,255,0.45)',
+              borderColor: 'var(--linear-cta-eyebrow-border)',
+              color: 'var(--linear-cta-eyebrow-color)',
             }}
           >
             Get started free
@@ -54,12 +50,12 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-white'
           >
-            Your music deserves better than a list of links.
+            Your music deserves better than a stack of links.
           </h2>
 
           <p
             className='mt-5 max-w-md marketing-lead-linear'
-            style={{ color: 'rgba(255,255,255,0.5)' }}
+            style={{ color: 'var(--linear-cta-lead-color)' }}
           >
             Launch an artist profile that grows your audience with every
             release.
@@ -72,23 +68,16 @@ export function FinalCTASection() {
               data-testid='final-cta-dock'
               className='relative w-full overflow-hidden rounded-2xl p-2'
               style={{
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                boxShadow: [
-                  '0 0 0 1px rgba(255,255,255,0.03)',
-                  '0 8px 40px rgba(0,0,0,0.5)',
-                  '0 32px 80px rgba(0,0,0,0.3)',
-                ].join(', '),
+                backgroundColor: 'var(--linear-cta-dock-bg)',
+                border: '1px solid var(--linear-cta-dock-border)',
+                boxShadow: 'var(--linear-cta-dock-shadow)',
               }}
             >
               {/* Top shine edge */}
               <div
                 aria-hidden='true'
                 className='pointer-events-none absolute inset-x-0 top-0 h-px'
-                style={{
-                  background:
-                    'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 40%, rgba(255,255,255,0.12) 60%, transparent)',
-                }}
+                style={{ background: 'var(--linear-cta-dock-shine)' }}
               />
               <ClaimHandleForm />
             </div>
@@ -97,12 +86,8 @@ export function FinalCTASection() {
           {/* Trust signals */}
           <div className='mt-6 flex items-center justify-center gap-4'>
             <p
-              className='flex items-center gap-2'
-              style={{
-                fontSize: '12px',
-                fontWeight: 450,
-                color: 'rgba(255,255,255,0.38)',
-              }}
+              className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)]'
+              style={{ color: 'var(--linear-cta-trust-color)' }}
             >
               <span
                 aria-hidden='true'
@@ -112,16 +97,13 @@ export function FinalCTASection() {
             </p>
             <span
               aria-hidden='true'
-              style={{ color: 'rgba(255,255,255,0.15)' }}
+              style={{ color: 'var(--linear-cta-trust-separator)' }}
             >
               ·
             </span>
             <p
-              style={{
-                fontSize: '12px',
-                fontWeight: 450,
-                color: 'rgba(255,255,255,0.38)',
-              }}
+              className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)]'
+              style={{ color: 'var(--linear-cta-trust-color)' }}
             >
               No credit card required
             </p>
