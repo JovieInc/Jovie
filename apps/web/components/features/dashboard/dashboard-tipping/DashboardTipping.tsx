@@ -33,6 +33,7 @@ import {
 import { BASE_URL } from '@/constants/domains';
 import { CopyToClipboardButton } from '@/features/dashboard/molecules/CopyToClipboardButton';
 import { EarningsTab } from '@/features/dashboard/organisms/EarningsTab';
+import { ShopifyStoreCard } from '@/features/dashboard/organisms/shopify/ShopifyStoreCard';
 import { cn } from '@/lib/utils';
 import { useDashboardTipping } from './useDashboardTipping';
 import { formatCount } from './utils';
@@ -544,6 +545,14 @@ export function DashboardTipping() {
           <EarningsTab />
         </div>
       )}
+
+      {/* ── Shopify Store ────────────────────────────────── */}
+      <div className='flex flex-col gap-5'>
+        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+          Shop
+        </p>
+        <ShopifyStoreCard />
+      </div>
     </div>
   );
 }

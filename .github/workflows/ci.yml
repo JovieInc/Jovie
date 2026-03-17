@@ -1842,7 +1842,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: preview-deploy-${{ github.repository }}
+      # Scope preview concurrency to a single PR/ref so unrelated PRs do not
+      # evict each other's pending preview deployments from the queue.
+      group: preview-deploy-${{ github.repository }}-${{ github.event.pull_request.number || github.ref_name }}
       cancel-in-progress: false
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}

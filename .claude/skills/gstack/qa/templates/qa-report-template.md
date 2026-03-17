@@ -4,12 +4,16 @@
 |-------|-------|
 | **Date** | {DATE} |
 | **URL** | {URL} |
+| **Branch** | {BRANCH} |
+| **Commit** | {COMMIT_SHA} ({COMMIT_DATE}) |
+| **PR** | {PR_NUMBER} ({PR_URL}) or "—" |
+| **Tier** | Quick / Standard / Exhaustive |
 | **Scope** | {SCOPE or "Full app"} |
-| **Mode** | {full / quick / regression} |
 | **Duration** | {DURATION} |
 | **Pages visited** | {COUNT} |
 | **Screenshots** | {COUNT} |
 | **Framework** | {DETECTED or "Unknown"} |
+| **Index** | [All QA runs](./index.md) |
 
 ## Health Score: {SCORE}/100
 
@@ -65,6 +69,33 @@
    ![Step 2](screenshots/issue-001-step-2.png)
 3. **Observe:** {what goes wrong}
    ![Result](screenshots/issue-001-result.png)
+
+---
+
+## Fixes Applied (if applicable)
+
+| Issue | Fix Status | Commit | Files Changed |
+|-------|-----------|--------|---------------|
+| ISSUE-NNN | verified / best-effort / reverted / deferred | {SHA} | {files} |
+
+### Before/After Evidence
+
+#### ISSUE-NNN: {title}
+**Before:** ![Before](screenshots/issue-NNN-before.png)
+**After:** ![After](screenshots/issue-NNN-after.png)
+
+---
+
+## Ship Readiness
+
+| Metric | Value |
+|--------|-------|
+| Health score | {before} → {after} ({delta}) |
+| Issues found | N |
+| Fixes applied | N (verified: X, best-effort: Y, reverted: Z) |
+| Deferred | N |
+
+**PR Summary:** "QA found N issues, fixed M, health score X → Y."
 
 ---
 

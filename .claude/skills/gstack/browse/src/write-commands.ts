@@ -44,11 +44,48 @@ export async function handleWriteCommand(
     case 'click': {
       const selector = args[0];
       if (!selector) throw new Error('Usage: browse click <selector>');
-      const resolved = bm.resolveRef(selector);
-      if ('locator' in resolved) {
-        await resolved.locator.click({ timeout: 5000 });
-      } else {
-        await page.click(resolved.selector, { timeout: 5000 });
+
+      // Auto-route: if ref points to a real <option> inside a <select>, use selectOption
+      const role = bm.getRefRole(selector);
+      if (role === 'option') {
+        const resolved = await bm.resolveRef(selector);
+        if ('locator' in resolved) {
+          const optionInfo = await resolved.locator.evaluate(el => {
+            if (el.tagName !== 'OPTION') return null; // custom [role=option], not real <option>
+            const option = el as HTMLOptionElement;
+            const select = option.closest('select');
+            if (!select) return null;
+            return { value: option.value, text: option.text };
+          });
+          if (optionInfo) {
+            await resolved.locator.locator('xpath=ancestor::select').selectOption(optionInfo.value, { timeout: 5000 });
+            return `Selected "${optionInfo.text}" (auto-routed from click on <option>) → now at ${page.url()}`;
+          }
+          // Real <option> with no parent <select> or custom [role=option] — fall through to normal click
+        }
+      }
+
+      const resolved = await bm.resolveRef(selector);
+      try {
+        if ('locator' in resolved) {
+          await resolved.locator.click({ timeout: 5000 });
+        } else {
+          await page.click(resolved.selector, { timeout: 5000 });
+        }
+      } catch (err: any) {
+        // Enhanced error guidance: clicking <option> elements always fails (not visible / timeout)
+        const isOption = 'locator' in resolved
+          ? await resolved.locator.evaluate(el => el.tagName === 'OPTION').catch(() => false)
+          : await page.evaluate(
+              (sel: string) => document.querySelector(sel)?.tagName === 'OPTION',
+              (resolved as { selector: string }).selector
+            ).catch(() => false);
+        if (isOption) {
+          throw new Error(
+            `Cannot click <option> elements. Use 'browse select <parent-select> <value>' instead of 'click' for dropdown options.`
+          );
+        }
+        throw err;
       }
       // Wait briefly for any navigation/DOM update
       await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -59,7 +96,7 @@ export async function handleWriteCommand(
       const [selector, ...valueParts] = args;
       const value = valueParts.join(' ');
       if (!selector || !value) throw new Error('Usage: browse fill <selector> <value>');
-      const resolved = bm.resolveRef(selector);
+      const resolved = await bm.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.fill(value, { timeout: 5000 });
       } else {
@@ -72,7 +109,7 @@ export async function handleWriteCommand(
       const [selector, ...valueParts] = args;
       const value = valueParts.join(' ');
       if (!selector || !value) throw new Error('Usage: browse select <selector> <value>');
-      const resolved = bm.resolveRef(selector);
+      const resolved = await bm.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.selectOption(value, { timeout: 5000 });
       } else {
@@ -84,7 +121,7 @@ export async function handleWriteCommand(
     case 'hover': {
       const selector = args[0];
       if (!selector) throw new Error('Usage: browse hover <selector>');
-      const resolved = bm.resolveRef(selector);
+      const resolved = await bm.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.hover({ timeout: 5000 });
       } else {
@@ -110,7 +147,7 @@ export async function handleWriteCommand(
     case 'scroll': {
       const selector = args[0];
       if (selector) {
-        const resolved = bm.resolveRef(selector);
+        const resolved = await bm.resolveRef(selector);
         if ('locator' in resolved) {
           await resolved.locator.scrollIntoViewIfNeeded({ timeout: 5000 });
         } else {
@@ -139,7 +176,7 @@ export async function handleWriteCommand(
         return 'DOM content loaded';
       }
       const timeout = args[1] ? parseInt(args[1], 10) : 15000;
-      const resolved = bm.resolveRef(selector);
+      const resolved = await bm.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.waitFor({ state: 'visible', timeout });
       } else {
@@ -204,7 +241,7 @@ export async function handleWriteCommand(
         if (!fs.existsSync(fp)) throw new Error(`File not found: ${fp}`);
       }
 
-      const resolved = bm.resolveRef(selector);
+      const resolved = await bm.resolveRef(selector);
       if ('locator' in resolved) {
         await resolved.locator.setInputFiles(filePaths);
       } else {

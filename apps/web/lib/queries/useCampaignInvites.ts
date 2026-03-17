@@ -12,6 +12,12 @@ export interface ThrottlingConfig {
   maxPerHour: number;
 }
 
+export const DEFAULT_THROTTLING: ThrottlingConfig = {
+  minDelayMs: 30000, // 30 seconds
+  maxDelayMs: 120000, // 2 minutes
+  maxPerHour: 30,
+};
+
 export interface CampaignSettingsData {
   fitScoreThreshold: number;
   batchLimit: number;

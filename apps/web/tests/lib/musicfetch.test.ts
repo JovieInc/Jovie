@@ -119,7 +119,7 @@ describe('musicfetch client', () => {
       expect(result!.links).toEqual({
         spotify: 'https://open.spotify.com/track/abc123',
         apple_music: 'https://music.apple.com/us/album/anti-hero/123',
-        youtube: 'https://music.youtube.com/watch?v=xyz',
+        youtube_music: 'https://music.youtube.com/watch?v=xyz',
         tidal: 'https://tidal.com/track/456',
         pandora: 'https://www.pandora.com/artist/taylor-swift/anti-hero',
         iheartradio: 'https://www.iheart.com/song/anti-hero-123',

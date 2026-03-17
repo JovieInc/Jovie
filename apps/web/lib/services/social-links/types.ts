@@ -65,33 +65,13 @@ export interface UpdateLinkData {
 }
 
 /**
- * List of Digital Streaming Platform (DSP) identifiers.
- * Note: Regular YouTube is classified as social, not music.
- * Only YouTube Music (music.youtube.com) is a DSP.
- */
-export const DSP_PLATFORMS = [
-  'amazon-music',
-  'amazon_music',
-  'apple-music',
-  'apple_music',
-  'bandcamp',
-  'deezer',
-  'netease',
-  'pandora',
-  'soundcloud',
-  'spotify',
-  'tencent-music',
-  'tencent_music',
-  'tidal',
-  'youtube-music',
-  'youtube_music',
-] as const;
-
-export type DspPlatform = (typeof DSP_PLATFORMS)[number];
-
-/**
  * Check if a platform is a DSP.
+ * Delegates to the canonical DSP registry which handles
+ * kebab-case, snake_case, and alias normalization.
  */
-export function isDspPlatform(platform: string): platform is DspPlatform {
-  return DSP_PLATFORMS.includes(platform as DspPlatform);
-}
+export {
+  isDspPlatform,
+  STREAMING_DSP_KEYS as DSP_PLATFORMS,
+} from '@/lib/dsp-registry';
+
+export type DspPlatform = string;

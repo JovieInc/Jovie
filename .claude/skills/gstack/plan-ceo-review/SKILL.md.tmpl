@@ -452,6 +452,25 @@ List every ASCII diagram in files this plan touches. Still accurate?
 ### Unresolved Decisions
 If any AskUserQuestion goes unanswered, note it here. Never silently default.
 
+## Review Log
+
+After producing the Completion Summary above, persist the review result:
+
+```bash
+eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
+mkdir -p ~/.gstack/projects/$SLUG
+echo '{"skill":"plan-ceo-review","timestamp":"TIMESTAMP","status":"STATUS","unresolved":N,"critical_gaps":N,"mode":"MODE"}' >> ~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl
+```
+
+Before running this command, substitute the placeholder values from the Completion Summary you just produced:
+- **TIMESTAMP**: current ISO 8601 datetime (e.g., 2026-03-16T14:30:00)
+- **STATUS**: "clean" if 0 unresolved decisions AND 0 critical gaps; otherwise "issues_open"
+- **unresolved**: number from "Unresolved decisions" in the summary
+- **critical_gaps**: number from "Failure modes: ___ CRITICAL GAPS" in the summary
+- **MODE**: the mode the user selected (SCOPE_EXPANSION / HOLD_SCOPE / SCOPE_REDUCTION)
+
+{{REVIEW_DASHBOARD}}
+
 ## Formatting Rules
 * NUMBER issues (1, 2, 3...) and LETTERS for options (A, B, C...).
 * Label with NUMBER + LETTER (e.g., "3A", "3B").

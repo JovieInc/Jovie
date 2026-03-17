@@ -53,14 +53,15 @@ export interface StaticArtistPageProps {
   /** HMAC-signed tracking token for authenticating visit tracking requests */
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
+  readonly showShopButton?: boolean;
 }
 
 /**
  * Merge artist-level DSPs with social-link-derived DSPs, deduped by key.
  * Artist DSPs take priority (listed first).
  */
-function getMergedDSPs(artist: Artist) {
-  return getCanonicalProfileDSPs(artist);
+function getMergedDSPs(artist: Artist, socialLinks: LegacySocialLink[]) {
+  return getCanonicalProfileDSPs(artist, socialLinks);
 }
 
 interface RenderContentOptions {
@@ -186,8 +187,9 @@ export function StaticArtistPage({
   tourDates = [],
   visitTrackingToken,
   showSubscriptionConfirmedBanner = true,
+  showShopButton = false,
 }: StaticArtistPageProps) {
-  const mergedDSPs = getMergedDSPs(artist);
+  const mergedDSPs = getMergedDSPs(artist, socialLinks);
   const viewModel = buildProfilePublicViewModel({
     mode,
     artist,
@@ -208,6 +210,7 @@ export function StaticArtistPage({
     tourDates,
     visitTrackingToken,
     showSubscriptionConfirmedBanner,
+    showShopButton,
   });
 
   return (

@@ -16,7 +16,7 @@ interface DspLogoProps {
  * viewBox is always "0 0 24 24" for the icon portion.
  */
 const DSP_LOGO_CONFIG: Record<
-  ProviderKey,
+  string,
   { name: string; color: string; iconPath: string }
 > = {
   spotify: {

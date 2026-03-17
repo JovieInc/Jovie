@@ -253,9 +253,9 @@ export function SettingsPolished({
         ? [
             {
               id: 'admin',
-              title: 'Admin',
+              title: 'General',
               description:
-                'Platform administration: waitlist, campaigns, and system settings.',
+                'Dev toolbar, waitlist controls, campaign targeting, and admin quick links.',
               render: () => <SettingsAdminSection />,
             },
           ]

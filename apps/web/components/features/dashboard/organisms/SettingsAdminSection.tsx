@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { CampaignSettingsPanel } from '@/components/features/admin/campaigns/CampaignSettingsPanel';
+import { WaitlistSettingsPanel } from '@/components/features/admin/WaitlistSettingsPanel';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
@@ -71,76 +73,86 @@ function AdminLink({ href, icon: Icon, title, description }: AdminLinkProps) {
 /**
  * Admin settings section - only visible to admin users.
  *
- * Provides quick links to admin pages for waitlist management,
- * campaign targeting, creator management, and system activity.
+ * Consolidates platform configuration (dev toolbar, waitlist controls,
+ * campaign targeting/throttling) with quick links to admin dashboards.
  */
 export function SettingsAdminSection() {
   const devToolbar = useDevToolbarCookie();
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
-        title='Admin tools'
-        subtitle='Platform-only controls for queue management, campaigns, and system operations.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 px-4 py-3.5'>
-          <ShieldCheck
-            className='h-4 w-4 shrink-0 text-secondary-token'
-            aria-hidden
-          />
-          <p className='text-[13px] leading-[18px] text-secondary-token'>
-            These controls are only visible to admin accounts. Use them to
-            manage platform operations without leaving the authenticated shell.
-          </p>
-        </ContentSurfaceCard>
-
-        <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
-          <div className='flex min-w-0 items-center gap-3'>
-            <Terminal
-              className='h-4 w-4 shrink-0 text-secondary-token'
-              aria-hidden
-            />
-            <div>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Dev Toolbar
-              </p>
-              <p className='mt-0.5 text-[13px] text-secondary-token'>
-                Show the dev toolbar with feature flag overrides and environment
-                info.
-              </p>
+    <div className='space-y-6'>
+      {/* Dev Toolbar toggle */}
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Developer tools'
+          subtitle='Controls for the on-screen dev toolbar.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='px-4 py-3'>
+          <ContentSurfaceCard className='flex items-center justify-between gap-3 bg-surface-0 p-4'>
+            <div className='flex min-w-0 items-center gap-3'>
+              <Terminal
+                className='h-4 w-4 shrink-0 text-secondary-token'
+                aria-hidden
+              />
+              <div>
+                <p className='text-[13px] font-[510] text-primary-token'>
+                  Dev Toolbar
+                </p>
+                <p className='mt-0.5 text-[13px] text-secondary-token'>
+                  Show the dev toolbar with feature flag overrides and
+                  environment info.
+                </p>
+              </div>
             </div>
-          </div>
-          <Switch.Root
-            checked={devToolbar.enabled}
-            onCheckedChange={devToolbar.toggle}
-            className={`relative w-9 h-5 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
-              devToolbar.enabled
-                ? 'bg-[var(--color-accent)]'
-                : 'bg-[var(--color-bg-surface-3,#333)]'
-            }`}
-          >
-            <Switch.Thumb className='block w-4 h-4 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[18px] shadow-sm' />
-          </Switch.Root>
-        </ContentSurfaceCard>
+            <Switch.Root
+              checked={devToolbar.enabled}
+              onCheckedChange={devToolbar.toggle}
+              className={`relative w-9 h-5 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
+                devToolbar.enabled
+                  ? 'bg-[var(--color-accent)]'
+                  : 'bg-[var(--color-bg-surface-3,#333)]'
+              }`}
+            >
+              <Switch.Thumb className='block w-4 h-4 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-[18px] shadow-sm' />
+            </Switch.Root>
+          </ContentSurfaceCard>
+        </div>
+      </DashboardCard>
 
-        <div className='space-y-2'>
+      {/* Waitlist settings */}
+      <WaitlistSettingsPanel />
+
+      {/* Campaign targeting & throttling */}
+      <CampaignSettingsPanel />
+
+      {/* Admin quick links */}
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <ContentSectionHeader
+          title='Admin dashboards'
+          subtitle='Quick links to admin data views and operational tools.'
+          className='min-h-0 px-4 py-3'
+        />
+        <div className='space-y-2 px-4 py-3'>
           <AdminLink
             href={APP_ROUTES.ADMIN_WAITLIST}
             icon={UserPlus}
             title='Waitlist'
-            description='Review signups, auto-accept settings, and approval queue.'
+            description='Review signups and approval queue.'
           />
           <AdminLink
             href={APP_ROUTES.ADMIN_CAMPAIGNS}
             icon={Send}
             title='Campaigns'
-            description='Manage creator claim campaigns with throttling and anti-spam controls.'
+            description='Invite throughput, claim funnel, and send controls.'
           />
           <AdminLink
             href={APP_ROUTES.ADMIN_CREATORS}
@@ -155,7 +167,7 @@ export function SettingsAdminSection() {
             description='Platform metrics, activity logs, and system health.'
           />
         </div>
-      </div>
-    </DashboardCard>
+      </DashboardCard>
+    </div>
   );
 }

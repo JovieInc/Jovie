@@ -2,7 +2,7 @@
 
 **gstack turns Claude Code from one generic assistant into a team of specialists you can summon on demand.**
 
-Eight opinionated workflow skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Plan review, code review, one-command shipping, browser automation, QA testing, and engineering retrospectives — all as slash commands.
+Thirteen opinionated workflow skills for [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Plan review, design review, code review, one-command shipping, browser automation, QA testing, engineering retrospectives, and post-ship documentation — all as slash commands.
 
 ### Without gstack
 
@@ -19,12 +19,17 @@ Eight opinionated workflow skills for [Claude Code](https://docs.anthropic.com/e
 |-------|------|--------------|
 | `/plan-ceo-review` | Founder / CEO | Rethink the problem. Find the 10-star product hiding inside the request. |
 | `/plan-eng-review` | Eng manager / tech lead | Lock in architecture, data flow, diagrams, edge cases, and tests. |
+| `/plan-design-review` | Senior product designer | Designer's eye audit. 80-item checklist, letter grades, AI Slop detection, DESIGN.md inference. Report only — never touches code. |
+| `/design-consultation` | Design consultant | Build a complete design system from scratch. Browses competitors to get in the ballpark, proposes safe choices AND creative risks, generates realistic product mockups, and writes DESIGN.md. |
 | `/review` | Paranoid staff engineer | Find the bugs that pass CI but blow up in production. Triages Greptile review comments. |
 | `/ship` | Release engineer | Sync main, run tests, resolve Greptile reviews, push, open PR. For a ready branch, not for deciding what to build. |
 | `/browse` | QA engineer | Give the agent eyes. It logs in, clicks through your app, takes screenshots, catches breakage. Full QA pass in 60 seconds. |
-| `/qa` | QA lead | Systematic QA testing. On a feature branch, auto-analyzes your diff, identifies affected pages, and tests them. Also: full exploration, quick smoke test, regression mode. |
+| `/qa` | QA + fix engineer | Test app, find bugs, fix them with atomic commits, re-verify. Before/after health scores and ship-readiness summary. Three tiers: Quick, Standard, Exhaustive. |
+| `/qa-only` | QA reporter | Report-only QA testing. Same methodology as /qa but never fixes anything. Use when you want a pure bug report without code changes. |
+| `/qa-design-review` | Designer + frontend engineer | Same design audit as /plan-design-review, then fixes what it finds. Atomic `style(design):` commits, before/after screenshots, CSS-safe self-regulation. |
 | `/setup-browser-cookies` | Session manager | Import cookies from your real browser (Comet, Chrome, Arc, Brave, Edge) into the headless session. Test authenticated pages without logging in manually. |
 | `/retro` | Engineering manager | Team-aware retro: your deep-dive + per-person praise and growth opportunities for every contributor. |
+| `/document-release` | Technical writer | Update README, ARCHITECTURE, CONTRIBUTING, and project docs to match what you just shipped. |
 
 ## Demo: one feature, five modes
 
@@ -77,6 +82,30 @@ You:   /qa https://staging.myapp.com --quick
 
 Claude: [Smoke test: homepage + 5 pages, 30 seconds]
         Health Score: 91/100. No critical issues. 1 medium: mobile nav overlap.
+
+You:   /plan-design-review https://staging.myapp.com
+
+Claude: Design Score: B  |  AI Slop Score: C
+
+        "The site communicates competence but not confidence."
+        "I notice the spacing between sections is uniform — nothing feels important."
+        "The first 3 things my eye goes to are: the gradient hero, a 3-column
+         feature grid with icons in circles, and a cookie-cutter CTA."
+        "If I had to describe this in one word: template."
+
+        Top issues: generic typography (Inter everywhere), AI slop patterns
+        (3-column icon grid, purple gradient), flat heading scale.
+
+        [Full report with letter grades, 12 findings, inferred design system]
+        Want me to save this as your DESIGN.md?
+
+You:   /qa-design-review
+
+Claude: [Runs the same audit, then fixes 8 design issues]
+        style(design): FINDING-001 — replace Inter with system font stack
+        style(design): FINDING-003 — add heading scale contrast
+        style(design): FINDING-007 — break 3-column grid into asymmetric layout
+        Design Score: B → A-  |  AI Slop Score: C → A
 ```
 
 ## Who this is for
@@ -103,11 +132,11 @@ This is the setup I use. One person, ten parallel agents, each with the right co
 
 Open Claude Code and paste this. Claude will do the rest.
 
-> Install gstack: run `git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack && cd ~/.claude/skills/gstack && ./setup` then add a "gstack" section to CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, and lists the available skills: /plan-ceo-review, /plan-eng-review, /review, /ship, /browse, /qa, /setup-browser-cookies, /retro. Then ask the user if they also want to add gstack to the current project so teammates get it.
+> Install gstack: run `git clone https://github.com/garrytan/gstack.git ~/.claude/skills/gstack && cd ~/.claude/skills/gstack && ./setup` then add a "gstack" section to CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, and lists the available skills: /plan-ceo-review, /plan-eng-review, /plan-design-review, /design-consultation, /review, /ship, /browse, /qa, /qa-only, /qa-design-review, /setup-browser-cookies, /retro, /document-release. Then ask the user if they also want to add gstack to the current project so teammates get it.
 
 ### Step 2: Add to your repo so teammates get it (optional)
 
-> Add gstack to this project: run `cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup` then add a "gstack" section to this project's CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, lists the available skills: /plan-ceo-review, /plan-eng-review, /review, /ship, /browse, /qa, /setup-browser-cookies, /retro, and tells Claude that if gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
+> Add gstack to this project: run `cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup` then add a "gstack" section to this project's CLAUDE.md that says to use the /browse skill from gstack for all web browsing, never use mcp\_\_claude-in-chrome\_\_\* tools, lists the available skills: /plan-ceo-review, /plan-eng-review, /plan-design-review, /design-consultation, /review, /ship, /browse, /qa, /qa-only, /qa-design-review, /setup-browser-cookies, /retro, /document-release, and tells Claude that if gstack skills aren't working, run `cd .claude/skills/gstack && ./setup` to build the binary and register skills.
 
 Real files get committed to your repo (not a submodule), so `git clone` just works. The binary and node\_modules are gitignored — teammates just need to run `cd .claude/skills/gstack && ./setup` once to build (or `/browse` handles it automatically on first use).
 
@@ -253,6 +282,182 @@ That is `/plan-eng-review`.
 
 Not "make the idea smaller."
 **Make the idea buildable.**
+
+---
+
+## `/plan-design-review`
+
+This is my **senior designer mode**.
+
+Most developers cannot tell whether their site looks AI-generated. I could not, until I started paying attention. There is a growing class of sites that are functional but soulless — they work fine but scream "an AI built this and nobody with taste looked at it." Purple gradients, 3-column icon grids, uniform bubbly border-radius on everything, centered text on every section, decorative blobs floating in the background. The ChatGPT aesthetic.
+
+`/plan-design-review` gives the agent a designer's eye.
+
+It opens your site and reacts to it the way a Stripe or Linear designer would — immediately, viscerally, with opinions. The first output is a structured gut reaction: what the site communicates at a glance, what the eye is drawn to, and a one-word verdict. That is the most valuable part. Everything after is supporting evidence.
+
+Then it extracts your actual design system by reading the CSS: how many fonts are you really using? What is your heading scale? How many colors? Is your spacing on a grid or arbitrary? It structures this as an **Inferred Design System** and offers to save it as a `DESIGN.md` — so now you have a design system you never had before, derived from what you actually shipped.
+
+The audit covers 80 items across 10 categories. Typography, spacing, hierarchy, color, responsive design, interaction states, motion, content quality, performance feel, and — the headline feature — **AI Slop Detection**. Ten specific anti-patterns that mark a site as machine-generated.
+
+Every finding gets a letter grade (A through F) per category. The report opens with two headline scores: **Design Score** and **AI Slop Score**. "Your site got a B on design but a D on AI Slop" tells you exactly where to focus.
+
+### Example
+
+```
+You:   /plan-design-review https://myapp.com
+
+Claude: Design Score: C  |  AI Slop Score: D
+
+        "The site communicates generic SaaS energy."
+        "I notice the hero section uses a blue-to-purple gradient
+         with a 3-column feature grid below it — the single most
+         recognizable AI-generated layout pattern."
+        "The first 3 things my eye goes to are: the gradient, the
+         symmetrical icon grid, and a 'Get Started' button that
+         looks like every other 'Get Started' button."
+        "If I had to describe this in one word: template."
+
+        Inferred Design System:
+        - Fonts: Inter (body), Inter (headings) — 1 font family
+        - Colors: 14 unique non-gray colors (flag: >12)
+        - Heading scale: 36/24/18/16 — flat, no drama between sizes
+        - Spacing: mostly 16px and 24px — no rhythm
+
+        Top 5 Design Improvements:
+        1. Break the 3-column icon grid (High, AI Slop)
+        2. Add heading scale contrast — at least 2:1 ratio (High, Typography)
+        3. Replace uniform border-radius with intentional hierarchy (Medium, Spacing)
+        4. Kill the gradient hero — use a real image or bold typography (High, AI Slop)
+        5. Add a second font for headings — Inter-only reads as generic (Medium, Typography)
+
+        [Full report saved to .gstack/design-reports/]
+        Want me to save this inferred design system as your DESIGN.md?
+```
+
+This is report only — it never touches your code. Use `/qa-design-review` when you want it to fix what it finds.
+
+---
+
+## `/design-consultation`
+
+This is my **design partner mode**.
+
+`/plan-design-review` audits a site that already exists. `/design-consultation` is for when you have nothing yet — no design system, no font choices, no color palette. You are starting from zero and you want a senior designer to sit down with you and build the whole visual identity together.
+
+It is a conversation, not a form. The agent asks about your product, your users, and your audience. It thinks about what your product needs to communicate — trust, speed, craft, warmth, whatever fits — and works backward from that to concrete choices. Then it proposes a complete, coherent design system: aesthetic direction, typography (3+ fonts with specific roles), color palette with hex values, spacing scale, layout approach, and motion strategy. Every recommendation comes with a rationale. Every choice reinforces every other choice.
+
+But coherence is table stakes. Every dev tool dashboard looks the same — clean sans-serif, muted grays, a blue accent. They are all coherent. They are all forgettable. The difference between a product that looks "nice" and one that people actually recognize is the **deliberate creative risks**: the unexpected serif for headings, the bold accent nobody else in your category uses, the tighter spacing that makes your data feel authoritative instead of airy.
+
+That is what `/design-consultation` is really about. It does not just propose a safe system. It proposes safe choices AND risks — and tells you which is which. "Here are the choices that keep you literate in your category. And here is where I think you should break from convention, and why." You pick which risks to take. The agent checks that the whole system still coheres either way.
+
+If you want, the agent will browse your competitors' actual sites — take screenshots, analyze their fonts and colors and spacing — so you can see the landscape before you make choices. This is not about copying. It is about getting in the ballpark so you know what the conventions are, and then deciding which ones are worth breaking.
+
+After you agree on the system, it generates an interactive HTML preview page — not just swatches and font samples, but realistic product pages. If you are building a dashboard, you see a dashboard with a sidebar, data tables, and stat cards. If you are building a marketing site, you see a hero section with real copy and a CTA. Everything rendered in your design system, with your product name, in light and dark mode. You see what your product could feel like before a single line of production code is written.
+
+Then it writes `DESIGN.md` to your repo root — your project's design source of truth — and updates `CLAUDE.md` so every future Claude Code session respects the system. From that point on, `/qa-design-review` can audit against it, and any agent working on your frontend knows the rules.
+
+```
+You:   /design-consultation
+
+Claude: From the README, this looks like a developer analytics dashboard
+        for engineering teams. Sound right? Tell me about the feeling
+        you want — and would you like me to browse some competitors
+        first so we can see the landscape?
+
+You:    Yes, it's for eng managers. Show me what's out there.
+
+Claude: [browses Linear, Vercel, Datadog, Posthog — takes screenshots]
+
+        Here's the landscape. They all converge on clean sans-serifs
+        and muted blue-gray palettes. Linear stands out with dark-first
+        and tight spacing. The rest feel interchangeable.
+
+        Here's my proposal — and where I'd play it safe vs. take risks:
+
+        AESTHETIC: Industrial/Utilitarian — data-first, every pixel earns its place
+        TYPOGRAPHY: Geist (body + UI), Instrument Serif (display), JetBrains Mono (data)
+        COLOR: Restrained — slate neutrals, single teal accent (#0D9488)
+        SPACING: 4px base, compact density
+        LAYOUT: Grid-disciplined, 12-column
+        MOTION: Minimal-functional — only transitions that aid comprehension
+
+        SAFE CHOICES (match category expectations):
+          Geist for body — your users already know this font from Vercel
+          Slate neutrals — warm grays feel right for data-heavy UIs
+          Grid-disciplined layout — dashboards need predictable alignment
+
+        RISKS (where you'd stand out):
+          Instrument Serif for display headings — nobody in dev tools
+            uses a serif. It creates instant hierarchy contrast and
+            signals "we care about craft" in a space full of sans-serifs.
+          Single teal accent instead of blue — every competitor uses blue.
+            Teal is close enough to feel trustworthy, different enough
+            to be recognizable.
+          4px compact density — tighter than Linear, says "we respect
+            your screen real estate."
+
+        The safe choices keep you literate. The risks are where your
+        product gets its own face. Which risks appeal to you?
+
+You:    Love the serif risk. Let's see it.
+
+Claude: Preview opened in your browser.
+        [/tmp/design-consultation-preview-1710000000.html]
+
+        The page shows a realistic dashboard: sidebar nav, header with
+        avatar, stat cards, data table — all in your design system.
+        Instrument Serif at hero scale, Geist in body text, JetBrains
+        Mono in the data table. Teal accent on buttons and active states.
+        Light and dark mode toggle in the corner.
+
+        How does it feel? Want to adjust anything before I write DESIGN.md?
+
+You:    Ship it.
+
+Claude: Wrote DESIGN.md (typography, color, spacing, layout, motion).
+        Updated CLAUDE.md with design system guidelines.
+        All future sessions will respect these choices.
+```
+
+---
+
+## `/qa-design-review`
+
+This is my **designer who codes mode**.
+
+`/plan-design-review` tells you what is wrong. `/qa-design-review` fixes it.
+
+It runs the same 80-item audit, then enters a fix loop: for each design finding, it locates the source file, makes the minimal CSS/styling change, commits with `style(design): FINDING-NNN`, re-navigates to verify, and takes before/after screenshots. One commit per fix, fully bisectable.
+
+The self-regulation heuristic is tuned for design work — CSS-only changes get a free pass (they are inherently safe and reversible), but changes to component JSX/TSX files count against the risk budget. Hard cap at 30 fixes. If the risk score exceeds 20%, it stops and asks.
+
+```
+You:   /qa-design-review https://myapp.com
+
+Claude: [Runs full design audit — same output as /plan-design-review]
+        Design Score: C  |  AI Slop Score: D
+        12 findings (4 high, 5 medium, 3 polish)
+
+        Fixing 9 design issues...
+
+        style(design): FINDING-001 — replace 3-column icon grid with asymmetric layout
+        style(design): FINDING-002 — add heading scale 48/32/24/18/16
+        style(design): FINDING-003 — remove gradient hero, use bold typography
+        style(design): FINDING-004 — add second font for headings
+        style(design): FINDING-005 — vary border-radius by element role
+        style(design): FINDING-006 — left-align body text, reserve center for headings
+        style(design): FINDING-007 — add hover/focus states to all interactive elements
+        style(design): FINDING-008 — add prefers-reduced-motion media query
+        style(design): FINDING-009 — set max content width to 680px for body text
+
+        Final audit:
+        Design Score: C → B+  |  AI Slop Score: D → A
+        9 fixes applied (8 verified, 1 best-effort). 3 deferred.
+
+        [Report with before/after screenshots saved to .gstack/design-reports/]
+```
+
+Nine commits, each touching one concern. The AI Slop score went from D to A because the three most recognizable patterns (gradient hero, 3-column grid, uniform radius) are gone. The design score improved two grades because the typography now has a scale, the spacing has hierarchy, and interactive elements have proper states.
 
 ---
 
@@ -589,6 +794,29 @@ It saves a JSON snapshot to `.context/retros/` so the next run can show trends. 
 
 ---
 
+## `/document-release`
+
+This is my **technical writer mode**.
+
+After `/ship` creates the PR but before it merges, `/document-release` reads every documentation file in the project and cross-references it against the diff. It updates file paths, command lists, project structure trees, and anything else that drifted. Risky or subjective changes get surfaced as questions — everything else is handled automatically.
+
+```
+You:   /document-release
+
+Claude: Analyzing 21 files changed across 3 commits. Found 8 documentation files.
+
+        README.md: updated skill count from 9 to 10, added new skill to table
+        CLAUDE.md: added new directory to project structure
+        CONTRIBUTING.md: current — no changes needed
+        TODOS.md: marked 2 items complete, added 1 new item
+
+        All docs updated and committed. PR body updated with doc diff.
+```
+
+It also polishes CHANGELOG voice (without ever overwriting entries), cleans up completed TODOS, checks cross-doc consistency, and asks about VERSION bumps only when appropriate.
+
+---
+
 ## Troubleshooting
 
 **Skill not showing up in Claude Code?**
@@ -598,28 +826,36 @@ Run `cd ~/.claude/skills/gstack && ./setup` (or `cd .claude/skills/gstack && ./s
 Run `cd ~/.claude/skills/gstack && bun install && bun run build`. This compiles the browser binary. Requires Bun v1.0+.
 
 **Project copy is stale?**
-Re-copy from global: `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack && cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup`
+Run `/gstack-upgrade` — it updates both the global install and any vendored project copy automatically.
 
 **`bun` not installed?**
 Install it: `curl -fsSL https://bun.sh/install | bash`
 
 ## Upgrading
 
-Paste this into Claude Code:
+Run `/gstack-upgrade` in Claude Code. It detects your install type (global or vendored), upgrades, syncs any project copies, and shows what's new.
 
-> Update gstack: run `cd ~/.claude/skills/gstack && git fetch origin && git reset --hard origin/main && ./setup`. If this project also has gstack at .claude/skills/gstack, update it too: run `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack && cp -Rf ~/.claude/skills/gstack .claude/skills/gstack && rm -rf .claude/skills/gstack/.git && cd .claude/skills/gstack && ./setup`
-
-The `setup` script rebuilds the browser binary and re-symlinks skills. It takes a few seconds.
+Or set `auto_upgrade: true` in `~/.gstack/config.yaml` to upgrade automatically whenever a new version is available.
 
 ## Uninstalling
 
 Paste this into Claude Code:
 
-> Uninstall gstack: remove the skill symlinks by running `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f ~/.claude/skills/$s; done` then run `rm -rf ~/.claude/skills/gstack` and remove the gstack section from CLAUDE.md. If this project also has gstack at .claude/skills/gstack, remove it by running `for s in browse plan-ceo-review plan-eng-review review ship retro qa setup-browser-cookies; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack` and remove the gstack section from the project CLAUDE.md too.
+> Uninstall gstack: remove the skill symlinks by running `for s in browse plan-ceo-review plan-eng-review plan-design-review design-consultation review ship retro qa qa-only qa-design-review setup-browser-cookies document-release; do rm -f ~/.claude/skills/$s; done` then run `rm -rf ~/.claude/skills/gstack` and remove the gstack section from CLAUDE.md. If this project also has gstack at .claude/skills/gstack, remove it by running `for s in browse plan-ceo-review plan-eng-review plan-design-review review ship retro qa qa-only qa-design-review setup-browser-cookies document-release; do rm -f .claude/skills/$s; done && rm -rf .claude/skills/gstack` and remove the gstack section from the project CLAUDE.md too.
 
 ## Development
 
-See [BROWSER.md](BROWSER.md) for the full development guide, architecture, and command reference.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, testing, and dev mode. See [ARCHITECTURE.md](ARCHITECTURE.md) for design decisions and system internals. See [BROWSER.md](BROWSER.md) for the browse command reference.
+
+### Testing
+
+```bash
+bun test                     # free static tests (<5s)
+EVALS=1 bun run test:evals   # full E2E + LLM evals (~$4, ~20min)
+bun run eval:watch            # live dashboard during E2E runs
+```
+
+E2E tests stream real-time progress, write machine-readable diagnostics, and persist partial results that survive kills. See CONTRIBUTING.md for the full eval infrastructure.
 
 ## License
 

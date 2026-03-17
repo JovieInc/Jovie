@@ -17,7 +17,7 @@ import type { AudienceMember } from '@/types';
 // ── Provider config (matches the shape ReleaseTable expects) ────────────────
 
 export const DEMO_PROVIDER_CONFIG: Record<
-  ProviderKey,
+  string,
   { label: string; accent: string }
 > = {
   spotify: { label: 'Spotify', accent: '#1DB954' },
