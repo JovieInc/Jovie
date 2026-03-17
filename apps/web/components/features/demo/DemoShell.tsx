@@ -23,8 +23,6 @@ import {
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/components/dashboard/atoms/DashboardHeaderActionGroup';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
 import {
   Sidebar,
@@ -48,6 +46,8 @@ import {
   PageToolbarTabButton,
 } from '@/components/organisms/table';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import type { DemoTab } from './demo-types';
 
 interface DemoShellProps {

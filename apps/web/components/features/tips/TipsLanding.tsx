@@ -12,8 +12,8 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { ClaimHandleForm } from '@/components/home/claim-handle';
 import { Container } from '@/components/site/Container';
+import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
 /*  Hero                                                                      */

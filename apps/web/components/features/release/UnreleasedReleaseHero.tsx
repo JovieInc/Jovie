@@ -10,7 +10,7 @@
 import { Bell } from 'lucide-react';
 import Link from 'next/link';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
-import { ArtistNotificationsCTA } from '@/components/profile/artist-notifications-cta';
+import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta';
 import type { Artist } from '@/types/db';
 import { PreSaveActions } from './PreSaveActions';
 import { ReleaseCountdown } from './ReleaseCountdown';

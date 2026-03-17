@@ -10,7 +10,7 @@ import {
   renderLastActionCell,
   renderLtvCell,
   renderUserCell,
-} from '@/components/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
+} from '@/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
 import type { AudienceMember } from '@/types';
 import {
   renderDemoIntentCell,

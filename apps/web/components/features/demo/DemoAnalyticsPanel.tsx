@@ -1,12 +1,12 @@
 'use client';
 
-import {
-  ANALYTICS_SUMMARY,
-  PLATFORM_CLICKS,
-} from '@/components/home/demo/mock-data';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import {
+  ANALYTICS_SUMMARY,
+  PLATFORM_CLICKS,
+} from '@/features/home/demo/mock-data';
 
 const maxClicks = Math.max(...PLATFORM_CLICKS.map(p => p.clicks));
 

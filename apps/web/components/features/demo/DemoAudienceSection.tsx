@@ -2,11 +2,11 @@
 
 import { BarChart3 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { UnifiedTable } from '@/components/organisms/table';
 import {
   AudienceTableStableProvider,
   AudienceTableVolatileProvider,
-} from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
-import { UnifiedTable } from '@/components/organisms/table';
+} from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
 import { cn } from '@/lib/utils';
 import type { AudienceMember } from '@/types';
 import { DemoAnalyticsSidebar } from './DemoAnalyticsSidebar';

@@ -21,10 +21,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { publicEnv } from '@/lib/env-public';
 import { queryKeys } from '@/lib/queries';
-import { AuthShellWrapper } from '../organisms/AuthShellWrapper';
 import { DEMO_DASHBOARD_DATA } from './mock-dashboard-data';
 import { DEMO_RELEASE_VIEW_MODELS } from './mock-release-data';
 

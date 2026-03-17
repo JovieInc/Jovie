@@ -1,11 +1,11 @@
 'use client';
 
 import { DotBadge, type DotBadgeVariant } from '@/components/atoms/DotBadge';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import {
   AUDIENCE_MEMBERS,
   AUDIENCE_SUMMARY,
-} from '@/components/home/demo/mock-data';
-import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+} from '@/features/home/demo/mock-data';
 
 const INTENT_STYLE: Record<string, DotBadgeVariant> = {
   High: {

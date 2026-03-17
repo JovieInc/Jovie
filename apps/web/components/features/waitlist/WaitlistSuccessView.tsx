@@ -1,7 +1,7 @@
 'use client';
 
-import { AuthLayout } from '@/components/auth';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout } from '@/features/auth';
 
 export function WaitlistSuccessView() {
   return (

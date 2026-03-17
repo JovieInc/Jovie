@@ -2,11 +2,11 @@
 
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { UnifiedTable } from '@/components/organisms/table';
 import {
   AudienceTableStableProvider,
   AudienceTableVolatileProvider,
-} from '@/components/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
-import { UnifiedTable } from '@/components/organisms/table';
+} from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableContext';
 import type { AudienceMember } from '@/types';
 import { DEMO_AUDIENCE_COLUMNS } from './demo-audience-columns';
 import { DEMO_AUDIENCE_MEMBERS } from './mock-release-data';

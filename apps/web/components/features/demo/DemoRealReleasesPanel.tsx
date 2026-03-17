@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { ReleaseTable } from '@/components/dashboard/organisms/release-provider-matrix/ReleaseTable';
+import { ReleaseTable } from '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   DEMO_PROVIDER_CONFIG,

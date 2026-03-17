@@ -6,7 +6,7 @@ import { Icon } from '@/components/atoms/Icon';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
+} from '@/features/release/AlbumArtworkContextMenu';
 
 interface SmartLinkArtworkProps {
   readonly src: string | null;

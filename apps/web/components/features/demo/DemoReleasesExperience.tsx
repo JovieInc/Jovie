@@ -6,7 +6,7 @@ import {
   primaryProviderKeys,
   providerConfig,
 } from '@/app/app/(shell)/dashboard/releases/config';
-import { ReleasesExperience } from '@/components/dashboard/organisms/release-provider-matrix';
+import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { DemoAuthShell } from './DemoAuthShell';

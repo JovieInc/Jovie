@@ -1,5 +1,5 @@
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 
 export function WaitlistSkeleton() {
   return (

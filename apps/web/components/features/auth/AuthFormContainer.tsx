@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
 import { Container } from '@/components/site/Container';
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 
 interface AuthFormContainerProps {
   readonly children: ReactNode;

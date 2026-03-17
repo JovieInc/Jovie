@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/components/auth/constants';
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
 
