@@ -7,6 +7,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Fixed
+
+- Homepage claim button now validates handle input before submitting (previously navigated to self-referential `/signup` when empty)
+- CRM audience demo table now shows visible text labels for Intent, Returning, and Source columns instead of invisible icon-only cells
+
+### Changed
+
+- Pricing CTA buttons now pass plan context (`?plan=free` / `?plan=founding`) to the signup page
+- Removed redundant FloatingClaimBar (third duplicate claim form) from homepage
+
 ### Changed
 
 - SSO callback loading screens now match app dark theme with centered spinner and fade-in animation instead of plain white page with spinning logo
