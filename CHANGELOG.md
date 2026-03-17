@@ -7,6 +7,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
+### Added
+
+- Canonical CDN domain registry (`constants/platforms/cdn-domains.ts`) as single source of truth for all platform image domains
+- Comprehensive CDN coverage for all supported platforms: music DSPs (Spotify, Apple Music, YouTube Music, SoundCloud, Bandcamp, Tidal, Deezer, Amazon Music, Pandora, Beatport), social networks (Instagram, Twitter/X, TikTok, Facebook, YouTube, LinkedIn, Snapchat, Pinterest, Reddit), and creator platforms (Twitch, Discord, Patreon, Substack, Medium, GitHub, Behance, Dribbble)
+- Sync test to verify `next.config.js` remotePatterns stays in sync with the CDN registry
+
+### Changed
+
+- Avatar host validation, CSP img-src, and DSP image bypass now derive from the CDN registry instead of maintaining separate hardcoded lists
+- Consolidated `next.config.js` remotePatterns to include all platform CDN domains
+
 ### Changed
 
 - Upgraded homepage hero H1 to "Your entire music career. One intelligent link."
