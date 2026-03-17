@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.1] - 2026-03-17
 
+### Changed
+
+- Move phone carousel (DeeplinksGrid) above CRM section (AudienceCRMSection) on homepage
+
 ### Fixed
 
 - `SettingsStatusPill` no longer shows "Save failed" alongside "Saving..." and "Saved" states due to operator precedence bug with `&&` and ternary
