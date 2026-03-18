@@ -15,7 +15,10 @@ import {
   type SortableColumnKey,
 } from '@/features/admin/creator-sort-config';
 import { AdminCreatorsTableHeader } from '@/features/admin/table/AdminCreatorsTableHeader';
-import { AdminCreatorsToolbar } from '@/features/admin/table/AdminCreatorsToolbar';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
@@ -398,12 +401,18 @@ export function AdminCreatorProfilesWithSidebar({
               onKeyDown: handleKeyDown,
             }}
             toolbar={
-              <AdminCreatorsToolbar
-                from={from}
-                to={to}
-                total={total}
-                profiles={profilesWithActions}
-              />
+              <>
+                <AdminTableHeader
+                  title='Creators'
+                  subtitle='Manage creator profiles, verification, and feature status.'
+                />
+                <AdminTableSubheader>
+                  <div className='hidden text-[11px] text-secondary-token tabular-nums md:block'>
+                    Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()} profiles
+                  </div>
+                </AdminTableSubheader>
+              </>
             }
           >
             {({ headerElevated, stickyTopPx }) => (
