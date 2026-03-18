@@ -12,7 +12,10 @@ import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
-import { canProceedFromProfileReview } from './profile-review-guards';
+import {
+  canProceedFromProfileReview,
+  validateDisplayName as validateDisplayNameGuard,
+} from './profile-review-guards';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -35,8 +38,6 @@ const ENRICHMENT_TIMEOUT_MS = 10_000;
 const PROFILE_SAVE_TIMEOUT_MS = 5000;
 /** Minimum time the profile preview must display before CTA enables. */
 const MIN_DISPLAY_MS = 5000;
-const DISPLAY_NAME_MAX_LENGTH = 50;
-
 function getCtaLabel(
   isSaving: boolean,
   isEnriching: boolean,
@@ -97,6 +98,7 @@ export function OnboardingProfileReviewStep({
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const prevNameRef = useRef(editableDisplayName);
 
   // Bio and genres from enrichment or existing profile
   const bio = enrichedProfile?.bio || existingBio || null;
@@ -191,17 +193,9 @@ export function OnboardingProfileReviewStep({
     }
   }, [enrichedProfile]);
 
-  // Display name validation
+  // Display name validation — delegates to shared guard
   const validateDisplayName = useCallback(
-    (name: string): string | null => {
-      const trimmed = name.trim();
-      if (!trimmed) return 'Display name is required';
-      if (trimmed.length > DISPLAY_NAME_MAX_LENGTH)
-        return `Must be ${DISPLAY_NAME_MAX_LENGTH} characters or less`;
-      if (trimmed.toLowerCase() === handle.toLowerCase())
-        return 'Please use your artist or real name, not your handle';
-      return null;
-    },
+    (name: string): string | null => validateDisplayNameGuard(name, handle),
     [handle]
   );
 
@@ -223,6 +217,7 @@ export function OnboardingProfileReviewStep({
         handleNameBlur();
       }
       if (e.key === 'Escape') {
+        setEditableDisplayName(prevNameRef.current);
         setIsEditingName(false);
         setNameError(null);
       }
@@ -231,9 +226,10 @@ export function OnboardingProfileReviewStep({
   );
 
   const startEditingName = useCallback(() => {
+    prevNameRef.current = editableDisplayName;
     setIsEditingName(true);
     globalThis.setTimeout(() => nameInputRef.current?.focus(), 0);
-  }, []);
+  }, [editableDisplayName]);
 
   // CTA proceed check
   const canProceed = canProceedFromProfileReview(
@@ -280,15 +276,21 @@ export function OnboardingProfileReviewStep({
       // Server-side defense-in-depth: verify avatar is in DB
       try {
         await verifyProfileHasAvatar();
-      } catch {
-        // Graceful degradation — client-side check is primary gate.
-        // Only block if we're confident the avatar is missing (not a network error).
-        // The client already checked avatarUrl is set, so proceed.
+      } catch (verifyError) {
+        // If the server confirms avatar is genuinely missing, block navigation
+        if (
+          verifyError instanceof Error &&
+          verifyError.message === 'Profile photo is required'
+        ) {
+          setIsSaving(false);
+          return;
+        }
+        // Network/timeout errors — client already checked avatarUrl is set, proceed
       }
 
       onGoToDashboard();
     } catch {
-      // Proceed to dashboard even if save fails — data is already in DB from enrichment
+      // Proceed to dashboard even if profile save fails — avatar data is already in DB
       onGoToDashboard();
     } finally {
       setIsSaving(false);
@@ -367,7 +369,7 @@ export function OnboardingProfileReviewStep({
                         onChange={e => setEditableDisplayName(e.target.value)}
                         onBlur={handleNameBlur}
                         onKeyDown={handleNameKeyDown}
-                        maxLength={DISPLAY_NAME_MAX_LENGTH}
+                        maxLength={50}
                         className='text-[16px] font-[590] text-primary-token text-center bg-transparent border-b border-accent outline-none w-full max-w-[280px] pb-0.5'
                         aria-label='Edit display name'
                       />

@@ -1,68 +1,54 @@
 import { describe, expect, it } from 'vitest';
+import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/apple-style-onboarding/types';
+import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 
 /**
- * Tests for step navigation with initialStepIndex support.
- * Validates the step-resume logic for existing users returning to onboarding.
+ * Tests for step-resume logic in onboarding.
+ * Imports the production resolver and step constant.
  */
-describe('Step navigation initialStepIndex', () => {
-  it('defaults to step 0 when no initialStepIndex provided', () => {
-    const initialStepIndex = undefined;
-    const resolved = initialStepIndex ?? 0;
-    expect(resolved).toBe(0);
+describe('resolveInitialStep', () => {
+  it('returns 0 for new users (no profile)', () => {
+    expect(resolveInitialStep(null, PROFILE_REVIEW_STEP_INDEX)).toBe(0);
   });
 
-  it('starts at step 2 for step-resume users', () => {
-    const initialStepIndex = 2;
-    expect(initialStepIndex).toBe(2);
+  it('returns 0 for users with avatar already set', () => {
+    expect(
+      resolveInitialStep(
+        {
+          onboardingCompletedAt: new Date(),
+          avatarUrl: 'https://cdn.example.com/avatar.jpg',
+        },
+        PROFILE_REVIEW_STEP_INDEX
+      )
+    ).toBe(0);
   });
 
-  it('back button goes to dashboard when at initialStepIndex > 0', () => {
-    const currentStepIndex = 2;
-    const initialStepIndex = 2;
-
-    // Simulates the goBack logic
-    const shouldGoToDashboard =
-      initialStepIndex > 0 && currentStepIndex <= initialStepIndex;
-    expect(shouldGoToDashboard).toBe(true);
+  it('returns profile-review step index for users with completed onboarding but no avatar', () => {
+    expect(
+      resolveInitialStep(
+        { onboardingCompletedAt: new Date(), avatarUrl: null },
+        PROFILE_REVIEW_STEP_INDEX
+      )
+    ).toBe(PROFILE_REVIEW_STEP_INDEX);
   });
 
-  it('back button goes to previous step when above initialStepIndex', () => {
-    const currentStepIndex = 2;
-    const initialStepIndex = 0;
-
-    const shouldGoToPrevious = currentStepIndex > initialStepIndex;
-    expect(shouldGoToPrevious).toBe(true);
+  it('returns 0 for users who never completed onboarding (even without avatar)', () => {
+    expect(
+      resolveInitialStep(
+        { onboardingCompletedAt: null, avatarUrl: null },
+        PROFILE_REVIEW_STEP_INDEX
+      )
+    ).toBe(0);
   });
 });
 
-interface ProfileSnapshot {
-  onboardingCompletedAt: Date | null;
-  avatarUrl: string | null;
-}
-
-function resolveInitialStep(profile: ProfileSnapshot | null): number {
-  const isReturningForPhoto =
-    profile?.onboardingCompletedAt && !profile?.avatarUrl;
-  return isReturningForPhoto ? 2 : 0;
-}
-
-describe('Step-resume detection', () => {
-  it('detects existing user with completed onboarding but no avatar', () => {
-    expect(
-      resolveInitialStep({ onboardingCompletedAt: new Date(), avatarUrl: null })
-    ).toBe(2);
+describe('PROFILE_REVIEW_STEP_INDEX', () => {
+  it('matches the profile-review step position in ONBOARDING_STEPS', () => {
+    // Sanity check: ensure the constant resolves to a valid index
+    expect(PROFILE_REVIEW_STEP_INDEX).toBeGreaterThanOrEqual(0);
   });
 
-  it('starts at step 0 for new users', () => {
-    expect(resolveInitialStep(null)).toBe(0);
-  });
-
-  it('starts at step 0 for users with avatar already set', () => {
-    expect(
-      resolveInitialStep({
-        onboardingCompletedAt: new Date(),
-        avatarUrl: 'https://cdn.example.com/avatar.jpg',
-      })
-    ).toBe(0);
+  it('is currently step 2 (handle=0, dsp=1, profile-review=2)', () => {
+    expect(PROFILE_REVIEW_STEP_INDEX).toBe(2);
   });
 });

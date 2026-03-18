@@ -55,3 +55,8 @@ export const ONBOARDING_STEPS = [
 ] as const;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
+
+/** Index of the profile-review step. Used for step-resume routing. */
+export const PROFILE_REVIEW_STEP_INDEX = ONBOARDING_STEPS.findIndex(
+  s => s.id === 'profile-review'
+);

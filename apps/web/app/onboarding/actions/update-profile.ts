@@ -8,6 +8,8 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { revalidatePath } from 'next/cache';
+import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -32,11 +34,12 @@ export async function verifyProfileHasAvatar(): Promise<{
     .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
     .limit(1);
 
-  if (!profile?.avatarUrl) {
+  const avatarUrl = profile?.avatarUrl?.trim();
+  if (!avatarUrl) {
     throw new Error('Profile photo is required');
   }
 
-  return { avatarUrl: profile.avatarUrl };
+  return { avatarUrl };
 }
 
 export async function updateOnboardingProfile(updates: {
@@ -78,6 +81,11 @@ export async function updateOnboardingProfile(updates: {
       .update(creatorProfiles)
       .set(profileUpdates)
       .where(eq(creatorProfiles.id, profile.id));
+
+    // Invalidate dashboard cache so ProfileCompletionRedirect sees fresh data
+    if (profileUpdates.avatarUrl) {
+      revalidatePath(APP_ROUTES.DASHBOARD, 'layout');
+    }
   }
 
   return { success: true };

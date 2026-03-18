@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
+import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/apple-style-onboarding/types';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
+import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { resolveUserState, UserState } from '@/lib/auth/gate';
@@ -104,10 +106,16 @@ export default async function OnboardingPage({
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
   // Step-resume: existing user with completed onboarding but missing photo
-  // Routes them directly to profile review (step 2) to upload a photo
-  const isReturningForPhoto =
-    existingProfile?.onboardingCompletedAt && !existingProfile?.avatarUrl;
-  const initialStepIndex = isReturningForPhoto ? 2 : 0;
+  // Routes them directly to profile review to upload a photo
+  const initialStepIndex = resolveInitialStep(
+    existingProfile
+      ? {
+          onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? null,
+          avatarUrl: existingProfile.avatarUrl ?? null,
+        }
+      : null,
+    PROFILE_REVIEW_STEP_INDEX
+  );
 
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 

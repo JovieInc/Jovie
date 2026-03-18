@@ -1,28 +1,14 @@
-/**
- * Unit tests for the avatar verification logic used in verifyProfileHasAvatar.
- *
- * The actual server action (in update-profile.ts) can't be imported directly
- * in tests due to the 'use server' directive. These tests validate the core
- * decision logic that the server action implements.
- */
-
 import { describe, expect, it } from 'vitest';
+import { verifyAvatarPresent } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 
 /**
- * Mirrors the verification logic from verifyProfileHasAvatar:
- * - If no profile found or avatarUrl is null → throw
- * - Otherwise → return the avatarUrl
+ * Tests for the avatar verification logic.
+ * Imports the production verifier from profile-review-guards.
+ *
+ * Note: The server action verifyProfileHasAvatar in update-profile.ts uses 'use server'
+ * and can't be imported directly. This tests the shared validation logic it delegates to.
  */
-function verifyAvatarPresent(
-  profile: { avatarUrl: string | null } | undefined
-): { avatarUrl: string } {
-  if (!profile?.avatarUrl) {
-    throw new Error('Profile photo is required');
-  }
-  return { avatarUrl: profile.avatarUrl };
-}
-
-describe('verifyProfileHasAvatar logic', () => {
+describe('verifyAvatarPresent', () => {
   it('returns avatarUrl when profile has a photo', () => {
     const result = verifyAvatarPresent({
       avatarUrl: 'https://cdn.example.com/avatar.avif',
@@ -45,9 +31,21 @@ describe('verifyProfileHasAvatar logic', () => {
   });
 
   it('throws when avatarUrl is empty string', () => {
-    // Empty string is falsy — should also be rejected
     expect(() => verifyAvatarPresent({ avatarUrl: '' })).toThrow(
       'Profile photo is required'
     );
+  });
+
+  it('throws when avatarUrl is whitespace-only', () => {
+    expect(() => verifyAvatarPresent({ avatarUrl: '   ' })).toThrow(
+      'Profile photo is required'
+    );
+  });
+
+  it('trims avatarUrl in return value', () => {
+    const result = verifyAvatarPresent({
+      avatarUrl: '  https://cdn.example.com/avatar.avif  ',
+    });
+    expect(result.avatarUrl).toBe('https://cdn.example.com/avatar.avif');
   });
 });

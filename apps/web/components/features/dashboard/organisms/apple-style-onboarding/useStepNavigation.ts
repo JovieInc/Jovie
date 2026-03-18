@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { ONBOARDING_STEPS } from './types';
 
@@ -60,7 +61,7 @@ export function useStepNavigation(
       goToPreviousStep();
     } else if (initialStepIndex > 0) {
       // Step-resume user at their starting step — go to dashboard, not previous steps
-      router.push('/app');
+      router.push(APP_ROUTES.DASHBOARD);
     } else {
       router.back();
     }
