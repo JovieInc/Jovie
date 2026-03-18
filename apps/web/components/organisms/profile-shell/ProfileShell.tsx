@@ -1,6 +1,7 @@
 'use client';
 
 import { Calendar, DollarSign, ShoppingBag } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -9,12 +10,36 @@ import { ArtistInfo } from '@/components/molecules/ArtistInfo';
 import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
-import { ProfileNotificationsMenu } from '@/components/organisms/profile-notifications-menu';
 import { Container } from '@/components/site/Container';
 import { ArtistContactsButton } from '@/features/profile/artist-contacts-button';
 import { ProfileFooter } from '@/features/profile/ProfileFooter';
-import { TipDrawer } from '@/features/profile/TipDrawer';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
+
+const TipDrawer = dynamic(
+  () =>
+    import('@/features/profile/TipDrawer').then(mod => ({
+      default: mod.TipDrawer,
+    })),
+  { ssr: false, loading: () => null }
+);
+
+const ProfileNotificationsMenu = dynamic(
+  () =>
+    import('@/components/organisms/profile-notifications-menu').then(mod => ({
+      default: mod.ProfileNotificationsMenu,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <ProfileNotificationsButton
+        hasActiveSubscriptions
+        notificationsState='idle'
+        onClick={() => {}}
+      />
+    ),
+  }
+);
+
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
