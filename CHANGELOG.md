@@ -11,6 +11,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Onboarding profile review step now requires a profile photo before allowing dashboard access
 - Releases page no longer shows "Connect Spotify" empty state during async onboarding import
+- Right-clicking a release row in the dashboard table now shows the custom context menu (Copy smart link, Open smart link, etc.) instead of the browser's default context menu
+- VirtualizedTableRow forwards extra HTML props to the underlying `<tr>` element, enabling Radix ContextMenu.Trigger's `asChild` pattern to work correctly
 
 ### Added
 
