@@ -1,9 +1,8 @@
 'use client';
 
-import { useCallback } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
-import { useTrackingMutation } from '@/lib/queries';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 
@@ -53,23 +52,10 @@ export function TourDateCard({
     }
   }
 
-  const trackClick = useTrackingMutation({ endpoint: '/api/track' });
-
-  const handleTicketClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (!tourDate.ticketUrl) return;
-      trackClick.mutate({
-        handle,
-        linkType: 'other',
-        target: tourDate.ticketUrl,
-        context: { contentType: 'tour_date', contentId: tourDate.id },
-      });
-      globalThis.open(tourDate.ticketUrl, '_blank', 'noopener,noreferrer');
-    },
-    // trackClick.mutate is stable in TanStack Query v5 — omit trackClick object
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handle, tourDate.ticketUrl, tourDate.id]
+  const handleTicketClick = useTourDateTicketClick(
+    handle,
+    tourDate.id,
+    tourDate.ticketUrl
   );
 
   const handleAddToCalendar = () => {

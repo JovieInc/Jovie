@@ -3,13 +3,13 @@
 import { Calendar, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Drawer } from 'vaul';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
-import { useTrackingMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
@@ -51,23 +51,10 @@ function TourDateRow({
     date.ticketStatus !== 'cancelled' &&
     date.ticketStatus !== 'sold_out';
 
-  const trackClick = useTrackingMutation({ endpoint: '/api/track' });
-
-  const handleTicketClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      if (!date.ticketUrl) return;
-      trackClick.mutate({
-        handle,
-        linkType: 'other',
-        target: date.ticketUrl,
-        context: { contentType: 'tour_date', contentId: date.id },
-      });
-      globalThis.open(date.ticketUrl, '_blank', 'noopener,noreferrer');
-    },
-    // trackClick.mutate is stable in TanStack Query v5 — omit trackClick object
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handle, date.ticketUrl, date.id]
+  const handleTicketClick = useTourDateTicketClick(
+    handle,
+    date.id,
+    date.ticketUrl
   );
 
   return (
