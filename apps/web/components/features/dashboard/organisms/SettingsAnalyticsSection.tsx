@@ -4,6 +4,7 @@ import { BarChart3 } from 'lucide-react';
 import { useCallback } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
@@ -49,7 +50,11 @@ export function SettingsAnalyticsSection({
   });
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
       <ContentSectionHeader
         title='Analytics filtering'
         subtitle='Control whether your own visits are excluded from profile analytics.'
@@ -83,6 +88,6 @@ export function SettingsAnalyticsSection({
           </ContentSurfaceCard>
         ) : null}
       </div>
-    </ContentSurfaceCard>
+    </DashboardCard>
   );
 }

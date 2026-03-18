@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input, Switch } from '@jovie/ui';
+import { Badge, Button, Input, Switch } from '@jovie/ui';
 import { ExternalLink, Eye, EyeOff } from 'lucide-react';
 import {
   type FormEvent,
@@ -20,9 +20,6 @@ import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggle
 import { usePixelSettingsMutation, usePixelSettingsQuery } from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
-
-const INPUT_CLASS =
-  'block w-full rounded-[8px] border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 interface PlatformSectionProps {
   readonly platform: string;
@@ -65,16 +62,16 @@ function PlatformSection({
     <ContentSurfaceCard className='space-y-4 bg-surface-0 p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
-          <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
+          <h4 className='text-[13px] font-[510] text-primary-token'>
             {platform}
           </h4>
           <p className='mt-1 text-[13px] leading-[18px] text-secondary-token'>
             {description}
           </p>
         </div>
-        <span className='rounded-full border border-subtle bg-surface-1 px-2 py-0.5 text-[11px] font-[560] uppercase tracking-[0.08em] text-secondary-token'>
+        <Badge variant='outline' className='shrink-0'>
           {isConfigured ? 'Configured' : 'Not configured'}
-        </span>
+        </Badge>
       </div>
 
       <a
@@ -91,7 +88,7 @@ function PlatformSection({
         <div>
           <label
             htmlFor={pixelIdName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {pixelIdLabel}
           </label>
@@ -102,14 +99,14 @@ function PlatformSection({
             value={pixelIdValue}
             onChange={e => onPixelIdChange(e.target.value)}
             placeholder={pixelIdPlaceholder}
-            className={INPUT_CLASS}
+            className='text-[13px]'
           />
         </div>
 
         <div>
           <label
             htmlFor={tokenName}
-            className='mb-2 block text-[11px] font-[560] uppercase tracking-[0.06em] text-tertiary-token'
+            className='mb-2 block text-[11px] font-[510] uppercase tracking-[0.06em] text-tertiary-token'
           >
             {tokenLabel}
           </label>
@@ -121,7 +118,7 @@ function PlatformSection({
               value={tokenValue}
               onChange={e => onTokenChange(e.target.value)}
               placeholder={tokenPlaceholder}
-              className={`${INPUT_CLASS} pr-10`}
+              className='pr-10 text-[13px]'
             />
             <button
               type='button'
@@ -375,7 +372,7 @@ export function SettingsAdPixelsSection({
           actionsClassName='w-auto shrink-0'
           actions={
             <div className='flex items-center gap-2'>
-              <span className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                 {pixelData.enabled ? 'Enabled' : 'Disabled'}
               </span>
               <Switch
