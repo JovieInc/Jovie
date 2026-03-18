@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy } from 'lucide-react';
+import { CheckCircle, Copy, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Icon } from '@/components/atoms/Icon';
@@ -148,8 +148,50 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
           }
         },
       },
+      {
+        label: 'Approve',
+        icon: <CheckCircle className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const eligible = selectedEntries.filter(e => e.status === 'new');
+          if (eligible.length === 0) {
+            toast.info(
+              'No entries eligible for approval (must have status "new")'
+            );
+            return;
+          }
+          await Promise.all(
+            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+          );
+          toast.success(
+            `Approved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
+          );
+          clearSelection();
+        },
+      },
+      {
+        label: 'Disapprove',
+        icon: <XCircle className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const eligible = selectedEntries.filter(
+            e => e.status === 'invited' || e.status === 'claimed'
+          );
+          if (eligible.length === 0) {
+            toast.info(
+              'No entries eligible for disapproval (must be invited or claimed)'
+            );
+            return;
+          }
+          await Promise.all(
+            eligible.map(e => approveEntry({ id: e.id, status: e.status }))
+          );
+          toast.success(
+            `Disapproved ${eligible.length} entr${eligible.length === 1 ? 'y' : 'ies'}`
+          );
+          clearSelection();
+        },
+      },
     ];
-  }, [entries, selectedIds, clearSelection]);
+  }, [entries, selectedIds, clearSelection, approveEntry]);
 
   // Group entries by status for Kanban board
   const kanbanColumns = useMemo<KanbanColumn<WaitlistEntryRow>[]>(() => {

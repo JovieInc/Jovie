@@ -15,6 +15,7 @@ export interface BulkAction {
   label: string;
   icon?: React.ReactNode;
   onClick: () => void;
+  variant?: 'default' | 'destructive';
 }
 
 export interface TableBulkActionsToolbarProps {
@@ -56,7 +57,15 @@ export function TableBulkActionsToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start'>
             {actions.map(action => (
-              <DropdownMenuItem key={action.label} onClick={action.onClick}>
+              <DropdownMenuItem
+                key={action.label}
+                onClick={action.onClick}
+                className={
+                  action.variant === 'destructive'
+                    ? 'text-destructive focus:text-destructive'
+                    : undefined
+                }
+              >
                 {action.icon && (
                   <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
                     {action.icon}
