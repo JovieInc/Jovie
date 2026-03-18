@@ -30,13 +30,13 @@ const segmentControlVariants = cva(
 const segmentTriggerVariants = cva(
   [
     'relative rounded-full font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
-    'border border-(--color-border-default)',
+    'border border-transparent',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
-    'text-(--linear-text-tertiary) hover:border-(--color-border-default) hover:bg-(--color-bg-secondary) hover:text-(--linear-text-secondary)',
+    'text-(--linear-text-tertiary) hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-secondary)',
     // Active state
-    'data-[state=active]:border-(--color-border-default) data-[state=active]:bg-(--color-bg-secondary) data-[state=active]:text-(--linear-text-primary) data-[state=active]:shadow-[0_1px_0_rgba(255,255,255,0.02)]',
+    'data-[state=active]:border-(--linear-border-default) data-[state=active]:bg-(--linear-bg-surface-0) data-[state=active]:text-(--linear-text-primary) data-[state=active]:shadow-[0_1px_0_rgba(255,255,255,0.02)]',
   ],
   {
     variants: {
