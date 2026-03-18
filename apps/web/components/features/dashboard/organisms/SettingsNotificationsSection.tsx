@@ -40,6 +40,7 @@ export function SettingsNotificationsSection({
           ariaLabel='Toggle double opt-in email confirmation'
           gated={!isGrowth}
           gatePlanName='Growth'
+          gateFeatureContext='Double opt-in confirmation'
         />
       </div>
     </ContentSurfaceCard>

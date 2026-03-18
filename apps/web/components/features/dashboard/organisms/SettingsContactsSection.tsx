@@ -8,6 +8,7 @@ import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ContactsSectionSkeleton } from '@/components/molecules/SettingsLoadingSkeleton';
+import { UsageLimitUpgradePrompt } from '@/components/molecules/UsageLimitUpgradePrompt';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import {
   type EditableContact,
@@ -19,7 +20,7 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
-import { useContactsQuery } from '@/lib/queries';
+import { useContactsQuery, usePlanGate } from '@/lib/queries';
 import type { Artist } from '@/types/db';
 
 interface SettingsContactsSectionProps {
@@ -180,6 +181,7 @@ function ContactsListInner({
       )
     : '';
 
+  const { contactsLimit } = usePlanGate();
   const isEmpty = contacts.length === 0;
   const isSidebarOpen = Boolean(selectedContact);
 
@@ -249,6 +251,15 @@ function ContactsListInner({
                 />
               ))}
             </div>
+          )}
+          {contactsLimit !== null && (
+            <UsageLimitUpgradePrompt
+              current={contacts.length}
+              limit={contactsLimit}
+              featureName='contacts'
+              upgradeCopy='unlimited contacts'
+              className='mt-3'
+            />
           )}
         </div>
       </DashboardCard>

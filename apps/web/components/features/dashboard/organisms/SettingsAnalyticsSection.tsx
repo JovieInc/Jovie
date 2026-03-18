@@ -66,6 +66,7 @@ export function SettingsAnalyticsSection({
           disabled={isPending}
           ariaLabel='Exclude yourself from analytics'
           gated={!isPro}
+          gateFeatureContext='Filter your own visits'
         />
         {isPro && excludeSelf ? (
           <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>

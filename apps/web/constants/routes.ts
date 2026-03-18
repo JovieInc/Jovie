@@ -78,6 +78,7 @@ export const APP_ROUTES = {
   SIGNIN: '/signin',
   SIGNUP: '/signup',
   ONBOARDING: '/onboarding',
+  ONBOARDING_CHECKOUT: '/onboarding/checkout',
   WAITLIST: '/waitlist',
 
   // Billing

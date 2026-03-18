@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
+import { ProfileLiveCelebration } from '@/features/dashboard/molecules/ProfileLiveCelebration';
 import { getValidationFailureKey } from '@/features/dashboard/organisms/apple-style-onboarding/analytics';
 import {
   OnboardingDspStep,
@@ -12,6 +13,13 @@ import {
   OnboardingProfileReviewStep,
 } from '@/features/dashboard/organisms/onboarding';
 import { track } from '@/lib/analytics';
+import {
+  clearPlanIntent,
+  getPlanIntent,
+  isPaidIntent,
+} from '@/lib/auth/plan-intent';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { getOnboardingDashboardInitialQuery } from './onboardingDashboardQuery';
 
 import type { AppleStyleOnboardingFormProps } from './types';
@@ -52,6 +60,10 @@ export function AppleStyleOnboardingForm({
   const validateHandleRef = useRef(validateHandle);
 
   const [isDspEnriching, setIsDspEnriching] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const checkoutStepEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.ONBOARDING_CHECKOUT_STEP
+  );
 
   const {
     state,
@@ -184,7 +196,7 @@ export function AppleStyleOnboardingForm({
     validateHandleRef.current(handleInput);
   }, [handleInput, setHandleValidation]);
 
-  const goToDashboard = useCallback(() => {
+  const navigateAfterOnboarding = useCallback(() => {
     if (globalThis.window === undefined) return;
 
     if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {
@@ -192,13 +204,32 @@ export function AppleStyleOnboardingForm({
       return;
     }
 
+    // If user expressed paid intent and checkout step is enabled, go to checkout
+    const planIntent = getPlanIntent();
+    if (checkoutStepEnabled && isPaidIntent(planIntent)) {
+      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${planIntent}`;
+      return;
+    }
+
+    // Free flow: clear any stale intent and go to dashboard
+    clearPlanIntent();
     const initialQuery = getOnboardingDashboardInitialQuery(
       spotifyImportState.status
     );
     const dashboardUrl = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
 
     globalThis.location.href = dashboardUrl;
-  }, [spotifyImportState.status]);
+  }, [spotifyImportState.status, checkoutStepEnabled]);
+
+  const goToDashboard = useCallback(() => {
+    if (process.env.NEXT_PUBLIC_E2E_MODE === '1') {
+      navigateAfterOnboarding();
+      return;
+    }
+
+    // Show celebration first, then navigate
+    setShowCelebration(true);
+  }, [navigateAfterOnboarding]);
 
   /**
    * JOV-1340: DSP connection handler is now non-blocking.
@@ -292,40 +323,48 @@ export function AppleStyleOnboardingForm({
 
   return (
     <div className='w-full flex flex-col items-center justify-center bg-(--bg) text-(--fg) gap-6'>
-      <AuthBackButton onClick={goBack} ariaLabel='Go back' />
+      {showCelebration && (
+        <ProfileLiveCelebration
+          username={profileReadyHandle || handle}
+          onComplete={navigateAfterOnboarding}
+        />
+      )}
+      <div aria-hidden={showCelebration} inert={showCelebration}>
+        <AuthBackButton onClick={goBack} ariaLabel='Go back' />
 
-      <Link
-        href='#main-content'
-        className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
-      >
-        Skip to main content
-      </Link>
-
-      <div className='sr-only' aria-live='polite' aria-atomic='true'>
-        Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}
-        {ONBOARDING_STEPS[currentStepIndex]?.title}
-      </div>
-
-      <main
-        className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
-        id='main-content'
-        aria-labelledby='step-heading'
-      >
-        <div id='step-heading' className='sr-only'>
-          {ONBOARDING_STEPS[currentStepIndex]?.title} step content
-        </div>
-        <div
-          key={currentStepIndex}
-          data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
-          className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
-            isTransitioning
-              ? 'opacity-0 translate-y-4'
-              : 'opacity-100 translate-y-0'
-          }`}
+        <Link
+          href='#main-content'
+          className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
         >
-          {renderStepContent()}
+          Skip to main content
+        </Link>
+
+        <div className='sr-only' aria-live='polite' aria-atomic='true'>
+          Step {currentStepIndex + 1} of {ONBOARDING_STEPS.length}:{' '}
+          {ONBOARDING_STEPS[currentStepIndex]?.title}
         </div>
-      </main>
+
+        <main
+          className='w-full max-w-3xl flex items-center justify-center px-4 pb-8'
+          id='main-content'
+          aria-labelledby='step-heading'
+        >
+          <div id='step-heading' className='sr-only'>
+            {ONBOARDING_STEPS[currentStepIndex]?.title} step content
+          </div>
+          <div
+            key={currentStepIndex}
+            data-onboarding-client-ready={isClientReady ? 'true' : 'false'}
+            className={`w-full max-w-2xl transform transition-all duration-500 ease-in-out ${
+              isTransitioning
+                ? 'opacity-0 translate-y-4'
+                : 'opacity-100 translate-y-0'
+            }`}
+          >
+            {renderStepContent()}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
