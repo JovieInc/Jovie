@@ -106,18 +106,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
-- Dashboard profile selector now prioritizes claimed profiles, preventing sidebar/panel username mismatch
-- Orphaned unclaimed profiles are deactivated on handle change to prevent stale public profile pages
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.2] - 2026-03-17
-
-### Added
-
-- Shopify shop redirect at `/[username]/shop` — redirects to creator's `*.myshopify.com` store with UTM attribution
-- Shopping bag icon in public profile nav bar when shop is enabled
-- Dashboard shop settings card in Earnings tab for connecting/disconnecting Shopify store URL
-- Shop click tracking via `/api/track` with `sendBeacon` for fire-and-forget analytics
 
 ### Removed
 
