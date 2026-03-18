@@ -11,6 +11,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Conductor workspace archive script to clean up build artifacts and node_modules when archiving
 
+### Changed
+
+- Replace SQL string interpolation with parameterized queries in batch update functions (`batchUpdateSortOrder`, `batchUpdateSocialLinks`) for defense-in-depth against SQL injection
+- Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
+- Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
+- Document intentional `Access-Control-Allow-Origin: *` CORS policy on public pixel tracking endpoint
+
 ### Fixed
 
 - Conductor run script no longer double-wraps Doppler secrets (was `doppler run -- pnpm dev:web` which chains into web's `doppler run -- next dev`)
