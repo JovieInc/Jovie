@@ -18,10 +18,9 @@ import {
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
 import {
-  SmartLinkAmbientGlow,
   SmartLinkArtistName,
   SmartLinkArtworkCard,
-  SmartLinkPoweredByFooter,
+  SmartLinkPageFrame,
 } from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { ProviderKey } from '@/lib/discography/types';
@@ -176,107 +175,98 @@ export function ReleaseLandingPage({
   );
 
   return (
-    <div className='h-dvh bg-base text-foreground'>
-      <SmartLinkAmbientGlow className='size-[30rem]' />
+    <SmartLinkPageFrame glowClassName='size-[30rem]'>
+      {/* Artwork + Info — pinned at top, never scrolls */}
+      <div className='shrink-0'>
+        {/* Release Artwork */}
+        <AlbumArtworkContextMenu
+          title={release.title}
+          sizes={sizes}
+          allowDownloads={allowDownloads}
+        >
+          <SmartLinkArtworkCard
+            title={release.title}
+            artworkUrl={release.artworkUrl}
+            className='shadow-black/40'
+          />
+        </AlbumArtworkContextMenu>
 
-      <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
-        {/* Content container — fills space between top padding and footer */}
-        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
-          {/* Artwork + Info — pinned at top, never scrolls */}
-          <div className='shrink-0'>
-            {/* Release Artwork */}
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={sizes}
-              allowDownloads={allowDownloads}
-            >
-              <SmartLinkArtworkCard
-                title={release.title}
-                artworkUrl={release.artworkUrl}
-                className='shadow-black/40'
+        {/* Release Info */}
+        <div className='mt-4 text-center'>
+          <h1 className='text-lg font-semibold leading-snug tracking-tight'>
+            {release.title}
+          </h1>
+          <SmartLinkArtistName
+            name={artist.name}
+            handle={artist.handle}
+            className='hover:text-foreground block text-sm transition-colors'
+          />
+          {formattedDate && (
+            <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
+              {formattedDate}
+            </p>
+          )}
+
+          {claimBanner && (
+            <SmartLinkClaimBanner
+              profileId={claimBanner.profileId}
+              username={claimBanner.username}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Streaming Platform Buttons — scrolls independently when overflowing */}
+      <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
+        <div className='space-y-2 py-1'>
+          {clickableProviders.map(provider => {
+            const logoConfig = DSP_LOGO_CONFIG[provider.key];
+
+            return (
+              <SmartLinkProviderButton
+                key={provider.key}
+                href={appendUTMParamsToUrl(provider.url, utmParams)}
+                onClick={() => handleProviderClick(provider.key)}
+                label={logoConfig?.name ?? provider.label}
+                iconPath={logoConfig?.iconPath}
               />
-            </AlbumArtworkContextMenu>
-
-            {/* Release Info */}
-            <div className='mt-4 text-center'>
-              <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-                {release.title}
-              </h1>
-              <SmartLinkArtistName
-                name={artist.name}
-                handle={artist.handle}
-                className='hover:text-foreground block text-sm transition-colors'
-              />
-              {formattedDate && (
-                <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
-                  {formattedDate}
-                </p>
-              )}
-
-              {claimBanner && (
-                <SmartLinkClaimBanner
-                  profileId={claimBanner.profileId}
-                  username={claimBanner.username}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Streaming Platform Buttons — scrolls independently when overflowing */}
-          <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 py-1'>
-              {clickableProviders.map(provider => {
-                const logoConfig = DSP_LOGO_CONFIG[provider.key];
-
-                return (
-                  <SmartLinkProviderButton
-                    key={provider.key}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
-            </div>
-
-            {/* "Use this sound" CTA for short-form video platforms */}
-            {soundsUrl && (
-              <div className='pt-1'>
-                <Link
-                  href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
-                >
-                  <Icon
-                    name='Sparkles'
-                    className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
-                    aria-hidden='true'
-                  />
-                  <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
-                    Use this sound
-                  </span>
-                </Link>
-              </div>
-            )}
-
-            {/* Empty state if no providers */}
-            {clickableProviders.length === 0 && (
-              <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
-                <Icon
-                  name='Music'
-                  className='text-muted-foreground mx-auto h-8 w-8'
-                  aria-hidden='true'
-                />
-                <p className='text-muted-foreground mt-2 text-sm'>
-                  No streaming links available yet.
-                </p>
-              </div>
-            )}
-          </div>
+            );
+          })}
         </div>
 
-        <SmartLinkPoweredByFooter />
-      </main>
-    </div>
+        {/* "Use this sound" CTA for short-form video platforms */}
+        {soundsUrl && (
+          <div className='pt-1'>
+            <Link
+              href={appendUTMParamsToUrl(soundsUrl, utmParams)}
+              className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
+            >
+              <Icon
+                name='Sparkles'
+                className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
+                aria-hidden='true'
+              />
+              <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
+                Use this sound
+              </span>
+            </Link>
+          </div>
+        )}
+
+        {/* Empty state if no providers */}
+        {clickableProviders.length === 0 && (
+          <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
+            <Icon
+              name='Music'
+              className='text-muted-foreground mx-auto h-8 w-8'
+              aria-hidden='true'
+            />
+            <p className='text-muted-foreground mt-2 text-sm'>
+              No streaming links available yet.
+            </p>
+          </div>
+        )}
+      </div>
+    </SmartLinkPageFrame>
   );
 }

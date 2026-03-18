@@ -19,6 +19,12 @@ interface SmartLinkArtistNameProps {
   readonly className?: string;
 }
 
+interface SmartLinkPageFrameProps {
+  readonly children: React.ReactNode;
+  readonly glowClassName?: string;
+  readonly mainId?: string;
+}
+
 export function SmartLinkAmbientGlow({
   className,
 }: Readonly<SmartLinkAmbientGlowProps>) {
@@ -97,5 +103,27 @@ export function SmartLinkPoweredByFooter() {
         <span className='font-semibold'>Jovie</span>
       </Link>
     </footer>
+  );
+}
+
+export function SmartLinkPageFrame({
+  children,
+  glowClassName,
+  mainId,
+}: Readonly<SmartLinkPageFrameProps>) {
+  return (
+    <div className='h-dvh bg-base text-foreground'>
+      <SmartLinkAmbientGlow className={glowClassName} />
+
+      <main
+        id={mainId}
+        className='relative z-10 flex h-full flex-col items-center px-6 pt-10'
+      >
+        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
+          {children}
+        </div>
+        <SmartLinkPoweredByFooter />
+      </main>
+    </div>
   );
 }
