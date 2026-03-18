@@ -69,7 +69,7 @@ export function SettingsAppearanceSection() {
         className='min-h-0 px-4 py-3'
       />
       <div className='px-4 py-3'>
-        <div className='mt-3 grid gap-1.5 sm:grid-cols-3'>
+        <div className='grid gap-1.5 sm:grid-cols-3'>
           {THEME_OPTIONS.map(option => {
             const isSelected = selectedTheme === option.value;
             const Icon = option.icon;
