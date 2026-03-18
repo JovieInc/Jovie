@@ -9,17 +9,21 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Tour date ticket click tracking — wired into audience analytics via `useTrackingMutation` on public profile and dedicated tour page
-- Tour date analytics sidebar card in dashboard — shows ticket clicks, top cities, and top referrers per show
+- Tour date ticket click tracking on public profile and dedicated tour page via shared `useTourDateTicketClick` hook
+- Tour date analytics sidebar card in dashboard — ticket clicks, top cities, and top referrers per show
 - API endpoint `GET /api/dashboard/tour-dates/[id]/analytics` with ownership verification and UUID validation
 - `useTourDateAnalyticsQuery` React Query hook for client-side analytics fetching
-- Comprehensive tour date seed data (12 venues across 7 countries) with diverse providers, statuses, and ticketing platforms
+- `tour_date` content type support in click tracking validation
+- Comprehensive tour date seed data (12 venues across 7 countries)
+- Test coverage: API route (auth, validation, ownership, errors), hook, sidebar analytics UI, and validation
+
+### Changed
+
+- Extracted shared `useTourDateTicketClick` hook from duplicated click handlers in `TourDateCard` and `TourModePanel`
 
 ### Fixed
 
 - Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
-- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
-- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.4] - 2026-03-17
 
