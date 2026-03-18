@@ -38,6 +38,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.5] - 2026-03-17
 
