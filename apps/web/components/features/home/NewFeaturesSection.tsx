@@ -44,7 +44,7 @@ const outcomes = [
   },
   {
     title: 'Owned audience',
-    description: 'Capture fan identity, not just clicks.',
+    description: 'Know your fans, not just your clicks.',
   },
   {
     title: 'Optimization over time',

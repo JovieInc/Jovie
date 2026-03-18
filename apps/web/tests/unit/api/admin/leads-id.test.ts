@@ -6,55 +6,37 @@ const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockIngestLeadAsCreator = vi.hoisted(() => vi.fn());
 const mockSpotifyEnrichLead = vi.hoisted(() => vi.fn());
 const mockRouteLead = vi.hoisted(() => vi.fn());
-const mockPushLeadToInstantly = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 
-const {
-  mockDb,
-  mockLeadsSchema,
-  mockUpdate,
-  mockWhere,
-  mockReturning,
-  mockSelect,
-  mockSelectLimit,
-} = vi.hoisted(() => {
-  const mockReturning = vi.fn();
-  const mockWhere = vi.fn();
-  const mockSet = vi.fn(() => ({
-    where: mockWhere,
-  }));
+const { mockDb, mockLeadsSchema, mockUpdate, mockWhere, mockReturning } =
+  vi.hoisted(() => {
+    const mockReturning = vi.fn();
+    const mockWhere = vi.fn();
+    const mockSet = vi.fn(() => ({
+      where: mockWhere,
+    }));
 
-  const mockUpdate = vi.fn(() => ({
-    set: mockSet,
-  }));
+    const mockUpdate = vi.fn(() => ({
+      set: mockSet,
+    }));
 
-  const mockSelectLimit = vi.fn();
-  const mockSelectWhere = vi.fn(() => ({ limit: mockSelectLimit }));
-  const mockSelectFrom = vi.fn(() => ({ where: mockSelectWhere }));
-  const mockSelect = vi.fn(() => ({ from: mockSelectFrom }));
+    const mockDb = {
+      update: mockUpdate,
+    };
+    const mockLeadsSchema = {
+      id: 'id',
+      status: 'status',
+    };
 
-  const mockDb = {
-    update: mockUpdate,
-    select: mockSelect,
-  };
-  const mockLeadsSchema = {
-    id: 'id',
-    status: 'status',
-  };
-
-  return {
-    mockDb,
-    mockLeadsSchema,
-    mockUpdate,
-    mockSet,
-    mockWhere,
-    mockReturning,
-    mockSelect,
-    mockSelectFrom,
-    mockSelectWhere,
-    mockSelectLimit,
-  };
-});
+    return {
+      mockDb,
+      mockLeadsSchema,
+      mockUpdate,
+      mockSet,
+      mockWhere,
+      mockReturning,
+    };
+  });
 
 vi.mock('drizzle-orm', () => ({
   eq: mockEq,
@@ -93,10 +75,6 @@ vi.mock('@/lib/leads/route-lead', () => ({
   routeLead: mockRouteLead,
 }));
 
-vi.mock('@/lib/leads/instantly', () => ({
-  pushLeadToInstantly: mockPushLeadToInstantly,
-}));
-
 import { PATCH } from '@/app/api/admin/leads/[id]/route';
 
 describe('PATCH /api/admin/leads/[id]', () => {
@@ -119,21 +97,8 @@ describe('PATCH /api/admin/leads/[id]', () => {
       {
         id: 'lead-1',
         linktreeUrl: 'https://linktr.ee/artist',
-        contactEmail: 'artist@example.com',
         displayName: 'Artist',
         linktreeHandle: 'artist',
-        priorityScore: 66,
-      },
-    ]);
-
-    mockSelectLimit.mockResolvedValue([
-      {
-        id: 'lead-1',
-        contactEmail: 'artist@example.com',
-        displayName: 'Artist',
-        linktreeHandle: 'artist',
-        priorityScore: 72,
-        emailInvalid: false,
       },
     ]);
 
@@ -144,7 +109,6 @@ describe('PATCH /api/admin/leads/[id]', () => {
       claimUrl: 'https://jovie.com/claim/token',
       dmCopy: null,
     });
-    mockPushLeadToInstantly.mockResolvedValue('instantly-123');
   });
 
   it('returns 401 when user is not authenticated', async () => {
@@ -161,7 +125,7 @@ describe('PATCH /api/admin/leads/[id]', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it('approves lead and queues Instantly outreach for email routes', async () => {
+  it('approves lead and leaves email outreach pending for manual queueing', async () => {
     const response = await PATCH(
       new Request('http://localhost', {
         method: 'PATCH',
@@ -178,20 +142,11 @@ describe('PATCH /api/admin/leads/[id]', () => {
     expect(mockIngestLeadAsCreator).toHaveBeenCalled();
     expect(mockSpotifyEnrichLead).toHaveBeenCalledWith('lead-1');
     expect(mockRouteLead).toHaveBeenCalledWith('lead-1');
-    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
-      expect.objectContaining({
-        email: 'artist@example.com',
-        priorityScore: 72,
-      })
-    );
-
-    expect(mockSelect).toHaveBeenCalledTimes(1);
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(mockUpdate).toHaveBeenCalledTimes(1);
     expect(data.routing).toEqual(
       expect.objectContaining({
         route: 'email',
-        instantlyLeadId: 'instantly-123',
-        outreachStatus: 'queued',
+        outreachStatus: 'pending',
       })
     );
   });

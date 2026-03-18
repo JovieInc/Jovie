@@ -1,4 +1,8 @@
 export {
+  CollapsibleSectionHeading,
+  type CollapsibleSectionHeadingProps,
+} from './CollapsibleSectionHeading';
+export {
   DrawerActionRow,
   type DrawerActionRowProps,
 } from './DrawerActionRow';

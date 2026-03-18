@@ -106,7 +106,7 @@ export function AddProviderUrlPopover({
           inputRef.current?.focus();
         }}
       >
-        <DrawerSurfaceCard className='p-3'>
+        <DrawerSurfaceCard variant='card' className='p-3'>
           <form onSubmit={handleSubmit} className='space-y-3'>
             <div className='flex items-center gap-2'>
               <span

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { AppleStyleOnboardingForm } from './apple-style-onboarding';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
@@ -46,27 +46,36 @@ export function OnboardingFormWrapper({
   userId,
   shouldAutoSubmitHandle = false,
 }: OnboardingFormWrapperProps) {
-  // If the server didn't provide a handle (e.g. OAuth flow stripped the query param),
-  // fall back to the pendingClaim stored in sessionStorage by ClaimHandleForm.
-  const resolvedHandle = useMemo(() => {
-    if (initialHandle) return initialHandle;
-    return readPendingClaimHandle();
+  const [resolvedHandle, setResolvedHandle] = useState(initialHandle);
+
+  // Defer sessionStorage reads until after mount to keep the first client render
+  // aligned with the server HTML and avoid hydration-only hook-order errors.
+  useEffect(() => {
+    if (initialHandle) {
+      setResolvedHandle(initialHandle);
+      return;
+    }
+
+    const pendingHandle = readPendingClaimHandle();
+    if (!pendingHandle) {
+      return;
+    }
+
+    setResolvedHandle(pendingHandle);
+
+    try {
+      globalThis.sessionStorage?.removeItem('pendingClaim');
+    } catch {
+      // sessionStorage may be unavailable in restricted contexts
+    }
   }, [initialHandle]);
 
-  // Clean up sessionStorage after mount (side effect deferred from render)
-  useEffect(() => {
-    if (!initialHandle && resolvedHandle) {
-      try {
-        globalThis.sessionStorage?.removeItem('pendingClaim');
-      } catch {
-        // sessionStorage may be unavailable in restricted contexts
-      }
-    }
-  }, [initialHandle, resolvedHandle]);
+  const formKey = resolvedHandle || '__empty__';
 
   return (
     <div data-testid='onboarding-form-wrapper'>
       <AppleStyleOnboardingForm
+        key={formKey}
         initialDisplayName={initialDisplayName}
         initialHandle={resolvedHandle}
         isReservedHandle={isReservedHandle}
