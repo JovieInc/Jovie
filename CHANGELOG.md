@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.4] - 2026-03-17
+
+### Fixed
+
+- Onboarding profile review step now requires a profile photo before allowing dashboard access
+- Releases page no longer shows "Connect Spotify" empty state during async onboarding import
+
+### Added
+
+- Uploadable avatar on onboarding profile review step (tap to upload)
+- Unit tests for Spotify connection detection during import status transitions
+
 ## [26.4.3] - 2026-03-17
 
 ### Fixed
