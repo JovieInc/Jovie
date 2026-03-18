@@ -7,8 +7,8 @@ import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
   'Get live fast with a smart artist profile',
-  'Build your email list and prove demand',
-  'Start building an owned audience',
+  'Fans get notified when you release',
+  'Start building your fanbase',
 ] as const;
 
 const FOUNDING_OUTCOMES = [
@@ -58,7 +58,7 @@ export function PricingSection() {
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Get live, build your email list, and prove it works — then
+                Get live, start notifying fans, and prove it works — then
                 decide.
               </p>
 

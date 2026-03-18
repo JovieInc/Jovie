@@ -14,7 +14,7 @@ interface Props {
 const CREATOR_LABELS = [
   'Release-first profile',
   'Tour conversion flow',
-  'Audience capture setup',
+  'Fan notification setup',
 ] as const;
 
 export function SeeItInActionCarousel({ creators }: Props) {
@@ -29,7 +29,7 @@ export function SeeItInActionCarousel({ creators }: Props) {
           </h2>
           <p className='max-w-md marketing-lead-linear text-secondary-token'>
             See how artists use one Jovie profile for listening, touring, and
-            fan capture.
+            fan notifications.
           </p>
         </div>
 
