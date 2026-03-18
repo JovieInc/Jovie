@@ -12,8 +12,6 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import {
-  ChevronDown,
-  ChevronRight,
   Copy,
   ExternalLink,
   Link2,
@@ -25,7 +23,7 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
-  DRAWER_SECTION_HEADING_CLASSNAME,
+  CollapsibleSectionHeading,
   DrawerEmptyState,
   DrawerInlineIconButton,
   DrawerSection,
@@ -33,7 +31,6 @@ import {
 } from '@/components/molecules/drawer';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { useReleaseTracksQuery } from '@/lib/queries';
-import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release, ReleaseSidebarTrack } from './types';
@@ -81,79 +78,71 @@ export function ReleaseTrackList({
 
   return (
     <DrawerSection>
-      <button
-        type='button'
-        onClick={() => {
+      <CollapsibleSectionHeading
+        isOpen={isExpanded}
+        onToggle={() => {
           handleToggle().catch(() => {});
         }}
-        aria-expanded={isExpanded}
         aria-controls={`release-tracklist-${release.id}`}
-        className={cn(
-          DRAWER_SECTION_HEADING_CLASSNAME,
-          'flex w-full items-center justify-between rounded-[8px] px-1.5 py-1 tracking-[0.08em] transition-[background-color,color] duration-150 hover:bg-surface-1/75 hover:text-secondary-token focus-visible:bg-surface-1/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-        )}
       >
-        <span>Tracks ({release.totalTracks})</span>
-        {isExpanded ? (
-          <ChevronDown className='h-3.5 w-3.5' />
-        ) : (
-          <ChevronRight className='h-3.5 w-3.5' />
+        Tracks ({release.totalTracks})
+      </CollapsibleSectionHeading>
+
+      <div
+        id={`release-tracklist-${release.id}`}
+        hidden={!isExpanded}
+        className='space-y-px'
+      >
+        {(isLoading || (isFetching && !tracks)) && (
+          <div className='space-y-0.5'>
+            {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
+              .slice(0, Math.min(release.totalTracks, 6))
+              .map(id => (
+                <DrawerSurfaceCard
+                  key={id}
+                  className='flex items-start gap-3 px-2.5 py-2'
+                >
+                  <div className='w-7 shrink-0 pt-0.5'>
+                    <div className='ml-auto h-3.5 w-4 rounded skeleton' />
+                  </div>
+                  <div className='min-w-0 flex-1 space-y-1'>
+                    <div className='h-4 w-3/4 rounded skeleton' />
+                    <div className='h-3 w-1/3 rounded skeleton' />
+                  </div>
+                </DrawerSurfaceCard>
+              ))}
+          </div>
         )}
-      </button>
 
-      {isExpanded && (
-        <div id={`release-tracklist-${release.id}`} className='space-y-px'>
-          {(isLoading || (isFetching && !tracks)) && (
-            <div className='space-y-0.5'>
-              {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
-                .slice(0, Math.min(release.totalTracks, 6))
-                .map(id => (
-                  <DrawerSurfaceCard
-                    key={id}
-                    className='flex items-start gap-3 px-2.5 py-2'
-                  >
-                    <div className='w-7 shrink-0 pt-0.5'>
-                      <div className='ml-auto h-3.5 w-4 rounded skeleton' />
-                    </div>
-                    <div className='min-w-0 flex-1 space-y-1'>
-                      <div className='h-4 w-3/4 rounded skeleton' />
-                      <div className='h-3 w-1/3 rounded skeleton' />
-                    </div>
-                  </DrawerSurfaceCard>
-                ))}
-            </div>
-          )}
+        {!isLoading && hasError && (
+          <DrawerEmptyState
+            className='min-h-[48px] px-3'
+            message='Failed to load tracks. Collapse and expand to retry.'
+            tone='error'
+          />
+        )}
 
-          {!isLoading && hasError && (
-            <DrawerEmptyState
-              className='min-h-[48px] px-3'
-              message='Failed to load tracks. Collapse and expand to retry.'
-              tone='error'
+        {!isLoading && !hasError && tracks?.length === 0 && (
+          <DrawerEmptyState
+            className='min-h-[48px] px-3'
+            message='No track data available.'
+          />
+        )}
+
+        {!isLoading &&
+          !hasError &&
+          tracks &&
+          tracks.length > 0 &&
+          tracks.map(track => (
+            <TrackItem
+              key={track.id}
+              track={track}
+              onClick={onTrackClick}
+              playbackState={playbackState}
+              onToggleTrack={toggleTrack}
             />
-          )}
-
-          {!isLoading && !hasError && tracks?.length === 0 && (
-            <DrawerEmptyState
-              className='min-h-[48px] px-3'
-              message='No track data available.'
-            />
-          )}
-
-          {!isLoading &&
-            !hasError &&
-            tracks &&
-            tracks.length > 0 &&
-            tracks.map(track => (
-              <TrackItem
-                key={track.id}
-                track={track}
-                onClick={onTrackClick}
-                playbackState={playbackState}
-                onToggleTrack={toggleTrack}
-              />
-            ))}
-        </div>
-      )}
+          ))}
+      </div>
     </DrawerSection>
   );
 }

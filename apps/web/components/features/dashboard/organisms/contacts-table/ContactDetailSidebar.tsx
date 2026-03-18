@@ -301,7 +301,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <div className='rounded-[10px] border border-subtle/75 bg-surface-0 px-3 py-2.5'>
+          <div className='space-y-1'>
             <p className='text-[15px] font-[520] leading-5 text-primary-token'>
               {contactDisplayName}
             </p>
@@ -313,33 +313,31 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       {contact && (
         <>
           <DrawerSection title='Role' className='space-y-2'>
-            <div className='rounded-[10px] border border-subtle/75 bg-surface-0 p-2.5'>
-              <Label className='text-[13px] text-secondary-token'>
-                Contact type
-              </Label>
-              <Select value={contact.role} onValueChange={handleRoleChange}>
-                <SelectTrigger className='h-9 rounded-lg border border-subtle bg-surface-1 px-3 text-[13px]'>
-                  <SelectValue>{roleLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent className='p-1'>
-                  {CONTACT_ROLE_OPTIONS.map(option => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                      className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
-                    >
-                      <div className='flex items-center gap-2'>
-                        <Icon
-                          name={option.iconName}
-                          className='h-4 w-4 text-tertiary-token'
-                        />
-                        <span>{option.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Label className='text-[13px] text-secondary-token'>
+              Contact type
+            </Label>
+            <Select value={contact.role} onValueChange={handleRoleChange}>
+              <SelectTrigger className='h-9 rounded-lg border border-subtle bg-surface-1 px-3 text-[13px]'>
+                <SelectValue>{roleLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent className='p-1'>
+                {CONTACT_ROLE_OPTIONS.map(option => (
+                  <SelectItem
+                    key={option.value}
+                    value={option.value}
+                    className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                  >
+                    <div className='flex items-center gap-2'>
+                      <Icon
+                        name={option.iconName}
+                        className='h-4 w-4 text-tertiary-token'
+                      />
+                      <span>{option.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </DrawerSection>
 
           <DrawerSection

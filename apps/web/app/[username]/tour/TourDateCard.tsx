@@ -2,6 +2,7 @@
 
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { cn } from '@/lib/utils';
 import { formatLocationString } from '@/lib/utils/string-utils';
 
@@ -12,12 +13,14 @@ const weekdayFormatter = new Intl.DateTimeFormat('en-US', { weekday: 'short' });
 
 interface TourDateCardProps {
   readonly tourDate: TourDateViewModel;
+  readonly handle: string;
   readonly isNearYou?: boolean;
   readonly distanceKm?: number | null;
 }
 
 export function TourDateCard({
   tourDate,
+  handle,
   isNearYou = false,
   distanceKm,
 }: Readonly<TourDateCardProps>) {
@@ -33,14 +36,27 @@ export function TourDateCard({
   const isCancelled = tourDate.ticketStatus === 'cancelled';
 
   // Derive timezone abbreviation (e.g., "EST") from IANA timezone
-  const timezoneAbbr = tourDate.timezone
-    ? (new Intl.DateTimeFormat('en-US', {
-        timeZone: tourDate.timezone,
-        timeZoneName: 'short',
-      })
-        .formatToParts(date)
-        .find(part => part.type === 'timeZoneName')?.value ?? null)
-    : null;
+  // Wrapped in try/catch: timezone is a free-text field that may contain invalid IANA values
+  let timezoneAbbr: string | null = null;
+  if (tourDate.timezone) {
+    try {
+      timezoneAbbr =
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: tourDate.timezone,
+          timeZoneName: 'short',
+        })
+          .formatToParts(date)
+          .find(part => part.type === 'timeZoneName')?.value ?? null;
+    } catch {
+      // Invalid timezone — silently ignore
+    }
+  }
+
+  const handleTicketClick = useTourDateTicketClick(
+    handle,
+    tourDate.id,
+    tourDate.ticketUrl
+  );
 
   const handleAddToCalendar = () => {
     // Generate ICS file URL - use direct navigation for reliable download
@@ -122,6 +138,7 @@ export function TourDateCard({
             {tourDate.ticketUrl && !isCancelled && !isSoldOut && (
               <a
                 href={tourDate.ticketUrl}
+                onClick={handleTicketClick}
                 target='_blank'
                 rel='noopener noreferrer'
                 className='inline-flex items-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-[var(--font-weight-medium)] text-white transition-colors duration-normal hover:bg-accent/90'

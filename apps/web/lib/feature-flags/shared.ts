@@ -18,6 +18,7 @@ export const FEATURE_FLAG_KEYS = {
   ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_AUDIENCE_CRM_SECTION: 'show_audience_crm_section',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
+  ONBOARDING_CHECKOUT_STEP: 'onboarding.checkoutStep',
 } as const;
 
 export type FeatureFlagKey =

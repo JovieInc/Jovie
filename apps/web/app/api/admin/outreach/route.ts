@@ -1,5 +1,17 @@
-import { and, asc, count, desc, eq, isNotNull } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+} from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
@@ -9,11 +21,73 @@ import {
   captureWarning,
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
+import { parseJsonBody } from '@/lib/http/parse-json';
+import { pushLeadToInstantly } from '@/lib/leads/instantly';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export const runtime = 'nodejs';
+
+const queueOutreachBodySchema = z.object({
+  limit: z.number().int().min(1).max(100).default(10),
+});
+
+const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
+
+function jsonError(message: string, status: number) {
+  return NextResponse.json(
+    { error: message },
+    { status, headers: NO_STORE_HEADERS }
+  );
+}
+
+async function requireAdminAccess() {
+  const entitlements = await getCurrentUserEntitlements();
+
+  if (!entitlements.isAuthenticated) {
+    return jsonError('Unauthorized', 401);
+  }
+
+  if (!entitlements.isAdmin) {
+    return jsonError('Forbidden', 403);
+  }
+
+  return null;
+}
+
+function getOutreachRouteWhereClause(
+  queue: 'email' | 'dm' | 'manual_review' | 'all'
+) {
+  switch (queue) {
+    case 'email':
+      return or(
+        eq(leads.outreachRoute, 'email'),
+        eq(leads.outreachRoute, 'both')
+      );
+    case 'dm':
+      return or(eq(leads.outreachRoute, 'dm'), eq(leads.outreachRoute, 'both'));
+    case 'manual_review':
+      return eq(leads.outreachRoute, 'manual_review');
+    case 'all':
+    default:
+      return isNotNull(leads.outreachRoute);
+  }
+}
+
+function getPendingEmailWhereClause(now = new Date()) {
+  const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
+
+  return and(
+    getOutreachRouteWhereClause('email'),
+    eq(leads.outreachStatus, 'pending'),
+    eq(leads.status, 'approved'),
+    eq(leads.emailInvalid, false),
+    isNotNull(leads.contactEmail),
+    isNotNull(leads.claimToken),
+    or(isNull(leads.outreachQueuedAt), lt(leads.outreachQueuedAt, claimCutoff))
+  );
+}
 
 function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
   // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
@@ -35,18 +109,9 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
  * GET /api/admin/outreach — List outreach leads by queue.
  */
 export async function GET(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
   }
 
   try {
@@ -66,13 +131,11 @@ export async function GET(request: NextRequest) {
     const { queue, sort, sortOrder, page, limit } = validated.data;
     const offset = (page - 1) * limit;
 
-    // Build filter conditions
-    const conditions = [isNotNull(leads.outreachRoute)];
-    if (queue !== 'all') {
-      conditions.push(eq(leads.outreachRoute, queue));
-    }
-
-    const whereClause = and(...conditions);
+    const whereClause = getOutreachRouteWhereClause(queue);
+    const pendingWhereClause =
+      queue === 'email'
+        ? getPendingEmailWhereClause()
+        : and(whereClause, eq(leads.outreachStatus, 'pending'));
 
     // Sort
     const sortColumn =
@@ -82,9 +145,10 @@ export async function GET(request: NextRequest) {
     // Query data and count in parallel
     let rows;
     let totalRow;
+    let pendingTotalRow;
 
     try {
-      [rows, [totalRow]] = await Promise.all([
+      [rows, [totalRow], [pendingTotalRow]] = await Promise.all([
         db
           .select()
           .from(leads)
@@ -93,6 +157,7 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset),
         db.select({ total: count() }).from(leads).where(whereClause),
+        db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     } catch (error) {
       if (!isMissingLeadEnrichmentColumnError(error)) {
@@ -105,7 +170,7 @@ export async function GET(request: NextRequest) {
         { route: '/api/admin/outreach' }
       );
 
-      [rows, [totalRow]] = await Promise.all([
+      [rows, [totalRow], [pendingTotalRow]] = await Promise.all([
         db
           .select({
             id: leads.id,
@@ -157,6 +222,7 @@ export async function GET(request: NextRequest) {
           .limit(limit)
           .offset(offset),
         db.select({ total: count() }).from(leads).where(whereClause),
+        db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     }
 
@@ -164,6 +230,7 @@ export async function GET(request: NextRequest) {
       {
         items: rows,
         total: totalRow?.total ?? 0,
+        pendingTotal: pendingTotalRow?.total ?? 0,
         page,
         limit,
       },
@@ -175,6 +242,142 @@ export async function GET(request: NextRequest) {
     });
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to list outreach leads') },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * POST /api/admin/outreach — Queue a limited batch of pending outreach emails.
+ */
+export async function POST(request: NextRequest) {
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const parsed = await parseJsonBody(request, {
+      route: 'POST /api/admin/outreach',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+
+    const validated = queueOutreachBodySchema.safeParse(parsed.data);
+    if (!validated.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: validated.error.flatten() },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const { limit } = validated.data;
+    const now = new Date();
+    const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
+    const pendingEmailWhereClause = getPendingEmailWhereClause(now);
+
+    const pendingEmailLeads = await db
+      .select({
+        id: leads.id,
+        linktreeHandle: leads.linktreeHandle,
+        displayName: leads.displayName,
+        contactEmail: leads.contactEmail,
+        claimToken: leads.claimToken,
+        priorityScore: leads.priorityScore,
+      })
+      .from(leads)
+      .where(pendingEmailWhereClause)
+      .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
+      .limit(limit);
+
+    let attempted = 0;
+    let queued = 0;
+    let failed = 0;
+
+    for (const lead of pendingEmailLeads) {
+      const claimedAt = new Date();
+      const [claimedLead] = await db
+        .update(leads)
+        .set({
+          outreachQueuedAt: claimedAt,
+          updatedAt: claimedAt,
+        })
+        .where(
+          and(
+            eq(leads.id, lead.id),
+            eq(leads.outreachStatus, 'pending'),
+            or(
+              isNull(leads.outreachQueuedAt),
+              lt(leads.outreachQueuedAt, claimCutoff)
+            )
+          )
+        )
+        .returning({ id: leads.id });
+
+      if (!claimedLead) {
+        continue;
+      }
+
+      attempted++;
+
+      try {
+        const instantlyLeadId = await pushLeadToInstantly({
+          email: lead.contactEmail!,
+          firstName: lead.displayName ?? lead.linktreeHandle,
+          claimLink: getAppUrl(`/claim/${lead.claimToken}`),
+          artistName: lead.displayName ?? lead.linktreeHandle,
+          priorityScore: lead.priorityScore ?? 0,
+        });
+
+        await db
+          .update(leads)
+          .set({
+            instantlyLeadId,
+            outreachStatus: 'queued',
+            updatedAt: claimedAt,
+          })
+          .where(eq(leads.id, lead.id));
+
+        queued++;
+      } catch (error) {
+        failed++;
+        await db
+          .update(leads)
+          .set({
+            outreachQueuedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(leads.id, lead.id));
+        await captureError('Manual outreach queue failed', error, {
+          route: '/api/admin/outreach',
+          contextData: { leadId: lead.id },
+        });
+      }
+    }
+
+    const [remainingPending] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(pendingEmailWhereClause);
+
+    return NextResponse.json(
+      {
+        ok: true,
+        attempted,
+        queued,
+        failed,
+        remainingPending: Number(remainingPending?.total ?? 0),
+      },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    await captureError('Failed to queue outreach leads', error, {
+      route: '/api/admin/outreach',
+    });
+    return NextResponse.json(
+      { error: getSafeErrorMessage(error, 'Failed to queue outreach leads') },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }

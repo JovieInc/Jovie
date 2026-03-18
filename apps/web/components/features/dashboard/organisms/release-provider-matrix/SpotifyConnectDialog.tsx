@@ -41,7 +41,10 @@ function SearchDropdownState({
       role={tone === 'error' ? 'alert' : undefined}
       aria-atomic='true'
     >
-      <DrawerSurfaceCard className='flex min-h-[64px] items-center rounded-[10px] px-3'>
+      <DrawerSurfaceCard
+        variant='card'
+        className='flex min-h-[64px] items-center rounded-[10px] px-3'
+      >
         <p
           className={cn(
             'text-[12px] leading-[17px]',
@@ -66,6 +69,7 @@ function SearchResultsLoadingSkeleton() {
       {LOADING_SKELETON_KEYS.map(key => (
         <DrawerSurfaceCard
           key={key}
+          variant='card'
           className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
           aria-hidden='true'
         >

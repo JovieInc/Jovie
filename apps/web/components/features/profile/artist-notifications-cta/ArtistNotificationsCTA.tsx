@@ -315,6 +315,8 @@ export function ArtistNotificationsCTA({
         artistName={artist.name}
         handle={artist.handle}
         subscribedChannels={subscribedChannels}
+        artistId={artist.id}
+        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
       />
     );
   }
@@ -339,6 +341,9 @@ export function ArtistNotificationsCTA({
     setIsInputFocused(false);
     handleFieldBlur();
   };
+
+  const handleFormSubmit =
+    otpStep === 'verify' ? handleVerifyOtp : handleSubscribe;
 
   return (
     <div className='space-y-3'>
@@ -375,7 +380,7 @@ export function ArtistNotificationsCTA({
                   value={otpCode}
                   onChange={handleOtpChange}
                   onComplete={() => {
-                    void handleVerifyOtp();
+                    handleVerifyOtp();
                   }}
                   autoFocus
                   aria-label='Enter 6-digit verification code'
@@ -414,9 +419,9 @@ export function ArtistNotificationsCTA({
 
       <button
         type='button'
-        onClick={() =>
-          void (otpStep === 'verify' ? handleVerifyOtp() : handleSubscribe())
-        }
+        onClick={() => {
+          handleFormSubmit();
+        }}
         disabled={isSubmitting}
         className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
         style={noFontSynthesisStyle}

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
+import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 export interface AvatarProps {
   /** Avatar image source URL */
@@ -119,6 +120,20 @@ function generateInitials(name?: string): string {
   return getInitials(name);
 }
 
+function shouldBypassImageOptimization(src: string): boolean {
+  if (isExternalDspImage(src)) return true;
+
+  try {
+    const { hostname } = new URL(src);
+    return (
+      hostname === 'blob.vercel-storage.com' ||
+      hostname.endsWith('.blob.vercel-storage.com')
+    );
+  } catch {
+    return src.includes('blob.vercel-storage.com');
+  }
+}
+
 /**
  * Unified Avatar component for display-only usage
  *
@@ -160,6 +175,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     return BLUR_DATA_URLS[96] || BLUR_DATA_URLS[48];
   }, [width]);
   const initials = generateInitials(name);
+  const unoptimized = src ? shouldBypassImageOptimization(src) : false;
 
   // Map avatar size to a sensible badge size
   const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
@@ -225,6 +241,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           placeholder='blur'
           blurDataURL={blurDataURL}
           sizes={`${width}px`}
+          unoptimized={unoptimized}
           className={cn(
             'object-cover object-center transition-opacity duration-300 ease-out',
             isLoaded ? 'opacity-100' : 'opacity-0'

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { track } from '@/lib/analytics';
 import { useTrackingMutation } from '@/lib/queries';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 interface ProfileViewTrackerProps {
   readonly handle: string;
@@ -40,12 +41,8 @@ export function ProfileViewTracker({
       source: source ?? (document.referrer || 'direct'),
     });
 
-    const body = JSON.stringify({ handle });
-    if (navigator.sendBeacon) {
-      const blob = new Blob([body], { type: 'application/json' });
-      const sent = navigator.sendBeacon('/api/profile/view', blob);
-      if (sent) return;
-    }
+    const sent = postJsonBeacon('/api/profile/view', { handle });
+    if (sent) return;
 
     trackViewRef.current.mutate({ handle });
   }, [handle, artistId, source]);

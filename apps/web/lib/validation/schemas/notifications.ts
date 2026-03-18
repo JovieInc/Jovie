@@ -104,6 +104,28 @@ export const verifyEmailOtpSchema = z.object({
 export type VerifyEmailOtpInput = z.infer<typeof verifyEmailOtpSchema>;
 
 // =============================================================================
+// Update Subscriber Name Schema
+// =============================================================================
+
+/**
+ * Schema for updating a subscriber's name after signup.
+ * Identified by artist_id + email (no auth required — fan just subscribed).
+ */
+export const updateSubscriberNameSchema = z.object({
+  artist_id: uuidSchema,
+  email: z.string().email(),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Name is required')
+    .max(100, 'Name is too long'),
+});
+
+export type UpdateSubscriberNameInput = z.infer<
+  typeof updateSubscriberNameSchema
+>;
+
+// =============================================================================
 // Unsubscribe Schema
 // =============================================================================
 

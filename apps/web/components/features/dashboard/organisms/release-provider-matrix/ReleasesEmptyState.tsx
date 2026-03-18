@@ -10,7 +10,10 @@ export function ReleasesEmptyState({
   onConnectSpotify,
 }: ReleasesEmptyStateProps) {
   return (
-    <DrawerSurfaceCard className='flex min-h-[220px] flex-col items-center justify-center rounded-[10px] px-4 py-12 text-center'>
+    <DrawerSurfaceCard
+      variant='card'
+      className='flex min-h-[220px] flex-col items-center justify-center rounded-[10px] px-4 py-12 text-center'
+    >
       <h3 className='text-[13px] font-[510] text-primary-token'>
         Connect Spotify
       </h3>

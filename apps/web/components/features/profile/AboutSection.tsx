@@ -1,4 +1,4 @@
-import { Calendar, MapPin } from 'lucide-react';
+import { Calendar, Home, MapPin } from 'lucide-react';
 import type { Artist } from '@/types/db';
 
 interface AboutSectionProps {
@@ -9,9 +9,10 @@ interface AboutSectionProps {
 export function AboutSection({ artist, genres }: AboutSectionProps) {
   const hasBio = Boolean(artist.tagline);
   const hasLocation = Boolean(artist.location);
+  const hasHometown = Boolean(artist.hometown);
   const hasActiveSince = Boolean(artist.active_since_year);
   const hasGenres = genres && genres.length > 0;
-  const hasMetadata = hasLocation || hasActiveSince;
+  const hasMetadata = hasLocation || hasHometown || hasActiveSince;
 
   const hasContent = hasBio || hasMetadata || hasGenres;
 
@@ -44,7 +45,7 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
           </div>
         )}
 
-        {/* Metadata: location + active since */}
+        {/* Metadata: location + hometown + active since */}
         {hasMetadata && (
           <div
             className={`px-6 pb-5 flex flex-wrap gap-x-5 gap-y-2 ${hasBio ? 'border-t border-subtle pt-5' : 'pt-6'}`}
@@ -53,6 +54,12 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
               <div className='flex items-center gap-2 text-sm text-tertiary-token'>
                 <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
                 <span>{artist.location}</span>
+              </div>
+            )}
+            {hasHometown && (
+              <div className='flex items-center gap-2 text-sm text-tertiary-token'>
+                <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+                <span>From {artist.hometown}</span>
               </div>
             )}
             {hasActiveSince && (

@@ -382,6 +382,7 @@ export {
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
+  useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
 export {
@@ -468,6 +469,8 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// Tour date analytics query
+export { useTourDateAnalyticsQuery } from './useTourDateAnalyticsQuery';
 // Tour date mutations
 export {
   useConnectBandsintownMutation,
