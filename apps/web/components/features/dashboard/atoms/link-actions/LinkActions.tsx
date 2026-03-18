@@ -111,7 +111,7 @@ export const LinkActions = memo(function LinkActions({
               role='menu'
               aria-label='Link actions menu'
               tabIndex={-1}
-              className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-default bg-surface-1 p-1 text-[13px] shadow-[0_18px_48px_rgba(0,0,0,0.22)] focus-visible:outline-none'
+              className='absolute right-0 top-9 z-50 min-w-[140px] rounded-lg border border-default bg-surface-1 p-1 text-[13px] shadow-popover focus-visible:outline-none'
               onKeyDown={handleKeyDown}
             >
               {menuItems.map((item, index) => (

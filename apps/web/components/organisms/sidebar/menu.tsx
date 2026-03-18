@@ -14,7 +14,7 @@ export const SidebarMenu = React.forwardRef<
   <ul
     ref={ref}
     data-sidebar='menu'
-    className={cn('flex w-full min-w-0 flex-col gap-0.5', className)}
+    className={cn('flex w-full min-w-0 flex-col gap-px', className)}
     {...props}
   />
 ));
@@ -58,9 +58,9 @@ const sidebarMenuButtonVariants = cva(
     // Text truncation in collapsed mode
     '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',
-    // Icon styling — intentionally compact to reduce visual dominance
-    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
-    '[&>svg]:size-3 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon/65 [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
+    // Icon styling — 14px to match Linear's nav icon size
+    '[&>[data-sidebar-icon]]:flex [&>[data-sidebar-icon]]:size-3.5 [&>[data-sidebar-icon]]:shrink-0 [&>[data-sidebar-icon]]:items-center [&>[data-sidebar-icon]]:justify-center',
+    '[&>svg]:size-3.5 [&>svg]:shrink-0 [&>svg]:text-sidebar-item-icon/65 [&>svg]:transition-colors [&>svg]:duration-0 [&>svg]:ease-interactive',
     '[&_[data-sidebar-icon]_svg]:text-sidebar-item-icon/65 [&_[data-sidebar-icon]_svg]:transition-colors [&_[data-sidebar-icon]_svg]:duration-0 [&_[data-sidebar-icon]_svg]:ease-interactive',
     'hover:[&>svg]:text-sidebar-item-foreground/85',
     'hover:[&_[data-sidebar-icon]_svg]:text-sidebar-item-foreground/85',

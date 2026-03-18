@@ -195,8 +195,8 @@
   /* Dark mode surfaces — matched to Linear's exact Hex values */
   --color-bg-base: #08090a;
   /* sidebar/page bg */
-  --color-bg-surface-0: #101012;
-  /* primary app surface */
+  --color-bg-surface-0: #0f1011;
+  /* primary app surface — matches --linear-bg-surface-0 */
   --color-bg-surface-1: var(--linear-bg-surface-2);
   /* cards/panels — single source of truth via linear token */
   --color-bg-surface-2: #23252a;

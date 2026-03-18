@@ -34,8 +34,8 @@ export function DrawerLoadingSkeleton({
         <div className='sticky top-0 z-10 flex min-h-[36px] shrink-0 items-center justify-between border-b border-subtle bg-surface-0 px-3 py-1'>
           <div className='h-2.5 w-28 rounded skeleton' />
           <div className='flex items-center gap-px'>
-            <div className='h-(--linear-app-control-height-sm) w-(--linear-app-control-height-sm) rounded-(--linear-app-control-radius) skeleton' />
-            <div className='h-(--linear-app-control-height-sm) w-(--linear-app-control-height-sm) rounded-(--linear-app-control-radius) skeleton' />
+            <div className='h-[24px] w-[24px] rounded-full skeleton' />
+            <div className='h-[24px] w-[24px] rounded-full skeleton' />
           </div>
         </div>
 
