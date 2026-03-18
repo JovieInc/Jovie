@@ -72,10 +72,12 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'One link that captures every fan.'
+      'One link to grow your music career.'
     );
     await expect(
-      page.getByText(/Connect Spotify, grow your audience automatically/i)
+      page.getByText(
+        /Import your catalog, capture every fan, and own the relationship/i
+      )
     ).toBeVisible();
 
     // Claim handle input in hero
@@ -113,7 +115,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     await expect(page.locator('h1')).toContainText(
-      'One link that captures every fan.',
+      'One link to grow your music career.',
       { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
 
@@ -137,13 +139,16 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const trustHeading = page.getByText(/Trusted by artists on/i).first();
-    const trustLogo = page
-      .locator(
-        'img[alt="Universal Music Group"], img[alt="AWAL"], img[alt="The Orchard"], img[alt="Armada Music"], img[alt="Black Hole Recordings"]'
-      )
-      .first();
-    await expect(trustHeading.or(trustLogo)).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.getByRole('heading', { name: /See it in action/i })
+    ).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole('link', { name: /Tim White's profile/i })
+    ).toBeVisible({
+      timeout: 20000,
+    });
   });
 
   test('showcase section has images with alt text', async ({ page }) => {
@@ -151,16 +156,25 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const trustHeading = page.getByText(/Trusted by artists on/i).first();
-    await expect(trustHeading).toBeVisible({ timeout: 20000 });
-
     await expect(
-      page.getByRole('img', { name: 'Universal Music Group' })
-    ).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('img', { name: 'AWAL' })).toBeVisible({
+      page.getByRole('heading', { name: /See it in action/i })
+    ).toBeVisible({
       timeout: 20000,
     });
-    await expect(page.getByRole('img', { name: 'The Orchard' })).toBeVisible({
+
+    await expect(
+      page.getByRole('img', { name: /Tim White's profile/i })
+    ).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole('img', { name: /Nova Lane's profile/i })
+    ).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole('img', { name: /Kai Rivers's profile/i })
+    ).toBeVisible({
       timeout: 20000,
     });
   });
