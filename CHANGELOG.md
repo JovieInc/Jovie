@@ -7,12 +7,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.7] - 2026-03-18
 
-### Fixed
-
-- Fix admin table checkbox multi-select on Creators and Waitlist tables by removing dual selection system conflict (TanStack Table internal selection racing with custom `useRowSelection` hook)
-
 ### Added
 
+- Non-interactive cleanup mode (`--force`, `--dry-run`) for E2E test account script, enabling agents and CI to clean up without human prompts
+- Paginated Clerk user discovery and database record cleanup (FK CASCADE) in cleanup script
+- Rate-limited batch deletion with exponential backoff for Clerk API calls
+- Expanded test user detection to match both `role: 'e2e'` metadata and `+clerk_test` email patterns
+- QA & Browse authentication instructions in AGENTS.md so agents auto-login using Doppler credentials instead of prompting
+- Agent cleanup requirement in AGENTS.md — agents must run cleanup after sessions creating test accounts
+- Clerk E2E test user cleanup step in CI workflows (`e2e-full-matrix.yml`, `nightly-tests.yml`)
 - Bulk Unfeature, Enable/Disable marketing email actions for Creators table
 - Bulk Copy User IDs action for Users table
 - Bulk Approve/Disapprove actions for Waitlist table (with status-based filtering)
@@ -24,9 +27,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Migrate Creators table from custom `AdminCreatorsToolbar` to shared `TableBulkActionsToolbar` dropdown pattern, matching Users and Waitlist tables
 - All three admin tables now use identical bulk actions toolbar UX
 
+### Fixed
+
+- Missing `E2E_CLERK_USER_USERNAME` and `E2E_CLERK_USER_PASSWORD` env vars in weekly E2E full matrix workflow
+- Badge test assertion updated to match renamed design token (`bg-(--color-bg-primary)`)
+- Fix admin table checkbox multi-select on Creators and Waitlist tables by removing dual selection system conflict (TanStack Table internal selection racing with custom `useRowSelection` hook)
+
 ### Removed
 
 - `AdminCreatorsToolbar.tsx` — replaced by shared `TableBulkActionsToolbar`
+
 
 ## [26.4.6] - 2026-03-18
 

@@ -74,6 +74,8 @@ jobs:
           NODE_ENV: test
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
+          E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
 
       - name: Upload Playwright Report on Failure
@@ -91,6 +93,16 @@ jobs:
           name: e2e-full-${{ matrix.browser }}-results-${{ github.run_id }}
           path: apps/web/test-results/
           retention-days: 7
+
+      - name: Cleanup Clerk E2E test users
+        if: always()
+        continue-on-error: true
+        run: |
+          cd apps/web
+          pnpm tsx scripts/cleanup-e2e-users.ts --force
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
 
       - name: Cleanup Neon branch
         if: always()
