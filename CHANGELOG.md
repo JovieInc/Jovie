@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.9] - 2026-03-18
+
+### Added
+
+- New blog post: "The Contact Problem" — explores the structural problem of stale artist contacts and introduces the Jovie Inbox vision
+- "Problems We're Solving" section in investor memo linking to all three problem essays (MySpace, Friday, Contact)
+
 ## [26.4.8] - 2026-03-18
 
 ### Changed
