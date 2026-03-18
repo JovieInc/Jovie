@@ -31,7 +31,7 @@ describe('admin load failures', () => {
     vi.clearAllMocks();
   });
 
-  it('shows inline message when leads fail to load without firing a toast', async () => {
+  it('shows empty state when leads fail to load without firing a toast', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: false, json: async () => ({}) });
@@ -42,9 +42,7 @@ describe('admin load failures', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(
-          'Unable to load leads right now. Try again in a moment.'
-        )
+        screen.getByText('No leads have been discovered yet')
       ).toBeInTheDocument();
     });
 
