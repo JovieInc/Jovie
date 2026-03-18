@@ -35,9 +35,7 @@ export async function AdminConversionFunnelSection() {
           <ContentMetricCard
             key={stage.key}
             icon={i === 0 ? Filter : ArrowDown}
-            iconClassName={
-              i === 0 ? 'text-tertiary-token' : 'text-tertiary-token'
-            }
+            iconClassName={'text-tertiary-token'}
             label={stage.label}
             value={stage.count.toLocaleString()}
             subtitle={

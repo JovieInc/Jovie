@@ -162,8 +162,8 @@ export async function getConversionFunnelData(
       key: label.toLowerCase().replace(/\s+/g, '_'),
       label,
       count: 0,
-      conversionRate: i === 0 ? null : null,
-      dropOff: i === 0 ? null : null,
+      conversionRate: null,
+      dropOff: null,
     }));
 
     return { stages: emptyStages, timeRange, errors };
