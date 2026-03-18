@@ -38,7 +38,7 @@ export function ProfileAboutTab({
         {hasGenres ? (
           <div className='flex flex-wrap gap-1.5'>
             {genres.map(genre => (
-              <Badge key={genre} variant='secondary'>
+              <Badge key={genre} variant='secondary' className='capitalize'>
                 {genre}
               </Badge>
             ))}
