@@ -50,4 +50,27 @@ describe('buildSystemPrompt', () => {
       '- No releases found in the connected discography yet.'
     );
   });
+
+  it('includes the analytics tool guidance when insights are enabled', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiDailyMessageLimit: 25,
+      insightsEnabled: true,
+    });
+
+    expect(prompt).toContain("call the 'showTopInsights' tool first");
+  });
+
+  it('does not instruct the model to call analytics tools when insights are disabled', () => {
+    const prompt = buildSystemPrompt(baseContext, [], {
+      aiCanUseTools: true,
+      aiDailyMessageLimit: 25,
+      insightsEnabled: false,
+    });
+
+    expect(prompt).not.toContain("call the 'showTopInsights' tool first");
+    expect(prompt).toContain(
+      'you do not have access to insight cards in this session'
+    );
+  });
 });

@@ -16,6 +16,7 @@ export interface NotificationPreferences {
 
 export interface NotificationTarget {
   email?: string | null;
+  name?: string | null;
   userId?: string;
   clerkUserId?: string;
   creatorProfileId?: string;

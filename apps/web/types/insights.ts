@@ -61,6 +61,12 @@ export interface InsightResponse {
   expiresAt: string;
 }
 
+export interface ChatInsightSummary {
+  title: string;
+  totalActive: number;
+  insights: InsightResponse[];
+}
+
 /** Response from GET /api/insights */
 export interface InsightsListResponse {
   insights: InsightResponse[];

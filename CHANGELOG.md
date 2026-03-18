@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.1] - 2026-03-17
+
+### Added
+
+- Post-signup name capture — fans can optionally share their first name after subscribing to a creator
+- Personalized email greetings — release notification emails use "Hey [Name]," when a subscriber name is available
+- Creator dashboard shows subscriber names alongside emails in the audience table
+- Name capture analytics: `name_capture_shown`, `name_capture_submitted`, `name_capture_skipped` events
+
+### Fixed
+
+- Strip control characters from subscriber names in plain text emails to prevent formatting injection
+- 5-minute time window on name update endpoint to prevent abuse of the unauthenticated API
+
 ## [26.4.0] - 2026-03-17
 
 ### Added
@@ -24,6 +38,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.5] - 2026-03-17
 
@@ -90,18 +106,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Duplicate creator profiles when users re-enter onboarding — `fetchExistingProfile` now prefers claimed profiles over unclaimed pre-populated ones
-- Dashboard profile selector now prioritizes claimed profiles, preventing sidebar/panel username mismatch
-- Orphaned unclaimed profiles are deactivated on handle change to prevent stale public profile pages
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+- Tour date analytics API route enforces ownership (IDOR prevention) via profileId check
+- Seed data idempotency — deterministic `externalId` values enable safe `onConflictDoNothing`
 
 ## [26.3.2] - 2026-03-17
-
-### Added
-
-- Shopify shop redirect at `/[username]/shop` — redirects to creator's `*.myshopify.com` store with UTM attribution
-- Shopping bag icon in public profile nav bar when shop is enabled
-- Dashboard shop settings card in Earnings tab for connecting/disconnecting Shopify store URL
-- Shop click tracking via `/api/track` with `sendBeacon` for fire-and-forget analytics
 
 ### Removed
 
