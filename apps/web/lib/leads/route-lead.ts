@@ -62,15 +62,16 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
     hasInstagram: lead.hasInstagram,
   });
 
-  // 6. Reuse token if present, otherwise generate claim token
+  // 6. Reuse token if present and not expired, otherwise generate claim token
   const token = lead.claimToken;
   const tokenHash = lead.claimTokenHash;
   const expiresAt = lead.claimTokenExpiresAt;
 
-  const tokenPair =
-    token && tokenHash && expiresAt
-      ? { token, tokenHash, expiresAt }
-      : await generateClaimTokenPair();
+  const isTokenValid =
+    token && tokenHash && expiresAt && expiresAt > new Date();
+  const tokenPair = isTokenValid
+    ? { token, tokenHash, expiresAt }
+    : await generateClaimTokenPair();
   const claimUrl = getAppUrl(`/claim/${tokenPair.token}`);
 
   // 7. Build DM copy if needed

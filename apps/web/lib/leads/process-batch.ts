@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
@@ -6,8 +6,10 @@ import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
 } from './constants';
-import { pipelineLog } from './pipeline-logger';
+import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { qualifyLead } from './qualify';
+
+const MAX_SCRAPE_ATTEMPTS = 3;
 
 export interface BatchResult {
   total: number;
@@ -105,6 +107,40 @@ async function processOneLead(
       route: 'leads/process-batch',
       contextData: { leadId },
     });
+
+    // Increment scrape attempts and auto-disqualify after MAX_SCRAPE_ATTEMPTS
+    try {
+      const [updated] = await db
+        .update(leads)
+        .set({
+          scrapeAttempts: drizzleSql`${leads.scrapeAttempts} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(leads.id, leadId))
+        .returning({ scrapeAttempts: leads.scrapeAttempts });
+
+      if (updated && updated.scrapeAttempts >= MAX_SCRAPE_ATTEMPTS) {
+        await db
+          .update(leads)
+          .set({
+            status: 'disqualified',
+            disqualificationReason: 'scrape_failed',
+            disqualifiedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(leads.id, leadId));
+        pipelineWarn('qualify', 'Lead disqualified after max scrape attempts', {
+          leadId,
+          attempts: updated.scrapeAttempts,
+        });
+      }
+    } catch (updateError) {
+      await captureError('Failed to update scrape attempts', updateError, {
+        route: 'leads/process-batch',
+        contextData: { leadId },
+      });
+    }
+
     return 'error';
   }
 }
