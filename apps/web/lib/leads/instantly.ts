@@ -38,6 +38,7 @@ async function attemptLeadPush(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (isRateLimitRetry(response.status, attempt)) {

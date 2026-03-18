@@ -9,6 +9,7 @@ export interface DrawerSurfaceCardProps {
   readonly as?: ElementType;
   readonly className?: string;
   readonly testId?: string;
+  readonly variant?: 'card' | 'flat';
 }
 
 export function DrawerSurfaceCard({
@@ -16,11 +17,15 @@ export function DrawerSurfaceCard({
   as: Component = 'div',
   className,
   testId,
+  variant = 'flat',
 }: DrawerSurfaceCardProps) {
   return (
     <Component
       data-testid={testId}
-      className={cn(DRAWER_SURFACE_CARD_CLASSNAME, className)}
+      className={cn(
+        variant === 'card' && DRAWER_SURFACE_CARD_CLASSNAME,
+        className
+      )}
     >
       {children}
     </Component>

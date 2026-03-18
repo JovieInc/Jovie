@@ -210,14 +210,11 @@
   --linear-app-header-padding-x: 14px;
   --linear-app-content-padding-x: 16px;
   --linear-app-content-padding-y: 10px;
-  --linear-app-drawer-header-height: 36px;
-  --linear-app-drawer-padding-x: 14px;
   --linear-app-control-height-sm: 28px;
   --linear-app-control-padding-x: 10px;
   --linear-app-control-radius: 7px;
   --linear-app-toolbar-gap: 3px;
   --linear-app-content-surface: var(--linear-bg-surface-0);
-  --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
   --linear-row-hover: oklch(96.9% 0.002 260);
@@ -378,7 +375,6 @@
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
   --linear-app-content-surface: var(--linear-bg-surface-1);
-  --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-shell-border: rgba(255, 255, 255, 0.06);
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.06);
   --linear-app-frame-seam: rgba(255, 255, 255, 0.05);

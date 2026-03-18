@@ -12,6 +12,7 @@ import { notFound, redirect } from 'next/navigation';
 import { BASE_URL } from '@/constants/app';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import {
+  isVideoProviderKey,
   VIDEO_PROVIDER_CONFIG,
   VIDEO_PROVIDER_KEYS,
 } from '@/lib/discography/video-providers';
@@ -61,7 +62,7 @@ export default async function SoundsPage({
 
   // Filter to only video provider links
   const videoLinks = content.providerLinks.filter(link =>
-    (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+    isVideoProviderKey(link.providerId)
   );
 
   // No video links — redirect to the main smart link
@@ -119,6 +120,11 @@ export default async function SoundsPage({
       videoProviders={videoProviders}
       smartLinkPath={smartLinkPath}
       utmParams={utmParams}
+      tracking={{
+        contentType: content.type,
+        contentId: content.id,
+        smartLinkSlug: content.slug,
+      }}
     />
   );
 }
