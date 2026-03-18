@@ -67,7 +67,7 @@ export function TableHeaderCell<TData>({
               className={cn(
                 tableHeaderClass,
                 'flex w-full items-center gap-2',
-                'rounded-[7px] border border-transparent px-1.5 transition-[background-color,border-color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1',
+                'rounded-full border border-transparent px-1.5 transition-[background-color,border-color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1',
                 'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
               )}
             >
