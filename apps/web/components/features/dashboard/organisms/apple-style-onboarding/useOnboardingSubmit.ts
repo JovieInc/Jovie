@@ -353,7 +353,9 @@ export function useOnboardingSubmit({
       setAutoSubmitClaimed(false);
 
       try {
-        // Use fullName if provided (from Clerk identity), otherwise fall back to handle
+        // Use fullName if provided (from Clerk identity), otherwise fall back to handle.
+        // Display name == handle is allowed here — it will be enforced on the profile
+        // review step where the user can edit it inline.
         const resolvedDisplayName = fullName.trim() || resolvedHandle;
         validateDisplayName(resolvedDisplayName);
         await completeOnboarding({

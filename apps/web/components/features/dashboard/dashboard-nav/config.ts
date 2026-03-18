@@ -2,6 +2,7 @@ import {
   Banknote,
   CalendarDays,
   Download,
+  Gift,
   HandCoins,
   Home,
   IdCard,
@@ -97,6 +98,12 @@ export const userSettingsNavigation: NavItem[] = [
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     icon: Banknote,
+  },
+  {
+    name: 'Referrals',
+    href: APP_ROUTES.SETTINGS_REFERRAL,
+    id: 'referral',
+    icon: Gift,
   },
 ];
 

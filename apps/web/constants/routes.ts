@@ -90,6 +90,7 @@ export const APP_ROUTES = {
 
   // Referrals
   REFERRALS: '/app/referrals',
+  SETTINGS_REFERRAL: '/app/settings/referral',
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
