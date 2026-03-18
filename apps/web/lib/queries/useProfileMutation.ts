@@ -44,6 +44,8 @@ export interface ProfileUpdateInput {
     spotifyUrl?: string | null;
     appleMusicUrl?: string | null;
     youtubeUrl?: string | null;
+    // Genre tags
+    genres?: string[];
     // Settings object for feature flags
     settings?: ProfileSettingsUpdate;
   };

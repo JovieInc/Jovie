@@ -25,6 +25,7 @@ import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
+import { getHometownFromSettings } from '@/types/db';
 
 interface ChatPageClientProps {
   readonly conversationId?: string;
@@ -115,6 +116,12 @@ export function ChatPageClient({
       avatarUrl: activeProfile.avatarUrl ?? null,
       bio: activeProfile.bio ?? null,
       genres: activeProfile.genres ?? null,
+      location: activeProfile.location ?? null,
+      hometown:
+        getHometownFromSettings(
+          activeProfile.settings as Record<string, unknown> | null
+        ) ?? null,
+      activeSinceYear: activeProfile.activeSinceYear ?? null,
       links: previewLinks,
       profilePath: `/${activeProfile.username}`,
       dspConnections: {

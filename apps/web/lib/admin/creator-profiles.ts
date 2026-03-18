@@ -15,6 +15,7 @@ import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { escapeLikePattern } from '@/lib/utils/sql';
+import { getHometownFromSettings } from '@/types/db';
 
 // Default claim token expiration: 30 days
 const _CLAIM_TOKEN_EXPIRY_DAYS = 30;
@@ -37,6 +38,9 @@ export interface AdminCreatorProfileRow {
   createdAt: Date | null;
   confidence?: number | null;
   ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed';
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
   lastIngestionError: string | null;
   socialLinks?: Array<{
     id: string;
@@ -138,6 +142,9 @@ function mapRowToProfile(
     userId: string | null;
     createdAt: Date | null;
     ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed' | null;
+    location: string | null;
+    activeSinceYear: number | null;
+    settings: Record<string, unknown> | null;
     lastIngestionError: string | null;
   },
   confidenceMap: Map<string, number>,
@@ -171,6 +178,9 @@ function mapRowToProfile(
     confidence: confidenceMap.get(row.id) ?? null,
     ingestionStatus: row.ingestionStatus ?? 'idle',
     lastIngestionError: row.lastIngestionError ?? null,
+    location: row.location ?? null,
+    hometown: getHometownFromSettings(row.settings) ?? null,
+    activeSinceYear: row.activeSinceYear ?? null,
     socialLinks: socialLinksMap.get(row.id) ?? [],
   };
 }
@@ -305,6 +315,9 @@ export async function getAdminCreatorProfiles(
           createdAt: creatorProfiles.createdAt,
           ingestionStatus: creatorProfiles.ingestionStatus,
           lastIngestionError: creatorProfiles.lastIngestionError,
+          location: creatorProfiles.location,
+          activeSinceYear: creatorProfiles.activeSinceYear,
+          settings: creatorProfiles.settings,
         })
         .from(creatorProfiles)
         .where(whereClause)

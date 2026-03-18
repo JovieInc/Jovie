@@ -412,7 +412,7 @@ type CanonicalArtistProfileShape = {
   createdAt: string;
 };
 
-function getHometownFromSettings(
+export function getHometownFromSettings(
   settings: Record<string, unknown> | null | undefined
 ): string | null {
   const hometown = settings?.hometown;

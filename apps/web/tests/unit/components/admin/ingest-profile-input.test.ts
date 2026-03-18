@@ -46,6 +46,9 @@ describe('mapProfileToContact', () => {
       createdAt: null,
       ingestionStatus: 'idle',
       lastIngestionError: null,
+      location: null,
+      hometown: null,
+      activeSinceYear: null,
       socialLinks: [
         {
           id: 'link-1',
@@ -87,6 +90,9 @@ describe('mapProfileToContact', () => {
       createdAt: null,
       ingestionStatus: 'idle',
       lastIngestionError: null,
+      location: null,
+      hometown: null,
+      activeSinceYear: null,
       socialLinks: [],
     };
 
