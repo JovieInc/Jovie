@@ -2,7 +2,7 @@
 name: design-consultation
 version: 1.0.0
 description: |
-  Design consultation: understands your product, researches competitors, proposes a
+  Design consultation: understands your product, researches the landscape, proposes a
   complete design system (aesthetic, typography, color, layout, spacing, motion), and
   generates font+color preview pages. Creates DESIGN.md as your project's design source
   of truth. For existing sites, use /plan-design-review to infer the system instead.
@@ -76,7 +76,7 @@ Ask the user a single question that covers everything you need to know. Pre-fill
 3. "Want me to research what top products in your space are doing for design, or should I work from my design knowledge?"
 4. **Explicitly say:** "At any point you can just drop into chat and we'll talk through anything — this isn't a rigid form, it's a conversation."
 
-If the README or brainstorm gives you enough context, pre-fill and confirm: *"From what I can see, this is [X] for [Y] in the [Z] space. Sound right? And would you like me to research competitors, or should I work from what I know?"*
+If the README or brainstorm gives you enough context, pre-fill and confirm: *"From what I can see, this is [X] for [Y] in the [Z] space. Sound right? And would you like me to research what's out there in this space, or should I work from what I know?"*
 
 ---
 
@@ -84,7 +84,7 @@ If the README or brainstorm gives you enough context, pre-fill and confirm: *"Fr
 
 If the user wants competitive research:
 
-**Step 1: Identify competitors via WebSearch**
+**Step 1: Identify what's out there via WebSearch**
 
 Use WebSearch to find 5-10 products in their space. Search for:
 - "[product category] website design"
@@ -93,17 +93,17 @@ Use WebSearch to find 5-10 products in their space. Search for:
 
 **Step 2: Visual research via browse (if available)**
 
-If the browse binary is available (`$B` is set), visit the top 3-5 competitor sites and capture visual evidence:
+If the browse binary is available (`$B` is set), visit the top 3-5 sites in the space and capture visual evidence:
 
 ```bash
-$B goto "https://competitor-site.com"
-$B screenshot "/tmp/design-research-competitor-name.png"
+$B goto "https://example-site.com"
+$B screenshot "/tmp/design-research-site-name.png"
 $B snapshot
 ```
 
-For each competitor, analyze: fonts actually used, color palette, layout approach, spacing density, aesthetic direction. The screenshot gives you the feel; the snapshot gives you structural data.
+For each site, analyze: fonts actually used, color palette, layout approach, spacing density, aesthetic direction. The screenshot gives you the feel; the snapshot gives you structural data.
 
-If a competitor site blocks the headless browser or requires login, skip it and note why.
+If a site blocks the headless browser or requires login, skip it and note why.
 
 If browse is not available, rely on WebSearch results and your built-in design knowledge — this is fine.
 
@@ -112,7 +112,7 @@ If browse is not available, rely on WebSearch results and your built-in design k
 The goal of research is NOT to copy. It is to get in the ballpark — to understand the visual language users in this category already expect. This gives you the baseline. The interesting design work starts after you have the baseline: deciding where to follow conventions (so the product feels literate) and where to break from them (so the product is memorable).
 
 Summarize conversationally:
-> "I looked at [competitors]. Here's the landscape: they converge on [patterns]. Most of them feel [observation — e.g., interchangeable, polished but generic, etc.]. The opportunity to stand out is [gap]. Here's where I'd play it safe and where I'd take a risk..."
+> "I looked at what's out there. Here's the landscape: they converge on [patterns]. Most of them feel [observation — e.g., interchangeable, polished but generic, etc.]. The opportunity to stand out is [gap]. Here's where I'd play it safe and where I'd take a risk..."
 
 **Graceful degradation:**
 - Browse available → screenshots + snapshots + WebSearch (richest research)

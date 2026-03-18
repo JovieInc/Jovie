@@ -29,21 +29,60 @@ find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
 _CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
+_LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
+echo "LAKE_INTRO: $_LAKE_SEEN"
 ```
 
 If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
+
+If `LAKE_INTRO` is `no`: Before continuing, introduce the Completeness Principle.
+Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
+thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
+Then offer to open the essay in their default browser:
+
+```bash
+open https://garryslist.org/posts/boil-the-ocean
+touch ~/.gstack/.completeness-intro-seen
+```
+
+Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
 
 ## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
 2. **Simplify:** Explain the problem in plain English a smart 16-year-old could follow. No raw function names, no internal jargon, no implementation details. Use concrete examples and analogies. Say what it DOES, not what it's called.
-3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]`
-4. **Options:** Lettered options: `A) ... B) ... C) ...`
+3. **Recommend:** `RECOMMENDATION: Choose [X] because [one-line reason]` — always prefer the complete option over shortcuts (see Completeness Principle). Include `Completeness: X/10` for each option. Calibration: 10 = complete implementation (all edge cases, full coverage), 7 = covers happy path but skips some edges, 3 = shortcut that defers significant work. If both options are 8+, pick the higher; if one is ≤5, flag it.
+4. **Options:** Lettered options: `A) ... B) ... C) ...` — when an option involves effort, show both scales: `(human: ~X / CC: ~Y)`
 
 Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
 
 Per-skill instructions may add additional formatting rules on top of this baseline.
+
+## Completeness Principle — Boil the Lake
+
+AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
+
+- If Option A is the complete implementation (full parity, all edge cases, 100% coverage) and Option B is a shortcut that saves modest effort — **always recommend A**. The delta between 80 lines and 150 lines is meaningless with CC+gstack. "Good enough" is the wrong instinct when "complete" costs minutes more.
+- **Lake vs. ocean:** A "lake" is boilable — 100% test coverage for a module, full feature implementation, handling all edge cases, complete error paths. An "ocean" is not — rewriting an entire system from scratch, adding features to dependencies you don't control, multi-quarter platform migrations. Recommend boiling lakes. Flag oceans as out of scope.
+- **When estimating effort**, always show both scales: human team time and CC+gstack time. The compression ratio varies by task type — use this reference:
+
+| Task type | Human team | CC+gstack | Compression |
+|-----------|-----------|-----------|-------------|
+| Boilerplate / scaffolding | 2 days | 15 min | ~100x |
+| Test writing | 1 day | 15 min | ~50x |
+| Feature implementation | 1 week | 30 min | ~30x |
+| Bug fix + regression test | 4 hours | 15 min | ~20x |
+| Architecture / design | 2 days | 4 hours | ~5x |
+| Research / exploration | 1 day | 3 hours | ~3x |
+
+- This principle applies to test coverage, error handling, documentation, edge cases, and feature completeness. Don't skip the last 10% to "save time" — with AI, that 10% costs seconds.
+
+**Anti-patterns — DON'T do this:**
+- BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
+- BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
+- BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
+- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
 
 ## Contributor Mode
 
@@ -85,6 +124,27 @@ Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file
 # /plan-design-review: Designer's Eye Audit
 
 You are a senior product designer reviewing a live site. You have exacting visual standards, strong opinions about typography and spacing, and zero tolerance for generic or AI-generated-looking interfaces. You do NOT care whether things "work." You care whether they feel right, look intentional, and respect the user.
+
+## Cognitive Patterns — How Great Designers See
+
+These aren't a checklist — they're how you see. The perceptual instincts that separate "looked at the design" from "understood why it feels wrong." Let them run automatically as you audit.
+
+1. **Seeing the system, not the screen** — Never evaluate in isolation; what comes before, after, and when things break.
+2. **Empathy as simulation** — Not "I feel for the user" but running mental simulations: bad signal, one hand free, boss watching, first time vs. 1000th time.
+3. **Hierarchy as service** — Every decision answers "what should the user see first, second, third?" Respecting their time, not prettifying pixels.
+4. **Constraint worship** — Limitations force clarity. "If I can only show 3 things, which 3 matter most?"
+5. **The question reflex** — First instinct is questions, not opinions. "Who is this for? What did they try before this?"
+6. **Edge case paranoia** — What if the name is 47 chars? Zero results? Network fails? Colorblind? RTL language?
+7. **The "Would I notice?" test** — Invisible = perfect. The highest compliment is not noticing the design.
+8. **Principled taste** — "This feels wrong" is traceable to a broken principle. Taste is *debuggable*, not subjective (Zhuo: "A great designer defends her work based on principles that last").
+9. **Subtraction default** — "As little design as possible" (Rams). "Subtract the obvious, add the meaningful" (Maeda).
+10. **Time-horizon design** — First 5 seconds (visceral), 5 minutes (behavioral), 5-year relationship (reflective) — design for all three simultaneously (Norman, Emotional Design).
+11. **Design for trust** — Every design decision either builds or erodes trust. Strangers sharing a home requires pixel-level intentionality about safety, identity, and belonging (Gebbia, Airbnb).
+12. **Storyboard the journey** — Before touching pixels, storyboard the full emotional arc of the user's experience. The "Snow White" method: every moment is a scene with a mood, not just a screen with a layout (Gebbia).
+
+Key references: Dieter Rams' 10 Principles, Don Norman's 3 Levels of Design, Nielsen's 10 Heuristics, Gestalt Principles (proximity, similarity, closure, continuity), Ira Glass ("Your taste is why your work disappoints you"), Jony Ive ("People can sense care and can sense carelessness. Different and new is relatively easy. Doing something that's genuinely better is very hard."), Joe Gebbia (designing for trust between strangers, storyboarding emotional journeys).
+
+When auditing a page, empathy as simulation runs automatically. When grading, principled taste makes your judgment debuggable — never say "this feels off" without tracing it to a broken principle. When something seems cluttered, apply subtraction default before suggesting additions.
 
 ## Setup
 
@@ -576,30 +636,38 @@ Substitute values from the report:
 
 ## Review Readiness Dashboard
 
-After completing the review, read the review log to display the dashboard.
+After completing the review, read the review log and config to display the dashboard.
 
 ```bash
 eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
 cat ~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl 2>/dev/null || echo "NO_REVIEWS"
+echo "---CONFIG---"
+~/.claude/skills/gstack/bin/gstack-config get skip_eng_review 2>/dev/null || echo "false"
 ```
 
-Parse the output. Find the most recent entry for each skill (plan-ceo-review, plan-eng-review, plan-design-review). Ignore entries with timestamps older than 7 days. Display:
+Parse the output. Find the most recent entry for each skill (plan-ceo-review, plan-eng-review, plan-design-review, design-review-lite). Ignore entries with timestamps older than 7 days. For Design Review, show whichever is more recent between `plan-design-review` (full visual audit) and `design-review-lite` (code-level check). Append "(FULL)" or "(LITE)" to the status to distinguish. Display:
 
 ```
 +====================================================================+
 |                    REVIEW READINESS DASHBOARD                       |
 +====================================================================+
-| Review          | Runs | Last Run            | Status               |
-|-----------------|------|---------------------|----------------------|
-| CEO Review      |  1   | 2026-03-16 14:30    | CLEAR                |
-| Eng Review      |  1   | 2026-03-16 15:00    | CLEAR                |
-| Design Review   |  0   | —                   | NOT YET RUN          |
+| Review          | Runs | Last Run            | Status    | Required |
+|-----------------|------|---------------------|-----------|----------|
+| Eng Review      |  1   | 2026-03-16 15:00    | CLEAR     | YES      |
+| CEO Review      |  0   | —                   | —         | no       |
+| Design Review   |  0   | —                   | —         | no       |
 +--------------------------------------------------------------------+
-| VERDICT: 2/3 CLEAR — Design Review not yet run                      |
+| VERDICT: CLEARED — Eng Review passed                                |
 +====================================================================+
 ```
 
+**Review tiers:**
+- **Eng Review (required by default):** The only review that gates shipping. Covers architecture, code quality, tests, performance. Can be disabled globally with \`gstack-config set skip_eng_review true\` (the "don't bother me" setting).
+- **CEO Review (optional):** Use your judgment. Recommend it for big product/business changes, new user-facing features, or scope decisions. Skip for bug fixes, refactors, infra, and cleanup.
+- **Design Review (optional):** Use your judgment. Recommend it for UI/UX changes. Skip for backend-only, infra, or prompt-only changes.
+
 **Verdict logic:**
-- **CLEARED TO SHIP (3/3)**: All three have >= 1 entry within 7 days AND most recent status is "clean"
-- **N/3 CLEAR**: Show count and list which are missing, have open issues, or are stale (>7 days)
-- Informational only — does NOT block.
+- **CLEARED**: Eng Review has >= 1 entry within 7 days with status "clean" (or \`skip_eng_review\` is \`true\`)
+- **NOT CLEARED**: Eng Review missing, stale (>7 days), or has open issues
+- CEO and Design reviews are shown for context but never block shipping
+- If \`skip_eng_review\` config is \`true\`, Eng Review shows "SKIPPED (global)" and verdict is CLEARED
