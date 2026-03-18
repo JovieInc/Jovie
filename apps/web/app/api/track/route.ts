@@ -185,7 +185,6 @@ export async function POST(request: NextRequest) {
             audienceMembers.creatorProfileId,
             audienceMembers.fingerprint,
           ],
-          where: drizzleSql`${audienceMembers.fingerprint} IS NOT NULL`,
         })
         .returning({
           id: audienceMembers.id,
