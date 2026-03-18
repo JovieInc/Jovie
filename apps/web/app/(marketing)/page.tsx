@@ -2,11 +2,10 @@ import type { Metadata } from 'next';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { DeeplinksGrid } from '@/features/home/DeeplinksGrid';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
+import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
-import { RedesignedHero } from '@/features/home/RedesignedHero';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { SeeItInAction } from '@/features/home/SeeItInAction';
 import {
@@ -168,13 +167,10 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* Hero + logo bar fill the viewport together (minus fixed header) */}
-      <div className='flex flex-col'>
-        <RedesignedHero />
-        <LogoBar />
-      </div>
+      {/* Hero with scroll-hijacking phone animation into mode carousel */}
+      <HeroScrollSection />
 
-      <DeeplinksGrid />
+      <LogoBar />
 
       <AudienceCRMSection />
 
@@ -204,15 +200,19 @@ export default function HomePage() {
 
       <PricingSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
+      {process.env.NEXT_PUBLIC_SHOW_SHOWCASE_SECTION === 'true' && (
+        <hr
+          className='mx-auto max-w-lg border-0 h-px'
+          style={{
+            background:
+              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+          }}
+        />
+      )}
 
-      <SeeItInAction />
+      {process.env.NEXT_PUBLIC_SHOW_SHOWCASE_SECTION === 'true' && (
+        <SeeItInAction />
+      )}
 
       <FinalCTASection />
     </div>
