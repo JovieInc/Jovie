@@ -6,7 +6,6 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { ingestLeadAsCreator } from '@/lib/leads/ingest-lead';
-import { pushLeadToInstantly } from '@/lib/leads/instantly';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
 import { routeLead } from '@/lib/leads/route-lead';
 import { spotifyEnrichLead } from '@/lib/leads/spotify-enrich-lead';
@@ -128,64 +127,21 @@ async function handleApprovedLeadRouting(id: string): Promise<object | null> {
 
     pipelineLog('approve', 'Starting lead routing', { leadId: id });
     const routeResult = await routeLead(id);
-    let routing: object = { route: routeResult.route };
+    const routing: {
+      route: string;
+      outreachStatus?: 'pending';
+    } = { route: routeResult.route };
     pipelineLog('approve', 'Lead routed', {
       leadId: id,
       route: routeResult.route,
     });
 
-    const [routedLead] = await db
-      .select()
-      .from(leads)
-      .where(eq(leads.id, id))
-      .limit(1);
-
-    pipelineLog('approve', 'Checking Instantly eligibility', {
-      leadId: id,
-      route: routeResult.route,
-      hasEmail: !!routedLead?.contactEmail,
-      emailInvalid: routedLead?.emailInvalid,
-    });
-
-    if (
-      routedLead?.contactEmail &&
-      !routedLead.emailInvalid &&
-      (routeResult.route === 'email' || routeResult.route === 'both')
-    ) {
-      try {
-        const instantlyLeadId = await pushLeadToInstantly({
-          email: routedLead.contactEmail,
-          firstName: routedLead.displayName ?? routedLead.linktreeHandle,
-          claimLink: routeResult.claimUrl,
-          artistName: routedLead.displayName ?? routedLead.linktreeHandle,
-          priorityScore: routedLead.priorityScore ?? 0,
-        });
-
-        const queuedNow = new Date();
-        await db
-          .update(leads)
-          .set({
-            instantlyLeadId,
-            outreachStatus: 'queued',
-            outreachQueuedAt: queuedNow,
-            updatedAt: queuedNow,
-          })
-          .where(eq(leads.id, id));
-
-        routing = { ...routing, instantlyLeadId, outreachStatus: 'queued' };
-      } catch (instantlyError) {
-        await captureError('Instantly push failed', instantlyError, {
-          route: '/api/admin/leads/[id]',
-          contextData: { leadId: id },
-        });
-        routing = {
-          ...routing,
-          instantlyError:
-            instantlyError instanceof Error
-              ? instantlyError.message
-              : 'Instantly push failed',
-        };
-      }
+    if (routeResult.route === 'email' || routeResult.route === 'both') {
+      pipelineLog('approve', 'Email outreach left pending for manual queue', {
+        leadId: id,
+        route: routeResult.route,
+      });
+      routing.outreachStatus = 'pending';
     }
 
     return routing;
