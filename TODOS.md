@@ -104,3 +104,45 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M
 **Priority:** P1
 **Depends on:** Onboarding checkout step PR (provides the events to visualize).
+
+---
+
+## Shareable "profile is live" social card
+
+**What:** After onboarding completion, auto-generate a social media-ready graphic (OG-image style) with the creator's avatar, name, and profile URL. Show it prominently with "Share on Instagram / Twitter / Copy Image" buttons. Think Spotify Wrapped cards — designed to be screenshotted and shared.
+
+**Why:** Turns every new signup into a distribution event. Creator posts card → their fans see Jovie → some fans are also artists → viral loop.
+
+**Context:** The share menu exists (14+ UTM-tagged platforms in `profileLinkShareMenu.tsx`) but it's buried in the dashboard sidebar. This would make sharing the primary post-onboarding action. Needs image generation (could use `@vercel/og` or a canvas-based approach).
+
+**Effort:** M (human ~1.5 days / CC ~20 min)
+**Priority:** P2
+**Depends on:** Nothing blocking.
+
+---
+
+## Weekly creator digest email
+
+**What:** A weekly email to creators summarizing their week — "12 new fans subscribed, 347 profile views, your top city is Los Angeles, 2 tips received." Simple, data-driven, with a CTA back to the dashboard.
+
+**Why:** The #1 retention mechanic for dashboard products. Creators who see their numbers going up come back. Without this, the only thing bringing creators back is curiosity.
+
+**Context:** Uses Resend (already integrated). Only sent if there's activity to report (no empty emails). Needs the analytics data infrastructure to aggregate weekly stats per creator. Query patterns exist in `lib/db/queries/analytics.ts`.
+
+**Effort:** M (human ~2 days / CC ~20 min)
+**Priority:** P1
+**Depends on:** Analytics data flowing post-launch. Build week 2-3.
+
+---
+
+## Win-back email for checkout skippers
+
+**What:** When a user has plan intent (clicked a paid pricing CTA) but clicks "Skip" on the onboarding checkout step, enqueue a follow-up email 24h later with their profile link + "Ready to unlock Pro?" CTA.
+
+**Why:** These users expressed purchase intent then bailed — warmest leads. The `onboarding_checkout_skipped` analytics event provides the trigger signal.
+
+**Context:** Requires GDPR/CCPA consent classification (marketing vs transactional), opt-in/opt-out rules by jurisdiction, privacy policy updates, and unsubscribe handling. Significant compliance work needed before implementation.
+
+**Effort:** L (human ~3 days including compliance / CC ~1 hr)
+**Priority:** P3
+**Depends on:** Onboarding checkout step PR + email sending infrastructure + GDPR compliance review.

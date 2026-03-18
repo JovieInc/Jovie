@@ -1,12 +1,40 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CheckCircle } from 'lucide-react';
+import { BarChart3, Eye, PartyPopper, ShieldCheck, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
+import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from '@/lib/queries';
+
+/* ------------------------------------------------------------------ */
+/*  Unlocked features                                                 */
+/* ------------------------------------------------------------------ */
+
+const UNLOCKED_FEATURES = [
+  {
+    icon: Eye,
+    title: 'Branding Removed',
+    description: 'Your profile now shows your brand, not ours.',
+  },
+  {
+    icon: BarChart3,
+    title: 'Advanced Analytics',
+    description: 'See 90-day trends, audience demographics, and more.',
+  },
+  {
+    icon: Upload,
+    title: 'Contact Export',
+    description: 'Download your fan list and use it anywhere.',
+  },
+] as const;
+
+/* ------------------------------------------------------------------ */
+/*  Verification helper                                               */
+/* ------------------------------------------------------------------ */
 
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';
@@ -14,30 +42,40 @@ function getVerificationButtonLabel(state: string): string {
   return 'Request Verification';
 }
 
+/* ------------------------------------------------------------------ */
+/*  Page                                                              */
+/* ------------------------------------------------------------------ */
+
 export default function CheckoutSuccessPage() {
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
   const { data: billingData } = useBillingStatusQuery();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  const planName = getPlanDisplayName(billingData?.plan);
 
   useEffect(() => {
     track('subscription_success', {
       flow_type: 'checkout',
       page: 'success',
     });
-
+    track('checkout_celebration_shown', {
+      planType: billingData?.plan ?? 'unknown',
+    });
     page('checkout_success', {
       page_type: 'billing',
       section: 'success',
       conversion: true,
     });
-  }, []);
+
+    const frame = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(frame);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRequestVerification = async () => {
-    if (requestState === 'submitting') {
-      return;
-    }
+    if (requestState === 'submitting') return;
 
     setRequestState('submitting');
     setFeedback(null);
@@ -73,40 +111,73 @@ export default function CheckoutSuccessPage() {
   };
 
   return (
-    <div className='flex min-h-[calc(100dvh-4rem)] items-center justify-center'>
-      <div className='w-full max-w-xl px-6 text-center'>
+    <div className='relative flex min-h-[calc(100dvh-4rem)] items-center justify-center overflow-hidden'>
+      <ConfettiOverlay />
+
+      {/* Content */}
+      <div
+        className={`relative z-10 w-full max-w-xl px-6 text-center transition-all duration-700 ease-out ${
+          isVisible
+            ? 'opacity-100 translate-y-0 scale-100'
+            : 'opacity-0 translate-y-8 scale-95'
+        }`}
+      >
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-success-subtle)]'>
-          <CheckCircle className='h-8 w-8 text-[var(--color-success)]' />
+          <PartyPopper className='h-8 w-8 text-[var(--color-success)]' />
         </div>
 
         <h1 className='mt-6 text-3xl font-bold text-primary-token'>
-          You&apos;re eligible for verification.
+          Welcome to {planName}!
         </h1>
 
-        <p className='mt-4 text-lg text-secondary-token'>
-          Your Pro plan is active and branding is now removed. If you&apos;d
-          like the verified badge, request a quick manual review.
+        <p className='mt-3 text-lg text-secondary-token'>
+          Your plan is active. Here&apos;s what you just unlocked:
         </p>
 
+        {/* Feature cards */}
+        <div className='mt-8 grid gap-4 sm:grid-cols-3'>
+          {UNLOCKED_FEATURES.map(feature => (
+            <div
+              key={feature.title}
+              className='rounded-xl border border-subtle bg-surface-1 p-4 text-left'
+            >
+              <feature.icon
+                className='h-5 w-5 text-[var(--linear-accent)]'
+                aria-hidden='true'
+              />
+              <p className='mt-2 text-sm font-medium text-primary-token'>
+                {feature.title}
+              </p>
+              <p className='mt-1 text-xs text-tertiary-token'>
+                {feature.description}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* CTAs */}
         <div className='mt-8 flex flex-col items-center gap-3'>
+          <Button asChild>
+            <Link href={APP_ROUTES.DASHBOARD}>Go to Dashboard</Link>
+          </Button>
+
           {billingData?.isPro ? (
-            <Button
+            <button
+              type='button'
               onClick={handleRequestVerification}
               disabled={
                 requestState === 'submitting' || requestState === 'success'
               }
+              className='inline-flex items-center gap-1.5 text-sm text-secondary-token transition-colors hover:text-primary-token disabled:opacity-50'
             >
+              <ShieldCheck className='h-4 w-4' aria-hidden='true' />
               {getVerificationButtonLabel(requestState)}
-            </Button>
+            </button>
           ) : null}
 
           {feedback ? (
             <output className='text-sm text-secondary-token'>{feedback}</output>
           ) : null}
-
-          <Button asChild variant='ghost'>
-            <Link href={APP_ROUTES.DASHBOARD}>Go to Dashboard</Link>
-          </Button>
         </div>
       </div>
     </div>

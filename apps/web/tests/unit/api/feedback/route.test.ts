@@ -4,6 +4,9 @@ const mockAuth = vi.hoisted(() => vi.fn());
 const mockCreateFeedbackItem = vi.hoisted(() => vi.fn());
 const mockNotifySlackFeedbackSubmission = vi.hoisted(() => vi.fn());
 const mockFindFirst = vi.hoisted(() => vi.fn());
+const mockLoggerError = vi.hoisted(() => vi.fn());
+const mockLoggerWarn = vi.hoisted(() => vi.fn());
+const mockCaptureError = vi.hoisted(() => vi.fn());
 
 vi.mock('@clerk/nextjs/server', () => ({
   auth: mockAuth,
@@ -25,6 +28,17 @@ vi.mock('@/lib/db', () => ({
       },
     },
   },
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    error: mockLoggerError,
+    warn: mockLoggerWarn,
+  },
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: mockCaptureError,
 }));
 
 describe('POST /api/feedback', () => {
@@ -78,5 +92,30 @@ describe('POST /api/feedback', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Unable to submit feedback',
     });
+  });
+
+  it('logs error and calls captureError when feedback creation throws', async () => {
+    const thrownError = new Error('insert failed');
+    mockCreateFeedbackItem.mockRejectedValue(thrownError);
+
+    const { POST } = await import('@/app/api/feedback/route');
+
+    await POST(
+      new Request('http://localhost/api/feedback', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ message: 'Excellent product direction' }),
+      })
+    );
+
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      '[api/feedback] Failed to submit feedback:',
+      thrownError
+    );
+    expect(mockCaptureError).toHaveBeenCalledWith(
+      'Feedback submission failed',
+      thrownError,
+      { route: '/api/feedback', method: 'POST' }
+    );
   });
 });
