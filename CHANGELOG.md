@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.8] - 2026-03-18
+
+### Changed
+
+- Replace SQL string interpolation with parameterized queries in batch update functions (`batchUpdateSortOrder`, `batchUpdateSocialLinks`) for defense-in-depth against SQL injection
+- Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
+- Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
+- Document intentional `Access-Control-Allow-Origin: *` CORS policy on public pixel tracking endpoint
+
 ## [26.4.7] - 2026-03-18
 
 ### Added
