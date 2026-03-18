@@ -101,7 +101,7 @@ export function AdminProfileSidebar({
               />
               <AppIconButton
                 ariaLabel='Open public profile'
-                className='h-8 w-8 shrink-0 rounded-[8px] bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/20 [&_svg]:h-3.5 [&_svg]:w-3.5'
+                className='h-8 w-8 shrink-0 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/20 [&_svg]:h-3.5 [&_svg]:w-3.5'
                 onClick={() =>
                   globalThis.open(
                     `${BASE_URL}/${profile.username}`,
