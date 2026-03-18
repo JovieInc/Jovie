@@ -98,7 +98,7 @@ describe('ProfileCompletionRedirect', () => {
     expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
 
-  it('does not redirect when avatar URL is blank (avatar no longer required)', () => {
+  it('redirects when avatar URL is blank (avatar is required)', () => {
     mockReplace.mockClear();
     renderGuard({
       ...baseDashboardData,
@@ -108,7 +108,7 @@ describe('ProfileCompletionRedirect', () => {
       },
     });
 
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/onboarding');
   });
 
   it('does NOT redirect when selectedProfile is null due to dashboardLoadError', () => {

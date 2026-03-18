@@ -35,6 +35,10 @@ export function AppleStyleOnboardingForm({
   userEmail = null,
   userId,
   shouldAutoSubmitHandle = false,
+  initialStepIndex = 0,
+  existingAvatarUrl = null,
+  existingBio = null,
+  existingGenres = null,
 }: Readonly<AppleStyleOnboardingFormProps>) {
   const onboardingStartedAtRef = useRef(Date.now());
   const previousStepIndexRef = useRef<number | null>(null);
@@ -50,7 +54,7 @@ export function AppleStyleOnboardingForm({
   const handleInputRef = useRef<HTMLInputElement | null>(null);
 
   const { currentStepIndex, isTransitioning, goToNextStep, goBack } =
-    useStepNavigation();
+    useStepNavigation(initialStepIndex);
 
   const { handleValidation, setHandleValidation, handle, validateHandle } =
     useHandleValidation({
@@ -313,6 +317,10 @@ export function AppleStyleOnboardingForm({
             isEnriching={
               isDspEnriching || isAutoConnectEnriching || isConnecting
             }
+            existingAvatarUrl={existingAvatarUrl}
+            existingBio={existingBio}
+            existingGenres={existingGenres}
+            isStepResume={initialStepIndex > 0}
           />
         );
 

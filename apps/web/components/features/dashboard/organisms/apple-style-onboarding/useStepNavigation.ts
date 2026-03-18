@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { env } from '@/lib/env-client';
 import { ONBOARDING_STEPS } from './types';
 
@@ -16,10 +17,15 @@ interface UseStepNavigationReturn {
 
 /**
  * Hook to manage step navigation in the onboarding form.
+ *
+ * @param initialStepIndex - Step to start on (default 0). Used for step-resume
+ *   when existing users return to onboarding to complete missing requirements.
  */
-export function useStepNavigation(): UseStepNavigationReturn {
+export function useStepNavigation(
+  initialStepIndex = 0
+): UseStepNavigationReturn {
   const router = useRouter();
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(initialStepIndex);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
   const goToNextStep = useCallback(() => {
@@ -51,12 +57,15 @@ export function useStepNavigation(): UseStepNavigationReturn {
   }, [currentStepIndex, isTransitioning]);
 
   const goBack = useCallback(() => {
-    if (currentStepIndex > 0) {
+    if (currentStepIndex > 0 && currentStepIndex > initialStepIndex) {
       goToPreviousStep();
+    } else if (initialStepIndex > 0) {
+      // Step-resume user at their starting step — go to dashboard, not previous steps
+      router.push(APP_ROUTES.DASHBOARD);
     } else {
       router.back();
     }
-  }, [currentStepIndex, goToPreviousStep, router]);
+  }, [currentStepIndex, goToPreviousStep, router, initialStepIndex]);
 
   return {
     currentStepIndex,
