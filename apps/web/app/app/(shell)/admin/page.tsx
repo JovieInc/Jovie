@@ -6,6 +6,8 @@ import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
   AdminBraggingRightsSection,
   AdminBraggingRightsSectionSkeleton,
+  AdminConversionFunnelSection,
+  AdminConversionFunnelSectionSkeleton,
   AdminKpiSection,
   AdminKpiSectionSkeleton,
   AdminOutreachSection,
@@ -40,6 +42,11 @@ export default function AdminPage() {
           {/* Row 1: Business KPIs + YC metrics */}
           <Suspense fallback={<AdminKpiSectionSkeleton />}>
             <AdminKpiSection />
+          </Suspense>
+
+          {/* Row 2: User conversion funnel */}
+          <Suspense fallback={<AdminConversionFunnelSectionSkeleton />}>
+            <AdminConversionFunnelSection />
           </Suspense>
 
           <ContentSurfaceCard as='details' className='overflow-hidden'>

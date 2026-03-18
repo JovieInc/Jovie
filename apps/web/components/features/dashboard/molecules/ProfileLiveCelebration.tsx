@@ -1,7 +1,8 @@
 'use client';
 
 import { PartyPopper } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { track } from '@/lib/analytics';
 import { CopyToClipboardButton } from './CopyToClipboardButton';
 
@@ -10,47 +11,6 @@ interface ProfileLiveCelebrationProps {
   readonly onComplete: () => void;
   /** Auto-advance delay in ms. Defaults to 4000. */
   readonly autoAdvanceMs?: number;
-}
-
-const CONFETTI_COUNT = 40;
-const CONFETTI_COLORS = [
-  'var(--linear-accent)',
-  'var(--color-success)',
-  '#f59e0b',
-  '#8b5cf6',
-  '#ec4899',
-  '#06b6d4',
-];
-
-interface ConfettiParticle {
-  id: string;
-  width: number;
-  height: number;
-  color: string;
-  left: string;
-  opacity: number;
-  animationDelay: string;
-  animationDuration: string;
-  rotation: string;
-}
-
-function getSeededValue(index: number, salt: number): number {
-  const seed = ((index + 1) * 1664525 + salt * 1013904223) >>> 0;
-  return seed / 0x100000000;
-}
-
-function generateParticles(): ConfettiParticle[] {
-  return Array.from({ length: CONFETTI_COUNT }, (_, i) => ({
-    id: `confetti-${crypto.randomUUID()}`,
-    width: 4 + getSeededValue(i, 1) * 6,
-    height: 4 + getSeededValue(i, 2) * 6,
-    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-    left: `${getSeededValue(i, 3) * 100}%`,
-    opacity: 0.9,
-    animationDelay: `${getSeededValue(i, 4) * 0.8}s`,
-    animationDuration: `${2 + getSeededValue(i, 5) * 2}s`,
-    rotation: `rotate(${getSeededValue(i, 6) * 360}deg)`,
-  }));
 }
 
 /**
@@ -72,7 +32,6 @@ export function ProfileLiveCelebration({
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCompleteRef = useRef(onComplete);
   const profileUrl = `jov.ie/${username}`;
-  const particles = useMemo(() => generateParticles(), []);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -187,29 +146,7 @@ export function ProfileLiveCelebration({
       className='fixed inset-0 z-50 m-0 flex h-full w-full max-w-none items-center justify-center border-none bg-(--bg)/95 p-0 backdrop-blur-sm'
       aria-label='Profile live celebration'
     >
-      {/* Confetti particles */}
-      <div
-        className='pointer-events-none absolute inset-0 overflow-hidden'
-        aria-hidden='true'
-      >
-        {particles.map(p => (
-          <span
-            key={p.id}
-            className='absolute block rounded-sm confetti-particle'
-            style={{
-              width: `${p.width}px`,
-              height: `${p.height}px`,
-              backgroundColor: p.color,
-              left: p.left,
-              top: '-10px',
-              opacity: p.opacity,
-              animationDelay: p.animationDelay,
-              animationDuration: p.animationDuration,
-              transform: p.rotation,
-            }}
-          />
-        ))}
-      </div>
+      <ConfettiOverlay />
 
       {/* Content */}
       <div
@@ -253,19 +190,6 @@ export function ProfileLiveCelebration({
       <style>{`
         dialog::backdrop {
           background: transparent;
-        }
-        @keyframes confetti-fall {
-          0% {
-            transform: translateY(0) rotate(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-        .confetti-particle {
-          animation: confetti-fall ease-out forwards;
         }
       `}</style>
     </dialog>

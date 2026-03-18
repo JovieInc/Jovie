@@ -9,6 +9,7 @@ import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
+import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -200,6 +201,19 @@ export default function HomePage() {
       )}
 
       <PricingSection />
+
+      {process.env.NEXT_PUBLIC_SHOW_TESTIMONIALS === 'true' && (
+        <>
+          <hr
+            className='mx-auto max-w-lg border-0 h-px'
+            style={{
+              background:
+                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            }}
+          />
+          <TestimonialsSection />
+        </>
+      )}
 
       <Suspense fallback={null}>
         <SeeItInActionSafe />

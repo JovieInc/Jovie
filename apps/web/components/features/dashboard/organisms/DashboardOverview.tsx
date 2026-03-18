@@ -21,6 +21,7 @@ import {
   getIncompleteTaskIndicatorContent,
   getIncompleteTaskLabelClass,
 } from '@/features/dashboard/organisms/dashboard-overview-helpers';
+import { GetStartedChecklistCard } from '@/features/dashboard/organisms/GetStartedChecklistCard';
 import { StarterEmptyState } from '@/features/feedback/StarterEmptyState';
 import { GLYPH_ARROW_RIGHT } from '@/lib/keyboard-shortcuts';
 import {
@@ -233,6 +234,13 @@ export function DashboardOverview({
     <DashboardOverviewControlsProvider>
       <div className='space-y-6' data-testid='dashboard-overview'>
         {header}
+
+        {artist.owner_user_id && (
+          <GetStartedChecklistCard
+            userId={artist.owner_user_id}
+            profileUrl={profileUrl}
+          />
+        )}
 
         {profileUrl && (
           <SocialBioNudge profileId={artist.id} profileUrl={profileUrl} />

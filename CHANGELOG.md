@@ -16,14 +16,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.5] - 2026-03-18
 
+### Added
+
+- Post-checkout celebration page with confetti animation, plan-aware greeting, and feature unlock cards (Branding Removed, Advanced Analytics, Contact Export)
+- Shared `Confetti.tsx` atom extracted from `ProfileLiveCelebration` for DRY reuse across celebration screens
+- First-fan celebration modal on dashboard — triggers when subscriber count reaches 1-5, gated by localStorage, auto-dismisses after 5s
+- Getting Started checklist card on dashboard with 5 growth tasks (share on Instagram, Spotify bio link, QR code, invite artist, connect Venmo), dismissible for 24h
+- Referral settings page at `/app/settings/referral` with copyable share link, program terms, and earnings stats
+- Testimonials section on homepage (feature-flagged via `NEXT_PUBLIC_SHOW_TESTIMONIALS`)
+- User conversion funnel section in admin dashboard (Total Users → With Profiles → Profile Complete → Has Subscribers → Paid)
+- 43 unit tests covering all new components and data flows
+- 3 deferred items in TODOS.md (shareable social card, weekly digest email, win-back email)
+- Test for billing reconciliation audit log insert failure path
+
 ### Fixed
 
 - Dashboard analytics CTE now has RLS session variable set on the db connection (defense-in-depth for audience_members and notification_subscriptions queries)
 - Billing reconciliation audit log insert failure no longer silently swallows errors — failures are captured via captureCriticalError
-
-### Added
-
-- Test for billing reconciliation audit log insert failure path
 
 ### Changed
 
@@ -37,6 +46,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Standardize all buttons and icon buttons to `rounded-full` (pill shape) across the design system
 - Wrap ProfileContactSidebar header and profile link sections in DrawerSurfaceCard for visual consistency
 - Align leads API response shape (`items` → `rows`, `limit` → `pageSize`) with other admin endpoints
+
+### Fixed
+
+- Feedback API route now logs errors with `captureError` instead of silently swallowing exceptions
 
 ### Removed
 
