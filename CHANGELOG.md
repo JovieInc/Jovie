@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+
+## [26.4.5] - 2026-03-18
+
+### Added
+
+- Post-checkout celebration page with confetti animation, plan-aware greeting, and feature unlock cards (Branding Removed, Advanced Analytics, Contact Export)
+- Shared `Confetti.tsx` atom extracted from `ProfileLiveCelebration` for DRY reuse across celebration screens
+- First-fan celebration modal on dashboard — triggers when subscriber count reaches 1-5, gated by localStorage, auto-dismisses after 5s
+- Getting Started checklist card on dashboard with 5 growth tasks (share on Instagram, Spotify bio link, QR code, invite artist, connect Venmo), dismissible for 24h
+- Referral settings page at `/app/settings/referral` with copyable share link, program terms, and earnings stats
+- Testimonials section on homepage (feature-flagged via `NEXT_PUBLIC_SHOW_TESTIMONIALS`)
+- User conversion funnel section in admin dashboard (Total Users → With Profiles → Profile Complete → Has Subscribers → Paid)
+- 43 unit tests covering all new components and data flows
+- 3 deferred items in TODOS.md (shareable social card, weekly digest email, win-back email)
+
+### Fixed
+
+- Feedback API route now logs errors with `captureError` instead of silently swallowing exceptions
+
 ## [26.4.4] - 2026-03-17
 
 ### Fixed
