@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.8] - 2026-03-18
+
+### Changed
+
+- Homepage hero: "One link to grow your music career" → "One link to launch your music career"
+- Final CTA: "start growing today" → "launch your career today"
+- Meta descriptions and SEO schema updated across all pages to new positioning
+- llms.txt brand description updated to match new messaging
+- Investor memo mission updated to "AI that manages your music career"
+
 ## [26.4.7] - 2026-03-18
 
 ### Added
