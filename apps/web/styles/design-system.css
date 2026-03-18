@@ -105,9 +105,9 @@
   --color-logo-muted-hover: rgba(0, 0, 0, 0.65);
 
   /* Border system - semi-transparent for flexibility */
-  --color-border-subtle: lch(94.89% 0 282);
-  --color-border-default: lch(89.49% 0 282);
-  --color-border-strong: lch(85.44% 0 282);
+  --color-border-subtle: oklch(0% 0 0 / 6%);
+  --color-border-default: oklch(0% 0 0 / 10%);
+  --color-border-strong: oklch(0% 0 0 / 18%);
   --color-border-focus: #7170ff;
   /* Linear accent for focus */
 
