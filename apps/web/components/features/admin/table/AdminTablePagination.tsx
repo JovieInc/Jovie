@@ -72,7 +72,7 @@ export function AdminTablePagination({
   const showPageSizeSelector = pageSize !== undefined && onPageSizeChange;
   const paginationButtonClassName = cn(
     APP_CONTROL_BUTTON_CLASS,
-    'h-8 min-w-8 rounded-[7px] px-2.5 text-[12px] font-[510] sm:px-3'
+    'h-8 min-w-8 rounded-full px-2.5 text-[12px] font-[510] sm:px-3'
   );
 
   return (
