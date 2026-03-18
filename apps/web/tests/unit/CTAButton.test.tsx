@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { CTAButton } from '@/components/atoms/CTAButton';
+import { CTAButton } from '@/components/molecules/CTAButton';
 
 // Mock the next/link component
 vi.mock('next/link', () => {

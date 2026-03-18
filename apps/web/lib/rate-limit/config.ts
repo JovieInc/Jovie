@@ -142,6 +142,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Admin outreach: 10 per hour per admin - bulk external API calls */
+  adminOutreach: {
+    name: 'Admin Outreach',
+    limit: 10,
+    window: '1 h',
+    prefix: 'admin:outreach',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   /** Admin creator ingest: 10 per minute per admin - heavy ingestion job */
   adminCreatorIngest: {
     name: 'Admin Creator Ingest',

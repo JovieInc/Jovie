@@ -1,7 +1,7 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
-import { ScrollRevealInit } from '@/components/home/ScrollRevealInit';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { ScrollRevealInit } from '@/features/home/ScrollRevealInit';
 
 export default async function MarketingLayout({
   children,

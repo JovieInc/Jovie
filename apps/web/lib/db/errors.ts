@@ -65,7 +65,8 @@ export function unwrapPgError(error: unknown, depth = 0): PgErrorFields {
  * while the actual PG message (e.g. "column X does not exist") is on `.cause`.
  */
 export function getDeepErrorMessage(error: unknown): string {
-  if (!error || typeof error !== 'object') return String(error ?? '');
+  if (error == null) return '';
+  if (typeof error !== 'object') return String(error);
 
   const messages: string[] = [];
   let current: unknown = error;

@@ -1,12 +1,17 @@
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { AiDemo } from '@/components/home/AiDemo';
-import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { HeroSpotifySearch } from '@/components/home/HeroSpotifySearch';
-import { ProfileMockup } from '@/components/home/ProfileMockup';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { AiDemo } from '@/features/home/AiDemo';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { ProfileMockup } from '@/features/home/ProfileMockup';
+import {
+  buildOrganizationSchema,
+  buildSoftwareSchema,
+  buildWebsiteSchema,
+} from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 import { captureWarning } from '@/lib/error-tracking';
 import { getProfileByUsername } from '@/lib/services/profile';
@@ -138,90 +143,21 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Helper to safely serialize JSON-LD with XSS protection
-const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
-
-const WEBSITE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: APP_NAME,
+const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: 'Jovie Link in Bio',
   description:
-    'Capture fan contacts and direct every visitor to the right listening destination with one focused profile.',
-  url: APP_URL,
-  inLanguage: 'en-US',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-      width: 512,
-      height: 512,
-    },
-  },
+    'Notify fans automatically and direct every visitor to the right listening destination with one focused profile.',
 });
 
-const SOFTWARE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: APP_NAME,
-  description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
-  url: APP_URL,
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    description: 'Free to start',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
-  author: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-  },
-});
+const SOFTWARE_SCHEMA = buildSoftwareSchema(
+  'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.'
+);
 
-const ORGANIZATION_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: APP_NAME,
+const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Inc',
-  url: APP_URL,
-  logo: {
-    '@type': 'ImageObject',
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-    width: 512,
-    height: 512,
-  },
-  image: `${APP_URL}/og/default.png`,
   description:
-    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan capture, and AI assistant in one platform.',
+    'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
   sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    contactType: 'customer support',
-    url: `${APP_URL}/support`,
-  },
 });
 
 /* ─── Shared inline style helpers ─── */
@@ -358,7 +294,7 @@ export default async function LaunchPage() {
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
             <span className='text-secondary-token'>
-              Paste one Spotify link. Get smart links, fan capture, and a
+              Paste one Spotify link. Get smart links, fan notifications, and a
               link-in-bio that converts &mdash; all in seconds.
             </span>
           </h2>
@@ -429,7 +365,7 @@ export default async function LaunchPage() {
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
                 { num: '1.1', title: 'Adaptive CTA' },
-                { num: '1.2', title: 'Email + SMS Capture' },
+                { num: '1.2', title: 'Email + SMS Notifications' },
                 { num: '1.3', title: 'Streaming Preference Memory' },
                 { num: '1.4', title: 'Custom Domains' },
               ].map(sf => (
@@ -1424,9 +1360,9 @@ export default async function LaunchPage() {
           </div>
           <div className='pt-1'>
             <p className='marketing-lead-linear max-w-[480px]'>
-              Most artists have zero data on their visitors. Jovie captures
-              every interaction and scores each fan by engagement &mdash; so you
-              know who your real fans are.
+              Most artists have zero data on their visitors. Jovie tracks every
+              interaction and scores each fan by engagement &mdash; so you know
+              who your real fans are.
             </p>
             <div className='grid grid-cols-1 sm:grid-cols-2 gap-x-8 mt-10 pt-6 border-t border-subtle'>
               {[
@@ -1783,8 +1719,7 @@ export default async function LaunchPage() {
               },
               {
                 val: '$100',
-                label:
-                  'lifetime value of each email subscriber you capture through Jovie',
+                label: 'lifetime value of each fan who opts in through Jovie',
                 source: 'Internal estimate based on direct-to-fan sales',
               },
             ].map(s => (
@@ -1868,7 +1803,7 @@ export default async function LaunchPage() {
               {[
                 'Static list of links — same for every visitor',
                 'No smart links — manually create each one',
-                'No fan capture — zero emails, zero SMS',
+                'No fan notifications — zero emails, zero SMS',
                 'No AI — write your own bios and press kits',
                 'Linktree branding on your page',
                 'No deeplinks — one link does one thing',
@@ -1898,7 +1833,7 @@ export default async function LaunchPage() {
               {[
                 'Adaptive CTA — subscribe or listen, per visitor',
                 'Smart links auto-created for every release',
-                'Email fan capture built in',
+                'Fan notifications built in',
                 'AI assistant with 10 queries/mo',
                 'Your brand, your domain potential',
                 '/tip, /tour, /contact, /listen deeplinks included',
@@ -1942,7 +1877,7 @@ export default async function LaunchPage() {
             id='cta-heading'
             className='marketing-h2-linear mx-auto max-w-[600px] mb-10 !text-[clamp(2.2rem,4.5vw,3.5rem)]'
           >
-            Your music deserves better than a list of links.
+            Your music deserves better than a stack of links.
           </h2>
           <div className='flex flex-col sm:flex-row gap-3 justify-center'>
             <Link href={APP_ROUTES.SIGNUP} className='marketing-cta focus-ring'>
@@ -1950,7 +1885,7 @@ export default async function LaunchPage() {
             </Link>
             <a
               href='mailto:hello@jov.ie'
-              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-[var(--linear-bg-surface-1)] border border-subtle hover:bg-white/[0.04]'
+              className='focus-ring inline-flex items-center justify-center px-6 py-3 rounded-md font-medium text-sm transition-colors bg-surface-1 border border-subtle hover:bg-white/[0.04]'
             >
               Contact us
             </a>

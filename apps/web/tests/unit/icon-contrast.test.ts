@@ -293,7 +293,7 @@ describe('Icon Contrast — WCAG AA Non-Text (3:1)', () => {
 
     it('DSP_ICONS covers all providers in DspProviderIcon.tsx PROVIDER_COLORS', async () => {
       const { PROVIDER_COLORS } = await import(
-        '@/components/dashboard/atoms/DspProviderIcon'
+        '@/features/dashboard/atoms/DspProviderIcon'
       );
 
       for (const [provider, color] of Object.entries(PROVIDER_COLORS)) {

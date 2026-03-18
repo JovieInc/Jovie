@@ -3,20 +3,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockGetCurrentUserEntitlements = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockParseJsonBody = vi.hoisted(() => vi.fn());
+const mockPushLeadToInstantly = vi.hoisted(() => vi.fn());
+const mockGetAppUrl = vi.hoisted(() => vi.fn());
 const mockEq = vi.hoisted(() => vi.fn(() => 'eq-clause'));
 const mockAnd = vi.hoisted(() => vi.fn(() => 'and-clause'));
 const mockAsc = vi.hoisted(() => vi.fn(() => 'asc-clause'));
 const mockDesc = vi.hoisted(() => vi.fn(() => 'desc-clause'));
 const mockCount = vi.hoisted(() => vi.fn(() => 'count-clause'));
 const mockIsNotNull = vi.hoisted(() => vi.fn(() => 'not-null-clause'));
+const mockIsNull = vi.hoisted(() => vi.fn(() => 'is-null-clause'));
+const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
+const mockOr = vi.hoisted(() => vi.fn(() => 'or-clause'));
 
-const { mockDb, mockSelect } = vi.hoisted(() => {
-  const mockSelect = vi.fn();
-  return {
-    mockDb: { select: mockSelect },
-    mockSelect,
-  };
-});
+const { mockDb, mockSelect, mockUpdate, mockUpdateReturning } = vi.hoisted(
+  () => {
+    const mockSelect = vi.fn();
+    const mockUpdateReturning = vi.fn();
+    const mockUpdateWhere = vi.fn(() => ({ returning: mockUpdateReturning }));
+    const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
+    const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
+    return {
+      mockDb: { select: mockSelect, update: mockUpdate },
+      mockSelect,
+      mockUpdate,
+      mockUpdateSet,
+      mockUpdateWhere,
+      mockUpdateReturning,
+    };
+  }
+);
 
 vi.mock('drizzle-orm', () => ({
   and: mockAnd,
@@ -25,6 +41,13 @@ vi.mock('drizzle-orm', () => ({
   desc: mockDesc,
   eq: mockEq,
   isNotNull: mockIsNotNull,
+  isNull: mockIsNull,
+  lt: mockLt,
+  or: mockOr,
+}));
+
+vi.mock('@/constants/domains', () => ({
+  getAppUrl: mockGetAppUrl,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -84,21 +107,42 @@ vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: mockGetCurrentUserEntitlements,
 }));
 
+vi.mock('@/lib/http/parse-json', () => ({
+  parseJsonBody: mockParseJsonBody,
+}));
+
+vi.mock('@/lib/leads/instantly', () => ({
+  pushLeadToInstantly: mockPushLeadToInstantly,
+}));
+
 vi.mock('@/lib/error-tracking', () => ({
   captureError: mockCaptureError,
   captureWarning: mockCaptureWarning,
   getSafeErrorMessage: () => 'safe-error',
 }));
 
-import { GET } from '@/app/api/admin/outreach/route';
+import { GET, POST } from '@/app/api/admin/outreach/route';
 
 describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSelect.mockReset();
+    mockUpdate.mockReset();
+    mockUpdateReturning.mockReset();
+    mockGetCurrentUserEntitlements.mockReset();
+    mockGetAppUrl.mockReset();
+    mockParseJsonBody.mockReset();
+    mockPushLeadToInstantly.mockReset();
     mockGetCurrentUserEntitlements.mockResolvedValue({
       isAuthenticated: true,
       isAdmin: true,
     });
+    mockGetAppUrl.mockReturnValue('https://app.jovie.test/claim/token');
+    mockParseJsonBody.mockResolvedValue({
+      ok: true,
+      data: { limit: 2 },
+    });
+    mockUpdateReturning.mockResolvedValue([{ id: 'lead-1' }]);
   });
 
   it('falls back to the legacy select when leads enrichment columns are missing', async () => {
@@ -129,6 +173,11 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 1 }]),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
           where: vi.fn(() => ({
             orderBy: vi.fn(() => ({
               limit: vi.fn(() => ({
@@ -136,6 +185,11 @@ describe('GET /api/admin/outreach', () => {
               })),
             })),
           })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 1 }]),
         })),
       }))
       .mockImplementationOnce(() => ({
@@ -160,10 +214,119 @@ describe('GET /api/admin/outreach', () => {
         createdAt: '2025-01-01T00:00:00.000Z',
       },
     ]);
+    expect(data.pendingTotal).toBe(1);
     expect(mockCaptureWarning).toHaveBeenCalledWith(
       '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
       expect.any(Error),
       { route: '/api/admin/outreach' }
     );
+  });
+
+  it('queues pending email outreach only when explicitly triggered', async () => {
+    mockSelect
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: 'lead-1',
+                  linktreeHandle: 'artist',
+                  displayName: 'Artist',
+                  contactEmail: 'artist@example.com',
+                  claimToken: 'claim-token',
+                  priorityScore: 88,
+                },
+              ]),
+            })),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 0 }]),
+        })),
+      }));
+
+    mockPushLeadToInstantly.mockResolvedValue('instantly-123');
+
+    const response = await POST(
+      new Request('http://localhost/api/admin/outreach', {
+        method: 'POST',
+        body: JSON.stringify({ limit: 1 }),
+      }) as never
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockParseJsonBody).toHaveBeenCalled();
+    expect(mockOr).toHaveBeenCalledWith('eq-clause', 'eq-clause');
+    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    expect(mockPushLeadToInstantly).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'artist@example.com',
+        claimLink: 'https://app.jovie.test/claim/token',
+        priorityScore: 88,
+      })
+    );
+    expect(data).toEqual({
+      ok: true,
+      attempted: 1,
+      queued: 1,
+      failed: 0,
+      remainingPending: 0,
+    });
+  });
+
+  it('skips leads already claimed by another queue request', async () => {
+    mockSelect
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            orderBy: vi.fn(() => ({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: 'lead-1',
+                  linktreeHandle: 'artist',
+                  displayName: 'Artist',
+                  contactEmail: 'artist@example.com',
+                  claimToken: 'claim-token',
+                  priorityScore: 88,
+                },
+              ]),
+            })),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ total: 1 }]),
+        })),
+      }));
+
+    mockUpdateReturning.mockResolvedValueOnce([]);
+
+    const response = await POST(
+      new Request('http://localhost/api/admin/outreach', {
+        method: 'POST',
+        body: JSON.stringify({ limit: 1 }),
+      }) as never
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockPushLeadToInstantly).not.toHaveBeenCalled();
+    expect(data).toEqual({
+      ok: true,
+      attempted: 0,
+      queued: 0,
+      failed: 0,
+      remainingPending: 1,
+    });
   });
 });

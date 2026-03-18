@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SettingsSection } from '@/components/dashboard/organisms/SettingsSection';
+import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
 describe('SettingsSection', () => {
   it('uses the updated typography scale for heading and description', () => {

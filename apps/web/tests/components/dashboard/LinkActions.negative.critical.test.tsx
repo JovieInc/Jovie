@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { LinkActions } from '@/components/dashboard/atoms/link-actions';
+import { LinkActions } from '@/features/dashboard/atoms/link-actions';
 
 // Mock Icon — lightweight stub
 vi.mock('@/components/atoms/Icon', () => ({

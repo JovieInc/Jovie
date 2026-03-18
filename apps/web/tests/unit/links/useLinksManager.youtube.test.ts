@@ -11,7 +11,7 @@ vi.mock('@/lib/analytics', () => ({
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
-import { useLinksManager } from '@/components/dashboard/organisms/links/hooks/useLinksManager';
+import { useLinksManager } from '@/features/dashboard/organisms/links/hooks/useLinksManager';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import {
   addLinkAndFlushTimers,

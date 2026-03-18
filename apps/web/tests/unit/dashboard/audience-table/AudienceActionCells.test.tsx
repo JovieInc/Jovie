@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { AudienceActionsCell } from '@/components/organisms/table/atoms/AudienceActionsCell';
-import { AudienceLastActionCell } from '@/components/organisms/table/atoms/AudienceLastActionCell';
+import {
+  AudienceActionsCell,
+  AudienceLastActionCell,
+} from '@/components/organisms/table';
 import type { AudienceAction } from '@/types';
 
 describe('Audience action cells', () => {

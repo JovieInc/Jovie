@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AdminOutreachPage from '@/app/app/(shell)/admin/outreach/page';
-import { LeadTable } from '@/components/admin/leads/LeadTable';
+import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 vi.mock('sonner', () => ({
@@ -31,7 +31,7 @@ describe('admin load failures', () => {
     vi.clearAllMocks();
   });
 
-  it('shows inline message when leads fail to load without firing a toast', async () => {
+  it('shows error state when leads fail to load without firing a toast', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: false, json: async () => ({}) });
@@ -41,11 +41,7 @@ describe('admin load failures', () => {
     renderWithQueryClient(<LeadTable />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Unable to load leads right now. Try again in a moment.'
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
     });
 
     expect(toast.error).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SignUpForm } from '@/components/auth/forms/SignUpForm';
+import { SignUpForm } from '@/features/auth/forms/SignUpForm';
 
 const pushMock = vi.fn();
 const startOAuthMock = vi.fn();
@@ -42,7 +42,7 @@ vi.mock('@/hooks/useSignUpFlow', () => ({
   }),
 }));
 
-vi.mock('@/components/auth/forms/MethodSelector', () => ({
+vi.mock('@/features/auth/forms/MethodSelector', () => ({
   MethodSelector: ({ error }: { error?: string | null }) => (
     <div>
       <p>Method selector</p>

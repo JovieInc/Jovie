@@ -3,18 +3,18 @@ import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
-import { ClaimBanner } from '@/components/profile/ClaimBanner';
-import type { ProfileMode } from '@/components/profile/contracts';
-import { DesktopQrOverlayClient } from '@/components/profile/DesktopQrOverlayClient';
-import { ProfileViewTracker } from '@/components/profile/ProfileViewTracker';
+import { BASE_URL } from '@/constants/app';
+import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { ClaimBanner } from '@/features/profile/ClaimBanner';
+import type { ProfileMode } from '@/features/profile/contracts';
+import { DesktopQrOverlayClient } from '@/features/profile/DesktopQrOverlayClient';
+import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 import {
   getProfileMode,
   getProfileModeSubtitle,
-} from '@/components/profile/registry';
-import { StaticArtistPage } from '@/components/profile/StaticArtistPage';
-import { JoviePixel } from '@/components/tracking';
-import { BASE_URL } from '@/constants/app';
+} from '@/features/profile/registry';
+import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
+import { JoviePixel } from '@/features/tracking';
 import { getClientTrackingToken } from '@/lib/analytics/tracking-token';
 import { toPublicContacts } from '@/lib/contacts/mapper';
 // eslint-disable-next-line no-restricted-imports -- Schema barrel import needed for types
@@ -30,10 +30,12 @@ import {
 } from '@/lib/feature-flags/server';
 import { calculateRequiredProfileCompletion } from '@/lib/profile/completion';
 import { getProfileOgImageUrl } from '@/lib/profile/og-image';
+import { isShopEnabled } from '@/lib/profile/shop-settings';
 import {
   getProfileWithLinks as getCreatorProfileWithLinks,
   getProfileWithUser as getCreatorProfileWithUser,
 } from '@/lib/services/profile';
+import { getProfileSocialLinks } from '@/lib/services/profile/queries';
 import { isDspPlatform } from '@/lib/services/social-links/types';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
@@ -478,12 +480,38 @@ async function renderListenMode(
     notFound();
   }
 
+  // Fetch social links for DSP resolution (~3ms on indexed columns)
+  let socialLinks: LegacySocialLink[] = [];
+  try {
+    const rawSocialLinks = await getProfileSocialLinks(
+      profileResult.profile.id
+    );
+    socialLinks = rawSocialLinks.map(link => ({
+      id: link.id,
+      artist_id: profileResult.profile.id,
+      platform: link.platform.toLowerCase(),
+      url: link.url,
+      clicks: link.clicks || 0,
+      created_at: toISOStringSafe(link.createdAt),
+    }));
+  } catch (error) {
+    await captureError(
+      'Error fetching profile social links (listen mode)',
+      error,
+      {
+        profileId: profileResult.profile.id,
+        route: '/[username]',
+        mode: 'listen',
+      }
+    );
+  }
+
   const artist = convertCreatorProfileToArtist(profileResult.profile);
   const subtitle = getProfileModeSubtitle('listen');
   const schemas = generateProfileStructuredData(
     profileResult.profile,
     profileResult.genres,
-    []
+    socialLinks
   );
 
   const body = (
@@ -500,7 +528,7 @@ async function renderListenMode(
       <StaticArtistPage
         mode='listen'
         artist={artist}
-        socialLinks={[]}
+        socialLinks={socialLinks}
         contacts={[]}
         subtitle={subtitle}
         showTipButton={profileResult.hasVenmoLink}
@@ -701,6 +729,7 @@ export default async function ArtistPage({
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
+        showShopButton={isShopEnabled(profileSettings)}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />

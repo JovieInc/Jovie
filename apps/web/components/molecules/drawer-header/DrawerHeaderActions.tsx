@@ -9,7 +9,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
 const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-[26px] w-[26px] border-transparent bg-transparent hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1)';
+  'h-[24px] w-[24px] rounded-full border-subtle bg-surface-0 hover:bg-surface-1 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;
@@ -85,7 +85,7 @@ export function DrawerHeaderActions({
               asChild
               className={cn(
                 DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-                'text-(--linear-text-tertiary)'
+                'text-tertiary-token'
               )}
               ariaLabel={action.label}
             >
@@ -107,7 +107,7 @@ export function DrawerHeaderActions({
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
               action.isActive
                 ? 'text-success hover:text-success'
-                : 'text-(--linear-text-tertiary) hover:text-(--linear-text-primary)'
+                : 'text-tertiary-token hover:text-primary-token'
             )}
             ariaLabel={action.label}
           >
@@ -143,7 +143,7 @@ export function DrawerHeaderActions({
           <AppIconButton
             className={cn(
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-              'text-(--linear-text-tertiary)'
+              'text-tertiary-token'
             )}
             ariaLabel='More actions'
           >

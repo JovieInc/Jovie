@@ -5,10 +5,10 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_FIELD_LABEL_CLASSNAME =
-  'text-[11px] font-[510] tracking-[-0.01em] text-(--linear-text-secondary)';
+  'text-[11px] font-[510] tracking-[-0.01em] text-secondary-token';
 
 export const DRAWER_FIELD_HELPER_CLASSNAME =
-  'text-[10.5px] leading-[14px] text-(--linear-text-tertiary)';
+  'text-[10.5px] leading-[14px] text-tertiary-token';
 
 export interface DrawerFormFieldProps {
   readonly label: ReactNode;

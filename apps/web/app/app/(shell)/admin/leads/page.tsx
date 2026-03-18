@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import { LeadPipelineKpis } from '@/components/admin/leads/LeadPipelineKpis';
-import { LeadPipelineWorkspace } from '@/components/admin/leads/LeadPipelineWorkspace';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { LeadPipelineKpis } from '@/features/admin/leads/LeadPipelineKpis';
+import { LeadPipelineWorkspace } from '@/features/admin/leads/LeadPipelineWorkspace';
 
 export const metadata: Metadata = {
   title: 'Leads | Admin',
@@ -14,7 +14,7 @@ export const runtime = 'nodejs';
 
 function KpisSkeleton() {
   return (
-    <section className='overflow-hidden rounded-xl border border-(--linear-border-subtle) bg-(--linear-bg-surface-1)'>
+    <section className='overflow-hidden rounded-xl border border-subtle bg-surface-1'>
       <ContentSectionHeaderSkeleton
         titleWidth='w-28'
         descriptionWidth='w-56'

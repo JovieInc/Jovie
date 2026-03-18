@@ -10,8 +10,8 @@ import {
   useMemo,
   useState,
 } from 'react';
-import { ErrorBanner } from '@/components/feedback/ErrorBanner';
 import { QueryProvider } from '@/components/providers/QueryProvider';
+import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {

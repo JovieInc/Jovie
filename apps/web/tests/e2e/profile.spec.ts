@@ -1,5 +1,5 @@
 import { type Page, type Route } from '@playwright/test';
-import { profileModes } from '@/components/profile/registry';
+import { profileModes } from '@/features/profile/registry';
 import { expect, test } from './setup';
 import {
   checkElementVisibility,

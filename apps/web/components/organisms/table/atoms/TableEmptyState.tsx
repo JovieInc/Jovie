@@ -53,22 +53,21 @@ export function TableEmptyState({
 }: TableEmptyStateProps) {
   const content = (
     <DrawerSurfaceCard
+      variant='card'
       className={cn(
         'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-[10px] bg-surface-1/25 px-4 py-10 text-center',
         className
       )}
     >
       {icon && (
-        <div className='flex h-9 w-9 items-center justify-center rounded-[8px] bg-surface-0/55 text-(--linear-text-tertiary)'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-[8px] bg-surface-0/55 text-tertiary-token'>
           {icon}
         </div>
       )}
       <div className='space-y-1.5'>
-        <p className='text-[13px] font-[510] text-(--linear-text-secondary)'>
-          {title}
-        </p>
+        <p className='text-[13px] font-[510] text-secondary-token'>{title}</p>
         {description && (
-          <p className='max-w-md text-[13px] text-(--linear-text-tertiary)'>
+          <p className='max-w-md text-[13px] text-tertiary-token'>
             {description}
           </p>
         )}

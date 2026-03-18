@@ -9,7 +9,7 @@ import type {
 import { cn } from '@/lib/utils';
 
 export const INLINE_ICON_BUTTON_BASE_CLASSNAME =
-  'shrink-0 rounded-[6px] border border-transparent text-(--linear-text-quaternary) transition-[opacity,background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-secondary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)';
+  'shrink-0 rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[opacity,background-color,border-color,color,box-shadow] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)';
 
 export const INLINE_ICON_BUTTON_VISIBLE_CLASSNAME =
   'p-0.5 opacity-60 hover:opacity-100 focus-visible:opacity-100';

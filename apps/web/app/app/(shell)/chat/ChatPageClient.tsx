@@ -11,14 +11,14 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
-import { DashboardHeaderActionButton } from '@/components/dashboard/atoms/DashboardHeaderActionButton';
-import { PreviewToggleButton } from '@/components/dashboard/layout/PreviewToggleButton';
-import { ProfileContactSidebar } from '@/components/dashboard/organisms/profile-contact-sidebar';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
+import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
+import { PreviewToggleButton } from '@/features/dashboard/layout/PreviewToggleButton';
+import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
@@ -39,7 +39,7 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='block max-w-[240px] truncate font-[510] text-(--linear-text-primary)'>
+    <span className='block max-w-[240px] truncate font-[510] text-primary-token'>
       {title}
     </span>
   );
@@ -331,13 +331,11 @@ export function ChatPageClient({
           {isProfileSetupRace ? (
             <LoadingSpinner size='lg' tone='muted' />
           ) : (
-            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
           )}
-          <p className='text-sm text-(--linear-text-secondary)'>
-            {profileMessage}
-          </p>
+          <p className='text-sm text-secondary-token'>{profileMessage}</p>
           {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-(--linear-text-tertiary)'>
+            <p className='text-xs text-tertiary-token'>
               Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
             </p>
           )}
@@ -362,8 +360,8 @@ export function ChatPageClient({
       fallback={
         <div className='flex h-full items-center justify-center'>
           <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <AlertCircle className='h-8 w-8 text-(--linear-text-tertiary)' />
-            <p className='text-sm text-(--linear-text-secondary)'>
+            <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            <p className='text-sm text-secondary-token'>
               Something went wrong loading chat. Please try again.
             </p>
             <Button

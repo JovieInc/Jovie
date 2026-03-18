@@ -1,11 +1,12 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ClaimBanner } from '@/components/profile/ClaimBanner';
+import { ClaimBanner } from '@/features/profile/ClaimBanner';
 
-// Mock useUserSafe hook (used by ClaimBanner)
+// Mock useUserSafe and useAuthSafe hooks (used by ClaimBanner)
 const mockUseUser = vi.fn();
 vi.mock('@/hooks/useClerkSafe', () => ({
   useUserSafe: () => mockUseUser(),
+  useAuthSafe: () => ({ isSignedIn: false }),
 }));
 
 // Mock analytics

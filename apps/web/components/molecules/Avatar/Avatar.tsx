@@ -1,9 +1,11 @@
 'use client';
 
+import { getInitials } from '@jovie/ui';
 import Image from 'next/image';
 import React, { forwardRef, useMemo, useState } from 'react';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { cn } from '@/lib/utils';
+import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 export interface AvatarProps {
   /** Avatar image source URL */
@@ -35,8 +37,6 @@ export interface AvatarProps {
   readonly priority?: boolean;
   /** Image quality */
   readonly quality?: number;
-  /** Fallback image URL */
-  readonly fallbackSrc?: string;
   /** Custom className */
   readonly className?: string;
   /** Custom styling */
@@ -114,18 +114,24 @@ const BLUR_DATA_URLS = {
   96: 'data:image/webp;base64,UklGRoQCAABXRUJQVlA4WAoAAAAgAAAAPwAAPwAASUNDUMgBAAAAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAaSQBuAGMALgAgADIAMAAxADZWUDhUAAAALwAAAP8QEI0AAAAgHyAQg4CARGQ=',
 } as const;
 
-/**
- * Generate initials from a name string
- */
+/** Generate initials — delegates to @jovie/ui's shared getInitials. */
 function generateInitials(name?: string): string {
   if (!name) return '?';
+  return getInitials(name);
+}
 
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
+function shouldBypassImageOptimization(src: string): boolean {
+  if (isExternalDspImage(src)) return true;
+
+  try {
+    const { hostname } = new URL(src);
+    return (
+      hostname === 'blob.vercel-storage.com' ||
+      hostname.endsWith('.blob.vercel-storage.com')
+    );
+  } catch {
+    return src.includes('blob.vercel-storage.com');
+  }
 }
 
 /**
@@ -151,7 +157,6 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     priority = false,
     quality = 85,
 
-    fallbackSrc: _fallbackSrc = '/android-chrome-192x192.png', // Currently unused - for future fallback image feature
     className,
     style,
   },
@@ -170,6 +175,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     return BLUR_DATA_URLS[96] || BLUR_DATA_URLS[48];
   }, [width]);
   const initials = generateInitials(name);
+  const unoptimized = src ? shouldBypassImageOptimization(src) : false;
 
   // Map avatar size to a sensible badge size
   const getBadgeSize = (): 'sm' | 'md' | 'lg' => {
@@ -235,6 +241,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           placeholder='blur'
           blurDataURL={blurDataURL}
           sizes={`${width}px`}
+          unoptimized={unoptimized}
           className={cn(
             'object-cover object-center transition-opacity duration-300 ease-out',
             isLoaded ? 'opacity-100' : 'opacity-0'

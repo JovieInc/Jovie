@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { DashboardTipping } from '@/components/dashboard/dashboard-tipping/DashboardTipping';
+import { DashboardTipping } from '@/features/dashboard/dashboard-tipping/DashboardTipping';
 
 const mockUseDashboardData = vi.fn();
 const mockUseDashboardTipping = vi.fn();
@@ -10,7 +10,7 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => mockUseDashboardData(),
 }));
 
-vi.mock('@/components/dashboard/organisms/EarningsTab', () => ({
+vi.mock('@/features/dashboard/organisms/EarningsTab', () => ({
   EarningsTab: () => <div data-testid='earnings-tab'>Earnings tab content</div>,
 }));
 
@@ -23,7 +23,7 @@ vi.mock('@/components/organisms/Dialog', () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
-vi.mock('@/components/dashboard/dashboard-tipping/useDashboardTipping', () => ({
+vi.mock('@/features/dashboard/dashboard-tipping/useDashboardTipping', () => ({
   useDashboardTipping: () => mockUseDashboardTipping(),
 }));
 

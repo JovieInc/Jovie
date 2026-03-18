@@ -6,37 +6,15 @@
  */
 
 import type { DspProviderId } from '@/lib/dsp-enrichment/types';
+import { PROVIDER_DOMAINS as REGISTRY_PROVIDER_DOMAINS } from '@/lib/dsp-registry';
 import type { ProviderKey, VideoProviderKey } from './types';
 
 /**
  * Known provider domains for validation.
- * Maps each provider to valid domains for URL validation.
+ * Derived from the canonical DSP registry.
  */
-export const PROVIDER_DOMAINS: Record<ProviderKey, string[]> = {
-  spotify: ['open.spotify.com', 'spotify.com', 'spotify.link'],
-  apple_music: [
-    'music.apple.com',
-    'itunes.apple.com',
-    'geo.music.apple.com',
-    'apple.co',
-  ],
-  youtube: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be'],
-  youtube_music: ['music.youtube.com'],
-  soundcloud: ['soundcloud.com', 'on.soundcloud.com', 'm.soundcloud.com'],
-  deezer: ['deezer.com', 'www.deezer.com', 'deezer.page.link'],
-  tidal: ['tidal.com', 'listen.tidal.com'],
-  amazon_music: ['music.amazon.com', 'amazon.com'],
-  bandcamp: ['bandcamp.com'],
-  beatport: ['beatport.com'],
-  pandora: ['pandora.com', 'www.pandora.com'],
-  napster: ['web.napster.com', 'napster.com', 'us.napster.com'],
-  audiomack: ['audiomack.com', 'www.audiomack.com'],
-  qobuz: ['qobuz.com', 'www.qobuz.com', 'open.qobuz.com', 'play.qobuz.com'],
-  anghami: ['anghami.com', 'play.anghami.com'],
-  boomplay: ['boomplay.com', 'www.boomplay.com'],
-  iheartradio: ['iheart.com', 'www.iheart.com'],
-  tiktok: ['tiktok.com', 'www.tiktok.com', 'vm.tiktok.com'],
-};
+export const PROVIDER_DOMAINS: Record<string, string[]> =
+  REGISTRY_PROVIDER_DOMAINS;
 
 /**
  * Maps ProviderKey to DspProviderId for icon rendering.
@@ -61,6 +39,19 @@ export const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   boomplay: null,
   iheartradio: null,
   tiktok: null,
+  amazon: null,
+  awa: null,
+  audius: null,
+  flo: null,
+  gaana: null,
+  jio_saavn: null,
+  joox: null,
+  kkbox: null,
+  line_music: null,
+  netease: null,
+  qq_music: null,
+  trebel: null,
+  yandex: null,
 };
 
 /**

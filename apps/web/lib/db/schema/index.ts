@@ -164,33 +164,23 @@ export {
 
 // DSP Enrichment (Cross-platform matches, enrichment data)
 export {
-  type DspArtistEnrichment,
   type DspArtistMatch,
   type DspExternalUrls,
   type DspImageUrls,
   type DspMatchConfidenceBreakdown,
-  dspArtistEnrichment,
   dspArtistMatches,
   type FanReleaseNotification,
   fanReleaseNotifications,
-  insertDspArtistEnrichmentSchema,
   insertDspArtistMatchSchema,
   insertFanReleaseNotificationSchema,
-  insertReleaseSyncStatusSchema,
   insertSocialLinkSuggestionSchema,
-  type NewDspArtistEnrichment,
   type NewDspArtistMatch,
   type NewFanReleaseNotification,
-  type NewReleaseSyncStatus,
   type NewSocialLinkSuggestion,
-  type ReleaseSyncStatus,
-  releaseSyncStatus,
   type SocialLinkSuggestion,
   type SocialSuggestionConfidenceBreakdown,
-  selectDspArtistEnrichmentSchema,
   selectDspArtistMatchSchema,
   selectFanReleaseNotificationSchema,
-  selectReleaseSyncStatusSchema,
   selectSocialLinkSuggestionSchema,
   socialLinkSuggestions,
 } from './dsp-enrichment';
@@ -482,7 +472,7 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
-// Tip Audience (Fan email capture from tips)
+// Tip Audience (Fan notifications from tips)
 export {
   insertTipAudienceSchema,
   type NewTipAudienceMember,

@@ -4,8 +4,10 @@ import {
   extractSoundcloudId,
   extractTidalId,
   extractYoutubeMusicId,
+  getMusicFetchServiceUrl,
   type MusicFetchArtistResult,
 } from '@/lib/dsp-enrichment/providers/musicfetch';
+import { MUSICFETCH_LINK_MAPPINGS } from '@/lib/dsp-registry';
 import type { ExtractedLink } from '@/lib/ingestion/types';
 
 /** Profile fields that can be enriched from MusicFetch. */
@@ -83,19 +85,21 @@ export function mapMusicFetchProfileFields(
 
   applySpotifyUpdates(updates, existingProfile, spotifyUrl, spotifyArtistId);
 
-  const appleMusicUrl = services.appleMusic?.url;
+  const appleMusicUrl = getMusicFetchServiceUrl(services.appleMusic);
   if (appleMusicUrl) {
     applyAppleMusicUpdates(updates, existingProfile, appleMusicUrl);
   }
 
   for (const mapping of DSP_ID_MAPPINGS) {
-    const serviceUrl = services[mapping.serviceKey]?.url;
+    const serviceUrl = getMusicFetchServiceUrl(services[mapping.serviceKey]);
     if (existingProfile[mapping.idField] || !serviceUrl) continue;
     const id = mapping.extractor(serviceUrl);
     if (id) updates[mapping.idField] = id;
   }
 
-  const youtubeUrl = services.youtube?.url || services.youtubeMusic?.url;
+  const youtubeUrl =
+    getMusicFetchServiceUrl(services.youtube) ||
+    getMusicFetchServiceUrl(services.youtubeMusic);
   if (!existingProfile.youtubeUrl && youtubeUrl) {
     updates.youtubeUrl = youtubeUrl;
   }
@@ -111,23 +115,6 @@ export function mapMusicFetchProfileFields(
   return updates;
 }
 
-const MUSICFETCH_LINK_MAPPINGS: Array<{
-  serviceKey: string;
-  platformId: string;
-}> = [
-  { serviceKey: 'spotify', platformId: 'spotify' },
-  { serviceKey: 'appleMusic', platformId: 'apple_music' },
-  { serviceKey: 'youtube', platformId: 'youtube' },
-  { serviceKey: 'youtubeMusic', platformId: 'youtube_music' },
-  { serviceKey: 'soundcloud', platformId: 'soundcloud' },
-  { serviceKey: 'bandcamp', platformId: 'bandcamp' },
-  { serviceKey: 'amazonMusic', platformId: 'amazon_music' },
-  { serviceKey: 'tidal', platformId: 'tidal' },
-  { serviceKey: 'deezer', platformId: 'deezer' },
-  { serviceKey: 'instagram', platformId: 'instagram' },
-  { serviceKey: 'tiktok', platformId: 'tiktok' },
-] as const;
-
 export function extractMusicFetchLinks(
   artistData: MusicFetchArtistResult,
   spotifyUrl: string,
@@ -139,7 +126,7 @@ export function extractMusicFetchLinks(
     const url =
       serviceKey === 'spotify'
         ? spotifyUrl
-        : artistData.services[serviceKey]?.url;
+        : getMusicFetchServiceUrl(artistData.services[serviceKey]);
     if (!url) continue;
 
     deduped.set(url, {

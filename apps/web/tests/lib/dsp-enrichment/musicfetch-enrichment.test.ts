@@ -50,6 +50,11 @@ vi.mock('@/lib/dsp-enrichment/providers/musicfetch', () => ({
   extractTidalId: (url: string) => mockExtractTidalId(url),
   extractSoundcloudId: (url: string) => mockExtractSoundcloudId(url),
   extractYoutubeMusicId: (url: string) => mockExtractYoutubeMusicId(url),
+  getMusicFetchServiceUrl: (
+    service: { link?: string; url?: string } | undefined
+  ) => {
+    return service?.link ?? service?.url;
+  },
 }));
 
 // Ingestion merge
@@ -375,9 +380,8 @@ describe('musicfetch-enrichment', () => {
           links: expect.arrayContaining([
             expect.objectContaining({ platformId: 'spotify' }),
             expect.objectContaining({ platformId: 'apple_music' }),
-            expect.objectContaining({ platformId: 'instagram' }),
-            expect.objectContaining({ platformId: 'tiktok' }),
             expect.objectContaining({ platformId: 'bandcamp' }),
+            // instagram and tiktok are category 'video', not included in streaming link mappings
           ]),
         })
       );

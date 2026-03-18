@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { ImportProgressBanner } from '@/components/dashboard/organisms/release-provider-matrix/ImportProgressBanner';
+import { ImportProgressBanner } from '@/features/dashboard/organisms/release-provider-matrix/ImportProgressBanner';
 
 describe('ImportProgressBanner', () => {
   it('renders compact import status copy', () => {

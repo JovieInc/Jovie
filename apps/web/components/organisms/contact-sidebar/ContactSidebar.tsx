@@ -3,7 +3,6 @@
 import type { CommonDropdownItem } from '@jovie/ui';
 import { Copy, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
 import { memo, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 
 import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import {
@@ -34,6 +33,7 @@ export const ContactSidebar = memo(function ContactSidebar({
   onContactChange,
   contextMenuItems: providedContextMenuItems,
   onAvatarUpload,
+  onDelete,
 }: ContactSidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>('details');
 
@@ -100,17 +100,32 @@ export const ContactSidebar = memo(function ContactSidebar({
         icon: <RefreshCw className='h-4 w-4' />,
         onClick: () => (onRefresh ?? (() => globalThis.location.reload()))(),
       },
-      { type: 'separator' },
-      {
-        id: 'delete',
-        label: 'Delete contact',
-        icon: <Trash2 className='h-4 w-4' />,
-        onClick: () => toast.info('Delete not implemented'),
-      },
+      ...(onDelete
+        ? [
+            { type: 'separator' } as const,
+            {
+              id: 'delete',
+              label: 'Delete contact',
+              icon: <Trash2 className='h-4 w-4' />,
+              onClick: () => {
+                if (contact) {
+                  onDelete(contact);
+                }
+              },
+            },
+          ]
+        : []),
     ];
 
     return convertToCommonDropdownItems(items);
-  }, [hasContact, username, handleCopyProfileUrl, onRefresh]);
+  }, [
+    hasContact,
+    username,
+    handleCopyProfileUrl,
+    onRefresh,
+    onDelete,
+    contact,
+  ]);
 
   const contextMenuItems = providedContextMenuItems ?? fallbackContextMenuItems;
 

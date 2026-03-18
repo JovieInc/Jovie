@@ -130,7 +130,7 @@ describe('dropdown-styles', () => {
     it('MENU_ITEM_BASE includes default sizing', () => {
       expect(MENU_ITEM_BASE).toContain('text-[12.5px]');
       expect(MENU_ITEM_BASE).toContain('leading-4');
-      expect(MENU_ITEM_BASE).toContain('font-[450]');
+      expect(MENU_ITEM_BASE).toContain('font-[400]');
       expect(MENU_ITEM_BASE).toContain('py-1');
       expect(MENU_ITEM_BASE).toContain('gap-1.5');
     });
@@ -138,7 +138,7 @@ describe('dropdown-styles', () => {
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
       expect(MENU_ITEM_COMPACT).toContain('text-[12.5px]');
       expect(MENU_ITEM_COMPACT).toContain('leading-4');
-      expect(MENU_ITEM_COMPACT).toContain('font-[450]');
+      expect(MENU_ITEM_COMPACT).toContain('font-[400]');
       expect(MENU_ITEM_COMPACT).toContain('py-1');
     });
 

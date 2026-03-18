@@ -43,12 +43,14 @@
 export {
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
+  type AdminLeadsSortBy,
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
   useAdminCreatorsInfiniteQuery,
   useAdminUsersInfiniteQuery,
   useAdminWaitlistInfiniteQuery,
+  useLeadsInfiniteQuery,
   type WaitlistEntryRow,
 } from './admin-infinite';
 // Audience infinite query
@@ -101,7 +103,6 @@ export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
 export {
   type AdminLead,
   type AdminLeadKeyword,
-  type AdminLeadListResponse,
   type DiscoveryKeywordDiagnostic,
   type DiscoveryResultResponse,
   type LeadPipelineSettings,
@@ -109,7 +110,6 @@ export {
   useDeleteLeadKeywordMutation,
   useLeadKeywordsQuery,
   useLeadPipelineSettingsQuery,
-  useLeadsListQuery,
   useMarkLeadDmSentMutation,
   useQueueLeadUrlsMutation,
   useRunLeadDiscoveryMutation,
@@ -199,9 +199,11 @@ export {
   type CampaignPreviewResponse,
   type CampaignStats,
   type CampaignStatsResponse,
+  DEFAULT_THROTTLING,
   type JobQueueStats,
   type SendCampaignInvitesInput,
   type SendCampaignInvitesResponse,
+  type ThrottlingConfig,
   useCampaignInvitesQuery,
   useCampaignOverviewQuery,
   useCampaignPreviewQuery,
@@ -380,6 +382,7 @@ export {
   useSubscribeNotificationsMutation,
   useUnsubscribeNotificationsMutation,
   useUpdateContentPreferencesMutation,
+  useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
 export {
@@ -466,6 +469,8 @@ export {
   type UseSuggestionsQueryOptions,
   useSuggestionsQuery,
 } from './useSuggestionsQuery';
+// Tour date analytics query
+export { useTourDateAnalyticsQuery } from './useTourDateAnalyticsQuery';
 // Tour date mutations
 export {
   useConnectBandsintownMutation,

@@ -11,18 +11,18 @@ import { Metadata } from 'next';
 import { notFound, permanentRedirect, redirect } from 'next/navigation';
 import { PreferredDspRedirect } from '@/app/[username]/[slug]/PreferredDspRedirect';
 import { ReleaseLandingPage } from '@/app/r/[slug]/ReleaseLandingPage';
+import { BASE_URL } from '@/constants/app';
 import {
   ScheduledReleasePage,
   UnreleasedReleaseHero,
-} from '@/components/release';
-import { BASE_URL } from '@/constants/app';
+} from '@/features/release';
 import {
   PRIMARY_PROVIDER_KEYS,
   PROVIDER_CONFIG,
 } from '@/lib/discography/config';
 import { findRedirectByOldSlug } from '@/lib/discography/slug';
 import type { ProviderKey } from '@/lib/discography/types';
-import { VIDEO_PROVIDER_KEYS } from '@/lib/discography/video-providers';
+import { isVideoProviderKey } from '@/lib/discography/video-providers';
 import { generateArtworkImageObject } from '@/lib/images/seo';
 import { trackServerEvent } from '@/lib/server-analytics';
 import { toDateOnlySafe, toISOStringOrNull } from '@/lib/utils/date';
@@ -311,9 +311,7 @@ export default async function ContentSmartLinkPage({
 
   // Check if any video provider links exist for "Use this sound"
   const hasVideoLinks = content.providerLinks.some(
-    link =>
-      Boolean(link.url) &&
-      (VIDEO_PROVIDER_KEYS as string[]).includes(link.providerId)
+    link => Boolean(link.url) && isVideoProviderKey(link.providerId)
   );
   const soundsUrl = hasVideoLinks
     ? `/${creator.usernameNormalized}/${content.slug}/sounds`

@@ -1,6 +1,6 @@
-import { PlatformStatsStrip } from '@/components/admin/PlatformStatsStrip';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PlatformStatsStrip } from '@/features/admin/PlatformStatsStrip';
 import { getAdminPlatformStats } from '@/lib/admin/platform-stats';
 
 const PLATFORM_STAT_SKELETON_KEYS = [

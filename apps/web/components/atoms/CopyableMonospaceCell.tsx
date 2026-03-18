@@ -45,19 +45,17 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
 
   if (!value) {
     return (
-      <span className='text-[11px] font-[450] text-(--linear-text-tertiary)'>
-        —
-      </span>
+      <span className='text-[11px] font-[400] text-tertiary-token'>—</span>
     );
   }
 
   const sizeClasses = {
     sm: {
-      button: 'h-5 gap-1 rounded-[6px] px-1 text-[10px]',
+      button: 'h-5 gap-1 rounded-full px-1 text-[10px]',
       icon: 'h-3 w-3',
     },
     md: {
-      button: 'h-6 gap-1 rounded-[7px] px-1 py-0.5 text-[11px]',
+      button: 'h-6 gap-1 rounded-full px-1 py-0.5 text-[11px]',
       icon: 'h-3 w-3',
     },
   } as const;
@@ -69,7 +67,7 @@ export const CopyableMonospaceCell = memo(function CopyableMonospaceCell({
       type='button'
       onClick={handleCopy}
       className={cn(
-        'group/copy -mx-1 inline-flex items-center border border-transparent font-mono text-(--linear-text-secondary) transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary) focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-1) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'group/copy -mx-1 inline-flex items-center border border-transparent font-mono text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         styles.button,
         className
       )}

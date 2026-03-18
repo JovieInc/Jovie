@@ -12,7 +12,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-center gap-6'>{children}</div>
@@ -29,7 +29,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-(--linear-text-tertiary)'>{title}</span>
+      <span className='text-[11px] text-tertiary-token'>{title}</span>
       <div className='flex items-center gap-3'>{children}</div>
     </div>
   );
@@ -40,10 +40,10 @@ export default function CheckboxesPage() {
 
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>
         Checkbox
       </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app — 16px, 4px radius, primary-bg when checked, 2.5
         stroke check
       </p>
@@ -80,7 +80,7 @@ export default function CheckboxesPage() {
           <Checkbox id='label-demo' />
           <label
             htmlFor='label-demo'
-            className='text-[13px] text-(--linear-text-primary)'
+            className='text-[13px] text-primary-token'
           >
             Label text
           </label>
@@ -95,7 +95,7 @@ export default function CheckboxesPage() {
               <Checkbox id={`filter-${item}`} />
               <label
                 htmlFor={`filter-${item}`}
-                className='text-[13px] text-(--linear-text-primary)'
+                className='text-[13px] text-primary-token'
               >
                 {item}
               </label>

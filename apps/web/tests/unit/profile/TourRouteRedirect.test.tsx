@@ -1,6 +1,6 @@
 import { render } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getProfileModeHref } from '@/components/profile/registry';
+import { getProfileModeHref } from '@/features/profile/registry';
 import TourPage from '../../../app/[username]/tour/page';
 
 const { replaceMock, searchParamsMock } = vi.hoisted(() => ({

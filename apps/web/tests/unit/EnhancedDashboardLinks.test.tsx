@@ -20,7 +20,7 @@ vi.mock('sonner', () => ({
 
 async function loadEnhancedDashboardLinks() {
   const importedModule = await import(
-    '@/components/dashboard/organisms/EnhancedDashboardLinks'
+    '@/features/dashboard/organisms/EnhancedDashboardLinks'
   );
   return importedModule.EnhancedDashboardLinks;
 }
@@ -38,7 +38,7 @@ vi.mock('@statsig/react-bindings', () => ({
   useFeatureGate: () => ({ value: false }),
 }));
 
-vi.mock('@/components/dashboard/molecules/ProfilePreview', () => ({
+vi.mock('@/features/dashboard/molecules/ProfilePreview', () => ({
   ProfilePreview: ({
     username,
     avatarUrl,
@@ -195,7 +195,7 @@ vi.mock('@/types/db', () => ({
   })),
 }));
 
-vi.mock('@/components/dashboard/organisms/GroupedLinksManager', () => ({
+vi.mock('@/features/dashboard/organisms/GroupedLinksManager', () => ({
   GroupedLinksManager: ({
     onLinksChange,
   }: {

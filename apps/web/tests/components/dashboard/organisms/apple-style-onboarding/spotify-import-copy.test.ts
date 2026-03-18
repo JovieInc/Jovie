@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getSpotifyImportStageMessage,
   getSpotifyImportSuccessMessage,
-} from '@/components/dashboard/organisms/apple-style-onboarding/spotifyImportCopy';
+} from '@/features/dashboard/organisms/apple-style-onboarding/spotifyImportCopy';
 
 describe('spotify import copy helpers', () => {
   it('returns confidence-building stage copy for each import stage', () => {

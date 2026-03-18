@@ -1,11 +1,9 @@
 import type { Metadata } from 'next';
 import dynamic from 'next/dynamic';
 import type { SearchParams } from 'nuqs/server';
-
-import { WaitlistMetrics } from '@/components/admin/WaitlistMetrics';
-import { WaitlistSettingsPanel } from '@/components/admin/WaitlistSettingsPanel';
 import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { WaitlistMetrics } from '@/features/admin/WaitlistMetrics';
 import {
   getAdminWaitlistEntries,
   getWaitlistMetrics,
@@ -14,11 +12,11 @@ import { adminWaitlistSearchParams } from '@/lib/nuqs';
 
 const AdminWaitlistTableWithViews = dynamic(
   () =>
-    import(
-      '@/components/admin/waitlist-table/AdminWaitlistTableWithViews'
-    ).then(mod => ({
-      default: mod.AdminWaitlistTableWithViews,
-    })),
+    import('@/features/admin/waitlist-table/AdminWaitlistTableWithViews').then(
+      mod => ({
+        default: mod.AdminWaitlistTableWithViews,
+      })
+    ),
   {
     loading: () => (
       <div className='p-6 space-y-6'>
@@ -63,7 +61,6 @@ export default async function AdminWaitlistPage({
     <PageShell>
       <PageContent noPadding>
         <div className='flex flex-col h-full space-y-4 p-4 sm:p-6'>
-          <WaitlistSettingsPanel />
           <WaitlistMetrics metrics={metrics} />
           <div className='flex-1 min-h-0'>
             <AdminWaitlistTableWithViews

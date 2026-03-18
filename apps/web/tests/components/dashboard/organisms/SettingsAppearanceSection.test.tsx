@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsAppearanceSection } from '@/components/dashboard/organisms/SettingsAppearanceSection';
+import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 
 const setThemeMock = vi.fn();
 const updateThemeMock = vi.fn();

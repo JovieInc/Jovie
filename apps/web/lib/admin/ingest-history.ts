@@ -1,5 +1,5 @@
 import { desc, eq, or } from 'drizzle-orm';
-import type { IngestHistoryRow } from '@/components/admin/ingest-history.types';
+import type { IngestHistoryRow } from '@/features/admin/ingest-history.types';
 import { getDb } from '@/lib/db';
 import { ingestAuditLogs } from '@/lib/db/schema/audit';
 

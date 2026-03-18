@@ -36,6 +36,7 @@ interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
+  readonly suggestions?: readonly ChatSuggestion[];
 }
 
 function SuggestionPill({
@@ -76,8 +77,9 @@ export function SuggestedPrompts({
   onSelect,
   isFirstSession = false,
   latestReleaseTitle,
+  suggestions,
 }: SuggestedPromptsProps) {
-  const suggestions = isFirstSession
+  const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
         if (
           suggestion.icon === 'Link2' &&
@@ -94,11 +96,13 @@ export function SuggestedPrompts({
 
         return suggestion;
       })
-    : DEFAULT_SUGGESTIONS;
+    : suggestions?.length
+      ? suggestions
+      : DEFAULT_SUGGESTIONS;
 
   return (
     <div className='flex flex-col gap-2 w-full max-w-sm mx-auto'>
-      {suggestions.map(suggestion => (
+      {promptSuggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}
           suggestion={suggestion}

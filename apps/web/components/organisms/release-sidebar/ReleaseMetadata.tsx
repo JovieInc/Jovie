@@ -33,8 +33,7 @@ const CANVAS_STATUS_CONFIG: Record<
   not_set: {
     label: 'No video',
     displayLabel: 'Has video',
-    className:
-      'border-(--linear-border-subtle) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    className: 'border-subtle bg-surface-1 text-secondary-token',
   },
 };
 
@@ -44,15 +43,15 @@ const METADATA_ROW_PROPS = {
   size: 'sm' as const,
 };
 const METADATA_TEXT_CLASSNAME =
-  'text-[11px] leading-[14px] text-(--linear-text-secondary)';
+  'text-[11px] leading-[14px] text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
-  'text-[10.5px] leading-[14px] text-(--linear-text-tertiary)';
+  'text-[10.5px] leading-[14px] text-tertiary-token';
 const METADATA_BADGE_CLASSNAME = 'border text-[9.5px] font-[510] shadow-none';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
+    <span className='text-[11px] tabular-nums text-secondary-token'>
       {clamped} / 100
     </span>
   );
@@ -222,7 +221,7 @@ export function ReleaseMetadata({
         {...METADATA_ROW_PROPS}
         label='Tracks'
         value={
-          <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
+          <span className='text-[11px] tabular-nums text-secondary-token'>
             {release.totalTracks}{' '}
             {release.totalTracks === 1 ? 'track' : 'tracks'}
           </span>
@@ -239,12 +238,12 @@ export function ReleaseMetadata({
                 <DrawerButton
                   tone='ghost'
                   size='sm'
-                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[450] leading-[14px] text-(--linear-text-secondary)'
+                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
                     size={12}
-                    className='text-(--linear-text-tertiary)'
+                    className='text-tertiary-token'
                     aria-hidden='true'
                   />
                 </DrawerButton>
@@ -269,7 +268,7 @@ export function ReleaseMetadata({
                         {isActive && (
                           <Check
                             size={14}
-                            className='ml-auto text-(--linear-text-primary)'
+                            className='ml-auto text-primary-token'
                             aria-hidden='true'
                           />
                         )}
@@ -295,7 +294,7 @@ export function ReleaseMetadata({
           {...METADATA_ROW_PROPS}
           label='Duration'
           value={
-            <span className='text-[11px] tabular-nums text-(--linear-text-secondary)'>
+            <span className='text-[11px] tabular-nums text-secondary-token'>
               {formatDuration(release.totalDurationMs)}
             </span>
           }
@@ -312,7 +311,7 @@ export function ReleaseMetadata({
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='rounded-[6px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-1.5 py-0 text-[9.5px] font-[510] text-(--linear-text-secondary) shadow-none'
+                  className='rounded-[6px] border border-subtle bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token shadow-none'
                 >
                   {genre}
                 </Badge>

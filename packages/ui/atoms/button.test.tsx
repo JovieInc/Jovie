@@ -47,5 +47,19 @@ describe('Button', () => {
     expect(screen.getByTestId('spinner')).toBeInTheDocument();
     expect(screen.getByRole('button')).toHaveAttribute('aria-busy', 'true');
   });
+  it('applies xl size classes', () => {
+    render(<Button size='xl'>Press</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('h-12');
+    expect(btn.className).toContain('rounded-full');
+  });
+
+  it('applies hero size classes', () => {
+    render(<Button size='hero'>Press</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('h-14');
+    expect(btn.className).toContain('rounded-full');
+    expect(btn.className).toContain('font-semibold');
+  });
   // href prop removed; use asChild with an anchor element instead
 });

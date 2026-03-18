@@ -1,6 +1,6 @@
 'use client';
 
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -34,13 +34,6 @@ export interface AdminLead {
   musicToolsDetected: string[];
   contactEmail: string | null;
   createdAt: string;
-}
-
-export interface AdminLeadListResponse {
-  items: AdminLead[];
-  total: number;
-  page: number;
-  limit: number;
 }
 
 interface ErrorResponse {
@@ -82,36 +75,6 @@ export function useLeadPipelineSettingsQuery() {
     },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
-  });
-}
-
-export function useLeadsListQuery(params: {
-  page: number;
-  limit: number;
-  sortBy: 'createdAt' | 'fitScore';
-  status?: string;
-  search?: string;
-}) {
-  return useQuery({
-    queryKey: queryKeys.admin.leads.list(params),
-    queryFn: ({ signal }) => {
-      const query = new URLSearchParams({
-        page: String(params.page),
-        limit: String(params.limit),
-        sortBy: params.sortBy,
-        sortOrder: 'desc',
-      });
-      if (params.status) query.set('status', params.status);
-      if (params.search) query.set('search', params.search);
-
-      return fetchWithTimeout<AdminLeadListResponse>(
-        `/api/admin/leads?${query.toString()}`,
-        { cache: 'no-store', signal }
-      );
-    },
-    staleTime: 15_000,
-    gcTime: 5 * 60_000,
-    placeholderData: keepPreviousData,
   });
 }
 

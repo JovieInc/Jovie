@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { OutreachKpis } from '@/components/admin/outreach/OutreachKpis';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OutreachKpis } from '@/features/admin/outreach/OutreachKpis';
 
 interface QueueResponse {
   items: unknown[];
@@ -86,7 +86,7 @@ export default function AdminOutreachPage() {
   return (
     <div className='flex flex-col gap-4'>
       {loadError && (
-        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-(--linear-text-secondary)'>
+        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-secondary-token'>
           <p>{loadError}</p>
         </ContentSurfaceCard>
       )}

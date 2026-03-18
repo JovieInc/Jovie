@@ -22,7 +22,7 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 // Import after mocks
-import { UniversalLinkInput } from '@/components/dashboard/molecules/universal-link-input';
+import { UniversalLinkInput } from '@/features/dashboard/molecules/universal-link-input';
 import { useArtistSearchQuery } from '@/lib/queries';
 
 const mockOnAdd = vi.fn();

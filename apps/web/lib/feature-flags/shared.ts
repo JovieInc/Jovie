@@ -18,6 +18,7 @@ export const FEATURE_FLAG_KEYS = {
   ENABLE_LIGHT_MODE: 'enable_light_mode',
   SHOW_AUDIENCE_CRM_SECTION: 'show_audience_crm_section',
   SHOW_SEE_IT_IN_ACTION: 'show_see_it_in_action',
+  ONBOARDING_CHECKOUT_STEP: 'onboarding.checkoutStep',
 } as const;
 
 export type FeatureFlagKey =
@@ -52,3 +53,11 @@ export const FEATURE_FLAGS = {
    */
   PWA_INSTALL_BANNER: false,
 } as const;
+
+export type CodeFlagName = keyof typeof FEATURE_FLAGS;
+
+export const CODE_FLAG_KEYS = {
+  THREADS_ENABLED: 'code:THREADS_ENABLED',
+  SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
+  PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
+} as const satisfies Record<CodeFlagName, string>;

@@ -200,6 +200,8 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.tourDates.all, 'detail', id] as const,
     connection: (profileId: string) =>
       [...queryKeys.tourDates.all, 'connection', profileId] as const,
+    analytics: (tourDateId: string) =>
+      [...queryKeys.tourDates.all, 'analytics', tourDateId] as const,
   },
 
   // Handle/username availability queries
@@ -233,9 +235,8 @@ export const queryKeys = {
     leads: {
       all: () => [...queryKeys.admin.all, 'leads'] as const,
       list: (filters: {
-        page: number;
-        limit: number;
-        sortBy: 'createdAt' | 'fitScore';
+        sortBy: string;
+        pageSize: number;
         status?: string;
         search?: string;
       }) => [...queryKeys.admin.leads.all(), 'list', filters] as const,

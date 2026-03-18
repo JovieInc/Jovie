@@ -1,6 +1,6 @@
 'use client';
 
-import { AudienceIntentBadge } from '@/components/dashboard/atoms/AudienceIntentBadge';
+import { AudienceIntentBadge } from '@/features/dashboard/atoms/AudienceIntentBadge';
 import { cn } from '@/lib/utils';
 import type { AudienceIntentLevel } from '@/types';
 

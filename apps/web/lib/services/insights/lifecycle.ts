@@ -9,6 +9,7 @@ import {
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { aiInsights, insightGenerationRuns } from '@/lib/db/schema/insights';
+import { sortInsightsForChat } from '@/lib/insights/chat-presentation';
 import { toISOStringSafe } from '@/lib/utils/date';
 import type {
   GeneratedInsight,
@@ -250,12 +251,7 @@ export async function getInsightsSummary(
           eq(aiInsights.status, 'active'),
           gte(aiInsights.expiresAt, now)
         )
-      )
-      .orderBy(
-        drizzleSql`case ${aiInsights.priority} when 'high' then 0 when 'medium' then 1 when 'low' then 2 end`,
-        desc(aiInsights.createdAt)
-      )
-      .limit(3),
+      ),
     db
       .select({ count: drizzleSql<number>`count(*)::int` })
       .from(aiInsights)
@@ -279,8 +275,12 @@ export async function getInsightsSummary(
       .limit(1),
   ]);
 
+  const sortedInsights = sortInsightsForChat(
+    insights.map(formatInsightResponse)
+  );
+
   return {
-    insights: insights.map(formatInsightResponse),
+    insights: sortedInsights.slice(0, 3),
     totalActive: countResult[0]?.count ?? 0,
     lastGeneratedAt: lastRun[0]?.createdAt
       ? toISOStringSafe(lastRun[0].createdAt)

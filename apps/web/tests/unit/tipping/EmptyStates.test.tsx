@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   TippingEmptyState,
   TippingMetricsSkeleton,
-} from '@/components/tipping/EmptyStates';
+} from '@/features/tipping/EmptyStates';
 
 // Mock next/image
 vi.mock('next/image', () => ({

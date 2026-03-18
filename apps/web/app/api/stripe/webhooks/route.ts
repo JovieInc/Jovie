@@ -45,7 +45,7 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function POST(request: NextRequest) {
-  const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
+  const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
     Sentry.addBreadcrumb({
       category: 'billing',

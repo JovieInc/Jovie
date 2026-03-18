@@ -82,7 +82,7 @@ Claim it now (takes 30 seconds): ${claimUrl}
 Why claim?
 - Shorter, cleaner URL than Linktree (${BASE_URL}/${username})
 - Automatically syncs your latest releases
-- Capture fan emails and grow your audience
+- Your fans get notified when you release
 - Free forever, no credit card required
 
 The claim link expires in 30 days.
@@ -246,7 +246,7 @@ export function getClaimInviteHtml(data: ClaimInviteTemplateData): string {
                 <ul style="margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.8; color: #555;">
                   <li>Shorter, cleaner URL than Linktree</li>
                   <li>Automatically syncs your latest releases</li>
-                  <li>Capture fan emails and grow your audience</li>
+                  <li>Your fans get notified when you release</li>
                   <li>Built specifically for musicians</li>
                 </ul>
               </div>

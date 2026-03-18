@@ -1,6 +1,5 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
-  boolean,
   decimal,
   index,
   integer,
@@ -139,93 +138,6 @@ export const dspArtistMatches = pgTable(
 );
 
 // ============================================================================
-// DSP Artist Enrichment - Profile data from each DSP
-// ============================================================================
-
-export const dspArtistEnrichment = pgTable(
-  'dsp_artist_enrichment',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    creatorProfileId: uuid('creator_profile_id')
-      .notNull()
-      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-    providerId: text('provider_id').notNull(), // e.g., 'apple_music', 'deezer', 'musicbrainz'
-    externalArtistId: text('external_artist_id'),
-    name: text('name'),
-    bio: text('bio'),
-    genres: text('genres').array(),
-    imageUrls: jsonb('image_urls').$type<DspImageUrls>(),
-    followerCount: integer('follower_count'),
-    monthlyListeners: integer('monthly_listeners'),
-    verified: boolean('verified'),
-    country: text('country'),
-    hometown: text('hometown'),
-    externalUrls: jsonb('external_urls').$type<DspExternalUrls>(),
-    // MusicBrainz specific fields
-    mbid: text('mbid'), // MusicBrainz ID
-    foundingDate: text('founding_date'), // life-span.begin
-    disbandedDate: text('disbanded_date'), // life-span.end
-    artistType: text('artist_type'), // Person, Group, Orchestra, etc.
-    aliases: text('aliases').array(),
-    isnis: text('isnis').array(), // International Standard Name Identifiers
-    rawResponse: jsonb('raw_response').$type<Record<string, unknown>>(),
-    fetchedAt: timestamp('fetched_at').defaultNow().notNull(),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  },
-  table => ({
-    // Unique per creator + provider
-    creatorProviderUnique: uniqueIndex(
-      'dsp_artist_enrichment_creator_provider_unique'
-    ).on(table.creatorProfileId, table.providerId),
-    // Index for fetching enrichment data
-    providerIdx: index('dsp_artist_enrichment_provider_idx').on(
-      table.providerId
-    ),
-  })
-);
-
-// ============================================================================
-// Release Sync Status - Track discography sync state per creator/provider
-// ============================================================================
-
-export const releaseSyncStatus = pgTable(
-  'release_sync_status',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    creatorProfileId: uuid('creator_profile_id')
-      .notNull()
-      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
-    providerId: text('provider_id').notNull(),
-    lastFullSyncAt: timestamp('last_full_sync_at'),
-    lastIncrementalSyncAt: timestamp('last_incremental_sync_at'),
-    nextScheduledSyncAt: timestamp('next_scheduled_sync_at'),
-    totalReleasesSynced: integer('total_releases_synced').default(0).notNull(),
-    releasesWithMatches: integer('releases_with_matches').default(0).notNull(),
-    lastNewReleaseFoundAt: timestamp('last_new_release_found_at'),
-    consecutiveFailures: integer('consecutive_failures').default(0).notNull(),
-    lastError: text('last_error'),
-    lastErrorAt: timestamp('last_error_at'),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    updatedAt: timestamp('updated_at').defaultNow().notNull(),
-  },
-  table => ({
-    // Unique per creator + provider
-    creatorProviderUnique: uniqueIndex(
-      'release_sync_status_creator_provider_unique'
-    ).on(table.creatorProfileId, table.providerId),
-    // Index for finding profiles due for sync
-    nextSyncIdx: index('release_sync_status_next_sync_idx').on(
-      table.nextScheduledSyncAt
-    ),
-    // Index for finding failed syncs
-    failuresIdx: index('release_sync_status_failures_idx').on(
-      table.consecutiveFailures
-    ),
-  })
-);
-
-// ============================================================================
 // Fan Release Notifications - Queue for fan emails about new releases
 // ============================================================================
 
@@ -340,16 +252,6 @@ export const socialLinkSuggestions = pgTable(
 export const insertDspArtistMatchSchema = createInsertSchema(dspArtistMatches);
 export const selectDspArtistMatchSchema = createSelectSchema(dspArtistMatches);
 
-export const insertDspArtistEnrichmentSchema =
-  createInsertSchema(dspArtistEnrichment);
-export const selectDspArtistEnrichmentSchema =
-  createSelectSchema(dspArtistEnrichment);
-
-export const insertReleaseSyncStatusSchema =
-  createInsertSchema(releaseSyncStatus);
-export const selectReleaseSyncStatusSchema =
-  createSelectSchema(releaseSyncStatus);
-
 export const insertFanReleaseNotificationSchema = createInsertSchema(
   fanReleaseNotifications
 );
@@ -370,12 +272,6 @@ export const selectSocialLinkSuggestionSchema = createSelectSchema(
 
 export type DspArtistMatch = typeof dspArtistMatches.$inferSelect;
 export type NewDspArtistMatch = typeof dspArtistMatches.$inferInsert;
-
-export type DspArtistEnrichment = typeof dspArtistEnrichment.$inferSelect;
-export type NewDspArtistEnrichment = typeof dspArtistEnrichment.$inferInsert;
-
-export type ReleaseSyncStatus = typeof releaseSyncStatus.$inferSelect;
-export type NewReleaseSyncStatus = typeof releaseSyncStatus.$inferInsert;
 
 export type FanReleaseNotification =
   typeof fanReleaseNotifications.$inferSelect;

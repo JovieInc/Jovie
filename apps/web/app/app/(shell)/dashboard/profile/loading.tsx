@@ -18,7 +18,7 @@ export default function ProfileLoading() {
       {/* Content area */}
       <div className='flex-1 min-h-0 overflow-auto'>
         <div className='px-4 py-6 sm:px-6'>
-          <div className='rounded-xl border border-(--linear-border-subtle) bg-(--linear-app-content-surface) p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'>
+          <div className='rounded-xl border border-subtle bg-(--linear-app-content-surface) p-6 shadow-subtle-bottom dark:shadow-inset-highlight'>
             {/* Profile avatar and name section */}
             <div className='flex items-center gap-4'>
               <LoadingSkeleton
@@ -40,7 +40,7 @@ export default function ProfileLoading() {
                 {PROFILE_LOADING_LINK_KEYS.map(key => (
                   <div
                     key={key}
-                    className='flex items-center gap-3 rounded-lg border border-(--linear-border-subtle) bg-(--linear-app-surface-elevated) p-3'
+                    className='flex items-center gap-3 rounded-lg border border-subtle bg-(--linear-app-surface-elevated) p-3'
                   >
                     <LoadingSkeleton
                       height='h-10'

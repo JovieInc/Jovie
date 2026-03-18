@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 
@@ -36,139 +39,67 @@ const nextConfig = {
   // Note: cacheComponents disabled due to incompatibility with runtime='nodejs' in API routes
   // Using traditional caching (unstable_cache) instead
   images: {
+    // Remote image patterns for Next.js image optimization.
+    // Keep in sync with constants/platforms/cdn-domains.ts — verified by sync test.
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'i.scdn.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.scdn.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.spotifycdn.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.dzcdn.net',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.clerk.dev',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'img.clerk.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'linktr.ee',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.linktr.ee',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.googleusercontent.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.fbcdn.net',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.fbsbx.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.twimg.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'avatars.githubusercontent.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'cdn.discordapp.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'secure.gravatar.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'api.qrserver.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.public.blob.vercel-storage.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.blob.vercel-storage.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.mzstatic.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.supabase.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.supabase.in',
-        port: '',
-        pathname: '/**',
-      },
+      // ── Music DSPs ────────────────────────────────────────
+      { protocol: 'https', hostname: 'i.scdn.co' }, // Spotify
+      { protocol: 'https', hostname: '*.scdn.co' }, // Spotify CDN
+      { protocol: 'https', hostname: '*.spotifycdn.com' }, // Spotify CDN
+      { protocol: 'https', hostname: '*.mzstatic.com' }, // Apple Music
+      { protocol: 'https', hostname: '*.ytimg.com' }, // YouTube / YouTube Music
+      { protocol: 'https', hostname: '*.ggpht.com' }, // YouTube channel avatars
+      { protocol: 'https', hostname: '*.sndcdn.com' }, // SoundCloud
+      { protocol: 'https', hostname: '*.bcbits.com' }, // Bandcamp
+      { protocol: 'https', hostname: '*.tidal.com' }, // Tidal
+      { protocol: 'https', hostname: '*.dzcdn.net' }, // Deezer
+      { protocol: 'https', hostname: 'm.media-amazon.com' }, // Amazon Music
+      { protocol: 'https', hostname: '*.ssl-images-amazon.com' }, // Amazon Music CDN
+      { protocol: 'https', hostname: '*.sndimg.com' }, // Pandora
+      { protocol: 'https', hostname: 'content-images.p-cdn.com' }, // Pandora CDN
+      { protocol: 'https', hostname: 'geo-media.beatport.com' }, // Beatport
+
+      // ── Social Networks ───────────────────────────────────
+      { protocol: 'https', hostname: '*.cdninstagram.com' }, // Instagram
+      { protocol: 'https', hostname: '*.fbcdn.net' }, // Facebook / Instagram CDN
+      { protocol: 'https', hostname: '*.fbsbx.com' }, // Facebook
+      { protocol: 'https', hostname: '*.twimg.com' }, // Twitter/X
+      { protocol: 'https', hostname: '*.tiktokcdn.com' }, // TikTok
+      { protocol: 'https', hostname: '*.tiktokcdn-us.com' }, // TikTok US CDN
+      { protocol: 'https', hostname: '*.licdn.com' }, // LinkedIn
+      { protocol: 'https', hostname: '*.sc-cdn.net' }, // Snapchat
+      { protocol: 'https', hostname: '*.pinimg.com' }, // Pinterest
+      { protocol: 'https', hostname: '*.redd.it' }, // Reddit
+      { protocol: 'https', hostname: '*.redditstatic.com' }, // Reddit
+
+      // ── Creator Platforms ─────────────────────────────────
+      { protocol: 'https', hostname: '*.jtvnw.net' }, // Twitch
+      { protocol: 'https', hostname: 'cdn.discordapp.com' }, // Discord
+      { protocol: 'https', hostname: '*.patreonusercontent.com' }, // Patreon
+      { protocol: 'https', hostname: '*.substackcdn.com' }, // Substack
+      { protocol: 'https', hostname: 'miro.medium.com' }, // Medium
+      { protocol: 'https', hostname: 'avatars.githubusercontent.com' }, // GitHub
+      { protocol: 'https', hostname: 'mir-s3-cdn-cf.behance.net' }, // Behance
+      { protocol: 'https', hostname: 'cdn.dribbble.com' }, // Dribbble
+
+      // ── Link Aggregators ──────────────────────────────────
+      { protocol: 'https', hostname: 'linktr.ee' }, // Linktree
+      { protocol: 'https', hostname: '*.linktr.ee' }, // Linktree
+
+      // ── Auth / Avatar Providers ───────────────────────────
+      { protocol: 'https', hostname: 'images.clerk.dev' },
+      { protocol: 'https', hostname: 'img.clerk.com' },
+      { protocol: 'https', hostname: '*.googleusercontent.com' },
+      { protocol: 'https', hostname: '*.gravatar.com' },
+      { protocol: 'https', hostname: 'images.unsplash.com' },
+
+      // ── Infrastructure ────────────────────────────────────
+      { protocol: 'https', hostname: 'api.qrserver.com' },
+      { protocol: 'https', hostname: '*.blob.vercel-storage.com' },
+      { protocol: 'https', hostname: '*.supabase.co' },
+      { protocol: 'https', hostname: '*.supabase.in' },
+      { protocol: 'https', hostname: 'vercel.live' },
+      { protocol: 'https', hostname: 'vercel.com' },
     ],
     formats: ['image/avif', 'image/webp'],
     qualities: [25, 50, 75, 85, 100],
@@ -208,7 +139,7 @@ const nextConfig = {
 
     securityHeaders.push({
       key: 'Permissions-Policy',
-      value: 'camera=(), microphone=(), geolocation=()',
+      value: 'camera=(), microphone=(), geolocation=(self)',
     });
 
     // Cache control header helpers
@@ -360,6 +291,10 @@ const nextConfig = {
         source: '/app/insights',
         destination: '/app/dashboard/insights',
       },
+      {
+        source: '/app/presence',
+        destination: '/app/dashboard/presence',
+      },
     ];
   },
   env: {
@@ -377,6 +312,7 @@ const nextConfig = {
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [
+      '@jovie/ui',
       '@headlessui/react',
       'lucide-react',
       'simple-icons',
@@ -426,38 +362,33 @@ const nextConfig = {
   },
 };
 
-// Enable Vercel Toolbar in non-production environments only.
-// Disabled in production to eliminate unnecessary JS bundles and 'unsafe-eval' CSP requirements.
-// Set NEXT_DISABLE_TOOLBAR=1 to opt out in non-production environments.
+// Vercel Toolbar: only on Vercel preview deploys (not local dev, not production).
+// Opt-in locally with NEXT_ENABLE_TOOLBAR=1 if needed.
 const enableVercelToolbar =
-  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+  process.env.VERCEL_ENV === 'preview' ||
+  process.env.NEXT_ENABLE_TOOLBAR === '1';
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: vercel toolbar -> sentry
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
-// Injected content via Sentry wizard below
-
+// Sentry build plugin: only in production/CI (source map upload, tunnel route).
+// The Sentry runtime SDK (sentry.server.config.ts) works independently in dev.
 const { withSentryConfig } = require('@sentry/nextjs');
 
-module.exports = withSentryConfig(module.exports, {
-  org: 'jovie',
-  project: 'jovie-web',
+const shouldUseSentryPlugin =
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  !!process.env.VERCEL_ENV;
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
-
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: '/monitoring',
-});
+module.exports = shouldUseSentryPlugin
+  ? withSentryConfig(module.exports, {
+      org: 'jovie',
+      project: 'jovie-web',
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      tunnelRoute: '/monitoring',
+    })
+  : module.exports;

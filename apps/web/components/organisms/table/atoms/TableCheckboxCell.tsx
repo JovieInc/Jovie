@@ -15,7 +15,7 @@ export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'rounded-[4px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-text-secondary) shadow-none transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
+  'rounded-[4px] border border-subtle bg-surface-0 text-secondary-token shadow-none transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
 );
 
 // Legacy props (backwards compatibility)
@@ -111,7 +111,7 @@ function TanStackRowCheckbox({
     >
       <span
         className={cn(
-          'select-none text-[13px] tabular-nums text-(--linear-text-tertiary) transition-opacity',
+          'select-none text-[13px] tabular-nums text-tertiary-token transition-opacity',
           isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
         )}
         aria-hidden='true'
@@ -152,8 +152,8 @@ function LegacyCheckboxCell({
   return (
     <Component
       className={cn(
-        'w-14 border-b border-(--linear-border-subtle) px-4 py-3 text-center',
-        isHeader && 'sticky z-20 bg-(--linear-bg-surface-1)/80 backdrop-blur',
+        'w-14 border-b border-subtle px-4 py-3 align-middle text-center',
+        isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
         !isHeader && 'group-hover:bg-transparent',
         className
       )}
@@ -162,7 +162,7 @@ function LegacyCheckboxCell({
         {!isHeader && rowNumber !== undefined && (
           <span
             className={cn(
-              'absolute inset-0 flex items-center justify-center text-[13px] tabular-nums text-(--linear-text-tertiary) transition-opacity',
+              'absolute inset-0 flex items-center justify-center text-[13px] tabular-nums text-tertiary-token transition-opacity',
               checked ? 'opacity-0' : 'group-hover:opacity-0'
             )}
           >

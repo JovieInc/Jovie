@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canProceedFromProfileReview } from '@/components/dashboard/organisms/onboarding/profile-review-guards';
+import { canProceedFromProfileReview } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 
 describe('canProceedFromProfileReview', () => {
   it('returns false when display name is missing', () => {

@@ -20,7 +20,7 @@ vi.mock('@/lib/utils/date', () => ({
 
 // Mock TwoStepNotificationsCTA to avoid its heavy dependency tree
 vi.mock(
-  '@/components/profile/artist-notifications-cta/TwoStepNotificationsCTA',
+  '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA',
   () => ({
     TwoStepNotificationsCTA: ({
       artist,

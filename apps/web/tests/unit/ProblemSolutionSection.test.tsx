@@ -6,7 +6,7 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { ProblemSolutionSection } from '@/components/home/ProblemSolutionSection';
+import { ProblemSolutionSection } from '@/features/home/ProblemSolutionSection';
 import { track } from '@/lib/analytics';
 
 describe('ProblemSolutionSection', () => {

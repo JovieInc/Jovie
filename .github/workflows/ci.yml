@@ -192,7 +192,7 @@ jobs:
             git fetch origin "${{ github.base_ref }}" --depth=1
             # Use diff-filter=d to exclude deleted files (biome can't lint deleted files)
             # Include .mts/.mjs extensions for ESM config files
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' | tr '\n' ' ')
+            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.json' '*.mts' '*.mjs' ':(exclude)**/package-lock.json' ':(exclude).claude/settings.json' ':(exclude).claude/skills/**' | tr '\n' ' ')
             if [ -n "$CHANGED_FILES" ]; then
               echo "Linting changed files only: $CHANGED_FILES"
               pnpm biome ci --reporter=github $CHANGED_FILES
@@ -1842,7 +1842,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: preview-deploy-${{ github.repository }}
+      # Scope preview concurrency to a single PR/ref so unrelated PRs do not
+      # evict each other's pending preview deployments from the queue.
+      group: preview-deploy-${{ github.repository }}-${{ github.event.pull_request.number || github.ref_name }}
       cancel-in-progress: false
     outputs:
       deployment_url: ${{ steps.pr_deploy.outputs.deployment_url }}
@@ -2343,6 +2345,10 @@ jobs:
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
+      - name: DB verify (post-migration schema check)
+        run: pnpm --filter=@jovie/web run drizzle:verify:ci
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env

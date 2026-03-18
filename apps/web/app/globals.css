@@ -27,9 +27,8 @@
 html,
 body {
   height: 100%;
-  overflow-x: hidden;
-  /* fallback for browsers without clip support (Safari <16) */
   overflow-x: clip;
+  overflow-y: hidden;
   overscroll-behavior: none;
 }
 
@@ -111,6 +110,7 @@ body {
       "rlig" 1,
       "calt" 1;
     letter-spacing: -0.011em;
+    text-rendering: optimizelegibility;
   }
 }
 
@@ -175,6 +175,26 @@ body {
   --transition-duration-slow: var(--duration-slow);
   --transition-duration-slower: var(--duration-slower);
   --transition-duration-slowest: var(--duration-slowest);
+  /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-elevated: var(--shadow-card-elevated);
+  --shadow-divider: var(--shadow-divider);
+  --shadow-button-inset: var(--shadow-button-inset);
+  /* Additional shadow tokens for common bracket patterns */
+  --shadow-subtle-bottom: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --shadow-subtle-bottom-sm: 0 1px 0 rgba(0, 0, 0, 0.03);
+  --shadow-subtle-bottom-xs: 0 1px 0 rgba(0, 0, 0, 0.02);
+  --shadow-inset-divider: inset 0 -1px 0 var(--linear-border-subtle);
+  --shadow-inset-ring-focus: inset 0 0 0 1px var(--linear-border-focus);
+  --shadow-inset-highlight: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-ring-surface-0: 0 0 0 3px var(--linear-bg-surface-0);
+  --shadow-ring-surface-1: 0 0 0 3px var(--linear-bg-surface-1);
+  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.22);
+  --shadow-panel-ring: inset 0 0 0 1px var(--linear-panel-ring);
 }
 
 /* ============================================
@@ -259,7 +279,7 @@ body {
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
   .btn-primary {
@@ -366,38 +386,57 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Exact Linear.app values — measured live 2026-03-10:
-       font-size: 64px, weight: 510, letter-spacing: -1.408px, line-height: 64px */
-    font-size: clamp(
-      var(--linear-h1-size-sm),
-      5vw +
-      1rem,
-      var(--linear-h1-size-lg)
-    );
+    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
+       375px: 38px/1.1  |  768px: 56px/1.1  |  1280px: 64px/1.0 */
+    font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
-    /* -1.408px at 64px = -0.022em */
-    line-height: 1;
+    line-height: 1.1;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
+  @media (min-width: 768px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size-md);
+    }
+  }
+  @media (min-width: 1280px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size-lg);
+      line-height: 1;
+    }
+  }
   .marketing-h2-linear {
     /* Exact Linear.app values:
        font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
-    font-size: clamp(
-      var(--linear-h2-size-sm),
-      3vw +
-      1rem,
-      var(--linear-h2-size-lg)
-    );
+    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
+       375px: 24px/1.33  |  768px: 32px/1.125  |  1280px: 40px/1.1  |  1440px: 48px/1.0 */
+    font-size: var(--linear-h2-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
-    /* -1.056px at 48px = -0.022em */
-    line-height: 1.05;
+    line-height: 1.33;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
+  }
+  @media (min-width: 768px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-md);
+      line-height: 1.125;
+    }
+  }
+  @media (min-width: 1280px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-xl);
+      line-height: 1.1;
+    }
+  }
+  @media (min-width: 1440px) {
+    .marketing-h2-linear {
+      font-size: var(--linear-h2-size-lg);
+      line-height: 1;
+    }
   }
   /* Hero radial glow — dramatic depth cue behind heading */
   .hero-glow {
@@ -535,9 +574,9 @@ body {
     height: var(--linear-button-height-sm);
     padding: 0 var(--linear-space-3);
     font-size: var(--linear-caption-size);
-    font-weight: var(--linear-font-weight-normal);
+    font-weight: 400;
     line-height: var(--linear-caption-leading);
-    color: var(--linear-text-secondary);
+    color: var(--linear-text-tertiary);
     background-color: transparent;
     border: none;
     border-radius: var(--linear-radius-sm);

@@ -9,13 +9,13 @@ const drawerToggleButtonMock = vi.fn((props: Record<string, unknown>) => (
   </button>
 ));
 
-vi.mock('@/components/dashboard/atoms/DrawerToggleButton', () => ({
+vi.mock('@/features/dashboard/atoms/DrawerToggleButton', () => ({
   DrawerToggleButton: (props: Record<string, unknown>) =>
     drawerToggleButtonMock(props),
 }));
 
 vi.mock(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown',
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown',
   () => ({
     ReleaseFilterDropdown: () => <button type='button'>Filters</button>,
   })
@@ -81,7 +81,7 @@ vi.mock('@/components/organisms/table', () => ({
 }));
 
 const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
-  '@/components/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader'
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader'
 );
 
 describe('ReleaseTableSubheader', () => {

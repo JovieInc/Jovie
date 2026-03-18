@@ -74,7 +74,7 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('leading-none');
       expect(kbd.className).toContain('font-mono');
       expect(kbd.className).toContain('text-[11px]');
-      expect(kbd.className).toContain('font-[450]');
+      expect(kbd.className).toContain('font-[400]');
     });
 
     it('merges custom className', () => {

@@ -97,18 +97,18 @@ export function ToastProvider({ children }: ToastProviderProps) {
         toastOptions={{
           classNames: {
             toast:
-              'items-start border border-(--linear-border-subtle)/80 bg-(--linear-bg-surface-1)/90 shadow-none backdrop-blur-[2px]',
-            title: 'font-medium text-(--linear-text-secondary)',
-            description: 'font-normal text-(--linear-text-tertiary)',
+              'items-start border border-subtle/80 bg-surface-1/90 shadow-none backdrop-blur-[2px]',
+            title: 'font-medium text-secondary-token',
+            description: 'font-normal text-tertiary-token',
             actionButton:
               'border border-default bg-transparent text-primary-token font-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
             cancelButton:
               'bg-surface-2 text-secondary-token font-medium hover:bg-surface-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2',
-            success: '[&>svg]:text-(--linear-text-tertiary)',
-            error: '[&>svg]:text-(--linear-text-tertiary)',
-            warning: '[&>svg]:text-(--linear-text-tertiary)',
-            info: '[&>svg]:text-(--linear-text-tertiary)',
-            loading: '[&>svg]:text-(--linear-text-tertiary)',
+            success: '[&>svg]:text-tertiary-token',
+            error: '[&>svg]:text-tertiary-token',
+            warning: '[&>svg]:text-tertiary-token',
+            info: '[&>svg]:text-tertiary-token',
+            loading: '[&>svg]:text-tertiary-token',
           },
         }}
       />

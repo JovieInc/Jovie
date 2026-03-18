@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-import { DashboardNav } from '@/components/dashboard/dashboard-nav';
 import {
   Sidebar,
   SidebarContent,
@@ -12,6 +11,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from '@/components/organisms/Sidebar';
+import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 
 const mockDashboardData: DashboardData = {
   user: { id: 'user-1' },

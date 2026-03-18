@@ -4,7 +4,7 @@ import {
   buildProfilePreviewLinks,
   buildProfilePublicViewModel,
   buildProfileSaveState,
-} from '@/components/profile/view-models';
+} from '@/features/profile/view-models';
 import type { Artist } from '@/types/db';
 
 const mockArtist: Artist = {
@@ -15,8 +15,10 @@ const mockArtist: Artist = {
   name: 'Test Artist',
   image_url: 'https://example.com/avatar.jpg',
   tagline: 'Test tagline',
+  location: 'Austin, TX',
+  hometown: 'Tulsa, OK',
   theme: {},
-  settings: { hide_branding: true },
+  settings: { hide_branding: true, hometown: 'Tulsa, OK' },
   spotify_url: undefined,
   apple_music_url: undefined,
   youtube_url: undefined,
@@ -52,6 +54,8 @@ describe('profile view models', () => {
       tagline: 'Test tagline',
       imageUrl: 'https://example.com/avatar.jpg',
       hideBranding: true,
+      location: 'Austin, TX',
+      hometown: 'Tulsa, OK',
       profilePath: '/testartist',
     });
   });

@@ -10,28 +10,23 @@ export interface AudienceTypeBadgeProps {
 
 const TYPE_VARIANTS: Record<AudienceMemberType, DotBadgeVariant> = {
   anonymous: {
-    className:
-      'border-(--linear-border-subtle) bg-transparent text-(--linear-text-tertiary)',
+    className: 'border-subtle bg-transparent text-tertiary-token',
     dotClassName: 'bg-zinc-400',
   },
   email: {
-    className:
-      'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    className: 'border-default bg-surface-1 text-secondary-token',
     dotClassName: 'bg-blue-500',
   },
   sms: {
-    className:
-      'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    className: 'border-default bg-surface-1 text-secondary-token',
     dotClassName: 'bg-violet-500',
   },
   spotify: {
-    className:
-      'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    className: 'border-default bg-surface-1 text-secondary-token',
     dotClassName: 'bg-emerald-500',
   },
   customer: {
-    className:
-      'border-(--linear-border-default) bg-(--linear-bg-surface-1) text-(--linear-text-secondary)',
+    className: 'border-default bg-surface-1 text-secondary-token',
     dotClassName: 'bg-amber-500',
   },
 };

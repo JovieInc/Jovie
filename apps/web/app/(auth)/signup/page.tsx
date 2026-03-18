@@ -2,8 +2,10 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
-import { AuthLayout, SignUpForm } from '@/components/auth';
 import { APP_ROUTES } from '@/constants/routes';
+import { AuthLayout, SignUpForm } from '@/features/auth';
+import { track } from '@/lib/analytics';
+import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
   persistSignupClaimValue,
@@ -26,6 +28,19 @@ function SignUpClaimDataPersistence() {
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
+    const plan = searchParams.get('plan');
+
+    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
+    if (plan) {
+      const validatedPlan = validatePlan(plan);
+      if (validatedPlan) {
+        setPlanIntent(validatedPlan);
+        let source = 'pricing';
+        if (spotifyUrl) source = 'hero_spotify';
+        else if (handle) source = 'hero_claim';
+        track('plan_intent_captured', { plan: validatedPlan, source });
+      }
+    }
 
     try {
       const now = Date.now();
@@ -79,19 +94,19 @@ function SignUpClaimDataPersistence() {
   if (!handle || !availability) return null;
 
   return (
-    <div className='mb-4 rounded-(--linear-radius-sm) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-4 py-3 text-center'>
+    <div className='mb-4 rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'>
       {availability === 'checking' && (
-        <p className='text-[13px] font-[450] text-(--linear-text-secondary)'>
+        <p className='text-[13px] font-[450] text-secondary-token'>
           Checking if @{normalizedHandle} is available...
         </p>
       )}
       {availability === 'available' && (
-        <p className='text-[13px] font-[450] text-(--linear-text-primary)'>
+        <p className='text-[13px] font-[450] text-primary-token'>
           @{normalizedHandle} is available. Sign up to claim it.
         </p>
       )}
       {availability === 'taken' && (
-        <p className='text-[13px] font-[450] text-(--linear-text-secondary)'>
+        <p className='text-[13px] font-[450] text-secondary-token'>
           @{normalizedHandle} is already taken. You can pick another handle
           after signing up.
         </p>

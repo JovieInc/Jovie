@@ -11,7 +11,7 @@ export function ContentMetricRowSkeleton({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[10px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) px-3 py-2.5',
+        'flex items-center justify-between gap-3 rounded-[10px] border border-subtle bg-surface-0 px-3 py-2.5',
         className
       )}
       aria-hidden='true'

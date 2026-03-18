@@ -7,8 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { ProfileCompletionCard } from '@/components/dashboard/molecules/ProfileCompletionCard';
+import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
+import { buildInsightPrompt } from '@/lib/insights/chat-presentation';
+import { useInsightsSummaryQuery } from '@/lib/queries';
 
 import {
   ChatInput,
@@ -25,7 +27,7 @@ import {
   useJovieChat,
   useSuggestedProfiles,
 } from './hooks';
-import type { JovieChatProps, MessagePart } from './types';
+import type { ChatSuggestion, JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
@@ -98,6 +100,27 @@ export function JovieChat({
     showSuggestedProfiles &&
     !suggestedProfiles.isLoading &&
     suggestedProfiles.total > 0;
+  const shouldLoadInsightSuggestions =
+    Boolean(profileId) &&
+    !isFirstSession &&
+    !hasCarouselItems &&
+    (profileCompletion?.percentage ?? 0) >= 100;
+  const insightsSummary = useInsightsSummaryQuery({
+    enabled: shouldLoadInsightSuggestions,
+  });
+  const insightSuggestions = useMemo<readonly ChatSuggestion[]>(() => {
+    const insights = insightsSummary.data?.insights ?? [];
+    if (insights.length === 0) {
+      return [];
+    }
+
+    return insights.map(insight => ({
+      icon: 'MessageSquare',
+      label: insight.title,
+      prompt: buildInsightPrompt(insight),
+      accent: 'blue',
+    }));
+  }, [insightsSummary.data?.insights]);
 
   const {
     input,
@@ -497,6 +520,7 @@ export function JovieChat({
                       onSelect={handleSuggestedPrompt}
                       isFirstSession={isFirstSession}
                       latestReleaseTitle={latestReleaseTitle}
+                      suggestions={insightSuggestions}
                     />
                   </>
                 )}

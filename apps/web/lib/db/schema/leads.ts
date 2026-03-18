@@ -94,6 +94,7 @@ export const leads = pgTable(
     dmSentAt: timestamp('dm_sent_at'),
     dmCopy: text('dm_copy'),
 
+    scrapeAttempts: integer('scrape_attempts').default(0).notNull(),
     scrapedAt: timestamp('scraped_at'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),

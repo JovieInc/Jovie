@@ -1,0 +1,145 @@
+'use client';
+
+import * as React from 'react';
+import { cn } from '@/lib/utils';
+
+export interface AdminTableShellRenderProps {
+  readonly headerElevated: boolean;
+  /** Pixel offset for sticky table headers when a toolbar is present. */
+  readonly stickyTopPx: number;
+}
+
+export interface AdminTableShellProps {
+  readonly toolbar?: React.ReactNode;
+  readonly footer?: React.ReactNode;
+  readonly children: (props: AdminTableShellRenderProps) => React.ReactNode;
+  readonly className?: string;
+  readonly testId?: string;
+  readonly scrollContainerProps?: Readonly<
+    Omit<React.HTMLAttributes<HTMLDivElement>, 'children' | 'className' | 'ref'>
+  >;
+  readonly scrollContainerRef?: React.RefObject<HTMLDivElement>;
+}
+
+/**
+ * Throttle interval for scroll handler (ms).
+ * 100ms provides smooth visual updates while reducing state updates from 60+/sec to 10/sec.
+ */
+const SCROLL_THROTTLE_MS = 100;
+
+export function AdminTableShell({
+  toolbar,
+  footer,
+  children,
+  className,
+  testId,
+  scrollContainerProps,
+  scrollContainerRef: externalRef,
+}: Readonly<AdminTableShellProps>) {
+  const internalRef = React.useRef<HTMLDivElement | null>(null);
+  const tableContainerRef = externalRef ?? internalRef;
+  const [headerElevated, setHeaderElevated] = React.useState(false);
+  const [stickyTopPx, setStickyTopPx] = React.useState(0);
+  const lastScrollTimeRef = React.useRef(0);
+  const rafIdRef = React.useRef<number | null>(null);
+  const toolbarRef = React.useRef<HTMLDivElement | null>(null);
+
+  React.useEffect(() => {
+    const container = tableContainerRef.current;
+    if (!container) return;
+
+    // Helper to update header elevation state
+    const updateHeaderElevation = () => {
+      rafIdRef.current = null;
+      const isScrolled = container.scrollTop > 0;
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
+      lastScrollTimeRef.current = Date.now();
+    };
+
+    // Throttled scroll handler using requestAnimationFrame + time check
+    const handleScroll = () => {
+      const now = Date.now();
+
+      // Skip if we're within the throttle window
+      if (now - lastScrollTimeRef.current < SCROLL_THROTTLE_MS) {
+        // Schedule one final update after throttle period ends
+        if (rafIdRef.current !== null) {
+          return;
+        }
+        rafIdRef.current = requestAnimationFrame(updateHeaderElevation);
+        return;
+      }
+
+      lastScrollTimeRef.current = now;
+      const isScrolled = container.scrollTop > 0;
+      setHeaderElevated(prev => (prev === isScrolled ? prev : isScrolled));
+    };
+
+    // Initial check
+    handleScroll();
+    container.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (rafIdRef.current === null) {
+        return;
+      }
+      cancelAnimationFrame(rafIdRef.current);
+    };
+  }, [tableContainerRef]);
+
+  React.useEffect(() => {
+    if (!toolbar) {
+      setStickyTopPx(0);
+      return;
+    }
+
+    const toolbarElement = toolbarRef.current;
+    if (!toolbarElement) {
+      return;
+    }
+
+    const updateToolbarHeight = () => {
+      setStickyTopPx(toolbarElement.getBoundingClientRect().height);
+    };
+
+    updateToolbarHeight();
+
+    const resizeObserver = new ResizeObserver(updateToolbarHeight);
+    resizeObserver.observe(toolbarElement);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [toolbar]);
+
+  return (
+    <div
+      className={cn('flex h-full min-h-0 flex-col contain-layout', className)}
+      data-testid={testId}
+    >
+      <div
+        ref={tableContainerRef}
+        className='min-h-0 flex-1 overflow-auto flex flex-col focus-visible:outline-none'
+        {...scrollContainerProps}
+      >
+        {toolbar ? (
+          <div
+            ref={toolbarRef}
+            className={cn(
+              'sticky top-0 z-30 border-b border-subtle bg-(--linear-app-content-surface)/90 backdrop-blur-sm supports-backdrop-filter:bg-(--linear-app-content-surface)/80',
+              headerElevated &&
+                'shadow-[0_1px_0_rgba(0,0,0,0.035)] dark:shadow-inset-highlight'
+            )}
+          >
+            {toolbar}
+          </div>
+        ) : null}
+
+        {children({ headerElevated, stickyTopPx })}
+      </div>
+
+      {footer ? <div className='border-t border-subtle'>{footer}</div> : null}
+    </div>
+  );
+}

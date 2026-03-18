@@ -14,7 +14,7 @@ import {
 configure({ asyncUtilTimeout: 100 });
 
 // Import hook after mocks are set up
-import { useCSVExport } from '@/components/admin/table/useCSVExport';
+import { useCSVExport } from '@/features/admin/table/useCSVExport';
 import {
   downloadCSVBlob,
   generateTimestampedFilename,

@@ -250,6 +250,7 @@ export const notificationSubscriptions = pgTable(
     city: text('city'),
     ipAddress: text('ip_address'),
     source: text('source'),
+    name: text('name'),
     // Fan notification preferences for granular control
     preferences: jsonb('preferences')
       .$type<FanNotificationPreferences>()

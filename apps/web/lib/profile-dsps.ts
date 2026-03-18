@@ -1,4 +1,5 @@
 import { type AvailableDSP, DSP_CONFIGS } from '@/lib/dsp';
+import { PLATFORM_TO_DSP_MAPPINGS } from '@/lib/dsp-registry';
 
 interface ProfileDspSource {
   readonly spotify_url?: string | null;
@@ -25,20 +26,6 @@ interface SocialLinkSource {
   readonly platform?: string | null;
   readonly url?: string | null;
 }
-
-const PLATFORM_TO_DSP_MAPPINGS: Array<{ keywords: string[]; dspKey: string }> =
-  [
-    { keywords: ['spotify'], dspKey: 'spotify' },
-    { keywords: ['applemusic', 'itunes'], dspKey: 'apple_music' },
-    { keywords: ['youtubemusic'], dspKey: 'youtube_music' },
-    { keywords: ['youtube'], dspKey: 'youtube' },
-    { keywords: ['soundcloud'], dspKey: 'soundcloud' },
-    { keywords: ['bandcamp'], dspKey: 'bandcamp' },
-    { keywords: ['tidal'], dspKey: 'tidal' },
-    { keywords: ['deezer'], dspKey: 'deezer' },
-    { keywords: ['amazonmusic'], dspKey: 'amazon_music' },
-    { keywords: ['pandora'], dspKey: 'pandora' },
-  ];
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;

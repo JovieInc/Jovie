@@ -20,7 +20,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   }) => <div data-testid='drawer-media-thumb'>{children ?? fallback}</div>,
 }));
 
-vi.mock('@/components/release/AlbumArtworkContextMenu', () => ({
+vi.mock('@/features/release/AlbumArtworkContextMenu', () => ({
   AlbumArtworkContextMenu: ({ children }: { children: ReactNode }) => (
     <div data-testid='album-artwork-context-menu'>{children}</div>
   ),

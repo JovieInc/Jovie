@@ -7,12 +7,17 @@ import {
   useMemo,
   useState,
 } from 'react';
-import type { FeatureFlagsBootstrap } from './shared';
+import {
+  CODE_FLAG_KEYS,
+  type CodeFlagName,
+  FEATURE_FLAGS,
+  type FeatureFlagsBootstrap,
+} from './shared';
 
 const FF_OVERRIDES_KEY = '__ff_overrides';
 
 function readOverrides(): Record<string, boolean> {
-  if (typeof globalThis.window === 'undefined') return {};
+  if (globalThis.window === undefined) return {};
   try {
     return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
   } catch {
@@ -117,6 +122,19 @@ export function useFeatureGate(gateKey: string, defaultValue = false): boolean {
   const bootstrap = useFeatureFlagsBootstrap();
   if (!bootstrap) return defaultValue;
   return bootstrap.gates[gateKey] ?? defaultValue;
+}
+
+/**
+ * Check if a code-level feature flag is enabled.
+ * Supports dev toolbar overrides via the `code:` prefixed key in localStorage.
+ */
+export function useCodeFlag(flagName: CodeFlagName): boolean {
+  const overrides = useContext(OverridesContext);
+  const overrideKey = CODE_FLAG_KEYS[flagName];
+  if (overrides && overrideKey in overrides.overrides) {
+    return overrides.overrides[overrideKey];
+  }
+  return FEATURE_FLAGS[flagName];
 }
 
 /**

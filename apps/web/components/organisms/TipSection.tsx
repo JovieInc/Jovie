@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { QRCodeCard } from '@/components/molecules/QRCodeCard';
 import { TipSelector } from '@/components/molecules/TipSelector';
-import { isAllowedVenmoUrl } from '@/components/profile/utils/venmo';
+import { isAllowedVenmoUrl } from '@/features/profile/utils/venmo';
 import { track } from '@/lib/analytics';
 import { captureError } from '@/lib/error-tracking';
 import { cn } from '@/lib/utils';

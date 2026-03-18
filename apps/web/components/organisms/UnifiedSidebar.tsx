@@ -13,14 +13,6 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { DashboardNav } from '@/components/dashboard/dashboard-nav';
-import {
-  artistSettingsNavigation,
-  userSettingsNavigation,
-} from '@/components/dashboard/dashboard-nav/config';
-import type { NavItem } from '@/components/dashboard/dashboard-nav/types';
-import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
-import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
 import {
   Sidebar,
   SidebarContent,
@@ -34,8 +26,17 @@ import {
 import { UserButton } from '@/components/organisms/user-button';
 import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
+import { DashboardNav } from '@/features/dashboard/dashboard-nav';
+import {
+  artistSettingsNavigation,
+  userSettingsNavigation,
+} from '@/features/dashboard/dashboard-nav/config';
+import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 
 export interface UnifiedSidebarProps {
@@ -111,7 +112,24 @@ function SettingsNavigation({
   section: string;
 }) {
   const { selectedProfile } = useDashboardData();
-  const artistName = selectedProfile?.displayName?.trim() || undefined;
+  // Prefer the TanStack Query cache (updated by profile mutations) over
+  // the server-rendered context so the sidebar reflects name edits immediately.
+  const { data: cachedProfileData } = useDashboardProfileQuery();
+  // Cache may hold either the unwrapped DashboardProfile (from optimistic updates)
+  // or the { profile: DashboardProfile } envelope (from server refetch).
+  const cachedDisplayName =
+    cachedProfileData?.displayName ??
+    (
+      cachedProfileData as unknown as {
+        profile?: { displayName?: string | null };
+      }
+    )?.profile?.displayName;
+  // Only fall back to selectedProfile when cache hasn't loaded yet (undefined/null).
+  // If cachedDisplayName is empty string, the user intentionally cleared it.
+  const artistName =
+    cachedDisplayName == null
+      ? selectedProfile?.displayName?.trim() || undefined
+      : cachedDisplayName.trim() || undefined;
 
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {
@@ -238,11 +256,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='offcanvas'
       className={cn(
         'bg-base',
-        '[--sidebar-width:244px]',
+        '[--sidebar-width:232px]',
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-10 justify-center gap-0 border-b border-sidebar-border/35 px-2.5 py-0'>
+      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 py-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -251,7 +269,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2 pb-1.5'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -263,18 +281,20 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/45 bg-sidebar/45 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pb-3 pt-1'>
-          <span className='text-2xs text-sidebar-muted/80 select-none'>
-            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-              : ''}
-          </span>
-        </div>
+        {isUserAdmin && (
+          <div className='pl-2 pr-3.5 pb-2 pt-1'>
+            <span className='text-2xs text-sidebar-muted/80 select-none'>
+              v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+              {process.env.NEXT_PUBLIC_BUILD_SHA
+                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                : ''}
+            </span>
+          </div>
+        )}
       </div>
     </Sidebar>
   );

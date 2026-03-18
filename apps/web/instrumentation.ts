@@ -131,95 +131,96 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./sentry.server.config');
 
-    // Run environment validation at startup to detect issues early
-    // This catches build-time vs runtime environment differences on Vercel
-    try {
-      const result = await runEnvironmentValidationWithRetry();
+    // Skip startup validation retries in dev — env vars are immediately available
+    // via `doppler run --`, retries only help Vercel cold starts where Doppler
+    // can take up to 4s to inject env vars.
+    const isDev = process.env.NODE_ENV === 'development';
 
-      if (result && result.critical.length > 0) {
-        // Only report to Sentry if the issues are truly blocking in production
-        if (shouldReportToSentry(result.critical)) {
-          // Calculate timing metadata
-          const timeSinceInstrumentation =
-            Date.now() - INSTRUMENTATION_START_TIME;
-          const retryDuration =
-            validationResolvedTime && firstValidationAttemptTime
-              ? validationResolvedTime - firstValidationAttemptTime
-              : null;
-          const hadRetries =
-            firstValidationAttemptTime !== validationResolvedTime;
+    if (!isDev) {
+      // Run environment validation at startup to detect issues early
+      // This catches build-time vs runtime environment differences on Vercel
+      try {
+        const result = await runEnvironmentValidationWithRetry();
 
-          Sentry.captureMessage(
-            `Critical environment issues at startup: ${result.critical.join(', ')}`,
-            {
-              level: 'warning', // Changed from 'error' - these are config issues, not app errors
-              tags: {
-                context: 'startup_environment_validation',
-                vercel_env: process.env.VERCEL_ENV || 'unknown',
-                is_cold_start_timing: hadRetries ? 'true' : 'false',
-              },
-              extra: {
-                critical_issues: result.critical,
-                warning_issues: result.warnings,
-                error_issues: result.errors,
-                timing: {
-                  time_since_instrumentation_ms: timeSinceInstrumentation,
-                  retry_duration_ms: retryDuration,
-                  first_attempt_timestamp: firstValidationAttemptTime,
-                  resolved_timestamp: validationResolvedTime,
+        if (result && result.critical.length > 0) {
+          // Only report to Sentry if the issues are truly blocking in production
+          if (shouldReportToSentry(result.critical)) {
+            // Calculate timing metadata
+            const timeSinceInstrumentation =
+              Date.now() - INSTRUMENTATION_START_TIME;
+            const retryDuration =
+              validationResolvedTime && firstValidationAttemptTime
+                ? validationResolvedTime - firstValidationAttemptTime
+                : null;
+            const hadRetries =
+              firstValidationAttemptTime !== validationResolvedTime;
+
+            Sentry.captureMessage(
+              `Critical environment issues at startup: ${result.critical.join(', ')}`,
+              {
+                level: 'warning', // Changed from 'error' - these are config issues, not app errors
+                tags: {
+                  context: 'startup_environment_validation',
+                  vercel_env: process.env.VERCEL_ENV || 'unknown',
+                  is_cold_start_timing: hadRetries ? 'true' : 'false',
                 },
-              },
-            }
-          );
-        }
-      }
-    } catch (error) {
-      console.error('[STARTUP] Environment validation failed:', error);
-      Sentry.captureException(error, {
-        extra: { context: 'startup_environment_validation' },
-      });
-    }
-
-    // Validate Stripe billing config with same retry logic as env validation
-    try {
-      const { validateStripeBillingConfig } = await import(
-        '@/lib/stripe/startup-validation'
-      );
-      let stripeResult = validateStripeBillingConfig();
-
-      if (!stripeResult.healthy) {
-        for (let i = 0; i < VALIDATION_RETRY_CONFIG.maxRetries; i++) {
-          const delay = VALIDATION_RETRY_CONFIG.intervals[i];
-          console.log(
-            `[STARTUP] Stripe config unhealthy (attempt ${i + 1}/${VALIDATION_RETRY_CONFIG.maxRetries}), retrying after ${delay}ms...`
-          );
-          await new Promise(r => setTimeout(r, delay));
-          stripeResult = validateStripeBillingConfig();
-          if (stripeResult.healthy) {
-            console.log(`[STARTUP] Stripe config healthy on retry ${i + 2}`);
-            break;
+                extra: {
+                  critical_issues: result.critical,
+                  warning_issues: result.warnings,
+                  error_issues: result.errors,
+                  timing: {
+                    time_since_instrumentation_ms: timeSinceInstrumentation,
+                    retry_duration_ms: retryDuration,
+                    first_attempt_timestamp: firstValidationAttemptTime,
+                    resolved_timestamp: validationResolvedTime,
+                  },
+                },
+              }
+            );
           }
         }
+      } catch (error) {
+        console.error('[STARTUP] Environment validation failed:', error);
+        Sentry.captureException(error, {
+          extra: { context: 'startup_environment_validation' },
+        });
       }
 
-      if (!stripeResult.healthy && shouldReportToSentry(stripeResult.issues)) {
-        Sentry.captureMessage(
-          `Stripe billing config unhealthy after retries: ${stripeResult.issues.join(', ')}`,
-          {
-            level: 'warning',
-            tags: {
-              context: 'stripe_startup_validation',
-              vercel_env: process.env.VERCEL_ENV || 'unknown',
-            },
-            extra: { issues: stripeResult.issues },
-          }
+      // Validate Stripe billing config with same retry logic as env validation
+      try {
+        const { validateStripeBillingConfig } = await import(
+          '@/lib/stripe/startup-validation'
         );
+        let stripeResult = validateStripeBillingConfig();
+
+        if (!stripeResult.healthy) {
+          for (let i = 0; i < VALIDATION_RETRY_CONFIG.maxRetries; i++) {
+            const delay = VALIDATION_RETRY_CONFIG.intervals[i];
+            console.log(
+              `[STARTUP] Stripe config unhealthy (attempt ${i + 1}/${VALIDATION_RETRY_CONFIG.maxRetries}), retrying after ${delay}ms...`
+            );
+            await new Promise(r => setTimeout(r, delay));
+            stripeResult = validateStripeBillingConfig();
+            if (stripeResult.healthy) {
+              console.log(`[STARTUP] Stripe config healthy on retry ${i + 2}`);
+              break;
+            }
+          }
+        }
+
+        // Note: validateStripeBillingConfig() already reports to Sentry at
+        // 'fatal' level on deployed environments — no duplicate report needed here.
+        if (!stripeResult.healthy) {
+          console.warn(
+            `[STARTUP] Stripe billing config still unhealthy after retries: ${stripeResult.issues.join(', ')}`
+          );
+        }
+      } catch (error) {
+        console.error('[STARTUP] Stripe billing validation failed:', error);
+        Sentry.captureException(error, {
+          extra: { context: 'stripe_startup_validation' },
+        });
       }
-    } catch (error) {
-      console.error('[STARTUP] Stripe billing validation failed:', error);
-      Sentry.captureException(error, {
-        extra: { context: 'stripe_startup_validation' },
-      });
     }
   }
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { EditableContact } from '@/components/dashboard/hooks/useContactsManager';
-import { getContactRowContextMenuItems } from '@/components/dashboard/organisms/contacts-table/row-actions';
+import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { getContactRowContextMenuItems } from '@/features/dashboard/organisms/contacts-table/row-actions';
 
 const baseContact: EditableContact = {
   id: 'contact-1',

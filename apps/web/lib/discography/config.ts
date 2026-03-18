@@ -1,7 +1,7 @@
 import type { ProviderKey, ReleaseTemplate } from './types';
 
 export const PROVIDER_CONFIG: Record<
-  ProviderKey,
+  string,
   { label: string; accent: string }
 > = {
   spotify: { label: 'Spotify', accent: '#1DB954' },

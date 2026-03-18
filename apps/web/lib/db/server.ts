@@ -59,6 +59,11 @@ export function profileIsPublishable(profile: CreatorProfile | null): boolean {
 export function selectDashboardProfile(
   profiles: CreatorProfile[]
 ): CreatorProfile {
+  // Prefer claimed + publishable profiles to avoid selecting unclaimed
+  // pre-populated profiles when a claimed profile exists
+  const claimed = profiles.find(p => p.isClaimed && profileIsPublishable(p));
+  if (claimed) return claimed;
+
   const publishable = profiles.find(profileIsPublishable);
   if (publishable) return publishable;
 

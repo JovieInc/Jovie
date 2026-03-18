@@ -61,7 +61,7 @@ export function HeaderBulkActions({
 
   return (
     <div className={cn('flex items-center gap-2 h-7', className)}>
-      <span className='whitespace-nowrap text-[11px] font-[510] tabular-nums text-(--linear-text-secondary)'>
+      <span className='whitespace-nowrap text-[11px] font-[510] tabular-nums text-secondary-token'>
         {selectedCount} selected
       </span>
       {bulkActions.length > 0 && (
@@ -95,7 +95,7 @@ export function HeaderBulkActions({
           variant='ghost'
           size='sm'
           onClick={onClearSelection}
-          className='h-7 w-7 rounded-[7px] border border-transparent p-0 text-(--linear-text-tertiary) transition-[background-color,border-color,color] duration-150 hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-1) hover:text-(--linear-text-primary)'
+          className='h-7 w-7 rounded-[7px] border border-transparent p-0 text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
           aria-label='Clear selection'
         >
           <X className='h-3.5 w-3.5' />

@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
   },
 }));
 
-const { runDemoAction } = await import('@/components/demo/demo-actions');
+const { runDemoAction } = await import('@/features/demo/demo-actions');
 
 describe('runDemoAction', () => {
   it('shows loading and success toasts with simulated latency', async () => {

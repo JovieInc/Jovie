@@ -4,7 +4,7 @@ import {
   persistViewModePreference,
   readGroupingPreference,
   readViewModePreference,
-} from '@/components/admin/waitlist-table/storage';
+} from '@/features/admin/waitlist-table/storage';
 
 describe('admin waitlist storage helpers', () => {
   beforeEach(() => {

@@ -50,11 +50,8 @@ const ACTION_ICONS: Record<ActivityAction, typeof Plus> = {
 function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   const IconComponent = ACTION_ICONS[action] ?? Plus;
   return (
-    <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)] transition-colors group-hover:border-(--linear-border-default)'>
-      <IconComponent
-        className='h-3 w-3 text-(--linear-text-tertiary)'
-        aria-hidden
-      />
+    <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0 transition-colors group-hover:border-default'>
+      <IconComponent className='h-3 w-3 text-tertiary-token' aria-hidden />
     </div>
   );
 }
@@ -71,7 +68,7 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
           aria-hidden='true'
         >
           <div className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)' />
-          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) shadow-[0_0_0_3px_var(--linear-bg-surface-0)] skeleton' />
+          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0 skeleton' />
           <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
             <div className='h-3 w-[72%] rounded skeleton' />
             <div className='h-2.5 w-[24%] rounded skeleton' />
@@ -85,17 +82,17 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
-    <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'>
+    <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus'>
       <div
         aria-hidden='true'
         className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle) group-last:hidden'
       />
       <ActivityIcon action={event.action} />
       <div className='min-w-0 flex-1'>
-        <p className='text-[13px] leading-[18px] tracking-[-0.01em] text-(--linear-text-secondary)'>
+        <p className='text-[13px] leading-[18px] tracking-[-0.01em] text-secondary-token'>
           {event.description}
         </p>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-(--linear-text-tertiary)'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
           {isSystem && (
             <>
               <Bot className='h-3 w-3' aria-hidden />
@@ -138,8 +135,8 @@ export function ActivityFeed({
 
   if (events.length === 0) {
     return (
-      <div className='flex min-h-[140px] items-center rounded-[8px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3'>
-        <p className='text-[12px] leading-[17px] text-(--linear-text-secondary)'>
+      <div className='flex min-h-[140px] items-center rounded-[8px] border border-subtle bg-surface-1 px-3'>
+        <p className='text-[12px] leading-[17px] text-secondary-token'>
           {emptyMessage}
         </p>
       </div>

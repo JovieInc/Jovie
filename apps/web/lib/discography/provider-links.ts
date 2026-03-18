@@ -1,5 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
 
+import {
+  buildSearchUrl as registryBuildSearchUrl,
+  STREAMING_DSP_KEYS,
+} from '@/lib/dsp-registry';
 import { captureError } from '@/lib/error-tracking';
 
 import {
@@ -48,23 +52,7 @@ export interface ResolveProviderLinksOptions {
   fetcher?: typeof fetch;
 }
 
-const DEFAULT_PROVIDERS: ProviderKey[] = [
-  'apple_music',
-  'spotify',
-  'youtube',
-  'soundcloud',
-  'deezer',
-  'amazon_music',
-  'tidal',
-  'pandora',
-  'napster',
-  'audiomack',
-  'qobuz',
-  'anghami',
-  'boomplay',
-  'iheartradio',
-  'tiktok',
-];
+const DEFAULT_PROVIDERS: ProviderKey[] = STREAMING_DSP_KEYS as ProviderKey[];
 
 const DEFAULT_APPLE_STOREFRONT = 'us';
 
@@ -80,44 +68,11 @@ export function buildSearchUrl(
   provider: ProviderKey,
   track: TrackDescriptor,
   options: { storefront?: string } = {}
-): string {
+): string | null {
   const query = buildSearchQuery(track);
-  const storefront = options.storefront ?? DEFAULT_APPLE_STOREFRONT;
-
-  switch (provider) {
-    case 'apple_music':
-      return `https://music.apple.com/${storefront}/search?term=${query}`;
-    case 'spotify':
-      return `https://open.spotify.com/search/${query}`;
-    case 'youtube':
-      return `https://music.youtube.com/search?q=${query}`;
-    case 'soundcloud':
-      return `https://soundcloud.com/search?q=${query}`;
-    case 'deezer':
-      return `https://www.deezer.com/search/${query}`;
-    case 'amazon_music':
-      return `https://music.amazon.com/search/${query}`;
-    case 'tidal':
-      return `https://tidal.com/search?q=${query}`;
-    case 'pandora':
-      return `https://www.pandora.com/search/${query}/tracks`;
-    case 'napster':
-      return `https://web.napster.com/search?query=${query}`;
-    case 'audiomack':
-      return `https://audiomack.com/search?q=${query}`;
-    case 'qobuz':
-      return `https://www.qobuz.com/search?q=${query}`;
-    case 'anghami':
-      return `https://play.anghami.com/search/${query}`;
-    case 'boomplay':
-      return `https://www.boomplay.com/search/default/${query}`;
-    case 'iheartradio':
-      return `https://www.iheart.com/search/?query=${query}`;
-    case 'tiktok':
-      return `https://www.tiktok.com/search?q=${query}`;
-    default:
-      return query;
-  }
+  return registryBuildSearchUrl(provider, decodeURIComponent(query), {
+    storefront: options.storefront ?? DEFAULT_APPLE_STOREFRONT,
+  });
 }
 
 export interface AppleMusicLookupResult {
@@ -378,9 +333,13 @@ export async function resolveProviderLinks(
   for (const provider of providers) {
     if (seenProviders.has(provider)) continue;
 
+    const searchUrl = buildSearchUrl(provider, track, { storefront });
+    // Skip providers without a search URL template (e.g. FLO, JOOX, LINE MUSIC)
+    if (!searchUrl) continue;
+
     links.push({
       provider,
-      url: buildSearchUrl(provider, track, { storefront }),
+      url: searchUrl,
       quality: 'search_fallback',
       discovered_from: 'search_url',
     });

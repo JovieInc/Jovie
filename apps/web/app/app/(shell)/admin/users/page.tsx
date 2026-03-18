@@ -9,7 +9,7 @@ import { adminUsersSearchParams } from '@/lib/nuqs';
 
 const AdminUsersTableUnified = dynamic(
   () =>
-    import('@/components/admin/admin-users-table/AdminUsersTableUnified').then(
+    import('@/features/admin/admin-users-table/AdminUsersTableUnified').then(
       mod => ({
         default: mod.AdminUsersTableUnified,
       })

@@ -18,6 +18,7 @@ export function DrawerEmptyState({
 }: DrawerEmptyStateProps) {
   return (
     <DrawerSurfaceCard
+      variant='card'
       testId={testId}
       className={cn(
         'flex min-h-[140px] items-center rounded-[10px] bg-surface-1/25 px-4 py-4',
@@ -27,7 +28,7 @@ export function DrawerEmptyState({
       <p
         className={cn(
           'text-[12px] leading-[18px] tracking-[0.01em]',
-          tone === 'error' ? 'text-error' : 'text-(--linear-text-secondary)'
+          tone === 'error' ? 'text-error' : 'text-secondary-token'
         )}
       >
         {message}

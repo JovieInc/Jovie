@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { HeaderChatUsageIndicator } from '@/components/dashboard/atoms/HeaderChatUsageIndicator';
+import { HeaderChatUsageIndicator } from '@/features/dashboard/atoms/HeaderChatUsageIndicator';
 import { fastRender } from '@/tests/utils/fast-render';
 
 const mockUseChatUsageQuery = vi.fn();

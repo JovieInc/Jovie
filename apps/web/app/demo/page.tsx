@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { DemoReleasesExperience } from '@/components/demo/DemoReleasesExperience';
+import { DemoReleasesExperience } from '@/features/demo/DemoReleasesExperience';
 
 export const metadata: Metadata = {
   title: 'Jovie Demo',

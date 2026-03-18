@@ -1,6 +1,6 @@
 'use client';
 
-import { Calendar, DollarSign } from 'lucide-react';
+import { Calendar, DollarSign, ShoppingBag } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { BackgroundPattern } from '@/components/atoms/BackgroundPattern';
@@ -10,11 +10,11 @@ import { ProfileNavButton } from '@/components/molecules/ProfileNavButton';
 import { SocialLink as SocialLinkComponent } from '@/components/molecules/SocialLink';
 import { ProfileNotificationsButton } from '@/components/organisms/ProfileNotificationsButton';
 import { ProfileNotificationsMenu } from '@/components/organisms/profile-notifications-menu';
-import { ArtistContactsButton } from '@/components/profile/artist-contacts-button';
-import { ProfileFooter } from '@/components/profile/ProfileFooter';
-import { TipDrawer } from '@/components/profile/TipDrawer';
-import { extractVenmoUsername } from '@/components/profile/utils/venmo';
 import { Container } from '@/components/site/Container';
+import { ArtistContactsButton } from '@/features/profile/artist-contacts-button';
+import { ProfileFooter } from '@/features/profile/ProfileFooter';
+import { TipDrawer } from '@/features/profile/TipDrawer';
+import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { getCanonicalProfileDSPs, toDSPPreferences } from '@/lib/profile-dsps';
 import { ProfileNotificationsContext } from './ProfileNotificationsContext';
@@ -36,6 +36,7 @@ export function ProfileShell({
   isTourModeActive = false,
   showFooter = true,
   showNotificationButton = false,
+  showShopButton = false,
   maxWidthClass = 'w-full max-w-md',
   backgroundPattern = 'grid',
   showGradientBlurs = true,
@@ -139,6 +140,7 @@ export function ProfileShell({
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
+        id='main-content'
         className='relative w-full min-h-dvh bg-base text-primary-token font-medium tracking-tight'
         data-test='public-profile-root'
       >
@@ -185,7 +187,7 @@ export function ProfileShell({
                   hasActiveSubscriptions) && (
                   <div className='flex justify-center'>
                     <div
-                      className='flex flex-wrap items-center justify-center gap-3 px-1 py-1'
+                      className='flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-1 py-1'
                       data-testid='social-links'
                     >
                       {/* Mail (contacts) — left */}
@@ -222,6 +224,26 @@ export function ProfileShell({
                           }}
                         >
                           <Calendar className='h-4 w-4' aria-hidden='true' />
+                        </CircleIconButton>
+                      )}
+
+                      {/* Shop */}
+                      {showShopButton && (
+                        <CircleIconButton
+                          size='md'
+                          variant='ghost'
+                          ariaLabel='Shop'
+                          data-testid='shop-trigger'
+                          className='border border-subtle/50 bg-transparent text-secondary-token transition-[background-color,border-color,color] hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+                          onClick={() => {
+                            window.open(
+                              `/${artist.handle}/shop`,
+                              '_blank',
+                              'noopener,noreferrer'
+                            );
+                          }}
+                        >
+                          <ShoppingBag className='h-4 w-4' aria-hidden='true' />
                         </CircleIconButton>
                       )}
 

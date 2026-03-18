@@ -1,0 +1,223 @@
+import {
+  CalendarClock,
+  ChartNoAxesCombined,
+  CircleDollarSign,
+  CreditCard,
+  Gauge,
+  TrendingUp,
+  Users,
+} from 'lucide-react';
+import Link from 'next/link';
+import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { APP_ROUTES } from '@/constants/routes';
+import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
+
+interface FunnelMetricsStripProps {
+  readonly metrics: AdminFunnelMetrics;
+}
+
+function formatPercent(rate: number | null): string {
+  if (rate === null) return '—';
+  return `${(rate * 100).toFixed(1)}%`;
+}
+
+function formatUsd(value: number): string {
+  return value.toLocaleString('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  });
+}
+
+function formatRunway(months: number | null, stripeAvailable: boolean): string {
+  if (!stripeAvailable) return '—';
+  if (months === null) return 'Infinite';
+  if (months === 0) return 'No balance';
+  return `${months.toFixed(1)}mo`;
+}
+
+function runwaySubtitle(
+  months: number | null,
+  stripeAvailable: boolean,
+  mrrDisplay: string
+): string {
+  if (!stripeAvailable) return 'Connect Stripe to calculate';
+  if (months === null) return 'Revenue covers burn';
+  if (months === 0) return 'Add bank balance to calculate';
+  return `at ${mrrDisplay}/mo revenue`;
+}
+
+interface MetricCardProps {
+  readonly title: string;
+  readonly value: string;
+  readonly subtitle: string;
+  readonly icon: React.ComponentType<{ className?: string }>;
+  readonly iconClassName?: string;
+}
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  iconClassName,
+}: MetricCardProps) {
+  return (
+    <ContentMetricCard
+      label={title}
+      value={value}
+      subtitle={subtitle}
+      icon={Icon}
+      iconClassName={iconClassName}
+    />
+  );
+}
+
+interface PlaceholderMetricCardProps {
+  readonly title: string;
+  readonly description: string;
+}
+
+function PlaceholderMetricCard({
+  title,
+  description,
+}: Readonly<PlaceholderMetricCardProps>) {
+  return (
+    <ContentSurfaceCard className='space-y-2 p-4'>
+      <p className='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'>
+        {title}
+      </p>
+      <div className='flex items-center justify-between gap-3'>
+        <p className='text-2xl font-semibold tabular-nums tracking-tight text-primary-token'>
+          —
+        </p>
+        <Link
+          href={APP_ROUTES.SETTINGS_BILLING}
+          className='text-[12px] font-medium text-primary-token transition-colors hover:text-secondary-token'
+        >
+          Configure
+        </Link>
+      </div>
+      <p className='text-[12px] leading-[17px] text-secondary-token'>
+        {description}
+      </p>
+    </ContentSurfaceCard>
+  );
+}
+
+export function FunnelMetricsStrip({
+  metrics,
+}: Readonly<FunnelMetricsStripProps>) {
+  const mrrDisplay = metrics.stripeAvailable ? formatUsd(metrics.mrrUsd) : '—';
+  const runwayDisplay = formatRunway(
+    metrics.runwayMonths,
+    metrics.stripeAvailable
+  );
+
+  return (
+    <div className='space-y-6' data-testid='funnel-metrics-strip'>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='Core KPIs'
+          subtitle='Revenue, runway, and monetization health'
+          className='min-h-0 px-5 py-3'
+        />
+        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-3'>
+          <MetricCard
+            title='MRR'
+            value={mrrDisplay}
+            subtitle='Monthly recurring revenue'
+            icon={CircleDollarSign}
+            iconClassName='text-success'
+          />
+
+          <MetricCard
+            title='ARR'
+            value={metrics.stripeAvailable ? formatUsd(metrics.arrUsd) : '—'}
+            subtitle='Annual recurring revenue'
+            icon={ChartNoAxesCombined}
+            iconClassName='text-info'
+          />
+
+          <MetricCard
+            title='Runway'
+            value={runwayDisplay}
+            subtitle={runwaySubtitle(
+              metrics.runwayMonths,
+              metrics.stripeAvailable,
+              mrrDisplay
+            )}
+            icon={Gauge}
+            iconClassName='text-warning'
+          />
+
+          <MetricCard
+            title='Default-alive date'
+            value={metrics.defaultAliveDate ?? '—'}
+            subtitle='Date business can sustain with current burn'
+            icon={CalendarClock}
+            iconClassName='text-tertiary-token'
+          />
+
+          <MetricCard
+            title='Paying customers'
+            value={
+              metrics.stripeAvailable
+                ? metrics.payingCustomers.toLocaleString('en-US')
+                : '—'
+            }
+            subtitle='Active Stripe subscriptions'
+            icon={Users}
+            iconClassName='text-accent'
+          />
+
+          <MetricCard
+            title='Growth rates'
+            value={`WoW ${formatPercent(metrics.wowGrowthRate)} · MoM ${formatPercent(metrics.momGrowthRate)}`}
+            subtitle='Weekly and monthly revenue momentum'
+            icon={TrendingUp}
+            iconClassName='text-success'
+          />
+        </div>
+      </ContentSurfaceCard>
+
+      <ContentSurfaceCard
+        className='overflow-hidden p-0'
+        data-testid='yc-metrics-section'
+      >
+        <ContentSectionHeader
+          title='YC metrics'
+          subtitle='Benchmark gaps and operating signals'
+          className='min-h-0 px-5 py-3'
+        />
+        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+          <PlaceholderMetricCard
+            title='Churn rate'
+            description='Customer churn in the trailing 30 days.'
+          />
+          <PlaceholderMetricCard
+            title='Retention (30/60/90 day)'
+            description='Cohort retention windows for active customers.'
+          />
+          <MetricCard
+            title='Engagement proxy'
+            value={
+              metrics.engagementActiveProfiles30d === null
+                ? '—'
+                : metrics.engagementActiveProfiles30d.toLocaleString('en-US')
+            }
+            subtitle='Profiles with at least one visitor in the last 30 days'
+            icon={CreditCard}
+            iconClassName='text-info'
+          />
+          <PlaceholderMetricCard
+            title='CAC · LTV · Payback'
+            description='Unit economics for sustainable growth.'
+          />
+        </div>
+      </ContentSurfaceCard>
+    </div>
+  );
+}

@@ -214,3 +214,24 @@ export const updateContentPreferences = async (
     undefined,
     'PATCH'
   );
+
+export type UpdateSubscriberNamePayload = {
+  artistId: string;
+  email: string;
+  name: string;
+};
+
+export const updateSubscriberName = async (
+  payload: UpdateSubscriberNamePayload
+): Promise<{ success: true }> =>
+  requestNotifications<{ success: true }>(
+    '/api/notifications/update-name',
+    {
+      artist_id: payload.artistId,
+      email: payload.email,
+      name: payload.name,
+    },
+    NOTIFICATION_COPY.errors.generic,
+    undefined,
+    'PATCH'
+  );

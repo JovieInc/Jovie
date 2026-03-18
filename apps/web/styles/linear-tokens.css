@@ -81,10 +81,10 @@
   --linear-btn-secondary-bg: oklch(94% 0.005 260);
   --linear-btn-secondary-fg: oklch(20% 0.005 260);
   --linear-btn-secondary-hover: oklch(90% 0.005 260);
-  /* Accent button — indigo (same in both modes) */
-  --linear-btn-accent-bg: oklch(55% 0.25 270);
+  /* Accent button — purple (same in both modes, extracted 2026-03-16) */
+  --linear-btn-accent-bg: #7170ff;
   --linear-btn-accent-fg: oklch(100% 0 0);
-  --linear-btn-accent-hover: oklch(60% 0.25 270);
+  --linear-btn-accent-hover: #828fff;
   /* ============================================
      ACCENT COLORS (mode-independent)
      ============================================ */
@@ -92,7 +92,7 @@
   --linear-warning: oklch(82% 0.17 85);
   --linear-warning-subtle: oklch(82% 0.17 85 / 0.15);
   --linear-error: oklch(65% 0.2 25);
-  --linear-accent: oklch(55% 0.25 270);
+  --linear-accent: #7170ff;
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -121,12 +121,12 @@
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
-  /* Font weights - Linear uses Inter variable font with precise weights */
-  --linear-font-weight-normal: 450;
-  /* Linear "book" weight — matches --font-weight-normal: 450 */
+  /* Font weights - Linear CSS vars (extracted 2026-03-16) */
+  --linear-font-weight-normal: 400;
+  /* Linear: --font-weight-normal = 400 */
   --linear-font-weight-medium: 510;
-  --linear-font-weight-semibold: 538;
-  --linear-font-weight-bold: 590;
+  --linear-font-weight-semibold: 590;
+  --linear-font-weight-bold: 680;
   /* Letter spacing */
   --linear-tracking-headline: -0.022em;
   --linear-tracking-subheadline: -0.0175em;
@@ -139,7 +139,7 @@
   --linear-leading-normal: 1.6;
   --linear-leading-relaxed: 1.33;
   /* Font features - Linear's OpenType features */
-  --linear-font-features: "cv01", "ss03", "rlig" 1, "calt" 1;
+  --linear-font-features: "cv01", "ss03";
   --linear-font-optical-sizing: 28;
   /* ============================================
      TYPE SCALE (Desktop) — mode-independent
@@ -181,19 +181,19 @@
   /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-  --linear-container-max: 1032px;
+  --linear-container-max: 1298px;
   --linear-container-padding: 24px;
-  --linear-content-max: 984px;
+  --linear-content-max: 1250px;
   --linear-hero-section-max: 1024px;
   --linear-hero-h1-width: 900px;
   --linear-hero-lead-width: 821.469px;
   --linear-pricing-grid-max: 1024px;
-  --linear-header-height: 56px;
+  --linear-header-height: 73px;
   --linear-hero-height: 392px;
   --linear-button-height-sm: 32px;
   --linear-button-height-md: 40px;
-  --linear-radius-sm: 8px;
-  --linear-radius-md: 10px;
+  --linear-radius-sm: 4px;
+  --linear-radius-md: 8px;
   --linear-radius-lg: 12px;
   --linear-radius-full: 9999px;
   /* App UI tokens (distinct from marketing page tokens) */
@@ -210,14 +210,11 @@
   --linear-app-header-padding-x: 14px;
   --linear-app-content-padding-x: 16px;
   --linear-app-content-padding-y: 10px;
-  --linear-app-drawer-header-height: 36px;
-  --linear-app-drawer-padding-x: 14px;
   --linear-app-control-height-sm: 28px;
   --linear-app-control-padding-x: 10px;
   --linear-app-control-radius: 7px;
   --linear-app-toolbar-gap: 3px;
   --linear-app-content-surface: var(--linear-bg-surface-0);
-  --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
   --linear-row-hover: oklch(96.9% 0.002 260);
@@ -231,6 +228,36 @@
   --linear-app-sidebar-item-foreground-rgb: 88 90 96;
   --linear-app-sidebar-item-icon-rgb: 122 125 132;
   --linear-app-sidebar-muted-rgb: 112 116 124;
+  /* ============================================
+     COMPONENT-SCOPED TOKENS — marketing page effects
+     ============================================ */
+  /* Hero */
+  --linear-hero-backdrop: radial-gradient(
+    ellipse 80% 60% at 50% -10%,
+    oklch(20% 0.025 265 / 0.9) 0%,
+    oklch(15% 0.015 260 / 0.4) 50%,
+    transparent 75%
+  );
+  /* CTA section spacing */
+  --linear-cta-section-pt: 7rem;
+  --linear-cta-section-pb: 9rem;
+  /* Pricing accent */
+  --linear-pricing-accent: var(--linear-accent);
+  --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
+  --linear-pricing-accent-shadow: rgba(94, 106, 210, 0.15);
+  /* Audience CRM section */
+  --linear-crm-glow: radial-gradient(
+    ellipse 60% 40% at 50% 100%,
+    oklch(18% 0.015 260 / 0.2) 0%,
+    transparent 60%
+  );
+  --linear-crm-shine: rgba(255, 255, 255, 0.04);
+  /* Deeplinks grid */
+  --linear-deeplinks-glow: radial-gradient(
+    ellipse 50% 40% at 50% 50%,
+    oklch(18% 0.015 260 / 0.15),
+    transparent 70%
+  );
   /* ============================================
      SPACING — mode-independent
      ============================================ */
@@ -257,7 +284,7 @@
   --linear-section-pt-md: 72px;
   --linear-section-pb-md: 80px;
   --linear-section-pt-lg: 96px;
-  --linear-section-pb-lg: 96px;
+  --linear-section-pb-lg: 128px;
   --linear-content-gap-sm: 40px;
   --linear-content-gap-md: 56px;
   --linear-content-gap-lg: 72px;
@@ -274,11 +301,12 @@
   /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */
-  --linear-h1-size-sm: 40px;
-  --linear-h1-size-md: 52px;
+  --linear-h1-size-sm: 38px;
+  --linear-h1-size-md: 56px;
   --linear-h1-size-lg: 64px;
-  --linear-h2-size-sm: 28px;
-  --linear-h2-size-md: 36px;
+  --linear-h2-size-sm: 24px;
+  --linear-h2-size-md: 32px;
+  --linear-h2-size-xl: 40px;
   --linear-h2-size-lg: 48px;
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
@@ -298,34 +326,37 @@
   --linear-text-primary: #f7f8f8;
   --linear-text-secondary: #d0d6e0;
   --linear-text-tertiary: #8a8f98;
-  --linear-text-quaternary: #5a5f6a;
+  --linear-text-quaternary: #62666d;
   --linear-text-inverse: oklch(5% 0.005 260);
   /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
      --color-bg-primary: #08090a  body bg
      --color-bg-secondary: #1c1c1f  cards/panels
      --color-bg-tertiary: #232326  elevated surfaces */
   --linear-bg-page: #08090a;
-  --linear-bg-header: rgba(8, 9, 10, 0.85);
-  --linear-bg-surface-0: #232326;
-  /* elevated menus/popovers = bg-tertiary */
-  --linear-bg-surface-1: #1c1c1f;
-  /* cards/panels = bg-secondary */
-  --linear-bg-surface-2: #141416;
-  /* deeper — between primary and secondary */
+  --linear-bg-header: transparent;
+  --linear-bg-surface-0: #0f1011;
+  /* main panels — matches Linear.app marketing panels (measured 2026-03-16) */
+  --linear-bg-surface-1: #17171a;
+  /* inner cards/headers — between panel and elevated */
+  --linear-bg-surface-2: #1c1c1f;
+  /* elevated elements — icons, badges, skeleton loaders */
+  /* Marketing panel — matches Linear.app homepage mockups (measured 2026-03-16) */
+  --linear-panel-bg: #0f1011;
+  --linear-panel-ring: #23252a;
   --linear-bg-button: #2a2a2e;
   --linear-bg-footer: #08090a;
   --linear-border-footer: #2a2a2e;
   --linear-bg-hover: rgba(255, 255, 255, 0.06);
-  /* Borders */
-  --linear-border-subtle: rgba(255, 255, 255, 0.06);
-  --linear-border-default: rgba(255, 255, 255, 0.1);
+  /* Borders — extracted 2026-03-17 */
+  --linear-border-subtle: rgba(255, 255, 255, 0.05);
+  --linear-border-default: rgba(255, 255, 255, 0.08);
   --linear-border-strong: rgba(255, 255, 255, 0.14);
   --linear-border-focus: oklch(60% 0.12 260);
-  /* Buttons — primary is near-white on dark (Linear pattern) */
-  --linear-btn-primary-bg: #f7f8f8;
+  /* Buttons — primary is light gray on dark (Linear pattern, extracted 2026-03-17) */
+  --linear-btn-primary-bg: #e6e6e6;
   --linear-btn-primary-fg: #08090a;
-  --linear-btn-primary-hover: #ffffff;
-  --linear-btn-primary-border: #f7f8f8;
+  --linear-btn-primary-hover: #f0f0f0;
+  --linear-btn-primary-border: #e6e6e6;
   --linear-btn-secondary-bg: #232326;
   --linear-btn-secondary-fg: #f7f8f8;
   --linear-btn-secondary-hover: #2a2a2e;
@@ -344,7 +375,6 @@
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
   --linear-app-content-surface: var(--linear-bg-surface-1);
-  --linear-app-drawer-surface: var(--linear-bg-surface-0);
   --linear-app-shell-border: rgba(255, 255, 255, 0.06);
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.06);
   --linear-app-frame-seam: rgba(255, 255, 255, 0.05);
@@ -362,61 +392,6 @@
   --linear-app-sidebar-item-foreground-rgb: 214 218 226;
   --linear-app-sidebar-item-icon-rgb: 116 120 128;
   --linear-app-sidebar-muted-rgb: 107 111 118;
-}
-
-/* ============================================
-   MARKETING LIGHT-THEME OVERRIDE
-   Applied to .linear-marketing to force light mode
-   regardless of the global html.dark class.
-   ============================================ */
-
-.linear-marketing {
-  /* Text — light mode values */
-  --linear-text-primary: oklch(12% 0.005 260);
-  --linear-text-secondary: oklch(45% 0.012 260);
-  --linear-text-tertiary: oklch(55% 0.01 260);
-  --linear-text-quaternary: oklch(70% 0.008 260);
-  --linear-text-inverse: oklch(97% 0.005 260);
-  /* Backgrounds — clean off-whites */
-  --linear-bg-page: oklch(98.5% 0.002 260);
-  --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
-  --linear-bg-surface-0: oklch(100% 0 0);
-  --linear-bg-surface-1: oklch(97% 0.002 260);
-  --linear-bg-surface-2: oklch(95% 0.003 260);
-  --linear-bg-button: oklch(92% 0.005 260);
-  --linear-bg-footer: oklch(98.5% 0.002 260);
-  --linear-border-footer: oklch(90% 0.005 260);
-  --linear-bg-hover: rgba(0, 0, 0, 0.04);
-  /* Borders — light mode */
-  --linear-border-subtle: rgba(0, 0, 0, 0.06);
-  --linear-border-default: rgba(0, 0, 0, 0.1);
-  --linear-border-strong: rgba(0, 0, 0, 0.15);
-  --linear-border-focus: oklch(55% 0.15 270);
-  /* Buttons */
-  --linear-btn-primary-bg: oklch(15% 0.005 260);
-  --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 260);
-  --linear-btn-primary-border: oklch(15% 0.005 260);
-  --linear-btn-secondary-bg: oklch(94% 0.005 260);
-  --linear-btn-secondary-fg: oklch(20% 0.005 260);
-  --linear-btn-secondary-hover: oklch(90% 0.005 260);
-  /* Hero tokens */
-  --linear-hero-glow: radial-gradient(
-    ellipse 60% 50% at 50% 40%,
-    oklch(92% 0.02 270 / 0.25),
-    transparent 70%
-  );
-  --linear-hero-gradient-from: oklch(40% 0.06 270);
-  --linear-hero-gradient-to: oklch(55% 0.04 270);
-  --linear-separator-from: rgba(0, 0, 0, 0.08);
-  --linear-separator-via: rgba(0, 0, 0, 0.04);
-  /* Shadows */
-  --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px,
-    rgba(0, 0, 0, 0.04) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px,
-    rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
 }
 
 /* ============================================

@@ -8,18 +8,23 @@
  * Includes right-click context menu on artwork for downloading at multiple sizes.
  */
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
-} from '@/components/release/AlbumArtworkContextMenu';
-import { SmartLinkProviderButton } from '@/components/release/SmartLinkProviderButton';
-import { APP_ROUTES } from '@/constants/routes';
+} from '@/features/release/AlbumArtworkContextMenu';
+import {
+  SmartLinkArtistName,
+  SmartLinkArtworkCard,
+  SmartLinkPageFrame,
+} from '@/features/release/SmartLinkPagePrimitives';
+import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { ProviderKey } from '@/lib/discography/types';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface Provider {
@@ -162,20 +167,7 @@ export function ReleaseLandingPage({
         },
       };
 
-      const body = JSON.stringify(payload);
-
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: 'application/json' });
-        navigator.sendBeacon('/api/track', blob);
-        return;
-      }
-
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => {
+      postJsonBeacon('/api/track', payload, () => {
         // Ignore tracking errors
       });
     },
@@ -183,141 +175,98 @@ export function ReleaseLandingPage({
   );
 
   return (
-    <div className='h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
+    <SmartLinkPageFrame glowClassName='size-[30rem]'>
+      {/* Artwork + Info — pinned at top, never scrolls */}
+      <div className='shrink-0'>
+        {/* Release Artwork */}
+        <AlbumArtworkContextMenu
+          title={release.title}
+          sizes={sizes}
+          allowDownloads={allowDownloads}
+        >
+          <SmartLinkArtworkCard
+            title={release.title}
+            artworkUrl={release.artworkUrl}
+            className='shadow-black/40'
+          />
+        </AlbumArtworkContextMenu>
+
+        {/* Release Info */}
+        <div className='mt-4 text-center'>
+          <h1 className='text-lg font-semibold leading-snug tracking-tight'>
+            {release.title}
+          </h1>
+          <SmartLinkArtistName
+            name={artist.name}
+            handle={artist.handle}
+            className='hover:text-foreground block text-sm transition-colors'
+          />
+          {formattedDate && (
+            <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
+              {formattedDate}
+            </p>
+          )}
+
+          {claimBanner && (
+            <SmartLinkClaimBanner
+              profileId={claimBanner.profileId}
+              username={claimBanner.username}
+            />
+          )}
+        </div>
       </div>
 
-      <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
-        {/* Content container — fills space between top padding and footer */}
-        <div className='flex min-h-0 w-full max-w-[17rem] flex-1 flex-col'>
-          {/* Artwork + Info — pinned at top, never scrolls */}
-          <div className='shrink-0'>
-            {/* Release Artwork */}
-            <AlbumArtworkContextMenu
-              title={release.title}
-              sizes={sizes}
-              allowDownloads={allowDownloads}
-            >
-              <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={`${release.title} artwork`}
-                    fill
-                    className='object-cover'
-                    sizes='272px'
-                    priority
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='text-muted-foreground h-16 w-16'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
-              </div>
-            </AlbumArtworkContextMenu>
+      {/* Streaming Platform Buttons — scrolls independently when overflowing */}
+      <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
+        <div className='space-y-2 py-1'>
+          {clickableProviders.map(provider => {
+            const logoConfig = DSP_LOGO_CONFIG[provider.key];
 
-            {/* Release Info */}
-            <div className='mt-4 text-center'>
-              <h1 className='text-lg font-semibold leading-snug tracking-tight'>
-                {release.title}
-              </h1>
-              {artist.handle ? (
-                <Link
-                  href={`/${artist.handle}`}
-                  className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-                >
-                  {artist.name}
-                </Link>
-              ) : (
-                <p className='text-muted-foreground mt-1 text-sm'>
-                  {artist.name}
-                </p>
-              )}
-              {formattedDate && (
-                <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
-                  {formattedDate}
-                </p>
-              )}
-
-              {claimBanner && (
-                <SmartLinkClaimBanner
-                  profileId={claimBanner.profileId}
-                  username={claimBanner.username}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Streaming Platform Buttons — scrolls independently when overflowing */}
-          <div className='mt-5 min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide'>
-            <div className='space-y-2 py-1'>
-              {clickableProviders.map(provider => {
-                const logoConfig = DSP_LOGO_CONFIG[provider.key];
-
-                return (
-                  <SmartLinkProviderButton
-                    key={provider.key}
-                    href={appendUTMParamsToUrl(provider.url, utmParams)}
-                    onClick={() => handleProviderClick(provider.key)}
-                    label={logoConfig?.name ?? provider.label}
-                    iconPath={logoConfig?.iconPath}
-                  />
-                );
-              })}
-            </div>
-
-            {/* "Use this sound" CTA for short-form video platforms */}
-            {soundsUrl && (
-              <div className='pt-1'>
-                <Link
-                  href={appendUTMParamsToUrl(soundsUrl, utmParams)}
-                  className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
-                >
-                  <Icon
-                    name='Sparkles'
-                    className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
-                    aria-hidden='true'
-                  />
-                  <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
-                    Use this sound
-                  </span>
-                </Link>
-              </div>
-            )}
-
-            {/* Empty state if no providers */}
-            {clickableProviders.length === 0 && (
-              <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
-                <Icon
-                  name='Music'
-                  className='text-muted-foreground mx-auto h-8 w-8'
-                  aria-hidden='true'
-                />
-                <p className='text-muted-foreground mt-2 text-sm'>
-                  No streaming links available yet.
-                </p>
-              </div>
-            )}
-          </div>
+            return (
+              <SmartLinkProviderButton
+                key={provider.key}
+                href={appendUTMParamsToUrl(provider.url, utmParams)}
+                onClick={() => handleProviderClick(provider.key)}
+                label={logoConfig?.name ?? provider.label}
+                iconPath={logoConfig?.iconPath}
+              />
+            );
+          })}
         </div>
 
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 pt-3 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
-          >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
-      </main>
-    </div>
+        {/* "Use this sound" CTA for short-form video platforms */}
+        {soundsUrl && (
+          <div className='pt-1'>
+            <Link
+              href={appendUTMParamsToUrl(soundsUrl, utmParams)}
+              className='group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-500/10 to-violet-500/10 px-4 py-3 ring-1 ring-inset ring-white/[0.08] backdrop-blur-sm transition-colors duration-100 hover:from-pink-500/20 hover:to-violet-500/20'
+            >
+              <Icon
+                name='Sparkles'
+                className='text-muted-foreground h-4 w-4 transition-colors group-hover:text-foreground/90'
+                aria-hidden='true'
+              />
+              <span className='text-foreground/85 group-hover:text-foreground text-sm font-semibold transition-colors'>
+                Use this sound
+              </span>
+            </Link>
+          </div>
+        )}
+
+        {/* Empty state if no providers */}
+        {clickableProviders.length === 0 && (
+          <div className='rounded-xl bg-surface-1/40 p-5 text-center ring-1 ring-inset ring-white/[0.08]'>
+            <Icon
+              name='Music'
+              className='text-muted-foreground mx-auto h-8 w-8'
+              aria-hidden='true'
+            />
+            <p className='text-muted-foreground mt-2 text-sm'>
+              No streaming links available yet.
+            </p>
+          </div>
+        )}
+      </div>
+    </SmartLinkPageFrame>
   );
 }

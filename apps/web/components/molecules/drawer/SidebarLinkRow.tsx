@@ -123,7 +123,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'bg-(--linear-bg-surface-2) text-(--linear-text-primary)'
+          'bg-surface-2 text-primary-token'
         )}
         aria-label={`Open ${label}`}
       >
@@ -157,8 +157,8 @@ export function SidebarLinkRow({
         className={cn(
           'group flex items-center justify-between rounded-[8px]',
           'px-4 py-3 lg:px-3 lg:py-2',
-          'active:bg-(--linear-bg-surface-1) lg:active:bg-(--linear-bg-surface-1) lg:hover:bg-(--linear-bg-surface-1)',
-          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+          'active:bg-surface-1 lg:active:bg-surface-1 lg:hover:bg-surface-1',
+          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
           className
         )}
@@ -169,11 +169,9 @@ export function SidebarLinkRow({
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-[13px] text-(--linear-text-secondary)'>
-            {label}
-          </span>
+          <span className='text-[13px] text-secondary-token'>{label}</span>
           {badge && (
-            <span className='shrink-0 text-[10px] text-(--linear-text-tertiary)'>
+            <span className='shrink-0 text-[10px] text-tertiary-token'>
               {badge}
             </span>
           )}
@@ -193,10 +191,10 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'rounded-[7px] border border-transparent p-1 text-(--linear-text-tertiary)',
-                  'hover:border-(--linear-border-subtle) hover:bg-(--linear-bg-surface-0) hover:text-(--linear-text-primary)',
+                  'rounded-[7px] border border-transparent p-1 text-tertiary-token',
+                  'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
-                  'focus-visible:border-(--linear-border-focus) focus-visible:bg-(--linear-bg-surface-0) focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                  'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 )}
                 aria-label={`Actions for ${label}`}
               >

@@ -21,7 +21,7 @@ function Section({
 }) {
   return (
     <div className='mb-10'>
-      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-(--linear-text-tertiary)'>
+      <h2 className='mb-4 text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
         {title}
       </h2>
       <div className='flex flex-wrap items-start gap-6'>{children}</div>
@@ -38,7 +38,7 @@ function Stack({
 }) {
   return (
     <div className='flex flex-col gap-2'>
-      <span className='text-[11px] text-(--linear-text-tertiary)'>{title}</span>
+      <span className='text-[11px] text-tertiary-token'>{title}</span>
       {children}
     </div>
   );
@@ -47,10 +47,8 @@ function Stack({
 export default function DialogsPage() {
   return (
     <div>
-      <h1 className='mb-1 text-lg font-semibold text-(--linear-text-primary)'>
-        Dialog
-      </h1>
-      <p className='mb-8 text-[13px] text-(--linear-text-tertiary)'>
+      <h1 className='mb-1 text-lg font-semibold text-primary-token'>Dialog</h1>
+      <p className='mb-8 text-[13px] text-tertiary-token'>
         Matches Linear.app — semi-transparent overlay, elevated surface, 8px
         radius, Linear typography
       </p>
@@ -161,7 +159,7 @@ export default function DialogsPage() {
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-title'
-                    className='text-[13px] font-[450] text-(--linear-text-primary)'
+                    className='text-[13px] font-[450] text-primary-token'
                   >
                     Title
                   </label>
@@ -169,13 +167,13 @@ export default function DialogsPage() {
                     id='issue-title'
                     type='text'
                     placeholder='Issue title'
-                    className='h-8 w-full rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
+                    className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
                 <div className='flex flex-col gap-1.5'>
                   <label
                     htmlFor='issue-description'
-                    className='text-[13px] font-[450] text-(--linear-text-primary)'
+                    className='text-[13px] font-[450] text-primary-token'
                   >
                     Description
                   </label>
@@ -183,7 +181,7 @@ export default function DialogsPage() {
                     id='issue-description'
                     placeholder='Add a description...'
                     rows={3}
-                    className='w-full resize-none rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 py-2 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
+                    className='w-full resize-none rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                   />
                 </div>
               </div>
@@ -211,7 +209,7 @@ export default function DialogsPage() {
                   type='text'
                   defaultValue='My Project'
                   aria-label='Project name'
-                  className='h-8 w-full rounded-(--linear-radius-md) border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] text-(--linear-text-primary) outline-none transition-colors focus:border-(--linear-border-focus)'
+                  className='h-8 w-full rounded-(--linear-radius-md) border border-subtle bg-surface-1 px-3 text-[13px] text-primary-token outline-none transition-colors focus:border-(--linear-border-focus)'
                 />
               </div>
               <DialogFooter>

@@ -2,7 +2,7 @@ import type {
   ProfileNotificationsHydrationStatus,
   ProfileNotificationsState,
 } from '@/components/organisms/hooks/useProfileNotificationsController';
-import type { ProfileMode } from '@/components/profile/contracts';
+import type { ProfileMode } from '@/features/profile/contracts';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -48,6 +48,7 @@ export interface ProfileShellProps {
   readonly isTourModeActive?: boolean;
   readonly showFooter?: boolean;
   readonly showNotificationButton?: boolean;
+  readonly showShopButton?: boolean;
   readonly maxWidthClass?: string;
   readonly backgroundPattern?: 'grid' | 'dots' | 'gradient' | 'none';
   readonly showGradientBlurs?: boolean;

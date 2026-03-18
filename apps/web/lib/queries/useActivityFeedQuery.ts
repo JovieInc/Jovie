@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type {
   Activity,
   ActivityRange,
-} from '@/components/dashboard/organisms/dashboard-activity-feed/types';
+} from '@/features/dashboard/organisms/dashboard-activity-feed/types';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -31,8 +31,8 @@ async function fetchActivityFeed(
   signal?: AbortSignal
 ): Promise<Activity[]> {
   const params = new URLSearchParams({
-    profileId: encodeURIComponent(profileId),
-    range: encodeURIComponent(range),
+    profileId,
+    range,
   });
 
   const response = await fetchWithTimeout<ActivityFeedResponse>(

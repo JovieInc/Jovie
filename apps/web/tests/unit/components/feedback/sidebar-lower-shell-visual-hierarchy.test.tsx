@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { SidebarInstallBanner } from '@/components/feedback/SidebarInstallBanner';
-import { SidebarUpgradeBanner } from '@/components/feedback/SidebarUpgradeBanner';
+import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
+import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 
 vi.mock('@/lib/env-client', () => ({
   env: {
@@ -33,11 +33,17 @@ vi.mock('@/hooks/usePWAInstall', () => ({
   }),
 }));
 
-vi.mock('@/lib/feature-flags/shared', () => ({
-  FEATURE_FLAGS: {
-    PWA_INSTALL_BANNER: true,
-  },
-}));
+vi.mock('@/lib/feature-flags/shared', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/feature-flags/shared')>();
+  return {
+    ...actual,
+    FEATURE_FLAGS: {
+      ...actual.FEATURE_FLAGS,
+      PWA_INSTALL_BANNER: true,
+    },
+  };
+});
 
 vi.mock('@/lib/hooks/useVersionMonitor', () => ({
   useVersionMonitor: vi.fn(),

@@ -146,6 +146,19 @@ export async function annotateClaimedStatus(
 }
 
 /**
+ * Boost claimed artists to the top of search results.
+ * Preserves relative order within claimed and unclaimed groups.
+ */
+export function boostClaimedArtists(
+  results: SpotifyArtistResult[]
+): SpotifyArtistResult[] {
+  if (results.length <= 1) return results;
+  const claimed = results.filter(r => r.isClaimed);
+  const unclaimed = results.filter(r => !r.isClaimed);
+  return [...claimed, ...unclaimed];
+}
+
+/**
  * Parse and clamp the limit parameter.
  */
 export function parseLimit(

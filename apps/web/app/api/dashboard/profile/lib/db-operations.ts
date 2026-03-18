@@ -39,14 +39,34 @@ export async function updateProfileRecords({
   }
 
   const [existingProfile] = await db
-    .select({ usernameNormalized: creatorProfiles.usernameNormalized })
+    .select({
+      usernameNormalized: creatorProfiles.usernameNormalized,
+      settings: creatorProfiles.settings,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, user.id))
     .limit(1);
 
+  const incomingSettings = dbProfileUpdates.settings;
+  const mergedSettings =
+    incomingSettings &&
+    typeof incomingSettings === 'object' &&
+    !Array.isArray(incomingSettings)
+      ? {
+          ...((existingProfile?.settings as Record<string, unknown> | null) ??
+            {}),
+          ...(incomingSettings as Record<string, unknown>),
+        }
+      : undefined;
+
+  const finalProfileUpdates =
+    mergedSettings !== undefined
+      ? { ...dbProfileUpdates, settings: mergedSettings }
+      : dbProfileUpdates;
+
   const [updatedProfile] = await db
     .update(creatorProfiles)
-    .set({ ...dbProfileUpdates, updatedAt: new Date() })
+    .set({ ...finalProfileUpdates, updatedAt: new Date() })
     .where(eq(creatorProfiles.userId, user.id))
     .returning();
 

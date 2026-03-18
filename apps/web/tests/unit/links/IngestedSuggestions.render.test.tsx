@@ -4,7 +4,7 @@
 
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { IngestedSuggestions } from '@/components/dashboard/organisms/links/IngestedSuggestions';
+import { IngestedSuggestions } from '@/features/dashboard/organisms/links/IngestedSuggestions';
 import {
   createMockCallbacks,
   createMockSuggestion,

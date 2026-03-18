@@ -34,7 +34,9 @@ import {
   succeedJob,
 } from '@/lib/ingestion/processor';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { runAutoApprove } from '@/lib/leads/auto-approve';
 import { resetBudgetIfNeeded, runDiscovery } from '@/lib/leads/discovery';
+import { pipelineWarn } from '@/lib/leads/pipeline-logger';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
@@ -118,7 +120,7 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // 5. Lead discovery — every invocation (15 min)
+  // 5. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
     // Fetch settings (upsert default if missing)
     let [settings] = await db
@@ -144,6 +146,22 @@ export async function GET(request: Request) {
     const keywords = await db.select().from(discoveryKeywords);
     const discoveryResult = await runDiscovery(settings, keywords);
 
+    // Health warning: zero results across all queries
+    if (
+      discoveryResult.queriesUsed > 0 &&
+      discoveryResult.newLeadsFound === 0 &&
+      discoveryResult.candidatesProcessed === 0
+    ) {
+      pipelineWarn(
+        'discovery',
+        'Zero results across all queries — check SerpAPI key and quota',
+        {
+          queriesUsed: discoveryResult.queriesUsed,
+          budgetRemaining: discoveryResult.budgetRemaining,
+        }
+      );
+    }
+
     // Qualify any newly discovered leads
     let qualificationResult = null;
     if (discoveryResult.newLeadsFound > 0) {
@@ -154,12 +172,28 @@ export async function GET(request: Request) {
         .limit(30);
       if (newLeads.length > 0) {
         qualificationResult = await processLeadBatch(newLeads.map(l => l.id));
+
+        // Health warning: high qualification error rate
+        if (
+          qualificationResult.total > 0 &&
+          qualificationResult.error > qualificationResult.total * 0.5
+        ) {
+          pipelineWarn('qualify', 'High error rate in qualification batch', {
+            errorRate: qualificationResult.error / qualificationResult.total,
+            errors: qualificationResult.error,
+            total: qualificationResult.total,
+          });
+        }
       }
     }
+
+    // Auto-approve qualified leads if enabled
+    const autoApproveResult = await runAutoApprove(settings);
 
     return {
       discovery: discoveryResult,
       qualification: qualificationResult,
+      autoApprove: autoApproveResult,
     } as unknown as Record<string, unknown>;
   });
 

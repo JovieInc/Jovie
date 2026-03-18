@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
-
-import { AdminFeedbackTable } from '@/components/admin/feedback-table/AdminFeedbackTable';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { AdminFeedbackTable } from '@/features/admin/feedback-table/AdminFeedbackTable';
 import { getAdminFeedbackItems, getFeedbackCounts } from '@/lib/feedback';
 
 export const metadata: Metadata = {

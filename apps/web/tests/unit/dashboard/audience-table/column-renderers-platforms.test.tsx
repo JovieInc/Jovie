@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { renderPlatformsCell } from '@/components/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
+import { renderPlatformsCell } from '@/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers';
 import type { AudienceMember } from '@/types';
 
 function createMember(): AudienceMember {

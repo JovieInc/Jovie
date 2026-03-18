@@ -43,7 +43,7 @@ export function DrawerSettingsToggle({
       className={cn(
         'flex items-center justify-between gap-3 rounded-[7px] py-0.5 transition-[background-color,box-shadow] duration-150',
         !disabled &&
-          'hover:bg-(--linear-bg-surface-1) focus-within:bg-(--linear-bg-surface-1) focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+          'hover:bg-surface-1 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
         density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
         density === 'compact' ? 'px-1.5' : 'px-2',
         disabled && 'opacity-60',
@@ -53,7 +53,7 @@ export function DrawerSettingsToggle({
       <label
         htmlFor={id}
         className={cn(
-          'select-none text-(--linear-text-secondary)',
+          'select-none text-secondary-token',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
           density === 'compact' ? 'text-[11px]' : 'text-[12px]'
         )}

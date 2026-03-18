@@ -1,24 +1,28 @@
 import type { Metadata } from 'next';
-import { AudienceCRMSection } from '@/components/home/AudienceCRMSection';
-import { AuthRedirectHandler } from '@/components/home/AuthRedirectHandler';
-import { DeeplinksGrid } from '@/components/home/DeeplinksGrid';
-import { FinalCTASection } from '@/components/home/FinalCTASection';
-import { FloatingClaimBar } from '@/components/home/FloatingClaimBar';
-import { LogoBar } from '@/components/home/LogoBar';
-import { PricingSection } from '@/components/home/PricingSection';
-import { RedesignedHero } from '@/components/home/RedesignedHero';
-import { ReleasesSection } from '@/components/home/ReleasesSection';
-import { SeeItInAction } from '@/components/home/SeeItInAction';
+import { Suspense } from 'react';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { FinalCTASection } from '@/features/home/FinalCTASection';
+import { HeroScrollSection } from '@/features/home/HeroScrollSection';
+import { LogoBar } from '@/features/home/LogoBar';
+import { PricingSection } from '@/features/home/PricingSection';
+import { ReleasesSection } from '@/features/home/ReleasesSection';
+import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
+import {
+  buildOrganizationSchema,
+  buildSoftwareSchema,
+  buildWebsiteSchema,
+} from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Turn profile visits into fans you can reach`;
+  const title = `${APP_NAME} | Your Entire Music Career. One Intelligent Link.`;
   const description =
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.';
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -84,7 +88,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - The link in bio that converts`,
+          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           type: 'image/png',
         },
       ],
@@ -96,7 +100,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - The link in bio that converts`,
+          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           width: 1200,
           height: 630,
         },
@@ -129,91 +133,22 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Helper to safely serialize JSON-LD with XSS protection
-const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
-
 // Pre-serialized JSON-LD structured data for static generation
-const WEBSITE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'WebSite',
-  name: APP_NAME,
+const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
-  url: APP_URL,
-  inLanguage: 'en-US',
-  potentialAction: {
-    '@type': 'SearchAction',
-    target: {
-      '@type': 'EntryPoint',
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
-  publisher: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-    logo: {
-      '@type': 'ImageObject',
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-      width: 512,
-      height: 512,
-    },
-  },
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
 });
 
-const SOFTWARE_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'SoftwareApplication',
-  name: APP_NAME,
-  description:
-    'A conversion-first profile platform for artists to grow their audience and drive clear next actions.',
-  url: APP_URL,
-  applicationCategory: 'BusinessApplication',
-  operatingSystem: 'Web',
-  offers: {
-    '@type': 'Offer',
-    price: '0',
-    priceCurrency: 'USD',
-    description: 'Free to start',
-  },
-  aggregateRating: {
-    '@type': 'AggregateRating',
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
-  author: {
-    '@type': 'Organization',
-    name: APP_NAME,
-    url: APP_URL,
-  },
-});
+const SOFTWARE_SCHEMA = buildSoftwareSchema(
+  'Your entire music career in one intelligent link — smart links, link-in-bio, fan notifications, and audience growth for artists.'
+);
 
-const ORGANIZATION_SCHEMA = jsonLd({
-  '@context': 'https://schema.org',
-  '@type': 'Organization',
-  name: APP_NAME,
+const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
-  url: APP_URL,
-  logo: {
-    '@type': 'ImageObject',
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-    width: 512,
-    height: 512,
-  },
-  image: `${APP_URL}/og/default.png`,
   description:
-    'Jovie gives artists one smart profile that grows their audience automatically, routes each visitor to the right next step, and keeps release growth working.',
+    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
-  contactPoint: {
-    '@type': 'ContactPoint',
-    contactType: 'customer support',
-    url: `${APP_URL}/support`,
-  },
 });
 
 export default function HomePage() {
@@ -233,15 +168,12 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* Hero + logo bar fill the viewport together (minus fixed header) */}
-      <div className='flex flex-col'>
-        <RedesignedHero />
-        <LogoBar />
-      </div>
+      {/* Hero with scroll-hijacking phone animation into mode carousel */}
+      <HeroScrollSection />
+
+      <LogoBar />
 
       <AudienceCRMSection />
-
-      <DeeplinksGrid />
 
       {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
         <hr
@@ -269,19 +201,11 @@ export default function HomePage() {
 
       <PricingSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
-      <SeeItInAction />
+      <Suspense fallback={null}>
+        <SeeItInActionSafe />
+      </Suspense>
 
       <FinalCTASection />
-
-      <FloatingClaimBar />
     </div>
   );
 }

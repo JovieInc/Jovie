@@ -85,11 +85,48 @@ const PLATFORM_CONFIGS: Record<string, PlatformHandleConfig> = {
     hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com'],
     requiresAtSymbol: true,
   },
+  x: {
+    hosts: ['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com'],
+    requiresAtSymbol: false,
+  },
   linktree: {
     hosts: ['linktr.ee', 'www.linktr.ee'],
     requiresAtSymbol: false,
   },
+  threads: {
+    hosts: ['threads.net', 'www.threads.net'],
+    requiresAtSymbol: false,
+  },
+  facebook: {
+    hosts: ['facebook.com', 'www.facebook.com', 'm.facebook.com'],
+    requiresAtSymbol: false,
+  },
+  twitch: {
+    hosts: ['twitch.tv', 'www.twitch.tv'],
+    requiresAtSymbol: false,
+  },
+  snapchat: {
+    hosts: ['snapchat.com', 'www.snapchat.com'],
+    requiresAtSymbol: false,
+  },
 };
+
+/**
+ * Resolve the first meaningful path segment for a given host,
+ * skipping known non-handle prefixes like snapchat.com/add.
+ * Returns null when the URL cannot yield a handle.
+ */
+function resolveHandleSegment(host: string, segments: string[]): string | null {
+  const first = segments[0];
+  if (host.includes('snapchat.com') && first === 'add')
+    return segments[1] ?? null;
+  if (
+    host.includes('facebook.com') &&
+    (first === 'profile.php' || first === 'pages')
+  )
+    return null;
+  return first ?? null;
+}
 
 /**
  * Extract username/handle from a social media URL.
@@ -121,18 +158,19 @@ export function extractHandleFromUrl(urlRaw: string): string | null {
 
     // Find matching platform configuration
     for (const config of Object.values(PLATFORM_CONFIGS)) {
-      if (config.hosts.includes(host)) {
-        const seg = url.pathname.split('/').find(Boolean);
-        if (!seg) return null;
+      if (!config.hosts.includes(host)) continue;
 
-        // YouTube requires @ symbol, others allow it optionally
-        if (config.requiresAtSymbol) {
-          return seg.startsWith('@') ? seg.slice(1) : null;
-        }
+      const segments = url.pathname.split('/').filter(Boolean);
+      const seg = resolveHandleSegment(host, segments);
+      if (!seg) return null;
 
-        // Strip @ symbol if present
-        return seg.replace(/^@/, '');
+      // YouTube requires @ symbol, others allow it optionally
+      if (config.requiresAtSymbol) {
+        return seg.startsWith('@') ? seg.slice(1) : null;
       }
+
+      // Strip @ symbol if present
+      return seg.replace(/^@/, '');
     }
 
     // Unsupported platform or unable to extract

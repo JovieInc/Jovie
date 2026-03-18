@@ -25,6 +25,7 @@ import { uploadAvatarToBlob } from './useAvatarUploadMutation';
  */
 export interface ProfileSettingsUpdate {
   hide_branding?: boolean;
+  hometown?: string | null;
 }
 
 /**
@@ -37,6 +38,8 @@ export interface ProfileUpdateInput {
     username?: string;
     avatarUrl?: string;
     bio?: string;
+    location?: string | null;
+    hometown?: string | null;
     // Music links (camelCase to match API validation schema)
     spotifyUrl?: string | null;
     appleMusicUrl?: string | null;
@@ -54,6 +57,8 @@ export interface ProfileData {
   username: string | null;
   displayName: string | null;
   avatarUrl: string | null;
+  location?: string | null;
+  settings?: Record<string, unknown> | null;
   creatorType: string | null;
   isPublic: boolean;
 }

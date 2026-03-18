@@ -15,7 +15,7 @@ export interface AudienceRowSelectionCellProps {
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'rounded-[3px] border border-(--linear-border-subtle) bg-(--linear-bg-surface-0) text-(--linear-accent) transition-all duration-100 ease-out data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white data-[state=indeterminate]:border-(--linear-accent) data-[state=indeterminate]:bg-(--linear-accent) data-[state=indeterminate]:text-white focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+  'rounded-[3px] border border-subtle bg-surface-0 text-(--linear-accent) transition-all duration-100 ease-out data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white data-[state=indeterminate]:border-(--linear-accent) data-[state=indeterminate]:bg-(--linear-accent) data-[state=indeterminate]:text-white focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
 );
 
 export function AudienceRowSelectionCell({
@@ -40,7 +40,7 @@ export function AudienceRowSelectionCell({
       >
         <span
           className={cn(
-            'select-none text-[13px] tabular-nums text-(--linear-text-tertiary) transition-opacity',
+            'select-none text-[13px] tabular-nums text-tertiary-token transition-opacity',
             isChecked ? 'opacity-0' : 'opacity-100 group-hover:opacity-0'
           )}
           aria-hidden='true'

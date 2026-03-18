@@ -5,11 +5,8 @@ import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
-import { ingestLeadAsCreator } from '@/lib/leads/ingest-lead';
-import { pushLeadToInstantly } from '@/lib/leads/instantly';
+import { approveLead } from '@/lib/leads/approve-lead';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
-import { routeLead } from '@/lib/leads/route-lead';
-import { spotifyEnrichLead } from '@/lib/leads/spotify-enrich-lead';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -52,57 +49,58 @@ export async function PATCH(
       );
     }
 
-    const now = new Date();
-    const timestampField =
-      validated.data.status === 'approved' ? 'approvedAt' : 'rejectedAt';
+    // For rejection, just update status directly
+    if (validated.data.status === 'rejected') {
+      const now = new Date();
+      const [updated] = await db
+        .update(leads)
+        .set({
+          status: 'rejected',
+          rejectedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(leads.id, id))
+        .returning();
 
-    const [updated] = await db
-      .update(leads)
-      .set({
-        status: validated.data.status,
-        [timestampField]: now,
-        updatedAt: now,
-      })
+      if (!updated) {
+        return NextResponse.json(
+          { error: 'Lead not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      pipelineLog('reject', 'Lead rejected', { leadId: id });
+      return NextResponse.json(updated, {
+        status: 200,
+        headers: NO_STORE_HEADERS,
+      });
+    }
+
+    // For approval, use the shared approval pipeline
+    const [lead] = await db
+      .select()
+      .from(leads)
       .where(eq(leads.id, id))
-      .returning();
+      .limit(1);
 
-    if (!updated) {
+    if (!lead) {
       return NextResponse.json(
         { error: 'Lead not found' },
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
 
-    pipelineLog('approve', `Lead ${validated.data.status}`, { leadId: id });
+    const result = await approveLead(lead);
 
-    // Auto-ingest on approval: create a creator profile from the Linktree data
-    let ingestion = null;
-    if (validated.data.status === 'approved' && updated.linktreeUrl) {
-      try {
-        ingestion = await ingestLeadAsCreator(updated);
-      } catch (ingestError) {
-        await captureError('Lead auto-ingest failed', ingestError, {
-          route: '/api/admin/leads/[id]',
-          contextData: { leadId: id },
-        });
-        ingestion = {
-          success: false,
-          error:
-            ingestError instanceof Error
-              ? ingestError.message
-              : 'Ingestion failed',
-        };
-      }
-    }
-
-    // Outreach routing on approval
-    const routing =
-      validated.data.status === 'approved'
-        ? await handleApprovedLeadRouting(id)
-        : null;
+    // Re-fetch the updated lead to return current state
+    const [updated] = await db
+      .select()
+      .from(leads)
+      .where(eq(leads.id, id))
+      .limit(1);
 
     return NextResponse.json(
-      { ...updated, ingestion, routing },
+      { ...updated, ingestion: result.ingestion, routing: result.routing },
       {
         status: 200,
         headers: NO_STORE_HEADERS,
@@ -118,86 +116,6 @@ export async function PATCH(
       { error: getSafeErrorMessage(error, 'Failed to update lead') },
       { status: 500, headers: NO_STORE_HEADERS }
     );
-  }
-}
-
-async function handleApprovedLeadRouting(id: string): Promise<object | null> {
-  try {
-    pipelineLog('approve', 'Starting Spotify enrichment', { leadId: id });
-    await spotifyEnrichLead(id);
-
-    pipelineLog('approve', 'Starting lead routing', { leadId: id });
-    const routeResult = await routeLead(id);
-    let routing: object = { route: routeResult.route };
-    pipelineLog('approve', 'Lead routed', {
-      leadId: id,
-      route: routeResult.route,
-    });
-
-    const [routedLead] = await db
-      .select()
-      .from(leads)
-      .where(eq(leads.id, id))
-      .limit(1);
-
-    pipelineLog('approve', 'Checking Instantly eligibility', {
-      leadId: id,
-      route: routeResult.route,
-      hasEmail: !!routedLead?.contactEmail,
-      emailInvalid: routedLead?.emailInvalid,
-    });
-
-    if (
-      routedLead?.contactEmail &&
-      !routedLead.emailInvalid &&
-      (routeResult.route === 'email' || routeResult.route === 'both')
-    ) {
-      try {
-        const instantlyLeadId = await pushLeadToInstantly({
-          email: routedLead.contactEmail,
-          firstName: routedLead.displayName ?? routedLead.linktreeHandle,
-          claimLink: routeResult.claimUrl,
-          artistName: routedLead.displayName ?? routedLead.linktreeHandle,
-          priorityScore: routedLead.priorityScore ?? 0,
-        });
-
-        const queuedNow = new Date();
-        await db
-          .update(leads)
-          .set({
-            instantlyLeadId,
-            outreachStatus: 'queued',
-            outreachQueuedAt: queuedNow,
-            updatedAt: queuedNow,
-          })
-          .where(eq(leads.id, id));
-
-        routing = { ...routing, instantlyLeadId, outreachStatus: 'queued' };
-      } catch (instantlyError) {
-        await captureError('Instantly push failed', instantlyError, {
-          route: '/api/admin/leads/[id]',
-          contextData: { leadId: id },
-        });
-        routing = {
-          ...routing,
-          instantlyError:
-            instantlyError instanceof Error
-              ? instantlyError.message
-              : 'Instantly push failed',
-        };
-      }
-    }
-
-    return routing;
-  } catch (routingError) {
-    await captureError('Lead routing failed', routingError, {
-      route: '/api/admin/leads/[id]',
-      contextData: { leadId: id },
-    });
-    return {
-      error:
-        routingError instanceof Error ? routingError.message : 'Routing failed',
-    };
   }
 }
 
