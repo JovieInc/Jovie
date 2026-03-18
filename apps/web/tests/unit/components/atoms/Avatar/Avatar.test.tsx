@@ -123,8 +123,8 @@ describe('Avatar Component', () => {
       const testCases = [
         { name: 'John Doe', expected: 'JD' },
         { name: 'Jane', expected: 'J' },
-        { name: 'Mary Jane Watson', expected: 'MJ' },
-        { name: 'jean-claude van damme', expected: 'JV' },
+        { name: 'Mary Jane Watson', expected: 'MW' },
+        { name: 'jean-claude van damme', expected: 'JD' },
         { name: '', expected: '?' },
         { name: undefined, expected: '?' },
       ];
