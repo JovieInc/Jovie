@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return {
     title: `Get notifications from ${username}`,
-    description: `Subscribe to receive updates whenever ${username} releases new content.`,
+    description: `Get notified whenever ${username} releases new music or goes on tour.`,
     alternates: {
       canonical: `${BASE_URL}/${username.toLowerCase()}/notifications`,
     },

@@ -133,7 +133,7 @@ export function EngagementEngineLanding() {
               <div className='mt-8 grid grid-cols-1 gap-4'>
                 <div className='rounded-2xl border border-subtle bg-surface-1 p-6'>
                   <h3 className='text-sm font-semibold text-primary-token'>
-                    Capture intent
+                    Collect intent
                   </h3>
                   <p className='mt-2 text-sm text-secondary-token leading-relaxed'>
                     Collect email first. Add SMS when you’re ready. Keep your
