@@ -376,7 +376,9 @@ module.exports = withVercelToolbar(nextConfig);
 const { withSentryConfig } = require('@sentry/nextjs');
 
 const shouldUseSentryPlugin =
-  process.env.NODE_ENV === 'production' || process.env.CI === 'true';
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  !!process.env.VERCEL_ENV;
 
 module.exports = shouldUseSentryPlugin
   ? withSentryConfig(module.exports, {
