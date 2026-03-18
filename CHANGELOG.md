@@ -7,8 +7,21 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.5] - 2026-03-18
 
+### Fixed
+
+- Dashboard analytics CTE now has RLS session variable set on the db connection (defense-in-depth for audience_members and notification_subscriptions queries)
+- Billing reconciliation audit log insert failure no longer silently swallows errors — failures are captured via captureCriticalError
+
+### Added
+
+- Test for billing reconciliation audit log insert failure path
+
 ### Changed
 
+- Removed 5 app-level legacy DB transactions in favor of getSessionContext() and direct queries
+- Tour date analytics route uses getSessionContext() instead of transaction-scoped RLS setup
+- getUserAnalytics and getUserDashboardAnalytics no longer wrap queries in transactions
+- Billing reconciliation repair functions use sequential writes with error handling instead of transactions
 - Migrate LeadTable from manual `<table>` with page-based pagination to UnifiedTable with infinite scroll, matching all other admin tables
 - Migrate EarningsTab tipper table from manual `<table>` to UnifiedTable with column definitions and empty state
 - Extract ~50 `shadow-[...]` bracket notations into 10 named shadow design tokens (`shadow-subtle-bottom`, `shadow-inset-divider`, `shadow-inset-ring-focus`, `shadow-popover`, etc.)

@@ -1,12 +1,9 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import { getSessionSetupSql, requireAuth } from '@/lib/auth/session';
+import { getSessionContext, requireAuth } from '@/lib/auth/session';
 import { db } from '@/lib/db';
-import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { getTourDateAnalytics } from '@/lib/db/queries/analytics';
-import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -29,19 +26,14 @@ export async function GET(
       );
     }
 
-    // Get the creator profile for this user (RLS-safe)
-    const creatorProfile = await runLegacyDbTransaction(async tx => {
-      await tx.execute(getSessionSetupSql(userId));
-      const result = await tx
-        .select({ id: creatorProfiles.id })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.clerkId, userId))
-        .limit(1);
-      return result[0];
+    // Get the creator profile for this user
+    const { profile } = await getSessionContext({
+      clerkUserId: userId,
+      requireUser: true,
+      requireProfile: false,
     });
 
-    if (!creatorProfile) {
+    if (!profile) {
       return NextResponse.json(
         { error: 'Creator profile not found' },
         { status: 404, headers: NO_STORE_HEADERS }
@@ -53,10 +45,7 @@ export async function GET(
       .select({ id: tourDates.id })
       .from(tourDates)
       .where(
-        and(
-          eq(tourDates.id, tourDateId),
-          eq(tourDates.profileId, creatorProfile.id)
-        )
+        and(eq(tourDates.id, tourDateId), eq(tourDates.profileId, profile.id))
       )
       .limit(1);
 
@@ -67,7 +56,7 @@ export async function GET(
       );
     }
 
-    const analytics = await getTourDateAnalytics(tourDateId, creatorProfile.id);
+    const analytics = await getTourDateAnalytics(tourDateId, profile.id);
 
     return NextResponse.json(analytics, {
       status: 200,

@@ -50,9 +50,6 @@ function isView(value: string): value is DashboardAnalyticsView {
 
 export async function GET(request: Request) {
   try {
-    // Authenticate the user. RLS session setup is handled inside
-    // getUserDashboardAnalytics via a transaction, so we only need the
-    // Clerk user ID here — no separate withDbSession call required.
     const userId = await requireAuth();
 
     // Parse query parameters
