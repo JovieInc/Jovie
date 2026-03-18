@@ -1,8 +1,7 @@
 import { sql as drizzleSql, eq } from 'drizzle-orm';
-import { getSessionSetupSql } from '@/lib/auth/session';
+import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
-import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { apiQuery, dashboardQuery } from '@/lib/db/query-timeout';
 import {
   audienceMembers,
@@ -10,7 +9,6 @@ import {
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
-import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import type {
@@ -235,38 +233,28 @@ export async function getUserAnalytics(
   clerkUserId: string,
   range: AnalyticsRange = '30d'
 ) {
-  // Run inside a transaction to ensure the RLS session variable is set on the
-  // same connection that queries the users table (which has RLS enabled).
-  return runLegacyDbTransaction(async tx => {
-    await tx.execute(getSessionSetupSql(clerkUserId));
-
-    // Single JOIN query to get user and profile in one round-trip
-    const result = await tx
-      .select({
-        creatorProfileId: creatorProfiles.id,
-        profileViews: creatorProfiles.profileViews,
-      })
-      .from(users)
-      .innerJoin(creatorProfiles, eq(users.id, creatorProfiles.userId))
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    const row = result[0];
-    if (!row) {
-      throw new TypeError('User or creator profile not found for Clerk ID');
-    }
-
-    // getAnalyticsData only touches click_events (no RLS) and uses the global
-    // db connection, so it doesn't need to run inside this transaction.
-    const analytics = await getAnalyticsData(row.creatorProfileId, range);
-
-    return {
-      ...analytics,
-      // Profile page visits increment creator_profiles.profile_views.
-      // The click_events table tracks link clicks; it is not a reliable proxy for views.
-      profileViewsInRange: row.profileViews ?? 0,
-    };
+  const { profile } = await getSessionContext({
+    clerkUserId,
+    requireUser: true,
+    requireProfile: true,
   });
+
+  // profileViews is not part of the standard ProfileContext shape,
+  // so fetch it directly.
+  const [profileRow] = await db
+    .select({ profileViews: creatorProfiles.profileViews })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profile!.id))
+    .limit(1);
+
+  const analytics = await getAnalyticsData(profile!.id, range);
+
+  return {
+    ...analytics,
+    // Profile page visits increment creator_profiles.profile_views.
+    // The click_events table tracks link clicks; it is not a reliable proxy for views.
+    profileViewsInRange: profileRow?.profileViews ?? 0,
+  };
 }
 
 function toStartDate(range: AnalyticsRange): Date {
@@ -301,44 +289,20 @@ export async function getUserDashboardAnalytics(
   range: AnalyticsRange,
   view: DashboardAnalyticsView
 ): Promise<DashboardAnalyticsResponse> {
-  // Run all queries inside a single transaction so that:
-  // 1. The RLS session variable (app.clerk_user_id) is set on the SAME connection
-  //    that executes the analytics query. Without a transaction, the connection pool
-  //    may dispatch set_config and the subsequent SELECT to different connections,
-  //    causing RLS-protected tables (audience_members, notification_subscriptions,
-  //    users) to return 0 rows — the root cause of JOV-1349.
-  // 2. All CTEs see a consistent snapshot of the data.
-  return runLegacyDbTransaction(async tx => {
-    // Set the RLS session variable on this transaction's connection
-    await tx.execute(getSessionSetupSql(clerkUserId));
+  const { profile } = await getSessionContext({
+    clerkUserId,
+    requireUser: true,
+    requireProfile: true,
+  });
 
-    const [userRow, creatorProfile] = await Promise.all([
-      tx
-        .select({ id: users.id, isPro: users.isPro })
-        .from(users)
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1)
-        .then(results => results[0]),
-      tx
-        .select({
-          id: creatorProfiles.id,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1)
-        .then(results => results[0]),
-    ]);
+  // Defense-in-depth: set RLS session variable on the db connection
+  // so the analytics CTE can query RLS-protected tables
+  // (audience_members, notification_subscriptions) correctly.
+  await setupDbSession(clerkUserId);
 
-    const appUserId = userRow?.id;
-    if (!appUserId) {
-      throw new TypeError('User not found for Clerk ID');
-    }
+  const creatorProfile = { id: profile!.id };
 
-    if (!creatorProfile) {
-      throw new TypeError('Creator profile not found');
-    }
-
+  {
     const startDate = toStartDate(range);
     const recentThreshold = new Date();
     recentThreshold.setDate(recentThreshold.getDate() - 7);
@@ -543,7 +507,7 @@ export async function getUserDashboardAnalytics(
       identified_users: Number(aggregates?.identified_users ?? 0),
       capture_rate: captureRate,
     };
-  });
+  }
 }
 
 // ─── Tour Date Analytics ─────────────────────────────────────────────
