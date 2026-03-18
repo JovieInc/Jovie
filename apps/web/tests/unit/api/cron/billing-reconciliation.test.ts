@@ -9,8 +9,6 @@ const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
 const mockStripeList = vi.hoisted(() => vi.fn());
 
-const mockDbTransaction = vi.hoisted(() => vi.fn());
-
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
@@ -20,7 +18,6 @@ vi.mock('@/lib/db', () => ({
     insert: vi.fn(() => ({
       values: mockDbInsertValues,
     })),
-    transaction: mockDbTransaction,
   },
 }));
 
@@ -71,20 +68,6 @@ describe('GET /api/cron/billing-reconciliation', () => {
     mockDbUpdateSet.mockReturnValue({ where: mockDbUpdateWhere });
     mockDbInsertValues.mockResolvedValue(undefined);
     mockStripeList.mockResolvedValue({ data: [], has_more: false });
-    // Mock transaction to invoke callback with a tx that has update/insert
-    mockDbTransaction.mockImplementation(
-      async (callback: (tx: unknown) => Promise<unknown>) => {
-        const mockTx = {
-          update: vi.fn(() => ({
-            set: mockDbUpdateSet,
-          })),
-          insert: vi.fn(() => ({
-            values: mockDbInsertValues,
-          })),
-        };
-        return callback(mockTx);
-      }
-    );
   });
 
   afterEach(() => {
@@ -297,6 +280,80 @@ describe('GET /api/cron/billing-reconciliation', () => {
       expect.objectContaining({
         stripeSubscriptionId: 'sub_active',
       })
+    );
+  });
+
+  it('continues reconciliation when audit log insert fails', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    // Audit log insert fails
+    mockDbInsertValues.mockRejectedValue(new Error('Audit insert failed'));
+
+    mockStripeList.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'sub_active',
+          customer: 'cus_123',
+          status: 'active',
+        },
+      ],
+      has_more: false,
+    });
+
+    mockDbSelect
+      // users with subscription ids
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            orderBy: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+      })
+      // pro users without subscription ids
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'user_1',
+                clerkId: 'clerk_1',
+                isPro: true,
+                stripeCustomerId: 'cus_123',
+              },
+            ]),
+          }),
+        }),
+      })
+      // stale customers
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+        }),
+      });
+
+    const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const request = new Request(
+      'http://localhost/api/cron/billing-reconciliation',
+      {
+        headers: { Authorization: 'Bearer test-secret' },
+      }
+    );
+
+    const response = await GET(request);
+    const data = await response.json();
+
+    // User update should still succeed
+    expect(response.status).toBe(200);
+    expect(data.stats.fixed).toBe(1);
+    // Audit failure should be captured as critical error
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'Billing audit log insert failed after user update',
+      expect.any(Error),
+      expect.objectContaining({ userId: 'user_1' })
     );
   });
 

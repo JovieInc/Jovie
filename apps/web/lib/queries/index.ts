@@ -43,12 +43,14 @@
 export {
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
+  type AdminLeadsSortBy,
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
   useAdminCreatorsInfiniteQuery,
   useAdminUsersInfiniteQuery,
   useAdminWaitlistInfiniteQuery,
+  useLeadsInfiniteQuery,
   type WaitlistEntryRow,
 } from './admin-infinite';
 // Audience infinite query
@@ -101,7 +103,6 @@ export { useDismissFeedbackMutation } from './useAdminFeedbackMutation';
 export {
   type AdminLead,
   type AdminLeadKeyword,
-  type AdminLeadListResponse,
   type DiscoveryKeywordDiagnostic,
   type DiscoveryResultResponse,
   type LeadPipelineSettings,
@@ -109,7 +110,6 @@ export {
   useDeleteLeadKeywordMutation,
   useLeadKeywordsQuery,
   useLeadPipelineSettingsQuery,
-  useLeadsListQuery,
   useMarkLeadDmSentMutation,
   useQueueLeadUrlsMutation,
   useRunLeadDiscoveryMutation,

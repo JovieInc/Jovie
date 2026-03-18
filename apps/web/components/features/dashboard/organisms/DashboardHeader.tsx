@@ -77,10 +77,10 @@ export function DashboardHeader({
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[11.5px] text-tertiary-token'>
+              <span className='shrink-0 text-[12px] text-tertiary-token'>
                 {rootLabel}
               </span>
-              <ChevronRight className='size-3.5 shrink-0 text-quaternary-token' />
+              <ChevronRight className='size-3 shrink-0 text-quaternary-token' />
               {breadcrumbSuffix ? (
                 <div className='min-w-0 truncate text-[12px] text-secondary-token'>
                   {breadcrumbSuffix}

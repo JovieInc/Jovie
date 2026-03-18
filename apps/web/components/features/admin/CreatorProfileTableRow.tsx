@@ -226,7 +226,7 @@ function CreatorProfileTableRowComponent({
     <tr
       className={cn(
         getRowClassName(isChecked, isSelected),
-        'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]'
+        'focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-inset-ring-focus'
       )}
       onClick={() => onRowClick(profile.id)}
       onKeyDown={event =>

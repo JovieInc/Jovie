@@ -2,6 +2,7 @@
 
 import { AlertCircle, MessageSquare, RefreshCw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { Suspense } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -84,10 +85,28 @@ function ProfilePageChatInner() {
   );
 }
 
+function ProfilePageChatSkeleton() {
+  return (
+    <div className='flex h-full flex-col'>
+      <div className='flex flex-1 items-center justify-center'>
+        <div className='flex flex-col items-center gap-3'>
+          <MessageSquare className='h-8 w-8 text-tertiary-token opacity-40' />
+          <div className='h-4 w-32 rounded skeleton' />
+        </div>
+      </div>
+      <div className='shrink-0 p-4'>
+        <div className='h-10 rounded-lg skeleton' />
+      </div>
+    </div>
+  );
+}
+
 export function ProfilePageChat() {
   return (
     <ErrorBoundary fallback={<ProfilePageChatFallback />}>
-      <ProfilePageChatInner />
+      <Suspense fallback={<ProfilePageChatSkeleton />}>
+        <ProfilePageChatInner />
+      </Suspense>
     </ErrorBoundary>
   );
 }

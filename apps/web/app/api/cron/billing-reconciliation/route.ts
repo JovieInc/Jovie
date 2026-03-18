@@ -22,7 +22,6 @@ import {
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
 import { db } from '@/lib/db';
-import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
@@ -285,16 +284,16 @@ async function repairProUserWithoutSubscription(user: {
 
     if (activeSubscription) {
       // They have an active subscription - link it
-      await runLegacyDbTransaction(async tx => {
-        await tx
-          .update(users)
-          .set({
-            stripeSubscriptionId: activeSubscription.id,
-            billingUpdatedAt: new Date(),
-            billingVersion: drizzleSql`${users.billingVersion} + 1`,
-          })
-          .where(eq(users.id, user.id));
-        await tx.insert(billingAuditLog).values({
+      await db
+        .update(users)
+        .set({
+          stripeSubscriptionId: activeSubscription.id,
+          billingUpdatedAt: new Date(),
+          billingVersion: drizzleSql`${users.billingVersion} + 1`,
+        })
+        .where(eq(users.id, user.id));
+      try {
+        await db.insert(billingAuditLog).values({
           userId: user.id,
           eventType: 'reconciliation_fix',
           previousState: { stripeSubscriptionId: null },
@@ -304,24 +303,30 @@ async function repairProUserWithoutSubscription(user: {
             reason: 'linked_active_subscription',
           },
         });
-      });
+      } catch (auditError) {
+        await captureCriticalError(
+          'Billing audit log insert failed after user update',
+          auditError,
+          { userId: user.id, eventType: 'reconciliation_fix' }
+        );
+      }
 
       return { mismatches: 1, fixed: 1 };
     }
   }
 
   // No active subscription found - they shouldn't be Pro
-  await runLegacyDbTransaction(async tx => {
-    await tx
-      .update(users)
-      .set({
-        isPro: false,
-        stripeSubscriptionId: null,
-        billingUpdatedAt: new Date(),
-        billingVersion: drizzleSql`${users.billingVersion} + 1`,
-      })
-      .where(eq(users.id, user.id));
-    await tx.insert(billingAuditLog).values({
+  await db
+    .update(users)
+    .set({
+      isPro: false,
+      stripeSubscriptionId: null,
+      billingUpdatedAt: new Date(),
+      billingVersion: drizzleSql`${users.billingVersion} + 1`,
+    })
+    .where(eq(users.id, user.id));
+  try {
+    await db.insert(billingAuditLog).values({
       userId: user.id,
       eventType: 'reconciliation_fix',
       previousState: { stripeSubscriptionId: null },
@@ -331,7 +336,13 @@ async function repairProUserWithoutSubscription(user: {
         reason: 'no_active_subscription',
       },
     });
-  });
+  } catch (auditError) {
+    await captureCriticalError(
+      'Billing audit log insert failed after user update',
+      auditError,
+      { userId: user.id, eventType: 'reconciliation_fix' }
+    );
+  }
 
   return { mismatches: 1, fixed: 1 };
 }

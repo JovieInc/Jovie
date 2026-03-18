@@ -123,7 +123,8 @@ export const presets = {
     'sticky top-0',
     zIndex.tableHeader,
     'bg-(--linear-app-content-surface)',
-    'shadow-[inset_0_-1px_0_var(--linear-border-subtle)]'
+    'shadow-inset-divider',
+    'align-middle'
   ),
   stickyGroupHeader: cn(
     'sticky top-0',
@@ -138,6 +139,6 @@ export const presets = {
     'last:border-b-0',
     'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'
   ),
-  tableCell: cn(alignment.cellPadding, typography.cellPrimary),
+  tableCell: cn(alignment.cellPadding, typography.cellPrimary, 'align-middle'),
   tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),
 } as const;

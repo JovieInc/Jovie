@@ -36,4 +36,9 @@ export interface ContactSidebarProps {
    * and emitted via onContactChange.
    */
   readonly onAvatarUpload?: (file: File, contact: Contact) => Promise<string>;
+  /**
+   * Optional delete handler. When provided, the sidebar's "Delete contact"
+   * action calls this callback instead of showing a placeholder toast.
+   */
+  readonly onDelete?: (contact: Contact) => void;
 }

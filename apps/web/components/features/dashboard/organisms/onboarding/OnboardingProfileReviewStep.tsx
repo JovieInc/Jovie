@@ -11,7 +11,7 @@ import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
-import { uploadAvatarToBlob } from '@/lib/queries/useAvatarUploadMutation';
+import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 import { canProceedFromProfileReview } from './profile-review-guards';
 
 interface OnboardingProfileReviewStepProps {
@@ -80,13 +80,16 @@ export function OnboardingProfileReviewStep({
     // Step-resume users don't need the review delay — they've seen their profile before
     isStepResume
   );
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(
+    null
+  );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Avatar state: enriched → existing → null
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(
-    enrichedProfile?.imageUrl || existingAvatarUrl || null
-  );
+  // Avatar state: uploaded → enriched → existing → null
+  const enrichedAvatarUrl = enrichedProfile?.imageUrl || null;
+  const avatarUrl = uploadedAvatarUrl || enrichedAvatarUrl || existingAvatarUrl;
+
   // Display name state: enriched → handle (editable)
   const [editableDisplayName, setEditableDisplayName] = useState(
     enrichedProfile?.name || handle
@@ -99,14 +102,30 @@ export function OnboardingProfileReviewStep({
   const bio = enrichedProfile?.bio || existingBio || null;
   const genres = enrichedProfile?.genres ?? existingGenres ?? [];
 
+  const { mutateAsync: uploadAvatar } = useUserAvatarMutation({
+    onSuccess: (blobUrl: string) => {
+      setUploadedAvatarUrl(blobUrl);
+      // Also save avatar URL to profile immediately
+      updateOnboardingProfile({ avatarUrl: blobUrl });
+      track('onboarding_photo_uploaded', {});
+    },
+  });
+
+  const handleAvatarUpload = useCallback(
+    async (file: File) => {
+      return uploadAvatar(file);
+    },
+    [uploadAvatar]
+  );
+
   const showLoading = isEnriching && !enrichedProfile && !enrichmentTimedOut;
 
-  // Update avatar from enrichment when it arrives
+  // Sync enriched avatar into local state so hasAvatar reflects it
   useEffect(() => {
-    if (enrichedProfile?.imageUrl && !avatarUrl) {
-      setAvatarUrl(enrichedProfile.imageUrl);
+    if (enrichedAvatarUrl && !uploadedAvatarUrl) {
+      setUploadedAvatarUrl(enrichedAvatarUrl);
     }
-  }, [enrichedProfile?.imageUrl, avatarUrl]);
+  }, [enrichedAvatarUrl, uploadedAvatarUrl]);
 
   // Update display name from enrichment when it arrives
   useEffect(() => {
@@ -171,19 +190,6 @@ export function OnboardingProfileReviewStep({
       timeoutRef.current = null;
     }
   }, [enrichedProfile]);
-
-  // Avatar upload handler
-  const handleAvatarUpload = useCallback(
-    async (file: File): Promise<string> => {
-      const blobUrl = await uploadAvatarToBlob(file);
-      // Save avatar URL to profile immediately
-      await updateOnboardingProfile({ avatarUrl: blobUrl });
-      setAvatarUrl(blobUrl);
-      track('onboarding_photo_uploaded', {});
-      return blobUrl;
-    },
-    []
-  );
 
   // Display name validation
   const validateDisplayName = useCallback(
@@ -339,6 +345,7 @@ export function OnboardingProfileReviewStep({
                       size='display-md'
                       uploadable
                       onUpload={handleAvatarUpload}
+                      onSuccess={setUploadedAvatarUrl}
                       showHoverOverlay
                     />
                   </div>
