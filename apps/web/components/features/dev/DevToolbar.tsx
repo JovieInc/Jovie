@@ -1,9 +1,17 @@
 'use client';
 
 import * as Switch from '@radix-ui/react-switch';
-import { ChevronDown, ChevronUp, Monitor, Moon, Sun, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronUp,
+  Monitor,
+  Moon,
+  Sun,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
 import {
   CODE_FLAG_KEYS,
@@ -15,6 +23,7 @@ const STATSIG_FLAGS = Object.entries(FEATURE_FLAG_KEYS) as [string, string][];
 const CODE_FLAGS_ENTRIES = Object.entries(CODE_FLAG_KEYS) as [string, string][];
 
 const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
+const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 
 export function DevToolbar({
   env,
@@ -26,15 +35,37 @@ export function DevToolbar({
   version: string;
 }>) {
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(true);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useFeatureFlagOverrides();
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
-  // Restore open state from localStorage and mark as mounted
+  // Restore state from localStorage and mark as mounted
   useEffect(() => {
     setMounted(true);
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
+    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
   }, []);
+
+  // Add bottom padding to body so the toolbar doesn't cover content
+  useEffect(() => {
+    if (hidden) {
+      document.body.style.paddingBottom = '';
+      return;
+    }
+    const updatePadding = () => {
+      const h = toolbarRef.current?.offsetHeight ?? 0;
+      document.body.style.paddingBottom = h > 0 ? `${h}px` : '';
+    };
+    updatePadding();
+    // Re-measure after expand/collapse animation
+    const timer = setTimeout(updatePadding, 220);
+    return () => {
+      clearTimeout(timer);
+      document.body.style.paddingBottom = '';
+    };
+  }, [open, hidden]);
 
   function toggleOpen() {
     setOpen(prev => {
@@ -44,6 +75,16 @@ export function DevToolbar({
     });
   }
 
+  const hide = useCallback(() => {
+    setHidden(true);
+    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+  }, []);
+
+  const show = useCallback(() => {
+    setHidden(false);
+    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+  }, []);
+
   const ENV_COLORS: Record<string, string> = {
     production: 'bg-red-500/20 text-red-400 border-red-500/30',
     preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
@@ -51,8 +92,27 @@ export function DevToolbar({
   const envColor =
     ENV_COLORS[env] ?? 'bg-green-500/20 text-green-400 border-green-500/30';
 
+  if (!mounted) return null;
+
+  if (hidden) {
+    return (
+      <button
+        type='button'
+        onClick={show}
+        className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)] shadow-md font-mono text-[10px] transition-colors'
+        aria-label='Show dev toolbar'
+      >
+        <Wrench size={11} />
+        Dev
+      </button>
+    );
+  }
+
   return (
-    <div className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'>
+    <div
+      ref={toolbarRef}
+      className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
+    >
       {/* Expanded panel */}
       <div
         className='overflow-hidden transition-all duration-200 ease-in-out border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)]'
@@ -196,8 +256,8 @@ export function DevToolbar({
           Dev Toolbar
         </span>
 
-        {/* Right: expand/collapse */}
-        <div className='flex items-center justify-end flex-1'>
+        {/* Right: expand/collapse + hide */}
+        <div className='flex items-center justify-end flex-1 gap-0.5'>
           <button
             type='button'
             onClick={toggleOpen}
@@ -205,6 +265,14 @@ export function DevToolbar({
             aria-label={open ? 'Collapse dev toolbar' : 'Expand dev toolbar'}
           >
             {open ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+          </button>
+          <button
+            type='button'
+            onClick={hide}
+            className='flex items-center px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
+            aria-label='Hide dev toolbar'
+          >
+            <X size={13} />
           </button>
         </div>
       </div>
