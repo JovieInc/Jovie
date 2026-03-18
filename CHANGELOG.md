@@ -14,6 +14,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Section visibility gated by Statsig `show_see_it_in_action` gate (off by default in production)
 - New `getCreatorByHandle()` cached function for single-profile lookup with timeout guards
 
+### Changed
+
+- Lazy-load TipDrawer and ProfileNotificationsMenu on public profile pages, removing ~25-40 KB from the critical-path client bundle
+- Parallelize tour dates fetch with Statsig feature flag queries, eliminating ~100-200ms sequential waterfall on tour mode pages
+
 ## [26.4.5] - 2026-03-18
 
 ### Added
