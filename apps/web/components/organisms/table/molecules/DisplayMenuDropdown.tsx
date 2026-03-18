@@ -77,7 +77,7 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-[7px] border border-transparent px-2 py-0.5 text-[11px] font-[510] transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1',
+        'rounded-full border border-transparent px-2 py-0.5 text-[11px] font-[510] transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1',
         isVisible
           ? 'border-subtle bg-surface-1 text-secondary-token'
           : 'text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-secondary-token'
@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-[7px] border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -158,7 +158,7 @@ export function DisplayMenuDropdown({
           </span>
           <PopoverPrimitive.Close
             aria-label='Close'
-            className='rounded-[7px] border border-transparent p-0.5 text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
+            className='rounded-full border border-transparent p-0.5 text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
           >
             <X className='h-4 w-4' />
           </PopoverPrimitive.Close>

@@ -147,7 +147,7 @@ export function TableStandardToolbar({
             variant='ghost'
             size='sm'
             onClick={onClearSelection}
-            className='h-7 gap-1 rounded-[7px] border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+            className='h-7 gap-1 rounded-full border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
           >
             <X className='h-4 w-4' />
             Clear
