@@ -61,7 +61,7 @@ export function AudienceRowActionsMenu({
       <DropdownMenuTrigger asChild>
         <AppIconButton
           ariaLabel='Open audience row actions'
-          className='h-8 w-8 rounded-[8px] bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
+          className='h-8 w-8 rounded-full bg-transparent text-quaternary-token hover:bg-surface-1 hover:text-secondary-token focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)/25 [&_svg]:h-3.5 [&_svg]:w-3.5'
         >
           <MoreHorizontal className='h-4 w-4' />
         </AppIconButton>
