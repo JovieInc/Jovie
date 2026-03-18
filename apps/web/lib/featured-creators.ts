@@ -217,6 +217,108 @@ export const getFeaturedCreators = unstable_cache(
 );
 
 /**
+ * Fetch a single creator by handle for pinned profile display.
+ * Returns null if the profile doesn't exist or isn't public.
+ */
+async function queryCreatorByHandle(
+  handle: string
+): Promise<FeaturedCreator | null> {
+  try {
+    const tableExists = await withTimeoutFallback(
+      doesTableExist(TABLE_NAMES.creatorProfiles),
+      15000,
+      false,
+      () => {
+        captureWarning(
+          '[FeaturedCreators] Table check timed out in queryCreatorByHandle'
+        );
+      }
+    );
+
+    if (!tableExists) return null;
+
+    const [row] = await Promise.race([
+      db
+        .select({
+          id: creatorProfiles.id,
+          username: creatorProfiles.username,
+          displayName: creatorProfiles.displayName,
+          bio: creatorProfiles.bio,
+          avatarUrl: creatorProfiles.avatarUrl,
+          genres: creatorProfiles.genres,
+        })
+        .from(creatorProfiles)
+        .where(
+          and(
+            eq(creatorProfiles.username, handle),
+            eq(creatorProfiles.isPublic, true)
+          )
+        )
+        .limit(1),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Creator by handle query timeout after 10s')),
+          10000
+        )
+      ),
+    ]);
+
+    if (!row) return null;
+
+    let latestReleaseTitle: string | null = null;
+    let latestReleaseType: string | null = null;
+
+    if (await doesTableExist('discog_releases')) {
+      const releases = await db.query.discogReleases.findMany({
+        where: (releases, { eq: releaseEq }) =>
+          releaseEq(releases.creatorProfileId, row.id),
+        columns: { title: true, releaseType: true, releaseDate: true },
+        orderBy: (releases, { desc }) => [desc(releases.releaseDate)],
+        limit: 1,
+      });
+
+      if (releases[0]) {
+        latestReleaseTitle = releases[0].title;
+        latestReleaseType = releases[0].releaseType;
+      }
+    }
+
+    return {
+      id: row.id,
+      handle: row.username,
+      name: row.displayName || row.username,
+      src: transformImageUrl(row.avatarUrl || '/android-chrome-192x192.png', {
+        width: 256,
+        height: 256,
+        quality: 70,
+        format: 'webp',
+        crop: 'fill',
+        gravity: 'face',
+      }),
+      tagline: row.bio,
+      genres: row.genres?.slice(0, 2) ?? [],
+      latestReleaseTitle,
+      latestReleaseType,
+    };
+  } catch (error) {
+    captureError('[FeaturedCreators] queryCreatorByHandle failed', error, {
+      context: 'creator_by_handle_query',
+      handle,
+    });
+    return null;
+  }
+}
+
+export const getCreatorByHandle = unstable_cache(
+  queryCreatorByHandle,
+  ['creator-by-handle'],
+  {
+    revalidate: 60 * 60 * 24,
+    tags: ['featured-creators'],
+  }
+);
+
+/**
  * Query featured creators for search VIP prioritization.
  * Returns a Map of normalized display names to VIP artist data.
  * Only includes creators with valid Spotify IDs.

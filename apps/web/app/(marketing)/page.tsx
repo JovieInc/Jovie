@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -8,7 +9,7 @@ import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
 import { RedesignedHero } from '@/features/home/RedesignedHero';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { SeeItInAction } from '@/features/home/SeeItInAction';
+import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -204,15 +205,9 @@ export default function HomePage() {
 
       <PricingSection />
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
-      <SeeItInAction />
+      <Suspense fallback={null}>
+        <SeeItInActionSafe />
+      </Suspense>
 
       <FinalCTASection />
     </div>
