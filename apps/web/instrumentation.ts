@@ -208,20 +208,11 @@ export async function register() {
           }
         }
 
-        if (
-          !stripeResult.healthy &&
-          shouldReportToSentry(stripeResult.issues)
-        ) {
-          Sentry.captureMessage(
-            `Stripe billing config unhealthy after retries: ${stripeResult.issues.join(', ')}`,
-            {
-              level: 'warning',
-              tags: {
-                context: 'stripe_startup_validation',
-                vercel_env: process.env.VERCEL_ENV || 'unknown',
-              },
-              extra: { issues: stripeResult.issues },
-            }
+        // Note: validateStripeBillingConfig() already reports to Sentry at
+        // 'fatal' level on deployed environments — no duplicate report needed here.
+        if (!stripeResult.healthy) {
+          console.warn(
+            `[STARTUP] Stripe billing config still unhealthy after retries: ${stripeResult.issues.join(', ')}`
           );
         }
       } catch (error) {
