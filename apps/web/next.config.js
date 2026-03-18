@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 
@@ -368,15 +371,17 @@ const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: vercel toolbar -> sentry
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
 // Sentry build plugin: only in production/CI (source map upload, tunnel route).
 // The Sentry runtime SDK (sentry.server.config.ts) works independently in dev.
 const { withSentryConfig } = require('@sentry/nextjs');
 
 const shouldUseSentryPlugin =
-  process.env.NODE_ENV === 'production' || process.env.CI === 'true';
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  !!process.env.VERCEL_ENV;
 
 module.exports = shouldUseSentryPlugin
   ? withSentryConfig(module.exports, {

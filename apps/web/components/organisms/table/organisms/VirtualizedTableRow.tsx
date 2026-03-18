@@ -2,8 +2,22 @@
 
 import type { Row } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect, useRef } from 'react';
 import { cn, presets } from '../table.styles';
+
+/**
+ * Props that VirtualizedTableRow manages internally.
+ * These are omitted from the spread so parent wrappers (e.g. Radix asChild)
+ * cannot accidentally override row behaviour.
+ */
+type ManagedTrProps =
+  | 'onClick'
+  | 'onKeyDown'
+  | 'onFocus'
+  | 'onMouseEnter'
+  | 'style'
+  | 'className'
+  | 'tabIndex';
 
 export interface VirtualizedTableRowProps<TData> {
   readonly row: Row<TData>;
@@ -61,8 +75,17 @@ function VirtualizedTableRowComponent<TData>({
   getRowClassName,
   measureElement,
   onRowShiftClick,
-}: VirtualizedTableRowProps<TData>) {
+  ...htmlProps
+}: VirtualizedTableRowProps<TData> &
+  Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>) {
   const rowData = row.original as TData;
+
+  // Keep a ref to the forwarded onContextMenu so we can compose it without
+  // breaking memoisation of handleContextMenu.
+  const forwardedContextMenuRef = useRef(htmlProps.onContextMenu);
+  useEffect(() => {
+    forwardedContextMenuRef.current = htmlProps.onContextMenu;
+  });
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -89,12 +112,14 @@ function VirtualizedTableRowComponent<TData>({
   }, [shouldEnableKeyboardNav, onFocusChange, rowIndex]);
 
   const handleContextMenu = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.MouseEvent<HTMLTableRowElement>) => {
       // Right-click should focus/select the row before opening actions so
       // side panels and contextual action menus stay in sync.
       onRowClick?.(rowData);
       onFocusChange(rowIndex);
       onRowContextMenu?.(rowData, e);
+      // Forward to parent handler (e.g. Radix ContextMenu.Trigger via asChild)
+      forwardedContextMenuRef.current?.(e);
     },
     [onRowClick, rowData, onFocusChange, rowIndex, onRowContextMenu]
   );
@@ -115,6 +140,7 @@ function VirtualizedTableRowComponent<TData>({
 
   return (
     <tr
+      {...htmlProps}
       key={row.id}
       ref={handleRef}
       data-index={rowIndex}
@@ -172,5 +198,6 @@ function VirtualizedTableRowComponent<TData>({
 export const VirtualizedTableRow = memo(VirtualizedTableRowComponent) as <
   TData,
 >(
-  props: VirtualizedTableRowProps<TData>
+  props: VirtualizedTableRowProps<TData> &
+    Omit<React.ComponentPropsWithoutRef<'tr'>, ManagedTrProps>
 ) => React.ReactElement;

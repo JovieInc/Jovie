@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import { updateOnboardingProfile } from '@/app/onboarding/actions/update-profile';
-import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -25,11 +26,13 @@ const MIN_DISPLAY_MS = 5000;
 function getCtaLabel(
   isSaving: boolean,
   isEnriching: boolean,
-  minTimeElapsed: boolean
+  minTimeElapsed: boolean,
+  hasAvatar: boolean
 ): string {
   if (isSaving) return 'Saving...';
   if (isEnriching) return 'Finishing setup...';
   if (!minTimeElapsed) return 'Reviewing your profile...';
+  if (!hasAvatar) return 'Add a photo to continue';
   return 'Continue to Dashboard';
 }
 
@@ -49,8 +52,24 @@ export function OnboardingProfileReviewStep({
   const [isSaving, setIsSaving] = useState(false);
   const [enrichmentTimedOut, setEnrichmentTimedOut] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(
+    null
+  );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { mutateAsync: uploadAvatar } = useUserAvatarMutation({
+    onSuccess: (blobUrl: string) => {
+      setUploadedAvatarUrl(blobUrl);
+    },
+  });
+
+  const handleAvatarUpload = useCallback(
+    async (file: File) => {
+      return uploadAvatar(file);
+    },
+    [uploadAvatar]
+  );
 
   const showLoading = isEnriching && !enrichedProfile && !enrichmentTimedOut;
 
@@ -97,8 +116,17 @@ export function OnboardingProfileReviewStep({
   }, [enrichedProfile]);
   const displayName = enrichedProfile?.name || handle;
   const bio = enrichedProfile?.bio || null;
-  const avatarUrl = enrichedProfile?.imageUrl || null;
+  const enrichedAvatarUrl = enrichedProfile?.imageUrl || null;
+  const avatarUrl = uploadedAvatarUrl || enrichedAvatarUrl;
+  const hasAvatar = Boolean(avatarUrl);
   const genres = enrichedProfile?.genres ?? [];
+
+  // Sync enriched avatar into local state so hasAvatar reflects it
+  useEffect(() => {
+    if (enrichedAvatarUrl && !uploadedAvatarUrl) {
+      setUploadedAvatarUrl(enrichedAvatarUrl);
+    }
+  }, [enrichedAvatarUrl, uploadedAvatarUrl]);
 
   const handleContinue = useCallback(async () => {
     setIsSaving(true);
@@ -158,13 +186,21 @@ export function OnboardingProfileReviewStep({
           <>
             <ContentSurfaceCard className='mb-6 p-6'>
               <div className='flex flex-col items-center gap-4'>
-                {/* Avatar */}
-                <Avatar
+                {/* Avatar — uploadable so user can set a photo */}
+                <AvatarUploadable
                   src={avatarUrl}
                   alt={displayName}
                   name={displayName}
                   size='display-md'
+                  uploadable
+                  onUpload={handleAvatarUpload}
+                  onSuccess={setUploadedAvatarUrl}
                 />
+                {!hasAvatar && (
+                  <p className='text-[12px] text-tertiary-token'>
+                    Tap to add a profile photo
+                  </p>
+                )}
 
                 {/* Name + Handle */}
                 <div className='text-center'>
@@ -204,6 +240,7 @@ export function OnboardingProfileReviewStep({
                 disabled={
                   isSaving ||
                   !minTimeElapsed ||
+                  !hasAvatar ||
                   (isEnriching && !enrichmentTimedOut)
                 }
                 aria-busy={isSaving || (isEnriching && !enrichmentTimedOut)}
@@ -211,7 +248,8 @@ export function OnboardingProfileReviewStep({
                 {getCtaLabel(
                   isSaving,
                   isEnriching && !enrichmentTimedOut,
-                  minTimeElapsed
+                  minTimeElapsed,
+                  hasAvatar
                 )}
               </AuthButton>
             </div>
