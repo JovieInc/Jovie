@@ -27,7 +27,8 @@
 html,
 body {
   height: 100%;
-  overflow: hidden;
+  overflow-x: clip;
+  overflow-y: hidden;
   overscroll-behavior: none;
 }
 

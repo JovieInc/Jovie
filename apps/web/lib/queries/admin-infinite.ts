@@ -256,11 +256,7 @@ export function useAdminWaitlistInfiniteQuery({
   });
 }
 
-export type AdminLeadsSortBy =
-  | 'createdAt'
-  | 'fitScore'
-  | 'priorityScore'
-  | 'displayName';
+export type AdminLeadsSortBy = 'createdAt' | 'fitScore';
 
 export function useLeadsInfiniteQuery({
   sortBy = 'createdAt',

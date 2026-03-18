@@ -100,12 +100,18 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const sortBy: AdminLeadsSortBy = 'createdAt';
   const [actioningId, setActioningId] = useState<string | null>(null);
 
-  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } =
-    useLeadsInfiniteQuery({
-      sortBy,
-      status: statusFilter || undefined,
-      search: search || undefined,
-    });
+  const {
+    data,
+    isLoading,
+    isError,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useLeadsInfiniteQuery({
+    sortBy,
+    status: statusFilter || undefined,
+    search: search || undefined,
+  });
 
   const updateLeadStatusMutation = useUpdateLeadStatusMutation();
 
@@ -306,14 +312,21 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         isFetchingNextPage={isFetchingNextPage}
         onLoadMore={handleLoadMore}
         emptyState={
-          <TableEmptyState
-            title='No leads found'
-            description={
-              statusFilter
-                ? 'Try a different status filter'
-                : 'No leads have been discovered yet'
-            }
-          />
+          isError ? (
+            <TableEmptyState
+              title='Unable to load leads'
+              description='Try again in a moment.'
+            />
+          ) : (
+            <TableEmptyState
+              title='No leads found'
+              description={
+                statusFilter
+                  ? 'Try a different status filter'
+                  : 'No leads have been discovered yet'
+              }
+            />
+          )
         }
       />
     </section>
