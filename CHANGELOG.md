@@ -9,11 +9,84 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Tour date ticket click tracking — wired into audience analytics via `useTrackingMutation` on public profile and dedicated tour page
-- Tour date analytics sidebar card in dashboard — shows ticket clicks, top cities, and top referrers per show
+- Tour date ticket click tracking on public profile and dedicated tour page via shared `useTourDateTicketClick` hook
+- Tour date analytics sidebar card in dashboard — ticket clicks, top cities, and top referrers per show
 - API endpoint `GET /api/dashboard/tour-dates/[id]/analytics` with ownership verification and UUID validation
 - `useTourDateAnalyticsQuery` React Query hook for client-side analytics fetching
-- Comprehensive tour date seed data (12 venues across 7 countries) with diverse providers, statuses, and ticketing platforms
+- `tour_date` content type support in click tracking validation
+- Comprehensive tour date seed data (12 venues across 7 countries)
+- Test coverage: API route (auth, validation, ownership, errors), hook, sidebar analytics UI, and validation
+
+### Changed
+
+- Extracted shared `useTourDateTicketClick` hook from duplicated click handlers in `TourDateCard` and `TourModePanel`
+
+### Fixed
+
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
+
+## [26.3.5] - 2026-03-17
+
+### Added
+
+- Shared `approveLead()` pipeline for both manual admin approval and auto-approve cron (DRY extraction)
+- `runAutoApprove()` — automated approval with daily limits, fit score threshold, high-profile/representation guards
+- Scrape retry tracking with auto-disqualification after 3 failures (`scrape_attempts` column)
+- Pipeline health warnings: zero discovery results and high qualification error rate alerts via Sentry
+- 15s fetch timeout on Instantly API push (`AbortSignal.timeout`)
+- Idempotency guard on Instantly push (skips if `instantlyLeadId` already set)
+- 20 new pipeline tests: approve-lead, process-batch, pipeline-health-warnings, instantly-timeout
+
+### Fixed
+
+- TOCTOU race condition in approval pipeline — atomic `WHERE status='qualified'` guard prevents double-approval
+- Non-atomic daily counter increment — uses SQL `autoIngestedToday + N` instead of in-memory calculation
+- Expired claim tokens now regenerated during routing instead of reusing stale tokens
+
+## [26.3.4] - 2026-03-17
+
+### Added
+
+- `docs/PRODUCT_CAPABILITIES.md` — canonical rich feature catalog for AI agents with 37+ features, consistent schema (one-line, plan tier, problem solved, how it works, benefits, routes)
+- "Use This Sound" feature documented in FEATURE_REGISTRY — influencer sharing pages at `/{username}/{slug}/sounds` for TikTok, Instagram Reels, YouTube Shorts
+- 7 new docs.jov.ie feature pages: Tour Dates, Verified Badge, AI Insights, Ad Pixels, Fan CRM, Retargeting Ads, Plans & Pricing
+- 4 new docs.jov.ie guides: Share Your First Smart Link, Set Up Tipping, Set Up Ad Pixels, Connect Bandsintown
+- Signup-to-paid conversion funnel: capture `?plan=` intent at signup, persist through onboarding, present personalized checkout step before dashboard
+- Onboarding checkout page (`/onboarding/checkout`) with profile value preview, interactive branding toggle, monthly/annual Stripe pricing, and skip option
+- "Profile is live" confetti celebration after onboarding step 3 with profile URL and copy button
+- Contextual upgrade nudges on plan-gated settings features (branding, analytics, contacts, notifications)
+- Reusable `UsageLimitUpgradePrompt` component shown at 80%+ of plan limits with progress bar
+- `plan-intent.ts` utility for cookie + sessionStorage plan intent persistence across the funnel
+- `onboarding.checkoutStep` feature flag for safe rollout (server + client gated)
+- 11+ analytics events across the full conversion funnel
+
+### Changed
+
+- Rewrote Chat & AI docs page → AI Assistant (was inaccurately describing fan messaging; now correctly documents AI career assistant)
+- Fixed Tips docs page (aligned with actual Venmo-based payments, not Stripe)
+- Expanded all 6 existing docs.jov.ie feature pages from ~20 lines to ~80-120 lines with plan availability tables and detailed capabilities
+- Updated FEATURE_REGISTRY.md change management process to include PRODUCT_CAPABILITIES.md and docs.jov.ie updates
+- Renamed "Self-Serve Guide" section to "Guides" in docs navigation
+- `ChatUsageAlert` now shows direct upgrade button for free users and plan-specific messaging
+- `SettingsPlanGateLabel` enhanced with feature-specific copy and upgrade click tracking
+
+## [26.3.3] - 2026-03-17
+
+### Added
+
+- Admin settings section in Settings sidebar with dedicated `/app/settings/admin` route
+- `CampaignSettingsPanel` — campaign targeting (fit score, batch size) and throttling controls moved from inline campaign manager to centralized settings
+- Dev toolbar on/off toggle under Admin > Developer tools
+- Waitlist settings panel embedded in admin settings
+- DSP Presence dashboard page at `/app/presence` — card grid showing all matched streaming platform profiles (Spotify, Apple Music, Deezer, etc.) with confidence scores, ISRC match counts, and confirm/reject actions for suggested matches
+- Detail sidebar for each DSP profile with match status, confidence breakdown, and external platform link
+- Navigation entry for Presence in the dashboard sidebar
+- Next.js rewrite rule mapping `/app/presence` to `/app/dashboard/presence`
+
+### Changed
+
+- Campaign manager now reads settings from persisted config instead of inline controls, with "Change in Settings" link
+- Admin sidebar section renamed from "Admin" to "General" with restructured card layout (dev tools, waitlist, campaigns, quick links)
 
 ### Fixed
 

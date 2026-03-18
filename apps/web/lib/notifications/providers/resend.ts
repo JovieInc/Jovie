@@ -3,6 +3,7 @@ import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { EMAIL_REPLY_TO, RESEND_ENABLED } from '@/lib/notifications/config';
 import { formatSystemSender } from '@/lib/notifications/sender-policy';
+import { getEmailSendBlockReason } from '@/lib/utils/email';
 import type {
   EmailMessage,
   EmailProvider,
@@ -30,6 +31,16 @@ export class ResendEmailProvider implements EmailProvider {
         status: 'skipped',
         provider: this.provider,
         detail: 'RESEND_API_KEY not configured',
+      };
+    }
+
+    const blockReason = getEmailSendBlockReason(message.to);
+    if (blockReason) {
+      return {
+        channel: 'email' as NotificationDeliveryChannel,
+        status: 'skipped',
+        provider: this.provider,
+        detail: blockReason,
       };
     }
 

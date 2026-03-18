@@ -4,6 +4,8 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, SignUpForm } from '@/features/auth';
+import { track } from '@/lib/analytics';
+import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
   persistSignupClaimValue,
@@ -26,6 +28,19 @@ function SignUpClaimDataPersistence() {
   useEffect(() => {
     const spotifyUrl = searchParams.get('spotify_url');
     const artistName = searchParams.get('artist_name');
+    const plan = searchParams.get('plan');
+
+    // Capture plan intent from pricing CTA (e.g., /signup?plan=founding)
+    if (plan) {
+      const validatedPlan = validatePlan(plan);
+      if (validatedPlan) {
+        setPlanIntent(validatedPlan);
+        let source = 'pricing';
+        if (spotifyUrl) source = 'hero_spotify';
+        else if (handle) source = 'hero_claim';
+        track('plan_intent_captured', { plan: validatedPlan, source });
+      }
+    }
 
     try {
       const now = Date.now();

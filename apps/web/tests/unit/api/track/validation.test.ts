@@ -49,4 +49,25 @@ describe('validateTrackRequest', () => {
 
     expect(result.data.context).toBeUndefined();
   });
+
+  it('accepts tour_date as a valid contentType', () => {
+    const result = validateTrackRequest({
+      handle: 'artist123',
+      linkType: 'other',
+      target: 'https://ticketmaster.com/event/abc',
+      context: {
+        contentType: 'tour_date',
+        contentId: '550e8400-e29b-41d4-a716-446655440000',
+      },
+    });
+
+    if ('error' in result) {
+      throw new Error('Expected validation to succeed');
+    }
+
+    expect(result.data.context).toEqual({
+      contentType: 'tour_date',
+      contentId: '550e8400-e29b-41d4-a716-446655440000',
+    });
+  });
 });

@@ -42,6 +42,7 @@ export function DialogLoadingSkeleton({
             {rowIds.map(rowId => (
               <DrawerSurfaceCard
                 key={rowId}
+                variant='card'
                 className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
               >
                 <div className='h-10 w-10 shrink-0 rounded-full skeleton' />

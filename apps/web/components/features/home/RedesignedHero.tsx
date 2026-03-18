@@ -15,7 +15,7 @@ export async function RedesignedHero() {
         </h1>
 
         <p className='marketing-lead-linear mt-8 max-w-[40rem] text-balance text-tertiary-token'>
-          Import your catalog, capture every fan, and own the relationship.
+          Import your catalog. Fans get notified when you release.
         </p>
 
         <div className='mt-10 w-full max-w-[32rem]'>

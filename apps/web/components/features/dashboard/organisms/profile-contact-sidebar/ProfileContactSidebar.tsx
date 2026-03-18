@@ -422,16 +422,14 @@ export function ProfileContactSidebar() {
       headerActions={headerActions}
       entityHeader={
         <div className='space-y-3.5'>
-          <div className='rounded-[10px] border border-subtle/75 bg-surface-0 p-3'>
-            <ProfileContactHeader
-              displayName={displayName}
-              username={username}
-              avatarUrl={avatarUrl}
-              editable
-              onDisplayNameChange={handleDisplayNameChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
-          </div>
+          <ProfileContactHeader
+            displayName={displayName}
+            username={username}
+            avatarUrl={avatarUrl}
+            editable
+            onDisplayNameChange={handleDisplayNameChange}
+            onAvatarUpload={handleAvatarUpload}
+          />
 
           {/* Analytics summary */}
           <ProfileAnalyticsSummary />

@@ -401,7 +401,7 @@ export function ReleasesSection() {
                 4,218 fans notified
               </span>
               <span className='text-xs text-quaternary-token'>
-                captured from your profile
+                from your profile
               </span>
             </div>
           </div>

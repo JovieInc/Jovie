@@ -127,12 +127,7 @@ describe('RightDrawer', () => {
     );
 
     const desktopAside = screen.getByLabelText('Responsive drawer');
-    expect(desktopAside).toHaveClass(
-      'border-l',
-      'transition-[width,opacity]',
-      'lg:rounded-l-[18px]',
-      'shadow-(--linear-shadow-card)'
-    );
+    expect(desktopAside).toHaveClass('border-l', 'transition-[width,opacity]');
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
   });

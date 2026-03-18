@@ -379,13 +379,13 @@ export function AdminFeedbackTable({
               </div>
             </DrawerSection>
 
-            <DrawerSection title='Feedback'>
+            <DrawerSection title='Feedback' collapsible={false}>
               <DrawerSurfaceCard className='rounded-[12px] bg-surface-0 px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
               </DrawerSurfaceCard>
             </DrawerSection>
 
-            <DrawerSection title='Context'>
+            <DrawerSection title='Context' collapsible={false}>
               <DrawerSurfaceCard className='overflow-auto rounded-[12px] bg-surface-0 p-0'>
                 <pre className='p-3 text-[11px] leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
