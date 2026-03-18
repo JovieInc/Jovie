@@ -21,7 +21,7 @@ export const leadListQuerySchema = z.object({
     .default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
 });
 
 export const leadStatusUpdateSchema = z.object({
