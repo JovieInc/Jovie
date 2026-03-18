@@ -202,24 +202,22 @@ export async function PUT(req: Request) {
 
       const { updatedProfile, oldUsernameNormalized } = updateResult;
 
-      const syncSocialLinksTimer =
-        'db:dashboard-profile:syncSocialLinksFromPrimaryMusicUrls';
-      console.time(syncSocialLinksTimer);
-      await syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
-        spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
-        appleMusicUrl: dbProfileUpdates.appleMusicUrl as
-          | string
-          | null
-          | undefined,
-        youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
-      });
-      console.timeEnd(syncSocialLinksTimer);
-
-      await finalizeProfileResponse({
-        updatedProfile,
-        oldUsernameNormalized,
-        clerkUserId,
-      });
+      // Run independent post-update operations in parallel.
+      await Promise.all([
+        syncSocialLinksFromPrimaryMusicUrls(db, updatedProfile.id, {
+          spotifyUrl: dbProfileUpdates.spotifyUrl as string | null | undefined,
+          appleMusicUrl: dbProfileUpdates.appleMusicUrl as
+            | string
+            | null
+            | undefined,
+          youtubeUrl: dbProfileUpdates.youtubeUrl as string | null | undefined,
+        }),
+        finalizeProfileResponse({
+          updatedProfile,
+          oldUsernameNormalized,
+          clerkUserId,
+        }),
+      ]);
 
       const responseProfile = addAvatarCacheBust(updatedProfile);
 

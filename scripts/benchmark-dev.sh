@@ -9,6 +9,8 @@ RUNS=${1:-3}
 WEB_DIR="apps/web"
 NEXT_DIR="$WEB_DIR/.next"
 TMPFILE="/tmp/benchmark-dev-results.$$"
+REPO_ROOT="$(pwd)"
+TIMEOUT=120
 
 # Ensure we're in the repo root
 if [ ! -f "turbo.json" ]; then
@@ -25,29 +27,51 @@ echo ""
 for i in $(seq 1 "$RUNS"); do
   echo "--- Run $i/$RUNS ---"
 
-  # Kill any existing dev server
-  pkill -f "next dev" 2>/dev/null || true
+  # Kill any existing dev server (scoped to this repo to avoid killing unrelated processes)
+  pkill -f "$REPO_ROOT.*next dev" 2>/dev/null || true
   sleep 1
 
   # Clear .next cache for true cold start
   rm -rf "$NEXT_DIR"
   echo "  Cleared .next cache"
 
-  # Start dev server and time until "Ready" message
+  # Start dev server in background and time until "Ready" message.
+  # Using process substitution so the while loop runs in the main shell
+  # (not a subshell), allowing TMPFILE writes and proper flow control.
   START_S=$(date +%s)
 
-  pnpm --filter web exec next dev --turbopack 2>&1 | while IFS= read -r line; do
-    echo "  $line"
-    if echo "$line" | grep -qiE "(Ready in|✓ Ready)"; then
-      END_S=$(date +%s)
-      ELAPSED=$((END_S - START_S))
-      echo ""
-      echo "  >>> COLD START: ${ELAPSED}s"
-      echo "$ELAPSED" >> "$TMPFILE"
-      pkill -f "next dev" 2>/dev/null || true
-      break
+  pnpm --filter web exec next dev --turbopack > "/tmp/benchmark-dev-output.$$" 2>&1 &
+  DEV_PID=$!
+
+  READY=false
+  DEADLINE=$((START_S + TIMEOUT))
+  while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+    if [ -f "/tmp/benchmark-dev-output.$$" ]; then
+      while IFS= read -r line; do
+        echo "  $line"
+        if echo "$line" | grep -qiE "(Ready in|✓ Ready)"; then
+          END_S=$(date +%s)
+          ELAPSED=$((END_S - START_S))
+          echo ""
+          echo "  >>> COLD START: ${ELAPSED}s"
+          echo "$ELAPSED" >> "$TMPFILE"
+          READY=true
+          break 2
+        fi
+      done < "/tmp/benchmark-dev-output.$$"
     fi
+    sleep 0.5
   done
+
+  if [ "$READY" = false ]; then
+    echo "  >>> TIMED OUT after ${TIMEOUT}s"
+  fi
+
+  # Kill the dev server
+  kill "$DEV_PID" 2>/dev/null || true
+  wait "$DEV_PID" 2>/dev/null || true
+  pkill -f "$REPO_ROOT.*next dev" 2>/dev/null || true
+  rm -f "/tmp/benchmark-dev-output.$$"
 
   sleep 2
 done

@@ -108,6 +108,15 @@ export const adminCreatorIngestLimiter = createRateLimiter(
   RATE_LIMITERS.adminCreatorIngest
 );
 
+/**
+ * Admin outreach rate limiter
+ * Limit: 10 per hour per admin
+ * Prevents excessive bulk external API calls via Instantly
+ */
+export const adminOutreachLimiter = createRateLimiter(
+  RATE_LIMITERS.adminOutreach
+);
+
 // ============================================================================
 // Tracking & Analytics
 // ============================================================================
@@ -705,6 +714,20 @@ export async function checkAdminCreatorIngestRateLimit(
   );
 }
 
+/**
+ * Check admin outreach rate limit
+ * Returns the first failure or success if pass
+ */
+export async function checkAdminOutreachRateLimit(
+  adminUserId: string
+): Promise<RateLimitResult> {
+  return checkRateLimit(
+    adminOutreachLimiter,
+    adminUserId,
+    'Outreach rate limit exceeded. Please wait before sending another batch.'
+  );
+}
+
 // ============================================================================
 // Account Operations (GDPR)
 // ============================================================================
@@ -805,6 +828,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     adminImpersonate: adminImpersonateLimiter,
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,
+    adminOutreach: adminOutreachLimiter,
     dspDiscovery: dspDiscoveryLimiter,
     isrcRescan: isrcRescanLimiter,
     trackingClicks: trackingClicksLimiter,
