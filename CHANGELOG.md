@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.3.6] - 2026-03-17
+## [26.4.1] - 2026-03-17
 
 ### Added
 
@@ -18,6 +18,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Strip control characters from subscriber names in plain text emails to prevent formatting injection
 - 5-minute time window on name update endpoint to prevent abuse of the unauthenticated API
+
+## [26.4.0] - 2026-03-17
+
+### Added
+
+- Tour date ticket click tracking on public profile and dedicated tour page via shared `useTourDateTicketClick` hook
+- Tour date analytics sidebar card in dashboard — ticket clicks, top cities, and top referrers per show
+- API endpoint `GET /api/dashboard/tour-dates/[id]/analytics` with ownership verification and UUID validation
+- `useTourDateAnalyticsQuery` React Query hook for client-side analytics fetching
+- `tour_date` content type support in click tracking validation
+- Comprehensive tour date seed data (12 venues across 7 countries)
+- Test coverage: API route (auth, validation, ownership, errors), hook, sidebar analytics UI, and validation
+
+### Changed
+
+- Extracted shared `useTourDateTicketClick` hook from duplicated click handlers in `TourDateCard` and `TourModePanel`
+
+### Fixed
+
+- Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
 
 ## [26.3.5] - 2026-03-17
 

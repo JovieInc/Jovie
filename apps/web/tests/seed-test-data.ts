@@ -23,6 +23,7 @@ const {
   discogReleases,
   discogTracks,
   providerLinks,
+  tourDates,
 } = schema;
 
 interface TestProfile {
@@ -190,6 +191,265 @@ function generateTracks(
     });
   }
   return tracks;
+}
+
+/** Tour date template for seeding */
+interface TestTourDate {
+  /** Deterministic external ID for idempotent seeding */
+  externalId: string;
+  title: string | null;
+  venueName: string;
+  city: string;
+  region: string | null;
+  country: string;
+  provider: 'bandsintown' | 'songkick' | 'manual';
+  ticketStatus: 'available' | 'sold_out' | 'cancelled';
+  ticketUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  timezone: string | null;
+  /** Months from now (negative = past) */
+  monthsFromNow: number;
+  startTime: string | null;
+}
+
+/** Generate a future (or past) date offset by months from today */
+function dateMonthsFromNow(months: number): Date {
+  const d = new Date();
+  d.setMonth(d.getMonth() + months);
+  d.setHours(20, 0, 0, 0); // Default 8 PM
+  return d;
+}
+
+const TEST_TOUR_DATES: TestTourDate[] = [
+  {
+    externalId: 'seed-wiltern-la',
+    title: 'Summer Tour 2026',
+    venueName: 'The Wiltern',
+    city: 'Los Angeles',
+    region: 'CA',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.ticketmaster.com/event/abc123',
+    latitude: 34.05,
+    longitude: -118.24,
+    timezone: 'America/Los_Angeles',
+    monthsFromNow: 3,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-brooklyn-steel-nyc',
+    title: null,
+    venueName: 'Brooklyn Steel',
+    city: 'New York',
+    region: 'NY',
+    country: 'USA',
+    provider: 'bandsintown',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.axs.com/events/xyz456',
+    latitude: 40.71,
+    longitude: -74.01,
+    timezone: 'America/New_York',
+    monthsFromNow: 4,
+    startTime: '7:30 PM',
+  },
+  {
+    externalId: 'seed-o2-brixton-london',
+    title: 'UK Headline',
+    venueName: 'O2 Academy Brixton',
+    city: 'London',
+    region: null,
+    country: 'UK',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.eventbrite.com/e/123456',
+    latitude: 51.51,
+    longitude: -0.13,
+    timezone: 'Europe/London',
+    monthsFromNow: 5,
+    startTime: '7:00 PM',
+  },
+  {
+    externalId: 'seed-columbiahalle-berlin',
+    title: null,
+    venueName: 'Columbiahalle',
+    city: 'Berlin',
+    region: null,
+    country: 'Germany',
+    provider: 'bandsintown',
+    ticketStatus: 'sold_out',
+    ticketUrl: 'https://dice.fm/event/abc-berlin',
+    latitude: 52.52,
+    longitude: 13.4,
+    timezone: 'Europe/Berlin',
+    monthsFromNow: 5,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-zepp-divercity-tokyo',
+    title: 'Asia Tour',
+    venueName: 'Zepp DiverCity',
+    city: 'Tokyo',
+    region: null,
+    country: 'Japan',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://seatgeek.com/event/456',
+    latitude: 35.68,
+    longitude: 139.69,
+    timezone: 'Asia/Tokyo',
+    monthsFromNow: 7,
+    startTime: '7:00 PM',
+  },
+  {
+    externalId: 'seed-enmore-sydney',
+    title: null,
+    venueName: 'Enmore Theatre',
+    city: 'Sydney',
+    region: 'NSW',
+    country: 'Australia',
+    provider: 'manual',
+    ticketStatus: 'cancelled',
+    ticketUrl: 'https://www.stubhub.com/event/789',
+    latitude: -33.87,
+    longitude: 151.21,
+    timezone: 'Australia/Sydney',
+    monthsFromNow: 8,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-ryman-nashville',
+    title: null,
+    venueName: 'Ryman Auditorium',
+    city: 'Nashville',
+    region: 'TN',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.bandsintown.com/e/abc-nashville',
+    latitude: 36.16,
+    longitude: -86.78,
+    timezone: 'America/Chicago',
+    monthsFromNow: 4,
+    startTime: '7:00 PM',
+  },
+  {
+    externalId: 'seed-fillmore-sf',
+    title: 'Summer Tour 2026',
+    venueName: 'The Fillmore',
+    city: 'San Francisco',
+    region: 'CA',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.ticketmaster.com/event/def456',
+    latitude: 37.77,
+    longitude: -122.42,
+    timezone: 'America/Los_Angeles',
+    monthsFromNow: 3,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-acl-live-austin',
+    title: null,
+    venueName: 'ACL Live',
+    city: 'Austin',
+    region: 'TX',
+    country: 'USA',
+    provider: 'bandsintown',
+    ticketStatus: 'available',
+    ticketUrl: 'https://www.axs.com/events/ghi789',
+    latitude: null,
+    longitude: null,
+    timezone: 'America/Chicago',
+    monthsFromNow: 6,
+    startTime: '7:30 PM',
+  },
+  {
+    externalId: 'seed-crystal-ballroom-portland',
+    title: null,
+    venueName: 'Crystal Ballroom',
+    city: 'Portland',
+    region: 'OR',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: null,
+    latitude: 45.52,
+    longitude: -122.68,
+    timezone: 'America/Los_Angeles',
+    monthsFromNow: 5,
+    startTime: '8:00 PM',
+  },
+  {
+    externalId: 'seed-metro-chicago',
+    title: null,
+    venueName: 'Metro Chicago',
+    city: 'Chicago',
+    region: 'IL',
+    country: 'USA',
+    provider: 'manual',
+    ticketStatus: 'sold_out',
+    ticketUrl: 'https://www.ticketmaster.com/event/past123',
+    latitude: 41.88,
+    longitude: -87.63,
+    timezone: 'America/Chicago',
+    monthsFromNow: -1,
+    startTime: '9:00 PM',
+  },
+  {
+    externalId: 'seed-olympia-paris',
+    title: 'Europe Farewell',
+    venueName: "L'Olympia",
+    city: 'Paris',
+    region: null,
+    country: 'France',
+    provider: 'manual',
+    ticketStatus: 'available',
+    ticketUrl: 'https://dice.fm/event/future-paris',
+    latitude: 48.86,
+    longitude: 2.35,
+    timezone: 'Europe/Paris',
+    monthsFromNow: 12,
+    startTime: '8:30 PM',
+  },
+];
+
+/**
+ * Seeds tour dates for a creator profile.
+ * Idempotent — uses onConflictDoNothing to safely backfill.
+ */
+async function seedTourDatesForProfile(
+  db: ReturnType<typeof drizzle>,
+  profileId: string
+) {
+  console.log('    Seeding tour dates...');
+
+  for (const td of TEST_TOUR_DATES) {
+    await db
+      .insert(tourDates)
+      .values({
+        profileId,
+        externalId: td.externalId,
+        title: td.title,
+        venueName: td.venueName,
+        city: td.city,
+        region: td.region,
+        country: td.country,
+        provider: td.provider,
+        ticketStatus: td.ticketStatus,
+        ticketUrl: td.ticketUrl,
+        latitude: td.latitude,
+        longitude: td.longitude,
+        timezone: td.timezone,
+        startDate: dateMonthsFromNow(td.monthsFromNow),
+        startTime: td.startTime,
+      })
+      .onConflictDoNothing();
+  }
+
+  console.log(`    ✓ Ensured ${TEST_TOUR_DATES.length} tour dates`);
 }
 
 // Sample release data for E2E tests — covers various edge cases
@@ -475,6 +735,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           );
 
           await seedReleasesForProfile(db, createdProfile.id);
+          await seedTourDatesForProfile(db, createdProfile.id);
         } else {
           await db
             .update(users)
@@ -492,6 +753,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
           if (existingProfile) {
             await seedReleasesForProfile(db, existingProfile.id);
+            await seedTourDatesForProfile(db, existingProfile.id);
           }
         }
       }
@@ -555,6 +817,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           state: 'active',
         });
         console.log(`    ✓ Added Spotify link for ${profile.username}`);
+      }
+
+      // Add tour dates for dualipa to test public touring display
+      if (profile.username === 'dualipa') {
+        await seedTourDatesForProfile(db, createdProfile.id);
       }
 
       // Add Venmo payment link for tipping tests
