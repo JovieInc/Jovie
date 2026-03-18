@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.1",
+  "version": "26.4.2",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -77,6 +77,8 @@
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
+    "drizzle:verify": "doppler run -- tsx scripts/drizzle-migrate-verify.ts",
+    "drizzle:verify:ci": "tsx scripts/drizzle-migrate-verify.ts",
     "drizzle:migrate:preflight": "doppler run -- tsx scripts/drizzle-migrate-preflight.ts",
     "drizzle:migrate:preview": "doppler run -c stg -- GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:prod": "doppler run -c prd -- GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",
