@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.6] - 2026-03-18
+
+### Added
+
+- "See it in action" homepage section now shows real creator profiles from the database instead of fake placeholders
+- Tim's profile (`jov.ie/tim`) pinned as first card, remaining slots filled from featured creators
+- Section visibility gated by Statsig `show_see_it_in_action` gate (off by default in production)
+- New `getCreatorByHandle()` cached function for single-profile lookup with timeout guards
+
 ## [26.4.5] - 2026-03-18
 
 ### Changed
