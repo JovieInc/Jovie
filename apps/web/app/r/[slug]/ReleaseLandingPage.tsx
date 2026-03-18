@@ -20,6 +20,7 @@ import {
 } from '@/features/release/AlbumArtworkContextMenu';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { ProviderKey } from '@/lib/discography/types';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 interface Provider {
@@ -162,20 +163,7 @@ export function ReleaseLandingPage({
         },
       };
 
-      const body = JSON.stringify(payload);
-
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: 'application/json' });
-        navigator.sendBeacon('/api/track', blob);
-        return;
-      }
-
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => {
+      postJsonBeacon('/api/track', payload, () => {
         // Ignore tracking errors
       });
     },

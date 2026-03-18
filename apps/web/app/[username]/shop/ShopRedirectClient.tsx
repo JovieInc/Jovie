@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 interface ShopRedirectClientProps {
   readonly redirectUrl: string;
@@ -20,7 +21,7 @@ export function ShopRedirectClient({
     // Fire tracking beacon before redirect
     // Uses /api/track which requires: handle, linkType, target
     try {
-      const payload = JSON.stringify({
+      postJsonBeacon('/api/track', {
         handle: username,
         linkType: 'other',
         target: redirectUrl,
@@ -28,23 +29,6 @@ export function ShopRedirectClient({
           provider: 'shopify',
         },
       });
-
-      // sendBeacon with a plain string sends text/plain, but /api/track
-      // calls request.json() which needs application/json. Use a Blob.
-      const blob = new Blob([payload], { type: 'application/json' });
-
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/track', blob);
-      } else {
-        fetch('/api/track', {
-          method: 'POST',
-          body: payload,
-          keepalive: true,
-          headers: { 'Content-Type': 'application/json' },
-        }).catch(() => {
-          // Fire-and-forget — don't block redirect
-        });
-      }
     } catch {
       // Tracking failure should never block the redirect
     }

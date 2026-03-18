@@ -2,14 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { VideoProviderKey } from '@/lib/discography/types';
 
-// Mock next/image
-vi.mock('next/image', () => ({
-  __esModule: true,
-  default: (props: { alt?: string; src: string }) => (
-    <img alt={props.alt ?? ''} {...props} />
-  ),
-}));
-
 // Mock next/link
 vi.mock('next/link', () => ({
   __esModule: true,

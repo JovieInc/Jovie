@@ -17,6 +17,7 @@ import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { VideoProviderKey } from '@/lib/discography/types';
+import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import { appendUTMParamsToUrl, type PartialUTMParams } from '@/lib/utm';
 
 export interface VideoProvider {
@@ -75,20 +76,7 @@ export function SoundsLandingPage({
         },
       };
 
-      const body = JSON.stringify(payload);
-
-      if (navigator.sendBeacon) {
-        const blob = new Blob([body], { type: 'application/json' });
-        navigator.sendBeacon('/api/track', blob);
-        return;
-      }
-
-      fetch('/api/track', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-        keepalive: true,
-      }).catch(() => {
+      postJsonBeacon('/api/track', payload, () => {
         // Ignore tracking errors — don't block the user
       });
     },
