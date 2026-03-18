@@ -470,6 +470,13 @@
       "when": 1774000000000,
       "tag": "0067_drop_unused_tables_and_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1774100000000,
+      "tag": "0068_add_subscriber_name",
+      "breakpoints": true
     }
   ]
 }

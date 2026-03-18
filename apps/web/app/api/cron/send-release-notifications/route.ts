@@ -91,6 +91,7 @@ type BatchSubscriber = {
   channel: string;
   email: string | null;
   phone: string | null;
+  name: string | null;
 };
 
 // ============================================================================
@@ -224,6 +225,7 @@ async function batchFetchSubscribers(subscriptionIds: string[]) {
       channel: notificationSubscriptions.channel,
       email: notificationSubscriptions.email,
       phone: notificationSubscriptions.phone,
+      name: notificationSubscriptions.name,
     })
     .from(notificationSubscriptions)
     .where(
@@ -374,6 +376,7 @@ async function processNotificationWithBatchedData(
       username: creator.usernameNormalized,
       slug: release.slug,
       streamingLinks: links,
+      subscriberName: subscriber.name,
     });
 
     // Build sender context for "Artist Name via Jovie" emails

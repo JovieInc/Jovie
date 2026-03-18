@@ -49,3 +49,13 @@
 **Context:** Use the existing dashboard refresh button (which calls `enqueueMusicFetchEnrichmentJob()`) to manually trigger re-enrichment for each artist. With ~30 artists this is feasible manually. For larger scale, a batch script would be needed.
 
 **Depends on:** DSP registry PR must be deployed first.
+
+## Post-signup birthday capture
+
+**What:** Add an optional birthday field (month + day only, no year) to the post-signup name capture flow.
+
+**Why:** Birthday data enables future birthday notifications and fan segmentation. Month/day only avoids age-related privacy concerns.
+
+**Context:** The post-signup name capture flow (added in the name capture PR) already has the UX pattern — a lightweight optional field shown after email subscription. Adding birthday means a second field in that flow. Risk: a second field may reduce conversion on the name field. Ship name capture first, collect ~2 weeks of conversion data, then evaluate whether adding birthday is worth the friction.
+
+**Depends on:** Post-signup name capture PR must ship first. Need ~2 weeks of name capture conversion data before deciding.

@@ -70,9 +70,11 @@ export function AudienceSubscriberRow({
       />
 
       <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>
-        {row.displayName && row.displayName !== row.phone
+        {row.displayName &&
+        row.displayName !== row.phone &&
+        row.displayName !== row.email
           ? row.displayName
-          : 'Subscriber'}
+          : (row.email ?? 'Subscriber')}
       </td>
 
       <td className='px-4 py-3 align-middle text-[13px] text-primary-token'>

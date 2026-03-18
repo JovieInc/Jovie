@@ -315,6 +315,8 @@ export function ArtistNotificationsCTA({
         artistName={artist.name}
         handle={artist.handle}
         subscribedChannels={subscribedChannels}
+        artistId={artist.id}
+        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
       />
     );
   }

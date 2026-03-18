@@ -23,6 +23,8 @@ export interface ReleaseDayNotificationData {
   slug: string;
   /** Streaming links for the release */
   streamingLinks: Array<{ providerId: string; url: string }>;
+  /** Subscriber's name for personalized greeting */
+  subscriberName?: string | null;
 }
 
 /**
@@ -62,15 +64,23 @@ export function getReleaseDayNotificationSubject(
 export function getReleaseDayNotificationText(
   data: ReleaseDayNotificationData
 ): string {
-  const { artistName, releaseTitle, username, slug, streamingLinks } = data;
+  const {
+    artistName,
+    releaseTitle,
+    username,
+    slug,
+    streamingLinks,
+    subscriberName,
+  } = data;
   const releaseUrl = buildReleaseUrl(username, slug);
+  const greeting = subscriberName ? `Hey ${subscriberName}, ` : '';
 
   const linksList = streamingLinks
     .slice(0, 4)
     .map(link => `- ${getProviderLabel(link.providerId)}: ${link.url}`)
     .join('\n');
 
-  return `${artistName} just dropped new music
+  return `${greeting}${artistName} just dropped new music
 
 "${releaseTitle}" is out now.
 
@@ -97,12 +107,14 @@ export function getReleaseDayNotificationHtml(
     username,
     slug,
     streamingLinks,
+    subscriberName,
   } = data;
   const releaseUrl = buildReleaseUrl(username, slug);
 
   // Escape user-provided values to prevent XSS
   const safeArtistName = escapeHtml(artistName);
   const safeReleaseTitle = escapeHtml(releaseTitle);
+  const safeSubscriberName = subscriberName ? escapeHtml(subscriberName) : null;
   const safeArtworkUrl = artworkUrl ? escapeHtml(artworkUrl) : null;
 
   // Build streaming link buttons
@@ -159,6 +171,7 @@ export function getReleaseDayNotificationHtml(
           <!-- Main Content -->
           <tr>
             <td style="padding: 16px 32px 24px;">
+              ${safeSubscriberName ? `<p style="margin: 0 0 4px; font-size: 15px; color: #666; text-align: center;">Hey ${safeSubscriberName},</p>` : ''}
               <h1 style="margin: 0 0 8px; font-size: 20px; font-weight: 600; color: #000; text-align: center;">
                 ${safeArtistName} just dropped new music
               </h1>
