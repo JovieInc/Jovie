@@ -71,6 +71,7 @@ export function SettingsBrandingSection({
           disabled={isPending}
           ariaLabel='Hide Jovie branding'
           gated={!isPro}
+          gateFeatureContext='Remove branding'
         />
         {isPro && hideBranding ? (
           <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 p-3.5'>

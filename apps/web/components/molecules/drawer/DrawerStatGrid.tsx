@@ -13,10 +13,11 @@ export interface DrawerStatGridProps {
 export function DrawerStatGrid({
   children,
   className,
-  variant = 'card',
+  variant = 'flush',
 }: DrawerStatGridProps) {
   return (
     <DrawerSurfaceCard
+      variant={variant === 'card' ? 'card' : 'flat'}
       className={cn(
         'grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)',
         variant === 'card'

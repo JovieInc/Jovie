@@ -28,6 +28,7 @@ export const APP_ROUTES = {
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',
   INSIGHTS: '/app/insights',
+  PRESENCE: '/app/presence',
 
   // Settings
   SETTINGS: '/app/settings',
@@ -78,6 +79,7 @@ export const APP_ROUTES = {
   SIGNIN: '/signin',
   SIGNUP: '/signup',
   ONBOARDING: '/onboarding',
+  ONBOARDING_CHECKOUT: '/onboarding/checkout',
   WAITLIST: '/waitlist',
 
   // Billing
