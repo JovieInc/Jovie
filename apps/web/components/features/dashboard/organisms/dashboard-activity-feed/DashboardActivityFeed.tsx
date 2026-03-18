@@ -46,7 +46,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
     <>
       <span
         aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-base shadow-[0_0_0_3px_var(--linear-bg-surface-0)] group-hover:shadow-[0_0_0_3px_var(--linear-bg-surface-1)] group-focus-visible:shadow-[0_0_0_3px_var(--linear-bg-surface-1)]'
+        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-base shadow-ring-surface-0 group-hover:shadow-ring-surface-1 group-focus-visible:shadow-ring-surface-1'
       >
         <span className='scale-90 text-tertiary-token'>{activity.icon}</span>
       </span>
@@ -112,7 +112,7 @@ export function DashboardActivityFeed({
     <div className='space-y-3' data-testid='dashboard-activity-feed'>
       <div className='flex items-center justify-between gap-4'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-[0_0_0_3px_var(--linear-bg-surface-0)]'>
+          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0'>
             <Zap className='h-3.5 w-3.5 text-tertiary-token' />
           </div>
           <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>

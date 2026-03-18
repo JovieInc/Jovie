@@ -30,8 +30,8 @@ fi
 errors=()
 
 # 1. TypeScript type check
-if ! pnpm --filter web exec tsc --noEmit >/dev/null 2>&1; then
-  errors+=("TypeScript type check failed — run: pnpm --filter web exec tsc --noEmit")
+if ! pnpm --filter @jovie/web exec tsc --noEmit >/dev/null 2>&1; then
+  errors+=("TypeScript type check failed — run: pnpm --filter @jovie/web exec tsc --noEmit")
 fi
 
 # 2. Biome lint
@@ -40,13 +40,13 @@ if ! pnpm biome check apps/web --no-errors-on-unmatched >/dev/null 2>&1; then
 fi
 
 # 3. Server/client boundary check (most common bug source)
-if ! pnpm --filter web lint:server-boundaries >/dev/null 2>&1; then
-  errors+=("Server/client boundary violations found — run: pnpm --filter web lint:server-boundaries")
+if ! pnpm --filter @jovie/web lint:server-boundaries >/dev/null 2>&1; then
+  errors+=("Server/client boundary violations found — run: pnpm --filter @jovie/web lint:server-boundaries")
 fi
 
-# 4. Run affected tests
-if ! pnpm vitest --run --changed >/dev/null 2>&1; then
-  errors+=("Affected tests failed — run: pnpm vitest --run --changed")
+# 4. Run affected tests (run from apps/web since vitest is not a root script)
+if ! (cd apps/web && pnpm exec vitest run --changed) >/dev/null 2>&1; then
+  errors+=("Affected tests failed — run: cd apps/web && pnpm exec vitest run --changed")
 fi
 
 # Build the JSON response safely using python3

@@ -81,7 +81,7 @@ export function AudienceTableLoadingShell() {
 
           <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
             <div className='px-4 py-4 sm:px-6'>
-              <div className='overflow-hidden rounded-xl border border-subtle bg-(--linear-app-content-surface) shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'>
+              <div className='overflow-hidden rounded-xl border border-subtle bg-(--linear-app-content-surface) shadow-subtle-bottom dark:shadow-inset-highlight'>
                 <div className='grid grid-cols-7 gap-4 border-b border-subtle px-4 py-3'>
                   {AUDIENCE_TABLE_HEADER_KEYS.map(key => (
                     <LoadingSkeleton

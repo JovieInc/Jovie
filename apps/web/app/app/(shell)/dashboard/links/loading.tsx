@@ -12,7 +12,7 @@ const LINKS_LOADING_ROW_KEYS = Array.from(
 export default function LinksLoading() {
   return (
     <div className='min-h-screen'>
-      <div className='rounded-xl border border-subtle bg-(--linear-app-content-surface) p-6 shadow-[0_1px_0_rgba(0,0,0,0.04)] dark:shadow-[0_1px_0_rgba(255,255,255,0.03)]'>
+      <div className='rounded-xl border border-subtle bg-(--linear-app-content-surface) p-6 shadow-subtle-bottom dark:shadow-inset-highlight'>
         <div className='space-y-2'>
           <LoadingSkeleton height='h-7' width='w-40' />
           <LoadingSkeleton height='h-4' width='w-72' />

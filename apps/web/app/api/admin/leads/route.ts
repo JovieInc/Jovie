@@ -224,8 +224,8 @@ export async function GET(request: NextRequest) {
           .from(leads)
           .where(where)
           .orderBy(orderFn(orderColumn))
-          .limit(query.limit)
-          .offset((query.page - 1) * query.limit),
+          .limit(query.pageSize)
+          .offset((query.page - 1) * query.pageSize),
         db.select({ count: count() }).from(leads).where(where),
       ]);
     } catch (error) {
@@ -285,8 +285,8 @@ export async function GET(request: NextRequest) {
           .from(leads)
           .where(where)
           .orderBy(desc(leads.createdAt))
-          .limit(query.limit)
-          .offset((query.page - 1) * query.limit),
+          .limit(query.pageSize)
+          .offset((query.page - 1) * query.pageSize),
         db.select({ count: count() }).from(leads).where(where),
       ]);
     }
@@ -328,10 +328,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(
       {
-        items: normalizedItems,
+        rows: normalizedItems,
         total: totalRow?.count ?? 0,
-        page: query.page,
-        limit: query.limit,
       },
       { status: 200, headers: NO_STORE_HEADERS }
     );
