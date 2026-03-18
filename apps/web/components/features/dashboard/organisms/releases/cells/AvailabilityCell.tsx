@@ -334,7 +334,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           }
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
-                            'rounded-[7px] border border-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                            'rounded-full border border-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                             isCopied && 'text-emerald-600 dark:text-emerald-400'
                           )}
                         >
@@ -374,7 +374,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           size='icon'
                           aria-label='Confirm URL'
                           disabled={!urlInput.trim() || isAddingUrl}
-                          className='h-8 w-8 rounded-[8px] text-tertiary-token'
+                          className='h-8 w-8 rounded-full text-tertiary-token'
                         >
                           <Icon
                             name='Check'
@@ -392,7 +392,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setUrlInput('');
                             setValidationError('');
                           }}
-                          className='h-8 w-8 rounded-[8px] text-tertiary-token'
+                          className='h-8 w-8 rounded-full text-tertiary-token'
                         >
                           <Icon
                             name='X'
