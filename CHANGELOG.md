@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.5] - 2026-03-18
+
+### Fixed
+
+- Dashboard analytics CTE now has RLS session variable set on the db connection (defense-in-depth for audience_members and notification_subscriptions queries)
+- Billing reconciliation audit log insert failure no longer silently swallows errors — failures are captured via captureCriticalError
+
+### Changed
+
+- Removed 5 app-level legacy DB transactions in favor of getSessionContext() and direct queries
+- Tour date analytics route uses getSessionContext() instead of transaction-scoped RLS setup
+- getUserAnalytics and getUserDashboardAnalytics no longer wrap queries in transactions
+- Billing reconciliation repair functions use sequential writes with error handling instead of transactions
+
+### Added
+
+- Test for billing reconciliation audit log insert failure path
+
 ## [26.4.4] - 2026-03-17
 
 ### Fixed
