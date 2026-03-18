@@ -3,7 +3,7 @@
 import { useChat } from '@ai-sdk/react';
 import { useAsyncRateLimiter } from '@tanstack/react-pacer';
 import { useQueryClient } from '@tanstack/react-query';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { matchCommand } from '@/lib/chat/command-registry';
@@ -17,6 +17,10 @@ import {
 } from '@/lib/queries';
 import { addBreadcrumb, captureException } from '@/lib/sentry/client-lite';
 
+import {
+  extractPersistableToolCalls,
+  hydratePersistedMessageParts,
+} from '../message-parts';
 import type { ArtistContext, ChatError, FileUIPart } from '../types';
 import { MAX_MESSAGE_LENGTH } from '../types';
 import {
@@ -35,20 +39,6 @@ interface UseJovieChatOptions {
   readonly onConversationCreate?: (conversationId: string) => void;
   /** Artist username — used by deterministic commands (e.g. "preview my profile") */
   readonly username?: string;
-}
-
-/**
- * Extracts tool call data from message parts for persistence.
- * Only includes parts that have a toolInvocation property to ensure consistent shape.
- */
-function extractToolCalls(
-  parts: Array<{ type: string; [key: string]: unknown }>
-): Record<string, unknown>[] | undefined {
-  const toolCalls = parts
-    .filter(p => p.type === 'tool-invocation' && p.toolInvocation != null)
-    .map(p => ({ type: p.type, toolInvocation: p.toolInvocation }));
-
-  return toolCalls.length > 0 ? toolCalls : undefined;
 }
 
 /** Interval (ms) to poll for auto-generated title after first message. */
@@ -145,7 +135,10 @@ export function useJovieChat({
       }) => ({
         id: msg.id,
         role: msg.role as 'user' | 'assistant',
-        parts: [{ type: 'text' as const, text: msg.content }],
+        parts: hydratePersistedMessageParts(
+          msg.content,
+          msg.toolCalls
+        ) as UIMessage['parts'],
         createdAt: new Date(msg.createdAt),
       })
     );
@@ -330,7 +323,7 @@ export function useJovieChat({
     }
 
     // Extract tool calls for persistence
-    const toolCalls = extractToolCalls(
+    const toolCalls = extractPersistableToolCalls(
       lastAssistantMessage.parts as Array<{
         type: string;
         [key: string]: unknown;
