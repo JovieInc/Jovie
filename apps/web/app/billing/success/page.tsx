@@ -61,9 +61,6 @@ export default function CheckoutSuccessPage() {
       flow_type: 'checkout',
       page: 'success',
     });
-    track('checkout_celebration_shown', {
-      planType: billingData?.plan ?? 'unknown',
-    });
     page('checkout_success', {
       page_type: 'billing',
       section: 'success',
@@ -72,7 +69,13 @@ export default function CheckoutSuccessPage() {
 
     const frame = requestAnimationFrame(() => setIsVisible(true));
     return () => cancelAnimationFrame(frame);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track celebration event only after billing data loads so planType is accurate
+  useEffect(() => {
+    if (!billingData?.plan) return;
+    track('checkout_celebration_shown', { planType: billingData.plan });
+  }, [billingData?.plan]);
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;

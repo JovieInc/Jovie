@@ -216,7 +216,10 @@ export function GetStartedChecklistCard({
             >
               <button
                 type='button'
-                onClick={() => toggleItem(item.id)}
+                onClick={e => {
+                  e.stopPropagation();
+                  toggleItem(item.id);
+                }}
                 className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                   isDone
                     ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
@@ -264,9 +267,52 @@ export function GetStartedChecklistCard({
 
           if (!isDone && item.href) {
             return (
-              <Link key={item.id} href={item.href} className='block'>
-                {content}
-              </Link>
+              <li
+                key={item.id}
+                className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors ${
+                  isDone ? 'opacity-60' : 'hover:bg-surface-1'
+                }`}
+              >
+                <button
+                  type='button'
+                  onClick={e => {
+                    e.stopPropagation();
+                    toggleItem(item.id);
+                  }}
+                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    isDone
+                      ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
+                      : 'border-subtle hover:border-secondary-token'
+                  }`}
+                  aria-label={
+                    isDone
+                      ? `Unmark ${item.label}`
+                      : `Mark ${item.label} as done`
+                  }
+                >
+                  {isDone ? (
+                    <Check className='h-3 w-3 text-white' aria-hidden='true' />
+                  ) : null}
+                </button>
+
+                <Link
+                  href={item.href}
+                  className='flex min-w-0 flex-1 items-center gap-3'
+                >
+                  <item.icon
+                    className='h-4 w-4 flex-shrink-0 text-tertiary-token'
+                    aria-hidden='true'
+                  />
+                  <div className='min-w-0 flex-1'>
+                    <p className='text-[13px] font-[450] text-primary-token'>
+                      {item.label}
+                    </p>
+                    <p className='text-[11px] text-tertiary-token'>
+                      {item.description}
+                    </p>
+                  </div>
+                </Link>
+              </li>
             );
           }
 
