@@ -50,7 +50,11 @@ function buildDiscographySection(releases: ReleasePromptContext[]): string {
 export function buildSystemPrompt(
   context: ArtistContext,
   releases: ReleasePromptContext[],
-  options?: { aiCanUseTools: boolean; aiDailyMessageLimit: number }
+  options?: {
+    aiCanUseTools: boolean;
+    aiDailyMessageLimit: number;
+    insightsEnabled?: boolean;
+  }
 ): string {
   const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
@@ -86,6 +90,7 @@ ${buildDiscographySection(releases)}
 - If a tool exists for the request, call it immediately with minimal preamble.
 - Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
 - You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
+${buildAnalyticsSection(options)}
 
 ## Profile Editing
 You have the ability to propose profile edits using the proposeProfileEdit tool. When the artist asks you to update their bio or display name, use this tool to show them a preview.
@@ -127,4 +132,28 @@ function buildPlanLimitationsSection(options?: {
 
 ## Plan Limitations (Free Tier)
 This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
+}
+
+function buildAnalyticsSection(options?: {
+  aiCanUseTools: boolean;
+  aiDailyMessageLimit: number;
+  insightsEnabled?: boolean;
+}): string {
+  if (options?.insightsEnabled) {
+    return `
+
+## Analytics
+- When the artist asks about audience, releases, tracks, growth, momentum, conversion, monetization, or what to focus on next, call the 'showTopInsights' tool first.
+- Use the returned insights to answer briefly and concretely.
+- Never invent downstream DSP performance or revenue figures.
+- You may describe monetization potential qualitatively, but do not expose guessed dollar values or hidden internal scoring.`;
+  }
+
+  return `
+
+## Analytics
+- You can discuss the artist's profile context and known releases, but you do not have access to insight cards in this session.
+- If the artist asks for detailed analytics, be explicit that the deeper insight view is unavailable on their current plan.
+- Never invent downstream DSP performance or revenue figures.
+- You may describe monetization potential qualitatively, but do not expose guessed dollar values or hidden internal scoring.`;
 }

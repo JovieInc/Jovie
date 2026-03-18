@@ -20,6 +20,7 @@ import { sqlAny } from '@/lib/db/sql-helpers';
 import { upsertRelease } from '@/lib/discography/queries';
 import { generateUniqueSlug } from '@/lib/discography/slug';
 import { getEntitlements } from '@/lib/entitlements/registry';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { createAuthenticatedCorsHeaders } from '@/lib/http/headers';
 import {
   classifyIntent,
@@ -37,6 +38,7 @@ import {
   summarizeCanvasStatus,
 } from '@/lib/services/canvas/service';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
+import { getInsightsSummary } from '@/lib/services/insights/lifecycle';
 import { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 import { getUserBillingInfo } from '@/lib/stripe/customer-sync/billing-info';
 import { toISOStringOrNull } from '@/lib/utils/date';
@@ -776,6 +778,32 @@ function createPromoStrategyTool(
   });
 }
 
+function createShowTopInsightsTool(profileId: string | null) {
+  return tool({
+    description:
+      'Show the artist their top audience, release, track, and monetization signals as structured insight cards. Use this when they ask what is working, what to focus on, or how their audience and releases are performing.',
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!profileId) {
+        return {
+          success: false,
+          title: 'Top signals',
+          totalActive: 0,
+          insights: [],
+        };
+      }
+
+      const summary = await getInsightsSummary(profileId);
+      return {
+        success: true,
+        title: 'Top signals',
+        totalActive: summary.totalActive,
+        insights: summary.insights,
+      };
+    },
+  });
+}
+
 /**
  * Creates the markCanvasUploaded tool.
  * Lets artists self-report that they've uploaded a canvas to Spotify for Artists.
@@ -1087,9 +1115,13 @@ function buildFreeChatTools(
  */
 function buildChatTools(
   artistContext: ArtistContext,
-  resolvedProfileId: string | null
+  resolvedProfileId: string | null,
+  insightsEnabled: boolean
 ) {
   return {
+    ...(insightsEnabled
+      ? { showTopInsights: createShowTopInsightsTool(resolvedProfileId) }
+      : {}),
     proposeProfileEdit: createProfileEditTool(artistContext),
     checkCanvasStatus: createCheckCanvasStatusTool(resolvedProfileId),
     suggestRelatedArtists: createSuggestRelatedArtistsTool(artistContext),
@@ -1279,6 +1311,10 @@ export async function POST(req: Request) {
   const billingInfo = await getUserBillingInfo();
   const userPlan = billingInfo.data?.plan ?? 'free';
   const planLimits = getEntitlements(userPlan);
+  const currentUserEntitlements = await getCurrentUserEntitlements().catch(
+    () => null
+  );
+  const insightsEnabled = currentUserEntitlements?.isPro ?? false;
 
   // Rate limiting - plan-aware daily quota + burst protection
   const rateLimitResult = await checkAiChatRateLimitForPlan(userId, userPlan);
@@ -1374,6 +1410,7 @@ export async function POST(req: Request) {
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    insightsEnabled,
   });
 
   try {
@@ -1383,7 +1420,10 @@ export async function POST(req: Request) {
     const freeTools = buildFreeChatTools(resolvedProfileId, userId);
     // Advanced tools gated behind paid plans
     const tools = planLimits.booleans.aiCanUseTools
-      ? { ...freeTools, ...buildChatTools(artistContext, resolvedProfileId) }
+      ? {
+          ...freeTools,
+          ...buildChatTools(artistContext, resolvedProfileId, insightsEnabled),
+        }
       : freeTools;
 
     const selectedModel = canUseLightModel(
