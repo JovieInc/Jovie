@@ -8,6 +8,7 @@ import { TourDateCard } from './TourDateCard';
 
 interface TourDatesListProps {
   readonly tourDates: TourDateViewModel[];
+  readonly handle: string;
 }
 
 interface TourDateWithDistance extends TourDateViewModel {
@@ -24,7 +25,10 @@ interface TourDateWithDistance extends TourDateViewModel {
  * - Sorting is memoized and only recalculated when location/dates change
  * - Haversine calculation is O(n) with ~microseconds per venue
  */
-export function TourDatesList({ tourDates }: Readonly<TourDatesListProps>) {
+export function TourDatesList({
+  tourDates,
+  handle,
+}: Readonly<TourDatesListProps>) {
   const { location, isLoading, error } = useUserLocation();
 
   const { sortedDates, nearbyCount } = useMemo(() => {
@@ -97,6 +101,7 @@ export function TourDatesList({ tourDates }: Readonly<TourDatesListProps>) {
         <TourDateCard
           key={tourDate.id}
           tourDate={tourDate}
+          handle={handle}
           isNearYou={tourDate.isNearYou}
           distanceKm={tourDate.distanceKm}
         />

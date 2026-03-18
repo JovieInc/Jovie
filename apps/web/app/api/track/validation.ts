@@ -41,7 +41,7 @@ export interface ValidatedTrackRequest {
 }
 
 export interface TrackClickContext {
-  contentType?: 'release' | 'track';
+  contentType?: 'release' | 'track' | 'tour_date';
   contentId?: string;
   provider?: string;
   smartLinkSlug?: string;
@@ -191,7 +191,11 @@ function normalizeContext(context: unknown): TrackClickContext | undefined {
   const raw = context as Record<string, unknown>;
   const normalized: TrackClickContext = {};
 
-  if (raw.contentType === 'release' || raw.contentType === 'track') {
+  if (
+    raw.contentType === 'release' ||
+    raw.contentType === 'track' ||
+    raw.contentType === 'tour_date'
+  ) {
     normalized.contentType = raw.contentType;
   }
 

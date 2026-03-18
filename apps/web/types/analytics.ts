@@ -27,6 +27,12 @@ export type AnalyticsLinkRow = {
   clicks: number;
 };
 
+export interface TourDateAnalyticsData {
+  ticketClicks: number;
+  topCities: AnalyticsCityRow[];
+  topReferrers: AnalyticsReferrerRow[];
+}
+
 export type DashboardAnalyticsResponse = {
   profile_views: number;
   unique_users?: number;

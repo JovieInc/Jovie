@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { Drawer } from 'vaul';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { useBreakpointDown } from '@/hooks/useBreakpoint';
+import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
 import { cn } from '@/lib/utils';
@@ -36,10 +37,12 @@ function TourDateRow({
   date,
   distanceMiles,
   showNearbyBadge,
+  handle,
 }: {
   readonly date: TourDateViewModel;
   readonly distanceMiles: number | null;
   readonly showNearbyBadge: boolean;
+  readonly handle: string;
 }) {
   const parsedDate = new Date(date.startDate);
   const location = formatLocationString([date.city, date.region, date.country]);
@@ -47,6 +50,12 @@ function TourDateRow({
     Boolean(date.ticketUrl) &&
     date.ticketStatus !== 'cancelled' &&
     date.ticketStatus !== 'sold_out';
+
+  const handleTicketClick = useTourDateTicketClick(
+    handle,
+    date.id,
+    date.ticketUrl
+  );
 
   return (
     <div className='rounded-xl border border-subtle bg-surface-1 px-3 py-3'>
@@ -70,14 +79,15 @@ function TourDateRow({
           </p>
         </div>
         {canBuyTickets ? (
-          <Link
+          <a
             href={date.ticketUrl as string}
+            onClick={handleTicketClick}
             target='_blank'
             rel='noopener noreferrer'
             className='rounded-full bg-accent px-3 py-1.5 text-xs font-[var(--font-weight-medium)] text-white transition-colors hover:bg-accent/90'
           >
             Tickets
-          </Link>
+          </a>
         ) : (
           <span className='rounded-full bg-surface-2 px-3 py-1.5 text-xs text-tertiary-token'>
             {date.ticketStatus === 'sold_out' ? 'Sold out' : 'No tickets'}
@@ -127,6 +137,7 @@ function TourDatesContent({
           date={item.date}
           distanceMiles={item.distanceMiles}
           showNearbyBadge
+          handle={artist.handle}
         />
       ))}
 
@@ -146,6 +157,7 @@ function TourDatesContent({
           date={item.date}
           distanceMiles={item.distanceMiles}
           showNearbyBadge={false}
+          handle={artist.handle}
         />
       ))}
     </div>
