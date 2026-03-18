@@ -60,6 +60,14 @@ vi.mock('@/components/jovie/components/ChatAvatarUploadCard', () => ({
     React.createElement('div', { 'data-testid': 'avatar-upload-card' }),
 }));
 
+vi.mock('@/components/jovie/components/ChatAnalyticsCard', () => ({
+  ChatAnalyticsCard: (props: { result: { title: string } }) =>
+    React.createElement('div', {
+      'data-testid': 'chat-analytics-card',
+      'data-title': props.result.title,
+    }),
+}));
+
 vi.mock('@/components/jovie/components/ChatLinkConfirmationCard', () => ({
   ChatLinkConfirmationCard: (props: { normalizedUrl: string }) =>
     React.createElement('div', {
@@ -233,6 +241,35 @@ describe('InlineChatArea tool invocation rendering', () => {
     );
   });
 
+  it('renders ChatAnalyticsCard for showTopInsights result', () => {
+    mockMessages = [
+      {
+        id: 'msg-1',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'tool-invocation',
+            toolInvocationId: 'tool-4',
+            toolName: 'showTopInsights',
+            state: 'result',
+            result: {
+              success: true,
+              title: 'Top signals',
+              totalActive: 2,
+              insights: [],
+            },
+          },
+        ],
+      },
+    ];
+
+    renderInlineChat();
+
+    const card = screen.getByTestId('chat-analytics-card');
+    expect(card).toBeDefined();
+    expect(card.getAttribute('data-title')).toBe('Top signals');
+  });
+
   it('does not render any cards when there are no tool invocations', () => {
     mockMessages = [
       {
@@ -251,6 +288,7 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     expect(screen.queryByTestId('profile-edit-preview-card')).toBeNull();
     expect(screen.queryByTestId('avatar-upload-card')).toBeNull();
+    expect(screen.queryByTestId('chat-analytics-card')).toBeNull();
     expect(screen.queryByTestId('link-confirmation-card')).toBeNull();
   });
 });

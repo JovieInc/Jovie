@@ -484,6 +484,13 @@
       "when": 1774200000000,
       "tag": "0069_add_subscriber_name",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1774300000000,
+      "tag": "0070_drop_subscriber_name",
+      "breakpoints": true
     }
   ]
 }

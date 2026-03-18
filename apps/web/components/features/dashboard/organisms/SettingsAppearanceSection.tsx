@@ -3,7 +3,8 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
@@ -57,17 +58,18 @@ export function SettingsAppearanceSection() {
   else if (resolvedTheme === 'dark') resolvedThemeLabel = 'Dark';
 
   return (
-    <ContentSurfaceCard className='divide-y divide-subtle/60 bg-surface-0/95'>
-      <div className='px-4 py-3.5'>
-        <div className='min-w-0'>
-          <h3 className='text-[13px] font-[510] text-primary-token'>
-            Interface theme
-          </h3>
-          <p className='mt-0.5 text-[13px] leading-normal text-tertiary-token'>
-            Pick the appearance style that feels most comfortable.
-          </p>
-        </div>
-        <div className='mt-3 grid gap-1.5 sm:grid-cols-3'>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='divide-y divide-subtle/60 overflow-hidden'
+    >
+      <ContentSectionHeader
+        title='Interface theme'
+        subtitle='Pick the appearance style that feels most comfortable.'
+        className='min-h-0 px-4 py-3'
+      />
+      <div className='px-4 py-3'>
+        <div className='grid gap-1.5 sm:grid-cols-3'>
           {THEME_OPTIONS.map(option => {
             const isSelected = selectedTheme === option.value;
             const Icon = option.icon;
@@ -126,7 +128,7 @@ export function SettingsAppearanceSection() {
         </div>
       </div>
 
-      <div className='px-4 py-2.5'>
+      <div className='px-4 py-3'>
         <SettingsToggleRow
           title='High contrast'
           description='Increase contrast for text, borders, and surfaces'
@@ -136,6 +138,6 @@ export function SettingsAppearanceSection() {
           ariaLabel='Toggle high contrast mode'
         />
       </div>
-    </ContentSurfaceCard>
+    </DashboardCard>
   );
 }

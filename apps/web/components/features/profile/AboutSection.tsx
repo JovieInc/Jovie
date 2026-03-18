@@ -53,13 +53,13 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
             {hasLocation && (
               <div className='flex items-center gap-2 text-sm text-tertiary-token'>
                 <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span>{artist.location}</span>
+                <span className='capitalize'>{artist.location}</span>
               </div>
             )}
             {hasHometown && (
               <div className='flex items-center gap-2 text-sm text-tertiary-token'>
                 <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                <span>From {artist.hometown}</span>
+                <span className='capitalize'>From {artist.hometown}</span>
               </div>
             )}
             {hasActiveSince && (
@@ -80,7 +80,7 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
               {genres.map(genre => (
                 <span
                   key={genre}
-                  className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium text-secondary-token'
+                  className='rounded-full bg-surface-2 px-3 py-1 text-xs font-medium capitalize text-secondary-token'
                 >
                   {genre}
                 </span>
