@@ -16,6 +16,8 @@ export interface SettingsToggleRowProps {
   readonly ariaLabel: string;
   readonly gated?: boolean;
   readonly gatePlanName?: string;
+  /** Feature name for contextual upgrade nudge (e.g., "Remove branding") */
+  readonly gateFeatureContext?: string;
 }
 
 export function SettingsToggleRow({
@@ -29,6 +31,7 @@ export function SettingsToggleRow({
   ariaLabel,
   gated = false,
   gatePlanName = 'Pro',
+  gateFeatureContext,
 }: SettingsToggleRowProps) {
   const reactId = React.useId();
   const baseId = id ?? `settings-toggle-${reactId}`;
@@ -67,7 +70,10 @@ export function SettingsToggleRow({
 
       <div className='flex min-h-8 items-center justify-end'>
         {gated ? (
-          <SettingsPlanGateLabel planName={gatePlanName} />
+          <SettingsPlanGateLabel
+            planName={gatePlanName}
+            featureContext={gateFeatureContext}
+          />
         ) : (
           <Switch
             checked={checked}

@@ -8,6 +8,13 @@ import { z } from 'zod';
 import { isContentClean } from '../../content-filter';
 import { httpUrlSchema, safeHttpUrlSchema } from '../base';
 
+const profilePlaceSchema = z
+  .preprocess(
+    value => (typeof value === 'string' ? value.trim() : value),
+    z.union([z.string().max(80), z.literal(''), z.null()]).optional()
+  )
+  .transform(value => (value === '' ? null : value));
+
 /**
  * Profile settings validation schema.
  * Validates dashboard settings with strict mode and payload size limit.
@@ -159,12 +166,31 @@ export const profileUpdateSchema = z
     isPublic: z.boolean().optional(),
     /** Marketing opt-out flag */
     marketingOptOut: z.boolean().optional(),
+    /** Current location shown on the public profile */
+    location: profilePlaceSchema,
+    /** Hometown shown separately from current location */
+    hometown: profilePlaceSchema,
     /** Dashboard settings */
     settings: settingsSchema.optional(),
     /** Theme preferences */
     theme: themeSchema.optional(),
     /** Venmo handle for tips */
     venmo_handle: venmoHandleSchema.optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      typeof data.location === 'string' &&
+      typeof data.hometown === 'string' &&
+      data.location.localeCompare(data.hometown, undefined, {
+        sensitivity: 'accent',
+      }) === 0
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['hometown'],
+        message: 'Hometown must be different from your current location',
+      });
+    }
   })
   .strict();
 

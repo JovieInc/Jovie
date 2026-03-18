@@ -133,6 +133,12 @@ export interface CreatorProfile {
   updated_at: string;
 }
 
+export interface ArtistSettings extends Record<string, unknown> {
+  hide_branding?: boolean;
+  exclude_self_from_analytics?: boolean;
+  hometown?: string | null;
+}
+
 // Backwards compatibility - Artist interface mapped from CreatorProfile
 export interface Artist {
   id: string;
@@ -143,10 +149,7 @@ export interface Artist {
   image_url?: string; // maps to avatar_url
   tagline?: string; // maps to bio
   theme?: Record<string, unknown>;
-  settings?: {
-    hide_branding?: boolean;
-    exclude_self_from_analytics?: boolean;
-  };
+  settings?: ArtistSettings;
   spotify_url?: string;
   apple_music_url?: string;
   youtube_url?: string;
@@ -158,6 +161,7 @@ export interface Artist {
   soundcloud_id?: string;
   venmo_handle?: string;
   location?: string | null;
+  hometown?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
   published: boolean; // maps to is_public
@@ -396,6 +400,7 @@ type CanonicalArtistProfileShape = {
   soundcloudId?: string | null;
   venmoHandle?: string | null;
   location?: string | null;
+  hometown?: string | null;
   activeSinceYear?: number | null;
   genres?: string[] | null;
   isPublic: boolean;
@@ -407,9 +412,27 @@ type CanonicalArtistProfileShape = {
   createdAt: string;
 };
 
+function getHometownFromSettings(
+  settings: Record<string, unknown> | null | undefined
+): string | null {
+  const hometown = settings?.hometown;
+  if (typeof hometown !== 'string') {
+    return null;
+  }
+
+  const trimmedHometown = hometown.trim();
+  return trimmedHometown ? trimmedHometown : null;
+}
+
 function mapCanonicalProfileToArtist(
   profile: CanonicalArtistProfileShape
 ): Artist {
+  const artistSettings = (profile.settings as ArtistSettings | null) ?? {
+    hide_branding: false,
+  };
+  const hometown =
+    profile.hometown ?? getHometownFromSettings(profile.settings);
+
   return {
     id: profile.id,
     owner_user_id: profile.userId || '',
@@ -419,9 +442,7 @@ function mapCanonicalProfileToArtist(
     image_url: profile.avatarUrl || undefined,
     tagline: profile.bio || undefined,
     theme: profile.theme || undefined,
-    settings: (profile.settings as { hide_branding?: boolean }) || {
-      hide_branding: false,
-    },
+    settings: artistSettings,
     spotify_url: profile.spotifyUrl || undefined,
     apple_music_url: profile.appleMusicUrl || undefined,
     youtube_url: profile.youtubeUrl || undefined,
@@ -432,6 +453,7 @@ function mapCanonicalProfileToArtist(
     soundcloud_id: profile.soundcloudId || undefined,
     venmo_handle: profile.venmoHandle || undefined,
     location: profile.location ?? null,
+    hometown,
     active_since_year: profile.activeSinceYear ?? null,
     genres: profile.genres ?? null,
     published: profile.isPublic,
@@ -474,6 +496,16 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
 export function convertArtistToCreatorProfile(
   artist: Artist
 ): Partial<CreatorProfile> {
+  const settings =
+    artist.settings || artist.hometown !== undefined
+      ? {
+          ...(artist.settings ?? {}),
+          ...(artist.hometown !== undefined
+            ? { hometown: artist.hometown }
+            : {}),
+        }
+      : undefined;
+
   return {
     user_id: artist.owner_user_id,
     creator_type: 'artist',
@@ -489,7 +521,7 @@ export function convertArtistToCreatorProfile(
     is_verified: artist.is_verified,
     is_featured: artist.is_featured,
     marketing_opt_out: artist.marketing_opt_out,
-    settings: artist.settings,
+    settings,
     theme: artist.theme,
   };
 }

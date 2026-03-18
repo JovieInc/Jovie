@@ -472,7 +472,7 @@ export {
   type WebhookEvent,
   webhookEvents,
 } from './suppression';
-// Tip Audience (Fan email capture from tips)
+// Tip Audience (Fan notifications from tips)
 export {
   insertTipAudienceSchema,
   type NewTipAudienceMember,

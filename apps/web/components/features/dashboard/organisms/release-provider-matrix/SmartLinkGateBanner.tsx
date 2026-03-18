@@ -35,6 +35,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
   return (
     <DrawerSurfaceCard
       as='aside'
+      variant='card'
       className={cn('flex items-start gap-3 rounded-[10px] p-3', className)}
       aria-label={
         mode === 'soft-cap'

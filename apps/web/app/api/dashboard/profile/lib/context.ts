@@ -16,7 +16,12 @@ export interface ProfileUpdateContext {
 export function buildProfileUpdateContext(
   parsedUpdates: ProfileUpdateInput
 ): ProfileUpdateContext {
-  const { username: usernameFromUpdates, ...profileUpdates } = parsedUpdates;
+  const {
+    username: usernameFromUpdates,
+    hometown,
+    settings: settingsUpdates,
+    ...profileUpdates
+  } = parsedUpdates;
   const sanitizedProfileUpdates = Object.fromEntries(
     Object.entries(profileUpdates).filter(([, value]) => value !== undefined)
   );
@@ -29,6 +34,18 @@ export function buildProfileUpdateContext(
   if (Object.hasOwn(dbProfileUpdates, 'venmo_handle')) {
     dbProfileUpdates.venmoHandle = dbProfileUpdates.venmo_handle;
     delete dbProfileUpdates.venmo_handle;
+  }
+
+  const normalizedSettings = {
+    ...(settingsUpdates ?? {}),
+  } as Record<string, unknown>;
+
+  if (Object.hasOwn(parsedUpdates, 'hometown')) {
+    normalizedSettings.hometown = hometown ?? null;
+  }
+
+  if (Object.keys(normalizedSettings).length > 0) {
+    dbProfileUpdates.settings = normalizedSettings;
   }
 
   const displayNameForUserUpdate =

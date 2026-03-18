@@ -41,13 +41,18 @@ export function SettingsProfileSection({
 
   /** Handle field changes with debounced save */
   const handleFieldChange = (
-    field: 'username' | 'displayName',
+    field: 'username' | 'displayName' | 'location' | 'hometown',
     value: string
   ) => {
     setFormData(prev => {
       const next = { ...prev, [field]: value };
       setProfileSaveStatus(s => ({ ...s, success: null, error: null }));
-      saveProfile({ displayName: next.displayName, username: next.username });
+      saveProfile({
+        displayName: next.displayName,
+        username: next.username,
+        location: next.location,
+        hometown: next.hometown,
+      });
       return next;
     });
   };
@@ -56,7 +61,7 @@ export function SettingsProfileSection({
     <ContentSurfaceCard className='overflow-hidden'>
       <ContentSectionHeader
         title='Profile identity'
-        subtitle='Control the display name, username, and public profile image fans see.'
+        subtitle='Control the display name, username, image, and place details fans see.'
         className='min-h-0 px-4 py-3'
         actions={<SettingsStatusPill status={profileSaveStatus} />}
         actionsClassName='w-auto shrink-0'
@@ -129,6 +134,54 @@ export function SettingsProfileSection({
               className={`min-w-0 flex-1 rounded-none rounded-r-[8px] border-l-0 ${PROFILE_INPUT_CLASS}`}
             />
           </div>
+        </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='shrink-0'>
+            <label
+              htmlFor='location'
+              className='text-[13px] text-primary-token'
+            >
+              Current location
+            </label>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
+              Where you are based now
+            </p>
+          </div>
+          <Input
+            type='text'
+            name='location'
+            id='location'
+            value={formData.location}
+            onChange={e => handleFieldChange('location', e.target.value)}
+            onBlur={() => flushSave()}
+            placeholder='Los Angeles, CA'
+            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+          />
+        </ContentSurfaceCard>
+
+        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='shrink-0'>
+            <label
+              htmlFor='hometown'
+              className='text-[13px] text-primary-token'
+            >
+              Hometown
+            </label>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
+              Where you are from if it differs from where you live now
+            </p>
+          </div>
+          <Input
+            type='text'
+            name='hometown'
+            id='hometown'
+            value={formData.hometown}
+            onChange={e => handleFieldChange('hometown', e.target.value)}
+            onBlur={() => flushSave()}
+            placeholder='Nashville, TN'
+            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+          />
         </ContentSurfaceCard>
       </div>
     </ContentSurfaceCard>

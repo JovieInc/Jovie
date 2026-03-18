@@ -241,10 +241,9 @@ export function Footer({
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40 order-2 sm:order-1'
+                className='order-2 text-[11px] leading-[16px] font-normal tracking-[-0.01em] sm:order-1'
                 style={{
-                  color:
-                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                  color: 'var(--linear-text-tertiary)',
                 }}
               />
               {effectiveShowThemeToggle && (
@@ -302,10 +301,9 @@ export function Footer({
             >
               <Copyright
                 variant={config.colorVariant}
-                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-40'
+                className='text-[11px] leading-[16px] font-normal tracking-[-0.01em] opacity-100'
                 style={{
-                  color:
-                    'var(--linear-text-quaternary, var(--linear-text-tertiary))',
+                  color: 'var(--linear-text-tertiary)',
                 }}
               />
               {/* Removed "Made for musicians" tagline — tightened per JOV-1094 */}

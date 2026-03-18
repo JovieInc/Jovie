@@ -229,7 +229,7 @@ export function ProfileMockup({
         <div className='mt-2 text-center text-[11px] text-tertiary-token transition-opacity duration-500'>
           {isListen
             ? 'Return visitor · preferred streaming platform'
-            : 'New visitor · email / sms capture'}
+            : 'New visitor · email / sms notification opt-in'}
         </div>
       </div>
     </figure>
