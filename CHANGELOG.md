@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.7] - 2026-03-18
+
+### Fixed
+
+- Fix admin table checkbox multi-select on Creators and Waitlist tables by removing dual selection system conflict (TanStack Table internal selection racing with custom `useRowSelection` hook)
+
+### Added
+
+- Bulk Unfeature, Enable/Disable marketing email actions for Creators table
+- Bulk Copy User IDs action for Users table
+- Bulk Approve/Disapprove actions for Waitlist table (with status-based filtering)
+- Destructive variant styling for bulk action dropdown items (Delete shows in red)
+- DRY `executeBulkAction` helper replacing 5+ near-identical bulk action handlers
+
+### Changed
+
+- Migrate Creators table from custom `AdminCreatorsToolbar` to shared `TableBulkActionsToolbar` dropdown pattern, matching Users and Waitlist tables
+- All three admin tables now use identical bulk actions toolbar UX
+
+### Removed
+
+- `AdminCreatorsToolbar.tsx` — replaced by shared `TableBulkActionsToolbar`
+
 ## [26.4.6] - 2026-03-18
 
 ### Added
