@@ -57,6 +57,7 @@ export {
   checkAccountExportRateLimit,
   checkAdminCreatorIngestRateLimit,
   checkAdminFitScoresRateLimit,
+  checkAdminOutreachRateLimit,
   checkAiChatRateLimit,
   checkAiChatRateLimitForPlan,
   checkAppleMusicRescanRateLimit,
