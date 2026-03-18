@@ -251,7 +251,8 @@ async function queryCreatorByHandle(
         .where(
           and(
             eq(creatorProfiles.username, handle),
-            eq(creatorProfiles.isPublic, true)
+            eq(creatorProfiles.isPublic, true),
+            eq(creatorProfiles.marketingOptOut, false)
           )
         )
         .limit(1),
@@ -269,13 +270,21 @@ async function queryCreatorByHandle(
     let latestReleaseType: string | null = null;
 
     if (await doesTableExist('discog_releases')) {
-      const releases = await db.query.discogReleases.findMany({
-        where: (releases, { eq: releaseEq }) =>
-          releaseEq(releases.creatorProfileId, row.id),
-        columns: { title: true, releaseType: true, releaseDate: true },
-        orderBy: (releases, { desc }) => [desc(releases.releaseDate)],
-        limit: 1,
-      });
+      const releases = await Promise.race([
+        db.query.discogReleases.findMany({
+          where: (releases, { eq: releaseEq }) =>
+            releaseEq(releases.creatorProfileId, row.id),
+          columns: { title: true, releaseType: true, releaseDate: true },
+          orderBy: (releases, { desc }) => [desc(releases.releaseDate)],
+          limit: 1,
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('discog_releases query timeout after 10s')),
+            10000
+          )
+        ),
+      ]);
 
       if (releases[0]) {
         latestReleaseTitle = releases[0].title;
