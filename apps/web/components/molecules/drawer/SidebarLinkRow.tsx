@@ -158,7 +158,7 @@ export function SidebarLinkRow({
           'group flex items-center justify-between rounded-[8px]',
           'px-4 py-3 lg:px-3 lg:py-2',
           'active:bg-surface-1 lg:active:bg-surface-1 lg:hover:bg-surface-1',
-          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
           className
         )}

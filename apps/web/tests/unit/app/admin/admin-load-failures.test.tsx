@@ -31,7 +31,7 @@ describe('admin load failures', () => {
     vi.clearAllMocks();
   });
 
-  it('shows inline message when leads fail to load without firing a toast', async () => {
+  it('shows error state when leads fail to load without firing a toast', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValue({ ok: false, json: async () => ({}) });
@@ -41,11 +41,7 @@ describe('admin load failures', () => {
     renderWithQueryClient(<LeadTable />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText(
-          'Unable to load leads right now. Try again in a moment.'
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText('Unable to load leads')).toBeInTheDocument();
     });
 
     expect(toast.error).not.toHaveBeenCalled();

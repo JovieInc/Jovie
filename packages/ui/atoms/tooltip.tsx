@@ -84,7 +84,7 @@ const TooltipContent = React.forwardRef<
         data-testid={testId}
         className={cn(
           // Base layout + spacing
-          'z-50 overflow-hidden rounded-(--linear-app-radius-item) border border-(--linear-border-default)',
+          'z-50 overflow-hidden rounded-md border border-(--linear-border-subtle)',
           'bg-(--linear-bg-surface-0) px-2 py-1 text-[12px] font-[400] tracking-[-0.011em]',
           'text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
           'max-w-[220px]',

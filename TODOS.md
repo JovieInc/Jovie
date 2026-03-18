@@ -104,3 +104,27 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M
 **Priority:** P1
 **Depends on:** Onboarding checkout step PR (provides the events to visualize).
+
+---
+
+## Card pattern unification
+
+**What:** Extend base `Card` (`packages/ui/atoms/card.tsx`) with surface variants (`default`, `marketing`, `settings`, `drawer`, `flat`), then deprecate `ContentSurfaceCard` (107 consumers) and `DrawerSurfaceCard` (28 consumers) as thin wrappers.
+
+**Why:** Three card abstractions serve overlapping purposes with different APIs (`Card` from packages/ui, `ContentSurfaceCard` with CVA surface variants, `DrawerSurfaceCard` with card/flat variant). Consolidating into one Card component with a `surface` prop reduces cognitive load, prevents further drift, and makes the design system predictable.
+
+**Context:** `ContentSurfaceCard` is at `apps/web/components/molecules/ContentSurfaceCard.tsx` with ~107 consumer files. `DrawerSurfaceCard` is at `apps/web/components/molecules/drawer/DrawerSurfaceCard.tsx` with ~28 consumers. Base `Card` is at `packages/ui/atoms/card.tsx`. The migration can be incremental — deprecate the wrappers, migrate consumers as files are touched.
+
+**Depends on:** Nothing. Independent initiative.
+
+---
+
+## Button/icon-button consolidation
+
+**What:** Add `icon-xs` (h-6 w-6) and `icon-sm` (h-7 w-7) sizes to base `Button` (`packages/ui/atoms/button.tsx`), align `DrawerButton` tone→variant naming (28 consumers), simplify `HeaderIconButton` to use base Button sizes (18 consumers), refactor `InlineIconButton` to use Button internally (15 consumers).
+
+**Why:** `DrawerButton` reimplements variant logic (tone="primary/secondary/ghost" with custom TONE_CLASSNAMES) that already exists in base Button's variant system. `HeaderIconButton` maintains its own SIZE_CLASS_MAP (xs/sm/md) that duplicates what should be base Button sizes. `InlineIconButton` doesn't use Button at all — it renders raw `<button>`/`<a>` elements.
+
+**Context:** Files: `apps/web/components/molecules/drawer/DrawerButton.tsx`, `apps/web/components/atoms/HeaderIconButton.tsx`, `apps/web/components/atoms/InlineIconButton.tsx`. Base Button at `packages/ui/atoms/button.tsx` already has CVA variants. HeaderIconButton already has tests at `apps/web/tests/unit/atoms/HeaderIconButton.test.tsx`.
+
+**Depends on:** Nothing. Independent initiative.

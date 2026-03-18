@@ -50,7 +50,7 @@ export function ProfileAnalyticsSummary() {
   // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <DrawerSurfaceCard className='overflow-hidden bg-surface-0'>
+      <DrawerSurfaceCard variant='card' className='overflow-hidden'>
         <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
           <div className='pr-3'>
             <div className='h-[10px] w-16 rounded skeleton' />
@@ -73,7 +73,7 @@ export function ProfileAnalyticsSummary() {
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <DrawerSurfaceCard className='overflow-hidden bg-surface-0'>
+    <DrawerSurfaceCard variant='card' className='overflow-hidden'>
       <DrawerStatGrid
         className={cn(
           'p-3.5 transition-opacity duration-150',

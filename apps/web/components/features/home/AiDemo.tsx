@@ -204,7 +204,7 @@ export function AiDemo() {
     <figure
       ref={containerRef}
       aria-label='AI writing demo'
-      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-[inset_0_0_0_1px_var(--linear-panel-ring)] font-sans'
+      className='rounded-t-xl rounded-b-none overflow-hidden bg-surface-0 shadow-panel-ring font-sans'
     >
       <style>{`
         @keyframes segmentIn {

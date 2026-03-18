@@ -11,7 +11,11 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerSurfaceCard,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -422,61 +426,65 @@ export function ProfileContactSidebar() {
       headerActions={headerActions}
       entityHeader={
         <div className='space-y-3.5'>
-          <ProfileContactHeader
-            displayName={displayName}
-            username={username}
-            avatarUrl={avatarUrl}
-            editable
-            onDisplayNameChange={handleDisplayNameChange}
-            onAvatarUpload={handleAvatarUpload}
-          />
+          <DrawerSurfaceCard variant='card' className='p-3.5'>
+            <ProfileContactHeader
+              displayName={displayName}
+              username={username}
+              avatarUrl={avatarUrl}
+              editable
+              onDisplayNameChange={handleDisplayNameChange}
+              onAvatarUpload={handleAvatarUpload}
+            />
+          </DrawerSurfaceCard>
 
           {/* Analytics summary */}
           <ProfileAnalyticsSummary />
 
           {/* Profile URL */}
-          <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3 border-t border-subtle/65 pt-3'>
-            <Label className='text-xs font-medium text-secondary-token'>
-              Profile link
-            </Label>
-            <div className='flex items-center gap-2'>
-              <CopyLinkInput
-                url={profileUrl}
-                size='md'
-                className='flex-1'
-                inputClassName='h-8 px-3 py-2'
-              />
-              <Button
-                type='button'
-                size='icon'
-                variant='ghost'
-                className='h-8 w-8 shrink-0 border border-subtle bg-surface-1'
-                onClick={() =>
-                  globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
-                }
-                aria-label='Open public profile'
-              >
-                <ExternalLink className='h-4 w-4' aria-hidden='true' />
-              </Button>
-              <CommonDropdown
-                variant='dropdown'
-                size='compact'
-                align='end'
-                side='bottom'
-                items={profileShareItems}
-                trigger={
-                  <AppIconButton
-                    type='button'
-                    variant='ghost'
-                    className='h-8 w-8 shrink-0'
-                    ariaLabel='Open profile share options'
-                  >
-                    <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
-                  </AppIconButton>
-                }
-              />
+          <DrawerSurfaceCard variant='card' className='p-3.5'>
+            <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
+              <Label className='text-xs font-medium text-secondary-token'>
+                Profile link
+              </Label>
+              <div className='flex items-center gap-2'>
+                <CopyLinkInput
+                  url={profileUrl}
+                  size='md'
+                  className='flex-1'
+                  inputClassName='h-8 px-3 py-2'
+                />
+                <Button
+                  type='button'
+                  size='icon'
+                  variant='ghost'
+                  className='h-8 w-8 shrink-0 border border-subtle bg-surface-1'
+                  onClick={() =>
+                    globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
+                  }
+                  aria-label='Open public profile'
+                >
+                  <ExternalLink className='h-4 w-4' aria-hidden='true' />
+                </Button>
+                <CommonDropdown
+                  variant='dropdown'
+                  size='compact'
+                  align='end'
+                  side='bottom'
+                  items={profileShareItems}
+                  trigger={
+                    <AppIconButton
+                      type='button'
+                      variant='ghost'
+                      className='h-8 w-8 shrink-0'
+                      ariaLabel='Open profile share options'
+                    >
+                      <MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+                    </AppIconButton>
+                  }
+                />
+              </div>
             </div>
-          </div>
+          </DrawerSurfaceCard>
         </div>
       }
       tabs={

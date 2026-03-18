@@ -57,10 +57,10 @@ export const cardTokens = {
   // Using semantic shadow variables defined in design-system.css
   shadow: {
     none: 'shadow-none',
-    subtle: 'shadow-[var(--shadow-sm)]',
-    default: 'shadow-[var(--shadow-md)]',
-    medium: 'shadow-[var(--shadow-lg)]',
-    large: 'shadow-[var(--shadow-xl)]',
+    subtle: 'shadow-sm',
+    default: 'shadow-md',
+    medium: 'shadow-lg',
+    large: 'shadow-xl',
   },
 
   // Sophisticated border system using design tokens
@@ -77,14 +77,14 @@ export const cardTokens = {
     hover: tw`
       hover:bg-[var(--color-bg-surface-2)]
       hover:border-[var(--color-border-default)]
-      hover:shadow-[var(--shadow-lg)]
+      hover:shadow-lg
       hover:-translate-y-0.5
       transition-all ${timing.normal} ${timing.easing}
     `,
 
     active: tw`
       active:bg-[var(--color-bg-surface-3)]
-      active:shadow-[var(--shadow-sm)]
+      active:shadow-sm
       active:translate-y-0
       active:scale-[0.99]
     `,
@@ -118,7 +118,7 @@ export const cardTokens = {
     // Default static card - responsive padding
     default: tw`
       bg-surface-1
-      shadow-[0_1px_0_rgba(0,0,0,0.03)]
+      shadow-subtle-bottom-sm
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
@@ -132,7 +132,7 @@ export const cardTokens = {
       hover:shadow-(--linear-shadow-card-elevated)
       hover:-translate-y-0.5
       active:translate-y-0
-      active:shadow-[0_1px_0_rgba(0,0,0,0.03)]
+      active:shadow-subtle-bottom-sm
       focus-visible:outline-none
       focus-visible:ring-2
       focus-visible:ring-(--linear-border-focus)
@@ -142,7 +142,7 @@ export const cardTokens = {
     // Settings card - elevated surface, no hover effects (Linear-style)
     settings: tw`
       bg-surface-1
-      shadow-[0_1px_0_rgba(0,0,0,0.03)]
+      shadow-subtle-bottom-sm
       dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]
     `,
 
@@ -166,9 +166,9 @@ export const cardTokens = {
       border border-[var(--color-border-default)]
       rounded-xl
       p-4 sm:p-6
-      shadow-[var(--shadow-sm)]
+      shadow-sm
       transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-md)]
+      hover:shadow-md
     `,
 
     // Floating card - modal-like presence, responsive padding
@@ -177,7 +177,7 @@ export const cardTokens = {
       border border-[var(--color-border-default)]
       rounded-xl
       p-4 sm:p-6
-      shadow-[var(--shadow-xl)]
+      shadow-xl
       backdrop-blur-lg
       transition-all ${timing.slow} ${timing.easing}
     `,
@@ -187,7 +187,7 @@ export const cardTokens = {
       relative
       bg-[var(--color-bg-surface-1)]
       rounded-2xl
-      shadow-[var(--shadow-lg)]
+      shadow-lg
       ring-1
       ring-[var(--color-border-subtle)]
       transition-all ${timing.slow} ${timing.easing}
@@ -199,9 +199,9 @@ export const cardTokens = {
       border border-[var(--color-border-subtle)]
       rounded-2xl
       p-6 sm:p-8
-      shadow-[var(--shadow-sm)]
+      shadow-sm
       transition-all ${timing.slow} ${timing.easing}
-      hover:shadow-[var(--shadow-md)]
+      hover:shadow-md
       hover:border-[var(--color-accent-subtle)]
     `,
 
