@@ -15,6 +15,7 @@ import { z } from 'zod';
 
 import { type DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
   extractMusicFetchLinks,
   mapMusicFetchProfileFields,
@@ -49,6 +50,8 @@ export interface MusicFetchEnrichmentResult {
   dspFieldsUpdated: string[];
   socialLinksInserted: number;
   socialLinksUpdated: number;
+  releasesImported: number;
+  releasesFailed: number;
   errors: string[];
 }
 
@@ -80,6 +83,8 @@ export async function processMusicFetchEnrichmentJob(
     dspFieldsUpdated: [],
     socialLinksInserted: 0,
     socialLinksUpdated: 0,
+    releasesImported: 0,
+    releasesFailed: 0,
     errors: [],
   };
 
@@ -204,5 +209,58 @@ export async function processMusicFetchEnrichmentJob(
     });
   }
 
+  // Import Spotify discography (releases, tracks, cross-platform links).
+  // This runs using the global db connection (not the transaction) because it
+  // makes many external API calls to Spotify and MusicFetch for link discovery.
+  const spotifyId = extractSpotifyArtistId(spotifyUrl, profile.spotifyId);
+  if (spotifyId) {
+    try {
+      const importResult = await importReleasesFromSpotify(
+        creatorProfileId,
+        spotifyId
+      );
+      result.releasesImported = importResult.imported;
+      result.releasesFailed = importResult.failed;
+
+      if (importResult.errors.length > 0) {
+        result.errors.push(...importResult.errors);
+      }
+
+      logger.info('MusicFetch enrichment: imported Spotify discography', {
+        creatorProfileId,
+        imported: importResult.imported,
+        failed: importResult.failed,
+        totalReleases: importResult.releases.length,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Spotify import failed';
+      result.errors.push(`Spotify discography import failed: ${message}`);
+      logger.error('MusicFetch enrichment: Spotify import failed', {
+        creatorProfileId,
+        error: message,
+      });
+    }
+  }
+
   return result;
+}
+
+/**
+ * Extract a Spotify artist ID from a Spotify URL or existing profile field.
+ */
+function extractSpotifyArtistId(
+  spotifyUrl: string,
+  existingSpotifyId: string | null
+): string | null {
+  if (existingSpotifyId) return existingSpotifyId;
+
+  try {
+    const url = new URL(spotifyUrl);
+    // Handle https://open.spotify.com/artist/{id} URLs
+    const match = url.pathname.match(/\/artist\/([a-zA-Z0-9]+)/);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
 }
