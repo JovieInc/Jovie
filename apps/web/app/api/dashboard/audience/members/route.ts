@@ -173,27 +173,11 @@ export async function GET(request: NextRequest) {
           tipCount: drizzleSql<number>`COALESCE(${tipAudience.tipCount}, 0)`.as(
             'tip_count'
           ),
-          ltvStreamingClicks: drizzleSql<number>`(
-            SELECT COALESCE(COUNT(*), 0)
-            FROM ${clickEvents}
-            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-              AND ${clickEvents.linkType} = 'listen'
-              AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-          )`.as('ltv_streaming_clicks'),
-          ltvTipClickValueCents: drizzleSql<number>`(
-            SELECT COALESCE(
-              SUM(
-                CASE
-                  WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
-                    THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
-                  ELSE 0
-                END
-              ),
-              0
-            )
-            FROM ${clickEvents}
-            WHERE ${clickEvents.audienceMemberId} = ${audienceMembers.id}
-          )`.as('ltv_tip_click_value_cents'),
+          // LTV metrics are batch-fetched after pagination to avoid correlated subqueries.
+          ltvStreamingClicks: drizzleSql<number>`0`.as('ltv_streaming_clicks'),
+          ltvTipClickValueCents: drizzleSql<number>`0`.as(
+            'ltv_tip_click_value_cents'
+          ),
           ltvMerchSalesCents: drizzleSql<number>`0`.as('ltv_merch_sales_cents'),
           ltvTicketSalesCents: drizzleSql<number>`0`.as(
             'ltv_ticket_sales_cents'
@@ -226,6 +210,48 @@ export async function GET(request: NextRequest) {
 
       const hasMore = rawRows.length > pageSize;
       const rows = hasMore ? rawRows.slice(0, pageSize) : rawRows;
+
+      // Batch-fetch LTV click data for the current page's members.
+      // Replaces per-row correlated subqueries with a single aggregation query.
+      const memberIds = rows.map(r => r.id);
+      const ltvMap = new Map<
+        string,
+        { streamingClicks: number; tipValue: number }
+      >();
+      if (memberIds.length > 0) {
+        const ltvRows = await tx
+          .select({
+            audienceMemberId: clickEvents.audienceMemberId,
+            streamingClicks: drizzleSql<number>`COALESCE(COUNT(*) FILTER (
+                WHERE ${clickEvents.linkType} = 'listen'
+                  AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+              ), 0)`.as('streaming_clicks'),
+            tipValue: drizzleSql<number>`COALESCE(SUM(
+                CASE
+                  WHEN ${clickEvents.linkType} = 'tip' AND (${clickEvents.isBot} = false OR ${clickEvents.isBot} IS NULL)
+                    THEN COALESCE((NULLIF(${clickEvents.metadata} ->> 'tipAmountCents', '')::integer), 500)
+                  ELSE 0
+                END
+              ), 0)`.as('tip_value'),
+          })
+          .from(clickEvents)
+          .where(
+            drizzleSql`${clickEvents.audienceMemberId} IN (${drizzleSql.join(
+              memberIds.map(id => drizzleSql`${id}`),
+              drizzleSql`, `
+            )})`
+          )
+          .groupBy(clickEvents.audienceMemberId);
+
+        for (const row of ltvRows) {
+          if (row.audienceMemberId) {
+            ltvMap.set(row.audienceMemberId, {
+              streamingClicks: row.streamingClicks,
+              tipValue: row.tipValue,
+            });
+          }
+        }
+      }
 
       // Build next-page cursor from the last returned row.
       let nextCursor: string | null = null;
@@ -267,8 +293,8 @@ export async function GET(request: NextRequest) {
         purchaseCount: member.purchaseCount,
         tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
         tipCount: member.tipCount ?? 0,
-        ltvStreamingClicks: member.ltvStreamingClicks ?? 0,
-        ltvTipClickValueCents: member.ltvTipClickValueCents ?? 0,
+        ltvStreamingClicks: ltvMap.get(member.id)?.streamingClicks ?? 0,
+        ltvTipClickValueCents: ltvMap.get(member.id)?.tipValue ?? 0,
         ltvMerchSalesCents: member.ltvMerchSalesCents ?? 0,
         ltvTicketSalesCents: member.ltvTicketSalesCents ?? 0,
         tags: Array.isArray(member.tags) ? member.tags : [],
