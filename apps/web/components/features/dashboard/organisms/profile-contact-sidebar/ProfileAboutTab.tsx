@@ -22,7 +22,7 @@ export function ProfileAboutTab({
 
   return (
     <div className='space-y-5'>
-      <DrawerSection title='Bio'>
+      <DrawerSection title='Bio' collapsible={false}>
         {bio ? (
           <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
             {bio}
@@ -34,7 +34,7 @@ export function ProfileAboutTab({
         )}
       </DrawerSection>
 
-      <DrawerSection title='Genres'>
+      <DrawerSection title='Genres' collapsible={false}>
         {hasGenres ? (
           <div className='flex flex-wrap gap-1.5'>
             {genres.map(genre => (
@@ -50,7 +50,7 @@ export function ProfileAboutTab({
         )}
       </DrawerSection>
 
-      <DrawerSection title='Settings'>
+      <DrawerSection title='Settings' collapsible={false}>
         <DrawerAsyncToggle
           label='Photo downloads'
           ariaLabel='Allow profile photo downloads on public pages'

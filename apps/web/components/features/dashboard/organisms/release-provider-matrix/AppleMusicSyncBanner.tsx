@@ -179,6 +179,7 @@ export function AppleMusicSyncBanner({
   if (syncState === 'no_match') {
     return (
       <DrawerSurfaceCard
+        variant='card'
         className={cn(
           'flex items-center gap-3 px-4 py-3 text-secondary-token',
           className
@@ -198,6 +199,7 @@ export function AppleMusicSyncBanner({
 
   return (
     <DrawerSurfaceCard
+      variant='card'
       className={cn(
         'flex items-center gap-3 border-[#FA243C]/20 bg-[#FA243C]/5 px-4 py-3',
         className

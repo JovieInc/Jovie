@@ -113,8 +113,9 @@ export function AudienceCRMSection() {
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-secondary-token'>
-                Profile traffic vanishes into streaming apps. Jovie captures who
-                visited, where they came from, and what they wanted.
+                Streaming apps don&apos;t tell you who&apos;s listening. Jovie
+                does — and when fans turn on notifications, you own that
+                relationship.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 Built-in fan CRM
@@ -197,7 +198,7 @@ export function AudienceCRMSection() {
 
               <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-5 py-3 text-xs text-tertiary-token'>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
-                  Captured from profile
+                  From profile
                 </span>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
                   Source tracked

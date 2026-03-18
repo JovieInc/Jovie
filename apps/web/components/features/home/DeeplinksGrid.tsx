@@ -24,7 +24,7 @@ interface ModeData {
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Capture the fan before they disappear.',
+    headline: 'Keep the fan before they disappear.',
     description:
       'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
     slug: '',

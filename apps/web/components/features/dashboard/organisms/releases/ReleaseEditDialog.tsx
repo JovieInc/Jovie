@@ -79,7 +79,7 @@ export function ReleaseEditDialog({
         {release ? (
           <div className='space-y-4'>
             {/* Release info header */}
-            <DrawerSurfaceCard className='rounded-[12px] p-4'>
+            <DrawerSurfaceCard variant='card' className='rounded-[12px] p-4'>
               <EntityHeaderCard
                 image={
                   <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-subtle bg-surface-0 shadow-none'>
@@ -123,6 +123,7 @@ export function ReleaseEditDialog({
                 return (
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
+                    variant='card'
                     className='rounded-[10px] p-3 shadow-none'
                   >
                     <div className='flex items-center justify-between gap-2'>

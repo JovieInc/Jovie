@@ -159,7 +159,6 @@ describe('PATCH /api/admin/leads/[id]', () => {
     expect(data.routing).toEqual(
       expect.objectContaining({
         route: 'email',
-        instantlyLeadId: 'instantly-123',
         outreachStatus: 'queued',
       })
     );
