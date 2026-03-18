@@ -53,11 +53,13 @@ gstack/
 │   └── skill-e2e.test.ts         # Tier 2: E2E via claude -p (~$3.85/run)
 ├── qa-only/         # /qa-only skill (report-only QA, no fixes)
 ├── plan-design-review/  # /plan-design-review skill (report-only design audit)
-├── qa-design-review/    # /qa-design-review skill (design audit + fix loop)
+├── design-review/    # /design-review skill (design audit + fix loop)
 ├── ship/            # Ship workflow skill
 ├── review/          # PR review skill
 ├── plan-ceo-review/ # /plan-ceo-review skill
 ├── plan-eng-review/ # /plan-eng-review skill
+├── office-hours/    # /office-hours skill (YC Office Hours — startup diagnostic + builder brainstorm)
+├── debug/           # /debug skill (systematic root-cause debugging)
 ├── retro/           # Retrospective skill
 ├── document-release/ # /document-release skill (post-ship doc updates)
 ├── setup            # One-time setup: build binary + symlink skills
@@ -119,12 +121,30 @@ symlink or a real copy. If it's a symlink to your working directory, be aware th
 gen-skill-docs pipeline, consider whether the changes should be tested in isolation
 before going live (especially if the user is actively using gstack in other windows).
 
+## Commit style
+
+**Always bisect commits.** Every commit should be a single logical change. When
+you've made multiple changes (e.g., a rename + a rewrite + new tests), split them
+into separate commits before pushing. Each commit should be independently
+understandable and revertable.
+
+Examples of good bisection:
+- Rename/move separate from behavior changes
+- Test infrastructure (touchfiles, helpers) separate from test implementations
+- Template changes separate from generated file regeneration
+- Mechanical refactors separate from new features
+
+When the user says "bisect commit" or "bisect and push," split staged/unstaged
+changes into logical commits and push.
+
 ## CHANGELOG style
 
 CHANGELOG.md is **for users**, not contributors. Write it like product release notes:
 
 - Lead with what the user can now **do** that they couldn't before. Sell the feature.
 - Use plain language, not implementation details. "You can now..." not "Refactored the..."
+- **Never mention TODOS.md, internal tracking, eval infrastructure, or contributor-facing
+  details.** These are invisible to users and meaningless to them.
 - Put contributor/internal changes in a separate "For contributors" section at the bottom.
 - Every entry should make someone think "oh nice, I want to try that."
 - No jargon: say "every question now tells you which project and branch you're in" not
