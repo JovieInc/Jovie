@@ -964,6 +964,22 @@ export async function checkSpotifyConnection(): Promise<{
       return { connected: true, spotifyId: profile.spotifyId, artistName };
     }
 
+    // If the Spotify import is still in progress (e.g., user just finished
+    // onboarding and the async connectSpotifyArtist hasn't written spotifyId
+    // yet), treat it as connected so we don't show the empty "Connect Spotify"
+    // state. The import banner will show instead.
+    const spotifyImportStatus =
+      typeof settings?.spotifyImportStatus === 'string'
+        ? settings.spotifyImportStatus
+        : null;
+    if (
+      artistName &&
+      (spotifyImportStatus === 'importing' ||
+        spotifyImportStatus === 'complete')
+    ) {
+      return { connected: true, spotifyId: null, artistName };
+    }
+
     // Diagnostic: spotifyArtistName in settings but no spotifyId indicates
     // a state inconsistency — the user previously connected but the ID is missing.
     if (artistName) {
@@ -973,10 +989,7 @@ export async function checkSpotifyConnection(): Promise<{
         {
           profileId: profile.id,
           artistName,
-          spotifyImportStatus:
-            typeof settings?.spotifyImportStatus === 'string'
-              ? settings.spotifyImportStatus
-              : 'none',
+          spotifyImportStatus: spotifyImportStatus ?? 'none',
         }
       );
     }

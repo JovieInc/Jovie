@@ -181,7 +181,7 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-0.5'>
-          <SidebarGroupLabel className='px-2 text-2xs tracking-tight text-sidebar-muted [font-weight:var(--font-weight-nav)]'>
+          <SidebarGroupLabel className='px-2 text-app font-[450] tracking-tight text-sidebar-muted'>
             Workspace
           </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-px'>
@@ -213,7 +213,7 @@ export function DashboardNav(_: DashboardNavProps) {
                   {index > 0 ? (
                     <div className='my-1 mx-2 border-t border-sidebar-border/70' />
                   ) : null}
-                  <p className='px-2 pb-0.5 text-[10px] uppercase tracking-[0.08em] text-sidebar-muted/85 group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2 pb-0.5 text-app font-[450] tracking-tight text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

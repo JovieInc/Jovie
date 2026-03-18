@@ -123,15 +123,15 @@ describe('GET /api/admin/leads', () => {
 
   it('returns leads with safe defaults for nullable fields', async () => {
     const request = {
-      nextUrl: new URL('http://localhost/api/admin/leads?page=1&limit=25'),
+      nextUrl: new URL('http://localhost/api/admin/leads?page=1&pageSize=20'),
     } as never;
 
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.items).toHaveLength(1);
-    expect(data.items[0]).toEqual(
+    expect(data.rows).toHaveLength(1);
+    expect(data.rows[0]).toEqual(
       expect.objectContaining({
         hasSpotifyLink: false,
         hasInstagram: false,
@@ -201,14 +201,14 @@ describe('GET /api/admin/leads', () => {
       }));
 
     const request = {
-      nextUrl: new URL('http://localhost/api/admin/leads?page=1&limit=25'),
+      nextUrl: new URL('http://localhost/api/admin/leads?page=1&pageSize=20'),
     } as never;
 
     const response = await GET(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.items[0]).toEqual(
+    expect(data.rows[0]).toEqual(
       expect.objectContaining({
         musicToolsDetected: [],
         spotifyPopularity: null,

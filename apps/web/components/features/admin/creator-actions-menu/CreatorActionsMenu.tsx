@@ -123,12 +123,16 @@ function MenuItems({
         </>
       )}
 
-      <DropdownMenuSeparator />
+      {!profile.isFeatured && (
+        <>
+          <DropdownMenuSeparator />
 
-      <DropdownMenuItem onClick={onDelete} variant='destructive'>
-        <Trash2 className='h-3.5 w-3.5' />
-        {profile.isClaimed ? 'Delete user' : 'Delete creator'}
-      </DropdownMenuItem>
+          <DropdownMenuItem onClick={onDelete} variant='destructive'>
+            <Trash2 className='h-3.5 w-3.5' />
+            {profile.isClaimed ? 'Delete user' : 'Delete creator'}
+          </DropdownMenuItem>
+        </>
+      )}
     </>
   );
 }

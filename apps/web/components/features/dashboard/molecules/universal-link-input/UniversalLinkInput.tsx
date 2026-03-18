@@ -511,7 +511,7 @@ export const UniversalLinkInput = forwardRef<
               <div
                 ref={refs.setFloating}
                 style={floatingStyles}
-                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-[0_18px_48px_rgba(0,0,0,0.22)]'
+                className='z-100 overflow-hidden rounded-b-3xl border-2 border-t-0 border-accent bg-surface-1 py-1 shadow-popover'
                 onMouseDown={event => {
                   event.preventDefault();
                 }}

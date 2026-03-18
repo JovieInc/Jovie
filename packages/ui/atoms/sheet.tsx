@@ -34,7 +34,7 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
   [
-    'fixed z-[65] gap-4 bg-surface-1 p-5 text-primary-token shadow-(--linear-shadow-card-elevated)',
+    'fixed z-[65] gap-4 bg-(--linear-bg-surface-0) p-5 text-(--linear-text-primary) shadow-(--linear-shadow-card-elevated)',
     'transition ease-in-out',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
     'data-[state=closed]:duration-300 data-[state=open]:duration-500',
@@ -44,19 +44,19 @@ const sheetVariants = cva(
     variants: {
       side: {
         top: [
-          'inset-x-0 top-0 border-b border-subtle',
+          'inset-x-0 top-0 border-b border-(--linear-border-subtle)',
           'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         ].join(' '),
         bottom: [
-          'inset-x-0 bottom-0 border-t border-subtle',
+          'inset-x-0 bottom-0 border-t border-(--linear-border-subtle)',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         ].join(' '),
         left: [
-          'inset-y-0 left-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-r border-subtle sm:max-w-sm',
+          'inset-y-0 left-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-r border-(--linear-border-subtle) sm:max-w-sm',
           'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         ].join(' '),
         right: [
-          'inset-y-0 right-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-l border-subtle sm:max-w-sm',
+          'inset-y-0 right-0 h-full w-3/4 max-w-[calc(100vw-2rem)] border-l border-(--linear-border-subtle) sm:max-w-sm',
           'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         ].join(' '),
       },
