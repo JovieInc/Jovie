@@ -31,7 +31,7 @@ ${APP_NAME} is a conversion-first link-in-bio platform built specifically for mu
 - Create a professional artist profile with a single link (jov.ie/username)
 - Automatically generate smart links for every music release
 - Connect fans to the right streaming platform (Spotify, Apple Music, YouTube, etc.)
-- Capture fan contacts (email, SMS) to build an owned audience
+- Notify fans automatically when artists release music or tour
 - Track engagement and listener analytics
 
 ## Key Page Types

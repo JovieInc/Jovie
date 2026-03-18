@@ -161,7 +161,10 @@ export function SendInviteDialog({
 
           {/* Error message */}
           {error && (
-            <DrawerSurfaceCard className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex items-center gap-2 border-destructive/20 bg-destructive/8 px-3 py-2'
+            >
               <Icon
                 name='XCircle'
                 className='h-3.5 w-3.5 text-destructive shrink-0'
@@ -172,7 +175,10 @@ export function SendInviteDialog({
 
           {/* Success message */}
           {success && (
-            <DrawerSurfaceCard className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='flex items-center gap-2 border-success/20 bg-success/8 px-3 py-2'
+            >
               <Icon
                 name='CheckCircle'
                 className='h-3.5 w-3.5 text-success shrink-0'

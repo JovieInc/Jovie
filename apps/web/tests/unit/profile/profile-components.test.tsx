@@ -13,6 +13,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileViewTracker } from '@/features/profile/ProfileViewTracker';
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -179,9 +180,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('tracks profile_view event on mount', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -194,9 +192,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('uses sendBeacon for view counting API', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -211,9 +206,6 @@ describe('ProfileViewTracker', () => {
     mockSendBeacon.mockReturnValue(false);
     mockFetch.mockResolvedValue(new Response('ok'));
 
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -229,9 +221,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('only tracks once per mount (deduplication)', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     const queryClient = createTestQueryClient();
     const { rerender } = render(
       <QueryClientProvider client={queryClient}>
@@ -251,9 +240,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('renders nothing (returns null)', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     const { container } = renderWithQueryClient(
       <ProfileViewTracker handle='testartist' artistId='artist-123' />
     );
@@ -262,9 +248,6 @@ describe('ProfileViewTracker', () => {
   });
 
   it('uses custom source when provided', async () => {
-    const { ProfileViewTracker } = await import(
-      '@/features/profile/ProfileViewTracker'
-    );
     renderWithQueryClient(
       <ProfileViewTracker
         handle='testartist'

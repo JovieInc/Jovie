@@ -24,7 +24,7 @@ interface ModeData {
 const MODES: ModeData[] = [
   {
     id: 'profile',
-    headline: 'Capture the fan before they disappear.',
+    headline: 'Keep the fan before they disappear.',
     description:
       'First-time visitors can subscribe fast. Returning fans see the next best action instead of a generic stack of links.',
     slug: '',
@@ -372,7 +372,6 @@ export function DeeplinksGrid() {
                       key={mode.id}
                       className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
                       style={{
-                        opacity: i === activeIndex ? 1 : 0.2,
                         transform:
                           i === activeIndex
                             ? 'translateX(0)'
@@ -387,12 +386,20 @@ export function DeeplinksGrid() {
                           color:
                             i === activeIndex
                               ? 'var(--linear-text-primary)'
-                              : 'var(--linear-text-tertiary)',
+                              : 'var(--linear-text-secondary)',
                           transition:
                             'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                         }}
                       >
-                        <span className='mr-2 text-xs uppercase tracking-[0.12em] text-quaternary-token'>
+                        <span
+                          className='mr-2 text-xs uppercase tracking-[0.12em]'
+                          style={{
+                            color:
+                              i === activeIndex
+                                ? 'var(--linear-text-secondary)'
+                                : 'var(--linear-text-tertiary)',
+                          }}
+                        >
                           {mode.outcome}
                         </span>
                         jov.ie/tim
@@ -401,8 +408,8 @@ export function DeeplinksGrid() {
                             style={{
                               color:
                                 i === activeIndex
-                                  ? 'var(--linear-text-primary)'
-                                  : 'var(--linear-text-quaternary)',
+                                  ? 'var(--linear-text-secondary)'
+                                  : 'var(--linear-text-tertiary)',
                             }}
                           >
                             /{mode.slug}

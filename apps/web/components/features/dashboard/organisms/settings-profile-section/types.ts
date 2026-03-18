@@ -14,5 +14,5 @@ export type ProfileSaveStatus = ProfileSaveState;
 
 export type ProfileFormData = Pick<
   ProfileIdentityFields,
-  'username' | 'displayName'
+  'username' | 'displayName' | 'location' | 'hometown'
 >;

@@ -53,6 +53,7 @@ export function TableEmptyState({
 }: TableEmptyStateProps) {
   const content = (
     <DrawerSurfaceCard
+      variant='card'
       className={cn(
         'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-[10px] bg-surface-1/25 px-4 py-10 text-center',
         className

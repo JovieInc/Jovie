@@ -20,4 +20,19 @@ describe('SmartLinkProviderButton', () => {
     fireEvent.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onClick when link with href is clicked', () => {
+    const onClick = vi.fn();
+    render(
+      <SmartLinkProviderButton
+        label='Spotify'
+        href='https://spotify.com'
+        onClick={onClick}
+      />
+    );
+
+    const link = screen.getByRole('link', { name: /spotify/i });
+    fireEvent.click(link);
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 });

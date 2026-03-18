@@ -64,6 +64,8 @@ export interface ProfileIdentityFields {
   readonly tagline: string;
   readonly imageUrl: string;
   readonly hideBranding: boolean;
+  readonly location: string;
+  readonly hometown: string;
   readonly profilePath: string;
 }
 
