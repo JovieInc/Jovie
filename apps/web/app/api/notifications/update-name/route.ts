@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte } from 'drizzle-orm';
 import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
@@ -13,6 +13,9 @@ import {
 } from '../route-helpers';
 
 export const runtime = 'nodejs';
+
+/** Only allow name updates within 5 minutes of subscription creation. */
+const NAME_UPDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
  * Strip HTML tags from a string to prevent stored XSS.
@@ -68,22 +71,27 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
+    const cutoff = new Date(Date.now() - NAME_UPDATE_WINDOW_MS);
     const result = await db
       .update(notificationSubscriptions)
       .set({ name: sanitizedName })
       .where(
         and(
           eq(notificationSubscriptions.creatorProfileId, artist_id),
-          eq(notificationSubscriptions.email, email)
+          eq(notificationSubscriptions.email, email),
+          gte(notificationSubscriptions.createdAt, cutoff)
         )
       )
       .returning({ id: notificationSubscriptions.id });
 
     if (result.length === 0) {
-      logger.warn('[Update Name] Subscription not found', {
-        artist_id,
-        email,
-      });
+      logger.warn(
+        '[Update Name] Subscription not found or outside update window',
+        {
+          artist_id,
+          email,
+        }
+      );
       return createNotificationJsonResponse(
         { success: false, error: 'Subscription not found' },
         404,
