@@ -3,7 +3,14 @@
 import { Badge } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
-import { Check, ExternalLink, Loader2, Search, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  ExternalLink,
+  Loader2,
+  Search,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -303,6 +310,12 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
           />
         }
       />
+      {isError && leads.length > 0 && (
+        <div className='flex items-center gap-2 border-b border-subtle bg-warning/5 px-4 py-2 text-[13px] text-warning'>
+          <AlertTriangle className='h-3.5 w-3.5 shrink-0' />
+          Unable to refresh leads. Showing cached data.
+        </div>
+      )}
       <UnifiedTable
         data={leads}
         columns={columns as ColumnDef<AdminLead, unknown>[]}
