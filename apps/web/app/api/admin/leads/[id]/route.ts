@@ -69,7 +69,7 @@ export async function PATCH(
         );
       }
 
-      pipelineLog('approve', 'Lead rejected', { leadId: id });
+      pipelineLog('reject', 'Lead rejected', { leadId: id });
       return NextResponse.json(updated, {
         status: 200,
         headers: NO_STORE_HEADERS,

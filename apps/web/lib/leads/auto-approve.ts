@@ -151,7 +151,7 @@ export async function runAutoApprove(
   await db
     .update(leadPipelineSettings)
     .set({
-      autoIngestedToday: settings.autoIngestedToday + approved,
+      autoIngestedToday: drizzleSql`${leadPipelineSettings.autoIngestedToday} + ${approved}`,
       updatedAt: new Date(),
     })
     .where(eq(leadPipelineSettings.id, 1));

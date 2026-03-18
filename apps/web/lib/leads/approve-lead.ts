@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { type Lead, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
@@ -35,16 +35,26 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
 
   pipelineLog('approve', 'Starting approval pipeline', { leadId });
 
-  // 1. Update status to approved
+  // 1. Atomically update status to approved (guard against concurrent approval)
   const now = new Date();
-  await db
+  const [updated] = await db
     .update(leads)
     .set({
       status: 'approved',
       approvedAt: now,
       updatedAt: now,
     })
-    .where(eq(leads.id, leadId));
+    .where(and(eq(leads.id, leadId), eq(leads.status, 'qualified')))
+    .returning({ id: leads.id });
+
+  if (!updated) {
+    pipelineLog(
+      'approve',
+      'Lead already approved or not in qualified state — skipping',
+      { leadId }
+    );
+    return { ingestion: null, routing: null };
+  }
 
   // 2. Ingest as creator profile
   let ingestion: ApproveLeadResult['ingestion'] = null;
