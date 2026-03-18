@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.9] - 2026-03-18
+
+### Fixed
+
+- Expand ISRC-based DSP artist discovery to include Deezer and MusicBrainz — previously hardcoded to Apple Music only, leaving built discovery code for 2 providers dead
+- Replace tautological E2E musicfetch-coverage tests with real DB and UI assertions that catch multi-DSP regressions
+
+### Added
+
+- Multi-DSP golden path assertions: poll for Apple Music, Deezer, Tidal, YouTube Music, SoundCloud IDs after Spotify connect with tiered thresholds by artist size
+- Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
+- Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
+- TODO: wrong-artist detection + multi-candidate DSP matching (PR2 follow-up)
+
 ## [26.4.8] - 2026-03-18
 
 ### Changed
