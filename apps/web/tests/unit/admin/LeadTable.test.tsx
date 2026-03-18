@@ -89,8 +89,11 @@ describe('LeadTable', () => {
     const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
-    // UnifiedTable renders a container even when loading
-    expect(document.querySelector('section')).toBeInTheDocument();
+    // UnifiedTable shows skeleton rows during loading — verify no data rows appear
+    expect(screen.queryByText('Test Lead')).not.toBeInTheDocument();
+    // Skeleton elements should be present
+    const skeletons = document.querySelectorAll('.skeleton');
+    expect(skeletons.length).toBeGreaterThan(0);
   }, 15_000);
 
   it('renders empty state when no leads exist', async () => {
@@ -187,8 +190,8 @@ describe('LeadTable', () => {
     const LeadTable = await getLeadTable();
     renderWithProviders(<LeadTable />);
 
-    expect(screen.getByTitle('Approve & ingest')).toBeInTheDocument();
-    expect(screen.getByTitle('Reject')).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Approve /)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Reject /)).toBeInTheDocument();
   });
 
   it('does not show action buttons for approved leads', async () => {

@@ -11,7 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   PageToolbar,
@@ -56,32 +56,40 @@ interface LeadTableProps {
   readonly refreshKey?: number;
 }
 
+interface ActioningState {
+  id: string;
+  status: 'approved' | 'rejected';
+}
+
 function LeadActionsCell({
   lead,
   onUpdateStatus,
-  actioningId,
+  actioning,
 }: {
   readonly lead: AdminLead;
   readonly onUpdateStatus: (
     id: string,
     status: 'approved' | 'rejected'
   ) => void;
-  readonly actioningId: string | null;
+  readonly actioning: ActioningState | null;
 }) {
   if (lead.status !== 'qualified' && lead.status !== 'discovered') {
     return null;
   }
+
+  const isBusy = actioning?.id === lead.id;
+  const isApproving = isBusy && actioning?.status === 'approved';
 
   return (
     <div className='flex gap-1'>
       <button
         type='button'
         onClick={() => onUpdateStatus(lead.id, 'approved')}
-        disabled={actioningId === lead.id}
-        className='rounded-md p-1 text-success hover:bg-success/10 disabled:opacity-50'
-        title='Approve & ingest'
+        disabled={isBusy}
+        className='rounded-full p-1 text-success hover:bg-success/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success/50 disabled:opacity-50'
+        aria-label={`Approve ${lead.displayName || lead.linktreeHandle}`}
       >
-        {actioningId === lead.id ? (
+        {isApproving ? (
           <Loader2 className='h-4 w-4 animate-spin' />
         ) : (
           <Check className='h-4 w-4' />
@@ -90,9 +98,9 @@ function LeadActionsCell({
       <button
         type='button'
         onClick={() => onUpdateStatus(lead.id, 'rejected')}
-        disabled={actioningId === lead.id}
-        className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
-        title='Reject'
+        disabled={isBusy}
+        className='rounded-full p-1 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-destructive/50 disabled:opacity-50'
+        aria-label={`Reject ${lead.displayName || lead.linktreeHandle}`}
       >
         <X className='h-4 w-4' />
       </button>
@@ -105,7 +113,9 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const sortBy: AdminLeadsSortBy = 'createdAt';
-  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [actioning, setActioning] = useState<ActioningState | null>(null);
+  const actioningRef = useRef<ActioningState | null>(null);
+  actioningRef.current = actioning;
 
   const {
     data,
@@ -137,7 +147,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
 
   const updateLeadStatus = useCallback(
     async (id: string, status: 'approved' | 'rejected') => {
-      setActioningId(id);
+      setActioning({ id, status });
       try {
         const result = await updateLeadStatusMutation.mutateAsync({
           id,
@@ -164,7 +174,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       } catch {
         toast.error(`Failed to ${status} lead`);
       } finally {
-        setActioningId(null);
+        setActioning(null);
       }
     },
     [updateLeadStatusMutation, queryClient]
@@ -268,12 +278,12 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
           <LeadActionsCell
             lead={row.original}
             onUpdateStatus={updateLeadStatus}
-            actioningId={actioningId}
+            actioning={actioningRef.current}
           />
         ),
       }),
     ],
-    [updateLeadStatus, actioningId]
+    [updateLeadStatus]
   );
 
   const handleLoadMore = useCallback(() => {
@@ -283,18 +293,14 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   return (
     <section className='flex flex-col'>
       <PageToolbar
-        start={
-          <>
-            {STATUS_OPTIONS.map(opt => (
-              <PageToolbarTabButton
-                key={opt.value}
-                label={opt.label}
-                active={statusFilter === opt.value}
-                onClick={() => setStatusFilter(opt.value)}
-              />
-            ))}
-          </>
-        }
+        start={STATUS_OPTIONS.map(opt => (
+          <PageToolbarTabButton
+            key={opt.value}
+            label={opt.label}
+            active={statusFilter === opt.value}
+            onClick={() => setStatusFilter(opt.value)}
+          />
+        ))}
         end={
           <PageToolbarSearchForm
             compact
@@ -334,9 +340,11 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
             <TableEmptyState
               title='No leads found'
               description={
-                statusFilter
-                  ? 'Try a different status filter'
-                  : 'No leads have been discovered yet'
+                search
+                  ? 'No leads match your search'
+                  : statusFilter
+                    ? 'Try a different status filter'
+                    : 'No leads have been discovered yet'
               }
             />
           )
