@@ -6,13 +6,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   mockRequireAuth,
-  mockRunLegacyDbTransaction,
+  mockGetSessionContext,
   mockDbSelect,
   mockGetTourDateAnalytics,
   mockCaptureException,
 } = vi.hoisted(() => ({
   mockRequireAuth: vi.fn(),
-  mockRunLegacyDbTransaction: vi.fn(),
+  mockGetSessionContext: vi.fn(),
   mockDbSelect: vi.fn(),
   mockGetTourDateAnalytics: vi.fn(),
   mockCaptureException: vi.fn(),
@@ -24,11 +24,7 @@ const {
 
 vi.mock('@/lib/auth/session', () => ({
   requireAuth: mockRequireAuth,
-  getSessionSetupSql: vi.fn(() => 'SET session.user_id = mock'),
-}));
-
-vi.mock('@/lib/db/legacy-transaction', () => ({
-  runLegacyDbTransaction: mockRunLegacyDbTransaction,
+  getSessionContext: mockGetSessionContext,
 }));
 
 vi.mock('@/lib/db', () => {
@@ -58,8 +54,6 @@ vi.mock('@sentry/nextjs', () => ({
   captureException: mockCaptureException,
 }));
 
-vi.mock('@/lib/db/schema/auth', () => ({ users: {} }));
-vi.mock('@/lib/db/schema/profiles', () => ({ creatorProfiles: {} }));
 vi.mock('@/lib/db/schema/tour', () => ({ tourDates: {} }));
 vi.mock('drizzle-orm', () => ({
   and: vi.fn((...args: unknown[]) => args),
@@ -123,7 +117,11 @@ describe('GET /api/dashboard/tour-dates/[id]/analytics', () => {
 
   it('returns 404 when creator profile not found', async () => {
     mockRequireAuth.mockResolvedValue('user_123');
-    mockRunLegacyDbTransaction.mockResolvedValue(undefined);
+    mockGetSessionContext.mockResolvedValue({
+      clerkUserId: 'user_123',
+      user: { id: 'db_user_1' },
+      profile: null,
+    });
 
     const response = await GET(makeRequest(), makeParams(VALID_UUID));
     const body = await response.json();
@@ -134,8 +132,10 @@ describe('GET /api/dashboard/tour-dates/[id]/analytics', () => {
 
   it('returns 404 when tour date not found or not owned', async () => {
     mockRequireAuth.mockResolvedValue('user_123');
-    mockRunLegacyDbTransaction.mockResolvedValue({
-      id: 'profile_123',
+    mockGetSessionContext.mockResolvedValue({
+      clerkUserId: 'user_123',
+      user: { id: 'db_user_1' },
+      profile: { id: 'profile_123' },
     });
     // db.select chain returns empty array (no tour date found)
     mockDbSelect.mockReturnValue({
@@ -155,8 +155,10 @@ describe('GET /api/dashboard/tour-dates/[id]/analytics', () => {
 
   it('returns analytics data for valid request', async () => {
     mockRequireAuth.mockResolvedValue('user_123');
-    mockRunLegacyDbTransaction.mockResolvedValue({
-      id: 'profile_123',
+    mockGetSessionContext.mockResolvedValue({
+      clerkUserId: 'user_123',
+      user: { id: 'db_user_1' },
+      profile: { id: 'profile_123' },
     });
     mockDbSelect.mockReturnValue({
       from: vi.fn(() => ({
@@ -185,9 +187,7 @@ describe('GET /api/dashboard/tour-dates/[id]/analytics', () => {
 
   it('returns 500 and captures to Sentry on unexpected error', async () => {
     mockRequireAuth.mockResolvedValue('user_123');
-    mockRunLegacyDbTransaction.mockRejectedValue(
-      new Error('DB connection lost')
-    );
+    mockGetSessionContext.mockRejectedValue(new Error('DB connection lost'));
 
     const response = await GET(makeRequest(), makeParams(VALID_UUID));
     const body = await response.json();
@@ -199,7 +199,11 @@ describe('GET /api/dashboard/tour-dates/[id]/analytics', () => {
 
   it('sets no-store cache headers on all responses', async () => {
     mockRequireAuth.mockResolvedValue('user_123');
-    mockRunLegacyDbTransaction.mockResolvedValue(undefined);
+    mockGetSessionContext.mockResolvedValue({
+      clerkUserId: 'user_123',
+      user: { id: 'db_user_1' },
+      profile: null,
+    });
 
     const response = await GET(makeRequest(), makeParams(VALID_UUID));
 
