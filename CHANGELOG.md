@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.3] - 2026-03-17
+
+### Fixed
+
+- Dev toolbar no longer covers page content — adds dynamic body padding so content flows above the toolbar
+- Dev toolbar can be hidden via X button, with a small "Dev" pill to bring it back
+- Hide/show state persists across page loads via localStorage
+
+## [26.4.2] - 2026-03-17
+
+### Added
+
+- Post-migration schema verification — CI now compares every Drizzle schema column against the actual database after running migrations, blocking deploys if any columns are missing
+
+### Changed
+
+- Title case genre, location, and hometown display on artist profiles and dashboard sidebar
+
 ## [26.4.1] - 2026-03-17
 
 ### Added

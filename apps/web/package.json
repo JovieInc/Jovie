@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.1",
+  "version": "26.4.3",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -12,6 +12,7 @@
     "dev:local:playwright": "next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
     "build": "next build --turbopack",
+    "analyze": "ANALYZE=true next build",
     "build:validate": "npm run validate-env && next build --turbopack",
     "start": "next start",
     "lint": "biome lint .",
@@ -77,6 +78,8 @@
     "drizzle:generate": "drizzle-kit generate",
     "drizzle:migrate": "doppler run -- tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:ci": "tsx scripts/drizzle-migrate.ts",
+    "drizzle:verify": "doppler run -- tsx scripts/drizzle-migrate-verify.ts",
+    "drizzle:verify:ci": "tsx scripts/drizzle-migrate-verify.ts",
     "drizzle:migrate:preflight": "doppler run -- tsx scripts/drizzle-migrate-preflight.ts",
     "drizzle:migrate:preview": "doppler run -c stg -- GIT_BRANCH=preview tsx scripts/drizzle-migrate.ts",
     "drizzle:migrate:prod": "doppler run -c prd -- GIT_BRANCH=production tsx scripts/drizzle-migrate.ts",
@@ -190,6 +193,7 @@
     "@clerk/clerk-js": "^5.121.1",
     "@clerk/testing": "^1.13.31",
     "@lhci/cli": "^0.15.1",
+    "@next/bundle-analyzer": "^16.1.7",
     "@playwright/test": "^1.58.2",
     "@sentry/node": "^10.39.0",
     "@storybook/addon-a11y": "^10.2.4",

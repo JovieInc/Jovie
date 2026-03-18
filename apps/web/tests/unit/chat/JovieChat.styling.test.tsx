@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { JovieChat } from '@/components/jovie/JovieChat';
-import { fastRender } from '@/tests/utils/fast-render';
+import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
   useDashboardData: () => ({
@@ -100,7 +100,9 @@ afterAll(() => {
 
 describe('JovieChat styling regressions', () => {
   it('removes extra loading borders and separator above compact chat input', () => {
-    const { container } = fastRender(<JovieChat profileId='profile-1' />);
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
 
     // Find the loading avatar element (h-8 w-8 rounded-xl with bg-surface-1)
     const loadingAvatar = container.querySelector(

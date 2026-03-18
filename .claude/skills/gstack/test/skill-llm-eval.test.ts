@@ -17,6 +17,7 @@ import * as path from 'path';
 import { callJudge, judge } from './helpers/llm-judge';
 import type { JudgeScore } from './helpers/llm-judge';
 import { EvalCollector } from './helpers/eval-store';
+import { selectTests, detectBaseBranch, getChangedFiles, LLM_JUDGE_TOUCHFILES, GLOBAL_TOUCHFILES } from './helpers/touchfiles';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 // Run when EVALS=1 is set (requires ANTHROPIC_API_KEY in env)
@@ -26,8 +27,43 @@ const describeEval = evalsEnabled ? describe : describe.skip;
 // Eval result collector
 const evalCollector = evalsEnabled ? new EvalCollector('llm-judge') : null;
 
-describeEval('LLM-as-judge quality evals', () => {
-  test('command reference table scores >= 4 on all dimensions', async () => {
+// --- Diff-based test selection ---
+let selectedTests: string[] | null = null;
+
+if (evalsEnabled && !process.env.EVALS_ALL) {
+  const baseBranch = process.env.EVALS_BASE
+    || detectBaseBranch(ROOT)
+    || 'main';
+  const changedFiles = getChangedFiles(baseBranch, ROOT);
+
+  if (changedFiles.length > 0) {
+    const selection = selectTests(changedFiles, LLM_JUDGE_TOUCHFILES, GLOBAL_TOUCHFILES);
+    selectedTests = selection.selected;
+    process.stderr.write(`\nLLM-judge selection (${selection.reason}): ${selection.selected.length}/${Object.keys(LLM_JUDGE_TOUCHFILES).length} tests\n`);
+    if (selection.skipped.length > 0) {
+      process.stderr.write(`  Skipped: ${selection.skipped.join(', ')}\n`);
+    }
+    process.stderr.write('\n');
+  }
+}
+
+/** Wrap a describe block to skip if none of its tests are selected. */
+function describeIfSelected(name: string, testNames: string[], fn: () => void) {
+  const anySelected = selectedTests === null || testNames.some(t => selectedTests!.includes(t));
+  (anySelected ? describeEval : describe.skip)(name, fn);
+}
+
+/** Skip an individual test if not selected (for multi-test describe blocks). */
+function testIfSelected(testName: string, fn: () => Promise<void>, timeout: number) {
+  const shouldRun = selectedTests === null || selectedTests.includes(testName);
+  (shouldRun ? test : test.skip)(testName, fn, timeout);
+}
+
+describeIfSelected('LLM-as-judge quality evals', [
+  'command reference table', 'snapshot flags reference',
+  'browse/SKILL.md reference', 'setup block', 'regression vs baseline',
+], () => {
+  testIfSelected('command reference table', async () => {
     const t0 = Date.now();
     const content = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
     const start = content.indexOf('## Command Reference');
@@ -53,7 +89,7 @@ describeEval('LLM-as-judge quality evals', () => {
     expect(scores.actionability).toBeGreaterThanOrEqual(4);
   }, 30_000);
 
-  test('snapshot flags section scores >= 4 on all dimensions', async () => {
+  testIfSelected('snapshot flags reference', async () => {
     const t0 = Date.now();
     const content = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
     const start = content.indexOf('## Snapshot System');
@@ -79,7 +115,7 @@ describeEval('LLM-as-judge quality evals', () => {
     expect(scores.actionability).toBeGreaterThanOrEqual(4);
   }, 30_000);
 
-  test('browse/SKILL.md overall scores >= 4', async () => {
+  testIfSelected('browse/SKILL.md reference', async () => {
     const t0 = Date.now();
     const content = fs.readFileSync(path.join(ROOT, 'browse', 'SKILL.md'), 'utf-8');
     const start = content.indexOf('## Snapshot Flags');
@@ -104,7 +140,7 @@ describeEval('LLM-as-judge quality evals', () => {
     expect(scores.actionability).toBeGreaterThanOrEqual(4);
   }, 30_000);
 
-  test('setup block scores >= 3 on actionability and clarity', async () => {
+  testIfSelected('setup block', async () => {
     const t0 = Date.now();
     const content = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
     const setupStart = content.indexOf('## SETUP');
@@ -131,7 +167,7 @@ describeEval('LLM-as-judge quality evals', () => {
     expect(scores.clarity).toBeGreaterThanOrEqual(3);
   }, 30_000);
 
-  test('regression check: compare branch vs baseline quality', async () => {
+  testIfSelected('regression vs baseline', async () => {
     const t0 = Date.now();
     const generated = fs.readFileSync(path.join(ROOT, 'SKILL.md'), 'utf-8');
     const genStart = generated.indexOf('## Command Reference');
@@ -220,10 +256,10 @@ Scores are 1-5 overall quality.`,
 
 // --- Part 7: QA skill quality evals (C6) ---
 
-describeEval('QA skill quality evals', () => {
+describeIfSelected('QA skill quality evals', ['qa/SKILL.md workflow', 'qa/SKILL.md health rubric'], () => {
   const qaContent = fs.readFileSync(path.join(ROOT, 'qa', 'SKILL.md'), 'utf-8');
 
-  test('qa/SKILL.md workflow quality scores >= 4', async () => {
+  testIfSelected('qa/SKILL.md workflow', async () => {
     const t0 = Date.now();
     const start = qaContent.indexOf('## Workflow');
     const end = qaContent.indexOf('## Health Score Rubric');
@@ -266,7 +302,7 @@ ${section}`);
     expect(scores.actionability).toBeGreaterThanOrEqual(4);
   }, 30_000);
 
-  test('qa/SKILL.md health score rubric is unambiguous', async () => {
+  testIfSelected('qa/SKILL.md health rubric', async () => {
     const t0 = Date.now();
     const start = qaContent.indexOf('## Health Score Rubric');
     const section = qaContent.slice(start);
@@ -310,8 +346,8 @@ ${section}`);
 
 // --- Part 7: Cross-skill consistency judge (C7) ---
 
-describeEval('Cross-skill consistency evals', () => {
-  test('greptile-history patterns are consistent across all skills', async () => {
+describeIfSelected('Cross-skill consistency evals', ['cross-skill greptile consistency'], () => {
+  testIfSelected('cross-skill greptile consistency', async () => {
     const t0 = Date.now();
     const reviewContent = fs.readFileSync(path.join(ROOT, 'review', 'SKILL.md'), 'utf-8');
     const shipContent = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
@@ -375,10 +411,10 @@ score (1-5): 5 = perfectly consistent, 1 = contradictory`);
 
 // --- Part 7: Baseline score pinning (C9) ---
 
-describeEval('Baseline score pinning', () => {
+describeIfSelected('Baseline score pinning', ['baseline score pinning'], () => {
   const baselinesPath = path.join(ROOT, 'test', 'fixtures', 'eval-baselines.json');
 
-  test('LLM eval scores do not regress below baselines', async () => {
+  testIfSelected('baseline score pinning', async () => {
     const t0 = Date.now();
     if (!fs.existsSync(baselinesPath)) {
       console.log('No baseline file found — skipping pinning check');

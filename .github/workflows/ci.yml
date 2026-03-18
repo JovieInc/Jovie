@@ -2345,6 +2345,10 @@ jobs:
           GIT_BRANCH: main
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
+      - name: DB verify (post-migration schema check)
+        run: pnpm --filter=@jovie/web run drizzle:verify:ci
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
