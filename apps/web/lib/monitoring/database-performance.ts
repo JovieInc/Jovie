@@ -37,6 +37,24 @@ class DatabasePerformanceMonitor {
   private queryMetrics: QueryPerformanceMetrics[] = [];
   private readonly maxMetricsHistory = 1000;
 
+  // Tiered slow-query thresholds
+  private static readonly SLOW_QUERY_WARN_MS = 500;
+  private static readonly SLOW_QUERY_ERROR_MS = 2000;
+  private static readonly SLOW_QUERY_CRITICAL_MS = 5000;
+
+  /**
+   * Normalize a query string by replacing literal values with placeholders.
+   * Groups queries like "SELECT * FROM users WHERE id = 1" and "... id = 2"
+   * under the same fingerprint.
+   */
+  private fingerprint(query: string): string {
+    return query
+      .replace(/'[^']*'/g, '?')
+      .replace(/\b\d+\b/g, '?')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   /**
    * Track query performance
    */
@@ -59,8 +77,18 @@ class DatabasePerformanceMonitor {
         rowCount: Array.isArray(result) ? result.length : 1,
       });
 
-      // Log slow queries
-      if (duration > 1000) {
+      // Tiered slow-query alerting
+      if (duration > DatabasePerformanceMonitor.SLOW_QUERY_CRITICAL_MS) {
+        captureError(
+          `Critical slow query: ${queryName} (${duration.toFixed(0)}ms)`,
+          new Error('Critical slow query')
+        );
+      } else if (duration > DatabasePerformanceMonitor.SLOW_QUERY_ERROR_MS) {
+        captureError(
+          `Slow query: ${queryName} (${duration.toFixed(0)}ms)`,
+          new Error('Slow query')
+        );
+      } else if (duration > DatabasePerformanceMonitor.SLOW_QUERY_WARN_MS) {
         captureWarning(`Slow query detected: ${queryName}`, {
           duration: duration.toFixed(2),
         });
@@ -179,19 +207,38 @@ class DatabasePerformanceMonitor {
   }
 
   /**
-   * Get connection pool statistics
+   * Get connection pool statistics from pg_stat_activity.
+   * Falls back gracefully if Neon restricts access.
    */
   async getConnectionStats(): Promise<ConnectionPoolMetrics> {
-    // This would depend on your connection pool implementation
-    // For Neon/postgres.js, we might not have direct access to these stats
-    // This is a placeholder for when such metrics become available
-    return {
-      totalConnections: 10,
-      idleConnections: 5,
-      activeConnections: 5,
-      waitingConnections: 0,
-      maxConnections: 20,
-    };
+    try {
+      const result = await db.execute(drizzleSql`
+        SELECT
+          count(*) FILTER (WHERE state IS NOT NULL) as total,
+          count(*) FILTER (WHERE state = 'idle') as idle,
+          count(*) FILTER (WHERE state = 'active') as active,
+          count(*) FILTER (WHERE wait_event_type IS NOT NULL AND state != 'idle') as waiting
+        FROM pg_stat_activity
+        WHERE datname = current_database()
+      `);
+      const row = result.rows[0];
+      return {
+        totalConnections: Number(row?.total) || 0,
+        idleConnections: Number(row?.idle) || 0,
+        activeConnections: Number(row?.active) || 0,
+        waitingConnections: Number(row?.waiting) || 0,
+        maxConnections: 100,
+      };
+    } catch (error) {
+      captureWarning('Cannot read connection pool stats', { error });
+      return {
+        totalConnections: 0,
+        idleConnections: 0,
+        activeConnections: 0,
+        waitingConnections: 0,
+        maxConnections: 0,
+      };
+    }
   }
 
   /**
@@ -259,10 +306,11 @@ class DatabasePerformanceMonitor {
 
     const queryGroups = recentMetrics.reduce(
       (groups, metric) => {
-        if (!groups[metric.query]) {
-          groups[metric.query] = [];
+        const key = this.fingerprint(metric.query);
+        if (!groups[key]) {
+          groups[key] = [];
         }
-        groups[metric.query].push(metric);
+        groups[key].push(metric);
         return groups;
       },
       {} as Record<string, QueryPerformanceMetrics[]>
@@ -276,6 +324,34 @@ class DatabasePerformanceMonitor {
           metrics.reduce((sum, m) => sum + m.duration, 0) / metrics.length,
       }))
       .sort((a, b) => b.count - a.count);
+  }
+
+  /**
+   * Get latency percentiles for the given time window.
+   */
+  getLatencyPercentiles(timeWindowMinutes = 15): {
+    p50: number;
+    p95: number;
+    p99: number;
+  } {
+    const cutoff = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
+    const durations = this.queryMetrics
+      .filter(m => m.timestamp >= cutoff && m.success)
+      .map(m => m.duration)
+      .sort((a, b) => a - b);
+
+    if (durations.length === 0) return { p50: 0, p95: 0, p99: 0 };
+
+    const percentile = (arr: number[], p: number) => {
+      const idx = Math.ceil(arr.length * p) - 1;
+      return arr[Math.max(0, idx)];
+    };
+
+    return {
+      p50: percentile(durations, 0.5),
+      p95: percentile(durations, 0.95),
+      p99: percentile(durations, 0.99),
+    };
   }
 
   /**
