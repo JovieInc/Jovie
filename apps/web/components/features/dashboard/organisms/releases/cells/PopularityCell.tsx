@@ -31,7 +31,7 @@ export const PopularityCell = memo(function PopularityCell({
       <TooltipTrigger asChild>
         {isValidPopularity ? (
           <DrawerInlineIconButton
-            className='gap-1.5 rounded-[6px] px-1 py-0.5 text-tertiary-token'
+            className='gap-1.5 rounded-full px-1 py-0.5 text-tertiary-token'
             aria-label={`Spotify popularity ${displayPopularity} out of 100`}
           >
             <div className='h-2 w-12 overflow-hidden rounded-full bg-(--linear-border-subtle)'>
