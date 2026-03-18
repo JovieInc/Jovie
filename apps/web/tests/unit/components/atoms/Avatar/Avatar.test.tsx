@@ -169,6 +169,7 @@ describe('Avatar Component', () => {
       ];
 
       testCases.forEach(name => {
+        const expected = name ? getInitials(name) : '?';
         const { unmount } = render(
           <Avatar
             src={null}
@@ -178,7 +179,6 @@ describe('Avatar Component', () => {
           />
         );
 
-        const expected = name ? getInitials(name) : '?';
         expect(screen.getByText(expected)).toBeInTheDocument();
         unmount();
       });
