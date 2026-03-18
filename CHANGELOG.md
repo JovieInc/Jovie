@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.4] - 2026-03-17
+
+### Fixed
+
+- Right-clicking a release row in the dashboard table now shows the custom context menu (Copy smart link, Open smart link, etc.) instead of the browser's default context menu
+- VirtualizedTableRow forwards extra HTML props to the underlying `<tr>` element, enabling Radix ContextMenu.Trigger's `asChild` pattern to work correctly
+
 ## [26.4.3] - 2026-03-17
 
 ### Fixed
