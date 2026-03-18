@@ -54,7 +54,7 @@ export function DotBadge({
   return (
     <span
       className={cn(
-        'inline-flex w-fit items-center rounded-[8px] border font-[510] tracking-[-0.01em] shadow-none',
+        'inline-flex w-fit items-center rounded-full border font-[510] tracking-[-0.01em] shadow-none',
         SIZE_CLASSES[size],
         variant.className,
         className
