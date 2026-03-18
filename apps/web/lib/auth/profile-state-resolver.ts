@@ -32,7 +32,9 @@ export interface ProfileStateResult {
 /**
  * Determines if a creator profile is considered "complete" for access purposes.
  * A complete profile has: username, display name, is public, and has completed onboarding.
- * Avatar is intentionally optional because onboarding no longer requires a photo.
+ * Avatar is enforced at the onboarding profile review step and by ProfileCompletionRedirect,
+ * but is NOT checked here to avoid proxy redirect loops during onboarding steps 1-2
+ * (avatar is uploaded asynchronously after step 0 completes).
  *
  * @param profile - Profile data to check
  * @returns Whether the profile is complete

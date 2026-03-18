@@ -5,6 +5,14 @@ export interface AppleStyleOnboardingFormProps {
   readonly userEmail?: string | null;
   readonly userId: string;
   readonly shouldAutoSubmitHandle?: boolean;
+  /** Step to start on (default 0). Used for step-resume when existing users return. */
+  readonly initialStepIndex?: number;
+  /** Existing profile avatar URL for step-resume users */
+  readonly existingAvatarUrl?: string | null;
+  /** Existing profile bio for step-resume users */
+  readonly existingBio?: string | null;
+  /** Existing profile genres for step-resume users */
+  readonly existingGenres?: string[] | null;
 }
 
 export interface OnboardingState {

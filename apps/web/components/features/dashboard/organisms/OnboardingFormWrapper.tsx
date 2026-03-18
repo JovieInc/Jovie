@@ -36,6 +36,14 @@ interface OnboardingFormWrapperProps {
   readonly userEmail?: string | null;
   readonly userId: string;
   readonly shouldAutoSubmitHandle?: boolean;
+  /** Step to start on (default 0). Used for step-resume when existing users return. */
+  readonly initialStepIndex?: number;
+  /** Existing profile avatar URL for step-resume users */
+  readonly existingAvatarUrl?: string | null;
+  /** Existing profile bio for step-resume users */
+  readonly existingBio?: string | null;
+  /** Existing profile genres for step-resume users */
+  readonly existingGenres?: string[] | null;
 }
 
 export function OnboardingFormWrapper({
@@ -45,6 +53,10 @@ export function OnboardingFormWrapper({
   userEmail = null,
   userId,
   shouldAutoSubmitHandle = false,
+  initialStepIndex = 0,
+  existingAvatarUrl = null,
+  existingBio = null,
+  existingGenres = null,
 }: OnboardingFormWrapperProps) {
   const [resolvedHandle, setResolvedHandle] = useState(initialHandle);
 
@@ -82,6 +94,10 @@ export function OnboardingFormWrapper({
         userEmail={userEmail}
         userId={userId}
         shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+        initialStepIndex={initialStepIndex}
+        existingAvatarUrl={existingAvatarUrl}
+        existingBio={existingBio}
+        existingGenres={existingGenres}
       />
     </div>
   );

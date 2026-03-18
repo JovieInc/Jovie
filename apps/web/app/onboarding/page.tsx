@@ -103,6 +103,12 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
+  // Step-resume: existing user with completed onboarding but missing photo
+  // Routes them directly to profile review (step 2) to upload a photo
+  const isReturningForPhoto =
+    existingProfile?.onboardingCompletedAt && !existingProfile?.avatarUrl;
+  const initialStepIndex = isReturningForPhoto ? 2 : 0;
+
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
   const providedHandle =
@@ -142,6 +148,10 @@ export default async function OnboardingPage({
           userEmail={userEmail}
           userId={userId}
           shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+          initialStepIndex={initialStepIndex}
+          existingAvatarUrl={existingProfile?.avatarUrl ?? null}
+          existingBio={existingProfile?.bio ?? null}
+          existingGenres={existingProfile?.genres ?? null}
         />
       </div>
     </AuthLayout>

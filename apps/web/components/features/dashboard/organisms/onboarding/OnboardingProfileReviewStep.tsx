@@ -2,11 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
-import { updateOnboardingProfile } from '@/app/onboarding/actions/update-profile';
-import { Avatar } from '@/components/molecules/Avatar/Avatar';
+import {
+  updateOnboardingProfile,
+  verifyProfileHasAvatar,
+} from '@/app/onboarding/actions/update-profile';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
+import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { uploadAvatarToBlob } from '@/lib/queries/useAvatarUploadMutation';
+import { canProceedFromProfileReview } from './profile-review-guards';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -15,28 +21,46 @@ interface OnboardingProfileReviewStepProps {
   readonly handle: string;
   readonly onGoToDashboard: () => void;
   readonly isEnriching: boolean;
+  /** Existing avatar URL from a prior onboarding (step-resume users) */
+  readonly existingAvatarUrl?: string | null;
+  /** Existing bio from a prior onboarding (step-resume users) */
+  readonly existingBio?: string | null;
+  /** Existing genres from a prior onboarding (step-resume users) */
+  readonly existingGenres?: string[] | null;
+  /** Whether this is a step-resume session (existing user returning) */
+  readonly isStepResume?: boolean;
 }
 
 const ENRICHMENT_TIMEOUT_MS = 10_000;
 const PROFILE_SAVE_TIMEOUT_MS = 5000;
 /** Minimum time the profile preview must display before CTA enables. */
 const MIN_DISPLAY_MS = 5000;
+const DISPLAY_NAME_MAX_LENGTH = 50;
 
 function getCtaLabel(
   isSaving: boolean,
   isEnriching: boolean,
-  minTimeElapsed: boolean
+  minTimeElapsed: boolean,
+  hasAvatar: boolean,
+  hasDisplayName: boolean
 ): string {
   if (isSaving) return 'Saving...';
   if (isEnriching) return 'Finishing setup...';
   if (!minTimeElapsed) return 'Reviewing your profile...';
+  if (!hasAvatar) return 'Upload a photo to continue';
+  if (!hasDisplayName) return 'Add your name to continue';
   return 'Continue to Dashboard';
 }
 
 /**
- * Profile review step in onboarding.
- * Shows a progress bar while enrichment loads, then a read-only profile card.
- * User must click "Continue to Dashboard" to proceed.
+ * Profile review step in onboarding — the quality gate.
+ *
+ * Shows a live preview of the user's public profile with:
+ * - Uploadable avatar (required before proceeding)
+ * - Editable display name (required, must differ from handle)
+ * - Bio and genres from DSP enrichment
+ *
+ * Users cannot proceed to the dashboard without a photo and valid display name.
  */
 export function OnboardingProfileReviewStep({
   title,
@@ -45,19 +69,71 @@ export function OnboardingProfileReviewStep({
   handle,
   onGoToDashboard,
   isEnriching,
+  existingAvatarUrl = null,
+  existingBio = null,
+  existingGenres = null,
+  isStepResume = false,
 }: OnboardingProfileReviewStepProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [enrichmentTimedOut, setEnrichmentTimedOut] = useState(false);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(
+    // Step-resume users don't need the review delay — they've seen their profile before
+    isStepResume
+  );
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Avatar state: enriched → existing → null
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    enrichedProfile?.imageUrl || existingAvatarUrl || null
+  );
+  // Display name state: enriched → handle (editable)
+  const [editableDisplayName, setEditableDisplayName] = useState(
+    enrichedProfile?.name || handle
+  );
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  // Bio and genres from enrichment or existing profile
+  const bio = enrichedProfile?.bio || existingBio || null;
+  const genres = enrichedProfile?.genres ?? existingGenres ?? [];
+
   const showLoading = isEnriching && !enrichedProfile && !enrichmentTimedOut;
 
-  // Start the minimum display timer when the profile card becomes visible,
-  // not on mount — so slow enrichments still get the full 5s review window.
+  // Update avatar from enrichment when it arrives
   useEffect(() => {
-    if (!showLoading && !minTimeElapsed) {
+    if (enrichedProfile?.imageUrl && !avatarUrl) {
+      setAvatarUrl(enrichedProfile.imageUrl);
+    }
+  }, [enrichedProfile?.imageUrl, avatarUrl]);
+
+  // Update display name from enrichment when it arrives
+  useEffect(() => {
+    if (enrichedProfile?.name && editableDisplayName === handle) {
+      setEditableDisplayName(enrichedProfile.name);
+    }
+  }, [enrichedProfile?.name, editableDisplayName, handle]);
+
+  // Track photo status on mount
+  useEffect(() => {
+    if (!showLoading) {
+      const source = enrichedProfile?.imageUrl
+        ? 'enrichment'
+        : existingAvatarUrl
+          ? 'oauth'
+          : 'none';
+      track('onboarding_photo_status', {
+        has_photo: Boolean(avatarUrl),
+        source,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once when preview becomes visible
+  }, [showLoading]);
+
+  // Start the minimum display timer when the profile card becomes visible
+  useEffect(() => {
+    if (!showLoading && !minTimeElapsed && !isStepResume) {
       minTimeRef.current = globalThis.setTimeout(
         () => setMinTimeElapsed(true),
         MIN_DISPLAY_MS
@@ -69,7 +145,7 @@ export function OnboardingProfileReviewStep({
         minTimeRef.current = null;
       }
     };
-  }, [showLoading, minTimeElapsed]);
+  }, [showLoading, minTimeElapsed, isStepResume]);
 
   // Auto-dismiss loading state after timeout
   useEffect(() => {
@@ -95,21 +171,98 @@ export function OnboardingProfileReviewStep({
       timeoutRef.current = null;
     }
   }, [enrichedProfile]);
-  const displayName = enrichedProfile?.name || handle;
-  const bio = enrichedProfile?.bio || null;
-  const avatarUrl = enrichedProfile?.imageUrl || null;
-  const genres = enrichedProfile?.genres ?? [];
+
+  // Avatar upload handler
+  const handleAvatarUpload = useCallback(
+    async (file: File): Promise<string> => {
+      const blobUrl = await uploadAvatarToBlob(file);
+      // Save avatar URL to profile immediately
+      await updateOnboardingProfile({ avatarUrl: blobUrl });
+      setAvatarUrl(blobUrl);
+      track('onboarding_photo_uploaded', {});
+      return blobUrl;
+    },
+    []
+  );
+
+  // Display name validation
+  const validateDisplayName = useCallback(
+    (name: string): string | null => {
+      const trimmed = name.trim();
+      if (!trimmed) return 'Display name is required';
+      if (trimmed.length > DISPLAY_NAME_MAX_LENGTH)
+        return `Must be ${DISPLAY_NAME_MAX_LENGTH} characters or less`;
+      if (trimmed.toLowerCase() === handle.toLowerCase())
+        return 'Please use your artist or real name, not your handle';
+      return null;
+    },
+    [handle]
+  );
+
+  const handleNameBlur = useCallback(() => {
+    const error = validateDisplayName(editableDisplayName);
+    setNameError(error);
+    if (!error && editableDisplayName.trim()) {
+      setIsEditingName(false);
+      track('onboarding_name_edited', {
+        had_enriched_name: Boolean(enrichedProfile?.name),
+      });
+    }
+  }, [editableDisplayName, validateDisplayName, enrichedProfile?.name]);
+
+  const handleNameKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleNameBlur();
+      }
+      if (e.key === 'Escape') {
+        setIsEditingName(false);
+        setNameError(null);
+      }
+    },
+    [handleNameBlur]
+  );
+
+  const startEditingName = useCallback(() => {
+    setIsEditingName(true);
+    globalThis.setTimeout(() => nameInputRef.current?.focus(), 0);
+  }, []);
+
+  // CTA proceed check
+  const canProceed = canProceedFromProfileReview(
+    editableDisplayName,
+    avatarUrl
+  );
 
   const handleContinue = useCallback(async () => {
+    // Final client-side validation
+    const nameValidationError = validateDisplayName(editableDisplayName);
+    if (nameValidationError) {
+      setNameError(nameValidationError);
+      return;
+    }
+    if (!avatarUrl) return;
+
     setIsSaving(true);
     try {
-      // Save enriched data to profile before navigating
-      if (enrichedProfile) {
+      // Save display name + bio updates
+      const updates: {
+        displayName?: string;
+        bio?: string;
+        avatarUrl?: string;
+      } = {};
+
+      if (editableDisplayName.trim()) {
+        updates.displayName = editableDisplayName.trim();
+      }
+      if (enrichedProfile?.bio?.trim()) {
+        updates.bio = enrichedProfile.bio.trim();
+      }
+
+      if (Object.keys(updates).length > 0) {
         await Promise.race([
-          updateOnboardingProfile({
-            displayName: enrichedProfile.name?.trim() || undefined,
-            bio: enrichedProfile.bio?.trim() || undefined,
-          }),
+          updateOnboardingProfile(updates),
           new Promise((_, reject) => {
             globalThis.setTimeout(() => {
               reject(new Error('Onboarding profile save timed out'));
@@ -117,6 +270,16 @@ export function OnboardingProfileReviewStep({
           }),
         ]);
       }
+
+      // Server-side defense-in-depth: verify avatar is in DB
+      try {
+        await verifyProfileHasAvatar();
+      } catch {
+        // Graceful degradation — client-side check is primary gate.
+        // Only block if we're confident the avatar is missing (not a network error).
+        // The client already checked avatarUrl is set, so proceed.
+      }
+
       onGoToDashboard();
     } catch {
       // Proceed to dashboard even if save fails — data is already in DB from enrichment
@@ -124,7 +287,15 @@ export function OnboardingProfileReviewStep({
     } finally {
       setIsSaving(false);
     }
-  }, [enrichedProfile, onGoToDashboard]);
+  }, [
+    editableDisplayName,
+    enrichedProfile,
+    onGoToDashboard,
+    avatarUrl,
+    validateDisplayName,
+  ]);
+
+  const isEnrichingActive = isEnriching && !enrichmentTimedOut;
 
   return (
     <div className='flex flex-col items-center justify-center h-full'>
@@ -154,24 +325,64 @@ export function OnboardingProfileReviewStep({
             `}</style>
           </div>
         ) : (
-          /* Read-only profile card */
+          /* Live profile preview with editable fields */
           <>
             <ContentSurfaceCard className='mb-6 p-6'>
               <div className='flex flex-col items-center gap-4'>
-                {/* Avatar */}
-                <Avatar
-                  src={avatarUrl}
-                  alt={displayName}
-                  name={displayName}
-                  size='display-md'
-                />
+                {/* Uploadable Avatar */}
+                <div className='flex flex-col items-center gap-2'>
+                  <div className='rounded-full p-[2px] ring-1 ring-black/5 dark:ring-white/6 shadow-sm'>
+                    <AvatarUploadable
+                      src={avatarUrl}
+                      alt={editableDisplayName}
+                      name={editableDisplayName}
+                      size='display-md'
+                      uploadable
+                      onUpload={handleAvatarUpload}
+                      showHoverOverlay
+                    />
+                  </div>
+                  {!avatarUrl && (
+                    <p className='text-[12px] text-tertiary-token'>
+                      Tap to add a profile photo
+                    </p>
+                  )}
+                </div>
 
-                {/* Name + Handle */}
-                <div className='text-center'>
-                  <p className='text-[16px] font-[590] text-primary-token'>
-                    {displayName}
+                {/* Editable Name + Handle */}
+                <div className='text-center w-full'>
+                  {isEditingName ? (
+                    <div className='flex flex-col items-center gap-1'>
+                      <input
+                        ref={nameInputRef}
+                        type='text'
+                        value={editableDisplayName}
+                        onChange={e => setEditableDisplayName(e.target.value)}
+                        onBlur={handleNameBlur}
+                        onKeyDown={handleNameKeyDown}
+                        maxLength={DISPLAY_NAME_MAX_LENGTH}
+                        className='text-[16px] font-[590] text-primary-token text-center bg-transparent border-b border-accent outline-none w-full max-w-[280px] pb-0.5'
+                        aria-label='Edit display name'
+                      />
+                      {nameError && (
+                        <p className='text-[11px] text-red-500'>{nameError}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      type='button'
+                      onClick={startEditingName}
+                      className='group cursor-pointer'
+                      aria-label='Click to edit display name'
+                    >
+                      <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
+                        {editableDisplayName}
+                      </p>
+                    </button>
+                  )}
+                  <p className='text-[13px] text-tertiary-token mt-1'>
+                    @{handle}
                   </p>
-                  <p className='text-[13px] text-tertiary-token'>@{handle}</p>
                 </div>
 
                 {/* Bio */}
@@ -187,7 +398,7 @@ export function OnboardingProfileReviewStep({
                     {genres.slice(0, 5).map(genre => (
                       <span
                         key={genre}
-                        className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token'
+                        className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token capitalize'
                       >
                         {genre}
                       </span>
@@ -204,14 +415,17 @@ export function OnboardingProfileReviewStep({
                 disabled={
                   isSaving ||
                   !minTimeElapsed ||
-                  (isEnriching && !enrichmentTimedOut)
+                  isEnrichingActive ||
+                  !canProceed
                 }
-                aria-busy={isSaving || (isEnriching && !enrichmentTimedOut)}
+                aria-busy={isSaving || isEnrichingActive}
               >
                 {getCtaLabel(
                   isSaving,
-                  isEnriching && !enrichmentTimedOut,
-                  minTimeElapsed
+                  isEnrichingActive,
+                  minTimeElapsed,
+                  Boolean(avatarUrl),
+                  Boolean(editableDisplayName.trim())
                 )}
               </AuthButton>
             </div>

@@ -13,6 +13,32 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
+/**
+ * Verify that the user's profile has an avatar URL set.
+ * Used as defense-in-depth before allowing dashboard navigation from onboarding.
+ */
+export async function verifyProfileHasAvatar(): Promise<{
+  avatarUrl: string;
+}> {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const [profile] = await db
+    .select({ avatarUrl: creatorProfiles.avatarUrl })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .limit(1);
+
+  if (!profile?.avatarUrl) {
+    throw new Error('Profile photo is required');
+  }
+
+  return { avatarUrl: profile.avatarUrl };
+}
+
 export async function updateOnboardingProfile(updates: {
   displayName?: string;
   bio?: string;
