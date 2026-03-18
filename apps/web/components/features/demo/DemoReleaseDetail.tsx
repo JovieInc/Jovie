@@ -47,7 +47,7 @@ export function DemoReleaseDetail({
         </div>
         <DrawerInlineIconButton
           onClick={onClose}
-          className='size-7 rounded-[7px]'
+          className='size-7 rounded-full'
           aria-label='Close detail panel'
         >
           <X className='size-4' />
@@ -217,7 +217,7 @@ export function DemoReleaseDetail({
                 </div>
                 <div className='flex items-center gap-1.5'>
                   <DrawerInlineIconButton
-                    className='size-7 rounded-[7px] text-tertiary-token'
+                    className='size-7 rounded-full text-tertiary-token'
                     aria-label='Attach file'
                   >
                     <Paperclip className='size-3.5' />
@@ -225,7 +225,7 @@ export function DemoReleaseDetail({
                   <DrawerButton
                     size='icon'
                     tone='secondary'
-                    className='h-7 w-7 rounded-[7px]'
+                    className='h-7 w-7 rounded-full'
                     aria-label='Send comment'
                     onClick={() =>
                       runDemoAction({
