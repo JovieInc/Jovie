@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -7,7 +8,7 @@ import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { SeeItInAction } from '@/features/home/SeeItInAction';
+import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import {
   buildOrganizationSchema,
@@ -214,17 +215,9 @@ export default function HomePage() {
         </>
       )}
 
-      <hr
-        className='mx-auto max-w-lg border-0 h-px'
-        style={{
-          background:
-            'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-        }}
-      />
-
-      {process.env.NEXT_PUBLIC_SHOW_SHOWCASE_SECTION === 'true' && (
-        <SeeItInAction />
-      )}
+      <Suspense fallback={null}>
+        <SeeItInActionSafe />
+      </Suspense>
 
       <FinalCTASection />
     </div>
