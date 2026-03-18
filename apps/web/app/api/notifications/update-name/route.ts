@@ -21,7 +21,7 @@ const NAME_UPDATE_WINDOW_MS = 5 * 60 * 1000;
  * Strip HTML tags from a string to prevent stored XSS.
  */
 function stripHtmlTags(input: string): string {
-  return input.replace(/<[^>]*>/g, '');
+  return input.replaceAll(/<[^>]*>/g, '');
 }
 
 /**

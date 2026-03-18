@@ -78,8 +78,8 @@ export function SubscriptionSuccess({
   const canCaptureName = Boolean(artistId && subscriberEmail);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsVisible(true), 100);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(() => setIsVisible(true), 100);
+    return () => globalThis.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -90,11 +90,11 @@ export function SubscriptionSuccess({
 
   useEffect(() => {
     if (canCaptureName && phase === 'ask' && isVisible) {
-      const timer = window.setTimeout(
+      const timer = globalThis.setTimeout(
         () => inputRef.current?.focus({ preventScroll: true }),
         300
       );
-      return () => window.clearTimeout(timer);
+      return () => globalThis.clearTimeout(timer);
     }
   }, [canCaptureName, phase, isVisible]);
 
@@ -128,7 +128,7 @@ export function SubscriptionSuccess({
     (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
         event.preventDefault();
-        void handleSaveName();
+        handleSaveName();
       }
     },
     [handleSaveName]
@@ -173,7 +173,9 @@ export function SubscriptionSuccess({
 
         <button
           type='button'
-          onClick={() => void handleSaveName()}
+          onClick={() => {
+            handleSaveName();
+          }}
           disabled={phase === 'saving' || !nameInput.trim()}
           className='inline-flex h-12 w-full items-center justify-center rounded-xl border border-white/10 bg-white text-base font-semibold text-black transition-[opacity,background-color,border-color] duration-150 hover:border-white/20 hover:bg-white/96 disabled:cursor-not-allowed disabled:opacity-50 focus-ring-themed focus-visible:ring-offset-2 focus-visible:ring-offset-(--color-bg-base)'
           style={noFontSynthesisStyle}
