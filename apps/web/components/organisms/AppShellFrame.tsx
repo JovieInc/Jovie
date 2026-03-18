@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='bg-surface-0 lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:rounded-r-[16px] lg:rounded-bl-[16px] lg:rounded-tl-[12px] lg:m-2 lg:ml-0 lg:peer-data-[state=open]:ml-2 lg:peer-data-[state=open]:rounded-l-none lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset] lg:peer-data-[state=closed]:rounded-l-[16px] flex flex-1 min-h-0 overflow-hidden'
+        className='bg-surface-0 lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:rounded-[12px] lg:rounded-l-[8px] lg:m-2 lg:ml-0 lg:peer-data-[state=open]:ml-2 lg:peer-data-[state=open]:rounded-l-none lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset] lg:peer-data-[state=closed]:rounded-l-[12px] flex flex-1 min-h-0 overflow-hidden'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>

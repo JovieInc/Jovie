@@ -235,9 +235,8 @@ export const queryKeys = {
     leads: {
       all: () => [...queryKeys.admin.all, 'leads'] as const,
       list: (filters: {
-        page: number;
-        limit: number;
-        sortBy: 'createdAt' | 'fitScore';
+        sortBy: string;
+        pageSize: number;
         status?: string;
         search?: string;
       }) => [...queryKeys.admin.leads.all(), 'list', filters] as const,

@@ -19,9 +19,9 @@ export function DrawerStatGrid({
     <DrawerSurfaceCard
       variant={variant === 'card' ? 'card' : 'flat'}
       className={cn(
-        'grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)',
+        'grid grid-cols-2 divide-x divide-subtle',
         variant === 'card'
-          ? 'p-3.5'
+          ? 'p-3'
           : 'rounded-none border-x-0 border-y-0 bg-transparent p-0 shadow-none',
         className
       )}

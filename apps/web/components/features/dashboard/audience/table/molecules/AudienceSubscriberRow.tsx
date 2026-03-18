@@ -45,7 +45,7 @@ export function AudienceSubscriberRow({
       data-index={dataIndex}
       ref={measureRef}
       className={cn(
-        'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-[inset_0_0_0_1px_var(--linear-border-focus)]',
+        'group cursor-pointer border-b border-subtle transition-[background-color,box-shadow] duration-150 last:border-b-0 hover:bg-(--linear-row-hover) focus-visible:outline-none focus-visible:bg-(--linear-row-hover) focus-visible:shadow-inset-ring-focus',
         isSelected && 'bg-(--linear-row-selected)'
       )}
       style={

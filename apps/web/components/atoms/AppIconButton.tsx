@@ -9,7 +9,7 @@ export const APP_CONTROL_BUTTON_CLASS =
 
 export const APP_ICON_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'w-(--linear-app-control-height-sm) shrink-0 px-0 [&_svg]:h-3 [&_svg]:w-3'
+  'w-(--linear-app-control-height-sm) shrink-0 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
 );
 
 type AppIconButtonLabelProps =

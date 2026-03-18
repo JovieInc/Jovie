@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-
 ## [26.4.5] - 2026-03-18
 
 ### Added
@@ -20,9 +19,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - 43 unit tests covering all new components and data flows
 - 3 deferred items in TODOS.md (shareable social card, weekly digest email, win-back email)
 
+### Changed
+
+- Migrate LeadTable from manual `<table>` with page-based pagination to UnifiedTable with infinite scroll, matching all other admin tables
+- Migrate EarningsTab tipper table from manual `<table>` to UnifiedTable with column definitions and empty state
+- Extract ~50 `shadow-[...]` bracket notations into 10 named shadow design tokens (`shadow-subtle-bottom`, `shadow-inset-divider`, `shadow-inset-ring-focus`, `shadow-popover`, etc.)
+- Standardize all buttons and icon buttons to `rounded-full` (pill shape) across the design system
+- Wrap ProfileContactSidebar header and profile link sections in DrawerSurfaceCard for visual consistency
+- Align leads API response shape (`items` → `rows`, `limit` → `pageSize`) with other admin endpoints
+
 ### Fixed
 
 - Feedback API route now logs errors with `captureError` instead of silently swallowing exceptions
+
+### Removed
+
+- Delete unused BaseSidebar component (4 files, 321 lines) — replaced by RightDrawer/EntitySidebarShell
+- Remove `useLeadsListQuery` and `AdminLeadListResponse` — replaced by `useLeadsInfiniteQuery`
 
 ## [26.4.4] - 2026-03-17
 
