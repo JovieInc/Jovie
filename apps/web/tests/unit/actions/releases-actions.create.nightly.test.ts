@@ -461,6 +461,78 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
 
       expect(result.connected).toBe(false);
     });
+
+    it('returns connected when no spotifyId but artistName and spotifyImportStatus is importing', async () => {
+      mockGetDashboardData.mockResolvedValue(
+        makeDashboardData({
+          selectedProfile: {
+            ...MOCK_PROFILE,
+            spotifyId: null,
+            settings: {
+              spotifyArtistName: 'Import Artist',
+              spotifyImportStatus: 'importing',
+            },
+          },
+        })
+      );
+
+      const { checkSpotifyConnection } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await checkSpotifyConnection();
+
+      expect(result.connected).toBe(true);
+      expect(result.spotifyId).toBeNull();
+      expect(result.artistName).toBe('Import Artist');
+    });
+
+    it('returns connected when no spotifyId but artistName and spotifyImportStatus is complete', async () => {
+      mockGetDashboardData.mockResolvedValue(
+        makeDashboardData({
+          selectedProfile: {
+            ...MOCK_PROFILE,
+            spotifyId: null,
+            settings: {
+              spotifyArtistName: 'Complete Artist',
+              spotifyImportStatus: 'complete',
+            },
+          },
+        })
+      );
+
+      const { checkSpotifyConnection } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await checkSpotifyConnection();
+
+      expect(result.connected).toBe(true);
+      expect(result.spotifyId).toBeNull();
+      expect(result.artistName).toBe('Complete Artist');
+    });
+
+    it('returns not connected when no spotifyId and no import status', async () => {
+      mockGetDashboardData.mockResolvedValue(
+        makeDashboardData({
+          selectedProfile: {
+            ...MOCK_PROFILE,
+            spotifyId: null,
+            settings: {},
+          },
+        })
+      );
+
+      // db.select fallback for dspArtistMatches — return no match
+      setupDbSelectChain([]);
+
+      const { checkSpotifyConnection } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await checkSpotifyConnection();
+
+      expect(result.connected).toBe(false);
+      expect(result.spotifyId).toBeNull();
+      expect(result.artistName).toBeNull();
+    });
   });
 
   // =========================================================================
