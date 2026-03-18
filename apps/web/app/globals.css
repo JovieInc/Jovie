@@ -27,9 +27,8 @@
 html,
 body {
   height: 100%;
-  overflow-x: hidden;
-  /* fallback for browsers without clip support (Safari <16) */
   overflow-x: clip;
+  overflow-y: hidden;
   overscroll-behavior: none;
 }
 
@@ -176,6 +175,26 @@ body {
   --transition-duration-slow: var(--duration-slow);
   --transition-duration-slower: var(--duration-slower);
   --transition-duration-slowest: var(--duration-slowest);
+  /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-elevated: var(--shadow-card-elevated);
+  --shadow-divider: var(--shadow-divider);
+  --shadow-button-inset: var(--shadow-button-inset);
+  /* Additional shadow tokens for common bracket patterns */
+  --shadow-subtle-bottom: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --shadow-subtle-bottom-sm: 0 1px 0 rgba(0, 0, 0, 0.03);
+  --shadow-subtle-bottom-xs: 0 1px 0 rgba(0, 0, 0, 0.02);
+  --shadow-inset-divider: inset 0 -1px 0 var(--linear-border-subtle);
+  --shadow-inset-ring-focus: inset 0 0 0 1px var(--linear-border-focus);
+  --shadow-inset-highlight: 0 1px 0 rgba(255, 255, 255, 0.03);
+  --shadow-ring-surface-0: 0 0 0 3px var(--linear-bg-surface-0);
+  --shadow-ring-surface-1: 0 0 0 3px var(--linear-bg-surface-1);
+  --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.22);
+  --shadow-panel-ring: inset 0 0 0 1px var(--linear-panel-ring);
 }
 
 /* ============================================
@@ -260,7 +279,7 @@ body {
   }
   /* Button component styles */
   .btn {
-    @apply inline-flex items-center justify-center rounded-lg text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-normal disabled:opacity-50 disabled:pointer-events-none;
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-500/50 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-gray-900;
   }
   .btn-primary {

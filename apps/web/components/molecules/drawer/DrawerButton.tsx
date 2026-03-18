@@ -17,8 +17,8 @@ const TONE_CLASSNAMES: Record<DrawerButtonTone, string> = {
 };
 
 const SIZE_CLASSNAMES: Record<DrawerButtonSize, string> = {
-  sm: 'h-8 rounded-[8px] px-2.5 text-[12px]',
-  icon: 'h-8 w-8 rounded-[8px] px-0 [&_svg]:h-4 [&_svg]:w-4',
+  sm: 'h-8 rounded-full px-2.5 text-[12px]',
+  icon: 'h-8 w-8 rounded-full px-0 [&_svg]:h-4 [&_svg]:w-4',
 };
 
 export interface DrawerButtonProps

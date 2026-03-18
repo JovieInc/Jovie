@@ -99,7 +99,7 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='sticky top-0 z-20 relative shrink-0 bg-surface-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border-subtle'>
+        <div className='sticky top-0 z-20 relative shrink-0 bg-transparent after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border-subtle'>
           {/* Header bar — close is in the overflow dropdown */}
           <DrawerHeader
             title={title}
@@ -117,7 +117,7 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-3 pt-[10px] pb-2'>
+            <div className='overflow-visible px-3.5 pt-[10px] pb-2'>
               {entityHeader}
             </div>
           )}
@@ -126,7 +126,7 @@ export function EntitySidebarShell({
           {tabs && (
             <div
               className={[
-                'overflow-visible border-t border-subtle px-3 py-2 [&>*]:w-full',
+                'overflow-visible border-t border-subtle px-3.5 py-2 [&>*]:w-full',
                 tabsContainerClassName,
               ]
                 .filter(Boolean)
@@ -145,7 +145,7 @@ export function EntitySidebarShell({
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-2 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-3'>
+            <div className='flex-1 min-h-0 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 py-3'>
               {children}
             </div>
 

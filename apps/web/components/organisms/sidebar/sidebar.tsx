@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-[transform,border-color,box-shadow] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-l-[18px] group-data-[variant=sidebar]:rounded-r-[14px] group-data-[variant=sidebar]:rounded-tr-[18px] group-data-[variant=sidebar]:rounded-br-[12px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-sidebar-border/90 group-data-[variant=sidebar]:border-r-0 group-data-[variant=sidebar]:shadow-[1px_0_0_0_var(--linear-app-frame-seam)_inset] group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='flex h-full w-full flex-col overflow-hidden bg-sidebar pointer-events-auto transition-[transform,border-color,box-shadow] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-l-[12px] group-data-[variant=sidebar]:rounded-r-0 group-data-[variant=sidebar]:rounded-tr-[6px] group-data-[variant=sidebar]:rounded-br-[6px] group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

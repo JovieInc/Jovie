@@ -3,6 +3,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { PAGINATED_CACHE } from './cache-strategies';
 import { queryKeys } from './keys';
+import type { AdminLead } from './useAdminLeadsPrimitives';
 
 export type AdminUsersSort =
   | 'created_desc'
@@ -251,6 +252,45 @@ export function useAdminWaitlistInfiniteQuery({
     initialData: initialData
       ? { pages: [initialData], pageParams: [1] }
       : undefined,
+    ...PAGINATED_CACHE,
+  });
+}
+
+export type AdminLeadsSortBy = 'createdAt' | 'fitScore';
+
+export function useLeadsInfiniteQuery({
+  sortBy = 'createdAt',
+  status,
+  search,
+  pageSize = DEFAULT_PAGE_SIZE,
+}: {
+  sortBy?: AdminLeadsSortBy;
+  status?: string;
+  search?: string;
+  pageSize?: number;
+}) {
+  return useInfiniteQuery<InfinitePage<AdminLead>>({
+    queryKey: queryKeys.admin.leads.list({ sortBy, pageSize, status, search }),
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(pageSize),
+        sortBy,
+        sortOrder: 'desc',
+      });
+      if (status) params.set('status', status);
+      if (search) params.set('search', search);
+
+      return fetchPage<AdminLead>(
+        `/api/admin/leads?${params.toString()}`,
+        signal
+      );
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
     ...PAGINATED_CACHE,
   });
 }

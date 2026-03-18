@@ -15,21 +15,17 @@ export function DocToolbar({ pdfTitle }: DocToolbarProps) {
 
   const handleDownloadPdf = () => {
     const previousTitle = document.title;
-    const nextTitle = `${pdfTitle} | ${APP_NAME}`;
-    document.title = nextTitle;
+    document.title = `${pdfTitle} | ${APP_NAME}`;
 
-    const restoreTitle = () => {
-      document.title = previousTitle;
-      globalThis.removeEventListener('afterprint', restoreTitle);
-    };
-
-    globalThis.addEventListener('afterprint', restoreTitle);
+    globalThis.addEventListener(
+      'afterprint',
+      () => {
+        document.title = previousTitle;
+      },
+      { once: true }
+    );
 
     globalThis.print?.();
-
-    setTimeout(() => {
-      restoreTitle();
-    }, 2000);
   };
 
   return (

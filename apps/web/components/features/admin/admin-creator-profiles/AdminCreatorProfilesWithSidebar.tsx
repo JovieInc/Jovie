@@ -333,6 +333,16 @@ export function AdminCreatorProfilesWithSidebar({
     return result;
   }, [deleteCreatorOrUser, profileToDelete]);
 
+  const handleSidebarDelete = useCallback(
+    (contact: Contact) => {
+      const profile = profilesWithActions.find(p => p.id === contact.id);
+      if (profile) {
+        handleDelete(profile);
+      }
+    },
+    [profilesWithActions, handleDelete]
+  );
+
   const handleInviteSuccess = useCallback(() => {
     setProfileToInvite(null);
     notifications.success('Invite created successfully');
@@ -481,6 +491,7 @@ export function AdminCreatorProfilesWithSidebar({
           onRefresh={handleSidebarRefresh}
           onContactChange={handleContactChange}
           onAvatarUpload={handleAvatarUpload}
+          onDelete={handleSidebarDelete}
         />
       ) : null}
       <DeleteCreatorDialog

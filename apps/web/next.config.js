@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
 // Read version from canonical source (version.json at monorepo root)
 const { version: APP_VERSION } = require('../../version.json');
 
@@ -309,6 +312,7 @@ const nextConfig = {
     // Disable optimizeCss to avoid critters dependency issues
     // optimizeCss: true,
     optimizePackageImports: [
+      '@jovie/ui',
       '@headlessui/react',
       'lucide-react',
       'simple-icons',
@@ -358,38 +362,33 @@ const nextConfig = {
   },
 };
 
-// Enable Vercel Toolbar in non-production environments only.
-// Disabled in production to eliminate unnecessary JS bundles and 'unsafe-eval' CSP requirements.
-// Set NEXT_DISABLE_TOOLBAR=1 to opt out in non-production environments.
+// Vercel Toolbar: only on Vercel preview deploys (not local dev, not production).
+// Opt-in locally with NEXT_ENABLE_TOOLBAR=1 if needed.
 const enableVercelToolbar =
-  process.env.NODE_ENV !== 'production' && !process.env.NEXT_DISABLE_TOOLBAR;
+  process.env.VERCEL_ENV === 'preview' ||
+  process.env.NEXT_ENABLE_TOOLBAR === '1';
 const withVercelToolbar = enableVercelToolbar
   ? require('@vercel/toolbar/plugins/next')()
   : config => config;
 
-// Apply plugins in order: vercel toolbar -> sentry
-module.exports = withVercelToolbar(nextConfig);
+// Apply plugins in order: bundle analyzer -> vercel toolbar -> sentry
+module.exports = withBundleAnalyzer(withVercelToolbar(nextConfig));
 
-// Injected content via Sentry wizard below
-
+// Sentry build plugin: only in production/CI (source map upload, tunnel route).
+// The Sentry runtime SDK (sentry.server.config.ts) works independently in dev.
 const { withSentryConfig } = require('@sentry/nextjs');
 
-module.exports = withSentryConfig(module.exports, {
-  org: 'jovie',
-  project: 'jovie-web',
+const shouldUseSentryPlugin =
+  process.env.NODE_ENV === 'production' ||
+  process.env.CI === 'true' ||
+  !!process.env.VERCEL_ENV;
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
-
-  // For all available options, see:
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
-
-  // Upload a larger set of source maps for prettier stack traces (increases build time)
-  widenClientFileUpload: true,
-
-  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
-  // This can increase your server load as well as your hosting bill.
-  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
-  // side errors will fail.
-  tunnelRoute: '/monitoring',
-});
+module.exports = shouldUseSentryPlugin
+  ? withSentryConfig(module.exports, {
+      org: 'jovie',
+      project: 'jovie-web',
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      tunnelRoute: '/monitoring',
+    })
+  : module.exports;

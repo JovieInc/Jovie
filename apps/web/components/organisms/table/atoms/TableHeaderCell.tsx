@@ -53,7 +53,7 @@ export function TableHeaderCell({
     <th
       className={cn(
         // Base styles
-        'border-b border-subtle px-4 py-1.5 text-[11px] text-tertiary-token',
+        'border-b border-subtle px-4 py-1.5 align-middle text-[11px] text-tertiary-token',
         // Sticky positioning
         sticky && 'sticky z-20 bg-(--linear-app-content-surface)',
         // Alignment

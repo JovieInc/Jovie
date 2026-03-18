@@ -1,3 +1,5 @@
+import type { ChatInsightSummary } from '@/types/insights';
+
 export interface ArtistContext {
   readonly displayName: string;
   readonly username: string;
@@ -67,6 +69,10 @@ export interface SocialLinkToolResult {
   readonly originalUrl: string;
 }
 
+export interface ChatInsightsToolResult extends ChatInsightSummary {
+  readonly success: boolean;
+}
+
 export interface ToolInvocationPart {
   type: 'tool-invocation';
   toolInvocationId: string;
@@ -74,6 +80,10 @@ export interface ToolInvocationPart {
   state: 'call' | 'result' | 'partial-call';
   args?: Record<string, unknown>;
   result?: Record<string, unknown>;
+  toolInvocation?: {
+    readonly toolName: string;
+    readonly state: string;
+  };
 }
 
 export function isToolInvocationPart(
@@ -121,6 +131,7 @@ export const TOOL_LABELS: Record<string, string> = {
   proposeAvatarUpload: 'Preparing photo upload...',
   proposeSocialLink: 'Adding link...',
   proposeSocialLinkRemoval: 'Removing link...',
+  showTopInsights: 'Checking your signals...',
   checkCanvasStatus: 'Checking canvas status...',
   suggestRelatedArtists: 'Finding related artists...',
   generateCanvasPlan: 'Planning canvas video...',

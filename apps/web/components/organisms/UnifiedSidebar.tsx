@@ -256,11 +256,11 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       collapsible='offcanvas'
       className={cn(
         'bg-base',
-        '[--sidebar-width:244px]',
+        '[--sidebar-width:232px]',
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-10 justify-center gap-0 border-b border-sidebar-border/35 px-2.5 py-0'>
+      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 py-0'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -269,7 +269,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-2'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2 pb-1.5'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -281,18 +281,20 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 border-t border-sidebar-border/45 bg-sidebar/45 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
-        <div className='pl-2 pr-3.5 pb-3 pt-1'>
-          <span className='text-2xs text-sidebar-muted/80 select-none'>
-            v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
-            {isUserAdmin && process.env.NEXT_PUBLIC_BUILD_SHA
-              ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
-              : ''}
-          </span>
-        </div>
+        {isUserAdmin && (
+          <div className='pl-2 pr-3.5 pb-2 pt-1'>
+            <span className='text-2xs text-sidebar-muted/80 select-none'>
+              v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
+              {process.env.NEXT_PUBLIC_BUILD_SHA
+                ? ` (${process.env.NEXT_PUBLIC_BUILD_SHA})`
+                : ''}
+            </span>
+          </div>
+        )}
       </div>
     </Sidebar>
   );

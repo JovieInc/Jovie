@@ -5,7 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.5] - 2026-03-18
+
+### Changed
+
+- Migrate LeadTable from manual `<table>` with page-based pagination to UnifiedTable with infinite scroll, matching all other admin tables
+- Migrate EarningsTab tipper table from manual `<table>` to UnifiedTable with column definitions and empty state
+- Extract ~50 `shadow-[...]` bracket notations into 10 named shadow design tokens (`shadow-subtle-bottom`, `shadow-inset-divider`, `shadow-inset-ring-focus`, `shadow-popover`, etc.)
+- Standardize all buttons and icon buttons to `rounded-full` (pill shape) across the design system
+- Wrap ProfileContactSidebar header and profile link sections in DrawerSurfaceCard for visual consistency
+- Align leads API response shape (`items` → `rows`, `limit` → `pageSize`) with other admin endpoints
+
+### Removed
+
+- Delete unused BaseSidebar component (4 files, 321 lines) — replaced by RightDrawer/EntitySidebarShell
+- Remove `useLeadsListQuery` and `AdminLeadListResponse` — replaced by `useLeadsInfiniteQuery`
+
+## [26.4.4] - 2026-03-17
+
+### Fixed
+
+- Onboarding profile review step now requires a profile photo before allowing dashboard access
+- Releases page no longer shows "Connect Spotify" empty state during async onboarding import
+- Right-clicking a release row in the dashboard table now shows the custom context menu (Copy smart link, Open smart link, etc.) instead of the browser's default context menu
+- VirtualizedTableRow forwards extra HTML props to the underlying `<tr>` element, enabling Radix ContextMenu.Trigger's `asChild` pattern to work correctly
+
+### Added
+
+- Uploadable avatar on onboarding profile review step (tap to upload)
+- Unit tests for Spotify connection detection during import status transitions
+
+## [26.4.3] - 2026-03-17
+
+### Fixed
+
+- Dev toolbar no longer covers page content — adds dynamic body padding so content flows above the toolbar
+- Dev toolbar can be hidden via X button, with a small "Dev" pill to bring it back
+- Hide/show state persists across page loads via localStorage
+
 ## [26.4.2] - 2026-03-17
+
+### Added
+
+- Post-migration schema verification — CI now compares every Drizzle schema column against the actual database after running migrations, blocking deploys if any columns are missing
 
 ### Changed
 

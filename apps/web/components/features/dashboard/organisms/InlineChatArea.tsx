@@ -31,11 +31,13 @@ import {
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ChatAnalyticsCard } from '@/components/jovie/components/ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from '@/components/jovie/components/ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from '@/components/jovie/components/ChatLinkConfirmationCard';
 import { useJovieChat } from '@/components/jovie/hooks';
 import {
   type ArtistContext,
+  type ChatInsightsToolResult,
   isToolInvocationPart,
   type SocialLinkToolResult,
   type ToolInvocationPart,
@@ -146,6 +148,22 @@ const InlineChatMessage = memo(function InlineChatMessage({
           return (
             <div key={toolInvocation.toolInvocationId} className='ml-10'>
               <ChatAvatarUploadCard />
+            </div>
+          );
+        }
+
+        if (
+          toolInvocation.toolName === 'showTopInsights' &&
+          toolInvocation.state === 'result' &&
+          toolInvocation.result?.success
+        ) {
+          return (
+            <div key={toolInvocation.toolInvocationId} className='ml-10'>
+              <ChatAnalyticsCard
+                result={
+                  toolInvocation.result as unknown as ChatInsightsToolResult
+                }
+              />
             </div>
           );
         }

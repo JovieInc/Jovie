@@ -3,11 +3,10 @@ import { Suspense } from 'react';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { DeeplinksGrid } from '@/features/home/DeeplinksGrid';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
+import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
-import { RedesignedHero } from '@/features/home/RedesignedHero';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import {
@@ -169,13 +168,10 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* Hero + logo bar fill the viewport together (minus fixed header) */}
-      <div className='flex flex-col'>
-        <RedesignedHero />
-        <LogoBar />
-      </div>
+      {/* Hero with scroll-hijacking phone animation into mode carousel */}
+      <HeroScrollSection />
 
-      <DeeplinksGrid />
+      <LogoBar />
 
       <AudienceCRMSection />
 
