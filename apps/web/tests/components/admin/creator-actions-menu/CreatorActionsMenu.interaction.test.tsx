@@ -213,7 +213,7 @@ describe('CreatorActionsMenu interaction tests', () => {
     ).not.toBeInTheDocument();
   });
 
-  it.skip('hides delete action for featured creators (business rule not implemented)', async () => {
+  it('hides delete action for featured creators', async () => {
     const user = userEvent.setup();
 
     renderMenu(createProfile({ isFeatured: true }));
