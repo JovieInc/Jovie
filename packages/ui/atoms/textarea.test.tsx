@@ -28,8 +28,8 @@ describe('Textarea', () => {
     it('applies default variant classes', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-default');
-      expect(textarea.className).toContain('bg-surface-input');
+      expect(textarea.className).toContain('border-(--linear-border-subtle)');
+      expect(textarea.className).toContain('bg-(--linear-bg-surface-1)');
     });
 
     it('applies hover border class', () => {
@@ -43,7 +43,7 @@ describe('Textarea', () => {
     it('applies error variant classes', () => {
       render(<Textarea variant='error' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-destructive');
+      expect(textarea.className).toContain('border-(--linear-error)');
     });
 
     it('applies success variant classes', () => {
@@ -77,7 +77,7 @@ describe('Textarea', () => {
       render(<Textarea className='custom-class' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('custom-class');
-      expect(textarea.className).toContain('border-default');
+      expect(textarea.className).toContain('border-(--linear-border-subtle)');
     });
   });
 
@@ -142,7 +142,7 @@ describe('Textarea', () => {
     it('applies error variant when error prop is provided', () => {
       render(<Textarea error='Error message' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-destructive');
+      expect(textarea.className).toContain('border-(--linear-error)');
     });
 
     it('sets aria-invalid when error is present', () => {
@@ -164,7 +164,7 @@ describe('Textarea', () => {
     it('applies invalid validation state', () => {
       render(<Textarea validationState='invalid' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('border-destructive');
+      expect(textarea.className).toContain('border-(--linear-error)');
       expect(textarea).toHaveAttribute('aria-invalid', 'true');
     });
 

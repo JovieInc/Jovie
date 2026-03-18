@@ -11,14 +11,19 @@ import type { PgTable } from 'drizzle-orm/pg-core';
 
 import { type DbOrTransaction, db } from './index';
 
-/** Escape single quotes for SQL string literals */
-function escapeSql(value: string): string {
-  return value.replaceAll("'", "''");
-}
-
 // Maximum batch size to prevent memory issues and timeout
 export const DEFAULT_BATCH_SIZE = 100;
 export const MAX_BATCH_SIZE = 1000;
+
+/** Validate an id/sortOrder pair shared by batch update functions. */
+function validateBatchItem(id: unknown, sortOrder: unknown): void {
+  if (typeof id !== 'string' || !/^[\w-]+$/.test(id)) {
+    throw new TypeError('Invalid ID format in batch update');
+  }
+  if (typeof sortOrder !== 'number' || !Number.isInteger(sortOrder)) {
+    throw new TypeError('Invalid sortOrder in batch update');
+  }
+}
 
 export interface BatchInsertOptions {
   batchSize?: number;
@@ -97,35 +102,25 @@ export async function batchUpdateSortOrder<T extends PgTable>(
 ): Promise<void> {
   if (orders.length === 0) return;
 
-  // Validate inputs to prevent SQL injection
   for (const order of orders) {
-    if (typeof order.id !== 'string' || !/^[\w-]+$/.test(order.id)) {
-      throw new TypeError('Invalid ID format in batch update');
-    }
-    if (
-      typeof order.sortOrder !== 'number' ||
-      !Number.isInteger(order.sortOrder)
-    ) {
-      throw new TypeError('Invalid sortOrder in batch update');
-    }
+    validateBatchItem(order.id, order.sortOrder);
   }
 
-  // Generate VALUES list: (id, sortOrder), (id, sortOrder), ...
-  // Using parameterized query for safety
-  const valuesList = orders
-    .map(o => `('${o.id}'::uuid, ${o.sortOrder})`)
-    .join(', ');
+  // Build parameterized VALUES clause — each interpolated value becomes a bind parameter.
+  const rows = orders.map(
+    o => drizzleSql`(${o.id}::uuid, ${o.sortOrder}::integer)`
+  );
 
-  // Get table name using Drizzle's utility
   const tableName = getTableName(table);
 
   await db.execute(
-    drizzleSql.raw(`
-    UPDATE ${tableName} AS t
-    SET sort_order = v.sort_order, updated_at = NOW()
-    FROM (VALUES ${valuesList}) AS v(id, sort_order)
-    WHERE t.id = v.id
-  `)
+    drizzleSql.join([
+      drizzleSql.raw(
+        `UPDATE ${tableName} AS t SET sort_order = v.sort_order, updated_at = NOW() FROM (VALUES `
+      ),
+      drizzleSql.join(rows, drizzleSql`, `),
+      drizzleSql.raw(`) AS v(id, sort_order) WHERE t.id = v.id`),
+    ])
   );
 }
 
@@ -179,40 +174,26 @@ export async function batchUpdateSocialLinks(
 ): Promise<void> {
   if (updates.length === 0) return;
 
-  // Validate IDs to prevent SQL injection
   for (const update of updates) {
-    if (typeof update.id !== 'string' || !/^[\w-]+$/.test(update.id)) {
-      throw new SyntaxError('Invalid ID format in batch update');
-    }
-    if (
-      typeof update.sortOrder !== 'number' ||
-      !Number.isInteger(update.sortOrder)
-    ) {
-      throw new SyntaxError('Invalid sortOrder in batch update');
-    }
+    validateBatchItem(update.id, update.sortOrder);
   }
 
-  // Generate VALUES list with proper escaping for SQL string literals
-  const valuesList = updates
-    .map(u => {
-      const displayText =
-        u.displayText === null ? 'NULL' : `'${escapeSql(u.displayText)}'`;
-      return `('${u.id}'::uuid, '${escapeSql(u.url)}', '${escapeSql(u.platform)}', '${escapeSql(u.platformType)}', ${displayText}, ${u.sortOrder})`;
-    })
-    .join(', ');
+  // Build parameterized VALUES clause — each interpolated value becomes a bind parameter.
+  const rows = updates.map(u => {
+    const displayText =
+      u.displayText === null ? drizzleSql`NULL` : drizzleSql`${u.displayText}`;
+    return drizzleSql`(${u.id}::uuid, ${u.url}, ${u.platform}, ${u.platformType}, ${displayText}, ${u.sortOrder}::integer)`;
+  });
 
   await db.execute(
-    drizzleSql.raw(`
-    UPDATE social_links AS t
-    SET
-      url = v.url,
-      platform = v.platform,
-      platform_type = v.platform_type,
-      display_text = v.display_text,
-      sort_order = v.sort_order,
-      updated_at = NOW()
-    FROM (VALUES ${valuesList}) AS v(id, url, platform, platform_type, display_text, sort_order)
-    WHERE t.id = v.id
-  `)
+    drizzleSql.join([
+      drizzleSql.raw(
+        `UPDATE social_links AS t SET url = v.url, platform = v.platform, platform_type = v.platform_type, display_text = v.display_text, sort_order = v.sort_order, updated_at = NOW() FROM (VALUES `
+      ),
+      drizzleSql.join(rows, drizzleSql`, `),
+      drizzleSql.raw(
+        `) AS v(id, url, platform, platform_type, display_text, sort_order) WHERE t.id = v.id`
+      ),
+    ])
   );
 }

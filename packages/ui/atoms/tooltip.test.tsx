@@ -180,7 +180,7 @@ describe('Tooltip', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
       expect(content.className).toContain('z-50');
-      expect(content.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(content.className).toContain('rounded-md');
       expect(content.className).toContain('text-[12px]');
     });
 
