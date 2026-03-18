@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Post-migration schema verification — CI now compares every Drizzle schema column against the actual database after running migrations, blocking deploys if any columns are missing
 
+### Changed
+
+- Title case genre, location, and hometown display on artist profiles and dashboard sidebar
+
 ## [26.4.1] - 2026-03-17
 
 ### Added
