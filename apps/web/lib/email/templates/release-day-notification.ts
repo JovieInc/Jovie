@@ -73,7 +73,8 @@ export function getReleaseDayNotificationText(
     subscriberName,
   } = data;
   const releaseUrl = buildReleaseUrl(username, slug);
-  const greeting = subscriberName ? `Hey ${subscriberName}, ` : '';
+  const safeName = subscriberName?.replace(/[\r\n\t]/g, '').trim();
+  const greeting = safeName ? `Hey ${safeName}, ` : '';
 
   const linksList = streamingLinks
     .slice(0, 4)
