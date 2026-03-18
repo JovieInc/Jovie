@@ -8,7 +8,6 @@
  * Includes right-click context menu on artwork for downloading at multiple sizes.
  */
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
@@ -18,6 +17,12 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
+import {
+  SmartLinkAmbientGlow,
+  SmartLinkArtistName,
+  SmartLinkArtworkCard,
+  SmartLinkPoweredByFooter,
+} from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { ProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -172,10 +177,7 @@ export function ReleaseLandingPage({
 
   return (
     <div className='h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[30rem] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
-      </div>
+      <SmartLinkAmbientGlow className='size-[30rem]' />
 
       <main className='relative z-10 flex h-full flex-col items-center px-6 pt-10'>
         {/* Content container — fills space between top padding and footer */}
@@ -188,26 +190,11 @@ export function ReleaseLandingPage({
               sizes={sizes}
               allowDownloads={allowDownloads}
             >
-              <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/40 ring-1 ring-white/[0.08]'>
-                {release.artworkUrl ? (
-                  <Image
-                    src={release.artworkUrl}
-                    alt={`${release.title} artwork`}
-                    fill
-                    className='object-cover'
-                    sizes='272px'
-                    priority
-                  />
-                ) : (
-                  <div className='flex h-full w-full items-center justify-center'>
-                    <Icon
-                      name='Disc3'
-                      className='text-muted-foreground h-16 w-16'
-                      aria-hidden='true'
-                    />
-                  </div>
-                )}
-              </div>
+              <SmartLinkArtworkCard
+                title={release.title}
+                artworkUrl={release.artworkUrl}
+                className='shadow-black/40'
+              />
             </AlbumArtworkContextMenu>
 
             {/* Release Info */}
@@ -215,18 +202,11 @@ export function ReleaseLandingPage({
               <h1 className='text-lg font-semibold leading-snug tracking-tight'>
                 {release.title}
               </h1>
-              {artist.handle ? (
-                <Link
-                  href={`/${artist.handle}`}
-                  className='text-muted-foreground hover:text-foreground mt-1 block text-sm transition-colors'
-                >
-                  {artist.name}
-                </Link>
-              ) : (
-                <p className='text-muted-foreground mt-1 text-sm'>
-                  {artist.name}
-                </p>
-              )}
+              <SmartLinkArtistName
+                name={artist.name}
+                handle={artist.handle}
+                className='hover:text-foreground block text-sm transition-colors'
+              />
               {formattedDate && (
                 <p className='text-muted-foreground/70 mt-0.5 text-2xs tracking-wide'>
                   {formattedDate}
@@ -295,16 +275,7 @@ export function ReleaseLandingPage({
           </div>
         </div>
 
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 pt-3 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
-          >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
+        <SmartLinkPoweredByFooter />
       </main>
     </div>
   );

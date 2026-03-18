@@ -10,11 +10,16 @@
  * Tracks individual button clicks via /api/track using sendBeacon.
  */
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useCallback } from 'react';
 import { VIDEO_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
+import {
+  SmartLinkAmbientGlow,
+  SmartLinkArtistName,
+  SmartLinkArtworkCard,
+  SmartLinkPoweredByFooter,
+} from '@/features/release/SmartLinkPagePrimitives';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import type { VideoProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
@@ -85,10 +90,7 @@ export function SoundsLandingPage({
 
   return (
     <div className='h-dvh bg-base text-foreground'>
-      {/* Ambient glow */}
-      <div className='pointer-events-none fixed inset-0'>
-        <div className='bg-foreground/5 absolute left-1/2 top-1/3 size-[480px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]' />
-      </div>
+      <SmartLinkAmbientGlow className='size-[480px]' />
 
       <main
         id='main-content'
@@ -97,26 +99,11 @@ export function SoundsLandingPage({
         <div className='flex w-full max-w-[272px] min-h-0 flex-1 flex-col'>
           {/* Artwork */}
           <div className='shrink-0'>
-            <div className='relative aspect-square w-full overflow-hidden rounded-lg bg-surface-1/30 shadow-2xl shadow-black/60 ring-1 ring-white/[0.08]'>
-              {release.artworkUrl ? (
-                <Image
-                  src={release.artworkUrl}
-                  alt={`${release.title} artwork`}
-                  fill
-                  className='object-cover'
-                  sizes='272px'
-                  priority
-                />
-              ) : (
-                <div className='flex h-full w-full items-center justify-center'>
-                  <Icon
-                    name='Disc3'
-                    className='text-muted-foreground h-16 w-16'
-                    aria-hidden='true'
-                  />
-                </div>
-              )}
-            </div>
+            <SmartLinkArtworkCard
+              title={release.title}
+              artworkUrl={release.artworkUrl}
+              className='shadow-black/60'
+            />
 
             {/* Release Info */}
             <div className='mt-4 text-center'>
@@ -126,18 +113,11 @@ export function SoundsLandingPage({
               <h1 className='mt-1.5 text-[17px] font-semibold leading-snug tracking-tight'>
                 {release.title}
               </h1>
-              {artist.handle ? (
-                <Link
-                  href={`/${artist.handle}`}
-                  className='text-muted-foreground hover:text-foreground/70 mt-1 block text-[13px] transition-colors'
-                >
-                  {artist.name}
-                </Link>
-              ) : (
-                <p className='text-muted-foreground mt-1 text-[13px]'>
-                  {artist.name}
-                </p>
-              )}
+              <SmartLinkArtistName
+                name={artist.name}
+                handle={artist.handle}
+                className='hover:text-foreground/70 block text-[13px] transition-colors'
+              />
             </div>
           </div>
 
@@ -177,16 +157,7 @@ export function SoundsLandingPage({
           </div>
         </div>
 
-        {/* Jovie Branding */}
-        <footer className='shrink-0 pb-5 pt-3 text-center'>
-          <Link
-            href='/'
-            className='text-muted-foreground/70 hover:text-foreground/90 inline-flex items-center gap-1 text-2xs uppercase tracking-widest transition-colors'
-          >
-            <span>Powered by</span>
-            <span className='font-semibold'>Jovie</span>
-          </Link>
-        </footer>
+        <SmartLinkPoweredByFooter />
       </main>
     </div>
   );
