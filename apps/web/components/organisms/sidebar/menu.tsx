@@ -35,8 +35,8 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 
 const sidebarMenuButtonVariants = cva(
   [
-    // Base layout — 13px / weight 500 / 6px radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[6px] px-2 text-left text-app leading-tight tracking-tight outline-none',
+    // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-full px-2 text-left text-app leading-tight tracking-tight outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
@@ -314,7 +314,7 @@ export const SidebarMenuSubButton = React.forwardRef<
       data-size={size}
       data-active={isActive}
       className={cn(
-        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-[6px] px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-normal ease-interactive',
+        'flex min-h-6 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-full px-1.5 text-app text-sidebar-item-foreground outline-none transition-[background-color,color] duration-normal ease-interactive',
         'hover:bg-sidebar-accent hover:text-sidebar-foreground',
         'focus-visible:bg-sidebar-accent focus-visible:outline-none',
         'active:bg-sidebar-accent active:text-sidebar-foreground',
