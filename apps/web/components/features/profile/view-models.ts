@@ -99,6 +99,8 @@ export function buildProfileIdentityFields(
     tagline: artist.tagline ?? '',
     imageUrl: artist.image_url ?? '',
     hideBranding: Boolean(artist.settings?.hide_branding),
+    location: artist.location ?? '',
+    hometown: artist.hometown ?? '',
     profilePath: `/${artist.handle}`,
   };
 }

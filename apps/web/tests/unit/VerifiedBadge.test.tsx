@@ -68,6 +68,13 @@ describe('VerifiedBadge', () => {
       expect(badge).toHaveAttribute('aria-label', 'Verified Jovie Profile');
     });
 
+    it('exposes the badge as an image role', () => {
+      const { container } = render(<VerifiedBadge />);
+      const badge = container.querySelector('span');
+
+      expect(badge).toHaveAttribute('role', 'img');
+    });
+
     it('has title attribute for tooltip', () => {
       const { container } = render(<VerifiedBadge />);
       const badge = container.querySelector('span');

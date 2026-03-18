@@ -16,9 +16,9 @@ export function VerifiedBadge({
   } as const;
 
   return (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label is needed for accessibility on span with icon
     <span
       className={`inline-flex align-middle rounded-full bg-white dark:bg-base p-0.5 text-sky-600 dark:text-sky-400 ${className}`}
+      role='img'
       title='Verified Jovie Profile'
       aria-label='Verified Jovie Profile'
     >

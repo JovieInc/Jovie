@@ -25,6 +25,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Invalid IANA timezone values no longer crash `TourDateCard` — wrapped `Intl.DateTimeFormat` in try/catch
 
+## [26.3.5] - 2026-03-17
+
+### Added
+
+- Shared `approveLead()` pipeline for both manual admin approval and auto-approve cron (DRY extraction)
+- `runAutoApprove()` — automated approval with daily limits, fit score threshold, high-profile/representation guards
+- Scrape retry tracking with auto-disqualification after 3 failures (`scrape_attempts` column)
+- Pipeline health warnings: zero discovery results and high qualification error rate alerts via Sentry
+- 15s fetch timeout on Instantly API push (`AbortSignal.timeout`)
+- Idempotency guard on Instantly push (skips if `instantlyLeadId` already set)
+- 20 new pipeline tests: approve-lead, process-batch, pipeline-health-warnings, instantly-timeout
+
+### Fixed
+
+- TOCTOU race condition in approval pipeline — atomic `WHERE status='qualified'` guard prevents double-approval
+- Non-atomic daily counter increment — uses SQL `autoIngestedToday + N` instead of in-memory calculation
+- Expired claim tokens now regenerated during routing instead of reusing stale tokens
+
 ## [26.3.4] - 2026-03-17
 
 ### Added
