@@ -72,7 +72,7 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'One link to grow your music career.'
+      'One link to launch your music career.'
     );
     await expect(
       page.getByText(
@@ -115,7 +115,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 667 });
 
     await expect(page.locator('h1')).toContainText(
-      'One link to grow your music career.',
+      'One link to launch your music career.',
       { timeout: SMOKE_TIMEOUTS.VISIBILITY }
     );
 

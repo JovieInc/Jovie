@@ -9,6 +9,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Homepage hero: "One link to grow your music career" → "One link to launch your music career"
+- Final CTA: "start growing today" → "launch your career today"
+- Meta descriptions and SEO schema updated across all pages to new positioning
+- llms.txt brand description updated to match new messaging
+- Investor memo mission updated to "AI that manages your music career"
 - Replace SQL string interpolation with parameterized queries in batch update functions (`batchUpdateSortOrder`, `batchUpdateSocialLinks`) for defense-in-depth against SQL injection
 - Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
 - Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
