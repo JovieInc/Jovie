@@ -133,7 +133,7 @@ export function DemoReleasesPanel({
               </button>
               <button
                 type='button'
-                className='flex size-6 items-center justify-center rounded-[6px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                className='flex size-6 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
               >
                 <Plus className='size-3.5' />
