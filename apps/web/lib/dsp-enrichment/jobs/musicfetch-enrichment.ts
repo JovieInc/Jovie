@@ -70,6 +70,7 @@ export interface MusicFetchEnrichmentResult {
  * 2. Maps DSP services to profile fields (only sets null fields)
  * 3. Creates social_links entries for Instagram, TikTok, etc.
  * 4. Updates bio if the profile has none
+ * 5. Imports Spotify discography (releases, tracks, cross-platform links)
  */
 export async function processMusicFetchEnrichmentJob(
   tx: DbOrTransaction,
