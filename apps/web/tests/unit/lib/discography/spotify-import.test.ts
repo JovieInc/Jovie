@@ -34,7 +34,9 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const mockGetSpotifyArtistAlbums = vi.fn().mockResolvedValue([]);
+const mockGetSpotifyArtistAlbums = vi
+  .fn()
+  .mockResolvedValue({ albums: [], total: 0 });
 const mockGetSpotifyAlbums = vi.fn().mockResolvedValue([]);
 const mockGetSpotifyTracks = vi.fn().mockResolvedValue([]);
 const mockSafeParse = vi.fn((id: unknown) => ({
@@ -101,7 +103,7 @@ describe('spotify-import', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset default mock implementations
-    mockGetSpotifyArtistAlbums.mockResolvedValue([]);
+    mockGetSpotifyArtistAlbums.mockResolvedValue({ albums: [], total: 0 });
     mockGetSpotifyAlbums.mockResolvedValue([]);
     mockGetSpotifyTracks.mockResolvedValue([]);
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
@@ -144,7 +146,10 @@ describe('spotify-import', () => {
     });
 
     it('should return success with empty releases when artist has no albums', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([]);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 0,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -170,7 +175,10 @@ describe('spotify-import', () => {
         artists: [{ id: 'artist-1', name: 'Test Artist' }],
         images: [],
       }));
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce(manyAlbums);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: manyAlbums,
+        total: manyAlbums.length,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -213,7 +221,10 @@ describe('spotify-import', () => {
 
   describe('SpotifyImportResult structure', () => {
     it('should have correct structure on success', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([]);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 0,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -252,7 +263,10 @@ describe('spotify-import', () => {
 
   describe('import options', () => {
     it('should use default options when none provided', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([]);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 0,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -270,7 +284,10 @@ describe('spotify-import', () => {
     });
 
     it('should respect custom includeGroups option', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([]);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 0,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -289,7 +306,10 @@ describe('spotify-import', () => {
     });
 
     it('should respect custom market option', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([]);
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [],
+        total: 0,
+      });
 
       const { importReleasesFromSpotify } = await import(
         '@/lib/discography/spotify-import'
@@ -310,22 +330,25 @@ describe('spotify-import', () => {
 
   describe('release metadata precedence', () => {
     it('fetches full track metadata and persists valid ISRC from track endpoint', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-isrc',
-          name: 'ISRC Release',
-          album_type: 'single',
-          total_tracks: 1,
-          release_date: '2024-01-01',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [],
-          uri: 'spotify:album:album-isrc',
-          external_urls: {
-            spotify: 'https://open.spotify.com/album/album-isrc',
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-isrc',
+            name: 'ISRC Release',
+            album_type: 'single',
+            total_tracks: 1,
+            release_date: '2024-01-01',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [],
+            uri: 'spotify:album:album-isrc',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-isrc',
+            },
           },
-        },
-      ]);
+        ],
+        total: 1,
+      });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -405,22 +428,25 @@ describe('spotify-import', () => {
     });
 
     it('stores spotify preview as audio fallback when available', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-preview',
-          name: 'Preview Release',
-          album_type: 'single',
-          total_tracks: 1,
-          release_date: '2024-01-01',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [],
-          uri: 'spotify:album:album-preview',
-          external_urls: {
-            spotify: 'https://open.spotify.com/album/album-preview',
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-preview',
+            name: 'Preview Release',
+            album_type: 'single',
+            total_tracks: 1,
+            release_date: '2024-01-01',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [],
+            uri: 'spotify:album:album-preview',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-preview',
+            },
           },
-        },
-      ]);
+        ],
+        total: 1,
+      });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -505,22 +531,25 @@ describe('spotify-import', () => {
     });
 
     it('falls back to safe defaults when Spotify omits numeric track fields', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-missing-numbers',
-          name: 'Missing Numbers Release',
-          album_type: 'single',
-          total_tracks: 1,
-          release_date: '2024-01-01',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [],
-          uri: 'spotify:album:album-missing-numbers',
-          external_urls: {
-            spotify: 'https://open.spotify.com/album/album-missing-numbers',
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-missing-numbers',
+            name: 'Missing Numbers Release',
+            album_type: 'single',
+            total_tracks: 1,
+            release_date: '2024-01-01',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [],
+            uri: 'spotify:album:album-missing-numbers',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-missing-numbers',
+            },
           },
-        },
-      ]);
+        ],
+        total: 1,
+      });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -600,22 +629,25 @@ describe('spotify-import', () => {
     });
 
     it('drops malformed ISRC values from full track metadata', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-invalid-isrc',
-          name: 'Bad ISRC Release',
-          album_type: 'single',
-          total_tracks: 1,
-          release_date: '2024-01-01',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [],
-          uri: 'spotify:album:album-invalid-isrc',
-          external_urls: {
-            spotify: 'https://open.spotify.com/album/album-invalid-isrc',
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-invalid-isrc',
+            name: 'Bad ISRC Release',
+            album_type: 'single',
+            total_tracks: 1,
+            release_date: '2024-01-01',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [],
+            uri: 'spotify:album:album-invalid-isrc',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-invalid-isrc',
+            },
           },
-        },
-      ]);
+        ],
+        total: 1,
+      });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -694,26 +726,31 @@ describe('spotify-import', () => {
     });
 
     it('classifies EPs based on full album track count when summary album says single', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-ep',
-          name: 'Great EP',
-          album_type: 'single',
-          total_tracks: 1,
-          release_date: '2024-05-10',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [
-            {
-              url: 'https://summary.example/image.jpg',
-              height: 300,
-              width: 300,
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-ep',
+            name: 'Great EP',
+            album_type: 'single',
+            total_tracks: 1,
+            release_date: '2024-05-10',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [
+              {
+                url: 'https://summary.example/image.jpg',
+                height: 300,
+                width: 300,
+              },
+            ],
+            uri: 'spotify:album:album-ep',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-ep',
             },
-          ],
-          uri: 'spotify:album:album-ep',
-          external_urls: { spotify: 'https://open.spotify.com/album/album-ep' },
-        },
-      ]);
+          },
+        ],
+        total: 1,
+      });
 
       mockGetSpotifyAlbums.mockResolvedValueOnce([
         {
@@ -760,28 +797,31 @@ describe('spotify-import', () => {
     });
 
     it('prefers full album artwork when available', async () => {
-      mockGetSpotifyArtistAlbums.mockResolvedValueOnce([
-        {
-          id: 'album-artwork',
-          name: 'Artwork Release',
-          album_type: 'album',
-          total_tracks: 10,
-          release_date: '2024-01-01',
-          release_date_precision: 'day',
-          artists: [{ id: 'artist-1', name: 'Artist Name' }],
-          images: [
-            {
-              url: 'https://summary.example/image.jpg',
-              height: 300,
-              width: 300,
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [
+          {
+            id: 'album-artwork',
+            name: 'Artwork Release',
+            album_type: 'album',
+            total_tracks: 10,
+            release_date: '2024-01-01',
+            release_date_precision: 'day',
+            artists: [{ id: 'artist-1', name: 'Artist Name' }],
+            images: [
+              {
+                url: 'https://summary.example/image.jpg',
+                height: 300,
+                width: 300,
+              },
+            ],
+            uri: 'spotify:album:album-artwork',
+            external_urls: {
+              spotify: 'https://open.spotify.com/album/album-artwork',
             },
-          ],
-          uri: 'spotify:album:album-artwork',
-          external_urls: {
-            spotify: 'https://open.spotify.com/album/album-artwork',
           },
-        },
-      ]);
+        ],
+        total: 1,
+      });
 
       const fullImage = {
         url: 'https://full.example/image.jpg',

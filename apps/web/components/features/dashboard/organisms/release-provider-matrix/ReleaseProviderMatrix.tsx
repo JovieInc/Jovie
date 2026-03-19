@@ -92,6 +92,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   appleMusicArtistName = null,
   allowArtworkDownloads = false,
   initialImporting = false,
+  initialTotalCount = 0,
   experienceAdapter,
 }: ReleaseProviderMatrixProps) {
   const router = useRouter();
@@ -354,8 +355,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setIsImporting(false);
   }, []);
 
-  const { importedCount } = useImportPolling({
+  const { importedCount, totalCount } = useImportPolling({
     enabled: isImporting,
+    initialTotalCount,
     onReleasesUpdate: handleReleasesFromPolling,
     onImportComplete: handleImportComplete,
   });
@@ -727,18 +729,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               <ImportProgressBanner
                 artistName={artistName}
                 importedCount={importedCount}
+                totalCount={totalCount}
                 visible={showImportProgress}
               />
             )}
-            {showReleasesTable && rows[0]?.profileId && !isAmConnected && (
-              <AppleMusicSyncBanner
-                profileId={rows[0].profileId}
-                spotifyConnected={isConnected}
-                releases={rows}
-                onMatchStatusChange={handleMatchStatusChange}
-                className='mx-4 mt-2'
-              />
-            )}
+            {showReleasesTable &&
+              rows[0]?.profileId &&
+              !isAmConnected &&
+              !isImporting && (
+                <AppleMusicSyncBanner
+                  profileId={rows[0].profileId}
+                  spotifyConnected={isConnected}
+                  releases={rows}
+                  onMatchStatusChange={handleMatchStatusChange}
+                  className='mx-4 mt-2'
+                />
+              )}
             {showEmptyState && (
               <ReleasesEmptyState
                 onConnectSpotify={() => setSpotifySearchOpen(true)}
