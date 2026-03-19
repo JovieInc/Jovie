@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input } from '@jovie/ui';
+import { Button, Input, Switch } from '@jovie/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -58,7 +58,42 @@ export default function AdminOutreachEmailPage() {
   const [queueing, setQueueing] = useState(false);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [campaignsEnabled, setCampaignsEnabled] = useState(true);
+  const [togglingCampaigns, setTogglingCampaigns] = useState(false);
   const limit = 50;
+
+  const fetchCampaignSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/outreach/settings', {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = (await res.json()) as { campaignsEnabled: boolean };
+        setCampaignsEnabled(data.campaignsEnabled);
+      }
+    } catch {
+      // Silently fail — toggle defaults to enabled
+    }
+  }, []);
+
+  const toggleCampaignsEnabled = useCallback(async (enabled: boolean) => {
+    setTogglingCampaigns(true);
+    try {
+      const res = await fetch('/api/admin/outreach', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignsEnabled: enabled }),
+      });
+      if (res.ok) {
+        setCampaignsEnabled(enabled);
+      }
+    } catch {
+      // Revert on error
+      setCampaignsEnabled(!enabled);
+    } finally {
+      setTogglingCampaigns(false);
+    }
+  }, []);
 
   const fetchQueue = useCallback(async () => {
     setLoading(true);
@@ -93,7 +128,8 @@ export default function AdminOutreachEmailPage() {
 
   useEffect(() => {
     fetchQueue();
-  }, [fetchQueue]);
+    fetchCampaignSettings();
+  }, [fetchQueue, fetchCampaignSettings]);
 
   const queuePendingEmails = useCallback(async () => {
     const parsedLimit = Number.parseInt(queueLimit, 10);
@@ -151,6 +187,27 @@ export default function AdminOutreachEmailPage() {
 
   return (
     <div className='flex flex-col gap-4'>
+      <ContentSurfaceCard className='px-4 py-3 sm:px-6'>
+        <div className='flex items-center justify-between'>
+          <div>
+            <p className='text-sm font-[560] text-primary-token'>
+              Campaign Emails
+            </p>
+            <p className='text-xs text-secondary-token'>
+              {campaignsEnabled
+                ? 'Outreach emails and drip campaigns are active'
+                : 'All outreach emails and drip campaigns are paused'}
+            </p>
+          </div>
+          <Switch
+            checked={campaignsEnabled}
+            onCheckedChange={toggleCampaignsEnabled}
+            disabled={togglingCampaigns}
+            aria-label='Toggle campaign emails'
+          />
+        </div>
+      </ContentSurfaceCard>
+
       <ContentSurfaceCard className='overflow-hidden'>
         <ContentSectionHeader
           title='Email Queue'
