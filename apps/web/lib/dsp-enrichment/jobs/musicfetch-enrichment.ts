@@ -64,6 +64,127 @@ export interface MusicFetchEnrichmentResult {
 // Job Processor
 // ============================================================================
 
+async function applyDspUpdates(
+  tx: DbOrTransaction,
+  artistData: { name?: string; [key: string]: unknown },
+  profile: { id: string; usernameNormalized: string | null; username: string | null; displayName: string | null; displayNameLocked: boolean | null; avatarLockedByUser: boolean | null; spotifyId: string | null },
+  spotifyUrl: string,
+  creatorProfileId: string
+): Promise<string[]> {
+  const dspUpdates = mapMusicFetchProfileFields(artistData, profile, spotifyUrl);
+
+  let enrichedDisplayName: string | undefined;
+  const hasPlaceholderName =
+    !profile.displayName ||
+    profile.displayName === profile.usernameNormalized ||
+    profile.displayName === profile.username;
+  if (artistData.name && !profile.displayNameLocked && hasPlaceholderName) {
+    enrichedDisplayName = artistData.name;
+  }
+
+  if (profile.avatarLockedByUser) {
+    delete dspUpdates.avatarUrl;
+  }
+
+  const dspFieldNames = Object.keys(dspUpdates);
+  if (enrichedDisplayName) dspFieldNames.push('displayName');
+
+  if (dspFieldNames.length > 0) {
+    await tx
+      .update(creatorProfiles)
+      .set({
+        ...dspUpdates,
+        ...(enrichedDisplayName ? { displayName: enrichedDisplayName } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, creatorProfileId));
+
+    logger.info('MusicFetch enrichment: updated profile DSP fields', {
+      creatorProfileId,
+      fields: dspFieldNames,
+    });
+  }
+
+  return dspFieldNames;
+}
+
+async function mergeSocialLinks(
+  tx: DbOrTransaction,
+  artistData: unknown,
+  profile: { id: string; usernameNormalized: string | null; avatarUrl: string | null; displayName: string | null; avatarLockedByUser: boolean | null; displayNameLocked: boolean | null },
+  spotifyUrl: string
+): Promise<{ inserted: number; updated: number }> {
+  const socialLinks = extractMusicFetchLinks(
+    artistData,
+    spotifyUrl,
+    'musicfetch_artist_lookup'
+  );
+  if (socialLinks.length === 0) return { inserted: 0, updated: 0 };
+
+  const mergeResult = await normalizeAndMergeExtraction(
+    tx,
+    {
+      id: profile.id,
+      usernameNormalized: profile.usernameNormalized,
+      avatarUrl: profile.avatarUrl,
+      displayName: profile.displayName,
+      avatarLockedByUser: profile.avatarLockedByUser,
+      displayNameLocked: profile.displayNameLocked,
+    },
+    {
+      links: socialLinks,
+      sourcePlatform: 'musicfetch',
+      sourceUrl: spotifyUrl,
+    }
+  );
+
+  logger.info('MusicFetch enrichment: merged social links', {
+    creatorProfileId: profile.id,
+    inserted: mergeResult.inserted,
+    updated: mergeResult.updated,
+  });
+
+  return { inserted: mergeResult.inserted, updated: mergeResult.updated };
+}
+
+async function importDiscography(
+  spotifyUrl: string,
+  existingSpotifyId: string | null,
+  creatorProfileId: string,
+  result: MusicFetchEnrichmentResult
+): Promise<void> {
+  const spotifyId = extractSpotifyArtistId(spotifyUrl, existingSpotifyId);
+  if (!spotifyId) return;
+
+  try {
+    const importResult = await importReleasesFromSpotify(
+      creatorProfileId,
+      spotifyId
+    );
+    result.releasesImported = importResult.imported;
+    result.releasesFailed = importResult.failed;
+
+    if (importResult.errors.length > 0) {
+      result.errors.push(...importResult.errors);
+    }
+
+    logger.info('MusicFetch enrichment: imported Spotify discography', {
+      creatorProfileId,
+      imported: importResult.imported,
+      failed: importResult.failed,
+      totalReleases: importResult.releases.length,
+    });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Spotify import failed';
+    result.errors.push(`Spotify discography import failed: ${message}`);
+    logger.error('MusicFetch enrichment: Spotify import failed', {
+      creatorProfileId,
+      error: message,
+    });
+  }
+}
+
 /**
  * Process a MusicFetch enrichment job.
  *
@@ -152,119 +273,16 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Map DSP services to profile fields
-  const dspUpdates = mapMusicFetchProfileFields(
-    artistData,
-    profile,
-    spotifyUrl
+  // Apply DSP field updates, merge social links, and import discography
+  result.dspFieldsUpdated = await applyDspUpdates(
+    tx, artistData, profile, spotifyUrl, creatorProfileId
   );
-
-  // Set displayName from artist data if profile still has a placeholder name
-  let enrichedDisplayName: string | undefined;
-  if (
-    artistData.name &&
-    !profile.displayNameLocked &&
-    (!profile.displayName ||
-      profile.displayName === profile.usernameNormalized ||
-      profile.displayName === profile.username)
-  ) {
-    enrichedDisplayName = artistData.name;
-  }
-
-  // Respect user's explicit avatar lock — don't overwrite a manually set photo
-  if (profile.avatarLockedByUser) {
-    delete dspUpdates.avatarUrl;
-  }
-
-  const dspFieldNames = Object.keys(dspUpdates);
-  if (enrichedDisplayName) dspFieldNames.push('displayName');
-
-  // Apply profile DSP updates
-  if (dspFieldNames.length > 0) {
-    await tx
-      .update(creatorProfiles)
-      .set({
-        ...dspUpdates,
-        ...(enrichedDisplayName ? { displayName: enrichedDisplayName } : {}),
-        updatedAt: new Date(),
-      })
-      .where(eq(creatorProfiles.id, creatorProfileId));
-
-    result.dspFieldsUpdated = dspFieldNames;
-
-    logger.info('MusicFetch enrichment: updated profile DSP fields', {
-      creatorProfileId,
-      fields: dspFieldNames,
-    });
-  }
-
-  // Extract and merge social links
-  const socialLinks = extractMusicFetchLinks(
-    artistData,
-    spotifyUrl,
-    'musicfetch_artist_lookup'
+  const linkResult = await mergeSocialLinks(
+    tx, artistData, profile, spotifyUrl
   );
-  if (socialLinks.length > 0) {
-    const mergeResult = await normalizeAndMergeExtraction(
-      tx,
-      {
-        id: profile.id,
-        usernameNormalized: profile.usernameNormalized,
-        avatarUrl: profile.avatarUrl,
-        displayName: profile.displayName,
-        avatarLockedByUser: profile.avatarLockedByUser,
-        displayNameLocked: profile.displayNameLocked,
-      },
-      {
-        links: socialLinks,
-        sourcePlatform: 'musicfetch',
-        sourceUrl: spotifyUrl,
-      }
-    );
-
-    result.socialLinksInserted = mergeResult.inserted;
-    result.socialLinksUpdated = mergeResult.updated;
-
-    logger.info('MusicFetch enrichment: merged social links', {
-      creatorProfileId,
-      inserted: mergeResult.inserted,
-      updated: mergeResult.updated,
-    });
-  }
-
-  // Import Spotify discography (releases, tracks, cross-platform links).
-  // This runs using the global db connection (not the transaction) because it
-  // makes many external API calls to Spotify and MusicFetch for link discovery.
-  const spotifyId = extractSpotifyArtistId(spotifyUrl, profile.spotifyId);
-  if (spotifyId) {
-    try {
-      const importResult = await importReleasesFromSpotify(
-        creatorProfileId,
-        spotifyId
-      );
-      result.releasesImported = importResult.imported;
-      result.releasesFailed = importResult.failed;
-
-      if (importResult.errors.length > 0) {
-        result.errors.push(...importResult.errors);
-      }
-
-      logger.info('MusicFetch enrichment: imported Spotify discography', {
-        creatorProfileId,
-        imported: importResult.imported,
-        failed: importResult.failed,
-        totalReleases: importResult.releases.length,
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Spotify import failed';
-      result.errors.push(`Spotify discography import failed: ${message}`);
-      logger.error('MusicFetch enrichment: Spotify import failed', {
-        creatorProfileId,
-        error: message,
-      });
-    }
-  }
+  result.socialLinksInserted = linkResult.inserted;
+  result.socialLinksUpdated = linkResult.updated;
+  await importDiscography(spotifyUrl, profile.spotifyId, creatorProfileId, result);
 
   return result;
 }
