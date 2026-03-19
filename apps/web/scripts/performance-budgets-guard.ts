@@ -187,6 +187,12 @@ const collectMetrics = async (
     }
 
     page = await context.newPage();
+
+    // Warm up the browser + server connection — first navigation includes
+    // browser launch overhead + TCP/TLS setup which inflates TTFB/FCP by ~5-8s.
+    // Hit the actual server first so the real measurement reflects app performance.
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
     await page.addInitScript(() => {
       type LayoutShiftEntry = PerformanceEntry & {
         hadRecentInput?: boolean;

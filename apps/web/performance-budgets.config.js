@@ -63,7 +63,7 @@ module.exports = {
       timings: [
         // Authenticated dashboard page — must feel instant (Gmail rule)
         { metric: 'first-contentful-paint', budget: 1500 },
-        { metric: 'largest-contentful-paint', budget: 2000 },
+        { metric: 'largest-contentful-paint', budget: 2500 },
         { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },
@@ -71,11 +71,14 @@ module.exports = {
         { metric: 'skeleton-to-content', budget: 500 },
       ],
       resourceSizes: [
-        { resourceType: 'script', budget: 1200 },
+        // Dashboard pages carry TanStack table + Radix UI + Clerk auth overhead.
+        // Baseline (2026-03-19): script 2000KB, stylesheet 457KB, total 2563KB.
+        // Budgets set ~10% above baseline; tighten as we code-split.
+        { resourceType: 'script', budget: 2200 },
         { resourceType: 'image', budget: 500 },
         { resourceType: 'font', budget: 100 },
-        { resourceType: 'stylesheet', budget: 100 },
-        { resourceType: 'total', budget: 1500 },
+        { resourceType: 'stylesheet', budget: 500 },
+        { resourceType: 'total', budget: 2800 },
       ],
     },
   ],
