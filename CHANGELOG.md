@@ -6,6 +6,57 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+
+## [26.4.14] - 2026-03-19
+
+### Fixed
+
+- Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
+- Added "Delete account" link to user profile menu with destructive styling
+- Added direct `/app/settings/delete-account` route for deep-linking
+- Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
+- Added 7 unit tests for the account deletion API route
+- Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
+- Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
+
+### Removed
+
+- Deleted unauthenticated `/api/waitlist-debug` endpoint and its tests
+- Removed unused domain-categorizer functions (addSensitiveDomain, containsSensitiveKeywords, sanitizeForCrawlers, getAllSensitiveDomains)
+
+## [26.4.13] - 2026-03-19
+
+### Added
+
+- Music-first dashboard: hero card showing recent releases with album art carousel and import status
+- AI-powered insight one-liner on dashboard (e.g., "3 people viewed your profile today")
+- Smart action cards that adapt based on profile state (Venmo setup, Shopify connect, share profile)
+- Lightweight `/api/dashboard/recent-releases` endpoint for dashboard hero card
+- `useRecentReleasesQuery` TanStack Query hook for client-side release data
+- Chat overlay mode: dashboard is the default view, chat activates on input focus (Spotlight model)
+- DSP match suggestions carousel relocated to Music tab in right drawer
+
+### Changed
+
+- Dashboard center panel redesigned from chat-first to music-first layout
+- Chat suggestions cleaned up: removed "Set up a link" and "How do I get paid?", added "Write me a bio" and "Show my top insights"
+- Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
+- Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
+- When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
+- US/Canada visitors with unknown region see the banner as a safe compliance fallback
+
+## [26.4.12] - 2026-03-18
+
+### Fixed
+
+- Move Next.js dev indicator to top-right corner so it no longer overlaps the DevToolbar at the bottom of the screen
+- Spotify import progress bar now shows determinate progress ("5 of 30 imported") instead of bouncing indeterminate animation
+- Fixed premature import status override that caused the progress banner to flash in and out during active imports
+- Suppressed "No matching Apple Music artist" banner during active Spotify import to prevent confusing UI state
+- Added 1-second completion hold at 100% before banner fadeout for a polished finish
+- Added ARIA progressbar attributes for screen reader accessibility
+- Replaced jerky ping-pong animation with smooth unidirectional shimmer for unknown-total fallback
+
 ## [26.4.11] - 2026-03-18
 
 ### Changed

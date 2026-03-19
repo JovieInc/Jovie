@@ -4,19 +4,25 @@ import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  it('renders default prompts when first-session mode is off', () => {
+  it('renders updated default prompts', () => {
     const onSelect = vi.fn();
     const { getByText, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
 
-    expect(getByText('Change profile photo')).toBeTruthy();
-    expect(queryByText('Preview my profile')).toBeNull();
+    // New defaults
+    expect(getByText('Write me a bio')).toBeTruthy();
+    expect(getByText('Show my top insights')).toBeTruthy();
+
+    // Removed suggestions should not appear
+    expect(queryByText('Change profile photo')).toBeNull();
+    expect(queryByText('How do I get paid?')).toBeNull();
+    expect(queryByText(/Set up a link/)).toBeNull();
   });
 
-  it('renders first-session prompts with release title personalization', () => {
+  it('renders first-session prompts without removed suggestions', () => {
     const onSelect = vi.fn();
-    const { getByRole } = fastRender(
+    const { getByRole, queryByText } = fastRender(
       <SuggestedPrompts
         onSelect={onSelect}
         isFirstSession
@@ -24,11 +30,12 @@ describe('SuggestedPrompts', () => {
       />
     );
 
-    expect(
-      getByRole('button', { name: 'Set up a link for “Midnight Drive”' })
-    ).toBeTruthy();
+    // Kept suggestion
     expect(getByRole('button', { name: 'Preview my profile' })).toBeTruthy();
-    expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
+
+    // Removed suggestions should not appear
+    expect(queryByText('How do I get paid?')).toBeNull();
+    expect(queryByText(/Set up a link/)).toBeNull();
   });
 
   it('renders insight-backed prompts when provided', () => {
@@ -52,6 +59,20 @@ describe('SuggestedPrompts', () => {
         name: 'Which release is getting traction right now?',
       })
     ).toBeTruthy();
-    expect(queryByText('Change profile photo')).toBeNull();
+    // Default prompts should not appear when custom suggestions are provided
+    expect(queryByText('Write me a bio')).toBeNull();
+  });
+
+  it('always shows feedback suggestion', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    expect(getByText('Share feedback')).toBeTruthy();
+  });
+
+  it('calls onSelect with prompt when clicked', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByText('Write me a bio').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Write me an artist bio.');
   });
 });

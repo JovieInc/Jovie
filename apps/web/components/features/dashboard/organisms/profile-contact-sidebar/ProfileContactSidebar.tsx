@@ -11,6 +11,8 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
+import { SuggestedProfilesCarousel } from '@/components/jovie/components';
+import { useSuggestedProfiles } from '@/components/jovie/hooks';
 import {
   DrawerSurfaceCard,
   DrawerTabs,
@@ -80,6 +82,16 @@ export function ProfileContactSidebar() {
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
   const removeLinkMutation = useRemoveSocialLinkMutation();
+
+  // Suggested DSP profiles (carousel shown on Music tab)
+  const profileId = selectedProfile?.id ?? '';
+  const suggestedProfiles = useSuggestedProfiles(profileId, {
+    enabled: Boolean(profileId),
+  });
+  const hasCarouselItems =
+    Boolean(profileId) &&
+    !suggestedProfiles.isLoading &&
+    suggestedProfiles.total > 0;
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -303,20 +315,17 @@ export function ProfileContactSidebar() {
           throw new Error('Failed to add link');
         }
 
-        // Replace the temp ID with the server-assigned ID so future deletes work
         const { linkId } = (await response.json()) as { linkId: string };
+        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
+          optimisticLink.id
+        );
 
-        // If user deleted this link while the add was in flight, fire a server
-        // delete now that we have the real ID, and skip the UI update.
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+        if (wasDeletedWhilePending) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
           if (linkId && selectedProfile) {
             removeLinkMutation.mutate(
               { profileId: selectedProfile.id, linkId },
-              {
-                // Suppress global onError — user already saw "Link removed"
-                onError: () => {},
-              }
+              { onError: () => {} }
             );
           }
           return;
@@ -606,6 +615,25 @@ export function ProfileContactSidebar() {
         />
       ) : (
         <>
+          {/* DSP match suggestions — only on Music tab */}
+          {resolvedCategory === 'dsp' && hasCarouselItems && (
+            <div className='mb-3'>
+              <SuggestedProfilesCarousel
+                suggestions={suggestedProfiles.suggestions}
+                isLoading={suggestedProfiles.isLoading}
+                currentIndex={suggestedProfiles.currentIndex}
+                total={suggestedProfiles.total}
+                next={suggestedProfiles.next}
+                prev={suggestedProfiles.prev}
+                confirm={suggestedProfiles.confirm}
+                reject={suggestedProfiles.reject}
+                isActioning={suggestedProfiles.isActioning}
+                username={previewData?.username ?? ''}
+                displayName={previewData?.displayName ?? ''}
+                avatarUrl={previewData?.avatarUrl ?? ''}
+              />
+            </div>
+          )}
           <ProfileLinkList
             links={links}
             selectedCategory={resolvedCategory as CategoryOption}

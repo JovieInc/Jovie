@@ -18,7 +18,7 @@ export function DspPresenceSummary({
 
         <div className='flex items-center gap-3 text-[13px] text-(--linear-text-tertiary)'>
           <span>
-            {confirmedCount} matched platform{confirmedCount !== 1 ? 's' : ''}
+            {confirmedCount} matched platform{confirmedCount === 1 ? '' : 's'}
           </span>
           {suggestedCount > 0 && (
             <>

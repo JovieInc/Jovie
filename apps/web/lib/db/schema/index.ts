@@ -387,7 +387,14 @@ export {
   type PreSaveToken,
   preSaveTokens,
 } from './pre-save';
-
+// Product Update Subscribers
+export {
+  insertProductUpdateSubscriberSchema,
+  type NewProductUpdateSubscriber,
+  type ProductUpdateSubscriber,
+  productUpdateSubscribers,
+  selectProductUpdateSubscriberSchema,
+} from './product-update-subscribers';
 // Creator Profiles
 export {
   type CreatorAvatarCandidate,
@@ -423,7 +430,6 @@ export {
   selectCreatorProfileSchema,
   selectProfilePhotoSchema,
 } from './profiles';
-
 // Referral Program (Codes, Referrals, Commissions)
 export {
   insertReferralCodeSchema,
@@ -442,7 +448,6 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
-
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,
@@ -463,7 +468,6 @@ export {
   selectCreatorSendingReputationSchema,
   selectEmailSendAttributionSchema,
 } from './sender';
-
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export {
   type CategorySubscription,

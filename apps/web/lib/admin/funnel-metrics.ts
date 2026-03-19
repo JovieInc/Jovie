@@ -4,8 +4,10 @@ import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { discogReleases } from '@/lib/db/schema/content';
 import { emailEngagement } from '@/lib/db/schema/email-engagement';
 import { leads } from '@/lib/db/schema/leads';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
@@ -67,6 +69,12 @@ export interface AdminFunnelMetrics {
   signupToPaidRate: number | null;
   /** MRR dollars generated per outreach sent: mrrUsd / outreachSent7d */
   dollarPerOutreach: number | null;
+  /** Magic moment: % of signups with avatar + name + DSP link + release */
+  magicMomentRate: number | null;
+  /** Magic moment: total profiles that achieved magic moment */
+  magicMomentCount: number;
+  /** Enrichment failure rate: profiles with any failed enrichment status */
+  enrichmentFailureRate: number | null;
 }
 
 /**
@@ -177,6 +185,72 @@ async function getPaidConversions7d(sevenDaysAgo: Date): Promise<number> {
   }
 }
 
+/**
+ * Magic moment metrics: profiles with avatar + display name + DSP link + release.
+ */
+async function getMagicMomentMetrics(): Promise<{
+  magicMomentCount: number;
+  totalProfiles: number;
+  enrichmentFailureCount: number;
+}> {
+  const profiles = await db
+    .select({
+      id: creatorProfiles.id,
+      avatarUrl: creatorProfiles.avatarUrl,
+      displayName: creatorProfiles.displayName,
+      spotifyId: creatorProfiles.spotifyId,
+      appleMusicId: creatorProfiles.appleMusicId,
+      settings: creatorProfiles.settings,
+    })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.isClaimed, true));
+
+  let magicMomentCount = 0;
+  let enrichmentFailureCount = 0;
+
+  // Get release counts per profile
+  const releaseCounts = await db
+    .select({
+      profileId: discogReleases.creatorProfileId,
+      count: drizzleSql<number>`count(*)::int`,
+    })
+    .from(discogReleases)
+    .groupBy(discogReleases.creatorProfileId);
+
+  const releaseCountMap = new Map(
+    releaseCounts.map(r => [r.profileId, r.count])
+  );
+
+  for (const profile of profiles) {
+    const hasAvatar = Boolean(profile.avatarUrl);
+    const hasDisplayName = Boolean(profile.displayName);
+    const hasDspLink = Boolean(profile.spotifyId || profile.appleMusicId);
+    const hasRelease = (releaseCountMap.get(profile.id) ?? 0) > 0;
+
+    if (hasAvatar && hasDisplayName && hasDspLink && hasRelease) {
+      magicMomentCount++;
+    }
+
+    const settings = (profile.settings ?? {}) as Record<string, unknown>;
+    const enrichmentStatus = (settings.enrichmentStatus ?? {}) as Record<
+      string,
+      string
+    >;
+    const hasFailure = Object.values(enrichmentStatus).some(
+      s => s === 'failed'
+    );
+    if (hasFailure) {
+      enrichmentFailureCount++;
+    }
+  }
+
+  return {
+    magicMomentCount,
+    totalProfiles: profiles.length,
+    enrichmentFailureCount,
+  };
+}
+
 function safeRate(numerator: number, denominator: number): number | null {
   if (denominator <= 0) return null;
   return numerator / denominator;
@@ -192,6 +266,7 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     signups7d,
     paidConversions7d,
     stripeMetrics,
+    magicMomentMetrics,
   ] = await Promise.all([
     getOutreachSent7d(sevenDaysAgo).catch(err => {
       errors.push(
@@ -214,6 +289,16 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     getAdminStripeOverviewMetrics().catch(err => {
       errors.push(`Stripe: ${err instanceof Error ? err.message : 'unknown'}`);
       return null;
+    }),
+    getMagicMomentMetrics().catch(err => {
+      errors.push(
+        `MagicMoment: ${err instanceof Error ? err.message : 'unknown'}`
+      );
+      return {
+        magicMomentCount: 0,
+        totalProfiles: 0,
+        enrichmentFailureCount: 0,
+      };
     }),
   ]);
 
@@ -275,5 +360,14 @@ export async function getAdminFunnelMetrics(): Promise<AdminFunnelMetrics> {
     outreachToSignupRate: safeRate(signups7d, outreachSent7d),
     signupToPaidRate: safeRate(paidConversions7d, signups7d),
     dollarPerOutreach: safeRate(mrrUsd, outreachSent7d),
+    magicMomentRate: safeRate(
+      magicMomentMetrics.magicMomentCount,
+      magicMomentMetrics.totalProfiles
+    ),
+    magicMomentCount: magicMomentMetrics.magicMomentCount,
+    enrichmentFailureRate: safeRate(
+      magicMomentMetrics.enrichmentFailureCount,
+      magicMomentMetrics.totalProfiles
+    ),
   };
 }

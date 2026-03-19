@@ -7,10 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
+import { InsightOneLiner } from '@/features/dashboard/organisms/InsightOneLiner';
+import { MusicImportHero } from '@/features/dashboard/organisms/MusicImportHero';
+import { SmartActionCards } from '@/features/dashboard/organisms/SmartActionCards';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { buildInsightPrompt } from '@/lib/insights/chat-presentation';
-import { useInsightsSummaryQuery } from '@/lib/queries';
+import { useInsightsSummaryQuery, useRecentReleasesQuery } from '@/lib/queries';
 
 import {
   ChatInput,
@@ -18,15 +20,10 @@ import {
   ChatMessageSkeleton,
   ErrorDisplay,
   ScrollToBottom,
-  SuggestedProfilesCarousel,
   SuggestedPrompts,
 } from './components';
 import { ChatUsageAlert } from './components/ChatUsageAlert';
-import {
-  useChatImageAttachments,
-  useJovieChat,
-  useSuggestedProfiles,
-} from './hooks';
+import { useChatImageAttachments, useJovieChat } from './hooks';
 import type { ChatSuggestion, JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
@@ -71,40 +68,26 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
-  const { profileCompletion } = useDashboardData();
+  const { profileCompletion, selectedProfile } = useDashboardData();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [chatActive, setChatActive] = useState(false);
 
-  // Suggested profiles carousel data — lifted here so we can hide
-  // the help text and suggested prompts while the carousel has items.
-  const shouldLoadSuggestedProfiles = Boolean(profileId) && !isFirstSessionProp;
-  const suggestedProfiles = useSuggestedProfiles(profileId, {
-    enabled: shouldLoadSuggestedProfiles,
-  });
-  const suggestionsReady = !suggestedProfiles.isLoading;
-  const detectedFirstSession = suggestionsReady
-    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
-    : null;
-  const isFirstSession =
-    detectedFirstSession === null
-      ? isFirstSessionProp
-      : isFirstSessionProp || detectedFirstSession;
-  const latestReleaseTitle =
-    latestReleaseTitleProp ??
-    suggestedProfiles.starterContext?.latestReleaseTitle ??
-    null;
-  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
-  const hasCarouselItems =
-    showSuggestedProfiles &&
-    !suggestedProfiles.isLoading &&
-    suggestedProfiles.total > 0;
+  // Releases data for the dashboard hero card
+  const { data: recentReleases, isLoading: isReleasesLoading } =
+    useRecentReleasesQuery(profileId);
+  const ingestionStatus =
+    (selectedProfile?.ingestionStatus as
+      | 'idle'
+      | 'pending'
+      | 'processing'
+      | 'failed') ?? 'idle';
+
+  // Insight suggestions for the chat active state
   const shouldLoadInsightSuggestions =
-    Boolean(profileId) &&
-    !isFirstSession &&
-    !hasCarouselItems &&
-    (profileCompletion?.percentage ?? 0) >= 100;
+    Boolean(profileId) && (profileCompletion?.percentage ?? 0) >= 100;
   const insightsSummary = useInsightsSummaryQuery({
     enabled: shouldLoadInsightSuggestions,
   });
@@ -210,6 +193,34 @@ export function JovieChat({
       onTitleChange?.(conversationTitle);
     }
   }, [conversationTitle, onTitleChange]);
+
+  // Activate chat mode when input is focused
+  const handleChatFocus = useCallback(() => {
+    if (!hasMessages) {
+      setChatActive(true);
+    }
+  }, [hasMessages]);
+
+  // ESC key returns to dashboard when chat is active but no messages sent
+  useEffect(() => {
+    if (hasMessages || !chatActive) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setChatActive(false);
+        inputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [chatActive, hasMessages, inputRef]);
+
+  // Handle feedback click from SmartActionCards
+  const handleFeedbackClick = useCallback(() => {
+    setChatActive(true);
+    handleSuggestedPrompt("I'd like to share some feedback about Jovie.");
+  }, [handleSuggestedPrompt]);
 
   // Auto-submit initialQuery on mount (e.g. navigated from profile with ?q=)
   useEffect(() => {
@@ -332,7 +343,7 @@ export function JovieChat({
       </AnimatePresence>
 
       {hasMessages ? (
-        // Chat view - messages + input at bottom
+        // Chat view — messages + input at bottom
         <>
           {/* Messages area */}
           <div
@@ -457,79 +468,33 @@ export function JovieChat({
             </div>
           </div>
         </>
-      ) : (
-        // Empty state - centered content with input pinned at bottom
+      ) : chatActive ? (
+        // Chat active — user focused input, show chat empty state with suggestions
         <div className='flex flex-1 flex-col'>
-          {/* Centered content area */}
           <div className='flex flex-1 flex-col items-center justify-center px-4'>
             <div className='chat-stagger w-full max-w-2xl space-y-4'>
-              {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
-              {showSuggestedProfiles && (
-                <SuggestedProfilesCarousel
-                  suggestions={suggestedProfiles.suggestions}
-                  isLoading={suggestedProfiles.isLoading}
-                  currentIndex={suggestedProfiles.currentIndex}
-                  total={suggestedProfiles.total}
-                  next={suggestedProfiles.next}
-                  prev={suggestedProfiles.prev}
-                  confirm={suggestedProfiles.confirm}
-                  reject={suggestedProfiles.reject}
-                  isActioning={suggestedProfiles.isActioning}
-                  username={username}
-                  displayName={displayName}
-                  avatarUrl={avatarUrl}
-                />
-              )}
-
-              {/* Momentum card and help prompts are mutually exclusive:
-                 incomplete profile = show momentum card, complete = show help prompts */}
-              {!hasCarouselItems &&
-                (profileCompletion?.percentage ?? 0) < 100 && (
-                  <ProfileCompletionCard />
-                )}
-
-              {/* Show help text and prompts only when profile is complete */}
-              {!hasCarouselItems &&
-                (profileCompletion?.percentage ?? 0) >= 100 && (
-                  <>
-                    {isFirstSession ? (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        Welcome, {displayName ?? 'there'}. Your profile is live
-                        at{' '}
-                        <a
-                          href={
-                            username
-                              ? `https://jov.ie/${username}`
-                              : 'https://jov.ie'
-                          }
-                          target='_blank'
-                          rel='noreferrer'
-                          className='font-medium text-primary-token underline-offset-2 hover:underline'
-                        >
-                          {username ? `jov.ie/${username}` : 'jov.ie'}
-                        </a>{' '}
-                        .
-                      </p>
-                    ) : (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        What can I help you with?
-                      </p>
-                    )}
-
-                    <SuggestedPrompts
-                      onSelect={handleSuggestedPrompt}
-                      isFirstSession={isFirstSession}
-                      latestReleaseTitle={latestReleaseTitle}
-                      suggestions={insightSuggestions}
-                    />
-                  </>
-                )}
+              <p className='text-center text-[15px] text-secondary-token'>
+                What can I help you with?
+              </p>
+              <SuggestedPrompts
+                onSelect={handleSuggestedPrompt}
+                isFirstSession={isFirstSessionProp}
+                latestReleaseTitle={latestReleaseTitleProp}
+                suggestions={insightSuggestions}
+              />
             </div>
           </div>
 
           {/* Input pinned at bottom */}
           <div className='px-4 pb-4 sm:pb-8'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
+              <button
+                type='button'
+                onClick={() => setChatActive(false)}
+                className='text-xs text-tertiary-token hover:text-secondary-token transition-colors'
+              >
+                ← Back to dashboard
+              </button>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
                   Sending too fast. Please wait a second before your next
@@ -539,7 +504,46 @@ export function JovieChat({
               <ChatUsageAlert />
               <ChatInput {...chatInputProps} />
 
-              {/* Error display */}
+              {chatError && (
+                <ErrorDisplay
+                  chatError={chatError}
+                  onRetry={handleRetry}
+                  isLoading={isLoading}
+                  isSubmitting={isSubmitting}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Dashboard view — music import hero, insight, smart action cards
+        <div className='flex flex-1 flex-col'>
+          <div className='flex-1 overflow-y-auto px-4 py-6'>
+            <div className='mx-auto w-full max-w-2xl space-y-6'>
+              <MusicImportHero
+                ingestionStatus={ingestionStatus}
+                releases={recentReleases ?? []}
+                isLoading={isReleasesLoading}
+              />
+              <InsightOneLiner displayName={displayName} />
+              <SmartActionCards
+                profileId={profileId}
+                username={username}
+                onFeedbackClick={handleFeedbackClick}
+              />
+            </div>
+          </div>
+
+          {/* Chat input pinned at bottom */}
+          <div className='px-4 pb-4 sm:pb-8'>
+            <div className='mx-auto w-full max-w-2xl space-y-3'>
+              <ChatUsageAlert />
+              <ChatInput
+                {...chatInputProps}
+                onFocus={handleChatFocus}
+                placeholder='Ask Jovie anything...'
+              />
+
               {chatError && (
                 <ErrorDisplay
                   chatError={chatError}

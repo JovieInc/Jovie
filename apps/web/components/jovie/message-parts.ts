@@ -14,6 +14,36 @@ function normalizeToolInvocationState(
   return value === 'call' || value === 'partial-call' ? value : 'result';
 }
 
+function resolveStringField(
+  primary: unknown,
+  fallback: unknown
+): string | null {
+  if (typeof primary === 'string') return primary;
+  if (typeof fallback === 'string') return fallback;
+  return null;
+}
+
+function resolveRecordField(
+  primary: unknown,
+  fallback: unknown
+): Record<string, unknown> | undefined {
+  if (isRecord(primary)) return primary;
+  if (isRecord(fallback)) return fallback;
+  return undefined;
+}
+
+function resolveToolInvocationId(
+  value: Record<string, unknown>,
+  nested: Record<string, unknown> | null,
+  index: number
+): string {
+  if (typeof value.toolInvocationId === 'string') return value.toolInvocationId;
+  if (typeof nested?.toolInvocationId === 'string')
+    return nested.toolInvocationId;
+  if (typeof nested?.toolCallId === 'string') return nested.toolCallId;
+  return `persisted-tool-${index}`;
+}
+
 function hydrateToolInvocationPart(
   value: unknown,
   index: number
@@ -25,42 +55,22 @@ function hydrateToolInvocationPart(
   }
 
   const nested = isRecord(value.toolInvocation) ? value.toolInvocation : null;
-  const toolName =
-    typeof value.toolName === 'string'
-      ? value.toolName
-      : typeof nested?.toolName === 'string'
-        ? nested.toolName
-        : null;
+  const toolName = resolveStringField(value.toolName, nested?.toolName);
 
   if (!toolName) {
     return null;
   }
 
   const state = normalizeToolInvocationState(value.state ?? nested?.state);
-  const toolInvocationId =
-    typeof value.toolInvocationId === 'string'
-      ? value.toolInvocationId
-      : typeof nested?.toolInvocationId === 'string'
-        ? nested.toolInvocationId
-        : typeof nested?.toolCallId === 'string'
-          ? nested.toolCallId
-          : `persisted-tool-${index}`;
+  const toolInvocationId = resolveToolInvocationId(value, nested, index);
 
   return {
     type: 'tool-invocation',
     toolInvocationId,
     toolName,
     state,
-    args: isRecord(value.args)
-      ? value.args
-      : isRecord(nested?.args)
-        ? nested.args
-        : undefined,
-    result: isRecord(value.result)
-      ? value.result
-      : isRecord(nested?.result)
-        ? nested.result
-        : undefined,
+    args: resolveRecordField(value.args, nested?.args),
+    result: resolveRecordField(value.result, nested?.result),
     toolInvocation: {
       toolName,
       state,

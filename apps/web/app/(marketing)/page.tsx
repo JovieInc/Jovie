@@ -7,6 +7,7 @@ import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
+import { RecentlyShippedSection } from '@/features/home/RecentlyShippedSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
@@ -212,6 +213,19 @@ export default function HomePage() {
             }}
           />
           <TestimonialsSection />
+        </>
+      )}
+
+      {process.env.NEXT_PUBLIC_SHOW_RECENTLY_SHIPPED === 'true' && (
+        <>
+          <hr
+            className='mx-auto max-w-lg border-0 h-px'
+            style={{
+              background:
+                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
+            }}
+          />
+          <RecentlyShippedSection />
         </>
       )}
 

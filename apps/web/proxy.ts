@@ -583,7 +583,10 @@ function buildFinalResponse(
   const countryCode =
     req.headers.get('x-vercel-ip-country') ?? req.headers.get('cf-ipcountry');
   const normalizedCountryCode = countryCode?.trim().toUpperCase() ?? null;
-  const requiresCookieConsent = isCookieBannerRequired(normalizedCountryCode);
+  const requiresCookieConsent = isCookieBannerRequired(
+    normalizedCountryCode,
+    geo.region
+  );
   const currentCookieRequirement = req.cookies.get(
     COOKIE_BANNER_REQUIRED_COOKIE
   )?.value;
