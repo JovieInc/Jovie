@@ -304,8 +304,9 @@ export function ProfileContactSidebar() {
         }
 
         const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending =
-          deletedWhilePendingRef.current.has(optimisticLink.id);
+        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
+          optimisticLink.id
+        );
 
         if (wasDeletedWhilePending) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
