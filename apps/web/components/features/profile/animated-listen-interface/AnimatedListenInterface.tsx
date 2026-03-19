@@ -38,8 +38,7 @@ export function AnimatedListenInterface({
           ) : (
             availableDSPs.map(dsp => {
               const isSelected = selectedDSP === dsp.key;
-              const logoConfig =
-                DSP_LOGO_CONFIG[dsp.key as keyof typeof DSP_LOGO_CONFIG];
+              const logoConfig = DSP_LOGO_CONFIG[dsp.key];
 
               return (
                 <motion.div
