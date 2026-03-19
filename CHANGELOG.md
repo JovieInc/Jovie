@@ -7,6 +7,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.10] - 2026-03-18
 
+### Fixed
+
+- Guard all keyboard shortcut hooks against undefined `event.key` — prevents crashes from IME composition, dead keys, and browser extension injected events (JOVIE-WEB-EE, JOVIE-WEB-CT, JOVIE-WEB-F1)
+
+### Added
+
+- Unit tests for `useSidebarKeyboardShortcut` and `useSequentialShortcuts` hooks (13 tests)
+
 ### Changed
 
 - Waitlist gating: replaced `WAITLIST_ENABLED` env var with DB-only `gateEnabled` toggle — admin panel now controls waitlist without server restarts
