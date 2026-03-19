@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.9] - 2026-03-18
+
+### Fixed
+
+- Fix conversion rate labels showing between wrong funnel stages — 33% now correctly appears between Profile Views and Unique Visitors instead of between Unique Visitors and Followers
+- Fix Cities, Countries, and Sources tabs showing blank by sourcing geo data from audience_members (visits) instead of click_events (link clicks only)
+- Fix time range toggle (7d/30d) overflowing off-screen by stacking it below the tab bar
+
+### Removed
+
+- Delete unused `getAnalyticsData()` and `getUserAnalytics()` functions from analytics query module
+
 ## [26.4.8] - 2026-03-18
 
 ### Changed
