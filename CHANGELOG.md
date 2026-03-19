@@ -18,6 +18,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- CI: unit tests now gate PR merges — runs on PRs and merge queue, not just post-merge on main
 - Chat prompts restored to practical defaults: "Change profile photo", "Set up a link", "How do I get paid?"
 - SuggestedProfilesCarousel relocated from sidebar to chat empty state
 - Pagination buttons use conditional rendering instead of disabled links to "#"
