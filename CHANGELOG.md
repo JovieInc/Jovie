@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.16] - 2026-03-19
+
+### Changed
+
+- CHANGELOG.md now uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs
+- Version bumping and changelog generation handled entirely by `/ship` workflow — removed standalone `version:bump` and `changelog:generate` scripts
+
+### Removed
+
+- `scripts/generate-changelog.mjs` — AI changelog rewriting script (superseded by `/ship` inline generation)
+- `scripts/version-bump.mjs` — standalone version bump script (superseded by `/ship` workflow)
+- `pnpm version:bump` and `pnpm changelog:generate` commands from package.json
+- `getUnreleased`, `hasUnreleasedEntries`, `replaceUnreleased` from changelog parser (only used by removed scripts)
+- `[Unreleased]` section requirement from version-check validation
+
 ## [26.4.15] - 2026-03-19
 
 ### Removed

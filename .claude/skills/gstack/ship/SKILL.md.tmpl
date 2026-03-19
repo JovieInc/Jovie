@@ -89,7 +89,7 @@ Fetch and merge the base branch into the feature branch so tests run against the
 git fetch origin <base> && git merge origin/<base> --no-edit
 ```
 
-**If there are merge conflicts:** Try to auto-resolve if they are simple (VERSION, schema.rb, CHANGELOG ordering). If conflicts are complex or ambiguous, **STOP** and show them.
+**If there are merge conflicts:** `CHANGELOG.md` should auto-resolve via `merge=union` in `.gitattributes`. For other conflicts (VERSION, schema.rb), try to auto-resolve if they are simple. If conflicts are complex or ambiguous, **STOP** and show them.
 
 **If already up to date:** Continue silently.
 
