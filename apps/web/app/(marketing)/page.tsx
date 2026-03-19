@@ -142,7 +142,7 @@ const WEBSITE_SCHEMA = buildWebsiteSchema({
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Your entire music career in one intelligent link — smart links, link-in-bio, fan notifications, and audience growth for artists.'
+  'One link to launch your music career — smart links, fan notifications, and AI for independent musicians.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
