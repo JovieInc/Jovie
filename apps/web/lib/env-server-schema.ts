@@ -38,9 +38,6 @@ export const ServerEnvSchema = z.object({
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
 
-  // Waitlist gate toggle (defaults to OFF when missing — new users skip waitlist)
-  WAITLIST_ENABLED: z.string().optional(),
-
   // Database configuration (required at runtime, but optional during build)
   DATABASE_URL: databaseUrlValidator,
 
@@ -184,7 +181,6 @@ export const ENV_KEYS = [
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
-  'WAITLIST_ENABLED',
   'DATABASE_URL',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',

@@ -134,6 +134,9 @@ export function AdminProfileSidebar({
         <ProfileAboutTab
           bio={profile.bio ?? null}
           genres={profile.genres ?? null}
+          location={profile.location ?? null}
+          hometown={profile.hometown ?? null}
+          activeSinceYear={profile.activeSinceYear ?? null}
           allowPhotoDownloads={false}
         />
       ) : (

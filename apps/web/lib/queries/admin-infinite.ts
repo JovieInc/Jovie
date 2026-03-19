@@ -69,6 +69,9 @@ export interface AdminCreatorProfileRow {
   createdAt: Date | null;
   confidence?: number | null;
   ingestionStatus: 'idle' | 'pending' | 'processing' | 'failed';
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
   lastIngestionError: string | null;
   socialLinks?: Array<{
     id: string;
