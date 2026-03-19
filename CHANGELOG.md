@@ -6,10 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.13] - 2026-03-18
+## [26.4.13] - 2026-03-19
+
+### Added
+
+- Music-first dashboard: hero card showing recent releases with album art carousel and import status
+- AI-powered insight one-liner on dashboard (e.g., "3 people viewed your profile today")
+- Smart action cards that adapt based on profile state (Venmo setup, Shopify connect, share profile)
+- Lightweight `/api/dashboard/recent-releases` endpoint for dashboard hero card
+- `useRecentReleasesQuery` TanStack Query hook for client-side release data
+- Chat overlay mode: dashboard is the default view, chat activates on input focus (Spotlight model)
+- DSP match suggestions carousel relocated to Music tab in right drawer
 
 ### Changed
 
+- Dashboard center panel redesigned from chat-first to music-first layout
+- Chat suggestions cleaned up: removed "Set up a link" and "How do I get paid?", added "Write me a bio" and "Show my top insights"
 - Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
 - Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
 - When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
