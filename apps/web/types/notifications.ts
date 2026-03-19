@@ -40,7 +40,8 @@ export interface SenderContext {
     | 'release_notification'
     | 'claim_invite'
     | 'marketing'
-    | 'transactional';
+    | 'transactional'
+    | 'product_update';
   /** Optional reference ID for the specific entity (release ID, etc.) */
   referenceId?: string;
 }
