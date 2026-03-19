@@ -15,7 +15,7 @@ export const revalidate = false;
 export function GET() {
   const content = `# ${APP_NAME}
 
-> ${APP_NAME} is the smartest link in bio for music artists. One profile to connect fans to your music, social media, and merch — no design needed.
+> ${APP_NAME} — one link to launch your music career. Smart links, fan notifications, and AI for independent musicians.
 
 ## Brand Identity
 
