@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.16] - 2026-03-19
+
+### Fixed
+
+- Admin creator table: UUID validation on all profileId inputs (single and bulk operations)
+- Admin creator table: email send failure during verification no longer crashes the action
+- Admin creator table: self-deletion prevention — admins cannot delete their own account
+- Admin creator table: double-delete guard rejects re-deleting already soft-deleted users
+- Admin creator table: cache invalidation added to delete and marketing toggle actions
+- Admin creator table: JSON.parse wrapped in try-catch for bulk operation payloads
+- Payload parsers: UUID validation and whitespace-only profileId rejection
+
 ## [26.4.15] - 2026-03-19
 
 ### Removed
