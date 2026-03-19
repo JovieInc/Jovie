@@ -5,14 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.7] - 2026-03-18
+## [26.4.10] - 2026-03-18
 
 ### Fixed
 
-- Fix admin table checkbox multi-select on Creators and Waitlist tables by removing dual selection system conflict (TanStack Table internal selection racing with custom `useRowSelection` hook)
+- Guard all keyboard shortcut hooks against undefined `event.key` — prevents crashes from IME composition, dead keys, and browser extension injected events (JOVIE-WEB-EE, JOVIE-WEB-CT, JOVIE-WEB-F1)
 
 ### Added
 
+- Unit tests for `useSidebarKeyboardShortcut` and `useSequentialShortcuts` hooks (13 tests)
+
+### Changed
+
+- Waitlist gating: replaced `WAITLIST_ENABLED` env var with DB-only `gateEnabled` toggle — admin panel now controls waitlist without server restarts
+- Default waitlist state for fresh environments changed to OFF (gateEnabled: false), matching previous env-var-unset behavior
+
+### Removed
+
+- `WAITLIST_ENABLED` environment variable and `waitlist-config.ts` — consolidated into `waitlist_settings.gateEnabled` DB column
+
+## [26.4.9] - 2026-03-18
+
+### Fixed
+
+- Expand ISRC-based DSP artist discovery to include Deezer and MusicBrainz — previously hardcoded to Apple Music only, leaving built discovery code for 2 providers dead
+- Replace tautological E2E musicfetch-coverage tests with real DB and UI assertions that catch multi-DSP regressions
+- Fix conversion rate labels showing between wrong funnel stages — 33% now correctly appears between Profile Views and Unique Visitors instead of between Unique Visitors and Followers
+- Fix Cities, Countries, and Sources tabs showing blank by sourcing geo data from audience_members (visits) instead of click_events (link clicks only)
+- Fix time range toggle (7d/30d) overflowing off-screen by stacking it below the tab bar
+- MusicFetch ingest pipeline: treat 400 errors as permanent failures instead of retrying indefinitely, preventing circuit breaker trips that blocked all enrichment (JOV-1629, JOV-1630)
+- MusicFetch enrichment: return gracefully when API returns no data instead of throwing and retrying
+
+### Added
+
+- Multi-DSP golden path assertions: poll for Apple Music, Deezer, Tidal, YouTube Music, SoundCloud IDs after Spotify connect with tiered thresholds by artist size
+- Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
+- Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
+- TODO: wrong-artist detection + multi-candidate DSP matching (PR2 follow-up)
+- New blog post: "The Contact Problem" — explores the structural problem of stale artist contacts and introduces the Jovie Inbox vision
+- "Problems We're Solving" section in investor memo linking to all three problem essays (MySpace, Friday, Contact)
+- Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
+- Campaign toggle check in both the campaign processor cron and claim-invite job processor
+- Admin UI toggle switch on the outreach email page for enabling/disabling campaigns
+- API endpoints for reading and updating campaign enabled state
+
+### Removed
+
+- Delete unused `getAnalyticsData()` and `getUserAnalytics()` functions from analytics query module
+
+
+## [26.4.8] - 2026-03-18
+
+### Added
+
+- Conductor workspace archive script to clean up build artifacts and node_modules when archiving
+
+### Changed
+
+- Homepage hero: "One link to grow your music career" → "One link to launch your music career"
+- Final CTA: "start growing today" → "launch your career today"
+- Meta descriptions and SEO schema updated across all pages to new positioning
+- llms.txt brand description updated to match new messaging
+- Investor memo mission updated to "AI that manages your music career"
+- Replace SQL string interpolation with parameterized queries in batch update functions (`batchUpdateSortOrder`, `batchUpdateSocialLinks`) for defense-in-depth against SQL injection
+- Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
+- Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
+- Document intentional `Access-Control-Allow-Origin: *` CORS policy on public pixel tracking endpoint
+
+### Fixed
+
+- Conductor run script no longer double-wraps Doppler secrets (was `doppler run -- pnpm dev:web` which chains into web's `doppler run -- next dev`)
+
+## [26.4.7] - 2026-03-18
+
+### Added
+
+- Non-interactive cleanup mode (`--force`, `--dry-run`) for E2E test account script, enabling agents and CI to clean up without human prompts
+- Paginated Clerk user discovery and database record cleanup (FK CASCADE) in cleanup script
+- Rate-limited batch deletion with exponential backoff for Clerk API calls
+- Expanded test user detection to match both `role: 'e2e'` metadata and `+clerk_test` email patterns
+- QA & Browse authentication instructions in AGENTS.md so agents auto-login using Doppler credentials instead of prompting
+- Agent cleanup requirement in AGENTS.md — agents must run cleanup after sessions creating test accounts
+- Clerk E2E test user cleanup step in CI workflows (`e2e-full-matrix.yml`, `nightly-tests.yml`)
 - Bulk Unfeature, Enable/Disable marketing email actions for Creators table
 - Bulk Copy User IDs action for Users table
 - Bulk Approve/Disapprove actions for Waitlist table (with status-based filtering)
@@ -24,9 +98,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Migrate Creators table from custom `AdminCreatorsToolbar` to shared `TableBulkActionsToolbar` dropdown pattern, matching Users and Waitlist tables
 - All three admin tables now use identical bulk actions toolbar UX
 
+### Fixed
+
+- Missing `E2E_CLERK_USER_USERNAME` and `E2E_CLERK_USER_PASSWORD` env vars in weekly E2E full matrix workflow
+- Badge test assertion updated to match renamed design token (`bg-(--color-bg-primary)`)
+- Fix admin table checkbox multi-select on Creators and Waitlist tables by removing dual selection system conflict (TanStack Table internal selection racing with custom `useRowSelection` hook)
+
 ### Removed
 
 - `AdminCreatorsToolbar.tsx` — replaced by shared `TableBulkActionsToolbar`
+
 
 ## [26.4.6] - 2026-03-18
 

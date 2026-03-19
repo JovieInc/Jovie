@@ -270,7 +270,7 @@ describe('Sheet', () => {
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('fixed');
       expect(content.className).toContain('z-[65]');
-      expect(content.className).toContain('bg-surface-1');
+      expect(content.className).toContain('bg-(--linear-bg-surface-0)');
     });
 
     it('applies animation classes', () => {

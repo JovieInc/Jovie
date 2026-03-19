@@ -59,6 +59,7 @@ export type ContactRole =
   | 'management'
   | 'press_pr'
   | 'brand_partnerships'
+  | 'music_collaboration'
   | 'fan_general'
   | 'other';
 
@@ -412,7 +413,7 @@ type CanonicalArtistProfileShape = {
   createdAt: string;
 };
 
-function getHometownFromSettings(
+export function getHometownFromSettings(
   settings: Record<string, unknown> | null | undefined
 ): string | null {
   const hometown = settings?.hometown;

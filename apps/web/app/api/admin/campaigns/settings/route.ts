@@ -53,6 +53,7 @@ export async function GET() {
         {
           ok: true,
           settings: {
+            campaignsEnabled: true,
             fitScoreThreshold: 50,
             batchLimit: 20,
             throttlingConfig: {
@@ -72,6 +73,7 @@ export async function GET() {
       {
         ok: true,
         settings: {
+          campaignsEnabled: row.campaignsEnabled,
           fitScoreThreshold: Number(row.fitScoreThreshold),
           batchLimit: row.batchLimit,
           throttlingConfig: row.throttlingConfig,

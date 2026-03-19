@@ -76,6 +76,67 @@ function spotifyImportIsReady(
   return hasSpotifyProfile && releaseCount > 0 && releaseLinkCount > 0;
 }
 
+/** Spotify IDs for known major artists with guaranteed multi-DSP coverage */
+const MAJOR_ARTIST_IDS = new Set([
+  '6M2wZ9GZgrQXHCFfjv46we', // Dua Lipa
+  '06HL4z0CvFAxyc27GXpf02', // Taylor Swift
+]);
+
+interface MultiDspEnrichmentState {
+  profile_id: string;
+  apple_music_id: string | null;
+  apple_music_url: string | null;
+  deezer_id: string | null;
+  tidal_id: string | null;
+  soundcloud_id: string | null;
+  youtube_music_id: string | null;
+  youtube_url: string | null;
+  social_link_count: number | null;
+}
+
+function countPopulatedDspFields(state: MultiDspEnrichmentState): number {
+  let count = 0;
+  if (state.apple_music_id || state.apple_music_url) count++;
+  if (state.deezer_id) count++;
+  if (state.tidal_id) count++;
+  if (state.soundcloud_id) count++;
+  if (state.youtube_music_id || state.youtube_url) count++;
+  return count;
+}
+
+async function waitForMultiDspEnrichment(clerkUserId: string) {
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error('DATABASE_URL required for multi-DSP enrichment checks');
+  }
+
+  const sql = neon(dbUrl);
+
+  const [state] = (await sql`
+    SELECT
+      cp.id AS profile_id,
+      cp.apple_music_id,
+      cp.apple_music_url,
+      cp.deezer_id,
+      cp.tidal_id,
+      cp.soundcloud_id,
+      cp.youtube_music_id,
+      cp.youtube_url,
+      (
+        SELECT COUNT(*)
+        FROM social_links sl
+        WHERE sl.creator_profile_id = cp.id
+          AND sl.state = 'active'
+      )::int AS social_link_count
+    FROM creator_profiles cp
+    INNER JOIN users u ON u.id = cp.user_id
+    WHERE u.clerk_id = ${clerkUserId}
+    LIMIT 1
+  `) as MultiDspEnrichmentState[];
+
+  return state ?? null;
+}
+
 function buildValidOnboardingHandle(seed: string, clerkUserId: string): string {
   const seedFragment = seed.replaceAll(/[^a-z0-9]/g, '').slice(0, 12);
   const userFragment = clerkUserId.replaceAll(/[^a-z0-9]/gi, '').toLowerCase();
@@ -426,7 +487,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
   test('complete user journey from signup to paid subscription', async ({
     page,
   }, testInfo) => {
-    test.setTimeout(180_000);
+    test.setTimeout(300_000);
     page.on('pageerror', error => {
       console.log(`[golden-path][pageerror] ${error.message}`);
     });
@@ -668,6 +729,96 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
       '[golden-path] Spotify import state:',
       JSON.stringify(importState)
     );
+
+    // ──────────────────────────────────────────────────────────────────
+    // STEP 7b: Multi-DSP enrichment verification
+    // ──────────────────────────────────────────────────────────────────
+    // MusicFetch enrichment runs async after onboarding. Poll for DSP
+    // fields (Apple Music, Deezer, Tidal, YouTube Music, SoundCloud)
+    // to be populated on creator_profiles + social_links.
+
+    const isMajorArtist = MAJOR_ARTIST_IDS.has(spotifyArtist.id);
+
+    let dspState: Awaited<ReturnType<typeof waitForMultiDspEnrichment>> | null =
+      null;
+
+    await expect(async () => {
+      dspState = await waitForMultiDspEnrichment(clerkUserId);
+      expect(dspState, 'No profile found for multi-DSP check').toBeTruthy();
+
+      const dspCount = countPopulatedDspFields(dspState!);
+      const socialCount = Number(dspState?.social_link_count ?? 0);
+
+      if (isMajorArtist) {
+        // Major artists (Dua Lipa, Taylor Swift) must have 3+ DSPs
+        expect(
+          dspCount,
+          `Major artist should have >= 3 DSP fields populated (got ${dspCount}). ` +
+            `State: ${JSON.stringify(dspState)}`
+        ).toBeGreaterThanOrEqual(3);
+      }
+
+      // All artists should get at least 2 social links from MusicFetch
+      expect(
+        socialCount,
+        `Expected >= 2 social links after enrichment (got ${socialCount})`
+      ).toBeGreaterThanOrEqual(2);
+    }).toPass({
+      timeout: 120_000,
+      intervals: [3_000, 5_000, 10_000, 15_000, 20_000],
+    });
+
+    // dspState is assigned inside the toPass() callback — TS narrows to never
+    const finalDspState = dspState as MultiDspEnrichmentState | null;
+    const dspCount = finalDspState ? countPopulatedDspFields(finalDspState) : 0;
+    const socialCount = Number(finalDspState?.social_link_count ?? 0);
+
+    if (!isMajorArtist && dspCount < 3) {
+      console.warn(
+        `[golden-path] WARN: Small artist has only ${dspCount} DSP fields populated. ` +
+          `This is expected for lesser-known artists. State: ${JSON.stringify(finalDspState)}`
+      );
+    }
+
+    console.log(
+      `[golden-path] Multi-DSP enrichment: ${dspCount} DSP fields, ${socialCount} social links, ` +
+        `major=${isMajorArtist}. State: ${JSON.stringify(finalDspState)}`
+    );
+
+    // ──────────────────────────────────────────────────────────────────
+    // STEP 7c: Profile page DSP round-trip
+    // ──────────────────────────────────────────────────────────────────
+    // Navigate to the public profile page and verify DSP buttons render.
+    // This catches rendering bugs where data exists in DB but the UI drops it.
+
+    if (isMajorArtist && dspCount >= 2) {
+      await page.goto(`/${onboardingHandle}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30_000,
+      });
+
+      const body = await page.evaluate(() =>
+        document.body.innerText.toLowerCase()
+      );
+      const dspNames = [
+        'spotify',
+        'apple music',
+        'deezer',
+        'tidal',
+        'youtube music',
+        'soundcloud',
+      ];
+      const visibleDsps = dspNames.filter(name => body.includes(name));
+
+      expect(
+        visibleDsps.length,
+        `Profile page should show >= 2 DSP links (found: ${visibleDsps.join(', ')})`
+      ).toBeGreaterThanOrEqual(2);
+
+      console.log(
+        `[golden-path] Profile page DSPs visible: ${visibleDsps.join(', ')}`
+      );
+    }
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 8: Stripe checkout session creation

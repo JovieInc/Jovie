@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureError } from '@/lib/error-tracking';
 import { extractHandleFromSocialUrl } from '@/lib/ingestion/flows/handle-extraction';
 import { findAvailableHandle } from '@/lib/ingestion/flows/profile-operations';
 import {
@@ -9,6 +10,7 @@ import {
   type SocialPlatformContext,
 } from '@/lib/ingestion/flows/social-platform-flow';
 import { fetchSpotifyArtistData } from '@/lib/ingestion/flows/spotify-integration';
+import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
   isValidHandle,
@@ -96,7 +98,7 @@ export async function ingestSocialPlatformUrl(
     spotifyData,
   };
 
-  return withSystemIngestionSession(async tx => {
+  const response = await withSystemIngestionSession(async tx => {
     const [existing] = await tx
       .select({
         id: creatorProfiles.id,
@@ -129,4 +131,29 @@ export async function ingestSocialPlatformUrl(
 
     return createNewSocialProfile(tx, finalHandle, socialContext);
   });
+
+  // Enqueue MusicFetch enrichment to populate all DSPs (Apple Music, YouTube, etc.)
+  if (response.ok && spotifyData?.spotifyUrl) {
+    try {
+      const body = await response.clone().json();
+      if (body?.profile?.id) {
+        void enqueueMusicFetchEnrichmentJob({
+          creatorProfileId: body.profile.id,
+          spotifyUrl: spotifyData.spotifyUrl,
+        }).catch(err =>
+          captureError(
+            'MusicFetch enrichment enqueue failed for admin import',
+            err,
+            {
+              profileId: body.profile.id,
+            }
+          )
+        );
+      }
+    } catch {
+      // Non-fatal: enrichment is best-effort
+    }
+  }
+
+  return response;
 }

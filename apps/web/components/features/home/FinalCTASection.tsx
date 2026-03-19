@@ -23,7 +23,7 @@ export function FinalCTASection() {
           </h2>
 
           <p className='mt-5 max-w-md marketing-lead-linear text-secondary-token'>
-            Claim your handle and start growing today.
+            Claim your handle and launch your career today.
           </p>
 
           {/* Form */}

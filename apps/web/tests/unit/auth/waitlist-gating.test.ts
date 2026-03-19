@@ -5,7 +5,7 @@
  * - proxy.ts middleware (primary gate)
  * - lib/auth/proxy-state.ts (user state resolution)
  * - lib/auth/gate.ts (centralized auth gate)
- * - lib/auth/waitlist-config.ts (feature flag)
+ * - lib/waitlist/settings.ts (DB-backed gate check)
  *
  * ## Architecture Summary
  *
@@ -13,6 +13,9 @@
  * 1. Middleware (proxy.ts) - rewrites/redirects based on ProxyUserState
  * 2. Server auth gate (lib/auth/gate.ts) - resolveUserState() for pages
  * 3. API routes - individual auth() checks (no waitlist status check)
+ *
+ * The waitlist gate is controlled via the `gateEnabled` column in the
+ * `waitlist_settings` DB table (runtime toggle via admin panel).
  *
  * ## User States (userStatus column)
  * - waitlist_pending: submitted waitlist, awaiting approval
@@ -31,54 +34,7 @@
  *    - Max staleness: 2-5 minutes (Redis TTL)
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-
-// ============================================================================
-// Tests for waitlist-config.ts
-// ============================================================================
-
-describe('isWaitlistEnabled', () => {
-  const originalEnv = process.env;
-
-  beforeEach(() => {
-    vi.resetModules();
-    process.env = { ...originalEnv };
-  });
-
-  afterEach(() => {
-    process.env = originalEnv;
-  });
-
-  it('returns true when WAITLIST_ENABLED is "true"', async () => {
-    process.env.WAITLIST_ENABLED = 'true';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(true);
-  });
-
-  it('returns false when WAITLIST_ENABLED is missing', async () => {
-    delete process.env.WAITLIST_ENABLED;
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is "false"', async () => {
-    process.env.WAITLIST_ENABLED = 'false';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is empty string', async () => {
-    process.env.WAITLIST_ENABLED = '';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-
-  it('returns false when WAITLIST_ENABLED is "TRUE" (case sensitive)', async () => {
-    process.env.WAITLIST_ENABLED = 'TRUE';
-    const { isWaitlistEnabled } = await import('@/lib/auth/waitlist-config');
-    expect(isWaitlistEnabled()).toBe(false);
-  });
-});
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ============================================================================
 // Tests for status-checker.ts

@@ -1,17 +1,17 @@
 {
   "name": "@jovie/web",
-  "version": "26.4.7",
+  "version": "26.4.9",
   "private": true,
   "sideEffects": false,
   "engines": {
     "node": ">=22.13.0 <23"
   },
   "scripts": {
-    "dev": "doppler run -- next dev",
+    "dev": "NODE_OPTIONS=--max-old-space-size=8192 doppler run -- next dev",
     "dev:local": "next dev",
     "dev:local:playwright": "next dev --webpack",
     "validate-env": "tsx scripts/validate-env.ts",
-    "build": "next build --turbopack",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 next build --turbopack",
     "analyze": "ANALYZE=true next build",
     "build:validate": "npm run validate-env && next build --turbopack",
     "start": "next start",
@@ -27,8 +27,8 @@
     "check": "pnpm run validate && pnpm run build && pnpm run test",
     "check:ci": "pnpm run validate && pnpm run test:ci",
     "validate": "pnpm run next:proxy-guard && pnpm run biome:check && pnpm run typecheck",
-    "test": "NODE_OPTIONS=--max-old-space-size=4096 node scripts/vitest-wrapper.mjs",
-    "test:ci": "NODE_OPTIONS=--max-old-space-size=4096 vitest run --pool=forks --maxWorkers=2",
+    "test": "NODE_OPTIONS=--max-old-space-size=8192 node scripts/vitest-wrapper.mjs",
+    "test:ci": "NODE_OPTIONS=--max-old-space-size=8192 vitest run --pool=forks --maxWorkers=2",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest --config=vitest.config.mts",
     "test:fast": "vitest run --config=vitest.config.mts",

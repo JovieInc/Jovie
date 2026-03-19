@@ -172,6 +172,16 @@ jobs:
           path: apps/web/test-results/
           retention-days: 7
 
+      - name: Cleanup Clerk E2E test users
+        if: always()
+        continue-on-error: true
+        run: |
+          cd apps/web
+          pnpm tsx scripts/cleanup-e2e-users.ts --force
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
+
       - name: Cleanup Neon branch
         if: always()
         env:

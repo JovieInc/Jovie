@@ -8,13 +8,13 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
 import { syncEmailFromClerk } from './clerk-sync';
 // eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { resolveProfileState } from './profile-state-resolver';
 // eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { checkUserStatus } from './status-checker';
-import { isWaitlistEnabled } from './waitlist-config';
 
 /**
  * Centralized user state enum for auth gating decisions.
@@ -87,11 +87,12 @@ interface ExistingUserData {
  */
 function determineUserStatus(
   waitlistEntryId: string | undefined,
-  existingUserData: ExistingUserData | undefined
+  existingUserData: ExistingUserData | undefined,
+  waitlistGateEnabled: boolean
 ): UserLifecycleStatus {
   if (!waitlistEntryId) {
     // When waitlist is disabled, skip waitlist states — treat as approved
-    if (!isWaitlistEnabled()) {
+    if (!waitlistGateEnabled) {
       const hasClaimedProfile =
         existingUserData?.profileId && existingUserData.profileClaimed;
       if (!hasClaimedProfile) {
@@ -249,6 +250,7 @@ async function createUserWithRetry(
   clerkUserId: string,
   email: string | null,
   waitlistEntryId: string | undefined,
+  waitlistGateEnabled: boolean,
   maxRetries = 3
 ): Promise<string | null> {
   let lastError: Error | null = null;
@@ -279,7 +281,11 @@ async function createUserWithRetry(
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      const userStatus = determineUserStatus(waitlistEntryId, existingUserData);
+      const userStatus = determineUserStatus(
+        waitlistEntryId,
+        existingUserData,
+        waitlistGateEnabled
+      );
       return await upsertUser(clerkUserId, email, userStatus, waitlistEntryId);
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
@@ -335,7 +341,8 @@ interface MissingDbUserContext {
  * Returns either a complete AuthGateResult (for early return) or the new user ID.
  */
 async function handleMissingDbUser(
-  ctx: MissingDbUserContext
+  ctx: MissingDbUserContext,
+  waitlistGateEnabled: boolean
 ): Promise<AuthGateResult | { dbUserId: string }> {
   const { createDbUserIfMissing, clerkUserId, email, baseContext } = ctx;
 
@@ -364,7 +371,7 @@ async function handleMissingDbUser(
   // Check waitlist status before creating user (only when waitlist is enabled)
   let waitlistEntryId: string | undefined;
 
-  if (isWaitlistEnabled()) {
+  if (waitlistGateEnabled) {
     const waitlistResult = await checkWaitlistAccessInternal(email);
 
     if (waitlistResult.status === 'new' || !waitlistResult.status) {
@@ -385,7 +392,8 @@ async function handleMissingDbUser(
   const newUserId = await createUserWithRetry(
     clerkUserId,
     email,
-    waitlistEntryId
+    waitlistEntryId,
+    waitlistGateEnabled
   );
 
   if (!newUserId) {
@@ -567,12 +575,16 @@ export async function resolveUserState(
     : null;
 
   if (!dbUserId) {
-    const creationResult = await handleMissingDbUser({
-      createDbUserIfMissing,
-      clerkUserId,
-      email,
-      baseContext,
-    });
+    const waitlistGateEnabled = await isWaitlistGateEnabled();
+    const creationResult = await handleMissingDbUser(
+      {
+        createDbUserIfMissing,
+        clerkUserId,
+        email,
+        baseContext,
+      },
+      waitlistGateEnabled
+    );
 
     // If creationResult is a full AuthGateResult, return it early
     if ('state' in creationResult) {

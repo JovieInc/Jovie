@@ -14,7 +14,7 @@ const {
   mockSyncEmailFromClerk,
   mockResolveProfileState,
   mockCheckUserStatus,
-  mockIsWaitlistEnabled,
+  mockIsWaitlistGateEnabled,
   mockNormalizeEmail,
   mockSentryAddBreadcrumb,
 } = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ const {
   mockSyncEmailFromClerk: vi.fn().mockResolvedValue(undefined),
   mockResolveProfileState: vi.fn(),
   mockCheckUserStatus: vi.fn(),
-  mockIsWaitlistEnabled: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
   mockNormalizeEmail: vi.fn((e: string) => e.toLowerCase().trim()),
   mockSentryAddBreadcrumb: vi.fn(),
 }));
@@ -110,8 +110,8 @@ vi.mock('@/lib/auth/status-checker', () => ({
   checkUserStatus: mockCheckUserStatus,
 }));
 
-vi.mock('@/lib/auth/waitlist-config', () => ({
-  isWaitlistEnabled: mockIsWaitlistEnabled,
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
 vi.mock('drizzle-orm', () => ({
@@ -217,7 +217,7 @@ describe('@critical gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: no fake timers needed since we mock setTimeout in retry tests
-    mockIsWaitlistEnabled.mockReturnValue(false);
+    mockIsWaitlistGateEnabled.mockResolvedValue(false);
     setupNonBlockedStatus();
     mockResolveProfileState.mockReturnValue({
       state: UserState.NEEDS_ONBOARDING,
@@ -491,7 +491,7 @@ describe('@critical gate.ts', () => {
     it('returns NEEDS_WAITLIST_SUBMISSION when waitlist enabled and no entry exists', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
-      mockIsWaitlistEnabled.mockReturnValue(true);
+      mockIsWaitlistGateEnabled.mockResolvedValue(true);
 
       // No DB user found (triggers handleMissingDbUser)
       mockDbSelect.mockReturnValue(createJoinSelectChain([]));
@@ -516,7 +516,7 @@ describe('@critical gate.ts', () => {
     it('creates user with waitlist entry when waitlist approved', async () => {
       mockCachedAuth.mockResolvedValue({ userId: 'clerk_123' });
       mockCachedCurrentUser.mockResolvedValue(mockClerkUser());
-      mockIsWaitlistEnabled.mockReturnValue(true);
+      mockIsWaitlistGateEnabled.mockResolvedValue(true);
 
       let selectCallCount = 0;
       mockDbSelect.mockImplementation(() => {

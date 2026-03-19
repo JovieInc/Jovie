@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -43,6 +44,7 @@ export const adminAuditLog = pgTable(
 // Campaign settings (singleton row, id=1)
 export const campaignSettings = pgTable('campaign_settings', {
   id: integer('id').primaryKey().default(1),
+  campaignsEnabled: boolean('campaigns_enabled').default(true).notNull(),
   fitScoreThreshold: numeric('fit_score_threshold', {
     precision: 5,
     scale: 2,

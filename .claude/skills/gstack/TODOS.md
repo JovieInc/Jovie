@@ -408,13 +408,35 @@
 **Priority:** P3
 **Depends on:** Ref staleness Parts 1+2 (shipped)
 
+## Office Hours / Design
+
+### Design docs → Supabase team store sync
+
+**What:** Add design docs (`*-design-*.md`) to the Supabase sync pipeline alongside test plans, retro snapshots, and QA reports.
+
+**Why:** Cross-team design discovery at scale. Local `~/.gstack/projects/$SLUG/` keyword-grep discovery works for same-machine users now, but Supabase sync makes it work across the whole team. Duplicate ideas surface, everyone sees what's been explored.
+
+**Context:** /office-hours writes design docs to `~/.gstack/projects/$SLUG/`. The team store already syncs test plans, retro snapshots, QA reports. Design docs follow the same pattern — just add a sync adapter.
+
+**Effort:** S
+**Priority:** P2
+**Depends on:** `garrytan/team-supabase-store` branch landing on main
+
+### /yc-prep skill
+
+**What:** Skill that helps founders prepare their YC application after /office-hours identifies strong signal. Pulls from the design doc, structures answers to YC app questions, runs a mock interview.
+
+**Why:** Closes the loop. /office-hours identifies the founder, /yc-prep helps them apply well. The design doc already contains most of the raw material for a YC application.
+
+**Effort:** M (human: ~2 weeks / CC: ~2 hours)
+**Priority:** P2
+**Depends on:** office-hours founder discovery engine shipping first
+
 ## Design Review
 
-### /design-consultation interactive skill — SHIPPED
+### /plan-design-review + /qa-design-review + /design-consultation — SHIPPED
 
-~~**What:** Interactive skill that walks user through creating a DESIGN.md from scratch.~~
-
-Shipped as `/design-consultation` on garrytan/design branch. Renamed from `/setup-design-md` to reflect the consultant approach (agent proposes a complete coherent system, user adjusts). Includes competitive research via WebSearch, combined font+color preview page, coherence validation, and LLM-judged E2E tests.
+Shipped as v0.5.0 on main. Includes `/plan-design-review` (report-only design audit), `/qa-design-review` (audit + fix loop), and `/design-consultation` (interactive DESIGN.md creation). `{{DESIGN_METHODOLOGY}}` resolver provides shared 80-item design audit checklist.
 
 ## Document-Release
 
@@ -481,6 +503,37 @@ Shipped as `/design-consultation` on garrytan/design branch. Renamed from `/setu
 **Effort:** M (human) / S (CC)
 **Priority:** P3
 **Depends on:** Boil the Lake shipped (v0.6.1)
+
+## Safety & Observability
+
+### On-demand hook skills (/careful, /freeze, /guard)
+
+**What:** Three new skills that use Claude Code's session-scoped PreToolUse hooks to add safety guardrails on demand.
+
+**Why:** Anthropic's internal skill best practices recommend on-demand hooks for safety. Claude Code already handles destructive command permissions, but these add an explicit opt-in layer for high-risk sessions (touching prod, debugging live systems).
+
+**Skills:**
+- `/careful` — PreToolUse hook on Bash tool. Warns (not blocks) before destructive commands: `rm -rf`, `DROP TABLE`, `git push --force`, `git reset --hard`, `kubectl delete`, `docker system prune`. Uses `permissionDecision: "ask"` so user can override.
+- `/freeze` — PreToolUse hook on Edit/Write tools. Restricts file edits to a user-specified directory. Great for debugging without accidentally "fixing" unrelated code.
+- `/guard` — meta-skill composing `/careful` + `/freeze` into one command.
+
+**Implementation notes:** Use `${CLAUDE_SKILL_DIR}` (not `${SKILL_DIR}`) for script paths in hook commands. Pure bash JSON parsing (no jq dependency). Freeze dir storage: `${CLAUDE_PLUGIN_DATA}/freeze-dir.txt` with `~/.gstack/freeze-dir.txt` fallback. Ensure trailing `/` on freeze dir paths to prevent `/src` matching `/src-old`.
+
+**Effort:** M (human) / S (CC)
+**Priority:** P3
+**Depends on:** None
+
+### Skill usage telemetry
+
+**What:** Track which skills get invoked, how often, from which repo.
+
+**Why:** Enables finding undertriggering skills and measuring adoption. Anthropic uses a PreToolUse hook for this; simpler approach is appending JSONL from the preamble.
+
+**Context:** Add to `generatePreamble()` in `scripts/gen-skill-docs.ts`. Append to `~/.gstack/analytics/skill-usage.jsonl` with skill name, timestamp, and repo name. `mkdir -p` ensures the directory exists.
+
+**Effort:** S (human) / S (CC)
+**Priority:** P3
+**Depends on:** None
 
 ## Completed
 

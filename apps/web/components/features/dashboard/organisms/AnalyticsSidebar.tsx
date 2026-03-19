@@ -13,6 +13,18 @@ import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
 
+/**
+ * Calculate conversion rate between two funnel stages.
+ * Returns null when the denominator is 0 to avoid division by zero.
+ */
+export function calculateConversionRate(
+  current: number,
+  previous: number
+): string | null {
+  if (previous === 0) return null;
+  return `${Math.round((current / previous) * 100)}%`;
+}
+
 interface RangeOption {
   value: AnalyticsRange;
   label: string;
@@ -284,10 +296,8 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   ];
 
   const calculateRate = useCallback(
-    (current: number, previous: number): string | null => {
-      if (previous === 0) return null;
-      return `${Math.round((current / previous) * 100)}%`;
-    },
+    (current: number, previous: number) =>
+      calculateConversionRate(current, previous),
     []
   );
 
@@ -308,9 +318,9 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <div className='flex min-h-[280px] flex-col items-center gap-0'>
           {stages.map((stage, index) => {
             const isLast = index === stages.length - 1;
-            const prevStage = index > 0 ? stages[index - 1] : null;
-            const conversionRate = prevStage
-              ? calculateRate(stage.value, prevStage.value)
+            const nextStage = !isLast ? stages[index + 1] : null;
+            const conversionRate = nextStage
+              ? calculateRate(nextStage.value, stage.value)
               : null;
 
             return (
@@ -346,15 +356,17 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           />
         </div>
 
-        <div className='flex items-center gap-1.5'>
+        <div className='space-y-2'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}
             options={ANALYTICS_TAB_OPTIONS}
-            className='flex-1'
+            className='w-full'
             ariaLabel='Analytics data tabs'
           />
-          <SidebarRangeToggle value={range} onChange={setRange} />
+          <div className='flex justify-end'>
+            <SidebarRangeToggle value={range} onChange={setRange} />
+          </div>
         </div>
 
         <DrawerSurfaceCard className='min-h-[196px] p-2'>

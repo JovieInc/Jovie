@@ -6,8 +6,9 @@
 
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-
 import type { DbOrTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
+import { campaignSettings } from '@/lib/db/schema/admin';
 import { creatorClaimInvites, creatorProfiles } from '@/lib/db/schema/profiles';
 import { enrollInCampaign } from '@/lib/email/campaigns/enrollment';
 import {
@@ -66,6 +67,25 @@ export async function processSendClaimInviteJob(
   jobPayload: unknown
 ): Promise<SendClaimInviteResult> {
   const payload = sendClaimInvitePayloadSchema.parse(jobPayload);
+
+  // Check global campaign toggle — skip sending if disabled
+  const [settings] = await db
+    .select({ campaignsEnabled: campaignSettings.campaignsEnabled })
+    .from(campaignSettings)
+    .where(eq(campaignSettings.id, 1))
+    .limit(1);
+
+  if (settings && !settings.campaignsEnabled) {
+    logger.info('Campaigns disabled, skipping claim invite send', {
+      inviteId: payload.inviteId,
+    });
+    return {
+      inviteId: payload.inviteId,
+      email: '',
+      status: 'skipped',
+      detail: 'Campaigns disabled',
+    };
+  }
 
   // Fetch the invite
   const [invite] = await tx
