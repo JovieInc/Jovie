@@ -6,11 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.13] - 2026-03-18
+
+### Changed
+
+- Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
+- Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
+- When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
+- US/Canada visitors with unknown region see the banner as a safe compliance fallback
+
 ## [26.4.12] - 2026-03-18
 
 ### Fixed
 
 - Move Next.js dev indicator to top-right corner so it no longer overlaps the DevToolbar at the bottom of the screen
+- Spotify import progress bar now shows determinate progress ("5 of 30 imported") instead of bouncing indeterminate animation
+- Fixed premature import status override that caused the progress banner to flash in and out during active imports
+- Suppressed "No matching Apple Music artist" banner during active Spotify import to prevent confusing UI state
+- Added 1-second completion hold at 100% before banner fadeout for a polished finish
+- Added ARIA progressbar attributes for screen reader accessibility
+- Replaced jerky ping-pong animation with smooth unidirectional shimmer for unknown-total fallback
 
 ## [26.4.11] - 2026-03-18
 

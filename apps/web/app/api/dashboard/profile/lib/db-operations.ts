@@ -53,16 +53,15 @@ export async function updateProfileRecords({
     typeof incomingSettings === 'object' &&
     !Array.isArray(incomingSettings)
       ? {
-          ...((existingProfile?.settings as Record<string, unknown> | null) ??
-            {}),
+          ...(existingProfile?.settings as Record<string, unknown> | null),
           ...(incomingSettings as Record<string, unknown>),
         }
       : undefined;
 
   const finalProfileUpdates =
-    mergedSettings !== undefined
-      ? { ...dbProfileUpdates, settings: mergedSettings }
-      : dbProfileUpdates;
+    mergedSettings === undefined
+      ? dbProfileUpdates
+      : { ...dbProfileUpdates, settings: mergedSettings };
 
   const [updatedProfile] = await db
     .update(creatorProfiles)

@@ -1,4 +1,4 @@
-import { CONTENT_SURFACE_CARD_CLASSNAME } from '@/components/molecules/ContentSurfaceCard';
+import { contentSurfaceCardVariants } from '@/components/molecules/ContentSurfaceCard';
 
 /**
  * Dashboard Card System Tokens
@@ -31,7 +31,7 @@ function tw(strings: TemplateStringsArray, ...values: unknown[]): string {
 
 export const cardTokens = {
   // Base card styles - Linear-inspired sophistication
-  base: `${CONTENT_SURFACE_CARD_CLASSNAME} transition-[background-color,border-color,box-shadow,transform] ${timing.slow} ${timing.easing}`,
+  base: `${contentSurfaceCardVariants()} transition-[background-color,border-color,box-shadow,transform] ${timing.slow} ${timing.easing}`,
 
   // Padding variations (8px grid system) - mobile-first responsive
   padding: {

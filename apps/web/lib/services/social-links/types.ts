@@ -73,5 +73,3 @@ export {
   isDspPlatform,
   STREAMING_DSP_KEYS as DSP_PLATFORMS,
 } from '@/lib/dsp-registry';
-
-export type DspPlatform = string;

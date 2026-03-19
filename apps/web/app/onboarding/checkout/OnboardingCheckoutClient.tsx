@@ -171,7 +171,7 @@ function BillingIntervalSelector({
             className='sr-only'
             checked={!isAnnual}
             onChange={() => onSelect(false)}
-          />
+          />{' '}
           Monthly
         </label>
         <label

@@ -60,7 +60,7 @@ interface ProfileUpdateData {
 
 function normalizePlace(value: string): string | null {
   const trimmedValue = value.trim();
-  return trimmedValue ? trimmedValue : null;
+  return trimmedValue || null;
 }
 
 function getHometownFromSettings(
@@ -72,7 +72,7 @@ function getHometownFromSettings(
   }
 
   const trimmedHometown = hometown.trim();
-  return trimmedHometown ? trimmedHometown : null;
+  return trimmedHometown || null;
 }
 
 /**
@@ -199,9 +199,8 @@ export function useSettingsProfile({
       };
 
       const nextSettings = {
-        ...(artistRef.current.settings ?? {}),
-        ...((response.profile?.settings as Record<string, unknown> | null) ??
-          {}),
+        ...artistRef.current.settings,
+        ...(response.profile?.settings as Record<string, unknown> | null),
       } as ArtistSettings;
       const nextHometown =
         getHometownFromSettings(response.profile?.settings ?? null) ?? hometown;

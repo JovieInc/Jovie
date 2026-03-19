@@ -28,8 +28,8 @@ export function DrawerSection({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {title ? (
-        isCollapsible ? (
+      {title &&
+        (isCollapsible ? (
           <CollapsibleSectionHeading
             isOpen={isOpen}
             onToggle={() => setIsOpen(prev => !prev)}
@@ -39,8 +39,7 @@ export function DrawerSection({
           </CollapsibleSectionHeading>
         ) : (
           <DrawerSectionHeading>{title}</DrawerSectionHeading>
-        )
-      ) : null}
+        ))}
       <div id={contentId} hidden={isCollapsible && !isOpen}>
         {children}
       </div>
