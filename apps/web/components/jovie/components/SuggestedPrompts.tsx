@@ -79,6 +79,9 @@ export function SuggestedPrompts({
   latestReleaseTitle,
   suggestions,
 }: SuggestedPromptsProps) {
+  const fallbackSuggestions = suggestions?.length
+    ? suggestions
+    : DEFAULT_SUGGESTIONS;
   const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
         if (
@@ -96,9 +99,7 @@ export function SuggestedPrompts({
 
         return suggestion;
       })
-    : suggestions?.length
-      ? suggestions
-      : DEFAULT_SUGGESTIONS;
+    : fallbackSuggestions;
 
   return (
     <div className='flex flex-col gap-2 w-full max-w-sm mx-auto'>

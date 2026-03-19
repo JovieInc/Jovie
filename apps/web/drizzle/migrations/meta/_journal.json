@@ -505,6 +505,13 @@
       "when": 1774500000000,
       "tag": "0072_jovie_inbox",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1774600000000,
+      "tag": "0073_add_product_update_subscribers",
+      "breakpoints": true
     }
   ]
 }

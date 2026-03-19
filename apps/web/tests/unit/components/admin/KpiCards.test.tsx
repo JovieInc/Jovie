@@ -31,6 +31,9 @@ const defaultMetrics: AdminFunnelMetrics = {
   outreachToSignupRate: 0.067,
   signupToPaidRate: 0.2,
   dollarPerOutreach: 0.003,
+  magicMomentRate: 0.75,
+  magicMomentCount: 15,
+  enrichmentFailureRate: 0.1,
 };
 
 describe('FunnelMetricsStrip', () => {

@@ -39,9 +39,9 @@ export async function AdminConversionFunnelSection() {
             label={stage.label}
             value={stage.count.toLocaleString()}
             subtitle={
-              stage.conversionRate !== null
-                ? `${formatPercent(stage.conversionRate)} from prev`
-                : 'Top of funnel'
+              stage.conversionRate === null
+                ? 'Top of funnel'
+                : `${formatPercent(stage.conversionRate)} from prev`
             }
           />
         ))}

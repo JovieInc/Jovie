@@ -35,7 +35,7 @@ export function ShopRedirectClient({
 
     // Redirect after a small delay to let the beacon fire
     setTimeout(() => {
-      window.location.href = redirectUrl;
+      globalThis.location.href = redirectUrl;
     }, 50);
   }, [redirectUrl, username]);
 

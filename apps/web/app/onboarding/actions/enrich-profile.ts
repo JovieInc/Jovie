@@ -14,6 +14,7 @@ import { withDbSessionTx } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { setAllEnrichmentStatuses } from '@/lib/dsp-enrichment/enrichment-status';
 import {
   extractMusicFetchLinks,
   type MusicFetchProfileFieldState,
@@ -317,6 +318,9 @@ export async function enrichProfileFromDsp(
   if (!profile) {
     throw new Error('Profile not found');
   }
+
+  // Set all enrichment sub-statuses to 'enriching' at the start
+  await setAllEnrichmentStatuses(db, profile.id, 'enriching');
 
   const result: EnrichedProfileData = {
     name: profile.displayName,

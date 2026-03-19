@@ -16,6 +16,7 @@ import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
 } from './profile-review-guards';
+import { useAvatarPolling } from './useAvatarPolling';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -87,9 +88,22 @@ export function OnboardingProfileReviewStep({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Avatar state: uploaded → enriched → existing → null
+  // Poll for background avatar upload (OAuth avatar via handleBackgroundAvatarUpload)
+  const { polledAvatarUrl } = useAvatarPolling({
+    enabled:
+      !uploadedAvatarUrl &&
+      !enrichedProfile?.imageUrl &&
+      !existingAvatarUrl &&
+      !isStepResume,
+  });
+
+  // Avatar state: uploaded → polled (bg upload) → enriched → existing → null
   const enrichedAvatarUrl = enrichedProfile?.imageUrl || null;
-  const avatarUrl = uploadedAvatarUrl || enrichedAvatarUrl || existingAvatarUrl;
+  const avatarUrl =
+    uploadedAvatarUrl ||
+    polledAvatarUrl ||
+    enrichedAvatarUrl ||
+    existingAvatarUrl;
 
   // Display name state: enriched → handle (editable)
   const [editableDisplayName, setEditableDisplayName] = useState(
@@ -129,6 +143,13 @@ export function OnboardingProfileReviewStep({
     }
   }, [enrichedAvatarUrl, uploadedAvatarUrl]);
 
+  // Sync polled avatar (background OAuth upload) into local state
+  useEffect(() => {
+    if (polledAvatarUrl && !uploadedAvatarUrl) {
+      setUploadedAvatarUrl(polledAvatarUrl);
+    }
+  }, [polledAvatarUrl, uploadedAvatarUrl]);
+
   // Update display name from enrichment when it arrives
   useEffect(() => {
     if (enrichedProfile?.name && editableDisplayName === handle) {
@@ -139,11 +160,9 @@ export function OnboardingProfileReviewStep({
   // Track photo status on mount
   useEffect(() => {
     if (!showLoading) {
-      const source = enrichedProfile?.imageUrl
-        ? 'enrichment'
-        : existingAvatarUrl
-          ? 'oauth'
-          : 'none';
+      let source: 'enrichment' | 'oauth' | 'none' = 'none';
+      if (enrichedProfile?.imageUrl) source = 'enrichment';
+      else if (existingAvatarUrl) source = 'oauth';
       track('onboarding_photo_status', {
         has_photo: Boolean(avatarUrl),
         source,
