@@ -61,6 +61,12 @@ interface ActioningState {
   status: 'approved' | 'rejected';
 }
 
+function getEmptyDescription(search: string, statusFilter: string): string {
+  if (search) return 'No leads match your search';
+  if (statusFilter) return 'Try a different status filter';
+  return 'No leads have been discovered yet';
+}
+
 function LeadActionsCell({
   lead,
   onUpdateStatus,
@@ -339,13 +345,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
           ) : (
             <TableEmptyState
               title='No leads found'
-              description={
-                search
-                  ? 'No leads match your search'
-                  : statusFilter
-                    ? 'Try a different status filter'
-                    : 'No leads have been discovered yet'
-              }
+              description={getEmptyDescription(search, statusFilter)}
             />
           )
         }

@@ -139,11 +139,9 @@ export function OnboardingProfileReviewStep({
   // Track photo status on mount
   useEffect(() => {
     if (!showLoading) {
-      const source = enrichedProfile?.imageUrl
-        ? 'enrichment'
-        : existingAvatarUrl
-          ? 'oauth'
-          : 'none';
+      let source: 'enrichment' | 'oauth' | 'none' = 'none';
+      if (enrichedProfile?.imageUrl) source = 'enrichment';
+      else if (existingAvatarUrl) source = 'oauth';
       track('onboarding_photo_status', {
         has_photo: Boolean(avatarUrl),
         source,
