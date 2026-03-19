@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { ProfileContactSidebar } from '@/features/dashboard/organisms/profile-contact-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AvailableDSP } from '@/lib/dsp';
+import { getHometownFromSettings } from '@/types/db';
 
 function convertSocialLinksToPreviewLinks(
   links: ProfileSocialLink[]
@@ -71,6 +72,9 @@ export function PreviewDataHydrator({
       avatarUrl: selectedProfile.avatarUrl ?? null,
       bio: selectedProfile.bio ?? null,
       genres: selectedProfile.genres ?? null,
+      location: selectedProfile.location ?? null,
+      hometown: getHometownFromSettings(selectedProfile.settings) ?? null,
+      activeSinceYear: selectedProfile.activeSinceYear ?? null,
       links: previewLinks,
       profilePath: `/${canonicalUsername}`,
       dspConnections: {

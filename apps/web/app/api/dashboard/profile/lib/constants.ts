@@ -22,4 +22,5 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
   'settings',
   'theme',
   'venmo_handle',
+  'genres',
 ]);
