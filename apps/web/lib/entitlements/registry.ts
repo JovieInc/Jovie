@@ -33,7 +33,8 @@ export type BooleanEntitlement =
   | 'canCreateManualReleases'
   | 'canAccessFutureReleases'
   | 'canSendNotifications'
-  | 'canEditSmartLinks';
+  | 'canEditSmartLinks'
+  | 'canAccessInbox';
 
 export type NumericEntitlement =
   | 'analyticsRetentionDays'
@@ -77,6 +78,7 @@ const PRO_BOOLEANS: Record<BooleanEntitlement, boolean> = {
   canAccessFutureReleases: true,
   canSendNotifications: true,
   canEditSmartLinks: true,
+  canAccessInbox: true,
 };
 
 const PRO_LIMITS: PlanEntitlements['limits'] = {
@@ -123,6 +125,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessFutureReleases: false,
       canSendNotifications: true,
       canEditSmartLinks: true,
+      canAccessInbox: false,
     },
     limits: {
       analyticsRetentionDays: 30,
@@ -192,6 +195,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       canAccessFutureReleases: true,
       canSendNotifications: true,
       canEditSmartLinks: true,
+      canAccessInbox: true,
     },
     limits: {
       analyticsRetentionDays: 365,

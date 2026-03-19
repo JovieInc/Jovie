@@ -33,6 +33,7 @@ export const ServerEnvSchema = z.object({
   RESEND_FROM_EMAIL: z.string().email().optional(),
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
+  RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
@@ -181,6 +182,7 @@ export const ENV_KEYS = [
   'RESEND_FROM_EMAIL',
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
+  'RESEND_INBOUND_WEBHOOK_SECRET',
   'SLACK_WEBHOOK_URL',
   'WAITLIST_ENABLED',
   'DATABASE_URL',
