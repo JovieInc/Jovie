@@ -5,12 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.10] - 2026-03-18
+
+### Changed
+
+- Waitlist gating: replaced `WAITLIST_ENABLED` env var with DB-only `gateEnabled` toggle — admin panel now controls waitlist without server restarts
+- Default waitlist state for fresh environments changed to OFF (gateEnabled: false), matching previous env-var-unset behavior
+
+### Removed
+
+- `WAITLIST_ENABLED` environment variable and `waitlist-config.ts` — consolidated into `waitlist_settings.gateEnabled` DB column
+
 ## [26.4.9] - 2026-03-18
 
 ### Fixed
 
 - Expand ISRC-based DSP artist discovery to include Deezer and MusicBrainz — previously hardcoded to Apple Music only, leaving built discovery code for 2 providers dead
 - Replace tautological E2E musicfetch-coverage tests with real DB and UI assertions that catch multi-DSP regressions
+- Fix conversion rate labels showing between wrong funnel stages — 33% now correctly appears between Profile Views and Unique Visitors instead of between Unique Visitors and Followers
+- Fix Cities, Countries, and Sources tabs showing blank by sourcing geo data from audience_members (visits) instead of click_events (link clicks only)
+- Fix time range toggle (7d/30d) overflowing off-screen by stacking it below the tab bar
 - MusicFetch ingest pipeline: treat 400 errors as permanent failures instead of retrying indefinitely, preventing circuit breaker trips that blocked all enrichment (JOV-1629, JOV-1630)
 - MusicFetch enrichment: return gracefully when API returns no data instead of throwing and retrying
 
@@ -20,10 +34,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
 - Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
 - TODO: wrong-artist detection + multi-candidate DSP matching (PR2 follow-up)
+- New blog post: "The Contact Problem" — explores the structural problem of stale artist contacts and introduces the Jovie Inbox vision
+- "Problems We're Solving" section in investor memo linking to all three problem essays (MySpace, Friday, Contact)
 - Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
 - Campaign toggle check in both the campaign processor cron and claim-invite job processor
 - Admin UI toggle switch on the outreach email page for enabling/disabling campaigns
 - API endpoints for reading and updating campaign enabled state
+
+### Removed
+
+- Delete unused `getAnalyticsData()` and `getUserAnalytics()` functions from analytics query module
+
 
 ## [26.4.8] - 2026-03-18
 

@@ -26,6 +26,9 @@ export interface PreviewPanelData {
   avatarUrl: string | null;
   bio: string | null;
   genres: string[] | null;
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
   links: PreviewPanelLink[];
   profilePath: string;
   dspConnections: {

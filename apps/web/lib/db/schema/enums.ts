@@ -126,8 +126,42 @@ export const contactRoleEnum = pgEnum('contact_role', [
   'management',
   'press_pr',
   'brand_partnerships',
+  'music_collaboration',
   'fan_general',
   'other',
+]);
+
+// Inbox Enums
+export const inboxEmailCategoryEnum = pgEnum('inbox_email_category', [
+  'booking',
+  'music_collaboration',
+  'brand_partnership',
+  'management',
+  'fan_mail',
+  'personal',
+  'press',
+  'business',
+  'spam',
+  'other',
+]);
+
+export const inboxThreadPriorityEnum = pgEnum('inbox_thread_priority', [
+  'high',
+  'medium',
+  'low',
+]);
+
+export const inboxThreadStatusEnum = pgEnum('inbox_thread_status', [
+  'pending_review',
+  'routed',
+  'routing_failed',
+  'in_progress',
+  'resolved',
+  'archived',
+]);
+
+export const inboxOutboundSentByEnum = pgEnum('inbox_outbound_sent_by', [
+  'jovie_routing',
 ]);
 
 export const contactChannelEnum = pgEnum('contact_channel', ['email', 'phone']);

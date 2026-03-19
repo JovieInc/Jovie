@@ -20,7 +20,6 @@ import {
   TEST_AUTH_BYPASS_MODE,
   TEST_MODE_HEADER,
 } from '@/lib/auth/test-mode';
-import { isWaitlistEnabled } from '@/lib/auth/waitlist-config';
 import {
   COOKIE_BANNER_REQUIRED_COOKIE,
   isCookieBannerRequired,
@@ -399,7 +398,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         req.nextUrl.searchParams.get('redirect_url')
       );
 
-      if (isWaitlistEnabled() && userState.needsWaitlist) {
+      if (userState.needsWaitlist) {
         return NextResponse.redirect(new URL('/waitlist', req.url));
       }
       if (userState.needsOnboarding) {
@@ -428,7 +427,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       }
 
       if (
-        isWaitlistEnabled() &&
         userState.needsWaitlist &&
         pathname !== '/waitlist' &&
         !pathname.startsWith('/api/') &&
@@ -457,7 +455,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           });
         }
       } else if (
-        (!isWaitlistEnabled() || !userState.needsWaitlist) &&
+        !userState.needsWaitlist &&
         pathname === '/waitlist' &&
         isNavigationMethod &&
         !isRSCPrefetch
