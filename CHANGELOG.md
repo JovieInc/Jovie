@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.9] - 2026-03-18
+
+### Added
+
+- Display and inline-edit location, hometown, and genres in the artist profile drawer About tab
+- GenrePicker component with search, multi-select, and 10-genre cap
+- LocationPicker component with popular cities, search, and free-text entry
+- Genre tags added to profile API validation (max 10, 40 chars each)
+- 25 new tests for GenrePicker, LocationPicker, and ProfileAboutTab components
+
+### Changed
+
+- Extracted LocationField helper to DRY up location/hometown rendering
+- Exported getHometownFromSettings utility for reuse across data hydrators
+
 ## [26.4.8] - 2026-03-18
 
 ### Added
