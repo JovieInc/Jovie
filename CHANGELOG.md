@@ -38,6 +38,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Added direct `/app/settings/delete-account` route for deep-linking
 - Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
 - Added 7 unit tests for the account deletion API route
+- Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
+- Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
+
+### Removed
+
+- Deleted unauthenticated `/api/waitlist-debug` endpoint and its tests
+- Removed unused domain-categorizer functions (addSensitiveDomain, containsSensitiveKeywords, sanitizeForCrawlers, getAllSensitiveDomains)
 
 ## [26.4.13] - 2026-03-19
 

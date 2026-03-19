@@ -5,16 +5,10 @@
 
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  checkRateLimit,
-  detectBot,
-  getBotSafeHeaders,
-} from '@/lib/utils/bot-detection';
+import { detectBot, getBotSafeHeaders } from '@/lib/utils/bot-detection';
 import {
   categorizeDomain,
-  containsSensitiveKeywords,
   getCrawlerSafeLabel,
-  sanitizeForCrawlers,
 } from '@/lib/utils/domain-categorizer';
 import {
   extractDomain,
@@ -153,38 +147,6 @@ describe('Domain Categorization with Anti-Cloaking', () => {
     });
   });
 
-  describe('Sensitive Keyword Detection', () => {
-    it('should detect sensitive keywords', () => {
-      expect(containsSensitiveKeywords('porn videos')).toBe(true);
-      expect(containsSensitiveKeywords('adult content')).toBe(true);
-      expect(containsSensitiveKeywords('casino games')).toBe(true);
-      expect(containsSensitiveKeywords('crypto trading')).toBe(true);
-      expect(containsSensitiveKeywords('cash advance loans')).toBe(true);
-    });
-
-    it('should not detect normal content as sensitive', () => {
-      expect(containsSensitiveKeywords('music streaming')).toBe(false);
-      expect(containsSensitiveKeywords('social media')).toBe(false);
-      expect(containsSensitiveKeywords('news website')).toBe(false);
-    });
-  });
-
-  describe('Crawler Text Sanitization', () => {
-    it('should sanitize sensitive keywords for crawlers', () => {
-      expect(sanitizeForCrawlers('porn videos')).toBe('content videos');
-      expect(sanitizeForCrawlers('adult content')).toBe('content content');
-      expect(sanitizeForCrawlers('casino games')).toBe('gaming games');
-      expect(sanitizeForCrawlers('crypto trading')).toBe('digital investment');
-      expect(sanitizeForCrawlers('bitcoin exchange')).toBe('digital exchange');
-      expect(sanitizeForCrawlers('cash advance')).toBe('financial');
-    });
-
-    it('should preserve non-sensitive text', () => {
-      const text = 'music streaming platform';
-      expect(sanitizeForCrawlers(text)).toBe(text);
-    });
-  });
-
   describe('Domain Categorization', async () => {
     it('should categorize sensitive domains correctly', async () => {
       const result = await categorizeDomain('https://onlyfans.com/user123');
@@ -238,13 +200,6 @@ describe('URL Encryption and Security', () => {
       expect(extractDomain('not-a-url')).toBe('');
       expect(extractDomain('')).toBe('');
     });
-  });
-});
-
-describe('Rate Limiting', () => {
-  it('should implement rate limiting correctly', async () => {
-    const isLimited = await checkRateLimit('127.0.0.1', '/api/test');
-    expect(typeof isLimited).toBe('boolean');
   });
 });
 
