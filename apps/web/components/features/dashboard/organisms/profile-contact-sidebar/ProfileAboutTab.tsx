@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { Calendar, Home, MapPin, Plus, X } from 'lucide-react';
+import { Calendar, Home, type LucideIcon, MapPin, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import {
@@ -100,6 +100,72 @@ function EditableBio({
   );
 }
 
+/** Renders a location-style field: editable via LocationPicker or static text. */
+function LocationField({
+  icon: Icon,
+  value,
+  label,
+  addLabel,
+  onChange,
+}: {
+  readonly icon: LucideIcon;
+  readonly value: string | null;
+  readonly label: (v: string) => string;
+  readonly addLabel: string;
+  readonly onChange?: (v: string | null) => void;
+}) {
+  if (value) {
+    if (onChange) {
+      return (
+        <LocationPicker
+          value={value}
+          onSelect={onChange}
+          placeholder={`Change ${addLabel.toLowerCase()}`}
+          trigger={
+            <button
+              type='button'
+              className='flex items-center gap-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
+            >
+              <Icon
+                className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+                aria-hidden='true'
+              />
+              <span className='capitalize'>{label(value)}</span>
+            </button>
+          }
+        />
+      );
+    }
+    return (
+      <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
+        <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+        <span className='capitalize'>{label(value)}</span>
+      </div>
+    );
+  }
+
+  if (onChange) {
+    return (
+      <LocationPicker
+        value={null}
+        onSelect={onChange}
+        placeholder={`Add your ${addLabel.toLowerCase()}`}
+        trigger={
+          <button
+            type='button'
+            className='flex items-center gap-2 text-[13px] text-tertiary-token hover:text-secondary-token transition-colors'
+          >
+            <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
+            <span>Add your {addLabel.toLowerCase()}</span>
+          </button>
+        }
+      />
+    );
+  }
+
+  return null;
+}
+
 export function ProfileAboutTab({
   bio,
   genres,
@@ -113,10 +179,8 @@ export function ProfileAboutTab({
   onGenresChange,
 }: ProfileAboutTabProps) {
   const hasGenres = genres && genres.length > 0;
-  const hasLocation = Boolean(location);
-  const hasHometown = Boolean(hometown);
-  const hasActiveSince = Boolean(activeSinceYear);
-  const hasMetadata = hasLocation || hasHometown || hasActiveSince;
+  const hasMetadata =
+    Boolean(location) || Boolean(hometown) || Boolean(activeSinceYear);
   const editable = Boolean(onLocationChange);
 
   return (
@@ -140,97 +204,23 @@ export function ProfileAboutTab({
       {(hasMetadata || editable) && (
         <DrawerSection title='Location' collapsible={false}>
           <div className='space-y-2'>
-            {/* Current location */}
-            {hasLocation ? (
-              onLocationChange ? (
-                <LocationPicker
-                  value={location}
-                  onSelect={onLocationChange}
-                  placeholder='Change location'
-                  trigger={
-                    <button
-                      type='button'
-                      className='flex items-center gap-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
-                    >
-                      <MapPin
-                        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                      <span className='capitalize'>{location}</span>
-                    </button>
-                  }
-                />
-              ) : (
-                <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
-                  <MapPin className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                  <span className='capitalize'>{location}</span>
-                </div>
-              )
-            ) : onLocationChange ? (
-              <LocationPicker
-                value={null}
-                onSelect={onLocationChange}
-                placeholder='Add your location'
-                trigger={
-                  <button
-                    type='button'
-                    className='flex items-center gap-2 text-[13px] text-tertiary-token hover:text-secondary-token transition-colors'
-                  >
-                    <MapPin
-                      className='h-3.5 w-3.5 shrink-0'
-                      aria-hidden='true'
-                    />
-                    <span>Add your location</span>
-                  </button>
-                }
-              />
-            ) : null}
-
-            {/* Hometown */}
-            {hasHometown ? (
-              onHometownChange ? (
-                <LocationPicker
-                  value={hometown}
-                  onSelect={onHometownChange}
-                  placeholder='Change hometown'
-                  trigger={
-                    <button
-                      type='button'
-                      className='flex items-center gap-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
-                    >
-                      <Home
-                        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                      <span className='capitalize'>From {hometown}</span>
-                    </button>
-                  }
-                />
-              ) : (
-                <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
-                  <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                  <span className='capitalize'>From {hometown}</span>
-                </div>
-              )
-            ) : onHometownChange ? (
-              <LocationPicker
-                value={null}
-                onSelect={onHometownChange}
-                placeholder='Add your hometown'
-                trigger={
-                  <button
-                    type='button'
-                    className='flex items-center gap-2 text-[13px] text-tertiary-token hover:text-secondary-token transition-colors'
-                  >
-                    <Home className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-                    <span>Add your hometown</span>
-                  </button>
-                }
-              />
-            ) : null}
+            <LocationField
+              icon={MapPin}
+              value={location}
+              label={v => v}
+              addLabel='Location'
+              onChange={onLocationChange}
+            />
+            <LocationField
+              icon={Home}
+              value={hometown}
+              label={v => `From ${v}`}
+              addLabel='Hometown'
+              onChange={onHometownChange}
+            />
 
             {/* Active since */}
-            {hasActiveSince && (
+            {Boolean(activeSinceYear) && (
               <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
                 <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
                 <span>Active since {activeSinceYear}</span>
