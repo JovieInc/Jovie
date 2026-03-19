@@ -132,6 +132,7 @@ export const creatorProfiles = pgTable(
       .default(false)
       .notNull(),
     displayNameLocked: boolean('display_name_locked').default(false).notNull(),
+    usernameLockedAt: timestamp('username_locked_at'),
     ingestionStatus: ingestionStatusEnum('ingestion_status')
       .default('idle')
       .notNull(),
@@ -238,6 +239,10 @@ export const creatorContacts = pgTable(
     preferredChannel: contactChannelEnum('preferred_channel'),
     isActive: boolean('is_active').notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
+    forwardInboxEmails: boolean('forward_inbox_emails')
+      .notNull()
+      .default(false),
+    autoMarkRead: boolean('auto_mark_read').notNull().default(false),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

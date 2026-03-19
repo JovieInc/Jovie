@@ -783,6 +783,20 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       }
 
       // Create the creator profile using Drizzle ORM insert to ensure proper boolean handling
+      // For dualipa, include real multi-DSP IDs so E2E tests can verify multi-DSP rendering
+      const dspFields =
+        profile.username === 'dualipa'
+          ? {
+              appleMusicId: '1031397873',
+              appleMusicUrl:
+                'https://music.apple.com/us/artist/dua-lipa/1031397873',
+              deezerId: '13206246',
+              tidalId: '7551163',
+              youtubeMusicId: 'UC-J-KZfRV8c13fOCkhXdLiQ',
+              soundcloudId: 'dualipa',
+            }
+          : {};
+
       const [createdProfile] = await db
         .insert(creatorProfiles)
         .values({
@@ -797,6 +811,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           isVerified: false,
           isClaimed: false,
           ingestionStatus: 'idle',
+          ...dspFields,
         })
         .returning({ id: creatorProfiles.id });
 
@@ -817,6 +832,55 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           state: 'active',
         });
         console.log(`    ✓ Added Spotify link for ${profile.username}`);
+      }
+
+      // Add multi-DSP social links for dualipa so E2E tests verify multi-DSP rendering
+      if (profile.username === 'dualipa') {
+        const dualipaSocialLinks = [
+          {
+            platform: 'apple_music',
+            platformType: 'music_streaming' as const,
+            url: 'https://music.apple.com/us/artist/dua-lipa/1031397873',
+            displayText: 'Listen on Apple Music',
+            sortOrder: 2,
+          },
+          {
+            platform: 'instagram',
+            platformType: 'social' as const,
+            url: 'https://instagram.com/dualipa',
+            displayText: 'Instagram',
+            sortOrder: 3,
+          },
+          {
+            platform: 'tiktok',
+            platformType: 'social' as const,
+            url: 'https://tiktok.com/@dualipa',
+            displayText: 'TikTok',
+            sortOrder: 4,
+          },
+          {
+            platform: 'youtube',
+            platformType: 'video' as const,
+            url: 'https://youtube.com/channel/UC-J-KZfRV8c13fOCkhXdLiQ',
+            displayText: 'YouTube',
+            sortOrder: 5,
+          },
+        ];
+        for (const link of dualipaSocialLinks) {
+          await db.insert(socialLinks).values({
+            creatorProfileId: createdProfile.id,
+            platform: link.platform,
+            platformType: link.platformType,
+            url: link.url,
+            displayText: link.displayText,
+            isActive: true,
+            sortOrder: link.sortOrder,
+            state: 'active',
+          });
+        }
+        console.log(
+          `    ✓ Added ${dualipaSocialLinks.length} multi-DSP social links for dualipa`
+        );
       }
 
       // Add tour dates for dualipa to test public touring display

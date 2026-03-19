@@ -156,6 +156,81 @@ export function ProfileContactSidebar() {
     [avatarMutation, previewData, setPreviewData]
   );
 
+  // Handle bio change — save to server and instantly update sidebar
+  const handleBioChange = useCallback(
+    (value: string) => {
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, bio: value || null });
+      profileMutation.mutate(
+        { updates: { bio: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, bio: previewData.bio });
+            toast.error('Failed to update bio');
+          },
+        }
+      );
+    },
+    [selectedProfile, previewData, setPreviewData, profileMutation]
+  );
+
+  // Handle location change — save to server and instantly update sidebar
+  const handleLocationChange = useCallback(
+    (value: string | null) => {
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, location: value });
+      profileMutation.mutate(
+        { updates: { location: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, location: previewData.location });
+            toast.error('Failed to update location');
+          },
+        }
+      );
+    },
+    [selectedProfile, previewData, setPreviewData, profileMutation]
+  );
+
+  // Handle hometown change — save to server and instantly update sidebar
+  const handleHometownChange = useCallback(
+    (value: string | null) => {
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, hometown: value });
+      profileMutation.mutate(
+        { updates: { hometown: value } },
+        {
+          onError: () => {
+            setPreviewData({
+              ...previewData,
+              hometown: previewData.hometown,
+            });
+            toast.error('Failed to update hometown');
+          },
+        }
+      );
+    },
+    [selectedProfile, previewData, setPreviewData, profileMutation]
+  );
+
+  // Handle genres change — save to server and instantly update sidebar
+  const handleGenresChange = useCallback(
+    (value: string[]) => {
+      if (!selectedProfile || !previewData) return;
+      setPreviewData({ ...previewData, genres: value });
+      profileMutation.mutate(
+        { updates: { genres: value } },
+        {
+          onError: () => {
+            setPreviewData({ ...previewData, genres: previewData.genres });
+            toast.error('Failed to update genres');
+          },
+        }
+      );
+    },
+    [selectedProfile, previewData, setPreviewData, profileMutation]
+  );
+
   // Existing platform IDs for filtering suggestions
   const existingPlatformIds = useMemo(
     () =>
@@ -390,6 +465,9 @@ export function ProfileContactSidebar() {
     avatarUrl,
     bio,
     genres,
+    location,
+    hometown,
+    activeSinceYear,
     links,
     profilePath,
     dspConnections,
@@ -517,7 +595,14 @@ export function ProfileContactSidebar() {
         <ProfileAboutTab
           bio={bio}
           genres={genres}
+          location={location}
+          hometown={hometown}
+          activeSinceYear={activeSinceYear}
           allowPhotoDownloads={allowPhotoDownloads}
+          onBioChange={handleBioChange}
+          onLocationChange={handleLocationChange}
+          onHometownChange={handleHometownChange}
+          onGenresChange={handleGenresChange}
         />
       ) : (
         <>

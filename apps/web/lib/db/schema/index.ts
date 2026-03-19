@@ -227,6 +227,10 @@ export {
   dspBioSyncMethodEnum,
   dspBioSyncStatusEnum,
   dspMatchStatusEnum,
+  inboxEmailCategoryEnum,
+  inboxOutboundSentByEnum,
+  inboxThreadPriorityEnum,
+  inboxThreadStatusEnum,
   ingestionJobStatusEnum,
   ingestionSourceTypeEnum,
   ingestionStatusEnum,
@@ -275,6 +279,24 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Inbox (Inbound emails, Threads, Outbound routing replies)
+export {
+  type EmailThread,
+  emailThreads,
+  type InboundEmail,
+  inboundEmails,
+  insertEmailThreadSchema,
+  insertInboundEmailSchema,
+  insertOutboundReplySchema,
+  type NewEmailThread,
+  type NewInboundEmail,
+  type NewOutboundReply,
+  type OutboundReply,
+  outboundReplies,
+  selectEmailThreadSchema,
+  selectInboundEmailSchema,
+  selectOutboundReplySchema,
+} from './inbox';
 // Ingestion
 export {
   type IngestionJob,

@@ -129,14 +129,13 @@ async function runEnvironmentValidationWithRetry() {
 
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./sentry.server.config');
-
-    // Skip startup validation retries in dev — env vars are immediately available
-    // via `doppler run --`, retries only help Vercel cold starts where Doppler
-    // can take up to 4s to inject env vars.
+    // Skip Sentry server SDK and startup validation in dev — env vars are
+    // immediately available via `doppler run --`, and Sentry in dev only
+    // produces warnings and adds overhead (100% trace sampling).
     const isDev = process.env.NODE_ENV === 'development';
 
     if (!isDev) {
+      await import('./sentry.server.config');
       // Run environment validation at startup to detect issues early
       // This catches build-time vs runtime environment differences on Vercel
       try {
@@ -225,7 +224,9 @@ export async function register() {
   }
 
   if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('./sentry.edge.config');
+    if (process.env.NODE_ENV !== 'development') {
+      await import('./sentry.edge.config');
+    }
   }
 }
 

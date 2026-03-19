@@ -65,6 +65,7 @@ export function useKeyboardShortcuts(
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (!e.key) return;
       const { allowInInputs = false, scopeRef } = optionsRef.current;
 
       if (scopeRef && !scopeRef.current) {

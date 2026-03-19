@@ -145,6 +145,9 @@ describe('AdminCreatorProfilesWithSidebar', () => {
     userId: 'user-1',
     ingestionStatus: 'idle',
     lastIngestionError: null,
+    location: null,
+    hometown: null,
+    activeSinceYear: null,
   };
 
   const defaultSort: AdminCreatorProfilesSort = 'created_desc';

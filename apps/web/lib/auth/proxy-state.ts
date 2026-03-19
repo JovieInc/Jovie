@@ -9,7 +9,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
-import { isWaitlistEnabled } from './waitlist-config';
+import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 export interface ProxyUserState {
   needsWaitlist: boolean;
@@ -199,10 +199,9 @@ function determineUserState(
         profileAvatarUrl: string | null;
         profileIsPublic: boolean | null;
       }
-    | undefined
+    | undefined,
+  waitlistEnabled: boolean
 ): ProxyUserState {
-  const waitlistEnabled = isWaitlistEnabled();
-
   // No DB user → needs waitlist/signup (or onboarding if waitlist is disabled)
   if (!result?.dbUserId) {
     return waitlistEnabled
@@ -407,7 +406,8 @@ export async function getUserState(
 
     logDbQueryPerformance(dbQueryDuration, !!result?.dbUserId);
 
-    const userState = determineUserState(result);
+    const gateEnabled = await isWaitlistGateEnabled();
+    const userState = determineUserState(result, gateEnabled);
 
     // Populate both cache layers
     setMemoryCachedState(cacheKey, userState);
