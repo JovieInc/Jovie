@@ -2,7 +2,7 @@
 name: ship
 version: 1.0.0
 description: |
-  Ship workflow: detect + merge base branch, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR.
+  Ship workflow: detect + merge base branch, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR. Use when asked to "ship", "deploy", "push to main", "create a PR", or "merge and push".
 allowed-tools:
   - Bash
   - Read
@@ -120,6 +120,31 @@ Hey gstack team — ran into this while using /{skill-name}:
 
 Slug: lowercase, hyphens, max 60 chars (e.g. `browse-js-no-await`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
 
+## Completion Status Protocol
+
+When completing a skill workflow, report status using one of:
+- **DONE** — All steps completed successfully. Evidence provided for each claim.
+- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
+- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
+- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+
+### Escalation
+
+It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+
+Bad work is worse than no work. You will not be penalized for escalating.
+- If you have attempted a task 3 times without success, STOP and escalate.
+- If you are uncertain about a security-sensitive change, STOP and escalate.
+- If the scope of work exceeds what you can verify, STOP and escalate.
+
+Escalation format:
+```
+STATUS: BLOCKED | NEEDS_CONTEXT
+REASON: [1-2 sentences]
+ATTEMPTED: [what you tried]
+RECOMMENDATION: [what the user should do next]
+```
+
 ## Step 0: Detect base branch
 
 Determine which branch this PR targets. Use the result as "the base branch" in all subsequent steps.
@@ -227,7 +252,7 @@ If the Eng Review is NOT "CLEAR":
    - RECOMMENDATION: Choose C if the change is obviously trivial (< 20 lines, typo fix, config-only); Choose B for larger changes
    - Options: A) Ship anyway  B) Abort — run /plan-eng-review first  C) Change is too small to need eng review
    - If CEO Review is missing, mention as informational ("CEO Review not run — recommended for product changes") but do NOT block
-   - For Design Review: run `eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)`. If `SCOPE_FRONTEND=true` and no design review (plan-design-review or design-review-lite) exists in the dashboard, mention: "Design Review not run — this PR changes frontend code. The lite design check will run automatically in Step 3.5, but consider running /plan-design-review for a full visual audit." Still never block.
+   - For Design Review: run `eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)`. If `SCOPE_FRONTEND=true` and no design review (plan-design-review or design-review-lite) exists in the dashboard, mention: "Design Review not run — this PR changes frontend code. The lite design check will run automatically in Step 3.5, but consider running /design-review for a full visual audit post-implementation." Still never block.
 
 3. **If the user chooses A or C,** persist the decision so future `/ship` runs on this branch skip the gate:
    ```bash
@@ -664,7 +689,7 @@ eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
 4. **Apply the design checklist** against the changed files. For each item:
    - **[HIGH] mechanical CSS fix** (`outline: none`, `!important`, `font-size < 16px`): classify as AUTO-FIX
    - **[HIGH/MEDIUM] design judgment needed**: classify as ASK
-   - **[LOW] intent-based detection**: present as "Possible — verify visually or run /qa-design-review"
+   - **[LOW] intent-based detection**: present as "Possible — verify visually or run /design-review"
 
 5. **Include findings** in the review output under a "Design Review" header, following the output format in the checklist. Design findings merge with code review findings into the same Fix-First flow.
 
@@ -877,6 +902,28 @@ EOF
 
 ---
 
+## Step 6.5: Verification Gate
+
+**IRON LAW: NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.**
+
+Before pushing, re-verify if code changed during Steps 4-6:
+
+1. **Test verification:** If ANY code changed after Step 3's test run (fixes from review findings, CHANGELOG edits don't count), re-run the test suite. Paste fresh output. Stale output from Step 3 is NOT acceptable.
+
+2. **Build verification:** If the project has a build step, run it. Paste output.
+
+3. **Rationalization prevention:**
+   - "Should work now" → RUN IT.
+   - "I'm confident" → Confidence is not evidence.
+   - "I already tested earlier" → Code changed since then. Test again.
+   - "It's a trivial change" → Trivial changes break production.
+
+**If tests fail here:** STOP. Do not push. Fix the issue and return to Step 3.
+
+Claiming work is complete without verification is dishonesty, not efficiency.
+
+---
+
 ## Step 7: Push
 
 Push to the remote with upstream tracking:
@@ -945,5 +992,6 @@ EOF
 - **Split commits for bisectability** — each commit = one logical change.
 - **TODOS.md completion detection must be conservative.** Only mark items as completed when the diff clearly shows the work is done.
 - **Use Greptile reply templates from greptile-triage.md.** Every reply includes evidence (inline diff, code references, re-rank suggestion). Never post vague replies.
+- **Never push without fresh verification evidence.** If code changed after Step 3 tests, re-run before pushing.
 - **Step 3.4 generates coverage tests.** They must pass before committing. Never commit failing tests.
 - **The goal is: user says `/ship`, next thing they see is the review + PR URL.**

@@ -76,7 +76,7 @@ function generateProfileStructuredData(
         'youtube',
         'tiktok',
         'spotify',
-      ].includes(link.platform.toLowerCase())
+      ].includes((link.platform ?? '').toLowerCase())
     )
     .map(link => link.url);
 
@@ -243,7 +243,7 @@ const fetchProfileAndLinks = async (
       result.socialLinks?.map(link => ({
         id: link.id,
         artist_id: result.id,
-        platform: link.platform.toLowerCase(),
+        platform: (link.platform ?? '').toLowerCase(),
         url: link.url,
         clicks: link.clicks || 0,
         created_at: toISOStringSafe(link.createdAt),
@@ -489,7 +489,7 @@ async function renderListenMode(
     socialLinks = rawSocialLinks.map(link => ({
       id: link.id,
       artist_id: profileResult.profile.id,
-      platform: link.platform.toLowerCase(),
+      platform: (link.platform ?? '').toLowerCase(),
       url: link.url,
       clicks: link.clicks || 0,
       created_at: toISOStringSafe(link.createdAt),

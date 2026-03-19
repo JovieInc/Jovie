@@ -4,7 +4,7 @@ import { renderStatusCell } from '@/features/admin/waitlist-table/utils/column-r
 
 describe('renderStatusCell', () => {
   it.each([
-    ['new', 'New', 'bg-(--linear-bg-surface-2)'],
+    ['new', 'New', 'bg-(--color-bg-primary)'],
     ['invited', 'Invited', 'bg-(--linear-warning)/15'],
     ['claimed', 'Claimed', 'bg-(--linear-success)/15'],
   ] as const)('renders %s as a small badge with consistent table sizing', (status, label, expectedClassToken) => {

@@ -800,10 +800,24 @@ Use Clerk's official Playwright testing helpers whenever an E2E test needs auth.
 **Test user cleanup:**
 
 - E2E users are tagged with metadata (`role: 'e2e'`).
-- Clean stale users with:
+- Clean stale users interactively:
   - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts`
+- Clean stale users non-interactively (for agents and CI):
+  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force`
+- Preview what would be deleted (dry run):
+  - `doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --dry-run`
 - To re-seed users:
   - `doppler run -- pnpm tsx apps/web/scripts/setup-e2e-users.ts`
+
+**Agent cleanup requirement:**
+
+Agents **MUST** run cleanup after any session that creates test accounts via sign-up flows (E2E tests, `/qa` runs that trigger signup). Run:
+
+```bash
+doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
+```
+
+This deletes all Clerk users matching either `role: 'e2e'` metadata OR `+clerk_test` email pattern, AND their corresponding database records (cascading to related tables). Only works against test Clerk instances (`sk_test_` keys). Safe to run repeatedly.
 
 #### General E2E Rules (Required)
 
@@ -1159,6 +1173,50 @@ cd .claude/skills/gstack && git pull origin main && ./setup
 ```
 
 Or use `/gstack-upgrade` from within Claude Code.
+
+### QA & Browse Authentication (Jovie-Specific)
+
+When running `/qa` or `/browse` against Jovie (localhost or staging), agents **MUST** handle authentication automatically using the project's E2E test credentials from Doppler. **Do NOT prompt the user for credentials.**
+
+**Why this is different from Playwright E2E auth:** The browse binary runs a standalone Playwright browser session, NOT the Playwright test runner. Clerk testing tokens (`setupClerkTestingToken`) are NOT available. Instead, sign in by filling the login form directly.
+
+**Steps:**
+
+1. Get credentials from environment (requires `doppler run --` prefix on the parent command):
+   - Email: `$E2E_CLERK_USER_USERNAME` (contains `+clerk_test` suffix)
+   - OTP code: `424242` (Clerk auto-accepts this for `+clerk_test` emails in test mode)
+
+2. Check if already authenticated:
+   ```bash
+   $B goto <base-url>/signin
+   $B snapshot -D
+   ```
+   If the URL redirected to `/app` (dashboard), authentication is already active — **skip the rest and proceed to QA**.
+
+3. If on the sign-in page, fill the login form:
+   ```bash
+   $B snapshot -i                    # identify email input element
+   $B fill <email-element> "$E2E_CLERK_USER_USERNAME"
+   $B click <submit-button>          # click "Continue" or submit
+   $B snapshot -i                    # identify OTP code input
+   $B fill <otp-element> "424242"
+   $B click <verify-button>          # submit OTP
+   $B snapshot -D                    # verify redirect to dashboard
+   ```
+
+4. Verify authentication succeeded:
+   - URL should contain `/app` (not `/signin` or `/sign-in`)
+   - Dashboard navigation should be visible
+
+**Do NOT:**
+- Prompt the user for credentials — use Doppler env vars
+- Use `/setup-browser-cookies` for automated QA runs — that is for importing human browser sessions
+- Hardcode the test email address — always read from `$E2E_CLERK_USER_USERNAME`
+
+**After QA/browse sessions that create test accounts**, run cleanup:
+```bash
+doppler run -- pnpm tsx apps/web/scripts/cleanup-e2e-users.ts --force
+```
 
 ---
 

@@ -72,15 +72,29 @@ describe('SKILL.md command validation', () => {
     expect(result.snapshotFlagErrors).toHaveLength(0);
   });
 
-  test('all $B commands in qa-design-review/SKILL.md are valid browse commands', () => {
-    const skill = path.join(ROOT, 'qa-design-review', 'SKILL.md');
+  test('all $B commands in design-review/SKILL.md are valid browse commands', () => {
+    const skill = path.join(ROOT, 'design-review', 'SKILL.md');
     if (!fs.existsSync(skill)) return;
     const result = validateSkill(skill);
     expect(result.invalid).toHaveLength(0);
   });
 
-  test('all snapshot flags in qa-design-review/SKILL.md are valid', () => {
-    const skill = path.join(ROOT, 'qa-design-review', 'SKILL.md');
+  test('all snapshot flags in design-review/SKILL.md are valid', () => {
+    const skill = path.join(ROOT, 'design-review', 'SKILL.md');
+    if (!fs.existsSync(skill)) return;
+    const result = validateSkill(skill);
+    expect(result.snapshotFlagErrors).toHaveLength(0);
+  });
+
+  test('all $B commands in design-consultation/SKILL.md are valid browse commands', () => {
+    const skill = path.join(ROOT, 'design-consultation', 'SKILL.md');
+    if (!fs.existsSync(skill)) return;
+    const result = validateSkill(skill);
+    expect(result.invalid).toHaveLength(0);
+  });
+
+  test('all snapshot flags in design-consultation/SKILL.md are valid', () => {
+    const skill = path.join(ROOT, 'design-consultation', 'SKILL.md');
     if (!fs.existsSync(skill)) return;
     const result = validateSkill(skill);
     expect(result.snapshotFlagErrors).toHaveLength(0);
@@ -204,8 +218,9 @@ describe('Update check preamble', () => {
     'ship/SKILL.md', 'review/SKILL.md',
     'plan-ceo-review/SKILL.md', 'plan-eng-review/SKILL.md',
     'retro/SKILL.md',
+    'office-hours/SKILL.md', 'debug/SKILL.md',
     'plan-design-review/SKILL.md',
-    'qa-design-review/SKILL.md',
+    'design-review/SKILL.md',
     'design-consultation/SKILL.md',
     'document-release/SKILL.md',
   ];
@@ -430,6 +445,8 @@ describe('No hardcoded branch names in SKILL templates', () => {
     'plan-ceo-review/SKILL.md.tmpl',
     'retro/SKILL.md.tmpl',
     'document-release/SKILL.md.tmpl',
+    'plan-eng-review/SKILL.md.tmpl',
+    'plan-design-review/SKILL.md.tmpl',
   ];
 
   // Patterns that indicate hardcoded 'main' in git commands
@@ -512,8 +529,9 @@ describe('v0.4.1 preamble features', () => {
     'ship/SKILL.md', 'review/SKILL.md',
     'plan-ceo-review/SKILL.md', 'plan-eng-review/SKILL.md',
     'retro/SKILL.md',
+    'office-hours/SKILL.md', 'debug/SKILL.md',
     'plan-design-review/SKILL.md',
-    'qa-design-review/SKILL.md',
+    'design-review/SKILL.md',
     'design-consultation/SKILL.md',
     'document-release/SKILL.md',
   ];
@@ -531,6 +549,108 @@ describe('v0.4.1 preamble features', () => {
       expect(content).toContain('RECOMMENDATION');
     });
   }
+
+  for (const skill of skillsWithPreamble) {
+    test(`${skill} contains escalation protocol`, () => {
+      const content = fs.readFileSync(path.join(ROOT, skill), 'utf-8');
+      expect(content).toContain('DONE_WITH_CONCERNS');
+      expect(content).toContain('BLOCKED');
+      expect(content).toContain('NEEDS_CONTEXT');
+    });
+  }
+});
+
+// --- Structural tests for new skills ---
+
+describe('office-hours skill structure', () => {
+  const content = fs.readFileSync(path.join(ROOT, 'office-hours', 'SKILL.md'), 'utf-8');
+
+  // Original structural assertions
+  for (const section of ['Phase 1', 'Phase 2', 'Phase 3', 'Phase 4', 'Phase 5', 'Phase 6',
+                          'Design Doc', 'Supersedes', 'APPROVED', 'Premise Challenge',
+                          'Alternatives', 'Smart-skip']) {
+    test(`contains ${section}`, () => expect(content).toContain(section));
+  }
+
+  // Dual-mode structure
+  for (const section of ['Startup mode', 'Builder mode']) {
+    test(`contains ${section}`, () => expect(content).toContain(section));
+  }
+
+  // Mode detection question
+  test('contains explicit mode detection question', () => {
+    expect(content).toContain("what's your goal");
+  });
+
+  // Six forcing questions (startup mode)
+  for (const question of ['Demand Reality', 'Status Quo', 'Desperate Specificity',
+                           'Narrowest Wedge', 'Observation & Surprise', 'Future-Fit']) {
+    test(`contains forcing question: ${question}`, () => expect(content).toContain(question));
+  }
+
+  // Builder mode questions
+  test('contains builder brainstorming questions', () => {
+    expect(content).toContain('coolest version');
+    expect(content).toContain('delightful');
+  });
+
+  // Intrapreneurship adaptation
+  test('contains intrapreneurship adaptation', () => {
+    expect(content).toContain('Intrapreneurship');
+  });
+
+  // YC founder discovery engine
+  test('contains YC apply CTA with ref tracking', () => {
+    expect(content).toContain('ycombinator.com/apply?ref=gstack');
+  });
+
+  test('contains "What I noticed" design doc section', () => {
+    expect(content).toContain('What I noticed about how you think');
+  });
+
+  test('contains golden age framing', () => {
+    expect(content).toContain('golden age');
+  });
+
+  test('contains Garry Tan personal plea', () => {
+    expect(content).toContain('Garry Tan, the creator of GStack');
+  });
+
+  test('contains founder signal synthesis phase', () => {
+    expect(content).toContain('Founder Signal Synthesis');
+  });
+
+  test('contains three-tier decision rubric', () => {
+    expect(content).toContain('Top tier');
+    expect(content).toContain('Middle tier');
+    expect(content).toContain('Base tier');
+  });
+
+  test('contains anti-slop examples', () => {
+    expect(content).toContain('GOOD:');
+    expect(content).toContain('BAD:');
+  });
+
+  test('contains "One more thing" transition beat', () => {
+    expect(content).toContain('One more thing');
+  });
+
+  // Operating principles per mode
+  test('contains startup operating principles', () => {
+    expect(content).toContain('Specificity is the only currency');
+  });
+
+  test('contains builder operating principles', () => {
+    expect(content).toContain('Delight is the currency');
+  });
+});
+
+describe('debug skill structure', () => {
+  const content = fs.readFileSync(path.join(ROOT, 'debug', 'SKILL.md'), 'utf-8');
+  for (const section of ['Iron Law', 'Root Cause', 'Pattern Analysis', 'Hypothesis',
+                          'DEBUG REPORT', '3-strike', 'BLOCKED']) {
+    test(`contains ${section}`, () => expect(content).toContain(section));
+  }
 });
 
 // --- Contributor mode preamble structure validation ---
@@ -543,6 +663,10 @@ describe('Contributor mode preamble structure', () => {
     'ship/SKILL.md', 'review/SKILL.md',
     'plan-ceo-review/SKILL.md', 'plan-eng-review/SKILL.md',
     'retro/SKILL.md',
+    'plan-design-review/SKILL.md',
+    'design-review/SKILL.md',
+    'design-consultation/SKILL.md',
+    'document-release/SKILL.md',
   ];
 
   for (const skill of skillsWithPreamble) {
@@ -628,7 +752,7 @@ describe('Completeness Principle in generated SKILL.md files', () => {
     'plan-ceo-review/SKILL.md', 'plan-eng-review/SKILL.md',
     'retro/SKILL.md',
     'plan-design-review/SKILL.md',
-    'qa-design-review/SKILL.md',
+    'design-review/SKILL.md',
     'design-consultation/SKILL.md',
     'document-release/SKILL.md',
   ];
@@ -801,8 +925,8 @@ describe('Test Bootstrap ({{TEST_BOOTSTRAP}}) integration', () => {
     expect(content).toContain('Step 2.5');
   });
 
-  test('TEST_BOOTSTRAP appears in qa-design-review/SKILL.md', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'qa-design-review', 'SKILL.md'), 'utf-8');
+  test('TEST_BOOTSTRAP appears in design-review/SKILL.md', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'design-review', 'SKILL.md'), 'utf-8');
     expect(content).toContain('Test Framework Bootstrap');
   });
 
@@ -843,10 +967,10 @@ describe('Test Bootstrap ({{TEST_BOOTSTRAP}}) integration', () => {
     expect(content).toContain('100% test coverage');
   });
 
-  test('WebSearch is in allowed-tools for qa, ship, qa-design-review', () => {
+  test('WebSearch is in allowed-tools for qa, ship, design-review', () => {
     const qa = fs.readFileSync(path.join(ROOT, 'qa', 'SKILL.md'), 'utf-8');
     const ship = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
-    const qaDesign = fs.readFileSync(path.join(ROOT, 'qa-design-review', 'SKILL.md'), 'utf-8');
+    const qaDesign = fs.readFileSync(path.join(ROOT, 'design-review', 'SKILL.md'), 'utf-8');
     expect(qa).toContain('WebSearch');
     expect(ship).toContain('WebSearch');
     expect(qaDesign).toContain('WebSearch');
@@ -869,8 +993,8 @@ describe('Phase 8e.5 regression test generation', () => {
     expect(content).not.toContain('Never modify tests or CI configuration');
   });
 
-  test('qa-design-review has CSS-aware Phase 8e.5 variant', () => {
-    const content = fs.readFileSync(path.join(ROOT, 'qa-design-review', 'SKILL.md'), 'utf-8');
+  test('design-review has CSS-aware Phase 8e.5 variant', () => {
+    const content = fs.readFileSync(path.join(ROOT, 'design-review', 'SKILL.md'), 'utf-8');
     expect(content).toContain('8e.5. Regression Test (design-review variant)');
     expect(content).toContain('CSS-only');
     expect(content).toContain('test(design): regression test');

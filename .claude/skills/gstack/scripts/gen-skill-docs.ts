@@ -197,7 +197,32 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 \`\`\`
 
-Slug: lowercase, hyphens, max 60 chars (e.g. \`browse-js-no-await\`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"`;
+Slug: lowercase, hyphens, max 60 chars (e.g. \`browse-js-no-await\`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+
+## Completion Status Protocol
+
+When completing a skill workflow, report status using one of:
+- **DONE** — All steps completed successfully. Evidence provided for each claim.
+- **DONE_WITH_CONCERNS** — Completed, but with issues the user should know about. List each concern.
+- **BLOCKED** — Cannot proceed. State what is blocking and what was tried.
+- **NEEDS_CONTEXT** — Missing information required to continue. State exactly what you need.
+
+### Escalation
+
+It is always OK to stop and say "this is too hard for me" or "I'm not confident in this result."
+
+Bad work is worse than no work. You will not be penalized for escalating.
+- If you have attempted a task 3 times without success, STOP and escalate.
+- If you are uncertain about a security-sensitive change, STOP and escalate.
+- If the scope of work exceeds what you can verify, STOP and escalate.
+
+Escalation format:
+\`\`\`
+STATUS: BLOCKED | NEEDS_CONTEXT
+REASON: [1-2 sentences]
+ATTEMPTED: [what you tried]
+RECOMMENDATION: [what the user should do next]
+\`\`\``;
 }
 
 function generateBrowseSetup(): string {
@@ -541,7 +566,7 @@ eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
 4. **Apply the design checklist** against the changed files. For each item:
    - **[HIGH] mechanical CSS fix** (\`outline: none\`, \`!important\`, \`font-size < 16px\`): classify as AUTO-FIX
    - **[HIGH/MEDIUM] design judgment needed**: classify as ASK
-   - **[LOW] intent-based detection**: present as "Possible — verify visually or run /qa-design-review"
+   - **[LOW] intent-based detection**: present as "Possible — verify visually or run /design-review"
 
 5. **Include findings** in the review output under a "Design Review" header, following the output format in the checklist. Design findings merge with code review findings into the same Fix-First flow.
 
@@ -1150,9 +1175,11 @@ function findTemplates(): string[] {
     path.join(ROOT, 'plan-ceo-review', 'SKILL.md.tmpl'),
     path.join(ROOT, 'plan-eng-review', 'SKILL.md.tmpl'),
     path.join(ROOT, 'retro', 'SKILL.md.tmpl'),
+    path.join(ROOT, 'office-hours', 'SKILL.md.tmpl'),
+    path.join(ROOT, 'debug', 'SKILL.md.tmpl'),
     path.join(ROOT, 'gstack-upgrade', 'SKILL.md.tmpl'),
     path.join(ROOT, 'plan-design-review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'qa-design-review', 'SKILL.md.tmpl'),
+    path.join(ROOT, 'design-review', 'SKILL.md.tmpl'),
     path.join(ROOT, 'design-consultation', 'SKILL.md.tmpl'),
     path.join(ROOT, 'document-release', 'SKILL.md.tmpl'),
   ];

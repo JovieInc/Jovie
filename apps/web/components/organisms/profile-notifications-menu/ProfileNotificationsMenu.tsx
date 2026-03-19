@@ -350,14 +350,14 @@ export function ProfileNotificationsMenu({
           <AlertDialogFooter className='gap-2 sm:gap-2'>
             <AlertDialogCancel
               disabled={isConfirming}
-              className='flex-1 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
+              className='flex-1 rounded-full border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token hover:bg-surface-2 hover:text-primary-token sm:flex-none'
             >
               Keep
             </AlertDialogCancel>
             <AlertDialogAction
               variant='destructive'
               disabled={isConfirming || confirmChannel === null}
-              className='flex-1 rounded-[8px] sm:flex-none'
+              className='flex-1 rounded-full sm:flex-none'
               onClick={() => handleConfirm(onUnsubscribe)}
             >
               {isConfirming ? 'Unsubscribing…' : 'Unsubscribe'}

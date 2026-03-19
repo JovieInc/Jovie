@@ -1,22 +1,41 @@
 'use client';
 
-import type { RowSelectionState } from '@tanstack/react-table';
-import { UserCircle2 } from 'lucide-react';
+import {
+  CheckCircle,
+  Mail,
+  MailX,
+  RefreshCw,
+  Star,
+  Trash2,
+  UserCircle2,
+  XCircle,
+} from 'lucide-react';
 import dynamic from 'next/dynamic';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   convertToCommonDropdownItems,
+  ExportCSVButton,
+  PAGE_TOOLBAR_END_GROUP_CLASS,
+  PAGE_TOOLBAR_META_TEXT_CLASS,
+  TableBulkActionsToolbar,
   UnifiedTable,
   useRowSelection,
 } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
-import { AdminCreatorsToolbar } from '@/features/admin/table/AdminCreatorsToolbar';
+import {
+  AdminTableHeader,
+  AdminTableSubheader,
+} from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdminTableKeyboardNavigation';
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import {
+  CREATORS_CSV_FILENAME_PREFIX,
+  creatorsCSVColumns,
+} from '@/lib/admin/csv-configs/creators';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -177,7 +196,10 @@ export function AdminCreatorProfilesUnified({
     handleBulkVerify,
     handleBulkUnverify,
     handleBulkFeature,
+    handleBulkUnfeature,
     handleBulkRefreshMusicFetch,
+    handleBulkEnableMarketing,
+    handleBulkDisableMarketing,
     handleBulkDelete,
     handleClearSelection,
   } = useBulkActions({
@@ -186,9 +208,83 @@ export function AdminCreatorProfilesUnified({
     confirmBulkDelete,
     toggleVerification,
     toggleFeatured,
+    toggleMarketing,
     deleteCreatorOrUser,
     clearSelection,
   });
+
+  const selectedCount = selectedIds.size;
+
+  const bulkActions = useMemo(() => {
+    return [
+      {
+        label: 'Verify',
+        icon: <CheckCircle className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkVerify();
+        },
+      },
+      {
+        label: 'Unverify',
+        icon: <XCircle className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkUnverify();
+        },
+      },
+      {
+        label: 'Feature',
+        icon: <Star className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkFeature();
+        },
+      },
+      {
+        label: 'Unfeature',
+        icon: <Star className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkUnfeature();
+        },
+      },
+      {
+        label: 'Refresh Music Data',
+        icon: <RefreshCw className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkRefreshMusicFetch();
+        },
+      },
+      {
+        label: 'Enable marketing emails',
+        icon: <Mail className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkEnableMarketing();
+        },
+      },
+      {
+        label: 'Disable marketing emails',
+        icon: <MailX className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkDisableMarketing();
+        },
+      },
+      {
+        label: 'Delete',
+        icon: <Trash2 className='h-3.5 w-3.5' />,
+        onClick: () => {
+          void handleBulkDelete();
+        },
+        variant: 'destructive' as const,
+      },
+    ];
+  }, [
+    handleBulkVerify,
+    handleBulkUnverify,
+    handleBulkFeature,
+    handleBulkUnfeature,
+    handleBulkRefreshMusicFetch,
+    handleBulkEnableMarketing,
+    handleBulkDisableMarketing,
+    handleBulkDelete,
+  ]);
 
   const handleRowClick = useCallback(
     (profile: AdminCreatorProfileRow) => {
@@ -240,46 +336,6 @@ export function AdminCreatorProfilesUnified({
   const rowSelection = useMemo(() => {
     return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
   }, [selectedIds]);
-
-  // Refs to avoid recreating handleRowSelectionChange when selection state changes
-  const rowSelectionRef = useRef(rowSelection);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
-  rowSelectionRef.current = rowSelection;
-  const filteredProfilesLengthRef = useRef(filteredProfiles.length);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
-  filteredProfilesLengthRef.current = filteredProfiles.length;
-  const selectedIdsSizeRef = useRef(selectedIds.size);
-  // eslint-disable-next-line react-hooks/refs -- stable ref read for TanStack Table callback
-  selectedIdsSizeRef.current = selectedIds.size;
-
-  const handleRowSelectionChange = useCallback(
-    (
-      updaterOrValue:
-        | RowSelectionState
-        | ((old: RowSelectionState) => RowSelectionState)
-    ) => {
-      const newSelection =
-        typeof updaterOrValue === 'function'
-          ? updaterOrValue(rowSelectionRef.current)
-          : updaterOrValue;
-
-      // Update our custom row selection state
-      const newSelectedIds = new Set(
-        Object.entries(newSelection)
-          .filter(([, selected]) => selected)
-          .map(([id]) => id)
-      );
-
-      // Toggle all if all selected or all deselected
-      if (
-        newSelectedIds.size === filteredProfilesLengthRef.current ||
-        (newSelectedIds.size === 0 && selectedIdsSizeRef.current > 0)
-      ) {
-        toggleSelectAll();
-      }
-    },
-    [toggleSelectAll]
-  );
 
   // Define columns using factory function
   // Note: selectedIds and headerCheckboxState use refs to prevent column recreation on selection change
@@ -375,19 +431,39 @@ export function AdminCreatorProfilesUnified({
             onKeyDown: handleKeyDown,
           }}
           toolbar={
-            <AdminCreatorsToolbar
-              from={from}
-              to={to}
-              total={total}
-              profiles={profilesWithActions}
-              selectedIds={selectedIds}
-              onBulkVerify={handleBulkVerify}
-              onBulkUnverify={handleBulkUnverify}
-              onBulkFeature={handleBulkFeature}
-              onBulkRefreshMusicFetch={handleBulkRefreshMusicFetch}
-              onBulkDelete={handleBulkDelete}
-              onClearSelection={handleClearSelection}
-            />
+            <>
+              <TableBulkActionsToolbar
+                selectedCount={selectedCount}
+                onClearSelection={handleClearSelection}
+                actions={bulkActions}
+              />
+              <AdminTableHeader
+                title='Creators'
+                subtitle='Manage creator profiles, verification, and feature status.'
+              />
+              <AdminTableSubheader
+                start={
+                  <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
+                    Showing {from.toLocaleString()}–{to.toLocaleString()} of{' '}
+                    {total.toLocaleString()} profiles
+                  </div>
+                }
+                end={
+                  <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+                    <ExportCSVButton<AdminCreatorProfileRow>
+                      getData={() => profilesWithActions}
+                      columns={creatorsCSVColumns}
+                      filename={CREATORS_CSV_FILENAME_PREFIX}
+                      disabled={profilesWithActions.length === 0}
+                      ariaLabel='Export creator profiles to CSV file'
+                      chrome='page-toolbar'
+                      iconOnly
+                      tooltipLabel='Export'
+                    />
+                  </div>
+                }
+              />
+            </>
           }
         >
           {() => (
@@ -407,7 +483,6 @@ export function AdminCreatorProfilesUnified({
                 </div>
               }
               rowSelection={rowSelection}
-              onRowSelectionChange={handleRowSelectionChange}
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}

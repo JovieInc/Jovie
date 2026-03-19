@@ -231,6 +231,11 @@ export async function POST(request: NextRequest) {
 
 /**
  * OPTIONS - CORS preflight
+ *
+ * Intentionally allows all origins (`*`) because this is a public tracking
+ * pixel endpoint designed for cross-origin embedding on creator websites.
+ * No credentials or sensitive data are involved. Rate limiting and input
+ * validation are enforced on the POST handler.
  */
 export async function OPTIONS() {
   return new NextResponse(null, {

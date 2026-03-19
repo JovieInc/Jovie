@@ -23,7 +23,7 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-8 rounded-[7px] border-subtle bg-transparent px-3 text-[12.5px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-full border-subtle bg-transparent px-3 text-[12.5px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
@@ -31,7 +31,7 @@ export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
-  'h-8 rounded-[6px] border border-transparent bg-transparent px-2 text-[12.5px] font-[510] text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-1 active:border-transparent active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-8 rounded-full border border-transparent bg-transparent px-2 text-[12.5px] font-[510] text-tertiary-token hover:border-transparent hover:bg-surface-1 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-1 active:border-transparent active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =

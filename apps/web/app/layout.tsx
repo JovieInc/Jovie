@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description:
-    'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
+    'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
   keywords: [
     'Jovie',
     'link in bio for musicians',
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     url: APP_URL,
     title: APP_NAME,
     description:
-      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
     siteName: APP_NAME,
     images: [
       {
@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: APP_NAME,
     description:
-      'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place. No design needed.',
+      'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
     images: [`${APP_URL}/og/default.png`],
     creator: '@jovieapp',
     site: '@jovieapp',
@@ -243,7 +243,7 @@ export default async function RootLayout({
               alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
               url: APP_URL,
               description:
-                'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
               inLanguage: 'en-US',
               publisher: {
                 '@type': 'Organization',
@@ -266,7 +266,7 @@ export default async function RootLayout({
               url: APP_URL,
               logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
               description:
-                'Jovie is the smartest link in bio for music artists. Connect your music, social media, and merch in one place.',
+                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
               sameAs: [
                 'https://x.com/jovieapp',
                 'https://instagram.com/jovieapp',
