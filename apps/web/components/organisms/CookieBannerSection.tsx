@@ -27,7 +27,7 @@ function isBannerRequiredFromCookie(): boolean {
   const match = document.cookie
     .split(';')
     .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
-  if (!match) return true; // cookie not set yet -- show banner as a safe default
+  if (!match) return false; // cookie not set yet -- middleware sets it on every request
   return match.split('=')[1]?.trim() !== '0';
 }
 
