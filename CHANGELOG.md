@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+
+## [26.4.12] - 2026-03-18
+
+### Fixed
+
+- Move Next.js dev indicator to top-right corner so it no longer overlaps the DevToolbar at the bottom of the screen
+
+## [26.4.11] - 2026-03-18
+
+### Changed
+
+- Skip Sentry server and edge SDK initialization in development — eliminates terminal warnings and 100% trace sampling overhead during local dev
 ## [26.4.10] - 2026-03-18
 
 ### Fixed
