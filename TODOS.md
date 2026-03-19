@@ -52,16 +52,6 @@
 
 **Depends on:** DSP registry PR. Also needs Genius API key or scraping strategy.
 
-## Re-enrichment of existing artists
-
-**What:** Run MusicFetch re-enrichment for all ~30 existing artists to populate newly supported DSP links.
-
-**Why:** Existing artists were enriched with only 10 MusicFetch services. After this PR, the pipeline requests all 40 services. Existing profiles won't have links for the 30 new services until re-enriched.
-
-**Context:** Use the existing dashboard refresh button (which calls `enqueueMusicFetchEnrichmentJob()`) to manually trigger re-enrichment for each artist. With ~30 artists this is feasible manually. For larger scale, a batch script would be needed.
-
-**Depends on:** DSP registry PR must be deployed first.
-
 ## Post-signup birthday capture
 
 **What:** Add an optional birthday field (month + day only, no year) to the post-signup name capture flow.
@@ -119,20 +109,6 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 ---
 
-## Shareable "profile is live" social card
-
-**What:** After onboarding completion, auto-generate a social media-ready graphic (OG-image style) with the creator's avatar, name, and profile URL. Show it prominently with "Share on Instagram / Twitter / Copy Image" buttons. Think Spotify Wrapped cards — designed to be screenshotted and shared.
-
-**Why:** Turns every new signup into a distribution event. Creator posts card → their fans see Jovie → some fans are also artists → viral loop.
-
-**Context:** The share menu exists (14+ UTM-tagged platforms in `profileLinkShareMenu.tsx`) but it's buried in the dashboard sidebar. This would make sharing the primary post-onboarding action. Needs image generation (could use `@vercel/og` or a canvas-based approach).
-
-**Effort:** M (human ~1.5 days / CC ~20 min)
-**Priority:** P2
-**Depends on:** Nothing blocking.
-
----
-
 ## Weekly creator digest email
 
 **What:** A weekly email to creators summarizing their week — "12 new fans subscribed, 347 profile views, your top city is Los Angeles, 2 tips received." Simple, data-driven, with a CTA back to the dashboard.
@@ -144,20 +120,6 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M (human ~2 days / CC ~20 min)
 **Priority:** P1
 **Depends on:** Analytics data flowing post-launch. Build week 2-3.
-
----
-
-## Win-back email for checkout skippers
-
-**What:** When a user has plan intent (clicked a paid pricing CTA) but clicks "Skip" on the onboarding checkout step, enqueue a follow-up email 24h later with their profile link + "Ready to unlock Pro?" CTA.
-
-**Why:** These users expressed purchase intent then bailed — warmest leads. The `onboarding_checkout_skipped` analytics event provides the trigger signal.
-
-**Context:** Requires GDPR/CCPA consent classification (marketing vs transactional), opt-in/opt-out rules by jurisdiction, privacy policy updates, and unsubscribe handling. Significant compliance work needed before implementation.
-
-**Effort:** L (human ~3 days including compliance / CC ~1 hr)
-**Priority:** P3
-**Depends on:** Onboarding checkout step PR + email sending infrastructure + GDPR compliance review.
 
 ---
 
