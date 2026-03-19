@@ -281,7 +281,7 @@ function extractSpotifyArtistId(
   try {
     const url = new URL(spotifyUrl);
     // Handle https://open.spotify.com/artist/{id} URLs
-    const match = url.pathname.match(/\/artist\/([a-zA-Z0-9]+)/);
+    const match = /\/artist\/([a-zA-Z0-9]+)/.exec(url.pathname);
     return match?.[1] ?? null;
   } catch {
     return null;
