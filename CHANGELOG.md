@@ -11,6 +11,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
+- Added "Delete account" link to user profile menu with destructive styling
+- Added direct `/app/settings/delete-account` route for deep-linking
+- Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
+- Added 7 unit tests for the account deletion API route
 - Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
 - Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
 
