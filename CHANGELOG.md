@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.10] - 2026-03-18
+
+### Changed
+
+- Waitlist gating: replaced `WAITLIST_ENABLED` env var with DB-only `gateEnabled` toggle — admin panel now controls waitlist without server restarts
+- Default waitlist state for fresh environments changed to OFF (gateEnabled: false), matching previous env-var-unset behavior
+
+### Removed
+
+- `WAITLIST_ENABLED` environment variable and `waitlist-config.ts` — consolidated into `waitlist_settings.gateEnabled` DB column
+
 ## [26.4.9] - 2026-03-18
 
 ### Fixed
