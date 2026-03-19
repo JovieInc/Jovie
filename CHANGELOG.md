@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.14] - 2026-03-19
+
+### Fixed
+
+- Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
+- Added "Delete account" link to user profile menu with destructive styling
+- Added direct `/app/settings/delete-account` route for deep-linking
+- Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
+- Added 7 unit tests for the account deletion API route
+
 ## [26.4.13] - 2026-03-19
 
 ### Added
