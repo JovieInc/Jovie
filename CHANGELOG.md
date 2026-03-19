@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.10] - 2026-03-18
+
+### Fixed
+
+- Guard all keyboard shortcut hooks against undefined `event.key` — prevents crashes from IME composition, dead keys, and browser extension injected events (JOVIE-WEB-EE, JOVIE-WEB-CT, JOVIE-WEB-F1)
+
+### Added
+
+- Unit tests for `useSidebarKeyboardShortcut` and `useSequentialShortcuts` hooks (13 tests)
+
 ## [26.4.9] - 2026-03-18
 
 ### Fixed
