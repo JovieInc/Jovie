@@ -12,12 +12,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fix conversion rate labels showing between wrong funnel stages — 33% now correctly appears between Profile Views and Unique Visitors instead of between Unique Visitors and Followers
 - Fix Cities, Countries, and Sources tabs showing blank by sourcing geo data from audience_members (visits) instead of click_events (link clicks only)
 - Fix time range toggle (7d/30d) overflowing off-screen by stacking it below the tab bar
+- MusicFetch ingest pipeline: treat 400 errors as permanent failures instead of retrying indefinitely, preventing circuit breaker trips that blocked all enrichment (JOV-1629, JOV-1630)
+- MusicFetch enrichment: return gracefully when API returns no data instead of throwing and retrying
+
+### Added
+
+- Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
+- Campaign toggle check in both the campaign processor cron and claim-invite job processor
+- Admin UI toggle switch on the outreach email page for enabling/disabling campaigns
+- API endpoints for reading and updating campaign enabled state
 
 ### Removed
 
 - Delete unused `getAnalyticsData()` and `getUserAnalytics()` functions from analytics query module
 
+
 ## [26.4.8] - 2026-03-18
+
+### Added
+
+- Conductor workspace archive script to clean up build artifacts and node_modules when archiving
 
 ### Changed
 
@@ -30,6 +44,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
 - Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
 - Document intentional `Access-Control-Allow-Origin: *` CORS policy on public pixel tracking endpoint
+
+### Fixed
+
+- Conductor run script no longer double-wraps Doppler secrets (was `doppler run -- pnpm dev:web` which chains into web's `doppler run -- next dev`)
 
 ## [26.4.7] - 2026-03-18
 
