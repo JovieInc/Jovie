@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
+import { campaignSettings } from '@/lib/db/schema/admin';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
@@ -378,6 +379,54 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json(
       { error: getSafeErrorMessage(error, 'Failed to queue outreach leads') },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+}
+
+/**
+ * PATCH /api/admin/outreach — Toggle campaign settings (e.g. campaignsEnabled).
+ */
+export async function PATCH(request: NextRequest) {
+  const authError = await requireAdminAccess();
+  if (authError) {
+    return authError;
+  }
+
+  try {
+    const parsed = await parseJsonBody(request, {
+      route: 'PATCH /api/admin/outreach',
+      headers: NO_STORE_HEADERS,
+    });
+    if (!parsed.ok) {
+      return parsed.response;
+    }
+
+    const body = parsed.data as Record<string, unknown>;
+    if (typeof body.campaignsEnabled !== 'boolean') {
+      return jsonError('campaignsEnabled must be a boolean', 400);
+    }
+
+    await db
+      .update(campaignSettings)
+      .set({
+        campaignsEnabled: body.campaignsEnabled,
+        updatedAt: new Date(),
+      })
+      .where(eq(campaignSettings.id, 1));
+
+    return NextResponse.json(
+      { ok: true, campaignsEnabled: body.campaignsEnabled },
+      { status: 200, headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    await captureError('Failed to update campaign settings', error, {
+      route: '/api/admin/outreach',
+    });
+    return NextResponse.json(
+      {
+        error: getSafeErrorMessage(error, 'Failed to update campaign settings'),
+      },
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
