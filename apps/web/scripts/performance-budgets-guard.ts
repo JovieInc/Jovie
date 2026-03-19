@@ -4,10 +4,16 @@
  *
  * Validates page performance against budgets defined in performance-budgets.config.js.
  * Runs against BASE_URL (defaults to http://localhost:3000).
+ *
+ * For authenticated routes (auth: true in config), reads Clerk session cookies
+ * from CLERK_SESSION_COOKIE env var or falls back to browser context stored at
+ * apps/web/.auth/session.json (created by `doppler run -- pnpm perf:auth`).
  */
 
 import { chromium } from '@playwright/test';
+import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
+import { resolve } from 'path';
 
 const require = createRequire(import.meta.url);
 
@@ -17,7 +23,8 @@ type TimingBudget = {
     | 'largest-contentful-paint'
     | 'cumulative-layout-shift'
     | 'first-input-delay'
-    | 'time-to-first-byte';
+    | 'time-to-first-byte'
+    | 'skeleton-to-content';
   budget: number;
 };
 
@@ -28,6 +35,7 @@ type ResourceBudget = {
 
 type BudgetEntry = {
   path: string;
+  auth?: boolean;
   timings: TimingBudget[];
   resourceSizes: ResourceBudget[];
 };
@@ -43,6 +51,7 @@ type PageMetrics = {
     'cumulative-layout-shift': number;
     'first-input-delay': number;
     'time-to-first-byte': number;
+    'skeleton-to-content': number;
   };
   resourceSizes: {
     script: number;
@@ -57,6 +66,11 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 const DEFAULT_PARAMS: Record<string, string> = {
   username: process.env.PERF_BUDGET_USERNAME || 'tim',
 };
+
+const AUTH_STORAGE_PATH = resolve(
+  import.meta.dirname ?? __dirname,
+  '../.auth/session.json'
+);
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
@@ -78,12 +92,101 @@ const resolvePath = (path: string) =>
 const formatMetric = (value: number, unit: string) =>
   `${value.toFixed(1)}${unit}`;
 
-const collectMetrics = async (url: string): Promise<PageMetrics> => {
+/**
+ * Load Clerk session cookies for authenticated routes.
+ * Priority: CLERK_SESSION_COOKIE env → .auth/session.json file.
+ */
+const loadAuthCookies = (
+  baseUrl: string
+): Array<{
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+}> => {
+  const cookieValue = process.env.CLERK_SESSION_COOKIE;
+  if (cookieValue) {
+    const domain = new URL(baseUrl).hostname;
+    return [
+      { name: '__session', value: cookieValue, domain, path: '/' },
+      { name: '__clerk_db_jwt', value: cookieValue, domain, path: '/' },
+    ];
+  }
+
+  if (existsSync(AUTH_STORAGE_PATH)) {
+    try {
+      const raw = readFileSync(AUTH_STORAGE_PATH, 'utf-8');
+      const data = JSON.parse(raw);
+      if (Array.isArray(data.cookies)) {
+        return data.cookies;
+      }
+    } catch {
+      console.warn('  ⚠ Could not parse auth session file, skipping auth');
+    }
+  }
+
+  return [];
+};
+
+/**
+ * Measure skeleton-to-content time.
+ * Waits for [data-testid="releases-loading"] to disappear and real content to render.
+ */
+const measureSkeletonToContent = async (
+  page: Awaited<
+    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
+  >
+): Promise<number> => {
+  const start = Date.now();
+
+  try {
+    // Wait for skeleton to disappear (it has data-testid="releases-loading")
+    await page.waitForSelector('[data-testid="releases-loading"]', {
+      state: 'detached',
+      timeout: 10000,
+    });
+    return Date.now() - start;
+  } catch {
+    // If skeleton was never present or didn't disappear, check if content loaded directly
+    try {
+      await page.waitForSelector(
+        'table tbody tr, [data-testid="releases-content"]',
+        {
+          state: 'visible',
+          timeout: 5000,
+        }
+      );
+      return Date.now() - start;
+    } catch {
+      return Date.now() - start;
+    }
+  }
+};
+
+const collectMetrics = async (
+  url: string,
+  needsAuth: boolean
+): Promise<PageMetrics> => {
   const browser = await chromium.launch();
   let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
-    page = await browser.newPage();
+    const context = await browser.newContext();
+
+    // Inject auth cookies for authenticated routes
+    if (needsAuth) {
+      const cookies = loadAuthCookies(BASE_URL);
+      if (cookies.length === 0) {
+        console.warn(
+          '  ⚠ No auth cookies found. Set CLERK_SESSION_COOKIE or run: doppler run -- pnpm perf:auth'
+        );
+      } else {
+        await context.addCookies(cookies);
+        console.log(`  🔐 Injected ${cookies.length} auth cookies`);
+      }
+    }
+
+    page = await context.newPage();
     await page.addInitScript(() => {
       type LayoutShiftEntry = PerformanceEntry & {
         hadRecentInput?: boolean;
@@ -132,6 +235,10 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
     });
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // Start skeleton-to-content measurement from navigation
+    const skeletonToContentPromise = measureSkeletonToContent(page);
+
     // Best-effort networkidle wait; fall back gracefully for dynamic pages
     // where third-party scripts or long-polling prevent idle state.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
@@ -145,6 +252,8 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
     } catch {
       // Ignore input errors; FID will remain 0.
     }
+
+    const skeletonToContent = await skeletonToContentPromise;
 
     await page.waitForTimeout(2000);
 
@@ -223,6 +332,7 @@ const collectMetrics = async (url: string): Promise<PageMetrics> => {
         'cumulative-layout-shift': metrics.timings['cumulative-layout-shift'],
         'first-input-delay': metrics.timings['first-input-delay'],
         'time-to-first-byte': metrics.timings['time-to-first-byte'],
+        'skeleton-to-content': skeletonToContent,
       },
       resourceSizes: {
         script: toKilobytes(metrics.resourceSizes.script),
@@ -246,14 +356,17 @@ const runBudgetGuard = async () => {
   for (const budgetEntry of config.budgets) {
     const resolvedPath = resolvePath(budgetEntry.path);
     const url = `${BASE_URL.replace(/\/$/, '')}${resolvedPath}`;
+    const needsAuth = budgetEntry.auth === true;
 
-    console.log(`\n🔎 Checking ${budgetEntry.path} (${url})`);
+    console.log(
+      `\n🔎 Checking ${budgetEntry.path} (${url})${needsAuth ? ' [auth]' : ''}`
+    );
 
     let metrics!: PageMetrics;
     const MAX_RETRIES = 2;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        metrics = await collectMetrics(url);
+        metrics = await collectMetrics(url, needsAuth);
         break;
       } catch (error) {
         if (attempt === MAX_RETRIES) throw error;
@@ -265,13 +378,14 @@ const runBudgetGuard = async () => {
     for (const timing of budgetEntry.timings) {
       const measured = metrics.timings[timing.metric];
       const maxAllowed = timing.budget;
+      const unit = timing.metric === 'cumulative-layout-shift' ? '' : 'ms';
       const status = measured <= maxAllowed ? '✅' : '❌';
       console.log(
-        ` ${status} ${timing.metric}: ${formatMetric(measured, 'ms')} (budget ${formatMetric(maxAllowed, 'ms')})`
+        ` ${status} ${timing.metric}: ${formatMetric(measured, unit)} (budget ${formatMetric(maxAllowed, unit)})`
       );
       if (measured > maxAllowed) {
         violations.push(
-          `${budgetEntry.path} ${timing.metric} ${measured.toFixed(1)}ms exceeds ${maxAllowed}ms`
+          `${budgetEntry.path} ${timing.metric} ${measured.toFixed(1)}${unit} exceeds ${maxAllowed}${unit}`
         );
       }
     }

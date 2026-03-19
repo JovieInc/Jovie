@@ -1,51 +1,78 @@
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
+import type { DashboardData } from '../actions/dashboard-data';
 import {
   checkAppleMusicConnection,
   checkSpotifyConnection,
   loadReleaseMatrix,
 } from './actions';
 import { primaryProviderKeys, providerConfig } from './config';
+import { ReleaseTableSkeleton } from './loading';
 import { ReleasesClientBoundary } from './ReleasesClientBoundary';
 
 export const runtime = 'nodejs';
 
+/**
+ * Releases page — streams instantly after auth gate.
+ *
+ * Auth check (getDashboardData) blocks navigation because we need to redirect
+ * unauthenticated/onboarding users. Everything else loads inside a Suspense
+ * boundary so the skeleton renders immediately while data fetches in parallel.
+ */
 export default async function ReleasesPage() {
-  // Fetch dashboard data to verify authentication (actions handle their own auth via requireProfile)
   const dashboardData = await getDashboardData();
 
-  // Handle unauthenticated users
   if (!dashboardData.user?.id) {
     redirect(
       `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
     );
   }
 
-  // Handle redirects for users who need onboarding
   if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
     redirect('/onboarding');
   }
 
-  // Fetch releases outside allSettled so redirect() from requireProfile() can propagate
+  return (
+    <ReleasesClientBoundary>
+      <Suspense fallback={<ReleaseTableSkeleton />}>
+        <ReleasesContent dashboardData={dashboardData} />
+      </Suspense>
+    </ReleasesClientBoundary>
+  );
+}
+
+/**
+ * Async server component that fetches all release data in parallel.
+ * Wrapped in Suspense above so the skeleton shows instantly.
+ */
+async function ReleasesContent({
+  dashboardData,
+}: {
+  dashboardData: DashboardData;
+}) {
+  // Fire all fetches in parallel — no sequential waterfall
+  const [releasesResult, spotifyResult, appleMusicResult] =
+    await Promise.allSettled([
+      loadReleaseMatrix(),
+      checkSpotifyConnection(),
+      checkAppleMusicConnection(),
+    ]);
+
+  // Handle releases — check for redirect errors, extract value
   let releases: Awaited<ReturnType<typeof loadReleaseMatrix>> = [];
-  try {
-    releases = await loadReleaseMatrix();
-  } catch (error) {
-    throwIfRedirect(error);
-    void captureError('loadReleaseMatrix failed', error, {
+  if (releasesResult.status === 'fulfilled') {
+    releases = releasesResult.value;
+  } else {
+    throwIfRedirect(releasesResult.reason);
+    void captureError('loadReleaseMatrix failed', releasesResult.reason, {
       route: APP_ROUTES.RELEASES,
     });
   }
-
-  // Use allSettled for connection checks — these don't redirect and degrade gracefully
-  const [spotifyResult, appleMusicResult] = await Promise.allSettled([
-    checkSpotifyConnection(),
-    checkAppleMusicConnection(),
-  ]);
 
   const spotifyStatus =
     spotifyResult.status === 'fulfilled'
@@ -78,19 +105,18 @@ export default async function ReleasesPage() {
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
   const spotifyImportStatus =
     (profileSettings.spotifyImportStatus as string) ?? 'idle';
+
   return (
-    <ReleasesClientBoundary>
-      <ReleasesExperience
-        releases={releases}
-        providerConfig={providerConfig}
-        primaryProviders={primaryProviderKeys}
-        spotifyConnected={spotifyStatus.connected}
-        spotifyArtistName={spotifyStatus.artistName}
-        appleMusicConnected={appleMusicStatus.connected}
-        appleMusicArtistName={appleMusicStatus.artistName}
-        allowArtworkDownloads={allowArtworkDownloads}
-        initialImporting={spotifyImportStatus === 'importing'}
-      />
-    </ReleasesClientBoundary>
+    <ReleasesExperience
+      releases={releases}
+      providerConfig={providerConfig}
+      primaryProviders={primaryProviderKeys}
+      spotifyConnected={spotifyStatus.connected}
+      spotifyArtistName={spotifyStatus.artistName}
+      appleMusicConnected={appleMusicStatus.connected}
+      appleMusicArtistName={appleMusicStatus.artistName}
+      allowArtworkDownloads={allowArtworkDownloads}
+      initialImporting={spotifyImportStatus === 'importing'}
+    />
   );
 }

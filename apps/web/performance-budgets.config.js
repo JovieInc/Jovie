@@ -57,8 +57,26 @@ module.exports = {
         { resourceType: 'total', budget: 1200 },
       ],
     },
-    // NOTE: /app/dashboard routes require authentication
-    // To test authenticated routes, use doppler run with the dev server
-    // For now, testing public routes only (/, /[username])
+    {
+      path: '/app/dashboard/releases',
+      auth: true,
+      timings: [
+        // Authenticated dashboard page — must feel instant (Gmail rule)
+        { metric: 'first-contentful-paint', budget: 1500 },
+        { metric: 'largest-contentful-paint', budget: 2000 },
+        { metric: 'cumulative-layout-shift', budget: 0.1 },
+        { metric: 'first-input-delay', budget: 100 },
+        { metric: 'time-to-first-byte', budget: 1500 },
+        // Custom: time from navigation to skeleton disappearing / real content visible
+        { metric: 'skeleton-to-content', budget: 500 },
+      ],
+      resourceSizes: [
+        { resourceType: 'script', budget: 1200 },
+        { resourceType: 'image', budget: 500 },
+        { resourceType: 'font', budget: 100 },
+        { resourceType: 'stylesheet', budget: 100 },
+        { resourceType: 'total', budget: 1500 },
+      ],
+    },
   ],
 };
