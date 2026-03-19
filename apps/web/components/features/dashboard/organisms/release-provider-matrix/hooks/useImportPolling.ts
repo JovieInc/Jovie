@@ -11,6 +11,8 @@ import type { ReleaseViewModel } from '@/lib/discography/types';
 const POLL_INTERVAL_MS = 2000;
 /** Stop polling after 5 minutes to avoid infinite polling when background import silently fails. */
 const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+/** Hold the banner at 100% for 1 second before hiding, so the user sees "done". */
+const COMPLETION_HOLD_MS = 1000;
 
 function getSortTimestamp(releaseDate: string | null | undefined): number {
   if (!releaseDate) return Number.NEGATIVE_INFINITY;
@@ -21,6 +23,7 @@ function getSortTimestamp(releaseDate: string | null | undefined): number {
 
 interface UseImportPollingParams {
   enabled: boolean;
+  initialTotalCount?: number;
   onReleasesUpdate: (releases: ReleaseViewModel[]) => void;
   onImportComplete: () => void;
 }
@@ -41,6 +44,7 @@ function sortReleases(releases: ReleaseViewModel[]): ReleaseViewModel[] {
 interface ImportPollResult {
   status: 'idle' | 'importing' | 'complete' | 'failed';
   releaseCount: number;
+  totalCount: number;
   releases: ReleaseViewModel[];
   serverCount: number;
 }
@@ -54,6 +58,7 @@ async function fetchImportPoll(): Promise<ImportPollResult> {
   return {
     status: statusResult.status,
     releaseCount: statusResult.releaseCount,
+    totalCount: statusResult.totalCount,
     releases: releasesResult.releases,
     serverCount: releasesResult.count,
   };
@@ -61,10 +66,12 @@ async function fetchImportPoll(): Promise<ImportPollResult> {
 
 export function useImportPolling({
   enabled,
+  initialTotalCount = 0,
   onReleasesUpdate,
   onImportComplete,
 }: UseImportPollingParams) {
   const [importedCount, setImportedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(initialTotalCount);
   const onReleasesUpdateRef = useRef(onReleasesUpdate);
   const onImportCompleteRef = useRef(onImportComplete);
   // Accumulate releases across polls so rows never disappear
@@ -72,6 +79,7 @@ export function useImportPolling({
   // Track whether import completed so we stop polling
   const [isComplete, setIsComplete] = useState(false);
   const queryClient = useQueryClient();
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onReleasesUpdateRef.current = onReleasesUpdate;
@@ -103,12 +111,19 @@ export function useImportPolling({
     if (enabled) {
       seenReleasesRef.current.clear();
       setImportedCount(0);
+      setTotalCount(initialTotalCount);
       setIsComplete(false);
       pollStartRef.current = Date.now();
       // Remove stale poll data from previous imports
       queryClient.removeQueries({ queryKey: ['import-polling'] });
     }
-  }, [enabled, queryClient]);
+    return () => {
+      if (completionTimerRef.current) {
+        clearTimeout(completionTimerRef.current);
+        completionTimerRef.current = null;
+      }
+    };
+  }, [enabled, initialTotalCount, queryClient]);
 
   const isPolling = enabled && !isComplete;
 
@@ -127,6 +142,11 @@ export function useImportPolling({
   useEffect(() => {
     if (!data || !isPolling) return;
 
+    // Update totalCount from server if available and larger
+    if (data.totalCount > 0 && data.totalCount > totalCount) {
+      setTotalCount(data.totalCount);
+    }
+
     if (data.releases.length > 0) {
       mergeAndEmit(data.releases, data.serverCount);
     }
@@ -142,9 +162,13 @@ export function useImportPolling({
         mergeAndEmit(data.releases, data.serverCount);
       }
       setIsComplete(true);
-      onImportCompleteRef.current();
+      // Hold the banner at 100% for 1 second so the user sees completion
+      completionTimerRef.current = setTimeout(() => {
+        onImportCompleteRef.current();
+        completionTimerRef.current = null;
+      }, COMPLETION_HOLD_MS);
     }
-  }, [data, isPolling, mergeAndEmit]);
+  }, [data, isPolling, mergeAndEmit, totalCount]);
 
-  return { importedCount };
+  return { importedCount, totalCount };
 }
