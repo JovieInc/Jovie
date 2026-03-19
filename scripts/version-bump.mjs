@@ -15,6 +15,10 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  getUnreleased,
+  hasUnreleasedEntries,
+} from './lib/changelog-parser.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -49,16 +53,13 @@ const next = isSameMonth ? `${yy}.${mm}.${curPatch + 1}` : `${yy}.${mm}.0`;
 
 const changelogPath = join(ROOT, 'CHANGELOG.md');
 const changelog = readFileSync(changelogPath, 'utf-8');
-const unreleasedMatch = changelog.match(
-  /## \[Unreleased\]\n([\s\S]*?)(?=\n## \[|$)/
-);
+const unreleasedBody = getUnreleased(changelog);
 
-if (!unreleasedMatch) {
+if (!unreleasedBody) {
   throw new Error('CHANGELOG.md must contain a "## [Unreleased]" section.');
 }
 
-const unreleasedBody = unreleasedMatch[1].trim();
-if (!ALLOW_EMPTY && unreleasedBody.length === 0) {
+if (!ALLOW_EMPTY && !hasUnreleasedEntries(changelog)) {
   throw new Error(
     'Refusing to bump version: [Unreleased] has no entries. Use --allow-empty to override.'
   );

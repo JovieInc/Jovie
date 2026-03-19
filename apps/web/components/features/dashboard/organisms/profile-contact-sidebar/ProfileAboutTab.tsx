@@ -187,13 +187,13 @@ export function ProfileAboutTab({
     <div className='space-y-5'>
       {/* Bio */}
       <DrawerSection title='Bio' collapsible={false}>
-        {onBioChange ? (
-          <EditableBio value={bio} onChange={onBioChange} />
-        ) : bio ? (
+        {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
+        {!onBioChange && bio && (
           <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
             {bio}
           </p>
-        ) : (
+        )}
+        {!onBioChange && !bio && (
           <p className='text-[13px] text-tertiary-token'>
             No bio yet. Use the chat to generate one.
           </p>
@@ -232,7 +232,7 @@ export function ProfileAboutTab({
 
       {/* Genres */}
       <DrawerSection title='Genres' collapsible={false}>
-        {hasGenres ? (
+        {hasGenres && (
           <div className='flex flex-wrap gap-1.5'>
             {genres.map(genre => (
               <Badge
@@ -271,7 +271,8 @@ export function ProfileAboutTab({
               />
             )}
           </div>
-        ) : onGenresChange ? (
+        )}
+        {!hasGenres && onGenresChange && (
           <GenrePicker
             selected={[]}
             onChange={onGenresChange}
@@ -285,7 +286,8 @@ export function ProfileAboutTab({
               </button>
             }
           />
-        ) : (
+        )}
+        {!hasGenres && !onGenresChange && (
           <p className='text-[13px] text-tertiary-token'>
             Auto-detected from your music connections.
           </p>

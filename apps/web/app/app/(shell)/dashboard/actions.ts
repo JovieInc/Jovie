@@ -21,7 +21,6 @@ export {
   selectDashboardProfile,
   type TippingStats,
 } from '@/lib/db/server';
-export type { DspPlatform } from '@/lib/services/social-links/types';
 export { DSP_PLATFORMS } from '@/lib/services/social-links/types';
 // Types and constants (imported directly from source to avoid "use server" conflicts)
 export type { DashboardData } from './actions/dashboard-data';
