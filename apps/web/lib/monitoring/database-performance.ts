@@ -49,9 +49,9 @@ class DatabasePerformanceMonitor {
    */
   private fingerprint(query: string): string {
     return query
-      .replace(/'[^']*'/g, '?')
-      .replace(/\b\d+\b/g, '?')
-      .replace(/\s+/g, ' ')
+      .replaceAll(/'[^']*'/g, '?')
+      .replaceAll(/\b\d+\b/g, '?')
+      .replaceAll(/\s+/g, ' ')
       .trim();
   }
 

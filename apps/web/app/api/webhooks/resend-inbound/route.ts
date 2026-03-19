@@ -207,12 +207,10 @@ export async function POST(req: NextRequest) {
         await db
           .update(emailThreads)
           .set({
-            suggestedCategory:
-              classification.category as (typeof emailThreads.suggestedCategory.enumValues)[number],
+            suggestedCategory: classification.category,
             suggestedTerritory: classification.territory,
             categoryConfidence: classification.confidence,
-            priority:
-              classification.priority as (typeof emailThreads.priority.enumValues)[number],
+            priority: classification.priority,
             aiSummary: classification.summary,
             aiExtractedData: classification.extractedData,
             updatedAt: new Date(),
