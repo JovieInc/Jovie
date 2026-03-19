@@ -74,7 +74,9 @@
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "knip": "knip",
     "version:bump": "node scripts/version-bump.mjs",
-    "version:check": "node scripts/version-check.mjs"
+    "version:check": "node scripts/version-check.mjs",
+    "changelog:generate": "doppler run -- node scripts/generate-changelog.mjs",
+    "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
@@ -86,6 +88,9 @@
     "husky": "^9.1.7",
     "knip": "^5.83.0",
     "lint-staged": "^16.2.6",
+    "@anthropic-ai/sdk": "^0.78.0",
+    "pg": "^8.13.0",
+    "resend": "^4.0.0",
     "turbo": "^2.8.9",
     "typescript": "^5"
   },

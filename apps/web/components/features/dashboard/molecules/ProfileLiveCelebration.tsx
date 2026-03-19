@@ -8,18 +8,21 @@ import { CopyToClipboardButton } from './CopyToClipboardButton';
 
 interface ProfileLiveCelebrationProps {
   readonly username: string;
+  readonly profileId?: string;
   readonly onComplete: () => void;
   /** Auto-advance delay in ms. Defaults to 4000. */
   readonly autoAdvanceMs?: number;
 }
 
 /**
- * Celebration screen shown after onboarding step 3 completes.
+ * Celebration screen shown when a profile goes live.
  * Displays CSS confetti + "Your profile is live" with the user's URL.
  * Auto-advances after a delay or on click.
+ * Uses localStorage to prevent re-firing (celebrated_{profileId}).
  */
 export function ProfileLiveCelebration({
   username,
+  profileId,
   onComplete,
   autoAdvanceMs = 4000,
 }: ProfileLiveCelebrationProps) {
@@ -32,6 +35,27 @@ export function ProfileLiveCelebration({
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCompleteRef = useRef(onComplete);
   const profileUrl = `jov.ie/${username}`;
+
+  // Check localStorage to prevent re-firing celebration
+  const celebrationKey = profileId ? `celebrated_${profileId}` : null;
+  const alreadyCelebrated = celebrationKey
+    ? typeof window !== 'undefined' &&
+      window.localStorage.getItem(celebrationKey) !== null
+    : false;
+
+  // Mark as celebrated on first render
+  useEffect(() => {
+    if (celebrationKey && !alreadyCelebrated) {
+      window.localStorage.setItem(celebrationKey, String(Date.now()));
+    }
+  }, [celebrationKey, alreadyCelebrated]);
+
+  // If already celebrated, auto-complete immediately
+  useEffect(() => {
+    if (alreadyCelebrated) {
+      onCompleteRef.current();
+    }
+  }, [alreadyCelebrated]);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;
@@ -110,7 +134,7 @@ export function ProfileLiveCelebration({
       }
 
       const first = tabbable[0];
-      const last = tabbable[tabbable.length - 1];
+      const last = tabbable.at(-1)!;
 
       if (event.shiftKey && globalThis.document.activeElement === first) {
         event.preventDefault();

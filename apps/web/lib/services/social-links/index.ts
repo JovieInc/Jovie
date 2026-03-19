@@ -33,7 +33,6 @@ export {
 export type {
   CreateLinkData,
   DashboardSocialLink,
-  DspPlatform,
   LinkSourceType,
   LinkState,
   UpdateLinkData,

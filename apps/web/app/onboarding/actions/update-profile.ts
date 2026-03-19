@@ -42,6 +42,29 @@ export async function verifyProfileHasAvatar(): Promise<{
   return { avatarUrl };
 }
 
+/**
+ * Get the current avatar URL for the authenticated user's profile.
+ * Used for polling during onboarding to detect background avatar uploads.
+ * Returns null if no avatar is set (instead of throwing like verifyProfileHasAvatar).
+ */
+export async function getProfileAvatarUrl(): Promise<{
+  avatarUrl: string | null;
+}> {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+
+  const [profile] = await db
+    .select({ avatarUrl: creatorProfiles.avatarUrl })
+    .from(creatorProfiles)
+    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .where(and(eq(users.clerkId, userId), eq(creatorProfiles.isClaimed, true)))
+    .limit(1);
+
+  return { avatarUrl: profile?.avatarUrl?.trim() || null };
+}
+
 export async function updateOnboardingProfile(updates: {
   displayName?: string;
   bio?: string;
