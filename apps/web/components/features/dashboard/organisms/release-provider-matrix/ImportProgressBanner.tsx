@@ -3,12 +3,15 @@
 import { memo } from 'react';
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import { DrawerSurfaceCard } from '@/components/molecules/drawer';
+import type { AggregateEnrichmentStatus } from '@/lib/dsp-enrichment/enrichment-status';
 
 interface ImportProgressBannerProps {
   readonly artistName: string | null;
   readonly importedCount: number;
   readonly visible?: boolean;
   readonly compact?: boolean;
+  /** Enrichment status for cross-platform DSP discovery */
+  readonly enrichmentStatus?: AggregateEnrichmentStatus;
 }
 
 export const ImportProgressBanner = memo(function ImportProgressBanner({
@@ -16,6 +19,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   importedCount,
   visible = true,
   compact = false,
+  enrichmentStatus,
 }: ImportProgressBannerProps) {
   if (compact) {
     return (
@@ -64,6 +68,24 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
           </div>
         </div>
       </DrawerSurfaceCard>
+      {enrichmentStatus === 'enriching' && (
+        <DrawerSurfaceCard
+          variant='card'
+          className='mx-4 mt-2 flex items-center gap-3 border-accent/18 bg-accent/6 px-4 py-3 transition-opacity duration-200'
+        >
+          <div className='flex h-5 w-5 items-center justify-center'>
+            <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />
+          </div>
+          <div className='flex min-w-0 flex-1 flex-col gap-1'>
+            <span className='text-[13px] text-primary-token'>
+              Finding your music across streaming platforms...
+            </span>
+            <div className='h-1 overflow-hidden rounded-full bg-accent/12'>
+              <div className='h-full w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite] rounded-full bg-accent' />
+            </div>
+          </div>
+        </DrawerSurfaceCard>
+      )}
     </div>
   );
 });
