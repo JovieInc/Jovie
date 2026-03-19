@@ -18,7 +18,7 @@ export default function ErrorBoundary({
   error,
   reset,
   context,
-  message = 'We encountered an error loading this page. Please try again.',
+  message = 'Something went wrong. Try again?',
 }: ErrorBoundaryProps) {
   const router = useRouter();
 

@@ -3,6 +3,7 @@
 import { Button, Textarea } from '@jovie/ui';
 import { CheckCircle2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 import { FormField } from '@/components/molecules/FormField';
 import {
   Dialog,
@@ -34,7 +35,6 @@ export function DashboardFeedbackModal({
     setIsSubmitting(true);
 
     try {
-      // Call optional submit handler (extracted from component)
       if (onSubmit) {
         await onSubmit(feedback.trim());
       }
@@ -48,16 +48,8 @@ export function DashboardFeedbackModal({
           setIsSubmitted(false);
         }, 300);
       }, 2000);
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      setIsSubmitted(true);
-      setTimeout(() => {
-        onClose();
-        setTimeout(() => {
-          setFeedback('');
-          setIsSubmitted(false);
-        }, 300);
-      }, 2000);
+    } catch {
+      toast.error('Could not send feedback. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -93,8 +85,7 @@ export function DashboardFeedbackModal({
             Thank you!
           </DialogTitle>
           <DialogDescription className='mt-2 text-[13px] text-secondary-token'>
-            Your note has been delivered to the team. Thank you for helping us
-            make Jovie feel effortlessly better.
+            Sent — thanks for the feedback.
           </DialogDescription>
         </div>
       ) : (
@@ -130,7 +121,7 @@ export function DashboardFeedbackModal({
                 value={feedback}
                 onChange={event => setFeedback(event.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder='Share what feels great, what slows you down, or the next capability you want to unlock.'
+                placeholder="What's working? What's not? What should we build next?"
                 rows={5}
                 autoFocus
                 className='bg-surface-1 border-subtle text-primary-token placeholder:text-secondary-token'
