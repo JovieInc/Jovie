@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.15] - 2026-03-19
+
+### Removed
+
+- AI-generated dashboard components: MusicImportHero, InsightOneLiner, SmartActionCards, and recent-releases API — AI slop adding complexity without user value
+- 3-state chat (dashboard/chatActive/chat) simplified to 2-state (empty/chat) — removes confusing intermediate state
+- Wordy error boundary messages replaced with concise default
+- Verbose modal/dialog copy trimmed across feedback, growth access, and cookie modals
+- Inline styles in CookieModal replaced with Tailwind classes and Button component
+
+### Changed
+
+- Chat prompts restored to practical defaults: "Change profile photo", "Set up a link", "How do I get paid?"
+- SuggestedProfilesCarousel relocated from sidebar to chat empty state
+- Pagination buttons use conditional rendering instead of disabled links to "#"
+
+### Fixed
+
+- DSP match status validated against allowlist (was unchecked type cast)
+- MusicFetch enrichment: removed duplicate complete-status call
+- MusicFetch enrichment: transient errors no longer pre-mark job as failed before retry
+- Feedback modal shows toast on failure instead of faking success
 
 ## [26.4.14] - 2026-03-19
 
@@ -26,20 +48,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.13] - 2026-03-19
 
-### Added
-
-- Music-first dashboard: hero card showing recent releases with album art carousel and import status
-- AI-powered insight one-liner on dashboard (e.g., "3 people viewed your profile today")
-- Smart action cards that adapt based on profile state (Venmo setup, Shopify connect, share profile)
-- Lightweight `/api/dashboard/recent-releases` endpoint for dashboard hero card
-- `useRecentReleasesQuery` TanStack Query hook for client-side release data
-- Chat overlay mode: dashboard is the default view, chat activates on input focus (Spotlight model)
-- DSP match suggestions carousel relocated to Music tab in right drawer
-
 ### Changed
 
-- Dashboard center panel redesigned from chat-first to music-first layout
-- Chat suggestions cleaned up: removed "Set up a link" and "How do I get paid?", added "Write me a bio" and "Show my top insights"
 - Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
 - Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
 - When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
