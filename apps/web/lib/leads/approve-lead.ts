@@ -20,6 +20,90 @@ export interface ApproveLeadResult {
   } | null;
 }
 
+async function trySpotifyEnrichment(leadId: string): Promise<void> {
+  try {
+    pipelineLog('approve', 'Starting Spotify enrichment', { leadId });
+    await spotifyEnrichLead(leadId);
+  } catch (enrichError) {
+    pipelineWarn(
+      'approve',
+      'Spotify enrichment failed — continuing with routing',
+      {
+        leadId,
+        error:
+          enrichError instanceof Error
+            ? enrichError.message
+            : String(enrichError),
+      }
+    );
+    await captureError(
+      'Spotify enrichment failed during approval',
+      enrichError,
+      { route: 'leads/approve-lead', contextData: { leadId } }
+    );
+  }
+}
+
+async function pushToInstantlyIfEligible(
+  leadId: string,
+  routeResult: { route: string; claimUrl?: string }
+): Promise<Partial<ApproveLeadResult['routing']>> {
+  const [routedLead] = await db
+    .select()
+    .from(leads)
+    .where(eq(leads.id, leadId))
+    .limit(1);
+
+  if (routedLead?.instantlyLeadId) {
+    pipelineLog('approve', 'Already pushed to Instantly — skipping', {
+      leadId,
+      instantlyLeadId: routedLead.instantlyLeadId,
+    });
+    return {};
+  }
+
+  const isEmailEligible =
+    routedLead?.contactEmail &&
+    !routedLead.emailInvalid &&
+    (routeResult.route === 'email' || routeResult.route === 'both');
+
+  if (!isEmailEligible || !routedLead?.contactEmail) return {};
+
+  try {
+    const instantlyLeadId = await pushLeadToInstantly({
+      email: routedLead.contactEmail,
+      firstName: routedLead.displayName ?? routedLead.linktreeHandle,
+      claimLink: routeResult.claimUrl,
+      artistName: routedLead.displayName ?? routedLead.linktreeHandle,
+      priorityScore: routedLead.priorityScore ?? 0,
+    });
+
+    const queuedNow = new Date();
+    await db
+      .update(leads)
+      .set({
+        instantlyLeadId,
+        outreachStatus: 'queued',
+        outreachQueuedAt: queuedNow,
+        updatedAt: queuedNow,
+      })
+      .where(eq(leads.id, leadId));
+
+    return { instantlyLeadId, outreachStatus: 'queued' };
+  } catch (instantlyError) {
+    await captureError('Instantly push failed', instantlyError, {
+      route: 'leads/approve-lead',
+      contextData: { leadId },
+    });
+    return {
+      error:
+        instantlyError instanceof Error
+          ? instantlyError.message
+          : 'Instantly push failed',
+    };
+  }
+}
+
 /**
  * Shared approval pipeline used by both manual admin approval and auto-approve cron.
  *
@@ -77,32 +161,9 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
   }
 
   // 3. Spotify enrichment — non-blocking so routing still proceeds
-  try {
-    pipelineLog('approve', 'Starting Spotify enrichment', { leadId });
-    await spotifyEnrichLead(leadId);
-  } catch (enrichError) {
-    pipelineWarn(
-      'approve',
-      'Spotify enrichment failed — continuing with routing',
-      {
-        leadId,
-        error:
-          enrichError instanceof Error
-            ? enrichError.message
-            : String(enrichError),
-      }
-    );
-    await captureError(
-      'Spotify enrichment failed during approval',
-      enrichError,
-      {
-        route: 'leads/approve-lead',
-        contextData: { leadId },
-      }
-    );
-  }
+  await trySpotifyEnrichment(leadId);
 
-  // 4. Route lead
+  // 4. Route lead + 5. Push to Instantly if email-eligible
   let routing: ApproveLeadResult['routing'] = null;
   try {
     pipelineLog('approve', 'Starting lead routing', { leadId });
@@ -110,58 +171,8 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
     routing = { route: routeResult.route };
     pipelineLog('approve', 'Lead routed', { leadId, route: routeResult.route });
 
-    // 5. Push to Instantly if email-eligible (with idempotency guard)
-    const [routedLead] = await db
-      .select()
-      .from(leads)
-      .where(eq(leads.id, leadId))
-      .limit(1);
-
-    if (routedLead?.instantlyLeadId) {
-      pipelineLog('approve', 'Already pushed to Instantly — skipping', {
-        leadId,
-        instantlyLeadId: routedLead.instantlyLeadId,
-      });
-    } else if (
-      routedLead?.contactEmail &&
-      !routedLead.emailInvalid &&
-      (routeResult.route === 'email' || routeResult.route === 'both')
-    ) {
-      try {
-        const instantlyLeadId = await pushLeadToInstantly({
-          email: routedLead.contactEmail,
-          firstName: routedLead.displayName ?? routedLead.linktreeHandle,
-          claimLink: routeResult.claimUrl,
-          artistName: routedLead.displayName ?? routedLead.linktreeHandle,
-          priorityScore: routedLead.priorityScore ?? 0,
-        });
-
-        const queuedNow = new Date();
-        await db
-          .update(leads)
-          .set({
-            instantlyLeadId,
-            outreachStatus: 'queued',
-            outreachQueuedAt: queuedNow,
-            updatedAt: queuedNow,
-          })
-          .where(eq(leads.id, leadId));
-
-        routing = { ...routing, instantlyLeadId, outreachStatus: 'queued' };
-      } catch (instantlyError) {
-        await captureError('Instantly push failed', instantlyError, {
-          route: 'leads/approve-lead',
-          contextData: { leadId },
-        });
-        routing = {
-          ...routing,
-          error:
-            instantlyError instanceof Error
-              ? instantlyError.message
-              : 'Instantly push failed',
-        };
-      }
-    }
+    const instantlyResult = await pushToInstantlyIfEligible(leadId, routeResult);
+    routing = { ...routing, ...instantlyResult };
   } catch (routingError) {
     await captureError('Lead routing failed', routingError, {
       route: 'leads/approve-lead',

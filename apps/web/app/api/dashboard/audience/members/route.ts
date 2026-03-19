@@ -77,6 +77,21 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
+function buildViewCondition(view: 'all' | 'identified' | 'anonymous'): SQL<boolean> {
+  if (view === 'anonymous') {
+    return eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
+  }
+  if (view === 'identified') {
+    return or(
+      eq(audienceMembers.type, 'email'),
+      eq(audienceMembers.type, 'sms'),
+      eq(audienceMembers.type, 'spotify'),
+      eq(audienceMembers.type, 'customer')
+    ) as SQL<boolean>;
+  }
+  return drizzleSql<boolean>`true`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     return await withDbSessionTx(async (tx, clerkUserId) => {
@@ -118,19 +133,7 @@ export async function GET(request: NextRequest) {
       const sortColumn = MEMBER_SORT_COLUMNS[sort];
       const orderFn = direction === 'asc' ? asc : desc;
       const segmentCondition = buildSegmentCondition(segments);
-      let viewCondition: SQL<boolean>;
-      if (view === 'anonymous') {
-        viewCondition = eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
-      } else if (view === 'identified') {
-        viewCondition = or(
-          eq(audienceMembers.type, 'email'),
-          eq(audienceMembers.type, 'sms'),
-          eq(audienceMembers.type, 'spotify'),
-          eq(audienceMembers.type, 'customer')
-        ) as SQL<boolean>;
-      } else {
-        viewCondition = drizzleSql<boolean>`true`;
-      }
+      const viewCondition = buildViewCondition(view);
 
       // Keyset WHERE clause from cursor — avoids full-table OFFSET scan (JOV-1263).
       let cursorCondition: SQL<unknown> = drizzleSql`true`;
