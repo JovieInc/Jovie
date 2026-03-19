@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getLatestRelease,
-  parseChangelog,
-} from '../changelog-parser.mjs';
+import { getLatestRelease, parseChangelog } from '../changelog-parser.mjs';
 
 const SAMPLE_CHANGELOG = `# Changelog
 
@@ -164,4 +161,3 @@ describe('getLatestRelease', () => {
     expect(release).toBeNull();
   });
 });
-

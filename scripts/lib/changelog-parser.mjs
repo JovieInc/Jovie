@@ -82,4 +82,3 @@ export function getLatestRelease(markdown) {
   const { releases } = parseChangelog(markdown);
   return releases[0] || null;
 }
-
