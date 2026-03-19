@@ -18,6 +18,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
   extractMusicFetchLinks,
+  type MusicFetchProfileFieldState,
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
@@ -27,6 +28,7 @@ import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
+  type MusicFetchArtistResult,
 } from '../providers/musicfetch';
 
 // ============================================================================
@@ -67,12 +69,23 @@ export interface MusicFetchEnrichmentResult {
 
 async function applyDspUpdates(
   tx: DbOrTransaction,
-  artistData: { name?: string; [key: string]: unknown },
-  profile: { id: string; usernameNormalized: string | null; username: string | null; displayName: string | null; displayNameLocked: boolean | null; avatarLockedByUser: boolean | null; spotifyId: string | null },
+  artistData: MusicFetchArtistResult,
+  profile: MusicFetchProfileFieldState & {
+    id: string;
+    usernameNormalized: string | null;
+    username: string | null;
+    displayName: string | null;
+    displayNameLocked: boolean | null;
+    avatarLockedByUser: boolean | null;
+  },
   spotifyUrl: string,
   creatorProfileId: string
 ): Promise<string[]> {
-  const dspUpdates = mapMusicFetchProfileFields(artistData, profile, spotifyUrl);
+  const dspUpdates = mapMusicFetchProfileFields(
+    artistData,
+    profile,
+    spotifyUrl
+  );
 
   let enrichedDisplayName: string | undefined;
   const hasPlaceholderName =
@@ -111,8 +124,15 @@ async function applyDspUpdates(
 
 async function mergeSocialLinks(
   tx: DbOrTransaction,
-  artistData: unknown,
-  profile: { id: string; usernameNormalized: string | null; avatarUrl: string | null; displayName: string | null; avatarLockedByUser: boolean | null; displayNameLocked: boolean | null },
+  artistData: MusicFetchArtistResult,
+  profile: {
+    id: string;
+    usernameNormalized: string | null;
+    avatarUrl: string | null;
+    displayName: string | null;
+    avatarLockedByUser: boolean | null;
+    displayNameLocked: boolean | null;
+  },
   spotifyUrl: string
 ): Promise<{ inserted: number; updated: number }> {
   const socialLinks = extractMusicFetchLinks(
@@ -278,14 +298,26 @@ export async function processMusicFetchEnrichmentJob(
 
   // Apply DSP field updates, merge social links, and import discography
   result.dspFieldsUpdated = await applyDspUpdates(
-    tx, artistData, profile, spotifyUrl, creatorProfileId
+    tx,
+    artistData,
+    profile,
+    spotifyUrl,
+    creatorProfileId
   );
   const linkResult = await mergeSocialLinks(
-    tx, artistData, profile, spotifyUrl
+    tx,
+    artistData,
+    profile,
+    spotifyUrl
   );
   result.socialLinksInserted = linkResult.inserted;
   result.socialLinksUpdated = linkResult.updated;
-  await importDiscography(spotifyUrl, profile.spotifyId, creatorProfileId, result);
+  await importDiscography(
+    spotifyUrl,
+    profile.spotifyId,
+    creatorProfileId,
+    result
+  );
 
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
