@@ -23,6 +23,7 @@ import {
 } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { setEnrichmentJobStatus } from '../enrichment-status';
 
 import {
   extractAppleMusicImageUrls,
@@ -540,6 +541,7 @@ export async function processProfileEnrichmentJob(
 
   if (!profile) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'failed');
     return result;
   }
 
@@ -547,6 +549,8 @@ export async function processProfileEnrichmentJob(
     result.errors.push(
       'Profile already enriched (use forceRefresh to override)'
     );
+    // Already enriched is a success state
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'complete');
     return result;
   }
 
@@ -555,6 +559,7 @@ export async function processProfileEnrichmentJob(
 
   if (dspData.length === 0) {
     result.errors.push('No DSP data could be fetched');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'failed');
     return result;
   }
 
@@ -573,6 +578,9 @@ export async function processProfileEnrichmentJob(
     profile
   );
   result.profileUpdated = profileUpdated;
+
+  // Mark enrichment as complete
+  await setEnrichmentJobStatus(tx, creatorProfileId, 'spotify', 'complete');
 
   return result;
 }

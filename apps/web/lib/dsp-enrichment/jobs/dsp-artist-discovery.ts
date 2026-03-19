@@ -22,6 +22,7 @@ import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
 
+import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   convertAppleMusicToIsrcMatches,
   convertDeezerToIsrcMatches,
@@ -733,12 +734,15 @@ export async function processDspArtistDiscoveryJob(
 
   if (!localArtist) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'failed');
     return result;
   }
   if (localTracks.length < MIN_TRACKS_FOR_DISCOVERY) {
     result.errors.push(
       `Not enough tracks with ISRCs (need ${MIN_TRACKS_FOR_DISCOVERY}, have ${localTracks.length})`
     );
+    // Not enough tracks is not a failure — it's expected for new artists
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'complete');
     return result;
   }
 
@@ -766,6 +770,9 @@ export async function processDspArtistDiscoveryJob(
         errors: result.errors,
       }
     );
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'failed');
+  } else {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'isrc', 'complete');
   }
 
   return result;

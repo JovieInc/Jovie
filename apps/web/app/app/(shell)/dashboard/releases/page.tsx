@@ -105,18 +105,24 @@ async function ReleasesContent({
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
   const spotifyImportStatus =
     (profileSettings.spotifyImportStatus as string) ?? 'idle';
-
+  const spotifyImportTotal =
+    typeof profileSettings.spotifyImportTotal === 'number'
+      ? profileSettings.spotifyImportTotal
+      : 0;
   return (
-    <ReleasesExperience
-      releases={releases}
-      providerConfig={providerConfig}
-      primaryProviders={primaryProviderKeys}
-      spotifyConnected={spotifyStatus.connected}
-      spotifyArtistName={spotifyStatus.artistName}
-      appleMusicConnected={appleMusicStatus.connected}
-      appleMusicArtistName={appleMusicStatus.artistName}
-      allowArtworkDownloads={allowArtworkDownloads}
-      initialImporting={spotifyImportStatus === 'importing'}
-    />
+    <ReleasesClientBoundary>
+      <ReleasesExperience
+        releases={releases}
+        providerConfig={providerConfig}
+        primaryProviders={primaryProviderKeys}
+        spotifyConnected={spotifyStatus.connected}
+        spotifyArtistName={spotifyStatus.artistName}
+        appleMusicConnected={appleMusicStatus.connected}
+        appleMusicArtistName={appleMusicStatus.artistName}
+        allowArtworkDownloads={allowArtworkDownloads}
+        initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
+      />
+    </ReleasesClientBoundary>
   );
 }

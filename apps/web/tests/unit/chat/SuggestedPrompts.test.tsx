@@ -54,4 +54,11 @@ describe('SuggestedPrompts', () => {
     ).toBeTruthy();
     expect(queryByText('Change profile photo')).toBeNull();
   });
+
+  it('calls onSelect with prompt when clicked', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByText('Change profile photo').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Help me change my profile photo.');
+  });
 });

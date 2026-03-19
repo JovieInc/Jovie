@@ -1149,6 +1149,23 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 | Skill | Invocation | Purpose |
 |-------|------------|---------|
 | Ship | `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+
+#### Changelog Automation (run as part of /ship workflow)
+
+Before `pnpm version:bump`, run `pnpm changelog:generate` to rewrite the `[Unreleased]` entries from developer language to customer-friendly product updates using AI.
+
+After the PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers.
+
+**Ship-time sequence:**
+1. `pnpm changelog:generate` — AI rewrites `[Unreleased]` (requires `ANTHROPIC_API_KEY`)
+2. `pnpm version:bump` — rotates `[Unreleased]` → dated release
+3. Commit, push, create PR (standard /ship flow)
+4. After merge: `pnpm changelog:send` — emails subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`)
+
+If `changelog:generate` fails (API down, key missing), it exits gracefully and the ship continues with original entries.
+
+**Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.
+
 | Review | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | Plan (CEO) | `/plan-ceo-review` | Founder mode: rethink problems from first principles, find the 10-star product |
 | Plan (Eng) | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |

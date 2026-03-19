@@ -6,11 +6,78 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.16] - 2026-03-19
+
+### Fixed
+
+- Admin creator table: UUID validation on all profileId inputs (single and bulk operations)
+- Admin creator table: email send failure during verification no longer crashes the action
+- Admin creator table: self-deletion prevention — admins cannot delete their own account
+- Admin creator table: double-delete guard rejects re-deleting already soft-deleted users
+- Admin creator table: cache invalidation added to delete and marketing toggle actions
+- Admin creator table: JSON.parse wrapped in try-catch for bulk operation payloads
+- Payload parsers: UUID validation and whitespace-only profileId rejection
+
+## [26.4.15] - 2026-03-19
+
+### Removed
+
+- AI-generated dashboard components: MusicImportHero, InsightOneLiner, SmartActionCards, and recent-releases API — AI slop adding complexity without user value
+- 3-state chat (dashboard/chatActive/chat) simplified to 2-state (empty/chat) — removes confusing intermediate state
+- Wordy error boundary messages replaced with concise default
+- Verbose modal/dialog copy trimmed across feedback, growth access, and cookie modals
+- Inline styles in CookieModal replaced with Tailwind classes and Button component
+
+### Changed
+
+- Chat prompts restored to practical defaults: "Change profile photo", "Set up a link", "How do I get paid?"
+- SuggestedProfilesCarousel relocated from sidebar to chat empty state
+- Pagination buttons use conditional rendering instead of disabled links to "#"
+
+### Fixed
+
+- DSP match status validated against allowlist (was unchecked type cast)
+- MusicFetch enrichment: removed duplicate complete-status call
+- MusicFetch enrichment: transient errors no longer pre-mark job as failed before retry
+- Feedback modal shows toast on failure instead of faking success
+
+## [26.4.14] - 2026-03-19
+
+### Fixed
+
+- Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
+- Added "Delete account" link to user profile menu with destructive styling
+- Added direct `/app/settings/delete-account` route for deep-linking
+- Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
+- Added 7 unit tests for the account deletion API route
+- Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
+- Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
+
+### Removed
+
+- Deleted unauthenticated `/api/waitlist-debug` endpoint and its tests
+- Removed unused domain-categorizer functions (addSensitiveDomain, containsSensitiveKeywords, sanitizeForCrawlers, getAllSensitiveDomains)
+
+## [26.4.13] - 2026-03-19
+
+### Changed
+
+- Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
+- Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
+- When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
+- US/Canada visitors with unknown region see the banner as a safe compliance fallback
+
 ## [26.4.12] - 2026-03-18
 
 ### Fixed
 
 - Move Next.js dev indicator to top-right corner so it no longer overlaps the DevToolbar at the bottom of the screen
+- Spotify import progress bar now shows determinate progress ("5 of 30 imported") instead of bouncing indeterminate animation
+- Fixed premature import status override that caused the progress banner to flash in and out during active imports
+- Suppressed "No matching Apple Music artist" banner during active Spotify import to prevent confusing UI state
+- Added 1-second completion hold at 100% before banner fadeout for a polished finish
+- Added ARIA progressbar attributes for screen reader accessibility
+- Replaced jerky ping-pong animation with smooth unidirectional shimmer for unknown-total fallback
 
 ## [26.4.11] - 2026-03-18
 

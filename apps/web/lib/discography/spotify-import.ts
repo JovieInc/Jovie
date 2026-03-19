@@ -84,6 +84,7 @@ export interface SpotifyImportResult {
   imported: number;
   updated: number;
   failed: number;
+  total: number;
   releases: ReleaseWithProviders[];
   errors: string[];
 }
@@ -243,6 +244,7 @@ export async function importReleasesFromSpotify(
     imported: 0,
     updated: 0,
     failed: 0,
+    total: 0,
     releases: [],
     errors: [],
   };
@@ -272,10 +274,11 @@ export async function importReleasesFromSpotify(
 
       try {
         // 1. Fetch all albums from Spotify
-        const spotifyAlbums = await getSpotifyArtistAlbums(spotifyArtistId, {
-          includeGroups,
-          market,
-        });
+        const { albums: spotifyAlbums, total: spotifyTotal } =
+          await getSpotifyArtistAlbums(spotifyArtistId, {
+            includeGroups,
+            market,
+          });
 
         if (spotifyAlbums.length === 0) {
           result.success = true;
@@ -285,6 +288,7 @@ export async function importReleasesFromSpotify(
 
         // Safety limit: cap number of releases
         const albumsToImport = spotifyAlbums.slice(0, MAX_RELEASES_PER_IMPORT);
+        result.total = Math.min(spotifyTotal, MAX_RELEASES_PER_IMPORT);
         if (spotifyAlbums.length > MAX_RELEASES_PER_IMPORT) {
           captureWarning('Spotify import truncated due to limit', {
             totalReleases: spotifyAlbums.length,
@@ -294,6 +298,31 @@ export async function importReleasesFromSpotify(
         }
 
         span.setAttribute('spotify.album_count', albumsToImport.length);
+
+        // Early-write total to settings so polling can show determinate progress
+        try {
+          const { creatorProfiles } = await import('@/lib/db/schema');
+          const [current] = await db
+            .select({ settings: creatorProfiles.settings })
+            .from(creatorProfiles)
+            .where(eq(creatorProfiles.id, creatorProfileId))
+            .limit(1);
+          const currentSettings = (current?.settings ?? {}) as Record<
+            string,
+            unknown
+          >;
+          await db
+            .update(creatorProfiles)
+            .set({
+              settings: {
+                ...currentSettings,
+                spotifyImportTotal: result.total,
+              },
+            })
+            .where(eq(creatorProfiles.id, creatorProfileId));
+        } catch {
+          // Non-critical: progress bar falls back to shimmer if this fails
+        }
 
         // 2. Get full album details (includes tracks and UPC)
         const albumIds = albumsToImport.map(a => a.id);
@@ -763,6 +792,7 @@ export async function syncReleasesFromSpotify(
       imported: 0,
       updated: 0,
       failed: 0,
+      total: 0,
       releases: [],
       errors: [
         'No Spotify artist connected. Please connect your Spotify artist profile first.',

@@ -318,7 +318,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         <div className='flex min-h-[280px] flex-col items-center gap-0'>
           {stages.map((stage, index) => {
             const isLast = index === stages.length - 1;
-            const nextStage = !isLast ? stages[index + 1] : null;
+            const nextStage = isLast ? null : stages[index + 1];
             const conversionRate = nextStage
               ? calculateRate(nextStage.value, stage.value)
               : null;

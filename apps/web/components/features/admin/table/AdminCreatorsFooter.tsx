@@ -47,16 +47,24 @@ export function AdminCreatorsFooter({
           <AdminCreatorFilters initialPageSize={pageSize} />
         </div>
         <div className='flex items-center gap-2'>
-          <Button asChild size='sm' variant='ghost' disabled={!canPrev}>
-            <Link href={prevHref ?? '#'} aria-disabled={!canPrev}>
+          {prevHref ? (
+            <Button asChild size='sm' variant='ghost'>
+              <Link href={prevHref}>Previous</Link>
+            </Button>
+          ) : (
+            <Button size='sm' variant='ghost' disabled>
               Previous
-            </Link>
-          </Button>
-          <Button asChild size='sm' variant='ghost' disabled={!canNext}>
-            <Link href={nextHref ?? '#'} aria-disabled={!canNext}>
+            </Button>
+          )}
+          {nextHref ? (
+            <Button asChild size='sm' variant='ghost'>
+              <Link href={nextHref}>Next</Link>
+            </Button>
+          ) : (
+            <Button size='sm' variant='ghost' disabled>
               Next
-            </Link>
-          </Button>
+            </Button>
+          )}
         </div>
       </div>
     </div>

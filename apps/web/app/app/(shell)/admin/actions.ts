@@ -10,9 +10,27 @@ import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { captureWarning } from '@/lib/error-tracking';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertValidUuid(value: string, fieldName: string): void {
+  if (!UUID_RE.test(value)) {
+    throw new TypeError(`${fieldName} must be a valid UUID`);
+  }
+}
+
+function safeParseJsonArray(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new TypeError('profileIds must be valid JSON');
+  }
+}
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
@@ -45,7 +63,7 @@ function validateAvatarUrl(url: string): string {
   }
 }
 
-async function requireAdmin(): Promise<void> {
+async function requireAdmin(): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -57,6 +75,50 @@ async function requireAdmin(): Promise<void> {
   if (!adminStatus) {
     throw new AdminUnauthorizedError();
   }
+
+  return userId;
+}
+
+function extractProfileId(formData: FormData): string {
+  const profileId = formData.get('profileId');
+
+  if (typeof profileId !== 'string' || profileId.trim().length === 0) {
+    throw new TypeError('profileId is required');
+  }
+
+  assertValidUuid(profileId, 'profileId');
+  return profileId;
+}
+
+function extractBulkProfileIds(formData: FormData): string[] {
+  const profileIdsRaw = formData.get('profileIds');
+  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
+    throw new TypeError('profileIds is required');
+  }
+
+  const parsed = safeParseJsonArray(profileIdsRaw);
+  if (!Array.isArray(parsed)) {
+    throw new TypeError('profileIds must be an array');
+  }
+
+  const profileIds = parsed.filter((value): value is string => {
+    return typeof value === 'string' && value.length > 0;
+  });
+
+  if (profileIds.length === 0) {
+    throw new TypeError('profileIds must contain at least one id');
+  }
+
+  if (profileIds.length > 200) {
+    throw new TypeError('Too many profileIds');
+  }
+
+  const invalidId = profileIds.find(id => !UUID_RE.test(id));
+  if (invalidId) {
+    throw new TypeError('profileIds must contain valid UUIDs');
+  }
+
+  return profileIds;
 }
 
 export async function toggleCreatorVerifiedAction(
@@ -64,12 +126,8 @@ export async function toggleCreatorVerifiedAction(
 ): Promise<void> {
   await requireAdmin();
 
-  const profileId = formData.get('profileId');
+  const profileId = extractProfileId(formData);
   const nextVerified = formData.get('nextVerified');
-
-  if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new TypeError('profileId is required');
-  }
 
   const isVerified =
     typeof nextVerified === 'string' ? nextVerified === 'true' : true;
@@ -88,19 +146,30 @@ export async function toggleCreatorVerifiedAction(
     });
 
   if (isVerified && updatedProfile?.userId) {
-    const [creatorUser] = await db
-      .select({ email: users.email })
-      .from(users)
-      .where(eq(users.id, updatedProfile.userId))
-      .limit(1);
+    try {
+      const [creatorUser] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, updatedProfile.userId))
+        .limit(1);
 
-    if (creatorUser?.email) {
-      const firstName =
-        updatedProfile.displayName?.trim().split(' ')[0] ?? 'Hey there';
-      await sendVerificationApprovedEmail({
-        to: creatorUser.email,
-        firstName,
-      });
+      if (creatorUser?.email) {
+        const firstName =
+          updatedProfile.displayName?.trim().split(' ')[0] ?? 'Hey there';
+        await sendVerificationApprovedEmail({
+          to: creatorUser.email,
+          firstName,
+        });
+      }
+    } catch (error) {
+      captureWarning(
+        '[admin/actions] Verification email failed — DB update succeeded',
+        {
+          profileId,
+          userId: updatedProfile.userId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
     }
   }
 
@@ -114,27 +183,7 @@ export async function bulkRerunCreatorIngestionAction(
 ): Promise<{ queuedCount: number }> {
   await requireAdmin();
 
-  const profileIdsRaw = formData.get('profileIds');
-  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new TypeError('profileIds is required');
-  }
-
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new TypeError('profileIds must be an array');
-  }
-
-  const profileIds = parsed.filter((value): value is string => {
-    return typeof value === 'string' && value.length > 0;
-  });
-
-  if (profileIds.length === 0) {
-    throw new TypeError('profileIds must contain at least one id');
-  }
-
-  if (profileIds.length > 200) {
-    throw new TypeError('Too many profileIds');
-  }
+  const profileIds = extractBulkProfileIds(formData);
 
   const profiles = await db
     .select({
@@ -184,32 +233,12 @@ export async function bulkSetCreatorsVerifiedAction(
 ): Promise<void> {
   await requireAdmin();
 
-  const profileIdsRaw = formData.get('profileIds');
   const nextVerifiedRaw = formData.get('nextVerified');
-
-  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new TypeError('profileIds is required');
-  }
 
   const isVerified =
     typeof nextVerifiedRaw === 'string' ? nextVerifiedRaw === 'true' : true;
 
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new TypeError('profileIds must be an array');
-  }
-
-  const profileIds = parsed.filter((value): value is string => {
-    return typeof value === 'string' && value.length > 0;
-  });
-
-  if (profileIds.length === 0) {
-    throw new TypeError('profileIds must contain at least one id');
-  }
-
-  if (profileIds.length > 200) {
-    throw new TypeError('Too many profileIds');
-  }
+  const profileIds = extractBulkProfileIds(formData);
 
   const updatedProfiles = await db
     .update(creatorProfiles)
@@ -239,6 +268,8 @@ export async function updateCreatorAvatarAsAdmin(
     throw new TypeError('profileId and avatarUrl are required');
   }
 
+  assertValidUuid(profileId, 'profileId');
+
   const sanitizedAvatarUrl = validateAvatarUrl(avatarUrl);
 
   const [updatedProfile] = await db
@@ -260,12 +291,8 @@ export async function toggleCreatorFeaturedAction(
 ): Promise<void> {
   await requireAdmin();
 
-  const profileId = formData.get('profileId');
+  const profileId = extractProfileId(formData);
   const nextFeatured = formData.get('nextFeatured');
-
-  if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new TypeError('profileId is required');
-  }
 
   const isFeatured =
     typeof nextFeatured === 'string' ? nextFeatured === 'true' : true;
@@ -290,32 +317,12 @@ export async function bulkSetCreatorsFeaturedAction(
 ): Promise<void> {
   await requireAdmin();
 
-  const profileIdsRaw = formData.get('profileIds');
   const nextFeaturedRaw = formData.get('nextFeatured');
-
-  if (typeof profileIdsRaw !== 'string' || profileIdsRaw.length === 0) {
-    throw new TypeError('profileIds is required');
-  }
 
   const isFeatured =
     typeof nextFeaturedRaw === 'string' ? nextFeaturedRaw === 'true' : true;
 
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
-  if (!Array.isArray(parsed)) {
-    throw new TypeError('profileIds must be an array');
-  }
-
-  const profileIds = parsed.filter((value): value is string => {
-    return typeof value === 'string' && value.length > 0;
-  });
-
-  if (profileIds.length === 0) {
-    throw new TypeError('profileIds must contain at least one id');
-  }
-
-  if (profileIds.length > 200) {
-    throw new TypeError('Too many profileIds');
-  }
+  const profileIds = extractBulkProfileIds(formData);
 
   const updatedProfiles = await db
     .update(creatorProfiles)
@@ -341,26 +348,26 @@ export async function toggleCreatorMarketingAction(
 ): Promise<void> {
   await requireAdmin();
 
-  const profileId = formData.get('profileId');
+  const profileId = extractProfileId(formData);
   const nextMarketingOptOut = formData.get('nextMarketingOptOut');
-
-  if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new TypeError('profileId is required');
-  }
 
   const marketingOptOut =
     typeof nextMarketingOptOut === 'string'
       ? nextMarketingOptOut === 'true'
       : false;
 
-  await db
+  const [updatedProfile] = await db
     .update(creatorProfiles)
     .set({
       marketingOptOut,
       updatedAt: new Date(),
     })
-    .where(eq(creatorProfiles.id, profileId));
+    .where(eq(creatorProfiles.id, profileId))
+    .returning({
+      usernameNormalized: creatorProfiles.usernameNormalized,
+    });
 
+  await invalidateProfileCache(updatedProfile?.usernameNormalized);
   revalidatePath(APP_ROUTES.ADMIN);
   revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }
@@ -368,19 +375,16 @@ export async function toggleCreatorMarketingAction(
 export async function deleteCreatorOrUserAction(
   formData: FormData
 ): Promise<void> {
-  await requireAdmin();
+  const adminUserId = await requireAdmin();
 
-  const profileId = formData.get('profileId');
-
-  if (typeof profileId !== 'string' || profileId.length === 0) {
-    throw new TypeError('profileId is required');
-  }
+  const profileId = extractProfileId(formData);
 
   // Check if profile is claimed (has userId)
   const [profile] = await db
     .select({
       userId: creatorProfiles.userId,
       username: creatorProfiles.username,
+      usernameNormalized: creatorProfiles.usernameNormalized,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, profileId));
@@ -389,7 +393,22 @@ export async function deleteCreatorOrUserAction(
     throw new TypeError('Profile not found');
   }
 
+  // Prevent admin from deleting their own account
+  if (profile.userId && profile.userId === adminUserId) {
+    throw new TypeError('Cannot delete your own account');
+  }
+
   if (profile.userId) {
+    // Check if user is already soft-deleted
+    const [existingUser] = await db
+      .select({ deletedAt: users.deletedAt })
+      .from(users)
+      .where(eq(users.id, profile.userId));
+
+    if (existingUser?.deletedAt) {
+      throw new TypeError('User is already deleted');
+    }
+
     // Claimed creator: Soft delete user (set deletedAt timestamp)
     await db
       .update(users)
@@ -403,6 +422,7 @@ export async function deleteCreatorOrUserAction(
     await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
   }
 
+  await invalidateProfileCache(profile.usernameNormalized);
   revalidatePath(APP_ROUTES.ADMIN);
   revalidatePath(APP_ROUTES.ADMIN_CREATORS);
 }

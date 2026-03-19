@@ -43,6 +43,7 @@ interface BuildDropdownItemsParams {
   handleManageBilling: () => void;
   handleUpgrade: () => void;
   upgradeLabel: string;
+  handleDeleteAccount: () => void;
   handleSignOut: () => void;
   setIsFeedbackOpen: (open: boolean) => void;
   handleOpenShortcuts?: () => void;
@@ -60,6 +61,7 @@ function buildDropdownItems({
   handleManageBilling,
   handleUpgrade,
   upgradeLabel,
+  handleDeleteAccount,
   handleSignOut,
   setIsFeedbackOpen,
   handleOpenShortcuts,
@@ -198,7 +200,7 @@ function buildDropdownItems({
     });
   }
 
-  // Add feedback and sign out
+  // Add feedback, delete account, and sign out
   items.push(
     {
       type: 'action',
@@ -207,6 +209,13 @@ function buildDropdownItems({
       onClick: () => setIsFeedbackOpen(true),
     },
     { type: 'separator', id: 'sep-2' },
+    {
+      type: 'action',
+      id: 'delete-account',
+      label: 'Delete account',
+      onClick: handleDeleteAccount,
+      className: 'text-destructive',
+    },
     {
       type: 'action',
       id: 'sign-out',
@@ -266,6 +275,7 @@ export function UserButton({
     handleManageBilling,
     handleProfile,
     handleSettings,
+    handleDeleteAccount,
     handleSignOut,
     handleUpgrade,
     loading,
@@ -315,6 +325,7 @@ export function UserButton({
     handleManageBilling,
     handleUpgrade,
     upgradeLabel: menuActions.upgradeLabel,
+    handleDeleteAccount,
     handleSignOut,
     setIsFeedbackOpen,
     handleOpenShortcuts: keyboardShortcuts?.open,
