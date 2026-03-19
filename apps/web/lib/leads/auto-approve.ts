@@ -129,14 +129,14 @@ export async function runAutoApprove(
   for (const lead of eligibleLeads) {
     try {
       const result = await approveLead(lead);
-      if (result.ingestion?.success !== false) {
-        approved++;
-      } else {
+      if (result.ingestion?.success === false) {
         errors++;
         pipelineWarn('auto-approve', 'Auto-approve ingestion failed', {
           leadId: lead.id,
           error: result.ingestion?.error,
         });
+      } else {
+        approved++;
       }
     } catch (error) {
       errors++;
