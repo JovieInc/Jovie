@@ -424,6 +424,11 @@ export {
 } from './usePublicProfileQuery';
 // QR code download mutation
 export { useQrCodeDownloadMutation } from './useQrCodeDownloadMutation';
+// Recent releases query (dashboard hero card)
+export {
+  type RecentRelease,
+  useRecentReleasesQuery,
+} from './useRecentReleasesQuery';
 export {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,
