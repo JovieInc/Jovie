@@ -159,7 +159,7 @@ export async function getConversionFunnelData(
       'Has Subscribers',
       'Paid',
     ].map((label, i) => ({
-      key: label.toLowerCase().replace(/\s+/g, '_'),
+      key: label.toLowerCase().replaceAll(/\s+/g, '_'),
       label,
       count: 0,
       conversionRate: null,

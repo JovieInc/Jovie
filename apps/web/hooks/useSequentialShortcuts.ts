@@ -53,6 +53,7 @@ export function useSequentialShortcuts({
       // Ignore if typing in a form element
       if (isFormElement(event.target)) return;
 
+      if (!event.key) return;
       const key = event.key.toLowerCase();
 
       // Handle modifier-based shortcuts first

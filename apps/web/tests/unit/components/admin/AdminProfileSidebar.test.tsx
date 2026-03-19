@@ -24,6 +24,9 @@ describe('AdminProfileSidebar', () => {
     createdAt: new Date('2024-01-01T00:00:00Z'),
     ingestionStatus: 'idle',
     lastIngestionError: null,
+    location: null,
+    hometown: null,
+    activeSinceYear: null,
     socialLinks: [
       {
         id: 'link-1',

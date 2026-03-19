@@ -46,6 +46,8 @@ function createContact(overrides: Record<string, unknown> = {}) {
     preferredChannel: 'email' as const,
     isActive: true,
     sortOrder: 0,
+    forwardInboxEmails: false,
+    autoMarkRead: false,
     createdAt: new Date('2024-01-01'),
     updatedAt: new Date('2024-01-01'),
     ...overrides,

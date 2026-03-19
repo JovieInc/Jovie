@@ -21,6 +21,7 @@ import {
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
+import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
@@ -127,17 +128,31 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Call MusicFetch API — throw so the job fails and retries
-  let artistData: Awaited<ReturnType<typeof fetchArtistBySpotifyUrl>>;
+  // Call MusicFetch API — only retry on transient errors (5xx, timeouts)
+  let artistData;
   try {
     artistData = await fetchArtistBySpotifyUrl(spotifyUrl);
   } catch (error) {
-    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
+    // 400 = bad URL, removed artist, non-artist entity — permanent failure, don't retry
+    if (error instanceof MusicfetchRequestError && error.statusCode === 400) {
+      logger.warn('MusicFetch enrichment: permanent failure (400)', {
+        creatorProfileId,
+        spotifyUrl,
+      });
+      result.errors.push(`MusicFetch API rejected request: ${error.message}`);
+      return result;
+    }
+    // Transient errors (5xx, timeout, network) — re-throw to trigger retry
     throw error;
   }
+
   if (!artistData) {
-    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
-    throw new Error('MusicFetch API returned no data');
+    logger.warn('MusicFetch enrichment: API returned no data', {
+      creatorProfileId,
+      spotifyUrl,
+    });
+    result.errors.push('MusicFetch API returned no data');
+    return result;
   }
 
   // Map DSP services to profile fields

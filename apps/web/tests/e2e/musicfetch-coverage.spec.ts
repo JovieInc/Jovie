@@ -22,6 +22,7 @@
  * @tag @musicfetch @enrichment @green
  */
 
+import { neon } from '@neondatabase/serverless';
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { ensureSignedInUser } from '../helpers/clerk-auth';
@@ -94,7 +95,7 @@ test.describe('DSP enrichment status API', () => {
 test.describe('Public profile — enriched DSP data visibility', () => {
   test.setTimeout(120_000);
 
-  test('seeded dualipa profile shows Spotify deep link on public page', async ({
+  test('seeded dualipa profile shows multiple DSP links on public page', async ({
     page,
   }) => {
     await setupPageMonitoring(page);
@@ -124,15 +125,25 @@ test.describe('Public profile — enriched DSP data visibility', () => {
       'Dua Lipa profile not found — seed-test-data not run'
     );
 
-    // Should have Spotify deep link rendered on the public profile
-    // (The listen mode renders DSP streaming links)
-    const hasSpotifyMention =
-      body.toLowerCase().includes('spotify') || page.url().includes('/listen');
+    // Count distinct DSP mentions — seeded profile should have multiple
+    const dspNames = [
+      'spotify',
+      'apple music',
+      'deezer',
+      'tidal',
+      'youtube music',
+      'soundcloud',
+    ];
+    const bodyLower = body.toLowerCase();
+    const visibleDsps = dspNames.filter(name => bodyLower.includes(name));
 
-    expect(hasSpotifyMention).toBe(true);
+    expect(
+      visibleDsps.length,
+      `Expected >= 3 DSPs visible on profile page (found: ${visibleDsps.join(', ')})`
+    ).toBeGreaterThanOrEqual(3);
   });
 
-  test('dualipa listen mode shows at least one DSP streaming link', async ({
+  test('dualipa listen mode shows multiple DSP streaming links', async ({
     page,
   }) => {
     test.skip(IS_FAST_ITERATION, 'DSP link check runs in the full suite');
@@ -153,20 +164,29 @@ test.describe('Public profile — enriched DSP data visibility', () => {
     await waitForHydration(page);
 
     const body = await page.evaluate(() => document.body.innerText);
+    const bodyLower = body.toLowerCase();
 
-    // At minimum, Spotify should appear (seeded during setup)
-    const hasDspLink =
-      body.toLowerCase().includes('spotify') ||
-      body.toLowerCase().includes('apple music') ||
-      body.toLowerCase().includes('listen');
-
-    // Skip if profile not seeded — don't fail
-    if (!body.toLowerCase().includes('dua lipa') && !hasDspLink) {
+    // Skip if profile not seeded
+    if (!bodyLower.includes('dua lipa')) {
       test.skip(true, 'Test profile not seeded');
       return;
     }
 
-    expect(hasDspLink).toBe(true);
+    // Count distinct DSP mentions in listen mode — should show multiple streaming links
+    const dspNames = [
+      'spotify',
+      'apple music',
+      'deezer',
+      'tidal',
+      'youtube music',
+      'soundcloud',
+    ];
+    const visibleDsps = dspNames.filter(name => bodyLower.includes(name));
+
+    expect(
+      visibleDsps.length,
+      `Listen mode should show >= 3 DSP links (found: ${visibleDsps.join(', ')})`
+    ).toBeGreaterThanOrEqual(3);
   });
 });
 
@@ -358,44 +378,76 @@ test.describe('MusicFetch error handling — chaos', () => {
 // Platform coverage audit
 // ─────────────────────────────────────────────────────────────────────────────
 
-test.describe('MusicFetch platform coverage — mapping audit', () => {
+test.describe('MusicFetch platform coverage — DB verification', () => {
   test.setTimeout(60_000);
 
   /**
-   * This test documents the full set of platforms MusicFetch maps.
-   * It passes by definition — it's a living spec for the 11 platforms.
-   *
-   * If a platform is REMOVED from MUSICFETCH_LINK_MAPPINGS, this test fails,
-   * alerting the team that coverage regressed.
+   * Verifies the seeded dualipa profile has multiple DSP IDs populated in
+   * the database and multiple active social links. This catches regressions
+   * where seed data or enrichment stops populating multi-DSP fields.
    */
-  test('all 11 expected platforms are in the MusicFetch mapping configuration', async ({
+  test('seeded dualipa profile has >= 4 DSP fields and >= 3 social links in DB', async ({
     page: _page,
   }) => {
-    // This is a documentation test — verified by reading the source config.
-    // The actual runtime values are validated in unit tests.
-    // Here we confirm the documented contract:
-
-    const EXPECTED_PLATFORMS = [
-      'spotify',
-      'apple_music',
-      'youtube',
-      'youtube_music',
-      'soundcloud',
-      'bandcamp',
-      'amazon_music',
-      'tidal',
-      'deezer',
-      'instagram',
-      'tiktok',
-    ];
-
-    // All 11 must be documented and tested — if this list shrinks, a PR must explain why
-    expect(EXPECTED_PLATFORMS).toHaveLength(11);
-
-    // Verify each platform ID is a non-empty string
-    for (const platform of EXPECTED_PLATFORMS) {
-      expect(platform.length).toBeGreaterThan(0);
-      expect(platform).toMatch(/^[a-z_]+$/);
+    const databaseUrl = process.env.DATABASE_URL;
+    if (!databaseUrl) {
+      test.skip(true, 'DATABASE_URL not configured');
+      return;
     }
+
+    const sql = neon(databaseUrl);
+
+    const [profile] = (await sql`
+      SELECT
+        cp.spotify_url,
+        cp.apple_music_id,
+        cp.deezer_id,
+        cp.tidal_id,
+        cp.soundcloud_id,
+        cp.youtube_music_id,
+        (
+          SELECT COUNT(*)
+          FROM social_links sl
+          WHERE sl.creator_profile_id = cp.id
+            AND sl.state = 'active'
+        )::int AS social_link_count
+      FROM creator_profiles cp
+      WHERE cp.username_normalized = 'dualipa'
+      LIMIT 1
+    `) as Array<{
+      spotify_url: string | null;
+      apple_music_id: string | null;
+      deezer_id: string | null;
+      tidal_id: string | null;
+      soundcloud_id: string | null;
+      youtube_music_id: string | null;
+      social_link_count: number;
+    }>;
+
+    if (!profile) {
+      test.skip(true, 'dualipa profile not seeded');
+      return;
+    }
+
+    // Count populated DSP fields
+    const dspFields = [
+      profile.spotify_url,
+      profile.apple_music_id,
+      profile.deezer_id,
+      profile.tidal_id,
+      profile.soundcloud_id,
+      profile.youtube_music_id,
+    ];
+    const populatedCount = dspFields.filter(Boolean).length;
+
+    expect(
+      populatedCount,
+      `Expected >= 4 DSP fields populated (got ${populatedCount})`
+    ).toBeGreaterThanOrEqual(4);
+
+    expect(
+      profile.social_link_count,
+      `Expected >= 3 active social links (got ${profile.social_link_count})`
+    ).toBeGreaterThanOrEqual(3);
   });
 });

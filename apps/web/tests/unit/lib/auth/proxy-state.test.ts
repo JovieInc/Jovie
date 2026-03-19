@@ -63,8 +63,8 @@ vi.mock('@/lib/db/client/retry', () => ({
 }));
 
 // Mock waitlist as enabled for proxy-state tests (tests waitlist behavior)
-vi.mock('@/lib/auth/waitlist-config', () => ({
-  isWaitlistEnabled: vi.fn().mockReturnValue(true),
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 // Import once — clear in-memory cache between tests via invalidateProxyUserStateCache
