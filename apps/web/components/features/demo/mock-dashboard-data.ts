@@ -51,6 +51,7 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   claimedUserAgent: null,
   avatarLockedByUser: false,
   displayNameLocked: false,
+  usernameLockedAt: null,
   ingestionStatus: 'idle',
   lastIngestionError: null,
   profileViews: 2_847,

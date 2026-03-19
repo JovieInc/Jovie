@@ -33,7 +33,7 @@ function ThemeKeyboardShortcut({ isEnabled }: { isEnabled: boolean }) {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented) return;
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key.toLowerCase() !== 't') return;
+      if (!event.key || event.key.toLowerCase() !== 't') return;
       if (isFormElement(event.target)) return;
 
       event.preventDefault();

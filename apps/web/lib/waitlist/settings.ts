@@ -4,6 +4,40 @@ import { waitlistSettings } from '@/lib/db/schema/waitlist';
 
 const SETTINGS_ROW_ID = 1;
 
+// ---------------------------------------------------------------------------
+// In-memory cache for gate status
+// ---------------------------------------------------------------------------
+// The waitlist gate setting changes rarely (admin toggle). A short TTL avoids
+// hitting the DB on every middleware request while keeping propagation latency
+// under 30 seconds. Explicitly invalidated on settings update.
+// ---------------------------------------------------------------------------
+let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
+const GATE_CACHE_TTL_MS = 30_000; // 30s
+
+/**
+ * Check if the waitlist gate is enabled (DB-backed, memory-cached).
+ * Replaces the old WAITLIST_ENABLED env var with a runtime DB toggle.
+ */
+export async function isWaitlistGateEnabled(): Promise<boolean> {
+  if (_gateEnabledCache && Date.now() < _gateEnabledCache.expiresAt) {
+    return _gateEnabledCache.value;
+  }
+  const settings = await getWaitlistSettings();
+  _gateEnabledCache = {
+    value: settings.gateEnabled,
+    expiresAt: Date.now() + GATE_CACHE_TTL_MS,
+  };
+  return settings.gateEnabled;
+}
+
+/**
+ * Clear the in-memory gate cache. Called after admin settings update
+ * so the next request picks up the new value immediately.
+ */
+export function invalidateWaitlistGateCache(): void {
+  _gateEnabledCache = null;
+}
+
 export interface WaitlistGateSettings {
   gateEnabled: boolean;
   autoAcceptEnabled: boolean;
@@ -35,7 +69,7 @@ async function ensureSettingsRow(): Promise<WaitlistGateSettings> {
     .insert(waitlistSettings)
     .values({
       id: SETTINGS_ROW_ID,
-      gateEnabled: true,
+      gateEnabled: false,
       autoAcceptEnabled: false,
       autoAcceptDailyLimit: 0,
       autoAcceptedToday: 0,
@@ -105,6 +139,7 @@ export async function updateWaitlistSettings(input: {
     .returning();
 
   if (!updated) throw new Error('Failed to update waitlist settings');
+  invalidateWaitlistGateCache();
   return updated;
 }
 

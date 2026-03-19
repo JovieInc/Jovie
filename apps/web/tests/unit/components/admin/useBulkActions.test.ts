@@ -29,6 +29,9 @@ function createProfile(
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     ingestionStatus: 'idle',
     lastIngestionError: null,
+    location: null,
+    hometown: null,
+    activeSinceYear: null,
     socialLinks: [],
     ...overrides,
   };

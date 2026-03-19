@@ -1,5 +1,17 @@
 # TODOs
 
+## Wrong-artist detection + multi-candidate DSP matching
+
+**What:** Change `dsp_artist_matches` unique constraint from `(creator_profile_id, provider_id)` to `(creator_profile_id, provider_id, external_artist_id)`. Update the discovery job to store the top-2 candidates per provider (best = auto_confirmed/suggested, 2nd = suggested). Surface secondary candidates in the presence page with "X tracks matched this profile" context. Detect split catalogs (e.g. "400 tracks on one David Guetta Apple Music profile, 2 on another").
+
+**Why:** The ISRC-based discovery pipeline already computes `allCandidates` (sorted by ISRC match count) in `isrc-aggregator.ts`, but only stores the single best match. This means: (1) artists can't see if their catalog is split across profiles on a DSP, (2) there's no visibility into wrong-artist matches, (3) no manual override when auto-confirm picks the wrong one. For artists with common names or catalog fragmentation, this is a data quality blind spot.
+
+**Context:** `aggregateIsrcMatches()` in `lib/dsp-enrichment/matching/isrc-aggregator.ts` already returns sorted candidates. `storeMatch()` in `dsp-artist-discovery.ts` just needs to be called for the top-2 instead of top-1. The unique constraint change is backwards-compatible (relaxing, not tightening). The `onConflictDoUpdate` target in `storeMatch()` needs updating to match the new 3-column constraint. The presence page (`DspPresenceView.tsx`) already supports multiple items per provider visually — it just filters by status. Secondary candidates would appear as `status: 'suggested'` cards.
+
+**Depends on:** PR that expanded `targetProviders` to `['apple_music', 'deezer', 'musicbrainz']` must land first so Deezer/MusicBrainz matches exist to surface.
+
+---
+
 ## Admin-gated items in user-facing menus
 
 **What:** Add `isAdmin`-gated admin actions (refresh ingest, verify, feature, marketing toggle) to dashboard profile action builders so admins can manage their own profile without navigating to admin tables.
