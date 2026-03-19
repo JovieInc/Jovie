@@ -15,7 +15,10 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getUnreleased, hasUnreleasedEntries } from './lib/changelog-parser.mjs';
+import {
+  getUnreleased,
+  hasUnreleasedEntries,
+} from './lib/changelog-parser.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
