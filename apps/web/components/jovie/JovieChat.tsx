@@ -58,6 +58,37 @@ function getActiveToolLabel(
   return null;
 }
 
+function deriveSessionState(
+  suggestedProfiles: ReturnType<typeof useSuggestedProfiles>,
+  isFirstSessionProp: boolean,
+  latestReleaseTitleProp: string | null,
+  profileId: string | undefined
+) {
+  const suggestionsReady = !suggestedProfiles.isLoading;
+  const detectedFirstSession = suggestionsReady
+    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
+    : null;
+  const isFirstSession =
+    detectedFirstSession === null
+      ? isFirstSessionProp
+      : isFirstSessionProp || detectedFirstSession;
+  const latestReleaseTitle =
+    latestReleaseTitleProp ??
+    suggestedProfiles.starterContext?.latestReleaseTitle ??
+    null;
+  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
+  const hasCarouselItems =
+    showSuggestedProfiles &&
+    !suggestedProfiles.isLoading &&
+    suggestedProfiles.total > 0;
+  return {
+    isFirstSession,
+    latestReleaseTitle,
+    showSuggestedProfiles,
+    hasCarouselItems,
+  };
+}
+
 export function JovieChat({
   profileId,
   artistContext, // NOSONAR - intentional backward compatibility for deprecated prop
@@ -83,23 +114,17 @@ export function JovieChat({
   const suggestedProfiles = useSuggestedProfiles(profileId, {
     enabled: shouldLoadSuggestedProfiles,
   });
-  const suggestionsReady = !suggestedProfiles.isLoading;
-  const detectedFirstSession = suggestionsReady
-    ? (suggestedProfiles.starterContext?.conversationCount ?? 0) === 0
-    : null;
-  const isFirstSession =
-    detectedFirstSession === null
-      ? isFirstSessionProp
-      : isFirstSessionProp || detectedFirstSession;
-  const latestReleaseTitle =
-    latestReleaseTitleProp ??
-    suggestedProfiles.starterContext?.latestReleaseTitle ??
-    null;
-  const showSuggestedProfiles = Boolean(profileId) && !isFirstSession;
-  const hasCarouselItems =
-    showSuggestedProfiles &&
-    !suggestedProfiles.isLoading &&
-    suggestedProfiles.total > 0;
+  const {
+    isFirstSession,
+    latestReleaseTitle,
+    showSuggestedProfiles,
+    hasCarouselItems,
+  } = deriveSessionState(
+    suggestedProfiles,
+    isFirstSessionProp,
+    latestReleaseTitleProp,
+    profileId
+  );
   const shouldLoadInsightSuggestions =
     Boolean(profileId) &&
     !isFirstSession &&
