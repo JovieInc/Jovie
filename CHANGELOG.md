@@ -20,6 +20,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Expand ISRC-based DSP artist discovery to include Deezer and MusicBrainz — previously hardcoded to Apple Music only, leaving built discovery code for 2 providers dead
+- Replace tautological E2E musicfetch-coverage tests with real DB and UI assertions that catch multi-DSP regressions
 - Fix conversion rate labels showing between wrong funnel stages — 33% now correctly appears between Profile Views and Unique Visitors instead of between Unique Visitors and Followers
 - Fix Cities, Countries, and Sources tabs showing blank by sourcing geo data from audience_members (visits) instead of click_events (link clicks only)
 - Fix time range toggle (7d/30d) overflowing off-screen by stacking it below the tab bar
@@ -28,6 +30,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Multi-DSP golden path assertions: poll for Apple Music, Deezer, Tidal, YouTube Music, SoundCloud IDs after Spotify connect with tiered thresholds by artist size
+- Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
+- Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
+- TODO: wrong-artist detection + multi-candidate DSP matching (PR2 follow-up)
 - New blog post: "The Contact Problem" — explores the structural problem of stale artist contacts and introduces the Jovie Inbox vision
 - "Problems We're Solving" section in investor memo linking to all three problem essays (MySpace, Friday, Contact)
 - Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch

@@ -361,7 +361,7 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       expect(mockEnqueueDspArtistDiscoveryJob).toHaveBeenCalledWith(
         expect.objectContaining({
           creatorProfileId: MOCK_PROFILE.id,
-          targetProviders: ['apple_music'],
+          targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
         })
       );
     });

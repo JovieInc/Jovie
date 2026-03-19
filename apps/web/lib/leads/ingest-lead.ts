@@ -47,7 +47,7 @@ async function enqueuePostIngestionJobs(profileId: string, leadId: string) {
     void enqueueDspArtistDiscoveryJob({
       creatorProfileId: profileId,
       spotifyArtistId: createdProfile.spotifyId,
-      targetProviders: ['apple_music'],
+      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
     }).catch(err =>
       captureError('DSP discovery enqueue failed for lead', err, {
         leadId,
