@@ -11,6 +11,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Expand ISRC-based DSP artist discovery to include Deezer and MusicBrainz — previously hardcoded to Apple Music only, leaving built discovery code for 2 providers dead
 - Replace tautological E2E musicfetch-coverage tests with real DB and UI assertions that catch multi-DSP regressions
+- MusicFetch ingest pipeline: treat 400 errors as permanent failures instead of retrying indefinitely, preventing circuit breaker trips that blocked all enrichment (JOV-1629, JOV-1630)
+- MusicFetch enrichment: return gracefully when API returns no data instead of throwing and retrying
 
 ### Added
 
@@ -18,6 +20,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
 - Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
 - TODO: wrong-artist detection + multi-candidate DSP matching (PR2 follow-up)
+- Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
+- Campaign toggle check in both the campaign processor cron and claim-invite job processor
+- Admin UI toggle switch on the outreach email page for enabling/disabling campaigns
+- API endpoints for reading and updating campaign enabled state
 
 ## [26.4.8] - 2026-03-18
 
