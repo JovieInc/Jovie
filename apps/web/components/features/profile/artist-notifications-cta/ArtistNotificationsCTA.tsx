@@ -329,7 +329,8 @@ export function ArtistNotificationsCTA({
     country.dialCode
   );
 
-  const handleInputChange = channel === 'sms' ? handlePhoneChange : handleEmailChange;
+  const handleInputChange =
+    channel === 'sms' ? handlePhoneChange : handleEmailChange;
 
   const handleInputBlur = () => {
     setIsInputFocused(false);

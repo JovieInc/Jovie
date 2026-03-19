@@ -81,7 +81,12 @@ function deriveSessionState(
     showSuggestedProfiles &&
     !suggestedProfiles.isLoading &&
     suggestedProfiles.total > 0;
-  return { isFirstSession, latestReleaseTitle, hasCarouselItems };
+  return {
+    isFirstSession,
+    latestReleaseTitle,
+    showSuggestedProfiles,
+    hasCarouselItems,
+  };
 }
 
 export function JovieChat({
@@ -109,8 +114,17 @@ export function JovieChat({
   const suggestedProfiles = useSuggestedProfiles(profileId, {
     enabled: shouldLoadSuggestedProfiles,
   });
-  const { isFirstSession, latestReleaseTitle, hasCarouselItems } =
-    deriveSessionState(suggestedProfiles, isFirstSessionProp, latestReleaseTitleProp, profileId);
+  const {
+    isFirstSession,
+    latestReleaseTitle,
+    showSuggestedProfiles,
+    hasCarouselItems,
+  } = deriveSessionState(
+    suggestedProfiles,
+    isFirstSessionProp,
+    latestReleaseTitleProp,
+    profileId
+  );
   const shouldLoadInsightSuggestions =
     Boolean(profileId) &&
     !isFirstSession &&
