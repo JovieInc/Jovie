@@ -38,6 +38,98 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
+interface InboundArtist {
+  id: string;
+  displayName: string | null;
+  username: string | null;
+  genres: string[] | null;
+}
+
+async function processInboundEmail(
+  data: ResendInboundEvent['data'],
+  artist: InboundArtist,
+  recipientEmail: string
+): Promise<void> {
+  const fullEmail = await fetchFullEmail(data.email_id);
+
+  const existingThreadId = await findThread({
+    creatorProfileId: artist.id,
+    inReplyTo: fullEmail?.headers?.['in-reply-to'] ?? null,
+    references: parseReferences(fullEmail?.headers?.references),
+    fromEmail: data.from,
+    subject: data.subject ?? null,
+  });
+
+  let threadId: string;
+
+  if (existingThreadId) {
+    threadId = existingThreadId;
+    await db
+      .update(emailThreads)
+      .set({
+        latestMessageAt: new Date(),
+        messageCount: drizzleSql`${emailThreads.messageCount} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(emailThreads.id, existingThreadId));
+  } else {
+    const [newThread] = await db
+      .insert(emailThreads)
+      .values({
+        creatorProfileId: artist.id,
+        subject: normalizeSubject(data.subject),
+        status: 'pending_review',
+      })
+      .returning({ id: emailThreads.id });
+
+    threadId = newThread!.id;
+  }
+
+  await db.insert(inboundEmails).values({
+    creatorProfileId: artist.id,
+    threadId,
+    messageId: data.message_id ?? null,
+    inReplyTo: fullEmail?.headers?.['in-reply-to'] ?? null,
+    references: parseReferences(fullEmail?.headers?.references),
+    fromEmail: data.from,
+    fromName: data.from_name ?? null,
+    toEmail: recipientEmail,
+    ccEmails: data.cc ?? [],
+    subject: data.subject ?? null,
+    bodyText: fullEmail?.text ?? null,
+    bodyHtml: fullEmail?.html ?? null,
+    strippedText: fullEmail?.stripped_text ?? null,
+    rawHeaders: fullEmail?.headers ?? null,
+    resendEmailId: data.email_id,
+  });
+
+  if (!existingThreadId) {
+    const classification = await classifyEmail({
+      fromEmail: data.from,
+      fromName: data.from_name ?? null,
+      subject: data.subject ?? null,
+      bodyText: fullEmail?.text ?? null,
+      artistName: artist.displayName ?? artist.username ?? 'Artist',
+      artistGenres: artist.genres,
+    });
+
+    if (classification) {
+      await db
+        .update(emailThreads)
+        .set({
+          suggestedCategory: classification.category,
+          suggestedTerritory: classification.territory,
+          categoryConfidence: classification.confidence,
+          priority: classification.priority,
+          aiSummary: classification.summary,
+          aiExtractedData: classification.extractedData,
+          updatedAt: new Date(),
+        })
+        .where(eq(emailThreads.id, threadId));
+    }
+  }
+}
+
 /**
  * POST handler for Resend inbound email webhooks.
  */
@@ -134,97 +226,12 @@ export async function POST(req: NextRequest) {
   const artist = profile[0];
 
   try {
-    // Fetch full email content from Resend API
-    const fullEmail = await fetchFullEmail(data.email_id);
-
-    // Thread assignment
-    const existingThreadId = await findThread({
-      creatorProfileId: artist.id,
-      inReplyTo: fullEmail?.headers?.['in-reply-to'] ?? null,
-      references: parseReferences(fullEmail?.headers?.references),
-      fromEmail: data.from,
-      subject: data.subject ?? null,
-    });
-
-    let threadId: string;
-
-    if (existingThreadId) {
-      // Append to existing thread — single atomic update
-      threadId = existingThreadId;
-      await db
-        .update(emailThreads)
-        .set({
-          latestMessageAt: new Date(),
-          messageCount: drizzleSql`${emailThreads.messageCount} + 1`,
-          updatedAt: new Date(),
-        })
-        .where(eq(emailThreads.id, existingThreadId));
-    } else {
-      // Create new thread
-      const [newThread] = await db
-        .insert(emailThreads)
-        .values({
-          creatorProfileId: artist.id,
-          subject: normalizeSubject(data.subject),
-          status: 'pending_review',
-        })
-        .returning({ id: emailThreads.id });
-
-      threadId = newThread!.id;
-    }
-
-    // Store the inbound email
-    await db.insert(inboundEmails).values({
-      creatorProfileId: artist.id,
-      threadId,
-      messageId: data.message_id ?? null,
-      inReplyTo: fullEmail?.headers?.['in-reply-to'] ?? null,
-      references: parseReferences(fullEmail?.headers?.references),
-      fromEmail: data.from,
-      fromName: data.from_name ?? null,
-      toEmail: recipientEmail,
-      ccEmails: data.cc ?? [],
-      subject: data.subject ?? null,
-      bodyText: fullEmail?.text ?? null,
-      bodyHtml: fullEmail?.html ?? null,
-      strippedText: fullEmail?.stripped_text ?? null,
-      rawHeaders: fullEmail?.headers ?? null,
-      resendEmailId: data.email_id,
-    });
-
-    // AI classification (inline — Haiku is ~200ms, well within webhook timeout)
-    if (!existingThreadId) {
-      const classification = await classifyEmail({
-        fromEmail: data.from,
-        fromName: data.from_name ?? null,
-        subject: data.subject ?? null,
-        bodyText: fullEmail?.text ?? null,
-        artistName: artist.displayName ?? artist.username ?? 'Artist',
-        artistGenres: artist.genres,
-      });
-
-      if (classification) {
-        await db
-          .update(emailThreads)
-          .set({
-            suggestedCategory: classification.category,
-            suggestedTerritory: classification.territory,
-            categoryConfidence: classification.confidence,
-            priority: classification.priority,
-            aiSummary: classification.summary,
-            aiExtractedData: classification.extractedData,
-            updatedAt: new Date(),
-          })
-          .where(eq(emailThreads.id, threadId));
-      }
-    }
+    await processInboundEmail(data, artist, recipientEmail);
 
     logger.info('Inbound email processed', {
-      threadId,
       username,
       from: data.from,
       subject: data.subject,
-      isNewThread: !existingThreadId,
     });
 
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
