@@ -120,22 +120,24 @@ export function LocationPicker({
           )}
 
           {/* When searching: show filtered results */}
-          {filteredCities !== null ? (
-            filteredCities.length > 0 ? (
-              filteredCities.map(city => (
-                <CityOption
-                  key={city.value}
-                  label={city.label}
-                  isSelected={value?.toLowerCase() === city.value}
-                  onSelect={handleSelect}
-                />
-              ))
-            ) : !showFreeText ? (
+          {filteredCities !== null &&
+            filteredCities.length > 0 &&
+            filteredCities.map(city => (
+              <CityOption
+                key={city.value}
+                label={city.label}
+                isSelected={value?.toLowerCase() === city.value}
+                onSelect={handleSelect}
+              />
+            ))}
+          {filteredCities !== null &&
+            filteredCities.length === 0 &&
+            showFreeText === false && (
               <p className='px-2.5 py-3 text-[13px] text-tertiary-token text-center'>
                 No matching cities
               </p>
-            ) : null
-          ) : (
+            )}
+          {filteredCities === null && (
             <>
               {/* Popular cities */}
               <div className='px-2.5 pt-1 pb-1'>
