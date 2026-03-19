@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+
+## [26.4.14] - 2026-03-19
+
+### Fixed
+
+- Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
+- Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
+
+### Removed
+
+- Deleted unauthenticated `/api/waitlist-debug` endpoint and its tests
+- Removed unused domain-categorizer functions (addSensitiveDomain, containsSensitiveKeywords, sanitizeForCrawlers, getAllSensitiveDomains)
+
 ## [26.4.13] - 2026-03-19
 
 ### Added
