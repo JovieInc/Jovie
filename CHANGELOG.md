@@ -7,6 +7,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.8] - 2026-03-18
 
+### Added
+
+- Conductor workspace archive script to clean up build artifacts and node_modules when archiving
+
 ### Changed
 
 - Homepage hero: "One link to grow your music career" → "One link to launch your music career"
@@ -18,6 +22,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Extract shared `validateBatchItem` helper to deduplicate validation logic across batch operations
 - Remove `console.time()`/`console.timeEnd()` from dashboard API routes to prevent timing information leaks in production logs
 - Document intentional `Access-Control-Allow-Origin: *` CORS policy on public pixel tracking endpoint
+
+### Fixed
+
+- Conductor run script no longer double-wraps Doppler secrets (was `doppler run -- pnpm dev:web` which chains into web's `doppler run -- next dev`)
 
 ## [26.4.7] - 2026-03-18
 
