@@ -21,6 +21,8 @@ export interface ReleaseProviderMatrixProps {
   readonly allowArtworkDownloads?: boolean;
   /** Whether a Spotify import is currently in progress (from server) */
   readonly initialImporting?: boolean;
+  /** Total releases expected from the current Spotify import (from server) */
+  readonly initialTotalCount?: number;
   /** Optional adapter that swaps live behaviors for demo/static rendering */
   readonly experienceAdapter?: ReleaseExperienceAdapter;
 }

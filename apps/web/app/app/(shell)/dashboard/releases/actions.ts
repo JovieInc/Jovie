@@ -1068,6 +1068,7 @@ export async function pollReleasesCount(): Promise<{
 export async function getSpotifyImportStatus(): Promise<{
   status: 'idle' | 'importing' | 'complete' | 'failed';
   releaseCount: number;
+  totalCount: number;
   enrichmentStatus: EnrichmentStatusMap;
   aggregateEnrichmentStatus: AggregateEnrichmentStatus;
 }> {
@@ -1097,6 +1098,10 @@ export async function getSpotifyImportStatus(): Promise<{
   const storedStatus = settings.spotifyImportStatus as string | undefined;
   const releaseCount = Number(row?.releaseCount ?? 0);
   const hasSpotifyProfile = Boolean(row?.spotifyId);
+  const totalCount =
+    typeof settings.spotifyImportTotal === 'number'
+      ? settings.spotifyImportTotal
+      : 0;
 
   let status: 'idle' | 'importing' | 'complete' | 'failed';
   if (storedStatus === 'complete') {
@@ -1104,7 +1109,7 @@ export async function getSpotifyImportStatus(): Promise<{
   } else if (storedStatus === 'failed') {
     status = 'failed';
   } else if (storedStatus === 'importing') {
-    status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'importing';
+    status = 'importing';
   } else {
     status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
   }
@@ -1118,7 +1123,13 @@ export async function getSpotifyImportStatus(): Promise<{
   );
   const aggregateEnrichmentStatus = deriveAggregateStatus(enrichmentStatus);
 
-  return { status, releaseCount, enrichmentStatus, aggregateEnrichmentStatus };
+  return {
+    status,
+    releaseCount,
+    totalCount,
+    enrichmentStatus,
+    aggregateEnrichmentStatus,
+  };
 }
 
 export async function connectSpotifyArtist(params: {
@@ -1192,6 +1203,7 @@ export async function connectSpotifyArtist(params: {
           ...currentSettings,
           spotifyArtistName: params.artistName,
           spotifyImportStatus: 'importing',
+          spotifyImportTotal: 0,
         },
         updatedAt: new Date(),
       })
@@ -1240,6 +1252,7 @@ export async function connectSpotifyArtist(params: {
           spotifyArtistName:
             params.artistName || (latestSettings.spotifyArtistName as string),
           spotifyImportStatus,
+          spotifyImportTotal: result.total,
         },
         updatedAt: new Date(),
       })

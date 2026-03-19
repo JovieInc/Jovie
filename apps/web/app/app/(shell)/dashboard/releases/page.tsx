@@ -78,6 +78,10 @@ export default async function ReleasesPage() {
     (profileSettings.allowArtworkDownloads as boolean) ?? false;
   const spotifyImportStatus =
     (profileSettings.spotifyImportStatus as string) ?? 'idle';
+  const spotifyImportTotal =
+    typeof profileSettings.spotifyImportTotal === 'number'
+      ? profileSettings.spotifyImportTotal
+      : 0;
   return (
     <ReleasesClientBoundary>
       <ReleasesExperience
@@ -90,6 +94,7 @@ export default async function ReleasesPage() {
         appleMusicArtistName={appleMusicStatus.artistName}
         allowArtworkDownloads={allowArtworkDownloads}
         initialImporting={spotifyImportStatus === 'importing'}
+        initialTotalCount={spotifyImportTotal}
       />
     </ReleasesClientBoundary>
   );
