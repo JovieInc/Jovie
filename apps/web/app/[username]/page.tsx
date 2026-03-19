@@ -76,7 +76,7 @@ function generateProfileStructuredData(
         'youtube',
         'tiktok',
         'spotify',
-      ].includes(link.platform.toLowerCase())
+      ].includes((link.platform ?? '').toLowerCase())
     )
     .map(link => link.url);
 
@@ -243,7 +243,7 @@ const fetchProfileAndLinks = async (
       result.socialLinks?.map(link => ({
         id: link.id,
         artist_id: result.id,
-        platform: link.platform.toLowerCase(),
+        platform: (link.platform ?? '').toLowerCase(),
         url: link.url,
         clicks: link.clicks || 0,
         created_at: toISOStringSafe(link.createdAt),
@@ -489,7 +489,7 @@ async function renderListenMode(
     socialLinks = rawSocialLinks.map(link => ({
       id: link.id,
       artist_id: profileResult.profile.id,
-      platform: link.platform.toLowerCase(),
+      platform: (link.platform ?? '').toLowerCase(),
       url: link.url,
       clicks: link.clicks || 0,
       created_at: toISOStringSafe(link.createdAt),
@@ -653,10 +653,18 @@ export default async function ArtistPage({
   }
 
   // Cache Statsig decisions for public profile traffic to avoid per-request latency.
-  const [showLatestRelease, subscribeCTAVariant] = await Promise.all([
-    getCachedLatestReleaseGate(),
-    getCachedSubscribeCTAVariant(profile.id),
-  ]);
+  // Tour dates are parallelized with statsig to eliminate sequential waterfall.
+  const [showLatestRelease, subscribeCTAVariant, tourDates] = await Promise.all(
+    [
+      getCachedLatestReleaseGate(),
+      getCachedSubscribeCTAVariant(profile.id),
+      mode === 'tour'
+        ? loadUpcomingTourDates(profile.id)
+        : Promise.resolve(
+            [] as Awaited<ReturnType<typeof loadUpcomingTourDates>>
+          ),
+    ]
+  );
 
   const latestRelease = showLatestRelease ? fetchedLatestRelease : null;
   const subscribeTwoStep = subscribeCTAVariant === 'two_step';
@@ -667,9 +675,6 @@ export default async function ArtistPage({
   );
 
   const subtitle = getProfileModeSubtitle(mode);
-
-  const tourDates =
-    mode === 'tour' ? await loadUpcomingTourDates(profile.id) : [];
 
   // Show tip button whenever artist has Venmo, and style active state in tip mode.
   const hasVenmoLink = links.some(link => link.platform === 'venmo');

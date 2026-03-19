@@ -15,6 +15,7 @@ export interface BulkAction {
   label: string;
   icon?: React.ReactNode;
   onClick: () => void;
+  variant?: 'default' | 'destructive';
 }
 
 export interface TableBulkActionsToolbarProps {
@@ -56,7 +57,15 @@ export function TableBulkActionsToolbar({
           </DropdownMenuTrigger>
           <DropdownMenuContent align='start'>
             {actions.map(action => (
-              <DropdownMenuItem key={action.label} onClick={action.onClick}>
+              <DropdownMenuItem
+                key={action.label}
+                onClick={action.onClick}
+                className={
+                  action.variant === 'destructive'
+                    ? 'text-destructive focus:text-destructive'
+                    : undefined
+                }
+              >
                 {action.icon && (
                   <span className='h-4 w-4 flex items-center justify-center [&>svg]:h-4 [&>svg]:w-4'>
                     {action.icon}
@@ -74,7 +83,7 @@ export function TableBulkActionsToolbar({
         variant='ghost'
         size='sm'
         onClick={onClearSelection}
-        className='ml-auto h-7 rounded-[7px] border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+        className='ml-auto h-7 rounded-full border border-transparent px-2 text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
       >
         <X className='h-4 w-4 mr-1' />
         Clear

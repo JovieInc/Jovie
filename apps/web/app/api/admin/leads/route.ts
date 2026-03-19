@@ -10,6 +10,7 @@ import {
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { cacheQuery } from '@/lib/db/cache';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leads } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
@@ -40,25 +41,6 @@ function getLeadSortColumn(sortBy: string) {
   if (sortBy === 'priorityScore') return leads.priorityScore;
   if (sortBy === 'displayName') return leads.displayName;
   return leads.createdAt;
-}
-
-function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
-  // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
-  // the actual PG "column X does not exist" lives on .cause, not the outer error.
-  const normalized = getDeepErrorMessage(error).toLowerCase();
-
-  return (
-    normalized.includes('column "spotify_popularity" does not exist') ||
-    normalized.includes('column "spotify_followers" does not exist') ||
-    normalized.includes('column "release_count" does not exist') ||
-    normalized.includes('column "latest_release_date" does not exist') ||
-    normalized.includes('column "priority_score" does not exist') ||
-    normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist') ||
-    normalized.includes('column "email_invalid" does not exist') ||
-    normalized.includes('column "email_suspicious" does not exist') ||
-    normalized.includes('column "email_invalid_reason" does not exist')
-  );
 }
 
 function isMissingLeadInsertColumnError(error: unknown): boolean {
@@ -128,7 +110,11 @@ async function insertLeadWithLegacyFallback(seed: {
  * GET /api/admin/leads — List leads with filtering, search, sort, pagination.
  */
 export async function GET(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await cacheQuery(
+    'entitlements:admin-leads',
+    () => getCurrentUserEntitlements(),
+    { ttlSeconds: 300 }
+  );
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -165,166 +151,88 @@ export async function GET(request: NextRequest) {
 
     const orderFn = query.sortOrder === 'asc' ? asc : desc;
 
-    let items;
-    let totalRow;
+    const [items, [totalRow]] = await Promise.all([
+      db
+        .select({
+          id: leads.id,
+          linktreeHandle: leads.linktreeHandle,
+          linktreeUrl: leads.linktreeUrl,
+          discoverySource: leads.discoverySource,
+          discoveryQuery: leads.discoveryQuery,
+          displayName: leads.displayName,
+          bio: leads.bio,
+          avatarUrl: leads.avatarUrl,
+          contactEmail: leads.contactEmail,
+          hasPaidTier: leads.hasPaidTier,
+          hasSpotifyLink: leads.hasSpotifyLink,
+          spotifyUrl: leads.spotifyUrl,
+          hasInstagram: leads.hasInstagram,
+          instagramHandle: leads.instagramHandle,
+          musicToolsDetected: leads.musicToolsDetected,
+          allLinks: leads.allLinks,
+          fitScore: leads.fitScore,
+          fitScoreBreakdown: leads.fitScoreBreakdown,
+          status: leads.status,
+          disqualificationReason: leads.disqualificationReason,
+          qualifiedAt: leads.qualifiedAt,
+          disqualifiedAt: leads.disqualifiedAt,
+          approvedAt: leads.approvedAt,
+          ingestedAt: leads.ingestedAt,
+          rejectedAt: leads.rejectedAt,
+          creatorProfileId: leads.creatorProfileId,
+          spotifyPopularity: leads.spotifyPopularity,
+          spotifyFollowers: leads.spotifyFollowers,
+          releaseCount: leads.releaseCount,
+          latestReleaseDate: leads.latestReleaseDate,
+          priorityScore: leads.priorityScore,
+          emailInvalid: leads.emailInvalid,
+          emailSuspicious: leads.emailSuspicious,
+          emailInvalidReason: leads.emailInvalidReason,
+          hasRepresentation: leads.hasRepresentation,
+          representationSignal: leads.representationSignal,
+          outreachRoute: leads.outreachRoute,
+          outreachStatus: leads.outreachStatus,
+          claimToken: leads.claimToken,
+          claimTokenHash: leads.claimTokenHash,
+          claimTokenExpiresAt: leads.claimTokenExpiresAt,
+          instantlyLeadId: leads.instantlyLeadId,
+          outreachQueuedAt: leads.outreachQueuedAt,
+          dmSentAt: leads.dmSentAt,
+          dmCopy: leads.dmCopy,
+          scrapedAt: leads.scrapedAt,
+          createdAt: leads.createdAt,
+          updatedAt: leads.updatedAt,
+        })
+        .from(leads)
+        .where(where)
+        .orderBy(orderFn(orderColumn))
+        .limit(query.pageSize)
+        .offset((query.page - 1) * query.pageSize),
+      db.select({ count: count() }).from(leads).where(where),
+    ]);
 
-    try {
-      [items, [totalRow]] = await Promise.all([
-        db
-          .select({
-            id: leads.id,
-            linktreeHandle: leads.linktreeHandle,
-            linktreeUrl: leads.linktreeUrl,
-            discoverySource: leads.discoverySource,
-            discoveryQuery: leads.discoveryQuery,
-            displayName: leads.displayName,
-            bio: leads.bio,
-            avatarUrl: leads.avatarUrl,
-            contactEmail: leads.contactEmail,
-            hasPaidTier: leads.hasPaidTier,
-            hasSpotifyLink: leads.hasSpotifyLink,
-            spotifyUrl: leads.spotifyUrl,
-            hasInstagram: leads.hasInstagram,
-            instagramHandle: leads.instagramHandle,
-            musicToolsDetected: leads.musicToolsDetected,
-            allLinks: leads.allLinks,
-            fitScore: leads.fitScore,
-            fitScoreBreakdown: leads.fitScoreBreakdown,
-            status: leads.status,
-            disqualificationReason: leads.disqualificationReason,
-            qualifiedAt: leads.qualifiedAt,
-            disqualifiedAt: leads.disqualifiedAt,
-            approvedAt: leads.approvedAt,
-            ingestedAt: leads.ingestedAt,
-            rejectedAt: leads.rejectedAt,
-            creatorProfileId: leads.creatorProfileId,
-            spotifyPopularity: leads.spotifyPopularity,
-            spotifyFollowers: leads.spotifyFollowers,
-            releaseCount: leads.releaseCount,
-            latestReleaseDate: leads.latestReleaseDate,
-            priorityScore: leads.priorityScore,
-            emailInvalid: leads.emailInvalid,
-            emailSuspicious: leads.emailSuspicious,
-            emailInvalidReason: leads.emailInvalidReason,
-            hasRepresentation: leads.hasRepresentation,
-            representationSignal: leads.representationSignal,
-            outreachRoute: leads.outreachRoute,
-            outreachStatus: leads.outreachStatus,
-            claimToken: leads.claimToken,
-            claimTokenHash: leads.claimTokenHash,
-            claimTokenExpiresAt: leads.claimTokenExpiresAt,
-            instantlyLeadId: leads.instantlyLeadId,
-            outreachQueuedAt: leads.outreachQueuedAt,
-            dmSentAt: leads.dmSentAt,
-            dmCopy: leads.dmCopy,
-            scrapedAt: leads.scrapedAt,
-            createdAt: leads.createdAt,
-            updatedAt: leads.updatedAt,
-          })
-          .from(leads)
-          .where(where)
-          .orderBy(orderFn(orderColumn))
-          .limit(query.pageSize)
-          .offset((query.page - 1) * query.pageSize),
-        db.select({ count: count() }).from(leads).where(where),
-      ]);
-    } catch (error) {
-      if (!isMissingLeadEnrichmentColumnError(error)) {
-        throw error;
-      }
-
-      await captureWarning(
-        '[admin/leads] leads enrichment columns missing; falling back to legacy select',
-        error,
-        { route: '/api/admin/leads' }
-      );
-
-      [items, [totalRow]] = await Promise.all([
-        db
-          .select({
-            id: leads.id,
-            linktreeHandle: leads.linktreeHandle,
-            linktreeUrl: leads.linktreeUrl,
-            discoverySource: leads.discoverySource,
-            discoveryQuery: leads.discoveryQuery,
-            displayName: leads.displayName,
-            bio: leads.bio,
-            avatarUrl: leads.avatarUrl,
-            contactEmail: leads.contactEmail,
-            hasPaidTier: leads.hasPaidTier,
-            hasSpotifyLink: leads.hasSpotifyLink,
-            spotifyUrl: leads.spotifyUrl,
-            hasInstagram: leads.hasInstagram,
-            instagramHandle: leads.instagramHandle,
-            allLinks: leads.allLinks,
-            fitScore: leads.fitScore,
-            fitScoreBreakdown: leads.fitScoreBreakdown,
-            status: leads.status,
-            disqualificationReason: leads.disqualificationReason,
-            qualifiedAt: leads.qualifiedAt,
-            disqualifiedAt: leads.disqualifiedAt,
-            approvedAt: leads.approvedAt,
-            ingestedAt: leads.ingestedAt,
-            rejectedAt: leads.rejectedAt,
-            creatorProfileId: leads.creatorProfileId,
-            hasRepresentation: leads.hasRepresentation,
-            representationSignal: leads.representationSignal,
-            outreachRoute: leads.outreachRoute,
-            outreachStatus: leads.outreachStatus,
-            claimToken: leads.claimToken,
-            claimTokenHash: leads.claimTokenHash,
-            claimTokenExpiresAt: leads.claimTokenExpiresAt,
-            instantlyLeadId: leads.instantlyLeadId,
-            outreachQueuedAt: leads.outreachQueuedAt,
-            dmSentAt: leads.dmSentAt,
-            dmCopy: leads.dmCopy,
-            scrapedAt: leads.scrapedAt,
-            createdAt: leads.createdAt,
-            updatedAt: leads.updatedAt,
-          })
-          .from(leads)
-          .where(where)
-          .orderBy(desc(leads.createdAt))
-          .limit(query.pageSize)
-          .offset((query.page - 1) * query.pageSize),
-        db.select({ count: count() }).from(leads).where(where),
-      ]);
-    }
-
-    const normalizedItems = items.map(item => {
-      const latestReleaseDate =
-        'latestReleaseDate' in item && item.latestReleaseDate instanceof Date
-          ? item.latestReleaseDate
-          : null;
-
-      return {
-        ...item,
-        hasSpotifyLink: item.hasSpotifyLink ?? false,
-        hasInstagram: item.hasInstagram ?? false,
-        musicToolsDetected:
-          'musicToolsDetected' in item ? (item.musicToolsDetected ?? []) : [],
-        spotifyPopularity:
-          'spotifyPopularity' in item ? (item.spotifyPopularity ?? null) : null,
-        spotifyFollowers:
-          'spotifyFollowers' in item ? (item.spotifyFollowers ?? null) : null,
-        releaseCount:
-          'releaseCount' in item ? (item.releaseCount ?? null) : null,
-        priorityScore:
-          'priorityScore' in item ? (item.priorityScore ?? null) : null,
-        createdAt: item.createdAt.toISOString(),
-        updatedAt: item.updatedAt.toISOString(),
-        qualifiedAt: toIsoStringOrNull(item.qualifiedAt),
-        disqualifiedAt: toIsoStringOrNull(item.disqualifiedAt),
-        approvedAt: toIsoStringOrNull(item.approvedAt),
-        ingestedAt: toIsoStringOrNull(item.ingestedAt),
-        rejectedAt: toIsoStringOrNull(item.rejectedAt),
-        latestReleaseDate: toIsoStringOrNull(latestReleaseDate),
-        scrapedAt: toIsoStringOrNull(item.scrapedAt),
-        outreachQueuedAt: toIsoStringOrNull(item.outreachQueuedAt),
-        claimTokenExpiresAt: toIsoStringOrNull(item.claimTokenExpiresAt),
-        dmSentAt: toIsoStringOrNull(item.dmSentAt),
-      };
-    });
+    const normalizedItems = items.map(item => ({
+      ...item,
+      hasSpotifyLink: item.hasSpotifyLink ?? false,
+      hasInstagram: item.hasInstagram ?? false,
+      musicToolsDetected: item.musicToolsDetected ?? [],
+      spotifyPopularity: item.spotifyPopularity ?? null,
+      spotifyFollowers: item.spotifyFollowers ?? null,
+      releaseCount: item.releaseCount ?? null,
+      priorityScore: item.priorityScore ?? null,
+      createdAt: item.createdAt.toISOString(),
+      updatedAt: item.updatedAt.toISOString(),
+      qualifiedAt: toIsoStringOrNull(item.qualifiedAt),
+      disqualifiedAt: toIsoStringOrNull(item.disqualifiedAt),
+      approvedAt: toIsoStringOrNull(item.approvedAt),
+      ingestedAt: toIsoStringOrNull(item.ingestedAt),
+      rejectedAt: toIsoStringOrNull(item.rejectedAt),
+      latestReleaseDate: toIsoStringOrNull(item.latestReleaseDate),
+      scrapedAt: toIsoStringOrNull(item.scrapedAt),
+      outreachQueuedAt: toIsoStringOrNull(item.outreachQueuedAt),
+      claimTokenExpiresAt: toIsoStringOrNull(item.claimTokenExpiresAt),
+      dmSentAt: toIsoStringOrNull(item.dmSentAt),
+    }));
 
     return NextResponse.json(
       {
@@ -413,7 +321,11 @@ async function processLeadUrl(
  * Inserts new leads as 'discovered', then triggers qualification.
  */
 export async function POST(request: NextRequest) {
-  const entitlements = await getCurrentUserEntitlements();
+  const entitlements = await cacheQuery(
+    'entitlements:admin-leads',
+    () => getCurrentUserEntitlements(),
+    { ttlSeconds: 300 }
+  );
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },

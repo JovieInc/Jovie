@@ -153,7 +153,7 @@ export function DspMatchCard({
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
-            className='flex w-full items-center justify-between rounded-[6px] text-[13px] text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+            className='flex w-full items-center justify-between rounded-full text-[13px] text-tertiary-token transition-colors hover:text-secondary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
           >
             <span>Confidence breakdown</span>
             <Icon

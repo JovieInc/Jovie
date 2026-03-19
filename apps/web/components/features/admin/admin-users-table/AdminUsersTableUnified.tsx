@@ -331,6 +331,21 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           }
         },
       },
+      {
+        label: 'Copy User IDs',
+        icon: <Copy className='h-3.5 w-3.5' />,
+        onClick: async () => {
+          const ids = selectedUsers.map(u => u.id).filter(Boolean);
+          if (ids.length === 0) return;
+          const ok = await copyToClipboard(ids.join('\n'));
+          if (ok) {
+            toast.success(`Copied ${ids.length} User ID(s)`);
+            clearSelection();
+          } else {
+            toast.error('Failed to copy User IDs');
+          }
+        },
+      },
     ];
   }, [users, selectedIds, clearSelection]);
 

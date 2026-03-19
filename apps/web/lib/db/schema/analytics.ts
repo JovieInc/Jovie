@@ -153,6 +153,10 @@ export const clickEvents = pgTable(
     nonBotClicksIdx: index('idx_click_events_non_bot')
       .on(table.creatorProfileId, table.createdAt)
       .where(drizzleSql`is_bot = false OR is_bot IS NULL`),
+    // Partial index for release analytics queries filtering on metadata contentId
+    metadataContentIdx: index('idx_click_events_metadata_content')
+      .on(table.creatorProfileId, table.createdAt)
+      .where(drizzleSql`metadata->>'contentId' IS NOT NULL`),
   })
 );
 

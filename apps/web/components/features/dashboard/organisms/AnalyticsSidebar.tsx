@@ -193,7 +193,7 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-8 items-center justify-between rounded-[7px] px-2'
+          className='group flex h-8 items-center justify-between rounded-full px-2'
         >
           <div className='flex min-w-0 flex-1 items-center gap-2'>
             <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>

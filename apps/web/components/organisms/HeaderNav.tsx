@@ -65,7 +65,7 @@ export function HeaderNav({
           <LogoLink
             logoSize={logoSize}
             variant={logoVariant}
-            className='px-2 rounded-[6px]'
+            className='px-2 rounded-full'
           />
         </div>
 

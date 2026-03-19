@@ -191,7 +191,7 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'rounded-[7px] border border-transparent p-1 text-tertiary-token',
+                  'rounded-full border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
                   'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'

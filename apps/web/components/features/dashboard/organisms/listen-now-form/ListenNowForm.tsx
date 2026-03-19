@@ -241,7 +241,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('spotify')}
-                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>
@@ -297,7 +297,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
               <button
                 type='button'
                 onClick={() => openSearchPalette('apple_music')}
-                className='shrink-0 rounded-[8px] px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
+                className='shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-0 hover:text-primary-token'
               >
                 Search
               </button>

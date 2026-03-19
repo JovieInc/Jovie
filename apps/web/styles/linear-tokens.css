@@ -192,12 +192,12 @@
   --linear-hero-height: 392px;
   --linear-button-height-sm: 32px;
   --linear-button-height-md: 40px;
-  --linear-radius-sm: 4px;
+  --linear-radius-sm: 8px;
   --linear-radius-md: 8px;
   --linear-radius-lg: 12px;
   --linear-radius-full: 9999px;
   /* App UI tokens (distinct from marketing page tokens) */
-  --linear-app-radius-item: 4px;
+  --linear-app-radius-item: 8px;
   --linear-app-radius-menu: 8px;
   --linear-app-shell-gap: 8px;
   --linear-app-shell-radius: 12px;

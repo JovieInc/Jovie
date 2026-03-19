@@ -59,10 +59,10 @@
      --bg-surface-2: Cards and panels
      --bg-surface-3: Interactive / elevated */
   /* prettier-ignore */
-  --color-bg-base: #f7f8f9;
+  --color-bg-base: #f5f5f5;
   /* Sidebar bg */
   /* prettier-ignore */
-  --color-bg-surface-0: #f7f8f9;
+  --color-bg-surface-0: #f5f5f5;
   /* Page bg */
   /* prettier-ignore */
   --color-bg-surface-1: var(--linear-bg-surface-0);
@@ -74,7 +74,7 @@
   --color-bg-surface-3: #ebecef;
   /* Nested / hover */
 
-  --color-bg-page: #f7f8f9;
+  --color-bg-page: #f5f5f5;
   /* Same as base */
   --color-bg-hover: rgba(0, 0, 0, 0.04);
   /* Hover overlay */
@@ -84,21 +84,17 @@
   /* Same as surface-3 */
   --color-bg-active: #ebecef;
   /* Same as surface-3 */
+  --color-bg-primary: lch(98.94% 0.5 282);
+  --color-bg-secondary: lch(93.797% 1.529 282);
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
 
   /* Text hierarchy - contrast-aware */
-  --color-text-primary-token: oklch(10% 0 0);
-  --color-text-secondary-token: oklch(
-    40% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-tertiary-token: oklch(
-    50% var(--theme-base-chroma) var(--theme-base-hue)
-  );
-  --color-text-quaternary-token: oklch(
-    60% var(--theme-base-chroma) var(--theme-base-hue)
-  );
+  --color-text-primary-token: lch(9.894% 0 282);
+  --color-text-secondary-token: lch(19.788% 1.25 282);
+  --color-text-tertiary-token: lch(39.576% 1.25 282);
+  --color-text-quaternary-token: lch(65.3% 1.25 282);
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
   );
@@ -215,6 +211,8 @@
   /* Same as surface-1 */
   --color-bg-active: #23252a;
   /* Same as surface-2 */
+  --color-bg-primary: lch(9.894% 0.5 282);
+  --color-bg-secondary: lch(14.44% 0.5 282);
   --color-bg-button: #2a2c32;
   /* Same as surface-3 */
   --color-bg-tooltip: #2a2c32;
@@ -776,12 +774,12 @@
   --radius-none: 0;
   --radius-xs: 2px;
   /* Tags/badges — extracted: 2px on issue labels */
-  --radius-sm: 4px;
-  /* Sidebar items, buttons (Linear: 4px border-radius on buttons) */
+  --radius-sm: 8px;
+  /* Sidebar items, buttons */
   --radius-md: 6px;
   /* Input fields — extracted: 6px on inputs & sidebar buttons */
-  --radius-default: 4px;
-  /* Buttons — Linear uses 4px (extracted 2026-03-16) */
+  --radius-default: 8px;
+  /* Buttons */
   --radius-lg: 8px;
   /* Cards, menus — extracted: 8px on marketing cards */
   --radius-xl: 12px;

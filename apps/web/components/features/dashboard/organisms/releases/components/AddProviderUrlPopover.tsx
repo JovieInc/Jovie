@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-7 min-w-[76px] gap-1.5 rounded-[7px] px-2.5 text-[11px] font-[400] text-tertiary-token'
+          className='group/add h-7 min-w-[76px] gap-1.5 rounded-full px-2.5 text-[11px] font-[400] text-tertiary-token'
         >
           <Icon
             name='Plus'
