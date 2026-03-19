@@ -116,6 +116,7 @@ export interface CreatorProfile {
   // About / bio metadata
   location?: string | null;
   active_since_year?: number | null;
+  genres?: string[] | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -482,8 +483,10 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     deezerId: profile.deezer_id,
     tidalId: profile.tidal_id,
     soundcloudId: profile.soundcloud_id,
+    venmoHandle: profile.venmo_handle,
     location: profile.location,
     activeSinceYear: profile.active_since_year,
+    genres: profile.genres,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,

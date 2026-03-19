@@ -156,6 +156,28 @@ describe('convertCreatorProfileToArtist', () => {
     expect(artist.apple_music_url).toBeUndefined();
     expect(artist.youtube_url).toBeUndefined();
   });
+
+  it('passes through genres when present', () => {
+    const withGenres = {
+      ...baseProfile,
+      genres: ['indie rock', 'alternative', 'dream pop'],
+    };
+    const artist = convertCreatorProfileToArtist(withGenres);
+
+    expect(artist.genres).toEqual(['indie rock', 'alternative', 'dream pop']);
+  });
+
+  it('defaults genres to null when absent', () => {
+    const artist = convertCreatorProfileToArtist(baseProfile);
+    expect(artist.genres).toBeNull();
+  });
+
+  it('passes through venmo_handle when present', () => {
+    const withVenmo = { ...baseProfile, venmo_handle: '@testartist' };
+    const artist = convertCreatorProfileToArtist(withVenmo);
+
+    expect(artist.venmo_handle).toBe('@testartist');
+  });
 });
 
 describe('convertArtistToCreatorProfile', () => {
