@@ -22,6 +22,7 @@ import {
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import { logger } from '@/lib/utils/logger';
+import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
@@ -91,6 +92,7 @@ export async function processMusicFetchEnrichmentJob(
 
   // Check availability — throw so the job fails and retries
   if (!isMusicFetchAvailable()) {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     throw new Error('MusicFetch API token not configured');
   }
 
@@ -121,12 +123,20 @@ export async function processMusicFetchEnrichmentJob(
 
   if (!profile) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     return result;
   }
 
   // Call MusicFetch API — throw so the job fails and retries
-  const artistData = await fetchArtistBySpotifyUrl(spotifyUrl);
+  let artistData: Awaited<ReturnType<typeof fetchArtistBySpotifyUrl>>;
+  try {
+    artistData = await fetchArtistBySpotifyUrl(spotifyUrl);
+  } catch (error) {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
+    throw error;
+  }
   if (!artistData) {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     throw new Error('MusicFetch API returned no data');
   }
 
@@ -243,6 +253,9 @@ export async function processMusicFetchEnrichmentJob(
       });
     }
   }
+
+  // Mark enrichment as complete
+  await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
 
   return result;
 }

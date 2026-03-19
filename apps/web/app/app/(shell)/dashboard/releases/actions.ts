@@ -43,6 +43,12 @@ import {
   buildProviderLabels,
   mapProviderLinksToViewModel,
 } from '@/lib/discography/view-models';
+import {
+  type AggregateEnrichmentStatus,
+  applyTtlToEnrichmentStatus,
+  deriveAggregateStatus,
+  type EnrichmentStatusMap,
+} from '@/lib/dsp-enrichment/enrichment-status';
 import { processReleaseEnrichmentJobStandalone } from '@/lib/dsp-enrichment/jobs/release-enrichment';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
@@ -1062,6 +1068,8 @@ export async function pollReleasesCount(): Promise<{
 export async function getSpotifyImportStatus(): Promise<{
   status: 'idle' | 'importing' | 'complete' | 'failed';
   releaseCount: number;
+  enrichmentStatus: EnrichmentStatusMap;
+  aggregateEnrichmentStatus: AggregateEnrichmentStatus;
 }> {
   noStore();
   const { userId } = await getCachedAuth();
@@ -1073,6 +1081,7 @@ export async function getSpotifyImportStatus(): Promise<{
     .select({
       settings: creatorProfiles.settings,
       spotifyId: creatorProfiles.spotifyId,
+      updatedAt: creatorProfiles.updatedAt,
       releaseCount: count(discogReleases.id),
     })
     .from(creatorProfiles)
@@ -1100,7 +1109,16 @@ export async function getSpotifyImportStatus(): Promise<{
     status = hasSpotifyProfile && releaseCount > 0 ? 'complete' : 'idle';
   }
 
-  return { status, releaseCount };
+  // Read enrichmentStatus with TTL check for stale 'enriching' entries
+  const rawEnrichmentStatus = (settings.enrichmentStatus ??
+    {}) as EnrichmentStatusMap;
+  const enrichmentStatus = applyTtlToEnrichmentStatus(
+    rawEnrichmentStatus,
+    row?.updatedAt ?? null
+  );
+  const aggregateEnrichmentStatus = deriveAggregateStatus(enrichmentStatus);
+
+  return { status, releaseCount, enrichmentStatus, aggregateEnrichmentStatus };
 }
 
 export async function connectSpotifyArtist(params: {

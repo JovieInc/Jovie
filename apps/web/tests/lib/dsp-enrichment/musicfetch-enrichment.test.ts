@@ -93,6 +93,18 @@ vi.mock('@/lib/db/schema/profiles', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: 'eq', args })),
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+      type: 'sql',
+    }),
+    { raw: (s: string) => ({ type: 'sql_raw', value: s }) }
+  ),
+}));
+
+vi.mock('@/lib/dsp-enrichment/enrichment-status', () => ({
+  setEnrichmentJobStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
 // Mock DB transaction
@@ -102,6 +114,7 @@ const mockTxFrom = vi.fn();
 const mockTxWhere = vi.fn();
 const mockTxLimit = vi.fn();
 const mockTxSet = vi.fn();
+const mockTxExecute = vi.fn().mockResolvedValue(undefined);
 
 function createMockTx() {
   return {
@@ -117,6 +130,7 @@ function createMockTx() {
         where: vi.fn().mockResolvedValue(undefined),
       }),
     }),
+    execute: mockTxExecute,
   };
 }
 

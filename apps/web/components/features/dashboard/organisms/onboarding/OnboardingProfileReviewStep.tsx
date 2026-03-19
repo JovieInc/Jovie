@@ -16,6 +16,7 @@ import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
 } from './profile-review-guards';
+import { useAvatarPolling } from './useAvatarPolling';
 
 interface OnboardingProfileReviewStepProps {
   readonly title: string;
@@ -87,9 +88,22 @@ export function OnboardingProfileReviewStep({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const minTimeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Avatar state: uploaded → enriched → existing → null
+  // Poll for background avatar upload (OAuth avatar via handleBackgroundAvatarUpload)
+  const { polledAvatarUrl } = useAvatarPolling({
+    enabled:
+      !uploadedAvatarUrl &&
+      !enrichedProfile?.imageUrl &&
+      !existingAvatarUrl &&
+      !isStepResume,
+  });
+
+  // Avatar state: uploaded → polled (bg upload) → enriched → existing → null
   const enrichedAvatarUrl = enrichedProfile?.imageUrl || null;
-  const avatarUrl = uploadedAvatarUrl || enrichedAvatarUrl || existingAvatarUrl;
+  const avatarUrl =
+    uploadedAvatarUrl ||
+    polledAvatarUrl ||
+    enrichedAvatarUrl ||
+    existingAvatarUrl;
 
   // Display name state: enriched → handle (editable)
   const [editableDisplayName, setEditableDisplayName] = useState(
@@ -128,6 +142,13 @@ export function OnboardingProfileReviewStep({
       setUploadedAvatarUrl(enrichedAvatarUrl);
     }
   }, [enrichedAvatarUrl, uploadedAvatarUrl]);
+
+  // Sync polled avatar (background OAuth upload) into local state
+  useEffect(() => {
+    if (polledAvatarUrl && !uploadedAvatarUrl) {
+      setUploadedAvatarUrl(polledAvatarUrl);
+    }
+  }, [polledAvatarUrl, uploadedAvatarUrl]);
 
   // Update display name from enrichment when it arrives
   useEffect(() => {
