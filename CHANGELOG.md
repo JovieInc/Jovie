@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.17] - 2026-03-19
+
+### Added
+
+- Demo account seed scripts: `setup-demo-user.ts` (Clerk user creation) and `seed-demo-account.ts` (comprehensive DB seeding)
+- Seeds 18 entity types with realistic data: profile, releases, social links, tour dates, subscribers (150), audience (200), tips (30), clicks (500+), profile views (90 days), contacts, inbox threads (8), AI insights, chat history, referrals, email engagement, pre-save tokens, DSP matches
+- Hockey-stick date distributions for convincing growth narrative on sales calls
+- Realistic fan names, heartfelt tip messages, and authentic email bodies for inbox threads
+- Production safety: `--allow-production` flag required for live Clerk keys
+- Username reservation: script aborts if `timwhite` username belongs to a different user
+- Hardcoded fallback profile data so script works without `/tim` in the database
+- Idempotent re-runs with delete-then-insert and batch inserts
+
 ## [26.4.16] - 2026-03-19
 
 ### Fixed
