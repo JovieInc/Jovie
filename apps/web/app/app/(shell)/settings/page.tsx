@@ -21,7 +21,7 @@ export default async function SettingsPage() {
       redirect('/onboarding');
     }
 
-    return <DashboardSettings focusSection='account' />;
+    return <DashboardSettings />;
   } catch (error) {
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
       throw error;

@@ -3,6 +3,7 @@
 import type { useClerk } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -89,6 +90,8 @@ export function useUserMenuActions({
 
   const handleProfile = () => navigateTo(profileUrl);
   const handleSettings = () => navigateTo(settingsUrl);
+  const handleDeleteAccount = () =>
+    router.push(APP_ROUTES.SETTINGS_DELETE_ACCOUNT);
 
   const handleSignOut = async () => {
     if (derivedLoading.signOut) return;
@@ -229,6 +232,7 @@ export function useUserMenuActions({
   return {
     handleProfile,
     handleSettings,
+    handleDeleteAccount,
     // Wrap async handlers to prevent promise leakage in onClick handlers
     handleUpgrade: () => void handleUpgrade(),
     handleManageBilling: () => void handleManageBilling(),
