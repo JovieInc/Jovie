@@ -1,4 +1,4 @@
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { getSessionContext, setupDbSession } from '@/lib/auth/session';
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { cacheQuery } from '@/lib/db/cache';
@@ -9,7 +9,6 @@ import {
   dailyProfileViews,
   notificationSubscriptions,
 } from '@/lib/db/schema/analytics';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import type {
   AnalyticsRange,
@@ -34,229 +33,6 @@ const parseJsonArray = <T>(value: JsonArray<T>): T[] => {
   return value;
 };
 
-interface AnalyticsData {
-  totalClicks: number;
-  spotifyClicks: number;
-  socialClicks: number;
-  recentClicks: number;
-  clicksByDay: { date: string; count: number }[];
-  topLinks: { id: string; url: string; clicks: number }[];
-  // New for MVP simplified analytics
-  profileViewsInRange: number;
-  topCities: { city: string; count: number }[];
-  topCountries: { country: string; count: number }[];
-  topReferrers: { referrer: string; count: number }[];
-}
-
-export async function getAnalyticsData(
-  creatorProfileId: string,
-  range: AnalyticsRange = '30d'
-): Promise<AnalyticsData> {
-  const now = new Date();
-  let startDate = new Date();
-
-  switch (range) {
-    case '1d':
-      startDate.setDate(now.getDate() - 1);
-      break;
-    case '7d':
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case '30d':
-      startDate.setDate(now.getDate() - 30);
-      break;
-    case '90d':
-      startDate.setDate(now.getDate() - 90);
-      break;
-    case 'all':
-      startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1);
-      break;
-  }
-
-  const recentThreshold = new Date();
-  recentThreshold.setDate(recentThreshold.getDate() - 7);
-
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  // Consolidated analytics into one SQL round trip (previously nine queries).
-  // Local dev timing (5-run avg, seeded DB): ~120ms ➝ ~48ms.
-  // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
-  /**
-   * Aggregate value from database (can be string, number, or null)
-   */
-  type AggregateValue = string | number | null;
-
-  const analyticsAggregates = await apiQuery(
-    () =>
-      db
-        .execute<{
-          total_clicks: AggregateValue;
-          spotify_clicks: AggregateValue;
-          social_clicks: AggregateValue;
-          recent_clicks: AggregateValue;
-          profile_views_in_range: AggregateValue;
-          clicks_by_day: JsonArray<{ date: string; count: number }>;
-          top_links: JsonArray<{
-            id: string | null;
-            url: string | null;
-            clicks: number;
-          }>;
-          top_cities: JsonArray<{ city: string | null; count: number }>;
-          top_countries: JsonArray<{ country: string | null; count: number }>;
-          top_referrers: JsonArray<{ referrer: string | null; count: number }>;
-        }>(
-          drizzleSql`
-            with base_events as (
-              select created_at, link_id, link_type, city, country, referrer
-              from ${clickEvents}
-              where ${clickEvents.creatorProfileId} = ${creatorProfileId}
-                and (${clickEvents.isBot} = false or ${clickEvents.isBot} is null)
-            ),
-            ranged_events as (
-              select link_id, link_type, city, country, referrer
-              from base_events
-              where created_at >= ${sqlTimestamp(startDate)}
-            ),
-            recent_events as (
-              select 1
-              from base_events
-              where created_at >= ${sqlTimestamp(recentThreshold)}
-            ),
-            clicks_last_30 as (
-              select date(created_at) as date, count(*) as count
-              from base_events
-              where created_at >= ${sqlTimestamp(thirtyDaysAgo)}
-              group by date(created_at)
-              order by date(created_at)
-            ),
-            top_links as (
-              select link_id as id, link_type as url, count(*) as clicks
-              from ranged_events
-              group by link_id, link_type
-              order by clicks desc
-              limit 5
-            ),
-            top_cities as (
-              select city, count(*) as count
-              from ranged_events
-              where city is not null
-              group by city
-              order by count desc
-              limit 5
-            ),
-            top_countries as (
-              select country, count(*) as count
-              from ranged_events
-              where country is not null
-              group by country
-              order by count desc
-              limit 5
-            ),
-            top_referrers as (
-              select referrer, count(*) as count
-              from ranged_events
-              where referrer is not null
-              group by referrer
-              order by count desc
-              limit 5
-            )
-            select
-              (select count(*) from base_events) as total_clicks,
-              (select count(*) from base_events where link_type = 'listen') as spotify_clicks,
-              (select count(*) from base_events where link_type = 'social') as social_clicks,
-              (select count(*) from recent_events) as recent_clicks,
-              (select count(*) from ranged_events) as profile_views_in_range,
-              coalesce((select json_agg(row_to_json(c)) from clicks_last_30 c), '[]'::json) as clicks_by_day,
-              coalesce((select json_agg(row_to_json(l)) from top_links l), '[]'::json) as top_links,
-              coalesce((select json_agg(row_to_json(c)) from top_cities c), '[]'::json) as top_cities,
-              coalesce((select json_agg(row_to_json(c)) from top_countries c), '[]'::json) as top_countries,
-              coalesce((select json_agg(row_to_json(r)) from top_referrers r), '[]'::json) as top_referrers
-            ;
-          `
-        )
-        .then(res => res.rows?.[0]),
-    'getAnalyticsData'
-  );
-
-  return {
-    totalClicks: Number(analyticsAggregates?.total_clicks ?? 0),
-    spotifyClicks: Number(analyticsAggregates?.spotify_clicks ?? 0),
-    socialClicks: Number(analyticsAggregates?.social_clicks ?? 0),
-    recentClicks: Number(analyticsAggregates?.recent_clicks ?? 0),
-    clicksByDay: parseJsonArray<{ date: string; count: number }>(
-      analyticsAggregates?.clicks_by_day ?? []
-    ).map(row => ({
-      date: row.date,
-      count: Number(row.count),
-    })),
-    topLinks: parseJsonArray<{
-      id: string | null;
-      url: string | null;
-      clicks: number;
-    }>(analyticsAggregates?.top_links ?? []).map(row => ({
-      id: row.id ?? 'unknown',
-      url: row.url ?? '',
-      clicks: Number(row.clicks),
-    })),
-    profileViewsInRange: Number(
-      analyticsAggregates?.profile_views_in_range ?? 0
-    ),
-    topCities: parseJsonArray<{ city: string | null; count: number }>(
-      analyticsAggregates?.top_cities ?? []
-    )
-      .filter(row => Boolean(row.city))
-      .map(row => ({
-        city: row.city as string,
-        count: Number(row.count),
-      })),
-    topCountries: parseJsonArray<{ country: string | null; count: number }>(
-      analyticsAggregates?.top_countries ?? []
-    )
-      .filter(row => Boolean(row.country))
-      .map(row => ({
-        country: row.country as string,
-        count: Number(row.count),
-      })),
-    topReferrers: parseJsonArray<{ referrer: string | null; count: number }>(
-      analyticsAggregates?.top_referrers ?? []
-    ).map(row => ({
-      referrer: row.referrer ?? '',
-      count: Number(row.count),
-    })),
-  };
-}
-
-// Helper function to get analytics for the current user
-export async function getUserAnalytics(
-  clerkUserId: string,
-  range: AnalyticsRange = '30d'
-) {
-  const { profile } = await getSessionContext({
-    clerkUserId,
-    requireUser: true,
-    requireProfile: true,
-  });
-
-  // profileViews is not part of the standard ProfileContext shape,
-  // so fetch it directly.
-  const [profileRow] = await db
-    .select({ profileViews: creatorProfiles.profileViews })
-    .from(creatorProfiles)
-    .where(eq(creatorProfiles.id, profile!.id))
-    .limit(1);
-
-  const analytics = await getAnalyticsData(profile!.id, range);
-
-  return {
-    ...analytics,
-    // Profile page visits increment creator_profiles.profile_views.
-    // The click_events table tracks link clicks; it is not a reliable proxy for views.
-    profileViewsInRange: profileRow?.profileViews ?? 0,
-  };
-}
-
 function toStartDate(range: AnalyticsRange): Date {
   const now = new Date();
   let startDate = new Date();
@@ -275,7 +51,6 @@ function toStartDate(range: AnalyticsRange): Date {
       startDate.setDate(now.getDate() - 90);
       break;
     case 'all':
-      // Use 1-year lookback for consistency with getAnalyticsData
       startDate = new Date();
       startDate.setFullYear(startDate.getFullYear() - 1);
       break;
@@ -317,16 +92,11 @@ export async function getUserDashboardAnalytics(
             and ${dailyProfileViews.viewDate} >= ${startDate.toISOString().slice(0, 10)}
         )`
       : drizzleSql`0`;
-    // Consolidated dashboard analytics into one SQL round trip (previously eight queries).
-    // Local dev timing (5-run avg, seeded DB): ~105ms ➝ ~42ms.
-    // Bot traffic is filtered from all aggregations (is_bot = false or is_bot IS NULL).
-    // Dashboard queries have a 20s timeout.
-    //
-    // Top-list aggregates (cities, countries, referrers, links) are cached for 5 minutes
-    // (JOV-1270). The heavy group-by work over raw click_events is identical for all
-    // concurrent requests from the same artist+range, so we share a single DB round-trip.
-    // The aggregates query filters only on creatorProfile.id and touches no RLS-protected
-    // tables, so it runs against the module-level db pool (not the RLS transaction).
+    // Consolidated dashboard analytics into one SQL round trip.
+    // Bot traffic is filtered from click aggregations (is_bot = false or is_bot IS NULL).
+    // Cities, countries, and referrers are sourced from audience_members (visit data)
+    // rather than click_events, so geo data appears even when visitors don't click links.
+    // Top-list aggregates are cached for 5 minutes (JOV-1270).
     const aggregates = await cacheQuery(
       `analytics:dashboard:${creatorProfile.id}:${range}`,
       () =>
@@ -375,26 +145,38 @@ export async function getUserDashboardAnalytics(
               where created_at >= ${sqlTimestamp(recentThreshold)}
             ),
             top_cities as (
-              select city, count(*) as count
-              from ranged_events
-              where city is not null
-              group by city
+              select ${audienceMembers.geoCity} as city, count(*) as count
+              from ${audienceMembers}
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+                and ${audienceMembers.geoCity} is not null
+              group by ${audienceMembers.geoCity}
               order by count desc
               limit 5
             ),
             top_countries as (
-              select country, count(*) as count
-              from ranged_events
-              where country is not null
-              group by country
+              select ${audienceMembers.geoCountry} as country, count(*) as count
+              from ${audienceMembers}
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+                and ${audienceMembers.geoCountry} is not null
+              group by ${audienceMembers.geoCountry}
               order by count desc
               limit 5
             ),
             top_referrers as (
-              select referrer, count(*) as count
-              from ranged_events
-              where referrer is not null
-              group by referrer
+              select r->>'url' as referrer, count(*) as count
+              from ${audienceMembers},
+                jsonb_array_elements(
+                  case when jsonb_typeof(${audienceMembers.referrerHistory}) = 'array'
+                    then ${audienceMembers.referrerHistory}
+                    else '[]'::jsonb
+                  end
+                ) as r
+              where ${audienceMembers.creatorProfileId} = ${creatorProfile.id}
+                and ${audienceMembers.lastSeenAt} >= ${sqlTimestamp(startDate)}
+                and r->>'url' is not null
+              group by r->>'url'
               order by count desc
               limit 5
             ),
