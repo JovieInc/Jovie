@@ -232,16 +232,17 @@ export function findBestTerritoryMatch(
     }
 
     for (const t of territories) {
+      const tLower = t.toLowerCase();
+      const territoryLower = territory.toLowerCase();
       // Check if this contact's territory matches or contains the detected territory
-      if (
-        t.toLowerCase() === territory.toLowerCase() ||
-        territory.toLowerCase().includes(t.toLowerCase())
-      ) {
-        const specificity = getTerritorySpecificity(t);
-        if (specificity > bestSpecificity) {
-          bestMatch = contact;
-          bestSpecificity = specificity;
-        }
+      const isMatch =
+        tLower === territoryLower || territoryLower.includes(tLower);
+      if (!isMatch) continue;
+
+      const specificity = getTerritorySpecificity(t);
+      if (specificity > bestSpecificity) {
+        bestMatch = contact;
+        bestSpecificity = specificity;
       }
     }
   }

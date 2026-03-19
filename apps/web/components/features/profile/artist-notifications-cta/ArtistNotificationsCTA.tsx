@@ -329,13 +329,7 @@ export function ArtistNotificationsCTA({
     country.dialCode
   );
 
-  const handleInputChange = (value: string) => {
-    if (channel === 'sms') {
-      handlePhoneChange(value);
-    } else {
-      handleEmailChange(value);
-    }
-  };
+  const handleInputChange = channel === 'sms' ? handlePhoneChange : handleEmailChange;
 
   const handleInputBlur = () => {
     setIsInputFocused(false);
