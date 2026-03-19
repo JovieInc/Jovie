@@ -89,8 +89,6 @@
     "knip": "^5.83.0",
     "lint-staged": "^16.2.6",
     "@anthropic-ai/sdk": "^0.78.0",
-    "pg": "^8.13.0",
-    "resend": "^4.0.0",
     "turbo": "^2.8.9",
     "typescript": "^5"
   },
