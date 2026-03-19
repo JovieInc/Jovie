@@ -7,6 +7,10 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const { version: APP_VERSION } = require('../../version.json');
 
 const nextConfig = {
+  // Move dev indicator to top-right so it doesn't overlap the DevToolbar
+  devIndicators: {
+    position: 'top-right',
+  },
   // Transpile workspace packages for proper module resolution
   transpilePackages: ['@jovie/ui'],
   turbopack: {
