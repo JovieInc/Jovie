@@ -77,7 +77,9 @@ const MEMBER_SORT_COLUMNS = {
   createdAt: audienceMembers.firstSeenAt,
 } as const;
 
-function buildViewCondition(view: 'all' | 'identified' | 'anonymous'): SQL<boolean> {
+function buildViewCondition(
+  view: 'all' | 'identified' | 'anonymous'
+): SQL<boolean> {
   if (view === 'anonymous') {
     return eq(audienceMembers.type, 'anonymous') as SQL<boolean>;
   }

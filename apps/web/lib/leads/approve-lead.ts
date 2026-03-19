@@ -67,7 +67,8 @@ async function pushToInstantlyIfEligible(
     !routedLead.emailInvalid &&
     (routeResult.route === 'email' || routeResult.route === 'both');
 
-  if (!isEmailEligible || !routedLead?.contactEmail) return {};
+  if (!isEmailEligible || !routedLead?.contactEmail || !routeResult.claimUrl)
+    return {};
 
   try {
     const instantlyLeadId = await pushLeadToInstantly({
@@ -171,7 +172,10 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
     routing = { route: routeResult.route };
     pipelineLog('approve', 'Lead routed', { leadId, route: routeResult.route });
 
-    const instantlyResult = await pushToInstantlyIfEligible(leadId, routeResult);
+    const instantlyResult = await pushToInstantlyIfEligible(
+      leadId,
+      routeResult
+    );
     routing = { ...routing, ...instantlyResult };
   } catch (routingError) {
     await captureError('Lead routing failed', routingError, {
