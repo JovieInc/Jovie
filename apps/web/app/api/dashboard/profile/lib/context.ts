@@ -37,7 +37,7 @@ export function buildProfileUpdateContext(
   }
 
   const normalizedSettings = {
-    ...(settingsUpdates ?? {}),
+    ...settingsUpdates,
   } as Record<string, unknown>;
 
   if (Object.hasOwn(parsedUpdates, 'hometown')) {
