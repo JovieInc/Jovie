@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Camera,
-  DollarSign,
-  Eye,
-  Link2,
-  MessageSquare,
-  Music,
-} from 'lucide-react';
+import { Eye, MessageSquare, Music, Pencil, Sparkles } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -21,12 +14,11 @@ import {
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-  Camera,
-  DollarSign,
   Eye,
-  Link2,
   MessageSquare,
   Music,
+  Pencil,
+  Sparkles,
 };
 
 /** All suggestion accents use the single accent color from the design system. */
