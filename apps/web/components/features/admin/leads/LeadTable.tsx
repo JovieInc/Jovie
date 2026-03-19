@@ -186,6 +186,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         header: 'Name / Handle',
         size: 200,
         cell: ({ row }) => {
+          // NOSONAR — TanStack Table render prop
           const lead = row.original;
           return (
             <div className='flex flex-col'>
@@ -209,6 +210,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         header: 'Status',
         size: 100,
         cell: ({ getValue }) => {
+          // NOSONAR — TanStack Table render prop
           const status = getValue();
           return (
             <Badge variant={STATUS_VARIANT[status] ?? 'secondary'}>
@@ -220,15 +222,16 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       columnHelper.accessor('fitScore', {
         header: 'Score',
         size: 70,
-        cell: ({ getValue }) => (
-          <span className='tabular-nums'>{getValue() ?? '-'}</span>
-        ),
+        cell: (
+          { getValue } // NOSONAR — TanStack Table render prop
+        ) => <span className='tabular-nums'>{getValue() ?? '-'}</span>,
       }),
       columnHelper.display({
         id: 'signals',
         header: 'Signals',
         size: 180,
         cell: ({ row }) => {
+          // NOSONAR — TanStack Table render prop
           const lead = row.original;
           return (
             <div className='flex gap-1'>
@@ -261,6 +264,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         header: 'Tools',
         size: 140,
         cell: ({ row }) => {
+          // NOSONAR — TanStack Table render prop
           const tools = row.original.musicToolsDetected;
           if (tools.length === 0) {
             return <span className='text-tertiary-token'>-</span>;
@@ -274,7 +278,9 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         id: 'actions',
         header: 'Actions',
         size: 80,
-        cell: ({ row }) => (
+        cell: (
+          { row } // NOSONAR — TanStack Table render prop
+        ) => (
           <LeadActionsCell
             lead={row.original}
             onUpdateStatus={updateLeadStatus}
@@ -287,7 +293,7 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   );
 
   const handleLoadMore = useCallback(() => {
-    void fetchNextPage();
+    fetchNextPage().catch(() => {}); // NOSONAR — fire-and-forget, errors handled by React Query
   }, [fetchNextPage]);
 
   return (
