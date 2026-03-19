@@ -18,6 +18,25 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// Resilient client — expose MusicfetchRequestError for error-handling tests
+vi.mock('@/lib/musicfetch/resilient-client', () => {
+  class MusicfetchRequestError extends Error {
+    statusCode?: number;
+    retryAfterSeconds?: number;
+    constructor(
+      message: string,
+      statusCode?: number,
+      retryAfterSeconds?: number
+    ) {
+      super(message);
+      this.name = 'MusicfetchRequestError';
+      this.statusCode = statusCode;
+      this.retryAfterSeconds = retryAfterSeconds;
+    }
+  }
+  return { MusicfetchRequestError };
+});
+
 // MusicFetch provider
 const mockIsMusicFetchAvailable = vi.fn(() => true);
 const mockFetchArtistBySpotifyUrl = vi.fn();
@@ -125,6 +144,7 @@ import {
   musicFetchEnrichmentPayloadSchema,
 } from '@/lib/dsp-enrichment/jobs/musicfetch-enrichment';
 import type { MusicFetchArtistResult } from '@/lib/dsp-enrichment/providers/musicfetch';
+import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
 
 // Helper to build valid payload
 function makePayload(
@@ -267,8 +287,46 @@ describe('musicfetch-enrichment', () => {
       expect(result.errors).toContain('Creator profile not found');
     });
 
-    it('throws when MusicFetch API returns no data', async () => {
+    it('completes with error when MusicFetch API returns no data (permanent failure)', async () => {
       mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(result.errors).toContain('MusicFetch API returned no data');
+    });
+
+    it('completes with error on 400 response (permanent failure, no retry)', async () => {
+      mockFetchArtistBySpotifyUrl.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 400', 400)
+      );
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(result.errors[0]).toContain('MusicFetch API rejected request');
+    });
+
+    it('re-throws on 500 response (transient failure, should retry)', async () => {
+      mockFetchArtistBySpotifyUrl.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 500', 500)
+      );
 
       const { processMusicFetchEnrichmentJob } = await import(
         '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
@@ -281,7 +339,7 @@ describe('musicfetch-enrichment', () => {
           >[0],
           makePayload()
         )
-      ).rejects.toThrow('MusicFetch API returned no data');
+      ).rejects.toThrow('MusicFetch API error: 500');
     });
 
     it('maps DSP fields from MusicFetch to profile when all fields are null', async () => {

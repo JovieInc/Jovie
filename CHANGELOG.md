@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.9] - 2026-03-18
+
+### Fixed
+
+- MusicFetch ingest pipeline: treat 400 errors as permanent failures instead of retrying indefinitely, preventing circuit breaker trips that blocked all enrichment (JOV-1629, JOV-1630)
+- MusicFetch enrichment: return gracefully when API returns no data instead of throwing and retrying
+
+### Added
+
+- Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
+- Campaign toggle check in both the campaign processor cron and claim-invite job processor
+- Admin UI toggle switch on the outreach email page for enabling/disabling campaigns
+- API endpoints for reading and updating campaign enabled state
+
 ## [26.4.8] - 2026-03-18
 
 ### Added
