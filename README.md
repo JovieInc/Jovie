@@ -447,14 +447,6 @@ Jovie uses Calendar Versioning (`YY.M.PATCH`) tracked in `version.json` and mirr
 ```bash
 # Validate versioning integrity (calendar, workspace sync, changelog consistency)
 pnpm version:check
-
-# Bump to next calendar-aware version and rotate changelog
-pnpm version:bump
 ```
 
-`pnpm version:bump` now:
-- Uses UTC calendar month/year to prevent timezone drift
-- Increments patch only within the same month
-- Resets patch to `0` when the month changes
-- Refuses empty releases unless `--allow-empty` is provided
-- Rotates `[Unreleased]` into a dated release and scaffolds a fresh unreleased template
+Version bumps and changelog entries are handled automatically by the `/ship` workflow. `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.

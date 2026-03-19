@@ -5,7 +5,7 @@
  * Validates:
  * - CalVer aligns with current UTC calendar month/year
  * - All package versions match version.json
- * - CHANGELOG has [Unreleased] and latest release equals current version
+ * - CHANGELOG latest release equals current version
  */
 
 import { readFileSync } from 'node:fs';
@@ -55,9 +55,6 @@ for (const rel of [
 }
 
 const changelog = readFileSync(join(ROOT, 'CHANGELOG.md'), 'utf-8');
-if (!/## \[Unreleased\]/.test(changelog)) {
-  errors.push('CHANGELOG.md is missing "## [Unreleased]".');
-}
 
 const releaseMatches = [
   ...changelog.matchAll(

@@ -73,17 +73,6 @@ export function parseChangelog(markdown) {
 }
 
 /**
- * Get the raw content of the [Unreleased] section.
- *
- * @param {string} markdown
- * @returns {string}
- */
-export function getUnreleased(markdown) {
-  const { unreleased } = parseChangelog(markdown);
-  return unreleased.raw;
-}
-
-/**
  * Get the latest (first) release after [Unreleased].
  *
  * @param {string} markdown
@@ -94,33 +83,3 @@ export function getLatestRelease(markdown) {
   return releases[0] || null;
 }
 
-/**
- * Replace the [Unreleased] section content in the markdown.
- *
- * @param {string} markdown - Original CHANGELOG.md content
- * @param {string} newContent - New content for the [Unreleased] section
- * @returns {string} Updated markdown
- */
-export function replaceUnreleased(markdown, newContent) {
-  // Match from "## [Unreleased]" until the next "## [" heading
-  const re = /(## \[Unreleased\]\n)([\s\S]*?)(?=\n## \[|$)/;
-  const match = markdown.match(re);
-
-  if (!match) {
-    throw new Error('CHANGELOG.md must contain a "## [Unreleased]" section.');
-  }
-
-  return markdown.replace(re, `$1\n${newContent}\n`);
-}
-
-/**
- * Check whether the [Unreleased] section has any meaningful entries.
- *
- * @param {string} markdown
- * @returns {boolean}
- */
-export function hasUnreleasedEntries(markdown) {
-  const raw = getUnreleased(markdown);
-  // Check if there are any bullet points (actual entries)
-  return /^- .+/m.test(raw);
-}

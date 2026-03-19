@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.2.1",
+  "version": "26.4.16",
   "private": true,
   "config": {
     "commitizen": {
@@ -73,9 +73,7 @@
     "pre-push": "biome check . && pnpm --filter=@jovie/web run pre-push",
     "tailwind:check": "pnpm --filter=@jovie/web run tailwind:check",
     "knip": "knip",
-    "version:bump": "node scripts/version-bump.mjs",
     "version:check": "node scripts/version-check.mjs",
-    "changelog:generate": "doppler run -- node scripts/generate-changelog.mjs",
     "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs"
   },
   "devDependencies": {

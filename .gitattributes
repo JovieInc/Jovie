@@ -9,3 +9,4 @@
 *.woff2 binary
 *.ttf binary
 *.eot binary
+CHANGELOG.md merge=union
