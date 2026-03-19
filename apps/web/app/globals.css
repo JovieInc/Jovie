@@ -1040,15 +1040,12 @@ body {
   }
 }
 
-@keyframes progress-indeterminate {
+@keyframes progress-shimmer {
   0% {
-    transform: translateX(-100%);
-  }
-  50% {
-    transform: translateX(200%);
+    background-position: 200% 0;
   }
   100% {
-    transform: translateX(-100%);
+    background-position: -200% 0;
   }
 }
 
