@@ -59,6 +59,7 @@ export type ContactRole =
   | 'management'
   | 'press_pr'
   | 'brand_partnerships'
+  | 'music_collaboration'
   | 'fan_general'
   | 'other';
 

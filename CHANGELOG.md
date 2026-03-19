@@ -14,6 +14,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- New blog post: "The Contact Problem" — explores the structural problem of stale artist contacts and introduces the Jovie Inbox vision
+- "Problems We're Solving" section in investor memo linking to all three problem essays (MySpace, Friday, Contact)
 - Global campaign email toggle (`campaignsEnabled`) on campaign settings — allows admin to pause all outreach emails and drip campaigns with a single switch
 - Campaign toggle check in both the campaign processor cron and claim-invite job processor
 - Admin UI toggle switch on the outreach email page for enabling/disabling campaigns

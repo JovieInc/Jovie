@@ -498,6 +498,13 @@
       "when": 1774400000000,
       "tag": "0071_add_campaigns_enabled",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1774500000000,
+      "tag": "0072_jovie_inbox",
+      "breakpoints": true
     }
   ]
 }
