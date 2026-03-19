@@ -68,7 +68,7 @@ export function getTerritorySpecificity(territory: string): number {
 export function normalizeSubject(subject: string | null | undefined): string {
   if (!subject) return '';
   return subject
-    .replace(/^(re|fw|fwd)\s*:\s*/gi, '')
-    .replace(/^(re|fw|fwd)\s*:\s*/gi, '') // Handle double prefixes
+    .replaceAll(/^(re|fw|fwd)\s*:\s*/gi, '')
+    .replaceAll(/^(re|fw|fwd)\s*:\s*/gi, '') // Handle double prefixes
     .trim();
 }
