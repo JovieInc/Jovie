@@ -428,17 +428,19 @@ export function TourDateSidebar({
             {/* Analytics */}
             <div className='border-t border-subtle pt-4'>
               <DrawerSection title='Analytics'>
-                {analyticsLoading ? (
+                {analyticsLoading && (
                   <DrawerSurfaceCard className='space-y-3 p-3'>
                     <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
                     <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
                     <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
                   </DrawerSurfaceCard>
-                ) : analyticsError ? (
+                )}
+                {!analyticsLoading && analyticsError && (
                   <p className='text-[12px] text-tertiary-token'>
                     Unable to load analytics data.
                   </p>
-                ) : (
+                )}
+                {!analyticsLoading && !analyticsError && (
                   <div className='space-y-3'>
                     <DrawerStatGrid>
                       <StatTile

@@ -23,6 +23,7 @@ import {
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
 import { logger } from '@/lib/utils/logger';
+import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   fetchArtistBySpotifyUrl,
   isMusicFetchAvailable,
@@ -92,6 +93,7 @@ export async function processMusicFetchEnrichmentJob(
 
   // Check availability — throw so the job fails and retries
   if (!isMusicFetchAvailable()) {
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     throw new Error('MusicFetch API token not configured');
   }
 
@@ -122,6 +124,7 @@ export async function processMusicFetchEnrichmentJob(
 
   if (!profile) {
     result.errors.push('Creator profile not found');
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     return result;
   }
 
@@ -266,6 +269,9 @@ export async function processMusicFetchEnrichmentJob(
     }
   }
 
+  // Mark enrichment as complete
+  await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
+
   return result;
 }
 
@@ -281,7 +287,7 @@ function extractSpotifyArtistId(
   try {
     const url = new URL(spotifyUrl);
     // Handle https://open.spotify.com/artist/{id} URLs
-    const match = url.pathname.match(/\/artist\/([a-zA-Z0-9]+)/);
+    const match = /\/artist\/([a-zA-Z0-9]+)/.exec(url.pathname);
     return match?.[1] ?? null;
   } catch {
     return null;

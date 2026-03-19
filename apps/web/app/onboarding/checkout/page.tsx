@@ -61,9 +61,9 @@ export const dynamic = 'force-dynamic';
 
 export default async function OnboardingCheckoutPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
+}>) {
   // Verify authentication
   const authResult = await resolveUserState();
   if (
