@@ -281,6 +281,12 @@ async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
 export async function getSpotifyArtistProfile(
   artistId: string
 ): Promise<SpotifyArtistProfile | null> {
+  // Block enrichment for blacklisted artists (e.g., wrong Tim White profiles)
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  if (isBlacklistedSpotifyId(artistId)) {
+    return null;
+  }
+
   const spotifyUrl = `${SPOTIFY_API_BASE}/artists/${artistId}`;
   return Sentry.startSpan(
     {

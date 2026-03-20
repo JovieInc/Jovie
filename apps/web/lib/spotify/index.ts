@@ -5,6 +5,14 @@
  * Import from '@/lib/spotify' for a clean API.
  */
 
+// Artist blacklist for founder identity protection
+export {
+  filterBlacklistedResults,
+  isBlacklistedSpotifyId,
+  SPOTIFY_BLACKLISTED_IDS,
+  TIM_WHITE_SPOTIFY_ID,
+} from './blacklist';
+
 // Circuit breaker for fault tolerance
 export {
   CircuitBreaker,
