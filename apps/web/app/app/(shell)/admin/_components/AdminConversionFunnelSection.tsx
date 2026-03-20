@@ -19,18 +19,18 @@ export async function AdminConversionFunnelSection() {
       <ContentSectionHeader
         title='User conversion funnel'
         subtitle='All-time: signup → profile → complete → subscribers → paid'
-        className='min-h-0 px-5 py-3'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />
 
       {funnel.errors.length > 0 ? (
-        <div className='px-5 pb-4'>
+        <div className='px-(--linear-app-content-padding-x) pb-(--linear-app-content-padding-y)'>
           <p className='text-xs text-[var(--color-danger)]'>
             {funnel.errors.join('; ')}
           </p>
         </div>
       ) : null}
 
-      <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-5'>
+      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-5'>
         {funnel.stages.map((stage, i) => (
           <ContentMetricCard
             key={stage.key}
@@ -56,9 +56,9 @@ export function AdminConversionFunnelSectionSkeleton() {
       <ContentSectionHeaderSkeleton
         titleWidth='w-40'
         descriptionWidth='w-64'
-        className='min-h-0 px-5 py-3'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-5'>
+      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-5'>
         {Array.from({ length: 5 }, (_, i) => (
           <ContentMetricCardSkeleton key={`funnel-${i + 1}`} />
         ))}
