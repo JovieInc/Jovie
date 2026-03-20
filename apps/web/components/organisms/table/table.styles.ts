@@ -18,8 +18,8 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: '32px', // Fixed height for consistent alignment (Linear compact standard)
-  cellPadding: 'px-3 py-0.5', // Dense padding for cells (Linear-density)
+  rowHeight: 'h-[30px]', // Fixed height for consistent alignment (Linear compact standard)
+  cellPadding: 'px-3 py-0', // Dense padding for cells (Linear-density)
   headerPadding: 'px-3 py-1', // Dense padding for headers (Linear-density)
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
@@ -122,8 +122,8 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-(--linear-app-content-surface)',
-    'shadow-inset-divider',
+    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] backdrop-blur-[12px]',
+    'shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
     'align-middle'
   ),
   stickyGroupHeader: cn(
@@ -134,7 +134,7 @@ export const presets = {
   ),
   tableRow: cn(
     alignment.rowHeight,
-    borders.cell,
+    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)]',
     selection.unchecked,
     'last:border-b-0',
     'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'

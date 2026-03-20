@@ -226,23 +226,23 @@ export const LINEAR_SURFACE = {
   /** Drawer section card — used inside sidebars for grouped content.
    *  Compose with padding/overflow as needed: `cn(LINEAR_SURFACE.drawerCard, 'p-3.5')` */
   drawerCard:
-    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))]',
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_91%,var(--linear-bg-surface-0))]',
 
   /** Smaller drawer section card — used for inline property groups inside drawer cards. */
   drawerCardSm:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_92%,var(--linear-bg-surface-0))]',
 
   /** Primary sidebar card — slightly more contrast for header/analytics cards. */
   sidebarCard:
-    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))]',
+    'rounded-[13px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_90%,var(--linear-bg-surface-0))]',
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))]',
+    'rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]',
 
   /** Banner/callout card — slightly quieter than content containers. */
   bannerCard:
-    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,var(--linear-bg-surface-0))]',
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_93%,var(--linear-bg-surface-0))]',
 
   /** Dialog inner card — for card-like sections inside dialogs. */
   dialogCard:

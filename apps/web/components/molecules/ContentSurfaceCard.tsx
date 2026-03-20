@@ -2,21 +2,25 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const contentSurfaceCardVariants = cva('bg-surface-0', {
-  variants: {
-    surface: {
-      default: 'rounded-lg',
-      marketing: 'rounded-xl',
-      settings: 'rounded-lg px-4 py-3 sm:px-5',
+const contentSurfaceCardVariants = cva(
+  'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]',
+  {
+    variants: {
+      surface: {
+        default: 'rounded-[14px]',
+        marketing: 'rounded-xl',
+        settings: 'rounded-[14px] px-4 py-3 sm:px-5',
+      },
     },
-  },
-  defaultVariants: {
-    surface: 'default',
-  },
-});
+    defaultVariants: {
+      surface: 'default',
+    },
+  }
+);
 
 /** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
-export const CONTENT_SURFACE_CARD_CLASSNAME = 'rounded-lg bg-surface-0';
+export const CONTENT_SURFACE_CARD_CLASSNAME =
+  'rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]';
 
 export interface ContentSurfaceCardProps
   extends VariantProps<typeof contentSurfaceCardVariants> {

@@ -36,17 +36,17 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[8px] border border-transparent px-2.5 text-left text-app leading-tight tracking-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[7px] border border-transparent px-2.25 text-left text-app leading-tight tracking-tight outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
     'transition-[background-color,color] duration-0 ease-interactive',
     // Default text color — keep non-active rows quiet
-    'text-sidebar-item-icon/78',
+    'text-sidebar-item-icon/80',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:border-(--linear-app-frame-seam) hover:bg-sidebar-accent/72 hover:text-sidebar-item-foreground',
+    'hover:border-transparent hover:bg-sidebar-accent/78 hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
-    'data-[active=true]:bg-sidebar-accent/88 data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_var(--linear-app-frame-seam)]',
+    'data-[active=true]:bg-sidebar-accent/92 data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_82%,transparent)]',
     // Focus state - subtle bg like Linear (no rings)
     'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
@@ -75,7 +75,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
-        default: 'h-[30px]',
+        default: 'h-7',
         sm: 'h-6 text-xs',
         lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },

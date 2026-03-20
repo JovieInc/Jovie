@@ -28,7 +28,10 @@ export function AdminTableHeader({
       title={title}
       subtitle={subtitle}
       actions={actions}
-      className={cn('bg-(--linear-app-content-surface)', className)}
+      className={cn(
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]',
+        className
+      )}
     />
   );
 }
@@ -50,8 +53,8 @@ export function AdminTableSubheader({
     <div
       className={cn(
         hasToolbar
-          ? 'bg-(--linear-app-content-surface)'
-          : 'border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-header-padding-x) py-1.5',
+          ? 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]'
+          : 'border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-header-padding-x) py-1',
         className
       )}
     >

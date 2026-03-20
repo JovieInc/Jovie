@@ -755,7 +755,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                   <div
                     className={cn(
                       LINEAR_SURFACE.contentContainer,
-                      'mt-3 flex min-h-[440px] flex-1 flex-col overflow-hidden'
+                      'mt-2.5 flex min-h-[420px] flex-1 flex-col overflow-hidden'
                     )}
                   >
                     <ReleaseTableSubheader
@@ -791,11 +791,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
               {/* Show "No releases" state when connected but no releases and not importing */}
               {isConnected && rows.length === 0 && !isImporting && (
-                <div className='mt-3 flex flex-1'>
+                <div className='mt-2.5 flex flex-1'>
                   <div
                     className={cn(
                       LINEAR_SURFACE.contentContainer,
-                      'flex min-h-[280px] w-full flex-col items-center justify-center px-5 py-14 text-center'
+                      'flex min-h-[260px] w-full flex-col items-center justify-center px-4 py-12 text-center'
                     )}
                   >
                     <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>

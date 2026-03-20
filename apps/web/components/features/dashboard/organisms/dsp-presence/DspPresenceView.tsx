@@ -30,8 +30,8 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
           suggestedCount={data.suggestedCount}
         />
 
-        <div className='flex-1 min-h-0 overflow-y-auto p-4 lg:p-6'>
-          <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3'>
+        <div className='flex-1 min-h-0 overflow-y-auto p-3 lg:p-3.5'>
+          <div className='grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'>
             {data.items.map(item => (
               <DspPresenceCard
                 key={item.matchId}

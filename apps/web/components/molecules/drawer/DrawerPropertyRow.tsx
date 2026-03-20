@@ -32,12 +32,12 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[21px] gap-1.5 rounded-[5px] px-1.5 py-px',
+      container: 'min-h-[20px] gap-1.5 rounded-[6px] px-1.5 py-px',
       label: 'text-[10px] leading-[13px] tracking-normal',
       value: 'text-[11.5px] leading-[15px]',
     },
     md: {
-      container: 'min-h-[23px] gap-1.5 rounded-[5px] px-1.5 py-px',
+      container: 'min-h-[22px] gap-1.5 rounded-[6px] px-1.5 py-px',
       label: 'text-[10px] leading-[13px] tracking-normal',
       value: 'text-[11.5px] leading-[15px]',
     },

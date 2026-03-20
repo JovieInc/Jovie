@@ -156,9 +156,9 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex min-h-[36px] items-center justify-between rounded-[8px] border border-transparent',
-          'px-2.5 py-1.5 lg:px-2.5 lg:py-1.5',
-          'active:border-(--linear-app-frame-seam) active:bg-surface-1 lg:hover:border-(--linear-app-frame-seam) lg:hover:bg-surface-1',
+          'group flex min-h-[32px] items-center justify-between rounded-[7px] border border-transparent',
+          'px-2.25 py-1 lg:px-2.25 lg:py-1',
+          'active:border-transparent active:bg-surface-1 lg:hover:border-transparent lg:hover:bg-surface-1',
           'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
           className
@@ -166,11 +166,11 @@ export function SidebarLinkRow({
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex min-w-0 flex-1 items-center gap-2.5'>
+        <div className='flex min-w-0 flex-1 items-center gap-2.25'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-[12.5px] font-[500] text-secondary-token'>
+          <span className='text-[12px] font-[510] text-secondary-token'>
             {label}
           </span>
           {badge && (
