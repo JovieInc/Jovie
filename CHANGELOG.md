@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.19] - 2026-03-19
+
+### Added
+
+- Performance budget for releases page (`/app/dashboard/releases`) with Gmail-rule targets: 500ms skeleton-to-content, 1500ms FCP/TTFB
+- Authenticated route support in perf guard script: Clerk session cookie injection via `CLERK_SESSION_COOKIE` env or `.auth/session.json`
+- Custom skeleton-to-content timing metric: measures time from navigation to `[data-testid="releases-loading"]` disappearing
+- Browser warm-up in perf guard to eliminate Playwright launch overhead from measurements
+
+### Changed
+
+- Releases page now uses Suspense streaming: auth gate blocks navigation, all data fetches fire in parallel inside a Suspense boundary (eliminates sequential waterfall)
+- Removed duplicate `ReleasesClientBoundary` wrapper from `ReleasesContent` component
+
 ## [26.4.18] - 2026-03-19
 
 ### Added
@@ -35,6 +49,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
 - Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
+- Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
+- Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
+- AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
+- Pricing headline: "Get live for free. Grow when you're ready"
+- Final CTA: "Every day without Jovie is fans you'll never see again"
+- Meta title, description, and structured data updated to match new positioning
+- Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
+- Added persistent "Claim your handle" ghost button during dashboard animation
+- Mobile dashboard uses stacked row layout for full smart link URL visibility
 
 ## [26.4.17] - 2026-03-19
 

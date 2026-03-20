@@ -517,7 +517,14 @@
       "idx": 73,
       "version": "7",
       "when": 1774700000000,
-      "tag": "0074_add_audience_attribution_source",
+      "tag": "0074_add_release_credit_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1774800000000,
+      "tag": "0075_add_audience_attribution_source",
       "breakpoints": true
     }
   ]

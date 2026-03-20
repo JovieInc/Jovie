@@ -19,6 +19,8 @@ export type ArtistRole =
   | 'lyricist'
   | 'arranger'
   | 'conductor'
+  | 'mix_engineer'
+  | 'mastering_engineer'
   | 'vs'
   | 'with'
   | 'other';
