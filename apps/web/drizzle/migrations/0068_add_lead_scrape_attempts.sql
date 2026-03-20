@@ -1,1 +1,0 @@
-ALTER TABLE "leads" ADD COLUMN "scrape_attempts" integer DEFAULT 0 NOT NULL;
