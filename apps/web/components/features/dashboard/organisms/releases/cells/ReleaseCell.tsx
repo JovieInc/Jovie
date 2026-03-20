@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
@@ -35,9 +35,19 @@ export const ReleaseCell = memo(function ReleaseCell({
         id: release.id,
         title: release.title,
         audioUrl: release.previewUrl,
+        releaseTitle: release.title,
+        artistName: release.artistNames?.[0],
+        artworkUrl: release.artworkUrl,
       }).catch(() => {});
     },
-    [toggleTrack, release.id, release.title, release.previewUrl]
+    [
+      toggleTrack,
+      release.id,
+      release.title,
+      release.previewUrl,
+      release.artistNames,
+      release.artworkUrl,
+    ]
   );
 
   const manualOverrideCount = release.providers.filter(
@@ -72,7 +82,10 @@ export const ReleaseCell = memo(function ReleaseCell({
             )}
           </DrawerInlineIconButton>
         ) : (
-          <span className='h-[14px] w-[14px]' />
+          <VolumeX
+            className='h-[9px] w-[9px] text-quaternary-token/40'
+            aria-label='No preview available'
+          />
         )}
       </div>
 

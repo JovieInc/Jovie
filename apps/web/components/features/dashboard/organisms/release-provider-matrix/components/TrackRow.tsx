@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { Pause, Play } from 'lucide-react';
+import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { Icon } from '@/components/atoms/Icon';
@@ -24,6 +24,7 @@ interface ProviderConfig {
 
 interface TrackRowProps {
   readonly track: TrackViewModel;
+  readonly release?: ReleaseViewModel;
   readonly providerConfig: Record<ProviderKey, ProviderConfig>;
   readonly allProviders: ProviderKey[];
   /** Number of visible columns (for proper spacing) */
@@ -46,6 +47,7 @@ interface TrackRowProps {
  */
 export const TrackRow = memo(function TrackRow({
   track,
+  release,
   providerConfig,
   allProviders,
   columnCount,
@@ -107,9 +109,20 @@ export const TrackRow = memo(function TrackRow({
         id: track.id,
         title: track.title,
         audioUrl: previewUrl,
+        releaseTitle: release?.title,
+        artistName: release?.artistNames?.[0],
+        artworkUrl: release?.artworkUrl,
       }).catch(() => {});
     },
-    [previewUrl, toggleTrack, track.id, track.title]
+    [
+      previewUrl,
+      toggleTrack,
+      track.id,
+      track.title,
+      release?.title,
+      release?.artistNames,
+      release?.artworkUrl,
+    ]
   );
 
   return (
@@ -133,7 +146,12 @@ export const TrackRow = memo(function TrackRow({
                   <Play className='h-3 w-3' />
                 )}
               </button>
-            ) : null}
+            ) : (
+              <VolumeX
+                className='h-3 w-3 text-quaternary-token/40'
+                aria-label='No preview available'
+              />
+            )}
           </div>
         </td>
       )}
@@ -317,6 +335,7 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
         <TrackRow
           key={track.id}
           track={track}
+          release={release}
           providerConfig={providerConfig}
           allProviders={allProviders}
           columnCount={columnCount}

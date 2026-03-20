@@ -17,12 +17,18 @@ import { useSaveStatus } from '@/features/dashboard/hooks/useSaveStatus';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
-import { usePixelSettingsMutation, usePixelSettingsQuery } from '@/lib/queries';
+import type { PlatformHealth } from '@/lib/queries';
+import {
+  usePixelHealthQuery,
+  usePixelSettingsMutation,
+  usePixelSettingsQuery,
+} from '@/lib/queries';
 
 const SETTINGS_BUTTON_CLASS = 'w-full sm:w-auto';
 
 interface PlatformSectionProps {
   readonly platform: string;
+  readonly platformKey: TestPlatform;
   readonly description: string;
   readonly pixelIdLabel: string;
   readonly pixelIdPlaceholder: string;
@@ -37,10 +43,12 @@ interface PlatformSectionProps {
   readonly onPixelIdChange: (value: string) => void;
   readonly onTokenChange: (value: string) => void;
   readonly isConfigured: boolean;
+  readonly health?: PlatformHealth;
 }
 
 function PlatformSection({
   platform,
+  platformKey,
   description,
   pixelIdLabel,
   pixelIdPlaceholder,
@@ -55,6 +63,7 @@ function PlatformSection({
   onPixelIdChange,
   onTokenChange,
   isConfigured,
+  health,
 }: PlatformSectionProps) {
   const [showToken, setShowToken] = useState(false);
 
@@ -69,9 +78,13 @@ function PlatformSection({
             {description}
           </p>
         </div>
-        <Badge variant='outline' className='shrink-0'>
-          {isConfigured ? 'Configured' : 'Not configured'}
-        </Badge>
+        <div className='flex shrink-0 items-center gap-2'>
+          <Badge variant='outline'>
+            {isConfigured ? 'Configured' : 'Not configured'}
+          </Badge>
+          <HealthIndicator health={health} />
+          <TestEventButton platform={platformKey} isConfigured={isConfigured} />
+        </div>
       </div>
 
       <a
@@ -142,6 +155,105 @@ function PlatformSection({
 // Token placeholder shown when a token is configured but not revealed
 const TOKEN_PLACEHOLDER = '••••••••';
 
+type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
+
+function HealthIndicator({ health }: { readonly health?: PlatformHealth }) {
+  if (!health) return null;
+
+  const config: Record<
+    HealthStatus,
+    { dot: string; color: string; label: string }
+  > = {
+    healthy: { dot: '\u25CF', color: 'text-green-500', label: 'Healthy' },
+    degraded: { dot: '\u25CF', color: 'text-yellow-500', label: 'Degraded' },
+    unhealthy: {
+      dot: '\u25CF',
+      color: 'text-red-500',
+      label: 'Check credentials',
+    },
+    inactive: {
+      dot: '\u25CB',
+      color: 'text-tertiary-token',
+      label: 'No events',
+    },
+  };
+
+  const { dot, color, label } = config[health.status];
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[11px] font-[510] ${color}`}
+    >
+      <span aria-hidden='true'>{dot}</span>
+      {label}
+    </span>
+  );
+}
+
+type TestPlatform = 'facebook' | 'google' | 'tiktok';
+
+function TestEventButton({
+  platform,
+  isConfigured,
+}: {
+  readonly platform: TestPlatform;
+  readonly isConfigured: boolean;
+}) {
+  const [status, setStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const handleTest = useCallback(async () => {
+    setStatus('loading');
+    setErrorMessage(null);
+    try {
+      const response = await fetch('/api/dashboard/pixels/test-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        setStatus('success');
+      } else {
+        setStatus('error');
+        setErrorMessage(data.error || 'Unknown error');
+      }
+    } catch {
+      setStatus('error');
+      setErrorMessage('Network error');
+    }
+  }, [platform]);
+
+  if (!isConfigured) return null;
+
+  return (
+    <div className='inline-flex items-center gap-2'>
+      <Button
+        type='button'
+        variant='outline'
+        size='sm'
+        disabled={status === 'loading'}
+        onClick={handleTest}
+        className='h-7 px-2.5 text-[11px]'
+      >
+        {status === 'loading' ? 'Testing...' : 'Test'}
+      </Button>
+      {status === 'success' && (
+        <span className='text-[11px] font-[510] text-green-500'>
+          Event received
+        </span>
+      )}
+      {status === 'error' && errorMessage && (
+        <span className='text-[11px] font-[510] text-red-500'>
+          {errorMessage}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export interface SettingsAdPixelsSectionProps {
   readonly isPro?: boolean;
 }
@@ -166,6 +278,9 @@ export function SettingsAdPixelsSection({
     isError,
     refetch,
   } = usePixelSettingsQuery({ enabled: isPro });
+
+  // Fetch pixel health status
+  const { data: healthData } = usePixelHealthQuery({ enabled: isPro });
 
   const [pixelData, setPixelData] = useState({
     facebookPixelId: '',
@@ -402,8 +517,19 @@ export function SettingsAdPixelsSection({
             </p>
           </ContentSurfaceCard>
 
+          {healthData && healthData.aggregate.totalEventsThisWeek > 0 && (
+            <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
+              <p className='text-[13px] font-[510] leading-[18px] text-primary-token'>
+                {healthData.aggregate.totalEventsThisWeek.toLocaleString()}{' '}
+                events forwarded this week &middot;{' '}
+                {healthData.aggregate.overallSuccessRate}% success rate
+              </p>
+            </ContentSurfaceCard>
+          )}
+
           <PlatformSection
             platform='Facebook Conversions API'
+            platformKey='facebook'
             description='Track profile views and link clicks in Meta Ads Manager.'
             pixelIdLabel='Pixel ID'
             pixelIdPlaceholder='1234567890123456'
@@ -421,6 +547,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.facebook
               )
             }
+            health={healthData?.platforms.facebook}
             onPixelIdChange={value =>
               handleInputChange('facebookPixelId', value)
             }
@@ -431,6 +558,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='Google Analytics 4 (Measurement Protocol)'
+            platformKey='google'
             description='Send conversion events directly to your GA4 property.'
             pixelIdLabel='Measurement ID'
             pixelIdPlaceholder='G-XXXXXXXXXX'
@@ -448,6 +576,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.google
               )
             }
+            health={healthData?.platforms.google}
             onPixelIdChange={value =>
               handleInputChange('googleMeasurementId', value)
             }
@@ -456,6 +585,7 @@ export function SettingsAdPixelsSection({
 
           <PlatformSection
             platform='TikTok Events API'
+            platformKey='tiktok'
             description='Measure profile engagement and optimize TikTok campaigns.'
             pixelIdLabel='Pixel Code'
             pixelIdPlaceholder='CXXXXXXXXXX'
@@ -473,6 +603,7 @@ export function SettingsAdPixelsSection({
                 existingSettings?.hasTokens?.tiktok
               )
             }
+            health={healthData?.platforms.tiktok}
             onPixelIdChange={value => handleInputChange('tiktokPixelId', value)}
             onTokenChange={value =>
               handleInputChange('tiktokAccessToken', value)

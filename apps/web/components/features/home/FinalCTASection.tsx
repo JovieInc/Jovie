@@ -19,11 +19,11 @@ export function FinalCTASection() {
             data-testid='final-cta-headline'
             className='marketing-h2-linear text-primary-token'
           >
-            Your fans are waiting.
+            Every day without Jovie is fans you&apos;ll never see again.
           </h2>
 
           <p className='mt-5 max-w-md marketing-lead-linear text-secondary-token'>
-            Claim your handle and launch your career today.
+            Claim your handle. Be live in 60 seconds.
           </p>
 
           {/* Form */}

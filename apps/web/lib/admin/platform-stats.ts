@@ -13,7 +13,7 @@ import { unstable_cache } from 'next/cache';
 
 import { db } from '@/lib/db';
 import { clickEvents } from '@/lib/db/schema/analytics';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
 const PLATFORM_STATS_CACHE_SECONDS = 60 * 10;
@@ -143,10 +143,10 @@ const getCachedAdminPlatformStats = unstable_cache(
         .where(eq(creatorProfiles.isClaimed, true)),
       db
         .select({ count: count() })
-        .from(discogTracks)
+        .from(discogRecordings)
         .innerJoin(
           creatorProfiles,
-          eq(discogTracks.creatorProfileId, creatorProfiles.id)
+          eq(discogRecordings.creatorProfileId, creatorProfiles.id)
         )
         .where(eq(creatorProfiles.isClaimed, true)),
     ]);

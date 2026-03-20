@@ -10,6 +10,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SmartLinkCreditGroup } from '@/app/[username]/[slug]/_lib/data';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
@@ -17,6 +18,7 @@ import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
 } from '@/features/release/AlbumArtworkContextMenu';
+import { ReleaseCreditsDialog } from '@/features/release/ReleaseCreditsDialog';
 import {
   SmartLinkArtistName,
   SmartLinkArtworkCard,
@@ -47,6 +49,7 @@ interface ReleaseLandingPageProps
       readonly avatarUrl: string | null;
     };
     readonly providers: Provider[];
+    readonly credits?: SmartLinkCreditGroup[];
     /** Pre-generated artwork sizes for download context menu */
     readonly artworkSizes?: Record<string, string> | null;
     /** Whether the artist allows artwork downloads on public pages */
@@ -131,6 +134,7 @@ export function ReleaseLandingPage({
   release,
   artist,
   providers,
+  credits,
   artworkSizes,
   allowDownloads = false,
   soundsUrl,
@@ -213,6 +217,16 @@ export function ReleaseLandingPage({
               username={claimBanner.username}
             />
           )}
+
+          <div
+            className={
+              claimBanner
+                ? 'mt-3 flex justify-center'
+                : 'mt-3.5 flex justify-center'
+            }
+          >
+            <ReleaseCreditsDialog credits={credits} />
+          </div>
         </div>
       </div>
 

@@ -18,8 +18,9 @@ import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
 import {
+  discogRecordings,
   discogReleases,
-  discogTracks,
+  discogReleaseTracks,
   providerLinks,
 } from '@/lib/db/schema/content';
 import { logger } from '@/lib/utils/logger';
@@ -131,17 +132,21 @@ async function fetchPrimaryIsrcsForReleases(
 
   const tracks = await dbConn
     .select({
-      releaseId: discogTracks.releaseId,
-      isrc: discogTracks.isrc,
+      releaseId: discogReleaseTracks.releaseId,
+      isrc: discogRecordings.isrc,
     })
-    .from(discogTracks)
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
     .where(
       and(
-        inArray(discogTracks.releaseId, releaseIds),
-        drizzleSql`${discogTracks.isrc} IS NOT NULL`
+        inArray(discogReleaseTracks.releaseId, releaseIds),
+        drizzleSql`${discogRecordings.isrc} IS NOT NULL`
       )
     )
-    .orderBy(discogTracks.discNumber, discogTracks.trackNumber);
+    .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber);
 
   // Take the first ISRC per release
   const isrcByRelease = new Map<string, string>();

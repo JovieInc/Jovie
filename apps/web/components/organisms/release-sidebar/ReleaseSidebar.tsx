@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
+import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import {
   DrawerAsyncToggle,
   DrawerMediaThumb,
@@ -28,6 +29,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   AlbumArtworkContextMenu,
   buildArtworkSizes,
@@ -52,7 +54,7 @@ import { useReleaseSidebar } from './useReleaseSidebar';
 import { useTrackAudioPlayer } from './useTrackAudioPlayer';
 
 /** Tab for organizing sidebar content into focused views */
-type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics';
+type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics' | 'tasks';
 
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
@@ -60,6 +62,7 @@ const SIDEBAR_TAB_OPTIONS = [
   { value: 'links' as const, label: 'Platforms' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
+  { value: 'tasks' as const, label: 'Tasks' },
 ];
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
@@ -400,6 +403,9 @@ export function ReleaseSidebar({
       id: release.id,
       title: release.title,
       audioUrl: release.previewUrl,
+      releaseTitle: release.title,
+      artistName: release.artistNames?.[0],
+      artworkUrl: release.artworkUrl,
     }).catch(() => {});
   }, [toggleTrack, release]);
 
@@ -541,6 +547,16 @@ export function ReleaseSidebar({
               isSaving={isLyricsSaving}
               onSaveLyrics={onSaveLyrics}
               onFormatLyrics={onFormatLyrics}
+            />
+          )}
+
+          {activeTab === 'tasks' && (
+            <ReleaseTaskChecklist
+              releaseId={release.id}
+              variant='compact'
+              onNavigateToFullPage={() => {
+                window.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+              }}
             />
           )}
         </>

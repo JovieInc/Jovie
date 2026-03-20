@@ -2,6 +2,7 @@ import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -17,7 +18,7 @@ import { creatorProfiles } from './profiles';
  * Forwarding status entry for a single platform
  */
 interface PlatformForwardingStatus {
-  status: 'pending' | 'sent' | 'failed' | 'skipped';
+  status: 'pending' | 'sent' | 'failed' | 'skipped' | 'dead_letter';
   sentAt?: string;
   error?: string;
 }
@@ -108,6 +109,9 @@ export const pixelEvents = pgTable(
       .$type<PixelForwardingStatus>()
       .default({}),
 
+    // Retry tracking — incremented each time the cron retries forwarding
+    retryCount: integer('retry_count').default(0).notNull(),
+
     // When event should be forwarded (for batching/queuing)
     forwardAt: timestamp('forward_at').defaultNow().notNull(),
 
@@ -131,6 +135,11 @@ export const pixelEvents = pgTable(
       table.profileId,
       table.createdAt
     ),
+
+    // Partial index for IP purge cron — only rows with raw IPs still present
+    purgeIdx: index('idx_pixel_events_purge')
+      .on(table.createdAt)
+      .where(drizzleSql`client_ip IS NOT NULL`),
   })
 );
 

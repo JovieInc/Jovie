@@ -137,6 +137,7 @@ export function ReleaseTrackList({
             <TrackItem
               key={track.id}
               track={track}
+              release={release}
               onClick={onTrackClick}
               playbackState={playbackState}
               onToggleTrack={toggleTrack}
@@ -149,11 +150,13 @@ export function ReleaseTrackList({
 
 function TrackItem({
   track,
+  release,
   onClick,
   playbackState,
   onToggleTrack,
 }: {
   readonly track: ReleaseSidebarTrack;
+  readonly release: Release;
   readonly onClick?: (track: ReleaseSidebarTrack) => void;
   readonly playbackState: {
     activeTrackId: string | null;
@@ -165,6 +168,9 @@ function TrackItem({
     id: string;
     title: string;
     audioUrl: string;
+    releaseTitle?: string;
+    artistName?: string;
+    artworkUrl?: string | null;
   }) => Promise<void>;
 }) {
   const trackLabel =
@@ -214,10 +220,21 @@ function TrackItem({
       id: track.id,
       title: track.title,
       audioUrl: playableUrl,
+      releaseTitle: release.title,
+      artistName: release.artistNames?.[0],
+      artworkUrl: release.artworkUrl,
     }).catch(() => {
       toast.error('Unable to play this track right now');
     });
-  }, [onToggleTrack, playableUrl, track.id, track.title]);
+  }, [
+    onToggleTrack,
+    playableUrl,
+    track.id,
+    track.title,
+    release.title,
+    release.artistNames,
+    release.artworkUrl,
+  ]);
 
   return (
     <div className='group flex items-start gap-2 rounded-md px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70'>

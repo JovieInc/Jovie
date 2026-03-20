@@ -43,9 +43,14 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'creatorProfileId',
     upc: 'upc',
   },
-  discogTracks: {
-    releaseId: 'releaseId',
+  discogRecordings: {
+    id: 'id',
     isrc: 'isrc',
+    creatorProfileId: 'creatorProfileId',
+  },
+  discogReleaseTracks: {
+    releaseId: 'releaseId',
+    recordingId: 'recordingId',
     discNumber: 'discNumber',
     trackNumber: 'trackNumber',
   },
@@ -118,6 +123,7 @@ function createMockDbConn(
     return chain;
   });
   chain.from = vi.fn(() => chain);
+  chain.innerJoin = vi.fn(() => chain);
   chain.where = vi.fn(() => chain);
   chain.orderBy = vi.fn(() => chain);
   chain.limit = vi.fn(() => getResultForCurrentQuery());

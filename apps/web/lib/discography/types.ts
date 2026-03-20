@@ -124,6 +124,10 @@ export interface ReleaseViewModel {
 /** Track view model for display in expandable release rows */
 export interface TrackViewModel {
   id: string;
+  /** Release-track junction ID (new model) — absent for legacy data */
+  releaseTrackId?: string;
+  /** Canonical recording ID (new model) — absent for legacy data */
+  recordingId?: string;
   releaseId: string;
   title: string;
   slug: string;

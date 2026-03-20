@@ -40,6 +40,8 @@ function mapProviderLinksToViewModel(
 export function mapTrackToViewModel(params: {
   track: {
     id: string;
+    releaseTrackId?: string;
+    recordingId?: string;
     releaseId: string;
     title: string;
     slug: string;
@@ -60,6 +62,8 @@ export function mapTrackToViewModel(params: {
 
   return {
     id: track.id,
+    releaseTrackId: track.releaseTrackId,
+    recordingId: track.recordingId,
     releaseId: track.releaseId,
     title: track.title,
     slug: track.slug,

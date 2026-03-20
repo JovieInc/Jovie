@@ -120,6 +120,9 @@ describe('ReleaseCell', () => {
       id: 'release-1',
       title: 'Skyline Dreams',
       audioUrl: 'https://cdn.example.com/preview.mp3',
+      releaseTitle: 'Skyline Dreams',
+      artistName: undefined,
+      artworkUrl: undefined,
     });
   });
 

@@ -59,6 +59,7 @@ export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
 export const providerLinkOwnerEnum = pgEnum('provider_link_owner_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Billing & Subscription Enums
@@ -309,6 +310,8 @@ export const artistRoleEnum = pgEnum('artist_role', [
   'lyricist',
   'arranger',
   'conductor',
+  'mix_engineer',
+  'mastering_engineer',
   'vs',
   'with',
   'other',
@@ -318,6 +321,7 @@ export const artistRoleEnum = pgEnum('artist_role', [
 export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Sender Reputation Enums
@@ -455,6 +459,43 @@ export const tipStatusEnum = pgEnum('tip_status', [
   'failed',
   'refunded',
 ]);
+
+// Profile Claim Enums
+export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
+  'owner',
+  'manager',
+  'viewer',
+]);
+
+export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
+  'claimed',
+  'linked',
+  'unlinked',
+  'transferred',
+  'role_changed',
+]);
+
+// Release Task Enums
+export const releaseTaskStatusEnum = pgEnum('release_task_status', [
+  'backlog',
+  'todo',
+  'in_progress',
+  'done',
+  'cancelled',
+]);
+
+export const releaseTaskPriorityEnum = pgEnum('release_task_priority', [
+  'urgent',
+  'high',
+  'medium',
+  'low',
+  'none',
+]);
+
+export const releaseTaskAssigneeTypeEnum = pgEnum(
+  'release_task_assignee_type',
+  ['human', 'ai_workflow']
+);
 
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [

@@ -385,6 +385,12 @@ export {
   useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
+// Pixel health query
+export {
+  type PixelHealthData,
+  type PlatformHealth,
+  usePixelHealthQuery,
+} from './usePixelHealthQuery';
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
