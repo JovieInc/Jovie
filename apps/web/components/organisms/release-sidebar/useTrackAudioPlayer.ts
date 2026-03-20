@@ -6,6 +6,9 @@ interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
   readonly audioUrl: string;
+  readonly releaseTitle?: string;
+  readonly artistName?: string;
+  readonly artworkUrl?: string | null;
 }
 
 interface PlaybackState {
@@ -13,6 +16,10 @@ interface PlaybackState {
   readonly isPlaying: boolean;
   readonly currentTime: number;
   readonly duration: number;
+  readonly trackTitle: string | null;
+  readonly releaseTitle: string | null;
+  readonly artistName: string | null;
+  readonly artworkUrl: string | null;
 }
 
 let _audio: HTMLAudioElement | null = null;
@@ -33,9 +40,14 @@ let state: PlaybackState = {
   isPlaying: false,
   currentTime: 0,
   duration: 0,
+  trackTitle: null,
+  releaseTitle: null,
+  artistName: null,
+  artworkUrl: null,
 };
 
 const listeners = new Set<() => void>();
+const errorListeners = new Set<() => void>();
 
 function notify(): void {
   for (const listener of listeners) {
@@ -65,6 +77,21 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     setState({
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
+  });
+  el.addEventListener('error', () => {
+    setState({
+      activeTrackId: null,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      trackTitle: null,
+      releaseTitle: null,
+      artistName: null,
+      artworkUrl: null,
+    });
+    for (const cb of errorListeners) {
+      cb();
+    }
   });
 }
 
@@ -97,12 +124,24 @@ export function useTrackAudioPlayer() {
       activeTrackId: track.id,
       currentTime: 0,
       duration: 0,
+      trackTitle: track.title,
+      releaseTitle: track.releaseTitle ?? null,
+      artistName: track.artistName ?? null,
+      artworkUrl: track.artworkUrl ?? null,
     });
     await audio.play();
+  }, []);
+
+  const onError = useCallback((cb: () => void) => {
+    errorListeners.add(cb);
+    return () => {
+      errorListeners.delete(cb);
+    };
   }, []);
 
   return {
     playbackState,
     toggleTrack,
+    onError,
   };
 }

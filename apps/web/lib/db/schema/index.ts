@@ -256,6 +256,9 @@ export {
   referralStatusEnum,
   releaseNotificationStatusEnum,
   releaseNotificationTypeEnum,
+  releaseTaskAssigneeTypeEnum,
+  releaseTaskPriorityEnum,
+  releaseTaskStatusEnum,
   scraperStrategyEnum,
   senderStatusEnum,
   socialAccountStatusEnum,
@@ -464,6 +467,24 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
+// Release Tasks (Templates, Template Items, Tasks)
+export {
+  insertReleaseTaskSchema,
+  insertReleaseTaskTemplateItemSchema,
+  insertReleaseTaskTemplateSchema,
+  type NewReleaseTask,
+  type NewReleaseTaskTemplate,
+  type NewReleaseTaskTemplateItem,
+  type ReleaseTask,
+  type ReleaseTaskTemplate,
+  type ReleaseTaskTemplateItem,
+  releaseTasks,
+  releaseTaskTemplateItems,
+  releaseTaskTemplates,
+  selectReleaseTaskSchema,
+  selectReleaseTaskTemplateItemSchema,
+  selectReleaseTaskTemplateSchema,
+} from './release-tasks';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,
