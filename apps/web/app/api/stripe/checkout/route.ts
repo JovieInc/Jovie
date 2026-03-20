@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
-    const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
+    const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({

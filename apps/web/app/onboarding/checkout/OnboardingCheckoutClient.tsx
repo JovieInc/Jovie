@@ -225,9 +225,6 @@ export function OnboardingCheckoutClient({
     ENTITLEMENT_REGISTRY[plan]?.marketing ??
     ENTITLEMENT_REGISTRY.founding.marketing;
 
-  const hasAnnual = hasAnnualOption;
-  const savingsPercent = annualSavingsPercent;
-
   const currentPriceId =
     isAnnual && annualPriceId !== null ? annualPriceId : monthlyPriceId;
   const currentAmount =
@@ -241,10 +238,10 @@ export function OnboardingCheckoutClient({
     track('onboarding_checkout_shown', {
       plan,
       has_spotify: !!spotifyFollowers,
-      has_annual: !!hasAnnual,
+      has_annual: !!hasAnnualOption,
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
-  }, [plan, spotifyFollowers, hasAnnual, isDefaultUpsell]);
+  }, [plan, spotifyFollowers, hasAnnualOption, isDefaultUpsell]);
 
   const handleCheckout = useCallback(async () => {
     setIsLoading(true);
@@ -291,8 +288,14 @@ export function OnboardingCheckoutClient({
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
     clearPlanIntent();
-    globalThis.location.href = APP_ROUTES.DASHBOARD;
-  }, [plan, isDefaultUpsell]);
+    // Preserve the dashboard handoff query so ChatPageClient auto-submits
+    // the onboarding prompt (mirrors AppleStyleOnboardingForm behavior)
+    const initialQuery =
+      spotifyFollowers != null
+        ? 'Show me my latest releases'
+        : 'Connect my Spotify';
+    globalThis.location.href = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
+  }, [plan, isDefaultUpsell, spotifyFollowers]);
 
   return (
     <div className='flex flex-col items-center justify-center'>
@@ -349,10 +352,10 @@ export function OnboardingCheckoutClient({
         </div>
 
         {/* Annual toggle */}
-        {hasAnnual ? (
+        {hasAnnualOption ? (
           <BillingIntervalSelector
             isAnnual={isAnnual}
-            savingsPercent={savingsPercent}
+            savingsPercent={annualSavingsPercent}
             onSelect={setIsAnnual}
           />
         ) : null}
