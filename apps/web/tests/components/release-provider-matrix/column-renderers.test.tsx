@@ -48,9 +48,9 @@ describe('createRightMetaCellRenderer', () => {
     );
 
     const wrapper = container.firstElementChild as HTMLElement;
-    expect(wrapper.className).toContain('min-w-[252px]');
+    expect(wrapper.className).toContain('min-w-[188px]');
     expect(wrapper.className).toContain(
-      'grid-cols-[minmax(168px,1fr)_12px_34px]'
+      'grid-cols-[minmax(124px,1fr)_10px_28px]'
     );
     expect(screen.getByText('2026')).toBeInTheDocument();
   });

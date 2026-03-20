@@ -55,7 +55,7 @@ export function DemoReleaseDetail({
       </div>
 
       {/* Scrollable content */}
-      <div className='flex-1 overflow-y-auto p-5'>
+      <div className='flex-1 overflow-y-auto p-4'>
         {/* Title Area */}
         <div className='mb-6'>
           <h2 className='mb-1 text-lg font-semibold text-primary-token'>
@@ -67,35 +67,35 @@ export function DemoReleaseDetail({
         {/* Properties grid */}
         <div className='mb-8 space-y-1'>
           <DemoPropertyRow label='Status'>
-            <div className='-ml-2 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 flex items-center gap-1.5 rounded px-2 py-1'>
               <DemoStatusIcon status={release.status} />
               <span className='capitalize'>{release.status}</span>
             </div>
           </DemoPropertyRow>
           <DemoPropertyRow label='Priority'>
-            <div className='-ml-2 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 flex items-center gap-1.5 rounded px-2 py-1'>
               <DemoPriorityIcon priority={release.priority} />
               <span className='capitalize'>{release.priority}</span>
             </div>
           </DemoPropertyRow>
           <DemoPropertyRow label='Assignee'>
-            <div className='-ml-2 flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 flex items-center gap-1.5 rounded px-2 py-1'>
               <DemoAvatar assignee={release.assignee} size={16} />
               <span>{release.assignee.name}</span>
             </div>
           </DemoPropertyRow>
           <DemoPropertyRow label='Type'>
-            <div className='-ml-2 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 rounded px-2 py-1'>
               <span>{release.type}</span>
             </div>
           </DemoPropertyRow>
           <DemoPropertyRow label='Tracks'>
-            <div className='-ml-2 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 rounded px-2 py-1'>
               <span>{release.trackCount}</span>
             </div>
           </DemoPropertyRow>
           <DemoPropertyRow label='Release date'>
-            <div className='-ml-2 rounded-md px-2 py-1 transition-colors duration-150 hover:bg-surface-1'>
+            <div className='-ml-2 rounded px-2 py-1'>
               <span>{release.releaseDate}</span>
             </div>
           </DemoPropertyRow>
@@ -111,7 +111,7 @@ export function DemoReleaseDetail({
               {release.links.map(link => (
                 <DrawerSurfaceCard
                   key={link.id}
-                  className='flex items-center gap-2 rounded-[8px] px-3 py-2 text-[13px]'
+                  className='flex items-center gap-2 rounded border-0 shadow-none px-2.5 py-1.5 text-[13px]'
                 >
                   <span
                     className='size-1.5 shrink-0 rounded-full'
@@ -144,7 +144,7 @@ export function DemoReleaseDetail({
               {release.labels.map(label => (
                 <span
                   key={label.id}
-                  className='flex items-center gap-1.5 rounded-[6px] border border-subtle bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'
+                  className='flex items-center gap-1.5 rounded bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'
                 >
                   <span
                     className='size-1.5 rounded-full'
@@ -160,11 +160,11 @@ export function DemoReleaseDetail({
         {/* Activity */}
         <div className='mt-4'>
           <DrawerSectionHeading className='mb-3'>Activity</DrawerSectionHeading>
-          <DrawerSurfaceCard className='space-y-0.5 border-subtle/70 bg-surface-1/24 p-2.5'>
+          <DrawerSurfaceCard className='space-y-0.5 border-0 shadow-none bg-surface-1/24 p-2'>
             {DEMO_ACTIVITY_TEMPLATE.map((activity, index) => (
               <div
                 key={activity.id}
-                className='relative flex items-start gap-2.5 rounded-[7px] px-1 py-1.5 pr-1 transition-colors duration-150 hover:bg-surface-0/35'
+                className='relative flex items-start gap-2.5 rounded px-1 py-1.5 pr-1'
               >
                 {index < DEMO_ACTIVITY_TEMPLATE.length - 1 ? (
                   <div
@@ -172,7 +172,7 @@ export function DemoReleaseDetail({
                     className='absolute bottom-0 left-[11px] top-0 w-px bg-(--linear-border-subtle)/65'
                   />
                 ) : null}
-                <div className='relative z-10 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full border border-subtle/70 bg-surface-0 shadow-[0_0_0_2px_var(--linear-bg-surface-1)]'>
+                <div className='relative z-10 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-0'>
                   <div className='size-1 rounded-full bg-(--linear-text-tertiary)/80' />
                 </div>
                 <div className='min-w-0 flex-1 leading-snug text-secondary-token'>
@@ -198,8 +198,8 @@ export function DemoReleaseDetail({
 
         <div className='mt-5'>
           <DrawerSectionHeading className='mb-2'>Comments</DrawerSectionHeading>
-          <DrawerSurfaceCard className='border-subtle/70 bg-surface-1/20 p-2'>
-            <div className='rounded-[8px] border border-subtle/75 bg-surface-0/90 px-2.5 py-2'>
+          <DrawerSurfaceCard className='border-0 shadow-none bg-surface-1/20 p-1.5'>
+            <div className='rounded bg-surface-0/90 px-2 py-1.5'>
               <label htmlFor='release-comment' className='sr-only'>
                 Add comment
               </label>
@@ -247,7 +247,7 @@ export function DemoReleaseDetail({
         {release.note && (
           <div className='mt-4 mb-4'>
             <DrawerSectionHeading className='mb-2'>Note</DrawerSectionHeading>
-            <DrawerSurfaceCard className='p-3'>
+            <DrawerSurfaceCard className='border-0 shadow-none p-2.5'>
               <p className='text-[13px] text-secondary-token'>{release.note}</p>
             </DrawerSurfaceCard>
           </div>
@@ -257,7 +257,7 @@ export function DemoReleaseDetail({
         <div className='mt-8 grid grid-cols-2 gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
           <DrawerButton
             tone='secondary'
-            className='justify-center border-subtle/80 bg-transparent text-tertiary-token hover:text-secondary-token'
+            className='justify-center bg-transparent text-tertiary-token'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Syncing providers',
@@ -269,7 +269,7 @@ export function DemoReleaseDetail({
           </DrawerButton>
           <DrawerButton
             tone='secondary'
-            className='justify-center border-subtle/80 bg-transparent text-tertiary-token hover:text-secondary-token'
+            className='justify-center bg-transparent text-tertiary-token'
             onClick={() =>
               runDemoAction({
                 loadingMessage: 'Publishing release',

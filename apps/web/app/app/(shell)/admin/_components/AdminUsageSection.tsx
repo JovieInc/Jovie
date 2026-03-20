@@ -22,9 +22,9 @@ export function AdminUsageSectionSkeleton() {
           titleWidth='w-20'
           descriptionWidth='w-32'
           actionWidths={['w-16']}
-          className='px-5 py-3'
+          className='px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='space-y-3 p-5'>
+        <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <ContentMetricRowSkeleton />
           <ContentMetricRowSkeleton />
           <ContentMetricRowSkeleton />

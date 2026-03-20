@@ -18,7 +18,7 @@ export interface TableRowProps {
  * Enhanced table row component with keyboard navigation support
  *
  * Features:
- * - Fixed 60px height to prevent layout shift
+ * - Fixed 36px height to prevent layout shift (Linear-density)
  * - Keyboard focus ring when focused via keyboard
  * - Virtual positioning for large datasets
  * - Accessible ARIA attributes
@@ -55,7 +55,7 @@ export function TableRow({
         // Base styles
         'group transition-colors duration-150',
         // Fixed height to prevent layout shift
-        'h-[60px]',
+        'h-[32px]',
         // Hover state — Linear: rgba(255,255,255,0.02)
         'hover:bg-white/[0.02]',
         // Selected state — Linear: rgba(255,255,255,0.04)
@@ -79,7 +79,7 @@ export function TableRow({
         isVirtual
           ? {
               transform: `translateY(${virtualRow.start}px)`,
-              height: '60px',
+              height: '32px',
             }
           : undefined
       }

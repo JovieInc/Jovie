@@ -42,7 +42,7 @@ export function AudienceMemberSidebar({
       ariaLabel='Audience member details'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
-      title='Contact'
+      title='Audience'
       onClose={onClose}
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
@@ -57,19 +57,19 @@ export function AudienceMemberSidebar({
     >
       {member && (
         <>
-          <DrawerSection title='Properties'>
+          <DrawerSection title='Properties' className='space-y-1.5'>
             <AudienceMemberDetails member={member} />
           </DrawerSection>
 
-          <DrawerSection title='Activity'>
+          <DrawerSection title='Activity' className='space-y-1.5'>
             <AudienceMemberActivityFeed member={member} />
           </DrawerSection>
 
-          <DrawerSection title='Recent actions'>
+          <DrawerSection title='Recent actions' className='space-y-1.5'>
             <AudienceMemberActions member={member} />
           </DrawerSection>
 
-          <DrawerSection title='Referrers'>
+          <DrawerSection title='Referrers' className='space-y-1.5'>
             <AudienceMemberReferrers member={member} />
           </DrawerSection>
         </>

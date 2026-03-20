@@ -6,10 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.25] - 2026-03-20
+
+### Changed
+
+- Schema verify step (`drizzle:verify:ci`) is now non-blocking — schema drift warns via Slack instead of blocking all deploys for days
+- Vercel deploy step retries up to 3 times for transient failures (10s backoff)
+- Health monitor auto-reruns failed CI deploys (once per run, prevents infinite loops via `run_attempt` check)
+- Health monitor permissions upgraded from `actions: read` to `actions: write` to support auto-rerun
+
+## [26.4.24] - 2026-03-20
+
+### Changed
+
+- Squash 79 pre-launch migrations into single v1 baseline (84 tables) with separate RLS/function migration
+- Remove ~400 LOC dead bootstrap/probe/boundary code from migration runner (`drizzle-migrate.ts`)
+- Preserve `create_profile_with_user()` onboarding function and Row Level Security policies in hand-written migration
+
+### Removed
+
+- 79 incremental migration files and 22 snapshot files accumulated pre-launch
+- Migration boundary execution logic (`planMigrationExecution`, `COMMIT_BOUNDARY_AFTER`)
+- Schema detection probes (`detectAppliedThroughIdx`, `resolveMigrationsSchemaSafely`)
+- Migration history bootstrapping (`bootstrapMigrationHistoryIfNeeded`)
+- Obsolete `drizzle-migrate.test.ts` (tested removed boundary logic)
+
+## [26.4.23] - 2026-03-20
+
+### Changed
+
+- Agent autonomy rules: agents now handle tests, error handling, edge cases, and linting without asking — questions reserved for real product/architecture decisions
+- Scope rule updated: agents include hardening (error handling, edge cases, tests) for code they touch, not just the literal task asked
+- Simplified changelog automation docs in AGENTS.md
+
 ## [26.4.22] - 2026-03-20
 
 ### Changed
 
+- Releases route visual overhaul: Linear-style surfaces, squircle corners, tighter spacing across table, sidebar drawers, toolbar, dialogs, banners, and mobile views
+- Shared segment control and drawer primitives aligned to Linear design language (flatter controls, stacked drawer cards, quieter chrome)
+- Extracted `LINEAR_SURFACE` token set for reusable card/popover/toolbar surface classes
+- Release sidebar now uses stacked card layout (header, analytics, tabs as separate cards)
+- Track sidebar uses stacked card layout (track card, details card)
+- Release table subheader moved inside the table card container
+- Lower-shell sidebar banners (upgrade, install) use quieter background treatment
+
+### Added
+
+- `LINEAR_SURFACE` design token constants for consistent surface hierarchy across the dashboard
+- Comprehensive test coverage for releases route: AddReleaseSidebar, MobileReleaseList, ReleaseTable, ReleasesEmptyState, SmartLinkGateBanner, TrackRow, ReleaseEditDialog, AddProviderUrlPopover, DialogLoadingSkeleton, DrawerLoadingSkeleton, ArtistSearchCommandPalette
+- Test hooks (`data-testid`) for drawer loading skeleton cards, dialog loading cards, mobile release list
 - Cap artist profile genres at 3 (was 10), populated by most frequent genres across releases
 - Genre picker UI default max reduced from 10 to 3
 - Onboarding review step shows top 3 genres instead of 5

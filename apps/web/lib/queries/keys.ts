@@ -175,6 +175,8 @@ export const queryKeys = {
   // Releases queries
   releases: {
     all: ['releases'] as const,
+    recent: (profileId: string) =>
+      [...queryKeys.releases.all, 'recent', profileId] as const,
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
     tracks: (releaseId: string) =>

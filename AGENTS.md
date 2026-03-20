@@ -17,6 +17,31 @@ This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, in
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
+### Database Isolation for Agents
+
+Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
+
+`setup.sh` must stay a fast, idempotent local bootstrap:
+- verify/install required tools
+- install dependencies
+- verify Doppler auth/config
+- avoid creating remote infrastructure by default
+
+Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
+
+Use an ephemeral Neon branch **only when the task actually requires isolated DB state**, such as:
+- mutation-heavy QA or crawling
+- end-to-end flows that create/update/delete data
+- migration validation
+- debugging issues caused by shared state
+
+Default policy:
+- normal coding/review/docs tasks: use the standard local/dev configuration
+- local tasks needing isolated mutable state: provision a DB branch explicitly via a dedicated command or script
+- PR preview / CI QA: prefer per-PR ephemeral databases in CI or preview workflows, not local worktree bootstrap
+
+If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`), agents should run it explicitly when needed rather than baking branch creation into `setup.sh`.
+
 ### Running tests and commands requiring secrets
 
 ALL commands that need secrets MUST be prefixed with `doppler run --`:
@@ -420,6 +445,27 @@ Do NOT push code that fails any of these. Fix first, push once.
 - This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
 - If a PR fails CI, the agent can fix it while other PRs continue merging
 - Each PR must still pass /verify locally before pushing
+
+### PR Labels (Required)
+
+Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
+
+- Add `testing` when a PR needs the heavyweight verification lanes beyond the default fast merge gate.
+- Add `testing` for changes affecting public routes, rendering, deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get preview QA and extended CI before merge.
+- Add `testing` when agent QA, browser crawling, or preview-environment validation should run against the PR before it merges.
+
+- Add `needs-human` when the PR should be held for human review or automation must stop.
+- Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
+- If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+
+- Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
+- Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
+
+- Use `deploy-preview` only when a PR specifically needs the build/preview lane for review or QA and `testing` is not otherwise warranted.
+- Do **NOT** rely on `deploy-preview` as a substitute for `testing` on risky changes.
+
+- Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
+- If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
 ### Auto-Merge Path Guardrails
 
@@ -992,6 +1038,36 @@ When a PR introduces or modifies any of the following, the PR description MUST i
 
 ---
 
+## Agent Autonomy: When to Ask vs. Just Do It
+
+Compute is infinite. Human decision capacity is finite. Don't waste questions on engineering hygiene — save them for decisions only a human has context on.
+
+### Just do it (never ask)
+
+- **Error handling** — add it everywhere: internal utils, helpers, boundaries, all of it
+- **Edge cases** — handle anything a real user could realistically hit (bad input, network errors, race conditions, concurrent state)
+- **Tests** — always write tests for new/changed code, but avoid slop tests or tests for rapidly-changing UI (design, copy). Follow the Test Coverage Guidelines above.
+- **Linting, type fixes, dead code removal** — fix what you touch
+- **Validation, logging, cleanup** — if it makes the code more robust, do it
+
+### Auto-fix, ask about structural changes (gstack skills)
+
+- `/qa`, `/review`, `/ship` should auto-fix obvious issues (lint, types, small bugs) without asking
+- Ask before structural changes (moving files, changing APIs, refactoring patterns)
+
+### Always ask (genuine human decisions)
+
+- Product/UX decisions (how should this behave for users?)
+- Architecture choices (which approach/pattern?)
+- Scope changes (should we also tackle X while we're here?)
+- Breaking changes or migrations
+- New external dependencies or services
+- Trade-offs where both options have real downsides
+
+**The principle:** If the upside is obvious and the cost is small (a few minutes of compute), just do it. Save questions for decisions only a human has context on.
+
+---
+
 ## General Agent Decision-Making Rules
 
 ### You Don't Know What You Don't Know
@@ -1002,7 +1078,7 @@ AI agents confidently make decisions about topics they have zero context on. The
 
 2. **Prefer boring, proven patterns.** The existing codebase has established patterns for webhooks, job queues, caching, and API integration. Use them. Don't invent new patterns for solved problems.
 
-3. **Scope your changes to what was asked.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer. Do the thing that was asked and nothing more.
+3. **Scope your changes to what was asked, plus hardening (error handling, edge cases, tests) for code you touch.** If the task is "add a field to the user profile," don't also refactor the database client, add a reconciliation job, or restructure the API layer — but do add error handling, edge case coverage, and tests for the code you modified.
 
 4. **When adding integrations, read the provider's docs on webhooks first.** Almost every SaaS provider (Stripe, Clerk, Resend, Vercel, etc.) has webhook support. Check for it before building a polling solution.
 

@@ -43,7 +43,7 @@ function SearchDropdownState({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[64px] items-center rounded-[10px] px-3'
+        className='flex min-h-[56px] items-center rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
       >
         <p
           className={cn(
@@ -61,7 +61,7 @@ function SearchDropdownState({
 function SearchResultsLoadingSkeleton() {
   return (
     <output
-      className='block p-3 space-y-1.5'
+      className='block p-2.5 space-y-1'
       aria-live='polite'
       aria-label='Loading Spotify artist results'
       aria-busy='true'
@@ -70,7 +70,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
+          className='flex min-h-[56px] items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -422,266 +422,276 @@ export function SpotifyConnectDialog({
         Search for your artist profile to import releases.
       </DialogDescription>
 
-      <DialogBody className='space-y-4'>
-        <div className='space-y-1'>
-          <p className='text-[13px] text-secondary-token'>
-            Search by artist name or paste your Spotify artist URL to connect
-            instantly.
-          </p>
-        </div>
-
-        <div ref={containerRef} className='relative'>
-          <label htmlFor='spotify-connect-search' className='sr-only'>
-            Search Spotify artists or paste a link
-          </label>
-          <div
-            className={cn(
-              'flex min-h-12 w-full items-center gap-3 rounded-xl border border-default bg-surface-0 px-4 py-3',
-              'transition-all duration-200',
-              shouldShowDropdown
-                ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/20'
-                : 'hover:border-(--linear-border-focus)',
-              isPending && 'opacity-60'
-            )}
-          >
-            <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
-              <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
-            </div>
-            <input
-              ref={inputRef}
-              id='spotify-connect-search'
-              type='text'
-              value={formState.searchQuery}
-              onChange={handleSearchInputChange}
-              onKeyDown={handleKeyDown}
-              onFocus={() => {
-                if (
-                  formState.searchQuery.trim().length >= 1 &&
-                  !isSpotifyUrl(formState.searchQuery)
-                ) {
-                  dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
-                }
-              }}
-              onBlur={e => {
-                if (containerRef.current?.contains(e.relatedTarget as Node))
-                  return;
-                dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
-                dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
-              }}
-              placeholder={DEFAULT_PLACEHOLDER}
-              autoCapitalize='none'
-              autoCorrect='off'
-              autoComplete='off'
-              disabled={isPending}
-              className='min-w-0 flex-1 bg-transparent text-[13px] text-primary-token focus-visible:outline-none'
-              role='combobox'
-              aria-expanded={shouldShowDropdown}
-              aria-controls='spotify-connect-results'
-              aria-activedescendant={
-                formState.activeResultIndex >= 0
-                  ? `spotify-connect-result-${formState.activeResultIndex}`
-                  : undefined
-              }
-            />
-            <SearchInputTrailing
-              showClaimButton={showClaimButton}
-              claimButtonDisabled={claimButtonDisabled}
-              isLoading={isLoading}
-              isPending={isPending}
-              onClaimArtist={handleClaimArtist}
-            />
-          </div>
-
-          {formState.error && (
-            <p className='mt-2 text-[13px] text-error' role='alert'>
-              {formState.error}
+      <DialogBody className='space-y-3'>
+        <DrawerSurfaceCard
+          variant='card'
+          className='overflow-visible rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+        >
+          <div className='mb-2.5'>
+            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+              Artist search
             </p>
-          )}
-
-          {shouldShowDropdown && (
-            <div className='absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-default bg-surface-0 shadow-(--linear-shadow-card-elevated)'>
-              <select
-                id='spotify-connect-results'
-                className='sr-only'
-                size={Math.min(totalItems, 6)}
-                aria-label='Spotify artist results'
-                value={
-                  formState.activeResultIndex === pasteUrlIndex
-                    ? '__paste__'
-                    : (results[formState.activeResultIndex]?.id ?? '')
-                }
-                onChange={event => {
-                  if (event.target.value === '__paste__') {
-                    handlePasteUrlClick();
-                    return;
-                  }
-                  const selectedArtist = results.find(
-                    artist => artist.id === event.target.value
-                  );
-                  if (selectedArtist) {
-                    handleArtistSelect(selectedArtist);
+            <p className='mt-1 text-[12px] leading-[17px] text-secondary-token'>
+              Search by artist name or paste your Spotify artist URL to connect
+              instantly.
+            </p>
+          </div>
+          <div ref={containerRef} className='relative'>
+            <label htmlFor='spotify-connect-search' className='sr-only'>
+              Search Spotify artists or paste a link
+            </label>
+            <div
+              className={cn(
+                'flex min-h-11 w-full items-center gap-2.5 rounded-[11px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2',
+                'transition-[border-color,box-shadow] duration-150',
+                shouldShowDropdown
+                  ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/20'
+                  : 'hover:border-(--linear-border-focus)',
+                isPending && 'opacity-60'
+              )}
+            >
+              <div className='flex items-center justify-center w-6 h-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
+                <ProviderIcon provider='spotify' className='h-3.5 w-3.5' />
+              </div>
+              <input
+                ref={inputRef}
+                id='spotify-connect-search'
+                type='text'
+                value={formState.searchQuery}
+                onChange={handleSearchInputChange}
+                onKeyDown={handleKeyDown}
+                onFocus={() => {
+                  if (
+                    formState.searchQuery.trim().length >= 1 &&
+                    !isSpotifyUrl(formState.searchQuery)
+                  ) {
+                    dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
                   }
                 }}
-              >
-                <option value='' disabled>
-                  Select an artist
-                </option>
-                {results.map((artist, index) => (
-                  <option
-                    key={artist.id}
-                    id={`spotify-connect-result-${index}`}
-                    value={artist.id}
-                  >
-                    {artist.name}
-                    {artist.followers
-                      ? ` — ${formatFollowers(artist.followers)}`
-                      : ''}
+                onBlur={e => {
+                  if (containerRef.current?.contains(e.relatedTarget as Node))
+                    return;
+                  dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
+                  dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
+                }}
+                placeholder={DEFAULT_PLACEHOLDER}
+                autoCapitalize='none'
+                autoCorrect='off'
+                autoComplete='off'
+                disabled={isPending}
+                className='min-w-0 flex-1 bg-transparent text-[13px] text-primary-token focus-visible:outline-none'
+                role='combobox'
+                aria-expanded={shouldShowDropdown}
+                aria-controls='spotify-connect-results'
+                aria-activedescendant={
+                  formState.activeResultIndex >= 0
+                    ? `spotify-connect-result-${formState.activeResultIndex}`
+                    : undefined
+                }
+              />
+              <SearchInputTrailing
+                showClaimButton={showClaimButton}
+                claimButtonDisabled={claimButtonDisabled}
+                isLoading={isLoading}
+                isPending={isPending}
+                onClaimArtist={handleClaimArtist}
+              />
+            </div>
+
+            {formState.error && (
+              <p className='mt-1.5 text-[13px] text-error' role='alert'>
+                {formState.error}
+              </p>
+            )}
+
+            {shouldShowDropdown && (
+              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
+                <select
+                  id='spotify-connect-results'
+                  className='sr-only'
+                  size={Math.min(totalItems, 6)}
+                  aria-label='Spotify artist results'
+                  value={
+                    formState.activeResultIndex === pasteUrlIndex
+                      ? '__paste__'
+                      : (results[formState.activeResultIndex]?.id ?? '')
+                  }
+                  onChange={event => {
+                    if (event.target.value === '__paste__') {
+                      handlePasteUrlClick();
+                      return;
+                    }
+                    const selectedArtist = results.find(
+                      artist => artist.id === event.target.value
+                    );
+                    if (selectedArtist) {
+                      handleArtistSelect(selectedArtist);
+                    }
+                  }}
+                >
+                  <option value='' disabled>
+                    Select an artist
                   </option>
-                ))}
-                <option
-                  id={`spotify-connect-result-${pasteUrlIndex}`}
-                  value='__paste__'
-                >
-                  Paste a Spotify URL instead
-                </option>
-              </select>
-
-              {searchState === 'loading' && results.length === 0 && (
-                <SearchResultsLoadingSkeleton />
-              )}
-
-              {searchState === 'empty' && (
-                <SearchDropdownState message='No artists found' />
-              )}
-
-              {searchState === 'error' && (
-                <SearchDropdownState
-                  message={searchError || 'Search failed. Try again.'}
-                  tone='error'
-                />
-              )}
-
-              {results.length > 0 && (
-                <div
-                  ref={resultsListRef}
-                  className='max-h-64 overflow-y-auto'
-                  aria-hidden='true'
-                >
                   {results.map((artist, index) => (
-                    <button
+                    <option
                       key={artist.id}
-                      type='button'
-                      tabIndex={artist.isClaimed ? -1 : 0}
-                      disabled={artist.isClaimed}
-                      className={cn(
-                        'flex w-full items-center gap-3 border-0 bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
-                        index === formState.activeResultIndex &&
-                          !artist.isClaimed &&
-                          'bg-surface-1',
-                        artist.isClaimed
-                          ? 'opacity-50 cursor-not-allowed'
-                          : 'cursor-pointer'
-                      )}
-                      onClick={() =>
-                        !artist.isClaimed && handleArtistSelect(artist)
-                      }
-                      onKeyDown={event =>
-                        !artist.isClaimed &&
-                        handleActivationKeyDown(event, () =>
-                          handleArtistSelect(artist)
-                        )
-                      }
-                      onMouseEnter={() =>
-                        dispatch({
-                          type: 'SET_ACTIVE_RESULT_INDEX',
-                          payload: index,
-                        })
-                      }
+                      id={`spotify-connect-result-${index}`}
+                      value={artist.id}
                     >
-                      <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
-                        {artist.imageUrl ? (
-                          <Image
-                            src={artist.imageUrl}
-                            alt={artist.name}
-                            fill
-                            sizes='40px'
-                            className='object-cover'
-                            unoptimized
-                          />
-                        ) : (
-                          <div className='w-full h-full flex items-center justify-center'>
-                            <ProviderIcon
-                              provider='spotify'
-                              className='h-5 w-5'
+                      {artist.name}
+                      {artist.followers
+                        ? ` — ${formatFollowers(artist.followers)}`
+                        : ''}
+                    </option>
+                  ))}
+                  <option
+                    id={`spotify-connect-result-${pasteUrlIndex}`}
+                    value='__paste__'
+                  >
+                    Paste a Spotify URL instead
+                  </option>
+                </select>
+
+                {searchState === 'loading' && results.length === 0 && (
+                  <SearchResultsLoadingSkeleton />
+                )}
+
+                {searchState === 'empty' && (
+                  <SearchDropdownState message='No artists found' />
+                )}
+
+                {searchState === 'error' && (
+                  <SearchDropdownState
+                    message={searchError || 'Search failed. Try again.'}
+                    tone='error'
+                  />
+                )}
+
+                {results.length > 0 && (
+                  <div
+                    ref={resultsListRef}
+                    className='max-h-64 overflow-y-auto p-2'
+                    aria-hidden='true'
+                  >
+                    {results.map((artist, index) => (
+                      <button
+                        key={artist.id}
+                        type='button'
+                        tabIndex={artist.isClaimed ? -1 : 0}
+                        disabled={artist.isClaimed}
+                        className={cn(
+                          'mb-1 flex w-full items-center gap-2.5 rounded-[10px] border border-transparent bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] px-2.5 py-2 text-left transition-colors last:mb-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                          index === formState.activeResultIndex &&
+                            !artist.isClaimed &&
+                            'border-(--linear-app-frame-seam) bg-surface-1',
+                          artist.isClaimed
+                            ? 'opacity-50 cursor-not-allowed'
+                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1/70'
+                        )}
+                        onClick={() =>
+                          !artist.isClaimed && handleArtistSelect(artist)
+                        }
+                        onKeyDown={event =>
+                          !artist.isClaimed &&
+                          handleActivationKeyDown(event, () =>
+                            handleArtistSelect(artist)
+                          )
+                        }
+                        onMouseEnter={() =>
+                          dispatch({
+                            type: 'SET_ACTIVE_RESULT_INDEX',
+                            payload: index,
+                          })
+                        }
+                      >
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
+                          {artist.imageUrl ? (
+                            <Image
+                              src={artist.imageUrl}
+                              alt={artist.name}
+                              fill
+                              sizes='40px'
+                              className='object-cover'
+                              unoptimized
+                            />
+                          ) : (
+                            <div className='w-full h-full flex items-center justify-center'>
+                              <ProviderIcon
+                                provider='spotify'
+                                className='h-5 w-5'
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className='flex-1 min-w-0'>
+                          <div className='truncate text-[13px] font-[510] text-primary-token'>
+                            {artist.name}
+                          </div>
+                          {artist.isClaimed && (
+                            <div className='text-[11px] text-tertiary-token'>
+                              Already claimed
+                            </div>
+                          )}
+                          {!artist.isClaimed && artist.followers && (
+                            <div className='text-[11px] text-tertiary-token'>
+                              {formatFollowers(artist.followers)}
+                            </div>
+                          )}
+                        </div>
+                        {artist.verified && (
+                          <div
+                            className='shrink-0 text-brand-spotify'
+                            data-testid='verified-badge'
+                          >
+                            <BadgeCheck
+                              className='h-4 w-4'
+                              aria-hidden='true'
                             />
                           </div>
                         )}
-                      </div>
-                      <div className='flex-1 min-w-0'>
-                        <div className='truncate text-[13px] font-[510] text-primary-token'>
-                          {artist.name}
-                        </div>
-                        {artist.isClaimed && (
-                          <div className='text-[11px] text-tertiary-token'>
-                            Already claimed
-                          </div>
-                        )}
-                        {!artist.isClaimed && artist.followers && (
-                          <div className='text-[11px] text-tertiary-token'>
-                            {formatFollowers(artist.followers)}
-                          </div>
-                        )}
-                      </div>
-                      {artist.verified && (
-                        <div
-                          className='shrink-0 text-brand-spotify'
-                          data-testid='verified-badge'
-                        >
-                          <BadgeCheck className='h-4 w-4' aria-hidden='true' />
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <button
-                type='button'
-                tabIndex={0}
-                className={cn(
-                  'flex w-full cursor-pointer items-center gap-3 border-t border-subtle bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
-                  formState.activeResultIndex === pasteUrlIndex &&
-                    'bg-surface-1'
+                      </button>
+                    ))}
+                  </div>
                 )}
-                onClick={handlePasteUrlClick}
-                onKeyDown={event =>
-                  handleActivationKeyDown(event, () => handlePasteUrlClick())
-                }
-                onMouseEnter={() =>
-                  dispatch({
-                    type: 'SET_ACTIVE_RESULT_INDEX',
-                    payload: pasteUrlIndex,
-                  })
-                }
-              >
-                <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
-                  <Link2
-                    className='h-5 w-5 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                </div>
-                <div className='flex-1'>
-                  <div className='text-[13px] font-[510] text-primary-token'>
-                    Paste a Spotify URL instead
+
+                <button
+                  type='button'
+                  tabIndex={0}
+                  className={cn(
+                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1/70',
+                    formState.activeResultIndex === pasteUrlIndex &&
+                      'bg-surface-1'
+                  )}
+                  onClick={handlePasteUrlClick}
+                  onKeyDown={event =>
+                    handleActivationKeyDown(event, () => handlePasteUrlClick())
+                  }
+                  onMouseEnter={() =>
+                    dispatch({
+                      type: 'SET_ACTIVE_RESULT_INDEX',
+                      payload: pasteUrlIndex,
+                    })
+                  }
+                >
+                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
+                    <Link2
+                      className='h-5 w-5 text-tertiary-token'
+                      aria-hidden='true'
+                    />
                   </div>
-                  <div className='text-[11px] text-tertiary-token'>
-                    open.spotify.com/artist/...
+                  <div className='flex-1'>
+                    <div className='text-[13px] font-[510] text-primary-token'>
+                      Paste a Spotify URL instead
+                    </div>
+                    <div className='text-[11px] text-tertiary-token'>
+                      open.spotify.com/artist/...
+                    </div>
                   </div>
-                </div>
-              </button>
-            </div>
-          )}
-        </div>
+                </button>
+              </div>
+            )}
+          </div>
+        </DrawerSurfaceCard>
       </DialogBody>
     </Dialog>
   );

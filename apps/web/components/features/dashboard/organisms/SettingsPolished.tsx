@@ -13,7 +13,6 @@ import {
 } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
@@ -164,7 +163,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[10px] border border-subtle/55 bg-surface-0 px-4 py-3.5 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
+      className='flex w-full items-center justify-between rounded-md bg-surface-0 px-3 py-3 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
     >
       <div>
         <p className='text-[14px] font-[510] text-primary-token'>
@@ -200,25 +199,20 @@ export function SettingsPolished({
   );
 
   const renderAccountSection = useCallback(
-    () => (
-      <div className='space-y-0'>
-        {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <AccountSettingsSection isGrowth={isGrowth} />
-        ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
-                Account settings unavailable
-              </h3>
-              <p className='text-[13px] text-secondary'>
-                Clerk is not configured (missing publishable key). Set
-                NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-              </p>
-            </div>
-          </DashboardCard>
-        )}
-      </div>
-    ),
+    () =>
+      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+        <AccountSettingsSection isGrowth={isGrowth} />
+      ) : (
+        <div className='text-center py-4'>
+          <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
+            Account settings unavailable
+          </h3>
+          <p className='text-[13px] text-secondary'>
+            Clerk is not configured (missing publishable key). Set
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+          </p>
+        </div>
+      ),
     [isGrowth]
   );
 
@@ -266,7 +260,7 @@ export function SettingsPolished({
         title: 'Artist Profile',
         description: 'Photo, display name, username, and branding.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsArtistProfileSection
               artist={artist}
               onArtistUpdate={onArtistUpdate}
@@ -311,7 +305,7 @@ export function SettingsPolished({
         description:
           'Fan verification, opt-in preferences, and conversion pixel tracking.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsAudienceSection />
             <SettingsAdPixelsSection isPro={isPro} />
           </div>
@@ -440,17 +434,17 @@ export function SettingsPolished({
         />
       </div>
 
-      <div className='space-y-10'>
+      <div className='space-y-6'>
         {sectionGroups.map(group => (
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
             className='px-1'
           >
-            <h3 className='mb-5 px-1 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <h3 className='mb-2 px-1 text-[13px] font-[590] tracking-normal text-secondary-token'>
               {group.label}
             </h3>
-            <div className='space-y-8'>
+            <div className='space-y-4'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

@@ -25,10 +25,10 @@ export function OutreachKpis({ counts }: OutreachKpisProps) {
             {counts.total} total
           </span>
         }
-        className='min-h-0 px-4 py-3 sm:px-5'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         actionsClassName='shrink-0'
       />
-      <div className='grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4'>
+      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
         <KpiItem
           title='TOTAL QUEUED'
           value={String(counts.total)}

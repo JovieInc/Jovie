@@ -18,7 +18,7 @@ function StatCard({ value, label }: Readonly<StatCardProps>) {
     <ContentMetricCard
       label={label}
       value={value.toLocaleString('en-US')}
-      className='p-3.5'
+      className='p-3'
       bodyClassName='space-y-1'
       valueClassName='text-[30px] font-[620] leading-none tracking-[-0.034em] text-primary-token tabular-nums'
       labelClassName='text-[11px] font-[510] tracking-[0.04em] text-tertiary-token'
@@ -64,7 +64,7 @@ export function PlatformStatsStrip({
         <StatCard value={stats.tracksTracked} label='Tracks tracked' />
       </div>
 
-      <ContentSurfaceCard className='space-y-3 p-4'>
+      <ContentSurfaceCard className='space-y-2 p-3'>
         <p className='flex items-center gap-2 text-app font-medium text-secondary-token'>
           <Building2 className='size-4 text-tertiary-token' />
           {getUsageCopy(stats)}
@@ -77,13 +77,13 @@ export function PlatformStatsStrip({
                 {stats.labelBadges.map(label => (
                   <span
                     key={label}
-                    className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-medium text-secondary-token'
+                    className='inline-flex items-center rounded bg-surface-0 px-1.5 py-0.5 text-2xs font-medium text-secondary-token'
                   >
                     {label}
                   </span>
                 ))}
                 {stats.labelsOnPlatform > stats.labelBadges.length && (
-                  <span className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-medium text-secondary-token'>
+                  <span className='inline-flex items-center rounded-md border border-subtle bg-surface-0 px-2 py-0.5 text-2xs font-medium text-secondary-token'>
                     +{stats.labelsOnPlatform - stats.labelBadges.length}
                   </span>
                 )}

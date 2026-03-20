@@ -86,7 +86,7 @@ export function HeaderSearchAction({
     <form
       action={action}
       method={action ? 'get' : undefined}
-      className={cn('flex min-w-0 items-center gap-1.5', className)}
+      className={cn('flex min-w-0 items-center gap-0.5', className)}
       onSubmit={event => {
         if (!action) {
           event.preventDefault();
@@ -118,7 +118,7 @@ export function HeaderSearchAction({
         ariaLabel={ariaLabel}
         autoFocus
         showClearButton={false}
-        className='w-[min(44vw,220px)] sm:w-[min(34vw,260px)] lg:w-[min(30vw,300px)]'
+        className='w-[min(42vw,208px)] sm:w-[min(30vw,240px)] lg:w-[min(26vw,276px)]'
         inputClassName={cn('text-[13px]', inputClassName)}
       />
       {action && clearHref && searchValue.length > 0 ? (

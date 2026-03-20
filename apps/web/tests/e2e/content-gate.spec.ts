@@ -265,6 +265,154 @@ test.describe('Content Gate — Public Pages', () => {
     }
   });
 
+  test('Under-covered marketing routes render meaningful content', async ({
+    page,
+  }) => {
+    test.setTimeout(180_000);
+
+    const routes = [
+      {
+        path: '/ai',
+        name: 'AI workflow',
+        expectedUrl: /\/ai(?:\/index\.html)?$/,
+        readyText: /the 7-method ai operating system/i,
+        minLength: 150,
+      },
+      {
+        path: '/engagement-engine',
+        name: 'Engagement engine',
+        expectedUrl: /\/engagement-engine$/,
+        readyText: /attention is the bottleneck|always-on engagement/i,
+        minLength: 150,
+      },
+      {
+        path: APP_ROUTES.LAUNCH,
+        name: 'Launch',
+        expectedUrl: /\/launch$/,
+        readyText: /your entire music career/i,
+        minLength: 250,
+      },
+      {
+        path: APP_ROUTES.LAUNCH_PRICING,
+        name: 'Launch pricing',
+        expectedUrl: /\/launch\/pricing$/,
+        readyText: /simple pricing/i,
+        minLength: 120,
+      },
+      {
+        path: '/support',
+        name: 'Support',
+        expectedUrl: /\/support$/,
+        readyText: /we(?:'|&apos;)re here to help/i,
+        minLength: 20,
+      },
+      {
+        path: '/tips',
+        name: 'Tips',
+        expectedUrl: /\/tips$/,
+        readyText: /turn every tip into a fan|scan\.\s*tip\.\s*stream\./i,
+        minLength: 120,
+      },
+      {
+        path: '/blog',
+        name: 'Blog',
+        expectedUrl: /\/blog$/,
+        readyText: /thoughts on product|now/i,
+        minLength: 120,
+      },
+      {
+        path: '/changelog',
+        name: 'Changelog',
+        expectedUrl: /\/changelog$/,
+        readyText: /what(?:'|&apos;)s new/i,
+        minLength: 80,
+      },
+      {
+        path: '/investors',
+        name: 'Investors',
+        expectedUrl: /\/investors$/,
+        readyText: /investor memo/i,
+        minLength: 80,
+      },
+    ] as const;
+
+    for (const route of routes) {
+      if (!(await navigateSafe(page, route.path, { timeout: 120_000 }))) return;
+
+      await expect(page).toHaveURL(route.expectedUrl, {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      });
+      await expect(
+        page.getByText(route.readyText).first(),
+        `${route.name}: ready signal did not render`
+      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      const main = page.locator('main').first();
+      const hasMain = await main
+        .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+        .catch(() => false);
+
+      if (hasMain) {
+        await assertMainContent(page, route.name, {
+          minLength: route.minLength,
+        });
+      } else {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        expect(
+          bodyText.length,
+          `${route.name}: body should contain meaningful content`
+        ).toBeGreaterThan(route.minLength);
+      }
+    }
+  });
+
+  test('Blog routes reach a real article page', async ({ page }) => {
+    test.setTimeout(120_000);
+
+    if (!(await navigateSafe(page, '/blog', { timeout: 120_000 }))) return;
+
+    const firstPostLink = page.locator('a[href^="/blog/"]').first();
+    const hasPostLink = await firstPostLink
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => false);
+
+    if (!hasPostLink) {
+      test.skip(true, 'Blog index has no visible post link');
+      return;
+    }
+
+    const href = await firstPostLink.getAttribute('href');
+    expect(href, 'Blog index should link to a slug route').toMatch(
+      /^\/blog\/[^/]+$/
+    );
+
+    await firstPostLink.click();
+    await waitForHydration(page);
+
+    await expect(page).toHaveURL(/\/blog\/[^/]+$/, {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.locator('h1').first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+
+    const article = page.locator('article').first();
+    const hasArticle = await article
+      .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
+      .catch(() => false);
+    expect(hasArticle, 'Blog post should render an article body').toBe(true);
+
+    const bodyText = await page
+      .locator('body')
+      .innerText()
+      .catch(() => '');
+    expect(bodyText.toLowerCase()).not.toContain('application error');
+    expect(bodyText.length).toBeGreaterThan(150);
+  });
+
   test('Public profile shows artist content and action buttons', async ({
     page,
   }, testInfo) => {

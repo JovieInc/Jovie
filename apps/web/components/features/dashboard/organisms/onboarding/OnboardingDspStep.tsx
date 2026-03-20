@@ -15,6 +15,7 @@ import { FORM_LAYOUT } from '@/lib/auth/constants';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { env } from '@/lib/env-client';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 function reducer(
   state: ReleasesEmptyStateState,
@@ -116,16 +117,16 @@ export function OnboardingDspStep({
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
-        <div className={FORM_LAYOUT.headerSection}>
+        <div className={cn(FORM_LAYOUT.headerSection, 'mb-6')}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
         </div>
 
-        <div className={FORM_LAYOUT.formInner}>
+        <div className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}>
           <div className='relative'>
             <div
               className={[
-                'flex w-full items-center gap-2 rounded-[8px] border bg-surface-1 px-4 py-2.5',
+                'flex w-full items-center gap-2 rounded-md border bg-surface-1 px-4 py-2.5',
                 'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
                 state.error ? 'border-error' : 'border-subtle',
               ].join(' ')}
@@ -163,7 +164,7 @@ export function OnboardingDspStep({
             {state.showResults && results.length > 0 && (
               <ContentSurfaceCard
                 as='ul'
-                className='absolute top-full right-0 left-0 z-10 mt-1 max-h-[240px] overflow-y-auto py-1'
+                className='absolute top-full right-0 left-0 z-10 mt-1 max-h-[240px] overflow-y-auto py-0.5'
               >
                 {results.map((artist, index) => (
                   <li key={artist.id}>
@@ -177,10 +178,8 @@ export function OnboardingDspStep({
                         })
                       }
                       className={[
-                        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors',
-                        state.activeResultIndex === index
-                          ? 'bg-surface-0'
-                          : 'hover:bg-surface-0',
+                        'w-full flex items-center gap-3 px-2.5 py-2 text-left',
+                        state.activeResultIndex === index ? 'bg-surface-0' : '',
                       ].join(' ')}
                     >
                       {artist.imageUrl ? (
@@ -193,7 +192,7 @@ export function OnboardingDspStep({
                           unoptimized
                         />
                       ) : (
-                        <div className='h-8 w-8 shrink-0 rounded-full border border-subtle bg-surface-0' />
+                        <div className='h-8 w-8 shrink-0 rounded-full bg-surface-0' />
                       )}
                       <div className='min-w-0 flex-1'>
                         <p className='truncate text-[13px] font-[510] text-primary-token'>
@@ -230,7 +229,7 @@ export function OnboardingDspStep({
           </AuthButton>
         </div>
 
-        <div className={FORM_LAYOUT.footerHint}>
+        <div className={cn(FORM_LAYOUT.footerHint, 'mt-4')}>
           You can always connect your music later from the dashboard.
         </div>
       </div>

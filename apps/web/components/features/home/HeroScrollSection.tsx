@@ -111,7 +111,7 @@ function HeroText({
   return (
     <div ref={innerRef} className={className} style={style}>
       <h1 className='marketing-h1-linear text-balance text-primary-token'>
-        Stop setting up smart links for every release.
+        Release More Music.
       </h1>
       <p className='marketing-lead-linear mt-6 max-w-[28rem] text-balance text-tertiary-token'>
         Connect Spotify once. Jovie creates smart links for every song, notifies

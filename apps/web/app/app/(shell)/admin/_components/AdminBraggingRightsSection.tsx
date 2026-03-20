@@ -21,9 +21,9 @@ export async function AdminBraggingRightsSection() {
       <ContentSectionHeader
         title='Platform Reach'
         subtitle='Labels, distributors, and ecosystem adoption signals'
-        className='min-h-0 px-5 py-3'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='px-5 py-4 pt-3'>
+      <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
         <BraggingRightsStrip data={data} />
       </div>
     </ContentSurfaceCard>
@@ -36,9 +36,12 @@ export function AdminBraggingRightsSectionSkeleton() {
       <ContentSectionHeaderSkeleton
         titleWidth='w-28'
         descriptionWidth='w-56'
-        className='min-h-0 px-5 py-3'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='space-y-4 px-5 py-4 pt-3' aria-hidden='true'>
+      <div
+        className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'
+        aria-hidden='true'
+      >
         <div className='grid gap-4 sm:grid-cols-2'>
           {BRAGGING_BADGE_CARD_SKELETON_KEYS.map(key => (
             <ContentSurfaceCard

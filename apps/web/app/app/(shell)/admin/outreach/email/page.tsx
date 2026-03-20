@@ -187,25 +187,25 @@ export default function AdminOutreachEmailPage() {
 
   return (
     <div className='flex flex-col gap-4'>
-      <ContentSurfaceCard className='px-4 py-3 sm:px-6'>
-        <div className='flex items-center justify-between'>
-          <div>
-            <p className='text-sm font-[560] text-primary-token'>
-              Campaign Emails
-            </p>
-            <p className='text-xs text-secondary-token'>
-              {campaignsEnabled
-                ? 'Outreach emails and drip campaigns are active'
-                : 'All outreach emails and drip campaigns are paused'}
-            </p>
-          </div>
-          <Switch
-            checked={campaignsEnabled}
-            onCheckedChange={toggleCampaignsEnabled}
-            disabled={togglingCampaigns}
-            aria-label='Toggle campaign emails'
-          />
-        </div>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader
+          title='Campaign emails'
+          subtitle={
+            campaignsEnabled
+              ? 'Outreach emails and drip campaigns are active'
+              : 'All outreach emails and drip campaigns are paused'
+          }
+          actions={
+            <Switch
+              checked={campaignsEnabled}
+              onCheckedChange={toggleCampaignsEnabled}
+              disabled={togglingCampaigns}
+              aria-label='Toggle campaign emails'
+            />
+          }
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          actionsClassName='shrink-0'
+        />
       </ContentSurfaceCard>
 
       <ContentSurfaceCard className='overflow-hidden'>
@@ -236,12 +236,12 @@ export default function AdminOutreachEmailPage() {
               </span>
             </div>
           }
-          className='min-h-0 px-4 py-3 sm:px-6'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 
         {(queueMessage || queueError) && (
-          <div className='border-b border-subtle px-4 py-3 text-sm sm:px-6'>
+          <div className='border-b border-subtle px-(--linear-app-content-padding-x) py-3 text-sm'>
             <p
               className={cn(
                 'font-medium',

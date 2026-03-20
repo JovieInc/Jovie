@@ -23,9 +23,8 @@ export function LogoBar() {
           Artists on these labels use Jovie
         </p>
         <div
-          className='flex w-full max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-6 rounded-[28px] px-6 py-5 sm:flex-nowrap sm:gap-16 sm:px-10'
+          className='flex w-full max-w-5xl flex-wrap items-center justify-center gap-x-10 gap-y-5 rounded-2xl px-4 py-3.5 sm:flex-nowrap sm:gap-16 sm:px-8'
           style={{
-            border: '1px solid var(--linear-border-subtle)',
             boxShadow: 'var(--linear-shadow-card)',
           }}
         >

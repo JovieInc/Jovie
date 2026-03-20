@@ -31,60 +31,56 @@ export function DspPresenceCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'cursor-pointer p-4 transition-[border-color,background-color,box-shadow] duration-150',
-        'hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-150',
+        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-(--linear-bg-surface-0)',
         isSelected &&
-          'border-(--linear-border-focus) ring-1 ring-(--linear-border-focus)'
+          'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-(--linear-border-focus)'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >
       <button
         type='button'
         onClick={onSelect}
-        className='w-full space-y-3 text-left'
+        className='w-full space-y-2.5 text-left'
       >
-        {/* Header: Avatar + Provider info */}
-        <div className='flex items-start justify-between gap-3'>
-          <div className='flex items-center gap-3'>
-            {/* Artist image or provider icon fallback */}
+        <div className='flex items-start justify-between gap-2.5'>
+          <div className='flex items-center gap-2.5'>
             {item.externalArtistImageUrl ? (
-              <div className='relative h-12 w-12 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <Image
                   src={item.externalArtistImageUrl}
                   alt={item.externalArtistName ?? label}
                   fill
-                  sizes='48px'
+                  sizes='40px'
                   className='object-cover'
                   unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
                 />
               </div>
             ) : (
-              <div className='flex h-12 w-12 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <DspProviderIcon provider={item.providerId} size='lg' />
               </div>
             )}
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate font-[510] text-(--linear-text-primary)'>
+                <span className='truncate text-[13px] font-[510] text-primary-token'>
                   {item.externalArtistName ?? 'Unknown Artist'}
                 </span>
               </div>
-              <div className='mt-0.5 flex items-center gap-1.5 text-[13px] text-(--linear-text-tertiary)'>
+              <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
                 <span>{label}</span>
               </div>
             </div>
           </div>
 
-          {/* Status badge */}
           <div className='shrink-0'>
             <MatchStatusBadge status={item.status} size='sm' />
           </div>
         </div>
 
-        {/* Metrics row */}
-        <div className='flex items-center gap-3 text-[13px] text-(--linear-text-tertiary)'>
+        <div className='flex min-h-5 items-center gap-2.5 text-[12px] text-tertiary-token'>
           {isConfirmed && (
             <ConfidenceBadge score={item.confidenceScore} size='sm' />
           )}
@@ -94,14 +90,13 @@ export function DspPresenceCard({
         </div>
       </button>
 
-      {/* External link — outside button to avoid invalid <a> inside <button> */}
       {item.externalArtistUrl && (
-        <div className='border-t border-(--linear-border-subtle) pt-3'>
+        <div className='border-t border-subtle pt-2.5'>
           <a
             href={item.externalArtistUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[13px] text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-primary)'
+            className='inline-flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-primary-token'
           >
             <Icon name='ExternalLink' className='h-3.5 w-3.5' />
             <span>View on {label}</span>

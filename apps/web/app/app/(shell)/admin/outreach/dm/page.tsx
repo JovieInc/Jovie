@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DmQueueCard } from '@/features/admin/outreach/DmQueueCard';
 
 interface DmQueueLead {
@@ -88,12 +90,21 @@ export default function AdminOutreachDmPage() {
   }, [fetchQueue]);
 
   return (
-    <div className='flex flex-col gap-6 p-4 sm:p-6'>
-      <h2 className='text-sm font-semibold text-primary-token'>
-        DM Queue ({total})
-      </h2>
-
-      <DmQueueBody loading={loading} leads={leads} fetchQueue={fetchQueue} />
-    </div>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='DM queue'
+        subtitle='Copy the prepared message, send it manually, and mark each lead as completed.'
+        actions={
+          <span className='text-[12px] font-[560] tabular-nums text-secondary-token'>
+            {total} queued
+          </span>
+        }
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        actionsClassName='shrink-0'
+      />
+      <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <DmQueueBody loading={loading} leads={leads} fetchQueue={fetchQueue} />
+      </div>
+    </ContentSurfaceCard>
   );
 }

@@ -141,8 +141,7 @@ export function PlanComparisonSection({
               key={planKey}
               className={cn(
                 'relative flex flex-col overflow-hidden p-0 transition-[border-color,box-shadow] duration-200',
-                isCurrentPlan &&
-                  'border-(--linear-border-focus) shadow-[0_0_0_1px_var(--linear-border-focus)]'
+                isCurrentPlan && 'border-(--linear-border-focus)'
               )}
             >
               {isCurrentPlan && (

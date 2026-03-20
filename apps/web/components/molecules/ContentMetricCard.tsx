@@ -39,8 +39,8 @@ export function ContentMetricCard({
   ...props
 }: Readonly<ContentMetricCardProps>) {
   return (
-    <ContentSurfaceCard as={as} className={cn('p-4', className)} {...props}>
-      <div className={cn('space-y-1.5', bodyClassName)}>
+    <ContentSurfaceCard as={as} className={cn('p-3', className)} {...props}>
+      <div className={cn('space-y-1', bodyClassName)}>
         <div className={cn('flex items-center gap-1.5', headerClassName)}>
           <div className='min-w-0 flex items-center gap-1.5'>
             {Icon ? (

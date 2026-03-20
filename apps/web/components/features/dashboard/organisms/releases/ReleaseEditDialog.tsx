@@ -63,10 +63,10 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-2.5 text-lg font-[590] text-primary-token'>
         <Icon
           name='Link'
-          className='h-5 w-5 text-secondary-token'
+          className='h-4.5 w-4.5 text-secondary-token'
           aria-hidden='true'
         />
         Edit release links
@@ -75,14 +75,17 @@ export function ReleaseEditDialog({
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
-      <DialogBody className='space-y-4'>
+      <DialogBody className='space-y-3'>
         {release ? (
-          <div className='space-y-4'>
+          <div className='space-y-3'>
             {/* Release info header */}
-            <DrawerSurfaceCard variant='card' className='rounded-[12px] p-4'>
+            <DrawerSurfaceCard
+              variant='card'
+              className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+            >
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-subtle bg-surface-0 shadow-none'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -98,7 +101,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='border border-subtle bg-transparent text-[11px] text-secondary-token'
+                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -109,7 +112,7 @@ export function ReleaseEditDialog({
             </DrawerSurfaceCard>
 
             {/* Provider inputs grid */}
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+            <div className='grid grid-cols-1 gap-2 md:grid-cols-2'>
               {providerList.map(provider => {
                 const value = drafts[provider.key] ?? '';
                 const existing = release.providers.find(
@@ -124,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-[10px] p-3 shadow-none'
+                    className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))] p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
@@ -140,7 +143,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
+                          className='rounded-[8px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300'
                         >
                           Manual
                         </Badge>
@@ -158,12 +161,14 @@ export function ReleaseEditDialog({
                         }
                         placeholder={`${provider.label} URL`}
                         data-testid={`provider-input-${release.id}-${provider.key}`}
+                        className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
                       />
                       <div className='flex items-center justify-between gap-2'>
                         <DrawerButton
                           tone='primary'
                           disabled={isSaving || !value.trim()}
                           data-testid={`save-provider-${release.id}-${provider.key}`}
+                          className='h-7 rounded-[8px] px-2.5 text-[11px]'
                           onClick={() => onSave(provider.key)}
                         >
                           Save
@@ -172,6 +177,7 @@ export function ReleaseEditDialog({
                           tone='ghost'
                           disabled={isSaving}
                           data-testid={`reset-provider-${release.id}-${provider.key}`}
+                          className='h-7 rounded-[8px] px-2.5 text-[11px]'
                           onClick={() => onReset(provider.key)}
                         >
                           Reset
@@ -185,8 +191,13 @@ export function ReleaseEditDialog({
           </div>
         ) : null}
       </DialogBody>
-      <DialogActions className='justify-end'>
-        <DrawerButton onClick={onClose}>Done</DrawerButton>
+      <DialogActions className='justify-end border-t border-(--linear-app-frame-seam) pt-4'>
+        <DrawerButton
+          onClick={onClose}
+          className='h-7 rounded-[8px] px-2.5 text-[11px]'
+        >
+          Done
+        </DrawerButton>
       </DialogActions>
     </Dialog>
   );

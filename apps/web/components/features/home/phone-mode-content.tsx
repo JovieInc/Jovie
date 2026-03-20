@@ -22,7 +22,7 @@ export const MOCK_ARTIST = {
 } as const;
 
 export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2.5 rounded-[14px] border px-8 py-3 text-[13px] font-semibold text-primary-token shadow-[0_12px_28px_rgba(0,0,0,0.18)]';
+  'inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold text-primary-token';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 export const FALLBACK_CITY = 'Los Angeles';
@@ -132,7 +132,7 @@ function ListenContent() {
           key={dsp.key}
           label={dsp.label}
           iconPath={DSP_LOGO_CONFIG[dsp.key]?.iconPath}
-          className='px-3 py-2.5 text-[13px] bg-surface-2 border border-subtle ring-0 backdrop-blur-none hover:bg-hover'
+          className='px-2.5 py-2 text-[13px] bg-surface-2 ring-0 backdrop-blur-none hover:bg-hover'
         />
       ))}
     </div>
@@ -149,10 +149,10 @@ function TipContent() {
         {([3, 5, 10] as const).map((amount, i) => (
           <div
             key={amount}
-            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl border text-center ${
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center ${
               i === 1
-                ? 'border-default bg-surface-2 text-primary-token shadow-sm'
-                : 'border-subtle bg-surface-1 text-primary-token'
+                ? 'bg-surface-2 text-primary-token shadow-sm'
+                : 'bg-surface-1 text-primary-token'
             }`}
           >
             <span
@@ -176,7 +176,7 @@ function TourContent() {
   const show = MOCK_TOUR_DATES[0];
   return (
     <div className='flex h-full flex-col justify-center gap-3'>
-      <div className='flex w-full items-center justify-between rounded-xl px-4 py-3.5 bg-surface-1 border border-subtle'>
+      <div className='flex w-full items-center justify-between rounded-xl px-3 py-2.5 bg-surface-1'>
         <div className='min-w-0'>
           <p className='text-[13px] font-medium text-primary-token truncate'>
             {show.venue}
@@ -200,23 +200,21 @@ function TourContent() {
 function ProfileContent() {
   const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
-    <div className='flex h-full flex-col justify-center gap-4'>
+    <div className='flex h-full flex-col justify-center gap-3'>
       <button
         type='button'
         className={PHONE_CTA_CLASS}
         style={{
           background:
             'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.05) 100%)',
-          borderColor: 'rgba(255,255,255,0.08)',
         }}
       >
         Turn on notifications
       </button>
       <div
-        className='flex items-center justify-center gap-1.5 rounded-full px-2 py-1.5'
+        className='flex items-center justify-center gap-1.5 rounded-full px-1.5 py-1'
         style={{
           backgroundColor: 'rgba(255,255,255,0.025)',
-          border: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         {platforms.map(p => (

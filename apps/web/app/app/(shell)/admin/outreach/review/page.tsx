@@ -124,7 +124,7 @@ export default function AdminOutreachReviewPage() {
               {total} queued
             </span>
           }
-          className='min-h-0 px-4 py-3 sm:px-6'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 

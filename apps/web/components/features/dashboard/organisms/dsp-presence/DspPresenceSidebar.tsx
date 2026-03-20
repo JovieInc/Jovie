@@ -54,28 +54,28 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-2'>
       {item.externalArtistImageUrl ? (
-        <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
           <Image
             src={item.externalArtistImageUrl}
             alt={item.externalArtistName ?? label}
             fill
-            sizes='56px'
+            sizes='36px'
             className='object-cover'
             unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
           />
         </div>
       ) : (
-        <div className='flex h-14 w-14 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
           <DspProviderIcon provider={item.providerId} size='lg' />
         </div>
       )}
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-[15px] font-[590] text-(--linear-text-primary)'>
+        <div className='truncate text-[14px] font-[590] text-primary-token'>
           {item.externalArtistName ?? 'Unknown Artist'}
         </div>
-        <div className='mt-0.5 flex items-center gap-2 text-[13px] text-(--linear-text-tertiary)'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
           <DspProviderIcon provider={item.providerId} size='sm' />
           <span>{label}</span>
         </div>
@@ -89,36 +89,29 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <>
-      {/* Match Status */}
-      <DrawerSection title='Match Status'>
-        <div className='space-y-3'>
+    <div className='space-y-3'>
+      <DrawerSection title='Match Status' className='space-y-1.5'>
+        <div className='space-y-2'>
           <div className='flex items-center justify-between'>
-            <span className='text-[13px] text-(--linear-text-tertiary)'>
-              Status
-            </span>
+            <span className='text-[12px] text-tertiary-token'>Status</span>
             <MatchStatusBadge status={item.status} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
-            <span className='text-[13px] text-(--linear-text-tertiary)'>
-              Confidence
-            </span>
+            <span className='text-[12px] text-tertiary-token'>Confidence</span>
             <ConfidenceBadge score={item.confidenceScore} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
-            <span className='text-[13px] text-(--linear-text-tertiary)'>
+            <span className='text-[12px] text-tertiary-token'>
               ISRC Matches
             </span>
-            <span className='text-[13px] text-(--linear-text-primary)'>
+            <span className='text-[12px] text-primary-token'>
               {item.matchingIsrcCount}
             </span>
           </div>
           {item.confirmedAt && (
             <div className='flex items-center justify-between'>
-              <span className='text-[13px] text-(--linear-text-tertiary)'>
-                Confirmed
-              </span>
-              <span className='text-[13px] text-(--linear-text-primary)'>
+              <span className='text-[12px] text-tertiary-token'>Confirmed</span>
+              <span className='text-[12px] text-primary-token'>
                 {formatDate(item.confirmedAt)}
               </span>
             </div>
@@ -126,9 +119,8 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </div>
       </DrawerSection>
 
-      {/* Confidence Breakdown */}
       {item.confidenceBreakdown && (
-        <DrawerSection title='Confidence Breakdown'>
+        <DrawerSection title='Confidence Breakdown' className='space-y-1.5'>
           <MatchConfidenceBreakdown
             breakdown={item.confidenceBreakdown}
             totalScore={item.confidenceScore}
@@ -136,8 +128,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
         </DrawerSection>
       )}
 
-      {/* Actions */}
-      <DrawerSection title='Actions'>
+      <DrawerSection title='Actions' className='space-y-1.5'>
         <div className='space-y-2'>
           {item.externalArtistUrl && (
             <a
@@ -149,7 +140,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               <Button
                 variant='secondary'
                 size='sm'
-                className='w-full text-[13px]'
+                className='h-8 w-full justify-start rounded-md border-subtle bg-surface-0 px-2.5 text-[12px] font-[510]'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
                 View on {label}
@@ -160,7 +151,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
         </div>
       </DrawerSection>
-    </>
+    </div>
   );
 }
 
@@ -182,7 +173,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => rejectMatch(matchId)}
         disabled={isLoading}
-        className='flex-1 text-[13px]'
+        className='h-8 flex-1 rounded-md text-[12px] font-[510]'
       >
         {isRejecting ? 'Rejecting...' : 'Reject'}
       </Button>
@@ -191,7 +182,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => confirmMatch(matchId)}
         disabled={isLoading}
-        className='flex-1 text-[13px]'
+        className='h-8 flex-1 rounded-md text-[12px] font-[510]'
       >
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>
