@@ -1,0 +1,27 @@
+{
+  "pages": [
+    {
+      "slug": "memo",
+      "file": "investor-memo.md",
+      "title": "Investor Memo",
+      "nav": true
+    },
+    { "slug": "ai", "file": "ai.md", "title": "AI Strategy", "nav": true },
+    { "slug": "gtm", "file": "gtm.md", "title": "Go-to-Market", "nav": true }
+  ],
+  "deck": {
+    "slides": [
+      "01-cover.md",
+      "02-problem.md",
+      "03-solution.md",
+      "04-product.md",
+      "05-why-now.md",
+      "06-differentiation.md",
+      "07-metrics.md",
+      "08-roadmap.md",
+      "09-team.md",
+      "10-funding.md"
+    ],
+    "downloadFilename": "Jovie-Pitch-Deck.pdf"
+  }
+}
