@@ -6,6 +6,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.21] - 2026-03-20
+
+### Added
+
+- MusicBrainz-inspired recording/release-track data model: `discog_recordings` (canonical audio entity) and `discog_release_tracks` (recording's appearance on a release)
+- `recording_artists` junction table for artist credits on recordings
+- Recording and release-track upsert functions with ISRC/slug collision handling
+- Recording-artists CRUD module (upsert, get, delete, query by artist)
+- Backfill migration to populate new tables from existing `discog_tracks` data
+
+### Changed
+
+- Spotify import now writes directly to new model (recordings + release tracks) instead of dual-writing to both old and new tables
+- All platform readers migrated from `discog_tracks` to `discog_recordings`/`discog_release_tracks`: release enrichment, DSP artist discovery, platform stats, sitemap, ISRC route
+- Dashboard release table no longer shows single/track toggle — tracks are always children of releases
+- Smart link resolution uses recordings as primary lookup with legacy track fallback
+
+### Removed
+
+- Legacy dual-write to `discog_tracks` during Spotify import — new imports only populate the new model
+- `releaseView` toggle in release provider matrix (singles classified correctly as releases now)
+
 ## [26.4.20] - 2026-03-19
 
 ### Removed
