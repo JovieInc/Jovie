@@ -12,6 +12,29 @@ interface PageProps {
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
 
+function stripHtmlTags(input: string): string {
+  let result = '';
+  let inTag = false;
+
+  for (const char of input) {
+    if (char === '<') {
+      inTag = true;
+      continue;
+    }
+
+    if (char === '>') {
+      inTag = false;
+      continue;
+    }
+
+    if (!inTag) {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Validate that the request is coming from the investor subdomain or has a valid
  * investor token cookie. Prevents access on the primary host without auth.
@@ -98,7 +121,8 @@ export default async function InvestorMemoPage({ params }: PageProps) {
     .map(entry => ({ id: entry.id, title: entry.title }));
 
   // Estimate reading time (~200 words per minute)
-  const wordCount = doc.html.replace(/<[^>]*>/g, '').split(/\s+/).length;
+  const plainText = stripHtmlTags(doc.html).trim();
+  const wordCount = plainText ? plainText.split(/\s+/).length : 0;
   const readingTime = Math.max(1, Math.round(wordCount / 200));
 
   return (
