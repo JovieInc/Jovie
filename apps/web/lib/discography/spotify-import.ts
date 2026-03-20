@@ -39,6 +39,7 @@ import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
+  syncProfileGenresFromReleases,
   upsertProviderLink,
   upsertRecording,
   upsertRelease,
@@ -361,12 +362,15 @@ export async function importReleasesFromSpotify(
           result
         );
 
-        // 4. Discover cross-platform links
+        // 4. Sync profile genres from release data
+        await syncProfileGenresFromReleases(creatorProfileId);
+
+        // 5. Discover cross-platform links
         if (discoverLinks && includeTracks) {
           await discoverLinksForReleases(creatorProfileId, market);
         }
 
-        // 5. Fetch the final state
+        // 6. Fetch the final state
         result.releases = await getReleasesForProfile(creatorProfileId);
         result.success = result.failed === 0;
 

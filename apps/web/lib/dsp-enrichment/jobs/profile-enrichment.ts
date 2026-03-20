@@ -339,7 +339,7 @@ function updateGenresIfNeeded(
     return false;
   }
 
-  updates.genres = Array.from(allGenres).slice(0, 10);
+  updates.genres = Array.from(allGenres).slice(0, 3);
   return true;
 }
 

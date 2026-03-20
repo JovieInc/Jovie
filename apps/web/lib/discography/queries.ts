@@ -1398,3 +1398,42 @@ export async function getReleaseTrackSummariesForReleases(
 
   return summaryMap;
 }
+
+/**
+ * Aggregate genres across all releases for a creator profile and update
+ * the profile's genres with the top 3 most frequent genres.
+ */
+export async function syncProfileGenresFromReleases(
+  creatorProfileId: string
+): Promise<void> {
+  const releases = await db
+    .select({ genres: discogReleases.genres })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, creatorProfileId),
+        drizzleSql`${discogReleases.genres} IS NOT NULL`
+      )
+    );
+
+  // Count frequency of each genre across all releases
+  const genreCounts = new Map<string, number>();
+  for (const release of releases) {
+    if (!release.genres) continue;
+    for (const genre of release.genres) {
+      const normalized = genre.toLowerCase();
+      genreCounts.set(normalized, (genreCounts.get(normalized) ?? 0) + 1);
+    }
+  }
+
+  // Sort by frequency (desc), then alphabetically for deterministic tiebreak
+  const topGenres = Array.from(genreCounts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 3)
+    .map(([genre]) => genre);
+
+  await db
+    .update(creatorProfiles)
+    .set({ genres: topGenres, updatedAt: new Date() })
+    .where(eq(creatorProfiles.id, creatorProfileId));
+}

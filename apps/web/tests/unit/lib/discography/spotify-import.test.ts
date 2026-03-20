@@ -79,6 +79,7 @@ vi.mock('@/lib/validation/schemas/spotify', () => ({
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: vi.fn().mockResolvedValue([]),
+  syncProfileGenresFromReleases: vi.fn().mockResolvedValue(undefined),
   upsertProviderLink: vi.fn().mockResolvedValue({ id: 'link-1' }),
   upsertRelease: mockUpsertRelease,
   upsertRecording: mockUpsertRecording,
