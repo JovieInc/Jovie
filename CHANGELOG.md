@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.24] - 2026-03-20
+
+### Changed
+
+- Squash 79 pre-launch migrations into single v1 baseline (84 tables) with separate RLS/function migration
+- Remove ~400 LOC dead bootstrap/probe/boundary code from migration runner (`drizzle-migrate.ts`)
+- Preserve `create_profile_with_user()` onboarding function and Row Level Security policies in hand-written migration
+
+### Removed
+
+- 79 incremental migration files and 22 snapshot files accumulated pre-launch
+- Migration boundary execution logic (`planMigrationExecution`, `COMMIT_BOUNDARY_AFTER`)
+- Schema detection probes (`detectAppliedThroughIdx`, `resolveMigrationsSchemaSafely`)
+- Migration history bootstrapping (`bootstrapMigrationHistoryIfNeeded`)
+- Obsolete `drizzle-migrate.test.ts` (tested removed boundary logic)
+
 ## [26.4.23] - 2026-03-20
 
 ### Changed

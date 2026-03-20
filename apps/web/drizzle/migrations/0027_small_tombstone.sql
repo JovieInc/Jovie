@@ -1,1 +1,0 @@
-ALTER TABLE "waitlist_entries" ADD COLUMN "spotify_artist_name" text;
