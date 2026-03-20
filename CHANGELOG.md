@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.18] - 2026-03-19
+
+### Added
+
+- Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
+- Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
+- `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
+- End-of-workflow summary shows count of auto-resolved vs asked decisions
+
 ## [26.4.17] - 2026-03-19
 
 ### Added
