@@ -22,9 +22,9 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Your Entire Music Career. One Intelligent Link.`;
+  const title = `${APP_NAME} | Stop setting up smart links for every release.`;
   const description =
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.';
+    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -90,7 +90,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
+          alt: `${APP_NAME} - Stop setting up smart links for every release.`,
           type: 'image/png',
         },
       ],
@@ -102,7 +102,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
+          alt: `${APP_NAME} - Stop setting up smart links for every release.`,
           width: 1200,
           height: 630,
         },
@@ -139,17 +139,17 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
+    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'One link to launch your music career — smart links, fan notifications, and AI for independent musicians.'
+  'Stop setting up smart links for every release. Connect Spotify once — Jovie creates smart links, notifies fans, and builds your audience automatically.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Paste your Spotify. Jovie imports your discography, creates smart links for every release, and builds a link-in-bio that notifies fans when you drop something new.',
+    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
 });
 
