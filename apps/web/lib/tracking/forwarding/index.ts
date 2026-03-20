@@ -40,6 +40,8 @@ export type {
   PlatformConfig,
 } from './types';
 
+const MAX_RETRIES = 5;
+
 type Platform = 'facebook' | 'google' | 'tiktok';
 type JoviePlatform = 'jovie_facebook' | 'jovie_google' | 'jovie_tiktok';
 
@@ -67,7 +69,8 @@ const joviePlatformMap: Record<Platform, JoviePlatform> = {
 async function forwardToPlatforms(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   configs: Partial<Record<Platform, PlatformConfig | null>>,
-  isJovie = false
+  isJovie = false,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   const tasks: Array<{
     platform: Platform;
@@ -78,9 +81,11 @@ async function forwardToPlatforms(
     Platform,
     PlatformConfig | null,
   ][]) {
-    if (config) {
-      tasks.push({ platform, config });
-    }
+    if (!config) continue;
+    // Skip platforms already successfully sent (prevents duplicate events on retry)
+    const key = isJovie ? joviePlatformMap[platform] : platform;
+    if (alreadySent?.has(key)) continue;
+    tasks.push({ platform, config });
   }
 
   if (tasks.length === 0) return [];
@@ -88,8 +93,17 @@ async function forwardToPlatforms(
   const settled = await Promise.allSettled(
     tasks.map(async ({ platform, config }) => {
       const forwarder = platformForwarders[platform];
-      const result = await forwarder(normalizedEvent, config);
       const platformName = isJovie ? joviePlatformMap[platform] : platform;
+      const start = Date.now();
+      const result = await forwarder(normalizedEvent, config);
+      const latencyMs = Date.now() - start;
+      logger.info('[Pixel Metrics] Event forwarded', {
+        platform: platformName,
+        success: result.success,
+        latency_ms: latencyMs,
+        event_type: normalizedEvent.eventType,
+        event_id: normalizedEvent.eventId,
+      });
       return { ...result, platform: platformName };
     })
   );
@@ -99,6 +113,13 @@ async function forwardToPlatforms(
     const platformName = isJovie
       ? joviePlatformMap[tasks[i].platform]
       : tasks[i].platform;
+    logger.info('[Pixel Metrics] Event forwarded', {
+      platform: platformName,
+      success: false,
+      latency_ms: -1,
+      event_type: normalizedEvent.eventType,
+      event_id: normalizedEvent.eventId,
+    });
     return {
       success: false,
       platform: platformName,
@@ -171,10 +192,11 @@ async function markEventSkipped(
  * Forward event to Jovie's own pixels
  */
 async function forwardToJoviePixels(
-  normalizedEvent: ReturnType<typeof normalizeEvent>
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   const jovieConfigs = getJoviePixelConfigs();
-  return forwardToPlatforms(normalizedEvent, jovieConfigs, true);
+  return forwardToPlatforms(normalizedEvent, jovieConfigs, true, alreadySent);
 }
 
 /**
@@ -207,7 +229,8 @@ function decryptCreatorConfig(
 async function forwardToCreatorPixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   profileId: string,
-  creatorConfigMap?: Map<string, CreatorPixel>
+  creatorConfigMap?: Map<string, CreatorPixel>,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   let creatorConfig: CreatorPixel | undefined;
 
@@ -238,7 +261,12 @@ async function forwardToCreatorPixels(
   }
 
   const platformConfigs = decryptCreatorConfig(creatorConfig);
-  return forwardToPlatforms(normalizedEvent, platformConfigs);
+  return forwardToPlatforms(
+    normalizedEvent,
+    platformConfigs,
+    false,
+    alreadySent
+  );
 }
 
 /**
@@ -296,15 +324,30 @@ export async function forwardEvent(
     return [];
   }
 
+  // On retries, skip platforms already marked 'sent' to avoid duplicate events
+  const alreadySent = new Set(
+    Object.entries(event.forwardingStatus ?? {})
+      .filter(([, v]) => v?.status === 'sent')
+      .map(([k]) => k)
+  );
+
   // Forward to all configured platforms in parallel
   const [jovieResults, creatorResults] = await Promise.all([
-    forwardToJoviePixels(normalizedEvent),
-    forwardToCreatorPixels(normalizedEvent, event.profileId, creatorConfigMap),
+    forwardToJoviePixels(normalizedEvent, alreadySent),
+    forwardToCreatorPixels(
+      normalizedEvent,
+      event.profileId,
+      creatorConfigMap,
+      alreadySent
+    ),
   ]);
   const results = [...jovieResults, ...creatorResults];
 
-  // Update event with forwarding status
-  const forwardingStatus = buildForwardingStatus(results);
+  // Merge new results with prior statuses (preserve 'sent' from earlier runs)
+  const forwardingStatus = {
+    ...(event.forwardingStatus ?? {}),
+    ...buildForwardingStatus(results),
+  };
   await db
     .update(pixelEvents)
     .set({ forwardingStatus })
@@ -324,10 +367,13 @@ export async function processPendingEvents(limit = 100): Promise<{
   processed: number;
   successful: number;
   failed: number;
+  dead_lettered: number;
 }> {
+  const batchStart = Date.now();
   let processed = 0;
   let successful = 0;
   let failed = 0;
+  let deadLettered = 0;
 
   try {
     // Get events that need forwarding:
@@ -353,14 +399,14 @@ export async function processPendingEvents(limit = 100): Promise<{
       .limit(limit);
 
     if (pendingEvents.length === 0) {
-      return { processed, successful, failed };
+      return { processed, successful, failed, dead_lettered: deadLettered };
     }
 
     // Batch-fetch all creator pixel configs upfront (eliminates N+1).
     // Only include configs for creators on a paid plan (canAccessAdPixels).
     const profileIds = [...new Set(pendingEvents.map(e => e.profileId))];
     const creatorConfigRows = await db
-      .select({ pixels: creatorPixels })
+      .select({ pixels: creatorPixels, plan: users.plan })
       .from(creatorPixels)
       .innerJoin(
         creatorProfiles,
@@ -370,12 +416,13 @@ export async function processPendingEvents(limit = 100): Promise<{
       .where(
         and(
           inArray(creatorPixels.profileId, profileIds),
-          eq(creatorPixels.enabled, true),
-          eq(users.isPro, true)
+          eq(creatorPixels.enabled, true)
         )
       );
     const creatorConfigMap = new Map(
-      creatorConfigRows.map(r => [r.pixels.profileId, r.pixels])
+      creatorConfigRows
+        .filter(r => checkBoolean(r.plan, 'canAccessAdPixels'))
+        .map(r => [r.pixels.profileId, r.pixels])
     );
 
     for (const event of pendingEvents) {
@@ -386,21 +433,78 @@ export async function processPendingEvents(limit = 100): Promise<{
         const allSuccessful = results.every(r => r.success);
         if (allSuccessful) {
           successful++;
+          // If no platforms were forwarded (all disabled/skipped) but old
+          // failed statuses remain, clear them so cron stops reprocessing.
+          if (results.length === 0) {
+            const hasStaleFailures = Object.values(
+              event.forwardingStatus ?? {}
+            ).some(p => p?.status === 'failed');
+            if (hasStaleFailures) {
+              const cleaned: PixelForwardingStatus = {};
+              for (const [k, v] of Object.entries(
+                event.forwardingStatus ?? {}
+              )) {
+                cleaned[k] =
+                  v?.status === 'failed'
+                    ? { ...v, status: 'skipped', error: 'platform_unavailable' }
+                    : v;
+              }
+              await db
+                .update(pixelEvents)
+                .set({ forwardingStatus: cleaned })
+                .where(eq(pixelEvents.id, event.id));
+            }
+          }
         } else {
           failed++;
-          // Schedule retry with exponential backoff
-          // Count retries by number of existing failed statuses
-          const failedCount = Object.values(
-            event.forwardingStatus || {}
-          ).filter(p => p?.status === 'failed').length;
-          const retryCount = failedCount > 0 ? Math.min(failedCount, 5) : 0;
-          const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
-          const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+          const retryCount = event.retryCount ?? 0;
 
-          await db
-            .update(pixelEvents)
-            .set({ forwardAt: nextRetry })
-            .where(eq(pixelEvents.id, event.id));
+          if (retryCount >= MAX_RETRIES) {
+            // Dead letter — stop retrying. Merge with existing status
+            // to preserve prior 'sent' entries from other platforms.
+            const deadLetterStatus: PixelForwardingStatus = {};
+            for (const result of results) {
+              deadLetterStatus[result.platform] = {
+                status: result.success ? 'sent' : 'dead_letter',
+                sentAt: new Date().toISOString(),
+                ...(result.error && { error: result.error }),
+              };
+            }
+            await db
+              .update(pixelEvents)
+              .set({
+                forwardingStatus: {
+                  ...(event.forwardingStatus ?? {}),
+                  ...deadLetterStatus,
+                },
+              })
+              .where(eq(pixelEvents.id, event.id));
+
+            logger.warn('[Pixel Metrics] Dead letter', {
+              eventId: event.id,
+              platforms: results.filter(r => !r.success).map(r => r.platform),
+              totalAttempts: retryCount + 1,
+            });
+            deadLettered++;
+          } else {
+            // Schedule retry with exponential backoff
+            const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
+            const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+
+            await db
+              .update(pixelEvents)
+              .set({
+                forwardAt: nextRetry,
+                retryCount: retryCount + 1,
+              })
+              .where(eq(pixelEvents.id, event.id));
+
+            logger.info('[Pixel Metrics] Retry scheduled', {
+              event_id: event.id,
+              retry_count: retryCount + 1,
+              next_retry_at: nextRetry.toISOString(),
+            });
+          }
         }
       } catch (error) {
         logger.error('[Pixel Forwarding] Event processing error', {
@@ -415,5 +519,13 @@ export async function processPendingEvents(limit = 100): Promise<{
     logger.error('[Pixel Forwarding] Batch processing error', { error });
   }
 
-  return { processed, successful, failed };
+  logger.info('[Pixel Metrics] Batch complete', {
+    processed,
+    successful,
+    failed,
+    dead_lettered: deadLettered,
+    duration_ms: Date.now() - batchStart,
+  });
+
+  return { processed, successful, failed, dead_lettered: deadLettered };
 }
