@@ -548,7 +548,7 @@ export function DashboardTipping() {
 
       {/* ── Shopify Store ────────────────────────────────── */}
       <div className='flex flex-col gap-5'>
-        <p className='text-[13px] font-[510] tracking-normal text-(--linear-text-tertiary)'>
+        <p className='text-[13px] font-[510] tracking-normal text-tertiary-token'>
           Shop
         </p>
         <ShopifyStoreCard />
