@@ -14,6 +14,7 @@ import * as Sentry from '@sentry/nextjs';
 import { MUSICFETCH_ALL_SERVICES } from '@/lib/dsp-registry';
 import { env } from '@/lib/env-server';
 import {
+  MusicfetchBudgetExceededError,
   MusicfetchRequestError,
   musicfetchRequest,
 } from '@/lib/musicfetch/resilient-client';
@@ -133,37 +134,37 @@ export async function fetchArtistBySpotifyUrl(
         span.setStatus({ code: 1, message: 'ok' });
         return data.result;
       } catch (error) {
-        span.setStatus({ code: 2, message: 'error' });
-
-        const statusCode =
-          error instanceof MusicfetchRequestError
-            ? error.statusCode
-            : undefined;
-
-        Sentry.captureException(error, {
-          tags: { 'music.fetch.source': 'musicfetch' },
-          extra: {
-            spotifyUrl,
-            statusCode,
-            errorMessage:
-              error instanceof Error ? error.message : 'Unknown error',
-          },
-        });
-
         if (error instanceof MusicfetchRequestError) {
+          span.setStatus({ code: 2, message: 'error' });
+
           logger.warn('MusicFetch request failed', {
             spotifyUrl,
             statusCode: error.statusCode,
             retryAfterSeconds: error.retryAfterSeconds,
+            budgetScope:
+              error instanceof MusicfetchBudgetExceededError
+                ? error.budgetScope
+                : undefined,
             message: error.message,
           });
+
+          if (error.statusCode === 400) {
+            return null;
+          }
+
+          throw error;
         } else {
+          span.setStatus({ code: 2, message: 'error' });
+
           logger.warn('MusicFetch request failed', {
             spotifyUrl,
             error: error instanceof Error ? error.message : 'Unknown error',
           });
+
+          throw error instanceof Error
+            ? error
+            : new Error('MusicFetch request failed');
         }
-        return null;
       }
     }
   );
