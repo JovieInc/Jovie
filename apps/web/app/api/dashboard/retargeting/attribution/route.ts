@@ -9,8 +9,10 @@ export const runtime = 'nodejs';
 /**
  * GET /api/dashboard/retargeting/attribution
  *
- * Returns conversion attribution stats: how many subscribers came from
- * retargeting ads, broken down by platform, for the last 30 days.
+ * Returns conversion attribution stats: how many *converted subscribers* came
+ * from retargeting ads, broken down by platform, for the last 30 days.
+ * Only counts audience members with an email (actual subscribers), not
+ * anonymous visitors.
  */
 export async function GET() {
   return withPixelSession('Attribution', async (tx, { profileId }) => {
@@ -27,7 +29,8 @@ export async function GET() {
         and(
           drizzleSql`${audienceMembers.creatorProfileId} = ${profileId}`,
           isNotNull(audienceMembers.attributionSource),
-          gte(audienceMembers.createdAt, thirtyDaysAgo)
+          isNotNull(audienceMembers.email),
+          gte(audienceMembers.updatedAt, thirtyDaysAgo)
         )
       )
       .groupBy(audienceMembers.attributionSource);

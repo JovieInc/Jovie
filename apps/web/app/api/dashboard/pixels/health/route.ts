@@ -2,11 +2,13 @@ import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  computeHealthStatus,
+  type HealthStatus,
+} from '@/lib/tracking/track-helpers';
 import { withPixelSession } from '@/lib/tracking/with-pixel-session';
 
 export const runtime = 'nodejs';
-
-type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
 
 const PLATFORMS = ['facebook', 'google', 'tiktok'] as const;
 type Platform = (typeof PLATFORMS)[number];
@@ -24,42 +26,6 @@ interface HealthResponse {
     totalEventsThisWeek: number;
     overallSuccessRate: number;
   };
-}
-
-/**
- * Determine health status for a platform based on its forwarding stats.
- */
-function computeHealthStatus(
-  totalSent: number,
-  totalFailed: number,
-  lastSuccessAt: Date | null
-): HealthStatus {
-  const total = totalSent + totalFailed;
-
-  if (total === 0) {
-    return 'inactive';
-  }
-
-  const now = Date.now();
-  const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
-  const seventyTwoHoursAgo = now - 72 * 60 * 60 * 1000;
-
-  const failureRate = total > 0 ? totalFailed / total : 0;
-  const lastSuccessMs = lastSuccessAt ? lastSuccessAt.getTime() : 0;
-
-  if (totalSent === 0 || !lastSuccessAt) {
-    return 'unhealthy';
-  }
-
-  if (lastSuccessMs >= twentyFourHoursAgo && failureRate < 0.1) {
-    return 'healthy';
-  }
-
-  // Remaining: failureRate >= 10% or last success older than 24h
-  if (lastSuccessMs >= seventyTwoHoursAgo) {
-    return 'degraded';
-  }
-  return 'unhealthy';
 }
 
 /**

@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { isCookieBannerRequired } from '@/lib/cookies/consent-regions';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
@@ -11,6 +12,10 @@ import {
   createRateLimitHeaders,
   trackingIpClicksLimiter,
 } from '@/lib/rate-limit';
+import {
+  anonymizeIp,
+  deriveAttributionSource,
+} from '@/lib/tracking/track-helpers';
 import { detectPlatformFromUA } from '@/lib/utils';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import {
@@ -43,34 +48,6 @@ function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
   } catch {
     return null;
   }
-}
-
-/**
- * Anonymize an IP address for privacy:
- * - IPv4: zero last octet (e.g. "1.2.3.4" → "1.2.3.0")
- * - IPv6: truncate last 80 bits (zero last 5 groups)
- */
-function anonymizeIp(ip: string): string {
-  if (ip.includes(':')) {
-    // IPv6: split on '::' once, expand the gap to fill 8 groups, zero last 5
-    const [left, right = ''] = ip.split('::');
-    const leftParts = left ? left.split(':') : [];
-    const rightParts = right ? right.split(':') : [];
-    const missing = 8 - leftParts.length - rightParts.length;
-    const full = [
-      ...leftParts,
-      ...Array(Math.max(0, missing)).fill('0000'),
-      ...rightParts,
-    ];
-    return full.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
-  }
-  // IPv4: zero last octet
-  const parts = ip.split('.');
-  if (parts.length === 4) {
-    parts[3] = '0';
-    return parts.join('.');
-  }
-  return '0.0.0.0';
 }
 
 // API routes should be dynamic
@@ -106,26 +83,6 @@ function inferAudienceDeviceType(
     return 'mobile';
   }
   return 'desktop';
-}
-
-// ---------------------------------------------------------------------------
-// Attribution helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Derive retargeting attribution source from UTM params.
- * Returns null when UTM params don't match a known retargeting pattern.
- */
-function deriveAttributionSource(
-  utmParams: { utm_source?: string; utm_medium?: string } | null | undefined
-): string | null {
-  if (!utmParams?.utm_source || utmParams.utm_medium !== 'retargeting')
-    return null;
-  const src = utmParams.utm_source.toLowerCase();
-  if (src === 'meta' || src === 'facebook') return 'retargeting_meta';
-  if (src === 'google') return 'retargeting_google';
-  if (src === 'tiktok') return 'retargeting_tiktok';
-  return null;
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -210,11 +167,15 @@ export async function POST(request: NextRequest) {
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
     // Determine marketing consent from jv_cc cookie.
-    // When the cookie banner is not shown (non-regulated jurisdictions),
-    // jv_cc is absent — treat absent cookie as consent given (default-allow).
-    // Only explicit marketing=false (user rejected) blocks audience tracking.
+    // When the cookie banner is not required for this visitor's region and the
+    // cookie is absent, treat as consent given (default-allow for non-regulated
+    // jurisdictions). Only explicit marketing=false blocks audience tracking.
+    const geoRegion =
+      request.headers.get('x-vercel-ip-country-region') ?? undefined;
     const consent = parseConsentCookie(request);
-    const hasMarketingConsent = consent === null || consent.marketing === true;
+    const hasMarketingConsent = consent
+      ? consent.marketing === true
+      : !isCookieBannerRequired(geoCountry ?? null, geoRegion);
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).

@@ -1,32 +1,9 @@
 /**
  * Tests for computeHealthStatus logic used by the pixel health endpoint.
+ * Function is imported from the production module to prevent drift.
  */
 import { describe, expect, it } from 'vitest';
-
-type HealthStatus = 'healthy' | 'degraded' | 'unhealthy' | 'inactive';
-
-// Mirror of computeHealthStatus from health/route.ts (pure function, no deps).
-// If this drifts, extract to @/lib/tracking/health-utils.ts and import in both.
-function computeHealthStatus(
-  totalSent: number,
-  totalFailed: number,
-  lastSuccessAt: Date | null
-): HealthStatus {
-  const total = totalSent + totalFailed;
-  if (total === 0) return 'inactive';
-
-  const now = Date.now();
-  const twentyFourHoursAgo = now - 24 * 60 * 60 * 1000;
-  const seventyTwoHoursAgo = now - 72 * 60 * 60 * 1000;
-  const failureRate = totalFailed / total;
-  const lastSuccessMs = lastSuccessAt ? lastSuccessAt.getTime() : 0;
-
-  if (totalSent === 0 || !lastSuccessAt) return 'unhealthy';
-  if (lastSuccessMs >= twentyFourHoursAgo && failureRate < 0.1)
-    return 'healthy';
-  if (lastSuccessMs >= seventyTwoHoursAgo) return 'degraded';
-  return 'unhealthy';
-}
+import { computeHealthStatus } from '@/lib/tracking/track-helpers';
 
 describe('computeHealthStatus', () => {
   it('returns inactive when no events exist', () => {

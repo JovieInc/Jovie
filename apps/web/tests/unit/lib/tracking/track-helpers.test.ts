@@ -1,46 +1,12 @@
 /**
- * Tests for helper functions in the /api/track route.
- * These are extracted as pure functions for testability.
+ * Tests for helper functions shared across tracking routes.
+ * Functions are imported from the production module to prevent drift.
  */
 import { describe, expect, it } from 'vitest';
-
-// ---------------------------------------------------------------------------
-// anonymizeIp — inline reimplementation for unit testing
-// (In production these live inside the route handler; we test the logic here)
-// ---------------------------------------------------------------------------
-
-function anonymizeIp(ip: string): string {
-  if (ip.includes(':')) {
-    const [left, right = ''] = ip.split('::');
-    const leftParts = left ? left.split(':') : [];
-    const rightParts = right ? right.split(':') : [];
-    const missing = 8 - leftParts.length - rightParts.length;
-    const full = [
-      ...leftParts,
-      ...Array(Math.max(0, missing)).fill('0000'),
-      ...rightParts,
-    ];
-    return full.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
-  }
-  const parts = ip.split('.');
-  if (parts.length === 4) {
-    parts[3] = '0';
-    return parts.join('.');
-  }
-  return '0.0.0.0';
-}
-
-function deriveAttributionSource(
-  utmParams: { utm_source?: string; utm_medium?: string } | null | undefined
-): string | null {
-  if (!utmParams?.utm_source || utmParams.utm_medium !== 'retargeting')
-    return null;
-  const src = utmParams.utm_source.toLowerCase();
-  if (src === 'meta' || src === 'facebook') return 'retargeting_meta';
-  if (src === 'google') return 'retargeting_google';
-  if (src === 'tiktok') return 'retargeting_tiktok';
-  return null;
-}
+import {
+  anonymizeIp,
+  deriveAttributionSource,
+} from '@/lib/tracking/track-helpers';
 
 describe('anonymizeIp', () => {
   it('zeroes last octet of IPv4', () => {

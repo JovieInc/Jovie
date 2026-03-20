@@ -32,35 +32,47 @@ export async function GET(request: Request) {
   const startTime = Date.now();
 
   try {
-    // PostgreSQL doesn't support LIMIT in UPDATE, so use a subquery
-    const result = await db.execute(
-      drizzleSql`UPDATE pixel_events
-        SET client_ip = NULL
-        WHERE id IN (
-          SELECT id FROM pixel_events
-          WHERE client_ip IS NOT NULL
-            AND created_at < NOW() - INTERVAL '1 hour' * ${PURGE_THRESHOLD_HOURS}
-          LIMIT ${BATCH_SIZE}
-        )`
-    );
+    // Loop in batches until all expired rows are purged.
+    // Guard against unbounded runtime with a max iteration cap.
+    const MAX_ITERATIONS = 50; // 50 * 1000 = 50k rows max per run
+    let totalPurged = 0;
 
-    // Drizzle returns rowCount for UPDATE statements
-    const purgedCount =
-      typeof result === 'object' && result !== null && 'rowCount' in result
-        ? (result.rowCount as number)
-        : 0;
+    for (let i = 0; i < MAX_ITERATIONS; i++) {
+      // PostgreSQL doesn't support LIMIT in UPDATE, so use a subquery
+      const result = await db.execute(
+        drizzleSql`UPDATE pixel_events
+          SET client_ip = NULL
+          WHERE id IN (
+            SELECT id FROM pixel_events
+            WHERE client_ip IS NOT NULL
+              AND created_at < NOW() - INTERVAL '1 hour' * ${PURGE_THRESHOLD_HOURS}
+            LIMIT ${BATCH_SIZE}
+          )`
+      );
+
+      // Drizzle returns rowCount for UPDATE statements
+      const batchCount =
+        typeof result === 'object' && result !== null && 'rowCount' in result
+          ? (result.rowCount as number)
+          : 0;
+
+      totalPurged += batchCount;
+
+      // If we purged fewer rows than the batch size, we're done
+      if (batchCount < BATCH_SIZE) break;
+    }
 
     const durationMs = Date.now() - startTime;
 
     logger.info('[purge-pixel-ips] Purge complete', {
-      purgedCount,
+      purgedCount: totalPurged,
       durationMs,
     });
 
     return NextResponse.json(
       {
         success: true,
-        purgedCount,
+        purgedCount: totalPurged,
         durationMs,
         timestamp: new Date().toISOString(),
       },

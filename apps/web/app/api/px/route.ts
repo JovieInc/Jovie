@@ -1,17 +1,20 @@
 import crypto from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { audienceMembers } from '@/lib/db/schema/analytics';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
 import { forwardEvent } from '@/lib/tracking/forwarding';
+import { deriveAttributionSource } from '@/lib/tracking/track-helpers';
 import { detectBot } from '@/lib/utils/bot-detection';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
+import { createFingerprint } from '../audience/lib/audience-utils';
 
 export const runtime = 'nodejs';
 
@@ -147,6 +150,13 @@ export async function POST(request: NextRequest) {
     // Raw IP is required by Facebook CAPI and TikTok Events API for user matching
     const ipHash = hashIP(clientIP);
 
+    // Derive retargeting attribution from UTM params (if present)
+    const attribution = deriveAttributionSource(
+      eventData
+        ? { utm_source: eventData.utm_source, utm_medium: eventData.utm_medium }
+        : null
+    );
+
     // Build event data with UTM params and referrer
     const enrichedEventData = {
       ...eventData,
@@ -209,6 +219,35 @@ export async function POST(request: NextRequest) {
           }
 
           await forwardEvent(insertedEvent);
+
+          // Stamp first-touch retargeting attribution on the audience member
+          // matching this visitor's fingerprint, if not already attributed.
+          // This ensures visitors arriving from retargeting ads who subscribe
+          // directly (without clicking a tracked link) get proper attribution.
+          if (attribution) {
+            try {
+              const fingerprint = createFingerprint(clientIP, userAgent);
+              await db
+                .update(audienceMembers)
+                .set({
+                  attributionSource: attribution,
+                  updatedAt: new Date(),
+                })
+                .where(
+                  and(
+                    eq(audienceMembers.creatorProfileId, profileId),
+                    eq(audienceMembers.fingerprint, fingerprint),
+                    isNull(audienceMembers.attributionSource)
+                  )
+                );
+            } catch (attrErr) {
+              logger.warn('[Pixel] Failed to stamp attribution', {
+                profileId,
+                attribution,
+                error: attrErr,
+              });
+            }
+          }
         } catch (error) {
           logger.error('[Pixel] After-response forwarding failed', {
             eventId: insertedEvent.id,
