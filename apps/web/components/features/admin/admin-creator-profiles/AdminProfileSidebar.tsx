@@ -81,13 +81,13 @@ export function AdminProfileSidebar({
       title='Creator profile'
       onClose={onClose}
       entityHeader={
-        <div className='space-y-2'>
+        <div className='space-y-1.5'>
           <ProfileContactHeader
             displayName={profile.displayName ?? profile.username}
             username={profile.username}
             avatarUrl={profile.avatarUrl}
           />
-          <div className='py-1'>
+          <div className='pt-0.5'>
             <div className='grid grid-cols-[88px,minmax(0,1fr)] items-center gap-3'>
               <Label className='text-xs font-medium text-secondary-token'>
                 Profile link
@@ -97,13 +97,13 @@ export function AdminProfileSidebar({
                   url={`${BASE_URL}/${profile.username}`}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 px-3 py-2'
+                  inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
                 />
                 <Button
                   type='button'
                   size='icon'
                   variant='ghost'
-                  className='h-8 w-8 shrink-0 bg-surface-1'
+                  className='h-7 w-7 shrink-0 border border-transparent bg-surface-0 hover:border-subtle hover:bg-surface-1'
                   onClick={() =>
                     globalThis.open(
                       `${BASE_URL}/${profile.username}`,
