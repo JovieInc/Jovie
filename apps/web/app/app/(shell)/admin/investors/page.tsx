@@ -156,9 +156,9 @@ function CreateLinkButton() {
 function TableSkeleton() {
   return (
     <div className='space-y-2'>
-      {Array.from({ length: 5 }).map((_, i) => (
+      {['a', 'b', 'c', 'd', 'e'].map(skeletonId => (
         <div
-          key={`skeleton-${i}`}
+          key={`skeleton-${skeletonId}`}
           className='h-12 animate-pulse rounded bg-muted/30'
         />
       ))}
