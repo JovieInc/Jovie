@@ -32,8 +32,8 @@ import {
   type SpotifyArtistInput,
 } from './artist-parser';
 import {
+  processRecordingArtistCredits,
   processReleaseArtistCredits,
-  processTrackArtistCredits,
 } from './artist-queries';
 import { discoverLinksForRelease } from './discovery';
 import {
@@ -43,7 +43,6 @@ import {
   upsertRecording,
   upsertRelease,
   upsertReleaseTrack,
-  upsertTrack,
 } from './queries';
 import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
@@ -634,48 +633,9 @@ async function processTracksForRelease(
       },
     });
 
-    // Legacy: also write to discog_tracks for backward compat during migration
-    const createdTrack = await upsertTrack({
-      releaseId: release.id,
-      creatorProfileId,
-      title: sanitizedTrackTitle,
-      slug: trackSlug,
-      trackNumber,
-      discNumber,
-      durationMs: sanitizeBoundedNullableInteger(
-        track.duration_ms,
-        0,
-        60 * 60 * 1000
-      ),
-      isExplicit: track.explicit,
-      isrc: sanitizedIsrc,
-      previewUrl: sanitizedPreviewUrl,
-      audioUrl: audioFallbackUrl,
-      audioFormat: audioFallbackFormat,
-      sourceType: 'ingested',
-      metadata: {
-        spotifyId: track.id,
-        spotifyUri: track.uri,
-      },
-    });
-
     // Provider link on release_track (new model)
     await upsertProviderLink({
       releaseTrackId: createdReleaseTrack.id,
-      providerId: 'spotify',
-      url: buildSpotifyTrackUrl(track.id),
-      externalId: null,
-      sourceType: 'ingested',
-      isPrimary: true,
-      metadata: {
-        providerExternalId: track.id,
-        isrc: sanitizedIsrc,
-      },
-    });
-
-    // Legacy provider link on track (backward compat)
-    await upsertProviderLink({
-      trackId: createdTrack.id,
       providerId: 'spotify',
       url: buildSpotifyTrackUrl(track.id),
       externalId: null,
@@ -696,10 +656,14 @@ async function processTracksForRelease(
       track.name,
       trackArtistInputs
     );
-    await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
-      deleteExisting: true,
-      sourceType: 'ingested',
-    });
+    await processRecordingArtistCredits(
+      createdRecording.id,
+      trackArtistCredits,
+      {
+        deleteExisting: true,
+        sourceType: 'ingested',
+      }
+    );
   }
 
   // Update release explicit flag if any track is explicit

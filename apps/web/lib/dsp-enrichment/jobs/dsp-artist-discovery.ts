@@ -14,7 +14,7 @@ import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { type DbOrTransaction, db } from '@/lib/db';
-import { discogTracks } from '@/lib/db/schema/content';
+import { discogRecordings } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
@@ -96,18 +96,18 @@ async function fetchLocalTracks(
 ): Promise<LocalTrackData[]> {
   const tracks = await tx
     .select({
-      id: discogTracks.id,
-      title: discogTracks.title,
-      isrc: discogTracks.isrc,
+      id: discogRecordings.id,
+      title: discogRecordings.title,
+      isrc: discogRecordings.isrc,
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .where(
       and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
-        drizzleSql`${discogTracks.isrc} IS NOT NULL`
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        drizzleSql`${discogRecordings.isrc} IS NOT NULL`
       )
     )
-    .orderBy(discogTracks.createdAt)
+    .orderBy(discogRecordings.createdAt)
     .limit(100);
 
   return tracks.map(t => ({

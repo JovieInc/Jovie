@@ -48,6 +48,10 @@ async function hasDiscogTracksTable(): Promise<boolean> {
   return doesTableExist('discog_tracks');
 }
 
+async function hasDiscogReleaseTracksTable(): Promise<boolean> {
+  return doesTableExist('discog_release_tracks');
+}
+
 async function hasProviderLinksTable(): Promise<boolean> {
   return doesTableExist('provider_links');
 }
@@ -132,25 +136,30 @@ function isUniqueConstraintViolation(
 async function getTrackSummariesForReleases(
   releaseIds: string[]
 ): Promise<Map<string, TrackSummary>> {
-  if (releaseIds.length === 0 || !(await hasDiscogTracksTable())) {
+  if (releaseIds.length === 0 || !(await hasDiscogReleaseTracksTable())) {
     return new Map();
   }
 
-  // Aggregate track data per release using raw SQL for efficiency
+  // Aggregate track data per release via release_tracks → recordings join
   const summaries = await db
     .select({
-      releaseId: discogTracks.releaseId,
-      totalDurationMs: drizzleSql<number>`sum(${discogTracks.durationMs})`.as(
-        'total_duration_ms'
-      ),
+      releaseId: discogReleaseTracks.releaseId,
+      totalDurationMs:
+        drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
+          'total_duration_ms'
+        ),
       primaryIsrc:
-        drizzleSql<string>`(array_agg(${discogTracks.isrc} ORDER BY ${discogTracks.discNumber}, ${discogTracks.trackNumber}) FILTER (WHERE ${discogTracks.isrc} IS NOT NULL))[1]`.as(
+        drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
     })
-    .from(discogTracks)
-    .where(inArray(discogTracks.releaseId, releaseIds))
-    .groupBy(discogTracks.releaseId);
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(inArray(discogReleaseTracks.releaseId, releaseIds))
+    .groupBy(discogReleaseTracks.releaseId);
 
   const summaryMap = new Map<string, TrackSummary>();
   for (const row of summaries) {

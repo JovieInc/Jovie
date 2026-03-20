@@ -5,7 +5,11 @@ import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogReleaseTracks,
+} from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
@@ -60,18 +64,22 @@ const getSitemapCatalog = unstable_cache(
         db
           .select({
             username: creatorProfiles.usernameNormalized,
-            slug: discogTracks.slug,
-            updatedAt: discogTracks.updatedAt,
+            slug: discogRecordings.slug,
+            updatedAt: discogRecordings.updatedAt,
             artworkUrl: discogReleases.artworkUrl,
           })
-          .from(discogTracks)
-          .innerJoin(
-            discogReleases,
-            eq(discogTracks.releaseId, discogReleases.id)
-          )
+          .from(discogRecordings)
           .innerJoin(
             creatorProfiles,
-            eq(discogTracks.creatorProfileId, creatorProfiles.id)
+            eq(discogRecordings.creatorProfileId, creatorProfiles.id)
+          )
+          .innerJoin(
+            discogReleaseTracks,
+            eq(discogReleaseTracks.recordingId, discogRecordings.id)
+          )
+          .innerJoin(
+            discogReleases,
+            eq(discogReleaseTracks.releaseId, discogReleases.id)
           )
           .where(eq(creatorProfiles.isPublic, true)),
       ]);

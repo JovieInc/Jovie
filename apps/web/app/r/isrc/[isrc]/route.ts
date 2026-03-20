@@ -15,7 +15,7 @@
 import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { discogTracks } from '@/lib/db/schema/content';
+import { discogRecordings } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -59,18 +59,18 @@ export async function GET(
     return new NextResponse('Invalid ISRC format', { status: 400 });
   }
 
-  // Look up track + creator handle in one query
+  // Look up recording + creator handle in one query
   const [record] = await db
     .select({
-      slug: discogTracks.slug,
+      slug: discogRecordings.slug,
       usernameNormalized: creatorProfiles.usernameNormalized,
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .innerJoin(
       creatorProfiles,
-      eq(creatorProfiles.id, discogTracks.creatorProfileId)
+      eq(creatorProfiles.id, discogRecordings.creatorProfileId)
     )
-    .where(eq(discogTracks.isrc, normalizedIsrc))
+    .where(eq(discogRecordings.isrc, normalizedIsrc))
     .limit(1);
 
   if (!record?.usernameNormalized) {
