@@ -11,12 +11,10 @@
  * - Handles environment variable validation
  */
 
-import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
-import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import { existsSync, readFileSync } from 'fs';
@@ -38,74 +36,6 @@ const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRootDir = path.resolve(scriptDir, '..');
 const migrationsDir = path.join(webRootDir, 'drizzle', 'migrations');
-const migrationsJournalPath = path.join(migrationsDir, 'meta', '_journal.json');
-
-type DrizzleMigrationsSchema = 'drizzle' | 'public';
-type JournalEntry = { idx: number; tag: string; when: number };
-type LoadedMigration = {
-  tag: string;
-  sql: string[];
-  folderMillis: number;
-  hash: string;
-};
-type MigrationPlan =
-  | { mode: 'noop'; boundaryMigrations: LoadedMigration[]; remainingCount: 0 }
-  | {
-      mode: 'batch';
-      boundaryMigrations: LoadedMigration[];
-      remainingCount: number;
-    }
-  | {
-      mode: 'boundary-then-batch';
-      boundaryMigrations: LoadedMigration[];
-      remainingCount: number;
-    }
-  | {
-      mode: 'boundary-only';
-      boundaryMigrations: LoadedMigration[];
-      remainingCount: 0;
-    };
-
-const COMMIT_BOUNDARY_AFTER = new Set([
-  '0078_add_recordings_and_release_tracks',
-]);
-
-function planMigrationExecution(
-  pendingMigrations: LoadedMigration[]
-): MigrationPlan {
-  if (pendingMigrations.length === 0) {
-    return { mode: 'noop', boundaryMigrations: [], remainingCount: 0 };
-  }
-
-  const boundaryIndex = pendingMigrations.findIndex(migration =>
-    COMMIT_BOUNDARY_AFTER.has(migration.tag)
-  );
-
-  if (boundaryIndex === -1) {
-    return {
-      mode: 'batch',
-      boundaryMigrations: [],
-      remainingCount: pendingMigrations.length,
-    };
-  }
-
-  const boundaryMigrations = pendingMigrations.slice(0, boundaryIndex + 1);
-  const remainingCount = pendingMigrations.length - boundaryMigrations.length;
-
-  if (remainingCount === 0) {
-    return {
-      mode: 'boundary-only',
-      boundaryMigrations,
-      remainingCount: 0,
-    };
-  }
-
-  return {
-    mode: 'boundary-then-batch',
-    boundaryMigrations,
-    remainingCount,
-  };
-}
 
 // ANSI color codes for terminal output
 const colors = {
@@ -187,8 +117,9 @@ function checkMigrationsExist(): boolean {
   }
 
   try {
-    if (existsSync(migrationsJournalPath)) {
-      const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8'));
+    const journalPath = path.join(migrationsDir, 'meta', '_journal.json');
+    if (existsSync(journalPath)) {
+      const journal = JSON.parse(readFileSync(journalPath, 'utf8'));
       return journal.entries && journal.entries.length > 0;
     }
   } catch {
@@ -298,8 +229,6 @@ async function runMigrations() {
   let pool: Pool;
   let db: Parameters<typeof migrate>[0];
   let client: PoolClient | null = null;
-  let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
-  const migrationsTable = '__drizzle_migrations';
 
   try {
     log.info('Connecting to database...');
@@ -314,347 +243,22 @@ async function runMigrations() {
     await client.query("SET app.allow_schema_changes = 'true'");
     db = drizzle(client);
 
-    // Using default public schema
-
     log.success('Database connection established');
   } catch (error) {
     log.error(`Failed to connect to database: ${error}`);
     process.exit(1);
   }
 
-  async function resolveMigrationsSchemaSafely(): Promise<DrizzleMigrationsSchema> {
-    try {
-      const [{ drizzle_table, public_table }] = (
-        await (client ?? pool).query<{
-          drizzle_table: string | null;
-          public_table: string | null;
-        }>(
-          "SELECT to_regclass('drizzle.__drizzle_migrations')::text AS drizzle_table, to_regclass('public.__drizzle_migrations')::text AS public_table"
-        )
-      ).rows;
-
-      if (drizzle_table) return 'drizzle';
-      if (public_table) return 'public';
-
-      return 'drizzle';
-    } catch {
-      return 'drizzle';
-    }
-  }
-
-  async function detectAppliedThroughIdx(): Promise<number | null> {
-    type Probe = {
-      idx: number | null;
-      tag: string;
-      existsQuery: string;
-    };
-
-    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: JournalEntry[];
-    };
-
-    const byTag = new Map(
-      (journal.entries ?? []).map(entry => [entry.tag, entry] as const)
-    );
-
-    const idxFor = (tag: string): number | null => byTag.get(tag)?.idx ?? null;
-
-    const schemaExistsResult = await (client ?? pool).query<{
-      has_schema: boolean;
-    }>(
-      "SELECT (to_regclass('public.users') IS NOT NULL OR to_regtype('public.creator_type') IS NOT NULL) AS has_schema"
-    );
-    const hasSchema = Boolean(schemaExistsResult.rows[0]?.has_schema);
-    if (!hasSchema) return null;
-
-    // Probes detect schema artifacts to determine which migrations have been applied
-    // when the migration history table is missing. Sorted by idx descending so we
-    // return the highest applied migration index.
-    const probes: Probe[] = [
-      {
-        tag: '0035_old_mindworm',
-        idx: idxFor('0035_old_mindworm'),
-        existsQuery: `SELECT (
-          to_regclass('public.creator_profiles') IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'creator_profiles'
-              AND column_name = 'location'
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'creator_profiles'
-              AND column_name = 'active_since_year'
-          )
-        ) AS ok`,
-      },
-      {
-        tag: '0031_add_referral_program',
-        idx: idxFor('0031_add_referral_program'),
-        existsQuery: `SELECT (
-          to_regclass('public.referral_codes') IS NOT NULL
-          AND to_regclass('public.referrals') IS NOT NULL
-          AND to_regclass('public.referral_commissions') IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'users'
-              AND column_name = 'referred_by_code'
-          )
-        ) AS ok`,
-      },
-      {
-        tag: '0030_regular_the_hunter',
-        idx: idxFor('0030_regular_the_hunter'),
-        existsQuery: `SELECT (
-          to_regclass('public.ai_insights') IS NOT NULL
-          AND to_regclass('public.insight_generation_runs') IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'audience_members'
-              AND column_name = 'utm_params'
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'notification_subscriptions'
-              AND column_name = 'confirmed_at'
-          )
-        ) AS ok`,
-      },
-      {
-        tag: '0026_add_subscription_email_verification',
-        idx: idxFor('0026_add_subscription_email_verification'),
-        existsQuery: `SELECT (
-          to_regclass('public.notification_subscriptions') IS NOT NULL
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'notification_subscriptions'
-              AND column_name = 'confirmed_at'
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'notification_subscriptions'
-              AND column_name = 'confirmation_token'
-          )
-          AND EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-              AND table_name = 'notification_subscriptions'
-              AND column_name = 'confirmation_sent_at'
-          )
-        ) AS ok`,
-      },
-      {
-        tag: '0000_sleepy_ted_forrester',
-        idx: idxFor('0000_sleepy_ted_forrester'),
-        existsQuery:
-          "SELECT (to_regclass('public.users') IS NOT NULL AND to_regclass('public.creator_profiles') IS NOT NULL) AS ok",
-      },
-    ]
-      .filter((probe): probe is Probe & { idx: number } => probe.idx !== null)
-      .sort((a, b) => b.idx - a.idx);
-
-    for (const probe of probes) {
-      const result = await (client ?? pool).query<{ ok: boolean }>(
-        probe.existsQuery
-      );
-      const ok = Boolean(result.rows[0]?.ok);
-      if (ok) return probe.idx;
-    }
-
-    return null;
-  }
-
-  async function bootstrapMigrationHistoryIfNeeded(): Promise<void> {
-    const existing = await (client ?? pool).query<{
-      drizzle_table: string | null;
-      public_table: string | null;
-    }>(
-      "SELECT to_regclass('drizzle.__drizzle_migrations')::text AS drizzle_table, to_regclass('public.__drizzle_migrations')::text AS public_table"
-    );
-
-    if (existing.rows[0]?.drizzle_table || existing.rows[0]?.public_table) {
-      return;
-    }
-
-    const appliedThroughIdx = await detectAppliedThroughIdx();
-    if (appliedThroughIdx === null) {
-      return;
-    }
-
-    await (client ?? pool).query('CREATE SCHEMA IF NOT EXISTS drizzle');
-    await (client ?? pool).query(
-      'CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (id SERIAL PRIMARY KEY, hash text NOT NULL, created_at numeric)'
-    );
-
-    const countResult = await (client ?? pool).query<{ count: string }>(
-      'SELECT COUNT(*)::text AS count FROM drizzle.__drizzle_migrations'
-    );
-    const existingCount = Number.parseInt(
-      countResult.rows[0]?.count ?? '0',
-      10
-    );
-    if (existingCount > 0) {
-      return;
-    }
-
-    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: JournalEntry[];
-    };
-
-    const entries = (journal.entries ?? [])
-      .filter(entry => entry.idx <= appliedThroughIdx)
-      .sort((a, b) => a.idx - b.idx);
-
-    if (entries.length === 0) {
-      return;
-    }
-
-    log.warning(
-      `Detected schema without migration history. Bootstrapping drizzle.__drizzle_migrations with ${entries.length} entries...`
-    );
-
-    for (const entry of entries) {
-      const migrationPath = path.join(migrationsDir, `${entry.tag}.sql`);
-
-      const sqlText = readFileSync(migrationPath, 'utf8');
-      const hash = crypto.createHash('sha256').update(sqlText).digest('hex');
-
-      await (client ?? pool).query(
-        'INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2)',
-        [hash, entry.when]
-      );
-    }
-
-    log.success('Bootstrapped drizzle migration history');
-  }
-
-  function loadMigrations(): LoadedMigration[] {
-    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
-      entries?: JournalEntry[];
-    };
-
-    return readMigrationFiles({ migrationsFolder: migrationsDir }).map(
-      (migration, index) => ({
-        tag: journal.entries?.[index]?.tag ?? `migration_${index}`,
-        sql: migration.sql,
-        folderMillis: migration.folderMillis,
-        hash: migration.hash,
-      })
-    );
-  }
-
-  async function getPendingMigrations(): Promise<LoadedMigration[]> {
-    const activeClient = client;
-    if (!activeClient) {
-      throw new Error('Migration client not initialized');
-    }
-
-    const migrationsTableRef = `"${migrationsSchema}"."${migrationsTable}"`;
-    const result = await activeClient.query<{ created_at: string | null }>(
-      `SELECT created_at::text FROM ${migrationsTableRef} ORDER BY created_at DESC LIMIT 1`
-    );
-    const lastAppliedMillis = Number.parseInt(
-      result.rows[0]?.created_at ?? '0',
-      10
-    );
-
-    const pendingMigrations = loadMigrations().filter(
-      migration => migration.folderMillis > lastAppliedMillis
-    );
-
-    return pendingMigrations;
-  }
-
-  async function applyMigrationsIndividually(
-    migrations: LoadedMigration[]
-  ): Promise<void> {
-    const activeClient = client;
-    if (!activeClient) {
-      throw new Error('Migration client not initialized');
-    }
-
-    const migrationsTableRef = `"${migrationsSchema}"."${migrationsTable}"`;
-
-    for (const migration of migrations) {
-      log.info(`Applying ${colors.bright}${migration.tag}${colors.reset}...`);
-
-      await activeClient.query('BEGIN');
-
-      try {
-        for (const statement of migration.sql) {
-          if (statement.trim().length === 0) {
-            continue;
-          }
-
-          await activeClient.query(statement);
-        }
-
-        await activeClient.query(
-          `INSERT INTO ${migrationsTableRef} (hash, created_at) VALUES ($1, $2)`,
-          [migration.hash, migration.folderMillis]
-        );
-        await activeClient.query('COMMIT');
-
-        log.success(`Applied ${migration.tag}`);
-      } catch (error) {
-        await activeClient.query('ROLLBACK');
-        throw error;
-      }
-    }
-  }
-
   // Run migrations
   try {
     log.info('Running migrations...');
 
-    migrationsSchema = await resolveMigrationsSchemaSafely();
-    await bootstrapMigrationHistoryIfNeeded();
-    log.info(
-      `Migrations schema: ${colors.bright}${migrationsSchema}${colors.reset}`
-    );
-
     const start = Date.now();
-    const pendingMigrations = await getPendingMigrations();
-    const migrationPlan = planMigrationExecution(pendingMigrations);
-
-    if (migrationPlan.mode === 'noop') {
-      log.info('No pending migrations found');
-    } else if (migrationPlan.mode === 'batch') {
-      log.info('No commit-boundary migrations pending; using Drizzle batching');
-      await migrate(db, {
-        migrationsFolder: migrationsDir,
-        migrationsSchema,
-        migrationsTable,
-      });
-    } else {
-      await applyMigrationsIndividually(migrationPlan.boundaryMigrations);
-
-      if (migrationPlan.remainingCount > 0) {
-        log.info(
-          'Boundary committed; resuming Drizzle batching for remaining migrations'
-        );
-        await migrate(db, {
-          migrationsFolder: migrationsDir,
-          migrationsSchema,
-          migrationsTable,
-        });
-      }
-    }
+    await migrate(db, {
+      migrationsFolder: migrationsDir,
+      migrationsSchema: 'drizzle',
+      migrationsTable: '__drizzle_migrations',
+    });
     const duration = ((Date.now() - start) / 1000).toFixed(2);
 
     log.success(`Migrations completed successfully in ${duration}s`);
@@ -756,4 +360,3 @@ if (require.main === module) {
 }
 
 export { runMigrations };
-export { planMigrationExecution };
