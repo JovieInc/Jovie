@@ -94,7 +94,7 @@ export function AudienceTableHeader({
     <thead
       className={cn(
         'sticky top-0 z-20 bg-(--linear-app-content-surface) shadow-inset-divider',
-        headerElevated && 'shadow-card shadow-black/10 dark:shadow-black/40'
+        headerElevated && 'shadow-inset-divider'
       )}
     >
       <tr className='text-[13px] font-[510] tracking-normal text-secondary-token'>
