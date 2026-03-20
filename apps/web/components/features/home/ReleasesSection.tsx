@@ -3,53 +3,15 @@
 import { Check, Zap } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Container } from '@/components/site/Container';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 import { PhoneFrame } from './PhoneFrame';
-
-const RELEASES = [
-  {
-    id: 'never-say-a-word',
-    title: 'Never Say A Word',
-    year: '2024',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273cbe401fd4a00b05b26a5233f',
-    slug: 'tim/never-say-a-word',
-    isNew: true,
-  },
-  {
-    id: 'deep-end',
-    title: 'The Deep End',
-    year: '2017',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b273164aac758a1deb79d33cc1b4',
-    slug: 'tim/the-deep-end',
-    isNew: false,
-  },
-  {
-    id: 'take-me-over',
-    title: 'Take Me Over',
-    year: '2014',
-    type: 'Single',
-    artwork: 'https://i.scdn.co/image/ab67616d0000b2732c05c3b2fb08c606843e7d98',
-    slug: 'tim/take-me-over',
-    isNew: false,
-  },
-] as const;
-
-const SMART_LINK_DSPS = [
-  'spotify',
-  'apple_music',
-  'youtube_music',
-  'amazon_music',
-] as const;
-
-const DSP_LABELS: Record<string, string> = {
-  apple_music: 'Apple Music',
-  youtube_music: 'YouTube Music',
-  amazon_music: 'Amazon Music',
-};
+import {
+  DSP_LABELS,
+  getDspConfig,
+  RELEASES,
+  SMART_LINK_DSPS,
+} from './releases-data';
 
 const RELEASE_PROOF_POINTS = [
   'Catalog sync',
@@ -237,7 +199,7 @@ function ReleasePhone({
 
       <div className='flex flex-col gap-2 px-5'>
         {SMART_LINK_DSPS.map(key => {
-          const config = DSP_LOGO_CONFIG[key as keyof typeof DSP_LOGO_CONFIG];
+          const config = getDspConfig(key);
           if (!config) return null;
           return (
             <SmartLinkProviderButton
