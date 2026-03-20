@@ -1,7 +1,7 @@
 export default function InvestorsLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
 }) {
   return children;
 }
