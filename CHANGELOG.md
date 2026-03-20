@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.22] - 2026-03-20
+
+### Changed
+
+- Cap artist profile genres at 3 (was 10), populated by most frequent genres across releases
+- Genre picker UI default max reduced from 10 to 3
+- Onboarding review step shows top 3 genres instead of 5
+- Profile validation schema caps genres array at 3
+
+### Added
+
+- `syncProfileGenresFromReleases()` — aggregates genres from all releases by frequency and writes top 3 to profile
+- Genre sync automatically runs after Spotify import
+- Unit tests for genre aggregation (frequency sorting, tiebreak, null handling, deduplication)
+
 ## [26.4.21] - 2026-03-20
 
 ### Added
