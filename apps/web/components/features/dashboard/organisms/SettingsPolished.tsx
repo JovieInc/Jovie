@@ -1,9 +1,18 @@
 'use client';
 
 import { PanelRight } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { memo, type ReactNode, useCallback, useMemo } from 'react';
+import {
+  memo,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
@@ -23,6 +32,7 @@ import { publicEnv } from '@/lib/env-public';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useBillingStatusQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import type { Artist } from '@/types/db';
 
 interface SettingsPolishedProps {
@@ -47,35 +57,97 @@ interface SettingsSectionGroup {
 
 interface SettingsSidebarProps {
   readonly groups: ReadonlyArray<SettingsSectionGroup>;
+  readonly activeSectionId?: string;
+  readonly useRouteLinks?: boolean;
 }
 
-const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
-  <aside className='h-fit'>
-    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
-      {groups.map(group => (
-        <div key={group.id} className='mb-2.5 last:mb-0'>
-          <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
-            {group.label}
-          </p>
-          <nav aria-label={`${group.label} settings`}>
-            <ul className='space-y-0.5'>
-              {group.sections.map(section => (
-                <li key={section.id}>
-                  <a
-                    href={`#${section.id}`}
-                    className='flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
-                  >
-                    {section.title}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
-      ))}
-    </div>
-  </aside>
-));
+function getFocusedSettingsHref(sectionId: string): string {
+  switch (sectionId) {
+    case 'account':
+      return APP_ROUTES.SETTINGS_APPEARANCE;
+    case 'billing':
+      return APP_ROUTES.SETTINGS_BILLING;
+    case 'data-privacy':
+      return APP_ROUTES.SETTINGS_DELETE_ACCOUNT;
+    case 'artist-profile':
+      return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
+    case 'contacts':
+      return APP_ROUTES.SETTINGS_CONTACTS;
+    case 'touring':
+      return APP_ROUTES.SETTINGS_TOURING;
+    case 'audience-tracking':
+      return APP_ROUTES.SETTINGS_AUDIENCE;
+    case 'admin':
+      return APP_ROUTES.SETTINGS_ADMIN;
+    case 'analytics':
+      return `${APP_ROUTES.SETTINGS}#analytics`;
+    case 'payments':
+      return `${APP_ROUTES.SETTINGS}#payments`;
+    default:
+      return APP_ROUTES.SETTINGS;
+  }
+}
+
+const SettingsSidebar = memo(
+  ({
+    groups,
+    activeSectionId,
+    useRouteLinks = false,
+  }: SettingsSidebarProps) => (
+    <aside className='h-fit'>
+      <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
+        {groups.map(group => (
+          <div key={group.id} className='mb-2.5 last:mb-0'>
+            <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+              {group.label}
+            </p>
+            <nav aria-label={`${group.label} settings`}>
+              <ul className='space-y-0.5'>
+                {group.sections.map(section => {
+                  const isActive = section.id === activeSectionId;
+                  const href = useRouteLinks
+                    ? getFocusedSettingsHref(section.id)
+                    : `#${section.id}`;
+                  return (
+                    <li key={section.id}>
+                      {useRouteLinks ? (
+                        <Link
+                          href={href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] transition-colors',
+                            isActive
+                              ? 'bg-surface-1 text-primary-token'
+                              : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                          )}
+                        >
+                          {section.title}
+                        </Link>
+                      ) : (
+                        <a
+                          href={href}
+                          aria-current={isActive ? 'page' : undefined}
+                          className={cn(
+                            'flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] transition-colors',
+                            isActive
+                              ? 'bg-surface-1 text-primary-token'
+                              : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                          )}
+                        >
+                          {section.title}
+                        </a>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+        ))}
+      </div>
+    </aside>
+  )
+);
 
 SettingsSidebar.displayName = 'SettingsSidebar';
 
@@ -117,6 +189,9 @@ export function SettingsPolished({
   isAdmin = false,
 }: SettingsPolishedProps) {
   const router = useRouter();
+  const [activeHashSectionId, setActiveHashSectionId] = useState<
+    string | undefined
+  >(undefined);
   const { data: billingData } = useBillingStatusQuery();
   const isPro = billingData?.isPro ?? false;
   const isGrowth = billingData?.plan === 'growth';
@@ -293,27 +368,61 @@ export function SettingsPolished({
     [sectionGroups]
   );
 
-  // When focusing a single section, show just that section
-  if (focusSection) {
-    const section = allSections.find(s => s.id === focusSection);
-    if (!section) {
-      return (
-        <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
-          <SettingsErrorState message='This settings section could not be found.' />
-        </div>
-      );
-    }
+  useEffect(() => {
+    if (focusSection) return;
 
+    const syncActiveSection = () => {
+      const nextHash = globalThis.location.hash.replace(/^#/, '');
+      setActiveHashSectionId(nextHash || undefined);
+    };
+
+    syncActiveSection();
+    globalThis.addEventListener('hashchange', syncActiveSection);
+
+    return () => {
+      globalThis.removeEventListener('hashchange', syncActiveSection);
+    };
+  }, [focusSection]);
+
+  if (
+    focusSection &&
+    !allSections.some(section => section.id === focusSection)
+  ) {
     return (
       <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
-        <SettingsSection
-          id={section.id}
-          title={section.title}
-          description={section.description}
-        >
-          {section.render()}
-        </SettingsSection>
-        {focusSection === 'artist-profile' && <MobileProfilePanelTrigger />}
+        <SettingsErrorState message='This settings section could not be found.' />
+      </div>
+    );
+  }
+
+  if (focusSection) {
+    const section = allSections.find(item => item.id === focusSection)!;
+
+    return (
+      <div
+        className='mx-auto grid w-full max-w-5xl gap-7 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-10'
+        data-testid='settings-polished'
+      >
+        <div className='lg:sticky lg:top-5 lg:self-start'>
+          <SettingsSidebar
+            groups={sectionGroups}
+            activeSectionId={focusSection}
+            useRouteLinks
+          />
+        </div>
+
+        <div className='space-y-8 pb-6 sm:pb-8'>
+          <SettingsSection
+            id={section.id}
+            title={section.title}
+            description={section.description}
+          >
+            {section.render()}
+          </SettingsSection>
+          {focusSection === 'artist-profile' ? (
+            <MobileProfilePanelTrigger />
+          ) : null}
+        </div>
       </div>
     );
   }
@@ -325,7 +434,10 @@ export function SettingsPolished({
       data-testid='settings-polished'
     >
       <div className='lg:sticky lg:top-5 lg:self-start'>
-        <SettingsSidebar groups={sectionGroups} />
+        <SettingsSidebar
+          groups={sectionGroups}
+          activeSectionId={activeHashSectionId}
+        />
       </div>
 
       <div className='space-y-10'>

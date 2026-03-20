@@ -2,7 +2,7 @@
 
 import { type QueryClient, useQuery } from '@tanstack/react-query';
 import type { EnvHealthResponse } from '@/lib/contracts/api';
-import { fetchWithTimeout } from './fetch';
+import { FetchError, fetchWithTimeout } from './fetch';
 
 export type { EnvHealthResponse } from '@/lib/contracts/api';
 
@@ -16,10 +16,18 @@ async function fetchEnvHealth({
 }: {
   signal?: AbortSignal;
 }): Promise<EnvHealthResponse> {
-  return fetchWithTimeout<EnvHealthResponse>('/api/health/env', {
-    cache: 'no-store',
-    signal,
-  });
+  try {
+    return await fetchWithTimeout<EnvHealthResponse>('/api/health/env', {
+      cache: 'no-store',
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof FetchError && error.response) {
+      return (await error.response.json()) as EnvHealthResponse;
+    }
+
+    throw error;
+  }
 }
 
 /**
