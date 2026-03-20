@@ -19,7 +19,7 @@ const AdminWaitlistTableWithViews = dynamic(
     ),
   {
     loading: () => (
-      <div className='p-6 space-y-6'>
+      <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
         <div className='flex items-center justify-between'>
           <div className='space-y-2'>
             <div className='h-8 w-32 skeleton rounded-md' />
@@ -60,7 +60,7 @@ export default async function AdminWaitlistPage({
   return (
     <PageShell>
       <PageContent noPadding>
-        <div className='flex flex-col h-full space-y-4 p-4 sm:p-6'>
+        <div className='flex h-full flex-col gap-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <WaitlistMetrics metrics={metrics} />
           <div className='flex-1 min-h-0'>
             <AdminWaitlistTableWithViews
