@@ -5,6 +5,11 @@ import {
   type TrackDescriptor,
 } from '@/lib/discography/provider-links';
 
+vi.mock('@/lib/discography/musicfetch', () => ({
+  isMusicfetchAvailable: () => false,
+  lookupByIsrc: vi.fn().mockResolvedValue(null),
+}));
+
 const baseTrack: TrackDescriptor = {
   title: 'Anti-Hero',
   artistName: 'Taylor Swift',

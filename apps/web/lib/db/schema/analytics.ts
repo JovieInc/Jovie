@@ -68,6 +68,7 @@ export const audienceMembers = pgTable(
       }>()
       .default({}),
     fingerprint: text('fingerprint'),
+    attributionSource: text('attribution_source'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },

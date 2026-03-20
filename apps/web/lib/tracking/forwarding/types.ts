@@ -78,6 +78,44 @@ export interface PlatformConfig {
   enabled: boolean;
 }
 
+const DEFAULT_TIMEOUT_MS = 10_000; // 10 seconds
+
+/**
+ * Shared fetch-with-timeout helper for all platform forwarders.
+ * Returns the Response or throws on timeout/network error.
+ */
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Build a failed ForwardingResult from an error.
+ */
+export function forwardingError(
+  platform: ForwardingResult['platform'],
+  error: unknown
+): ForwardingResult {
+  return {
+    platform,
+    success: false,
+    error: error instanceof Error ? error.message : 'Unknown error',
+  };
+}
+
 /**
  * Transforms a PixelEvent database record into a normalized format suitable for
  * forwarding to advertising platforms (e.g. Facebook, Google, TikTok).

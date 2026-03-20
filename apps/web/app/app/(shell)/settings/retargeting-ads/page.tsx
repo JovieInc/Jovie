@@ -2,9 +2,72 @@
 
 import { Button } from '@jovie/ui';
 import { Download, RefreshCw } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+
+// ---------------------------------------------------------------------------
+// Attribution stats
+// ---------------------------------------------------------------------------
+
+interface AttributionStats {
+  total: number;
+  byPlatform: {
+    retargeting_meta: number;
+    retargeting_google: number;
+    retargeting_tiktok: number;
+  };
+}
+
+function AttributionStatsCard() {
+  const [stats, setStats] = useState<AttributionStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/dashboard/retargeting/attribution')
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: AttributionStats | null) => {
+        if (!cancelled && data) setStats(data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!stats || stats.total === 0) return null;
+
+  const platforms = [
+    { key: 'retargeting_meta' as const, label: 'Meta' },
+    { key: 'retargeting_google' as const, label: 'Google' },
+    { key: 'retargeting_tiktok' as const, label: 'TikTok' },
+  ];
+
+  return (
+    <ContentSurfaceCard className='bg-surface-0 p-4'>
+      <h3 className='text-sm font-medium text-primary-token'>
+        Retargeting attribution
+      </h3>
+      <p className='mt-1 text-2xl font-semibold text-primary-token'>
+        {stats.total}{' '}
+        <span className='text-sm font-normal text-secondary-token'>
+          {stats.total === 1 ? 'subscriber' : 'subscribers'} from your
+          retargeting ads this month
+        </span>
+      </p>
+      <div className='mt-2 flex gap-4'>
+        {platforms.map(
+          p =>
+            stats.byPlatform[p.key] > 0 && (
+              <span key={p.key} className='text-xs text-tertiary-token'>
+                {p.label}: {stats.byPlatform[p.key]}
+              </span>
+            )
+        )}
+      </div>
+    </ContentSurfaceCard>
+  );
+}
 
 type AdVariant = {
   type: 'fan' | 'claim';
@@ -157,6 +220,8 @@ export default function RetargetingAdsPage() {
           Upload them to Meta Ads Manager to retarget profile visitors.
         </p>
       </ContentSurfaceCard>
+
+      <AttributionStatsCard />
 
       <div className='space-y-4'>
         <h2 className='text-sm font-medium uppercase tracking-wide text-tertiary-token'>

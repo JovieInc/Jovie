@@ -140,4 +140,34 @@ describe('GET /api/admin/leads', () => {
       })
     );
   });
+
+  it('returns 500 when lead enrichment columns are missing', async () => {
+    mockSelect.mockReset();
+    mockSelect.mockImplementationOnce(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          orderBy: vi.fn(() => ({
+            limit: vi.fn(() => ({
+              offset: vi
+                .fn()
+                .mockRejectedValue(
+                  new Error(
+                    'column "spotify_popularity" of relation "leads" does not exist'
+                  )
+                ),
+            })),
+          })),
+        })),
+      })),
+    }));
+
+    const request = {
+      nextUrl: new URL('http://localhost/api/admin/leads?page=1&pageSize=20'),
+    } as never;
+
+    const response = await GET(request);
+
+    expect(response.status).toBe(500);
+    expect(mockCaptureError).toHaveBeenCalled();
+  });
 });
