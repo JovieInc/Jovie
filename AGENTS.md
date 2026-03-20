@@ -1150,19 +1150,13 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 |-------|------------|---------|
 | Ship | `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
 
-#### Changelog Automation (run as part of /ship workflow)
+#### Changelog
 
-Before `pnpm version:bump`, run `pnpm changelog:generate` to rewrite the `[Unreleased]` entries from developer language to customer-friendly product updates using AI.
+**Do not manually edit `CHANGELOG.md` during development.** The `/ship` workflow generates changelog entries automatically from the diff and commit history.
 
-After the PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers.
+`CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
 
-**Ship-time sequence:**
-1. `pnpm changelog:generate` — AI rewrites `[Unreleased]` (requires `ANTHROPIC_API_KEY`)
-2. `pnpm version:bump` — rotates `[Unreleased]` → dated release
-3. Commit, push, create PR (standard /ship flow)
-4. After merge: `pnpm changelog:send` — emails subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`)
-
-If `changelog:generate` fails (API down, key missing), it exits gracefully and the ship continues with original entries.
+**Post-merge emails:** After a PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`).
 
 **Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.
 
