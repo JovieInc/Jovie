@@ -180,7 +180,10 @@ async function importDiscography(
   try {
     const importResult = await importReleasesFromSpotify(
       creatorProfileId,
-      spotifyId
+      spotifyId,
+      {
+        discoverLinks: false,
+      }
     );
     result.releasesImported = importResult.imported;
     result.releasesFailed = importResult.failed;
