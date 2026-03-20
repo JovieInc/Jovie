@@ -6,15 +6,16 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type {
-  ForwardingResult,
-  NormalizedEvent,
-  PlatformConfig,
+import {
+  type ForwardingResult,
+  fetchWithTimeout,
+  forwardingError,
+  type NormalizedEvent,
+  type PlatformConfig,
 } from './types';
 
 const TIKTOK_API_URL =
   'https://business-api.tiktok.com/open_api/v1.3/event/track/';
-const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Map our event types to TikTok standard events
@@ -84,24 +85,14 @@ export async function forwardToTikTok(
       },
     };
 
-    // Create abort controller with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(TIKTOK_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Token': accessToken,
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const response = await fetchWithTimeout(TIKTOK_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Token': accessToken,
+      },
+      body: JSON.stringify(payload),
+    });
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -139,11 +130,6 @@ export async function forwardToTikTok(
       error,
       eventId: event.eventId,
     });
-
-    return {
-      platform: 'tiktok',
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return forwardingError('tiktok', error);
   }
 }

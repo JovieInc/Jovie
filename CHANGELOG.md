@@ -24,6 +24,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Server-side pixel forwarding to Facebook CAPI, Google Measurement Protocol, and TikTok Events API with consent gating and retry logic
+- Pixel health monitoring API with per-platform health status (healthy/degraded/unhealthy/inactive)
+- Manual test event button to verify pixel credentials from the dashboard
+- First-touch conversion attribution: tracks which retargeting platform drove each subscriber
+- IP purge cron job: deletes raw IPs after 48 hours, retains hashed IPs for analytics
+- Pixel forwarding retry cron with exponential backoff (5 retries, max 3h) and dead-lettering
+- Unit tests for anonymizeIp, deriveAttributionSource, computeHealthStatus, parseConsentCookie, and forwarding orchestration
 - Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
 - Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
 - `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
@@ -31,6 +38,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Pixel health endpoint now uses SQL aggregation instead of loading all events into memory
+- Replaced `drizzleSql.raw()` with safe parameterized query in IP purge cron
+- Deduplicated `NO_STORE_HEADERS` constant across 5 route files (now imports from shared module)
+- Added `retryCount` column to pixel_events for accurate dead-letter tracking
+- Added partial index on pixel_events for efficient IP purge queries
+- Attribution endpoint now requires Pro plan entitlement (consistent with all other pixel APIs)
+
+### Fixed
+
+- Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
 - Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
 - Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
 - AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios

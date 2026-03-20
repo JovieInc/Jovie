@@ -310,6 +310,8 @@ export const artistRoleEnum = pgEnum('artist_role', [
   'lyricist',
   'arranger',
   'conductor',
+  'mix_engineer',
+  'mastering_engineer',
   'vs',
   'with',
   'other',

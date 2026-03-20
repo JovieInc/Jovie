@@ -6,15 +6,16 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type {
-  ForwardingResult,
-  NormalizedEvent,
-  PlatformConfig,
+import {
+  type ForwardingResult,
+  fetchWithTimeout,
+  forwardingError,
+  type NormalizedEvent,
+  type PlatformConfig,
 } from './types';
 
 const FACEBOOK_API_VERSION = 'v18.0';
 const FACEBOOK_API_URL = 'https://graph.facebook.com';
-const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Map our event types to Facebook standard events
@@ -59,9 +60,13 @@ export async function forwardToFacebook(
   }
 
   try {
-    const url = `${FACEBOOK_API_URL}/${FACEBOOK_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
+    const url = `${FACEBOOK_API_URL}/${FACEBOOK_API_VERSION}/${pixelId}/events`;
 
     const payload = {
+      // access_token in the POST body instead of URL query string to avoid
+      // credential leakage in server logs, CDN caches, and error reports.
+      // Facebook CAPI accepts access_token in the request body.
+      access_token: accessToken,
       data: [
         {
           event_name: mapEventToFacebook(event.eventType),
@@ -92,23 +97,11 @@ export async function forwardToFacebook(
       ],
     };
 
-    // Create abort controller with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -137,11 +130,6 @@ export async function forwardToFacebook(
       error,
       eventId: event.eventId,
     });
-
-    return {
-      platform: 'facebook',
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return forwardingError('facebook', error);
   }
 }
