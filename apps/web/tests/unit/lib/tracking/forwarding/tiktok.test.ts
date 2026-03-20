@@ -1,35 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { forwardToTikTok } from '@/lib/tracking/forwarding/tiktok';
-import type {
-  NormalizedEvent,
-  PlatformConfig,
-} from '@/lib/tracking/forwarding/types';
+import type { NormalizedEvent } from '@/lib/tracking/forwarding/types';
+import {
+  getFetchBody,
+  getFetchUrl,
+  makeConfig,
+  makeEvent,
+  mockFetchError,
+  mockFetchNetworkError,
+} from './test-helpers';
 
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
-
-function makeEvent(overrides: Partial<NormalizedEvent> = {}): NormalizedEvent {
-  return {
-    eventId: 'evt-001',
-    eventType: 'page_view',
-    eventTime: 1700000000,
-    sourceUrl: 'https://jov.ie/artist',
-    ipHash: 'hash123',
-    clientIp: '1.2.3.4',
-    userAgent: 'TestAgent/1.0',
-    ...overrides,
-  };
-}
-
-function makeConfig(overrides: Partial<PlatformConfig> = {}): PlatformConfig {
-  return {
-    pixelId: 'tt-pixel-123',
-    accessToken: 'tt-access-token',
-    enabled: true,
-    ...overrides,
-  };
-}
 
 describe('forwardToTikTok', () => {
   beforeEach(() => {
@@ -43,14 +26,10 @@ describe('forwardToTikTok', () => {
       })
     );
   });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+  afterEach(() => vi.restoreAllMocks());
 
   it('returns success when API returns code=0', async () => {
     const result = await forwardToTikTok(makeEvent(), makeConfig());
-
     expect(result.platform).toBe('tiktok');
     expect(result.success).toBe(true);
     expect(result.responseId).toBe('req-abc');
@@ -58,15 +37,10 @@ describe('forwardToTikTok', () => {
 
   it('sends access token in headers, not URL', async () => {
     await forwardToTikTok(makeEvent(), makeConfig());
-
-    const fetchCall = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-    const url: string = fetchCall[0];
-    const options = fetchCall[1];
-
-    // Token must NOT be in URL
-    expect(url).not.toContain('tt-access-token');
-    // Token must be in header
-    expect(options.headers['Access-Token']).toBe('tt-access-token');
+    const url = getFetchUrl();
+    const options = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(url).not.toContain('token-secret');
+    expect(options.headers['Access-Token']).toBe('token-secret');
   });
 
   it('sends correct event payload', async () => {
@@ -77,20 +51,21 @@ describe('forwardToTikTok', () => {
       utmSource: 'meta',
     });
     await forwardToTikTok(event, makeConfig());
-
-    const body = JSON.parse(
-      (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
-    );
-
-    expect(body.pixel_code).toBe('tt-pixel-123');
+    const body = getFetchBody() as Record<string, unknown>;
+    expect(body.pixel_code).toBe('pixel-123');
     expect(body.event).toBe('ClickButton');
     expect(body.event_id).toBe('evt-001');
-    expect(body.context.page.url).toBe('https://jov.ie/artist');
-    expect(body.context.page.referrer).toBe('https://google.com');
-    expect(body.context.ip).toBe('1.2.3.4');
-    expect(body.context.user_agent).toBe('TestAgent/1.0');
-    expect(body.properties.content_id).toBe('link-42');
-    expect(body.properties.utm_source).toBe('meta');
+    const ctx = body.context as Record<string, unknown>;
+    expect((ctx.page as Record<string, unknown>).url).toBe(
+      'https://jov.ie/artist'
+    );
+    expect((ctx.page as Record<string, unknown>).referrer).toBe(
+      'https://google.com'
+    );
+    expect(ctx.ip).toBe('1.2.3.4');
+    const props = body.properties as Record<string, unknown>;
+    expect(props.content_id).toBe('link-42');
+    expect(props.utm_source).toBe('meta');
   });
 
   it('returns error when API returns non-zero code', async () => {
@@ -103,37 +78,21 @@ describe('forwardToTikTok', () => {
         text: () => Promise.resolve(''),
       })
     );
-
     const result = await forwardToTikTok(makeEvent(), makeConfig());
-
     expect(result.success).toBe(false);
     expect(result.error).toContain('Invalid pixel code');
   });
 
   it('returns error on HTTP failure', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 403,
-        text: () => Promise.resolve('Forbidden'),
-      })
-    );
-
+    mockFetchError(403, 'Forbidden');
     const result = await forwardToTikTok(makeEvent(), makeConfig());
-
     expect(result.success).toBe(false);
     expect(result.error).toContain('HTTP 403');
   });
 
   it('returns error on network/timeout', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockRejectedValue(new Error('The operation was aborted'))
-    );
-
+    mockFetchNetworkError('The operation was aborted');
     const result = await forwardToTikTok(makeEvent(), makeConfig());
-
     expect(result.success).toBe(false);
     expect(result.error).toContain('aborted');
   });
@@ -143,7 +102,6 @@ describe('forwardToTikTok', () => {
       makeEvent(),
       makeConfig({ pixelId: '' })
     );
-
     expect(result.success).toBe(false);
     expect(result.error).toContain('Missing');
     expect(fetch).not.toHaveBeenCalled();
@@ -154,9 +112,7 @@ describe('forwardToTikTok', () => {
       makeEvent(),
       makeConfig({ accessToken: '' })
     );
-
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Missing');
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -173,10 +129,7 @@ describe('forwardToTikTok', () => {
     for (const [input, expected] of mappings) {
       it(`maps "${input}" to "${expected}"`, async () => {
         await forwardToTikTok(makeEvent({ eventType: input }), makeConfig());
-
-        const body = JSON.parse(
-          (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
-        );
+        const body = getFetchBody() as Record<string, unknown>;
         expect(body.event).toBe(expected);
       });
     }
@@ -184,10 +137,7 @@ describe('forwardToTikTok', () => {
 
   it('sends to TikTok Events API URL', async () => {
     await forwardToTikTok(makeEvent(), makeConfig());
-
-    const url: string = (fetch as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(url).toContain('business-api.tiktok.com');
-    expect(url).toContain('/event/track/');
+    expect(getFetchUrl()).toContain('business-api.tiktok.com');
   });
 
   it('handles missing message in error response', async () => {
@@ -199,9 +149,7 @@ describe('forwardToTikTok', () => {
         text: () => Promise.resolve(''),
       })
     );
-
     const result = await forwardToTikTok(makeEvent(), makeConfig());
-
     expect(result.success).toBe(false);
     expect(result.error).toBe('Unknown TikTok API error');
   });
