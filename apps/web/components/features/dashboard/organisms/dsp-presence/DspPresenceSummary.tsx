@@ -1,5 +1,8 @@
 'use client';
 
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens/card-tokens';
+import { cn } from '@/lib/utils';
+
 interface DspPresenceSummaryProps {
   readonly confirmedCount: number;
   readonly suggestedCount: number;
@@ -10,7 +13,12 @@ export function DspPresenceSummary({
   suggestedCount,
 }: DspPresenceSummaryProps) {
   return (
-    <div className='shrink-0 border-b border-(--linear-border-subtle) px-3 py-2.5 lg:px-4'>
+    <div
+      className={cn(
+        LINEAR_SURFACE.toolbar,
+        'shrink-0 border-b px-3 py-2.5 lg:px-4'
+      )}
+    >
       <div className='flex items-center gap-3'>
         <h1 className='text-[14px] font-[590] text-(--linear-text-primary)'>
           DSP Presence
