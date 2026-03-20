@@ -5,7 +5,7 @@ import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 
@@ -23,7 +23,6 @@ type SitemapCatalog = {
     username: string;
     slug: string;
     updatedAt: Date | null;
-    artworkUrl: string | null;
   }>;
 };
 
@@ -60,18 +59,13 @@ const getSitemapCatalog = unstable_cache(
         db
           .select({
             username: creatorProfiles.usernameNormalized,
-            slug: discogTracks.slug,
-            updatedAt: discogTracks.updatedAt,
-            artworkUrl: discogReleases.artworkUrl,
+            slug: discogRecordings.slug,
+            updatedAt: discogRecordings.updatedAt,
           })
-          .from(discogTracks)
-          .innerJoin(
-            discogReleases,
-            eq(discogTracks.releaseId, discogReleases.id)
-          )
+          .from(discogRecordings)
           .innerJoin(
             creatorProfiles,
-            eq(discogTracks.creatorProfileId, creatorProfiles.id)
+            eq(discogRecordings.creatorProfileId, creatorProfiles.id)
           )
           .where(eq(creatorProfiles.isPublic, true)),
       ]);
@@ -153,7 +147,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: track.updatedAt ?? now,
       changeFrequency: 'monthly',
       priority: 0.6,
-      ...(track.artworkUrl ? { images: [track.artworkUrl] } : {}),
     }));
 
   return [

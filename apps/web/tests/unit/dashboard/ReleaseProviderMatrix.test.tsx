@@ -1,20 +1,9 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  act,
-  type RenderOptions,
-  render,
-  screen,
-} from '@testing-library/react';
+import { type RenderOptions, render, screen } from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
-
-let latestSubheaderProps:
-  | {
-      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
-    }
-  | undefined;
 
 /**
  * ReleaseProviderMatrix Component Tests
@@ -138,10 +127,7 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
-    ReleaseTableSubheader: (props: {
-      onReleaseViewChange?: (view: 'tracks' | 'releases') => void;
-    }) => {
-      latestSubheaderProps = props;
+    ReleaseTableSubheader: () => {
       return (
         <button type='button' data-testid='release-subheader'>
           subheader
@@ -329,7 +315,6 @@ const primaryProviders = [
 describe('ReleaseProviderMatrix', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    latestSubheaderProps = undefined;
   });
 
   describe('conditional rendering', () => {
@@ -444,8 +429,8 @@ describe('ReleaseProviderMatrix', () => {
     });
   });
 
-  describe('release view filtering', () => {
-    it('defaults to tracks rows on first render', () => {
+  describe('release display', () => {
+    it('shows all releases without tracks/releases split', () => {
       const single = makeRelease('single-track');
       const album = {
         ...makeRelease('album-track'),
@@ -463,33 +448,7 @@ describe('ReleaseProviderMatrix', () => {
       );
 
       expect(screen.getByTestId('release-table')).toHaveTextContent(
-        'ids:single-track'
-      );
-    });
-
-    it('filters to multi-track releases when switched to releases view', () => {
-      const single = makeRelease('single-track');
-      const album = {
-        ...makeRelease('album-track'),
-        releaseType: 'album' as const,
-        totalTracks: 12,
-      };
-
-      renderWithProviders(
-        <ReleaseProviderMatrix
-          releases={[single, album]}
-          providerConfig={providerConfig}
-          primaryProviders={primaryProviders}
-          spotifyConnected={true}
-        />
-      );
-
-      act(() => {
-        latestSubheaderProps?.onReleaseViewChange?.('releases');
-      });
-
-      expect(screen.getByTestId('release-table')).toHaveTextContent(
-        'ids:album-track'
+        'ids:single-track,album-track'
       );
     });
   });
