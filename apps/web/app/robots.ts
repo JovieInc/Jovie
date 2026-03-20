@@ -14,11 +14,12 @@ import { env } from '@/lib/env-server';
 
 const isProduction = env.VERCEL_ENV === 'production';
 
-/** Paths blocked from indexing (app dashboard, APIs, tracking params). */
+/** Paths blocked from indexing (app dashboard, APIs, investor portal, tracking params). */
 const DISALLOW_PATHS = [
   '/app/',
   '/api/',
   '/out/',
+  '/(investors)/',
   '/*?ref=*',
   '/*&ref=*',
   '/*?utm_*',
@@ -53,10 +54,11 @@ export default function robots(): MetadataRoute.Robots {
           disallow: DISALLOW_PATHS,
         },
         // Explicitly welcome AI crawlers for better AI search visibility
+        // But block investor portal from ALL crawlers
         ...AI_CRAWLERS.map(crawler => ({
           userAgent: crawler,
           allow: ['/', '/llms.txt'],
-          disallow: DISALLOW_PATHS,
+          disallow: [...DISALLOW_PATHS, '/(investors)/'],
         })),
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,
