@@ -25,7 +25,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Refactored `opengraph-image.tsx` to use shared `profileCardLayout` instead of inline JSX (net -120 lines)
 - Cleaned up TODOS.md: removed completed items (re-enrichment, social card) and duplicate win-back email entry
 
-## [26.4.16] - 2026-03-19
+## [26.4.18] - 2026-03-19
 
 ### Changed
 
