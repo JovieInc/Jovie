@@ -423,7 +423,7 @@ export function OnboardingProfileReviewStep({
                 {/* Genres */}
                 {genres.length > 0 && (
                   <div className='flex flex-wrap justify-center gap-1.5'>
-                    {genres.slice(0, 5).map(genre => (
+                    {genres.slice(0, 3).map(genre => (
                       <span
                         key={genre}
                         className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token capitalize'

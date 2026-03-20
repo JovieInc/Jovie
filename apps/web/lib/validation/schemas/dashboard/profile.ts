@@ -177,7 +177,7 @@ export const profileUpdateSchema = z
     /** Venmo handle for tips */
     venmo_handle: venmoHandleSchema.optional(),
     /** Genre tags for the profile */
-    genres: z.array(z.string().max(40).trim()).max(10).optional(),
+    genres: z.array(z.string().max(40).trim()).max(3).optional(),
   })
   .superRefine((data, ctx) => {
     if (

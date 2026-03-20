@@ -39,6 +39,7 @@ import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
+  syncProfileGenresFromReleases,
   upsertProviderLink,
   upsertRecording,
   upsertRelease,
@@ -361,12 +362,25 @@ export async function importReleasesFromSpotify(
           result
         );
 
-        // 4. Discover cross-platform links
+        // 4. Sync profile genres from release data (best-effort)
+        try {
+          await syncProfileGenresFromReleases(creatorProfileId);
+        } catch (error) {
+          // Non-critical: don't fail the import if genre sync fails
+          Sentry.addBreadcrumb({
+            category: 'spotify-import',
+            message: 'Genre sync failed',
+            level: 'warning',
+            data: { creatorProfileId, error },
+          });
+        }
+
+        // 5. Discover cross-platform links
         if (discoverLinks && includeTracks) {
           await discoverLinksForReleases(creatorProfileId, market);
         }
 
-        // 5. Fetch the final state
+        // 6. Fetch the final state
         result.releases = await getReleasesForProfile(creatorProfileId);
         result.success = result.failed === 0;
 

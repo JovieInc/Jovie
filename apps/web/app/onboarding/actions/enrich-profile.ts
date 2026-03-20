@@ -221,8 +221,9 @@ function buildEnrichmentUpdates(
 
   // Genres, followers, popularity from Spotify
   if (artist?.genres && artist.genres.length > 0) {
-    profileUpdates.genres = artist.genres;
-    result.genres = artist.genres;
+    const cappedGenres = artist.genres.slice(0, 3);
+    profileUpdates.genres = cappedGenres;
+    result.genres = cappedGenres;
   }
   if (artist?.followers) {
     profileUpdates.spotifyFollowers = artist.followers.total;
