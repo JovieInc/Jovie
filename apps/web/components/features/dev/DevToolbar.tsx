@@ -2,16 +2,23 @@
 
 import * as Switch from '@radix-ui/react-switch';
 import {
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
+  ExternalLink,
   Monitor,
   Moon,
+  Route,
+  Search,
   Sun,
   Wrench,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useTheme } from 'next-themes';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
 import {
   CODE_FLAG_KEYS,
@@ -19,11 +26,39 @@ import {
   FEATURE_FLAGS,
 } from '@/lib/feature-flags/shared';
 
-const STATSIG_FLAGS = Object.entries(FEATURE_FLAG_KEYS) as [string, string][];
-const CODE_FLAGS_ENTRIES = Object.entries(CODE_FLAG_KEYS) as [string, string][];
+type FlagEntry = {
+  name: string;
+  key: string;
+  source: 'statsig' | 'code';
+  serverDefault: boolean;
+};
+
+const ALL_FLAGS: FlagEntry[] = [
+  ...(Object.entries(FEATURE_FLAG_KEYS) as [string, string][]).map(
+    ([name, key]) => ({
+      name,
+      key,
+      source: 'statsig' as const,
+      serverDefault: false,
+    })
+  ),
+  ...(Object.entries(CODE_FLAG_KEYS) as [string, string][]).map(
+    ([name, key]) => ({
+      name,
+      key,
+      source: 'code' as const,
+      serverDefault: FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS],
+    })
+  ),
+];
 
 const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
+
+const ENV_COLORS: Record<string, string> = {
+  production: 'bg-red-500/20 text-red-400 border-red-500/30',
+  preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+};
 
 export function DevToolbar({
   env,
@@ -37,9 +72,12 @@ export function DevToolbar({
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [search, setSearch] = useState('');
+  const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useFeatureFlagOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Restore state from localStorage and mark as mounted
   useEffect(() => {
@@ -47,6 +85,29 @@ export function DevToolbar({
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
     setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
   }, []);
+
+  // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd') {
+        e.preventDefault();
+        if (hidden) {
+          setHidden(false);
+          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+        } else {
+          setHidden(true);
+          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+        }
+      }
+      if (e.key === 'Escape' && open) {
+        e.preventDefault();
+        setOpen(false);
+        localStorage.setItem(TOOLBAR_STORAGE_KEY, '0');
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [hidden, open]);
 
   // Add bottom padding to body so the toolbar doesn't cover content
   useEffect(() => {
@@ -59,7 +120,6 @@ export function DevToolbar({
       document.body.style.paddingBottom = h > 0 ? `${h}px` : '';
     };
     updatePadding();
-    // Re-measure after expand/collapse animation
     const timer = setTimeout(updatePadding, 220);
     return () => {
       clearTimeout(timer);
@@ -71,6 +131,9 @@ export function DevToolbar({
     setOpen(prev => {
       const next = !prev;
       localStorage.setItem(TOOLBAR_STORAGE_KEY, next ? '1' : '0');
+      if (next) {
+        setTimeout(() => searchRef.current?.focus(), 220);
+      }
       return next;
     });
   }
@@ -85,10 +148,39 @@ export function DevToolbar({
     localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
   }, []);
 
-  const ENV_COLORS: Record<string, string> = {
-    production: 'bg-red-500/20 text-red-400 border-red-500/30',
-    preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  };
+  const overrides = useMemo(
+    () => overridesCtx?.overrides ?? {},
+    [overridesCtx?.overrides]
+  );
+  const overrideCount = Object.keys(overrides).length;
+
+  // Unified flag list: filter by search, sort overrides to top
+  const filteredFlags = useMemo(() => {
+    const query = search.toLowerCase();
+    const matched = query
+      ? ALL_FLAGS.filter(f =>
+          f.name.toLowerCase().replaceAll('_', ' ').includes(query)
+        )
+      : ALL_FLAGS;
+
+    const overridden = matched.filter(f => f.key in overrides);
+    const nonOverridden = matched.filter(f => !(f.key in overrides));
+    return { overridden, nonOverridden, total: ALL_FLAGS.length };
+  }, [search, overrides]);
+
+  const matchCount =
+    filteredFlags.overridden.length + filteredFlags.nonOverridden.length;
+
+  async function copyToClipboard(text: string, field: 'sha' | 'route') {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch {
+      // Clipboard not available — fail silently
+    }
+  }
+
   const envColor =
     ENV_COLORS[env] ?? 'bg-green-500/20 text-green-400 border-green-500/30';
 
@@ -101,6 +193,7 @@ export function DevToolbar({
         onClick={show}
         className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)] shadow-md font-mono text-[10px] transition-colors'
         aria-label='Show dev toolbar'
+        title='Show dev toolbar (⌘⇧D)'
       >
         <Wrench size={11} />
         Dev
@@ -115,149 +208,222 @@ export function DevToolbar({
     >
       {/* Expanded panel */}
       <div
-        className='overflow-hidden transition-all duration-200 ease-in-out border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)]'
+        className='overflow-hidden transition-all duration-200 ease-in-out border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80'
         style={{
-          maxHeight: open ? '300px' : '0px',
+          maxHeight: open ? '400px' : '0px',
           borderTopWidth: open ? undefined : 0,
         }}
       >
-        <div className='flex flex-col md:flex-row'>
-          {/* Theme section */}
-          <Section label='Theme'>
-            <div className='flex gap-1'>
-              {[
-                { value: 'dark', icon: Moon, label: 'Dark' },
-                { value: 'light', icon: Sun, label: 'Light' },
-                { value: 'system', icon: Monitor, label: 'System' },
-              ].map(({ value, icon: Icon, label }) => (
+        <div className='flex flex-col'>
+          {/* Search bar */}
+          {overridesCtx && (
+            <div className='flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border-subtle)]'>
+              <Search
+                size={12}
+                className='shrink-0 text-[var(--color-text-quaternary-token)]'
+              />
+              <input
+                ref={searchRef}
+                type='text'
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder='Search flags...'
+                className='flex-1 bg-transparent text-[var(--color-text-primary)] placeholder:text-[var(--color-text-quaternary-token)] outline-none text-xs'
+                aria-label='Search flags'
+              />
+              {search && (
                 <button
                   type='button'
-                  key={value}
-                  onClick={() => setTheme(value)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border transition-colors flex-1 justify-center ${
-                    mounted && theme === value
-                      ? 'border-[var(--color-accent)] bg-[var(--color-accent)]/10 text-[var(--color-accent)]'
-                      : 'border-[var(--color-border-subtle)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)]'
-                  }`}
+                  onClick={() => setSearch('')}
+                  className='shrink-0 text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] transition-colors'
+                  aria-label='Clear search'
                 >
-                  <Icon size={11} />
-                  <span>{label}</span>
+                  <X size={11} />
                 </button>
-              ))}
+              )}
+              <span className='shrink-0 text-[10px] text-[var(--color-text-quaternary-token)]'>
+                {matchCount} of {filteredFlags.total}
+              </span>
             </div>
-          </Section>
-
-          {/* Statsig flags */}
-          {overridesCtx && (
-            <Section
-              label='Feature Flags'
-              action={
-                Object.keys(overridesCtx.overrides).length > 0 ? (
-                  <button
-                    type='button'
-                    onClick={overridesCtx.clearOverrides}
-                    className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline'
-                  >
-                    clear all
-                  </button>
-                ) : null
-              }
-            >
-              <div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
-                {STATSIG_FLAGS.map(([name, key]) => {
-                  const isOverridden = key in overridesCtx.overrides;
-                  const value = overridesCtx.overrides[key] ?? false;
-                  return (
-                    <FlagRow
-                      key={key}
-                      label={name.toLowerCase().replaceAll('_', ' ')}
-                      isOverridden={isOverridden}
-                      checked={value}
-                      onCheckedChange={checked =>
-                        overridesCtx.setOverride(key, checked)
-                      }
-                      onClear={() => overridesCtx.removeOverride(key)}
-                    />
-                  );
-                })}
-              </div>
-            </Section>
           )}
 
-          {/* Code-level flags */}
+          {/* Flags list */}
           {overridesCtx && (
-            <Section
-              label='Code Flags'
-              action={
-                CODE_FLAGS_ENTRIES.some(
-                  ([, key]) => key in overridesCtx.overrides
-                ) ? (
-                  <button
-                    type='button'
-                    onClick={() => {
-                      for (const [, key] of CODE_FLAGS_ENTRIES) {
-                        overridesCtx.removeOverride(key);
-                      }
-                    }}
-                    className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline'
-                  >
-                    clear all
-                  </button>
-                ) : null
-              }
-            >
-              <div className='flex flex-col gap-1 max-h-32 overflow-y-auto'>
-                {CODE_FLAGS_ENTRIES.map(([name, key]) => {
-                  const isOverridden = key in overridesCtx.overrides;
-                  const checked = isOverridden
-                    ? overridesCtx.overrides[key]
-                    : FEATURE_FLAGS[name as keyof typeof FEATURE_FLAGS];
-                  return (
-                    <FlagRow
-                      key={key}
-                      label={name.toLowerCase().replaceAll('_', ' ')}
-                      isOverridden={isOverridden}
-                      checked={checked}
-                      onCheckedChange={v => overridesCtx.setOverride(key, v)}
-                      onClear={() => overridesCtx.removeOverride(key)}
-                      source='code'
-                    />
-                  );
-                })}
-              </div>
-            </Section>
+            <div className='px-4 py-2 max-h-48 overflow-y-auto'>
+              {/* Overridden flags group */}
+              {filteredFlags.overridden.length > 0 && (
+                <div className='mb-2 border-l-2 border-[var(--color-accent)] pl-3'>
+                  <div className='flex items-center justify-between mb-1'>
+                    <span className='text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]'>
+                      Overrides ({filteredFlags.overridden.length})
+                    </span>
+                    <button
+                      type='button'
+                      onClick={overridesCtx.clearOverrides}
+                      className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
+                    >
+                      clear all
+                    </button>
+                  </div>
+                  <div className='flex flex-col gap-0.5'>
+                    {filteredFlags.overridden.map(flag => (
+                      <FlagRow
+                        key={flag.key}
+                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                        isOverridden
+                        checked={overrides[flag.key]}
+                        serverDefault={flag.serverDefault}
+                        onCheckedChange={v =>
+                          overridesCtx.setOverride(flag.key, v)
+                        }
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
+                        source={flag.source}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Non-overridden flags */}
+              {filteredFlags.nonOverridden.length > 0 && (
+                <div className='flex flex-col gap-0.5'>
+                  {filteredFlags.nonOverridden.map(flag => {
+                    const checked =
+                      flag.source === 'code' ? flag.serverDefault : false;
+                    return (
+                      <FlagRow
+                        key={flag.key}
+                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                        isOverridden={false}
+                        checked={checked}
+                        onCheckedChange={v =>
+                          overridesCtx.setOverride(flag.key, v)
+                        }
+                        onClear={() => overridesCtx.removeOverride(flag.key)}
+                        source={flag.source}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Empty search state */}
+              {matchCount === 0 && search && (
+                <div className='py-3 text-center text-[var(--color-text-quaternary-token)]'>
+                  No flags match &lsquo;{search}&rsquo;
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
 
       {/* Bottom bar (always visible) */}
-      <div className='flex items-center h-9 px-4 border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
-        {/* Left: env info */}
-        <div className='flex items-center gap-2 flex-1 min-w-0'>
-          <span
-            className={`px-2 py-0.5 rounded border text-[10px] font-semibold shrink-0 ${envColor}`}
-          >
-            {env}
-          </span>
-          {sha && (
-            <span className='text-[var(--color-text-quaternary-token)] truncate'>
-              {sha}
-            </span>
-          )}
-          {version && (
-            <span className='text-[var(--color-text-quaternary-token)] shrink-0'>
-              v{version}
-            </span>
-          )}
-        </div>
-
-        {/* Center: label */}
-        <span className='text-[10px] font-semibold tracking-wide uppercase text-[var(--color-text-quaternary-token)] shrink-0'>
-          Dev Toolbar
+      <div className='flex items-center h-9 px-4 gap-2 border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+        {/* Left: env + version */}
+        <span
+          className={`px-2 py-0.5 rounded border text-[10px] font-semibold shrink-0 ${envColor}`}
+        >
+          {env}
         </span>
+        {sha && (
+          <span className='hidden sm:inline text-[var(--color-text-quaternary-token)] truncate'>
+            {sha}
+          </span>
+        )}
+        {version && (
+          <span className='hidden sm:inline text-[var(--color-text-quaternary-token)] shrink-0'>
+            v{version}
+          </span>
+        )}
 
-        {/* Right: expand/collapse + hide */}
-        <div className='flex items-center justify-end flex-1 gap-0.5'>
+        {/* Override badge */}
+        {overrideCount > 0 && (
+          <button
+            type='button'
+            onClick={() => {
+              if (!open) toggleOpen();
+            }}
+            className='px-2 py-0.5 rounded-full text-[10px] font-medium bg-[var(--color-accent)]/10 text-[var(--color-accent)] border border-[var(--color-accent)]/30 shrink-0 hover:bg-[var(--color-accent)]/20 transition-colors cursor-pointer'
+            title='View overrides'
+          >
+            {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'}
+          </button>
+        )}
+
+        <div className='flex-1' />
+
+        {/* Quick actions */}
+        <div className='flex items-center gap-0.5'>
+          {/* Theme picker */}
+          {[
+            { value: 'dark', icon: Moon, label: 'Dark theme' },
+            { value: 'light', icon: Sun, label: 'Light theme' },
+            { value: 'system', icon: Monitor, label: 'System theme' },
+          ].map(({ value, icon: Icon, label }) => (
+            <button
+              type='button'
+              key={value}
+              onClick={() => setTheme(value)}
+              title={label}
+              className={`p-1.5 rounded transition-colors ${
+                mounted && theme === value
+                  ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+                  : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+              }`}
+              aria-label={label}
+            >
+              <Icon size={12} />
+            </button>
+          ))}
+
+          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+
+          {sha && (
+            <button
+              type='button'
+              onClick={() => copyToClipboard(sha, 'sha')}
+              title={`Copy SHA: ${sha}`}
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
+              aria-label='Copy SHA'
+            >
+              {copiedField === 'sha' ? (
+                <Check size={11} className='text-[var(--color-accent)]' />
+              ) : (
+                <Copy size={11} />
+              )}
+              <span className='hidden sm:inline text-[10px]'>SHA</span>
+            </button>
+          )}
+
+          <button
+            type='button'
+            onClick={() => copyToClipboard(window.location.pathname, 'route')}
+            title={`Copy route: ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
+            className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
+            aria-label='Copy route'
+          >
+            {copiedField === 'route' ? (
+              <Check size={11} className='text-[var(--color-accent)]' />
+            ) : (
+              <Route size={11} />
+            )}
+            <span className='hidden sm:inline text-[10px]'>Route</span>
+          </button>
+
+          <Link
+            href={APP_ROUTES.ADMIN}
+            title='Open admin panel'
+            className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
+            aria-label='Admin panel'
+          >
+            <ExternalLink size={11} />
+            <span className='hidden sm:inline text-[10px]'>Admin</span>
+          </Link>
+
+          <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+
+          {/* Expand/collapse + hide */}
           <button
             type='button'
             onClick={toggleOpen}
@@ -280,41 +446,11 @@ export function DevToolbar({
   );
 }
 
-function Section({
-  label,
-  subtitle,
-  action,
-  children,
-}: Readonly<{
-  label: string;
-  subtitle?: string;
-  action?: React.ReactNode;
-  children: React.ReactNode;
-}>) {
-  return (
-    <div className='px-4 py-2.5 border-b md:border-b-0 md:border-r border-[var(--color-border-subtle)] last:border-b-0 last:border-r-0 flex-1 min-w-0'>
-      <div className='flex items-center justify-between mb-2'>
-        <div>
-          <span className='text-[10px] font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)]'>
-            {label}
-          </span>
-          {subtitle && (
-            <span className='ml-1.5 text-[10px] text-[var(--color-text-quaternary-token)]'>
-              ({subtitle})
-            </span>
-          )}
-        </div>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 function FlagRow({
   label,
   isOverridden,
   checked,
+  serverDefault,
   onCheckedChange,
   onClear,
   source = 'statsig',
@@ -322,19 +458,33 @@ function FlagRow({
   label: string;
   isOverridden: boolean;
   checked: boolean;
+  serverDefault?: boolean;
   onCheckedChange: (v: boolean) => void;
   onClear: () => void;
   source?: 'statsig' | 'code';
 }>) {
+  const [flash, setFlash] = useState(false);
+  const flashTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  const handleChange = (v: boolean) => {
+    onCheckedChange(v);
+    setFlash(true);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlash(false), 400);
+  };
+
   return (
-    <div className='flex items-center gap-2 py-0.5'>
+    <div
+      className={`flex items-center gap-2 py-0.5 rounded-sm transition-colors duration-300 ${
+        flash ? 'bg-[var(--color-accent)]/10' : ''
+      }`}
+    >
       <Switch.Root
         checked={checked}
-        onCheckedChange={onCheckedChange}
+        onCheckedChange={handleChange}
         className={`relative w-7 h-4 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
           checked
             ? 'bg-[var(--color-accent)]'
-            : 'bg-[var(--color-bg-surface-3,#333)]'
+            : 'bg-[var(--color-bg-surface-3)]'
         }`}
       >
         <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm' />
@@ -344,6 +494,11 @@ function FlagRow({
       >
         {label}
       </span>
+      {isOverridden && serverDefault !== undefined && (
+        <span className='shrink-0 text-[9px] text-[var(--color-text-quaternary-token)]'>
+          server: {serverDefault ? 'on' : 'off'}
+        </span>
+      )}
       {isOverridden && (
         <button
           type='button'
