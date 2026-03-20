@@ -181,15 +181,15 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-0.5'>
-          <SidebarGroupLabel className='px-2 text-app font-[450] tracking-tight text-sidebar-muted'>
+          <SidebarGroupLabel className='h-6 px-2.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/85'>
             Workspace
           </SidebarGroupLabel>
-          <SidebarGroupContent className='space-y-px'>
+          <SidebarGroupContent className='space-y-0.5'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
                 {index > 0 && (
-                  <div className='my-1 mx-2 border-t border-sidebar-border/70' />
+                  <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
                 )}
                 {renderSection(section.items)}
               </div>
@@ -199,21 +199,21 @@ export function DashboardNav(_: DashboardNavProps) {
       )}
 
       {!isInSettings && threadsEnabled && !env.IS_E2E && (
-        <div className='mt-3'>
+        <div className='mt-3.5'>
           <RecentChats />
         </div>
       )}
 
       {isAdmin && !isInSettings && (
-        <div data-testid='admin-nav-section' className='mt-2.5'>
+        <div data-testid='admin-nav-section' className='mt-3'>
           <SidebarCollapsibleGroup label='Admin' defaultOpen>
-            <div className='space-y-1.5'>
+            <div className='space-y-2'>
               {adminNavigationSections.map((section, index) => (
                 <div key={section.label} data-admin-section={section.label}>
                   {index > 0 ? (
-                    <div className='my-1 mx-2 border-t border-sidebar-border/70' />
+                    <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
                   ) : null}
-                  <p className='px-2 pb-0.5 text-app font-[450] tracking-tight text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  <p className='px-2.5 pb-0.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

@@ -1,5 +1,11 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -151,29 +157,69 @@ function renderDemo() {
   );
 }
 
+function hasTextContent(text: string) {
+  return (_content: string, node: Element | null) =>
+    node?.textContent?.includes(text) ?? false;
+}
+
 describe('DemoReleasesExperience', () => {
-  it('renders fixture data and opens the selected release in the drawer', () => {
+  it('renders fixture data and opens the selected release in the drawer', async () => {
     renderDemo();
 
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
 
-    // All releases are shown (no tracks/releases toggle)
+    const releasesNavLabel = screen
+      .getAllByText('Releases')
+      .find(node => node.closest('button'));
+    expect(releasesNavLabel).toBeTruthy();
+    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
+
+    const releasesMatrix = await screen.findByTestId('releases-matrix');
+    fireEvent.click(
+      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
+    );
+
     // Release titles should appear in the list
-    expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
+    expect(
+      within(releasesMatrix).getAllByText(hasTextContent('Midnight Express'))
+        .length
+    ).toBeGreaterThan(0);
 
     // Click a release row to open the detail drawer
-    fireEvent.click(screen.getByText('Static Skies'));
+    const releaseTitle = within(releasesMatrix).getAllByText(
+      hasTextContent('Midnight Express')
+    )[0];
+    fireEvent.click(
+      releaseTitle.closest('tr') ?? releaseTitle.closest('td') ?? releaseTitle
+    );
 
-    // Detail drawer should show the release info
-    expect(screen.getAllByText('Static Skies').length).toBeGreaterThan(0);
+    // Selecting a row should surface the release details alongside the table.
+    await waitFor(() => {
+      expect(
+        screen.getAllByText(hasTextContent('Midnight Express')).length
+      ).toBeGreaterThan(1);
+    });
   });
 
-  it('renders release data in the table', () => {
+  it('renders release data in the table', async () => {
     renderDemo();
 
-    // All releases are shown directly (no view toggle)
+    const releasesNavLabel = screen
+      .getAllByText('Releases')
+      .find(node => node.closest('button'));
+    expect(releasesNavLabel).toBeTruthy();
+    fireEvent.click(releasesNavLabel?.closest('button') as HTMLButtonElement);
+
+    const releasesMatrix = await screen.findByTestId('releases-matrix');
+    fireEvent.click(
+      within(releasesMatrix).getByRole('tab', { name: 'Releases' })
+    );
+
     // The table should contain mock release titles
-    expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
+    expect(
+      within(releasesMatrix).getAllByText(hasTextContent('Midnight Express'))
+        .length
+    ).toBeGreaterThan(0);
   });
 });

@@ -10,6 +10,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Releases route visual overhaul: Linear-style surfaces, squircle corners, tighter spacing across table, sidebar drawers, toolbar, dialogs, banners, and mobile views
+- Shared segment control and drawer primitives aligned to Linear design language (flatter controls, stacked drawer cards, quieter chrome)
+- Extracted `LINEAR_SURFACE` token set for reusable card/popover/toolbar surface classes
+- Release sidebar now uses stacked card layout (header, analytics, tabs as separate cards)
+- Track sidebar uses stacked card layout (track card, details card)
+- Release table subheader moved inside the table card container
+- Lower-shell sidebar banners (upgrade, install) use quieter background treatment
+
+### Added
+
+- `LINEAR_SURFACE` design token constants for consistent surface hierarchy across the dashboard
+- Comprehensive test coverage for releases route: AddReleaseSidebar, MobileReleaseList, ReleaseTable, ReleasesEmptyState, SmartLinkGateBanner, TrackRow, ReleaseEditDialog, AddProviderUrlPopover, DialogLoadingSkeleton, DrawerLoadingSkeleton, ArtistSearchCommandPalette
+- Test hooks (`data-testid`) for drawer loading skeleton cards, dialog loading cards, mobile release list
 - Cap artist profile genres at 3 (was 10), populated by most frequent genres across releases
 - Genre picker UI default max reduced from 10 to 3
 - Onboarding review step shows top 3 genres instead of 5

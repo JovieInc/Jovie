@@ -23,10 +23,10 @@ export function AdminSentrySectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-16'
           descriptionWidth='w-52'
-          className='px-5 py-3'
+          className='px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='space-y-4 p-5 pt-4'>
-          <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+          <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
             {SENTRY_CARD_SKELETON_KEYS.map(key => (
               <ContentMetricCardSkeleton key={key} className='p-3.5' />
             ))}

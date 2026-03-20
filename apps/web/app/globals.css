@@ -32,6 +32,15 @@ body {
   overscroll-behavior: none;
 }
 
+/* Marketing pages use document scrolling rather than app-shell scroll panes. */
+html:has(.linear-marketing),
+body:has(.linear-marketing) {
+  height: auto;
+  min-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: auto;
+}
+
 /* Prevent Chrome autofill from bleeding background onto sibling elements */
 
 input:-webkit-autofill,

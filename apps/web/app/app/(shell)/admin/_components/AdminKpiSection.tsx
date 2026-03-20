@@ -8,7 +8,7 @@ export async function AdminKpiSection() {
   const metrics = await getAdminFunnelMetrics();
 
   return (
-    <section id='funnel' className='space-y-6' data-testid='admin-kpi-section'>
+    <section id='funnel' className='space-y-4' data-testid='admin-kpi-section'>
       <FunnelMetricsStrip metrics={metrics} />
     </section>
   );
@@ -16,14 +16,14 @@ export async function AdminKpiSection() {
 
 export function AdminKpiSectionSkeleton() {
   return (
-    <section id='funnel' className='space-y-6'>
+    <section id='funnel' className='space-y-4'>
       <ContentSurfaceCard className='overflow-hidden p-0'>
         <ContentSectionHeaderSkeleton
           titleWidth='w-20'
           descriptionWidth='w-48'
-          className='min-h-0 px-5 py-3'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-3'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           {Array.from({ length: 6 }, (_, i) => (
             <ContentMetricCardSkeleton key={`core-${i + 1}`} />
           ))}
@@ -33,9 +33,9 @@ export function AdminKpiSectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-20'
           descriptionWidth='w-48'
-          className='min-h-0 px-5 py-3'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           {Array.from({ length: 4 }, (_, i) => (
             <ContentMetricCardSkeleton key={`yc-${i + 1}`} showIcon={false} />
           ))}

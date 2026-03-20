@@ -21,7 +21,7 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Stop setting up smart links for every release.`;
+  const title = `${APP_NAME} | Release More Music.`;
   const description =
     'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.';
   const keywords = [
@@ -89,7 +89,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Stop setting up smart links for every release.`,
+          alt: `${APP_NAME} - Release More Music.`,
           type: 'image/png',
         },
       ],
@@ -101,7 +101,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - Stop setting up smart links for every release.`,
+          alt: `${APP_NAME} - Release More Music.`,
           width: 1200,
           height: 630,
         },
@@ -142,7 +142,7 @@ const WEBSITE_SCHEMA = buildWebsiteSchema({
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Stop setting up smart links for every release. Connect Spotify once — Jovie creates smart links, notifies fans, and builds your audience automatically.'
+  'Release More Music. Connect Spotify once — Jovie creates smart links, notifies fans, and builds your audience automatically.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({

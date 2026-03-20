@@ -25,12 +25,12 @@ export function TrackPlatformLinksSection({
 }: TrackPlatformLinksSectionProps) {
   return (
     <DrawerLinkSection
-      title='Available on'
+      title='Platforms'
       isEmpty={providers.length === 0}
       emptyMessage={emptyMessage}
       emptyStateTestId='track-platforms-empty'
     >
-      <div className='space-y-1'>
+      <div className='space-y-1.5'>
         {providers.map(provider => (
           <SidebarLinkRow
             key={provider.key}

@@ -48,7 +48,7 @@ function BadgeRow({
           {visible.map(item => (
             <span
               key={item}
-              className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-medium text-secondary-token'
+              className='inline-flex items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-medium text-secondary-token'
             >
               {item}
             </span>
@@ -58,7 +58,7 @@ function BadgeRow({
               <TooltipTrigger asChild>
                 <button
                   type='button'
-                  className='inline-flex cursor-default items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-default hover:text-secondary-token'
+                  className='inline-flex cursor-default items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-medium text-tertiary-token'
                   aria-label={`${overflow.length} more ${title.toLowerCase()}`}
                 >
                   +{overflow.length} others
@@ -131,7 +131,7 @@ export function BraggingRightsStrip({
     <div className='space-y-4' data-testid='bragging-rights-strip'>
       {/* Labels + Distributors row */}
       <div className='grid gap-4 sm:grid-cols-2'>
-        <ContentSurfaceCard className='space-y-2 p-4'>
+        <ContentSurfaceCard className='space-y-2 p-3'>
           <BadgeRow
             items={data.labels}
             emptyText='No label data yet'
@@ -140,7 +140,7 @@ export function BraggingRightsStrip({
           />
         </ContentSurfaceCard>
 
-        <ContentSurfaceCard className='space-y-2 p-4'>
+        <ContentSurfaceCard className='space-y-2 p-3'>
           <BadgeRow
             items={data.distributors}
             emptyText='No distributor data yet'

@@ -26,22 +26,15 @@ export function CurrentPlanCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.05, ease: LINEAR_EASE }}
     >
-      <ContentSurfaceCard
-        className={cn(
-          'relative overflow-hidden p-0',
-          isPro
-            ? 'border-emerald-500/35 dark:border-emerald-400/30'
-            : 'border-amber-500/35 dark:border-amber-400/30'
-        )}
-      >
-        <div className='flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:justify-between'>
+      <ContentSurfaceCard className='relative overflow-hidden p-0'>
+        <div className='flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-start sm:justify-between'>
           <div className='flex items-start gap-3.5'>
             <div
               className={cn(
-                'flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] border text-white shadow-[0_1px_0_rgba(0,0,0,0.08)]',
+                'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white',
                 isPro
-                  ? 'border-emerald-500/20 bg-gradient-to-br from-emerald-500 to-teal-600'
-                  : 'border-amber-500/20 bg-gradient-to-br from-amber-400 to-orange-500'
+                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600'
+                  : 'bg-gradient-to-br from-amber-400 to-orange-500'
               )}
             >
               {isPro ? (

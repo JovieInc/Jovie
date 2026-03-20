@@ -112,7 +112,7 @@ export function DemoReleasesPanel({
               <button
                 type='button'
                 onClick={() => toggleGroup(group.status)}
-                className='flex min-w-0 flex-1 items-center gap-2 text-[12.5px] text-tertiary-token transition-colors hover:text-secondary-token [font-weight:var(--font-weight-medium)]'
+                className='flex min-w-0 flex-1 items-center gap-2 text-[12.5px] text-tertiary-token [font-weight:var(--font-weight-medium)]'
                 aria-label={`Toggle ${STATUS_LABEL[group.status]} releases section`}
               >
                 <ChevronRight
@@ -133,7 +133,7 @@ export function DemoReleasesPanel({
               </button>
               <button
                 type='button'
-                className='flex size-6 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-1 hover:text-primary-token'
+                className='flex size-6 items-center justify-center rounded-full text-tertiary-token'
                 aria-label={`Add ${STATUS_LABEL[group.status]} release`}
               >
                 <Plus className='size-3.5' />
@@ -166,11 +166,11 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex h-[32px] cursor-pointer items-center gap-3 px-4 text-app shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
+                      'flex h-[32px] cursor-pointer items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 text-app',
                       isSelected &&
-                        'bg-accent/8 shadow-[inset_2px_0_0_var(--color-accent),inset_0_-1px_0_var(--linear-app-frame-seam)]',
+                        'bg-accent/8 shadow-[inset_2px_0_0_var(--color-accent)]',
                       isFocused && !isSelected && 'bg-surface-2',
-                      !isSelected && !isFocused && 'hover:bg-surface-2'
+                      !isSelected && !isFocused && ''
                     )}
                   >
                     {/* Priority */}
@@ -203,7 +203,7 @@ export function DemoReleasesPanel({
                       {release.labels.slice(0, 2).map(label => (
                         <span
                           key={label.id}
-                          className='flex items-center gap-1.5 rounded-[3px] border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
+                          className='flex items-center gap-1.5 rounded-sm bg-surface-1 px-1.5 py-0.5 text-[10px] text-secondary-token [font-weight:var(--font-weight-medium)]'
                         >
                           <span
                             className='size-1.5 rounded-full'

@@ -110,7 +110,7 @@ export function TableActionMenu({
       align={align}
       open={open}
       onOpenChange={onOpenChange}
-      triggerClassName='ml-auto'
+      triggerClassName='ml-auto inline-flex h-6.5 w-6.5 items-center justify-center rounded-[7px] border border-transparent bg-transparent text-tertiary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1'
     />
   );
 }

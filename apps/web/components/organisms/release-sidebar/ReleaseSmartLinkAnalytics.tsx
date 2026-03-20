@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import {
   DrawerEmptyState,
-  DrawerStatGrid,
-  StatTile,
+  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
@@ -85,28 +85,35 @@ export function ReleaseSmartLinkAnalytics({
   const showSkeleton = isLoading && !data;
 
   return (
-    <div className='min-h-[100px] border-t border-subtle/40 pt-2'>
-      <div>
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+      testId='release-smart-link-analytics'
+    >
+      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          Analytics
+        </p>
+      </div>
+
+      <div className='p-3'>
         {showSkeleton && (
-          <div className='space-y-2'>
-            <DrawerStatGrid variant='flush' className='px-0.5'>
-              <div className='space-y-1.5 pr-4'>
-                <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-3 w-10 rounded skeleton' />
-              </div>
-              <div className='space-y-1.5 pl-4'>
-                <div className='h-[10px] w-14 rounded skeleton' />
-                <div className='h-5 w-10 rounded skeleton' />
-                <div className='h-3 w-10 rounded skeleton' />
-              </div>
-            </DrawerStatGrid>
+          <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
+            <div className='space-y-1 pr-3'>
+              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-4 w-8 rounded skeleton' />
+              <div className='h-[9px] w-10 rounded skeleton' />
+            </div>
+            <div className='space-y-1 pl-3'>
+              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-4 w-8 rounded skeleton' />
+              <div className='h-[9px] w-10 rounded skeleton' />
+            </div>
           </div>
         )}
 
         {!showSkeleton && hasError && (
           <DrawerEmptyState
-            className='min-h-[76px]'
+            className='min-h-[52px] px-0 py-0'
             message='Analytics unavailable'
           />
         )}
@@ -114,36 +121,58 @@ export function ReleaseSmartLinkAnalytics({
         {!showSkeleton && !hasError && (
           <div
             className={cn(
-              'transition-opacity duration-100',
+              'space-y-2 transition-opacity duration-100',
               isSwitching && 'opacity-50'
             )}
           >
-            <DrawerStatGrid variant='flush' className='px-0.5'>
-              <div className='pr-4'>
-                <StatTile
-                  label='Total clicks'
-                  value={numberFormatter.format(totalClicks)}
-                  hint='All time'
-                />
-              </div>
-              <div className='pl-4'>
-                <StatTile
-                  label='Last 7 days'
-                  value={numberFormatter.format(last7DaysClicks)}
-                  hint='Recent'
-                />
-              </div>
-            </DrawerStatGrid>
+            <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
+              <AnalyticsMetric
+                label='Total clicks'
+                value={numberFormatter.format(totalClicks)}
+                hint='All time'
+                className='pr-3'
+              />
+              <AnalyticsMetric
+                label='Last 7 days'
+                value={numberFormatter.format(last7DaysClicks)}
+                hint='Recent'
+                className='pl-3'
+              />
+            </div>
 
             {showEmpty && (
               <DrawerEmptyState
-                className='mt-1.5 min-h-[36px] px-0'
+                className='min-h-[32px] px-0 py-0'
                 message='Share your smart link to start tracking clicks.'
               />
             )}
           </div>
         )}
       </div>
+    </DrawerSurfaceCard>
+  );
+}
+
+function AnalyticsMetric({
+  label,
+  value,
+  hint,
+  className,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly hint: string;
+  readonly className?: string;
+}) {
+  return (
+    <div className={cn('space-y-px', className)}>
+      <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
+        {label}
+      </p>
+      <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
+        {value}
+      </p>
+      <p className='text-[10px] leading-[13px] text-tertiary-token'>{hint}</p>
     </div>
   );
 }

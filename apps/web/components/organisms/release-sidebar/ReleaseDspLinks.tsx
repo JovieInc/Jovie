@@ -17,7 +17,14 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
@@ -28,7 +35,9 @@ import {
   DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -53,9 +62,7 @@ interface ReleaseDspLinksProps {
   readonly onSetSelectedProvider: (value: ProviderKey | null) => void;
   readonly onAddLink: () => Promise<void>;
   readonly onRemoveLink: (provider: ProviderKey) => Promise<void>;
-  readonly onNewLinkKeyDown: (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => void;
+  readonly onNewLinkKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   readonly onRescanIsrc?: () => void;
   readonly isRescanningIsrc?: boolean;
 }
@@ -180,7 +187,7 @@ export function ReleaseDspLinks({
 
   return (
     <DrawerLinkSection
-      title='Links'
+      title='Platforms'
       onAdd={
         isEditable && availableProviders.length > 0
           ? () => onSetIsAddingLink(true)
@@ -193,7 +200,7 @@ export function ReleaseDspLinks({
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='space-y-0.5'>
+        <div className='space-y-1.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const isManual = provider.source === 'manual';
@@ -223,7 +230,9 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
+        <DrawerSurfaceCard
+          className={cn(LINEAR_SURFACE.drawerCardSm, 'mt-1.5 space-y-2.5 p-3')}
+        >
           <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
@@ -233,7 +242,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-[8px] border-subtle bg-surface-0 text-[12px]'>
+              <SelectTrigger className='h-[30px] w-full rounded-md border-subtle bg-surface-0 text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -254,7 +263,7 @@ export function ReleaseDspLinks({
             <Input
               type='url'
               value={newLinkUrl}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 onSetNewLinkUrl(event.target.value)
               }
               onKeyDown={onNewLinkKeyDown}
@@ -263,10 +272,10 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
-              className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              className='h-8 rounded-md border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormGridRow>
-          <div className='flex justify-end gap-2 pt-1'>
+          <div className='flex justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-2'>
             <DrawerButton
               type='button'
               onClick={() => {

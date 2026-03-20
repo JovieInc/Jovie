@@ -52,7 +52,7 @@ export function InsightCard({ insight }: InsightCardProps) {
           {/* Footer: metadata + actions */}
           <div className='mt-3 flex flex-wrap items-center justify-between gap-2'>
             <div className='flex items-center gap-3'>
-              <span className='text-[10px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
                 {insight.category}
               </span>
               <span className='text-[10px] text-tertiary-token'>

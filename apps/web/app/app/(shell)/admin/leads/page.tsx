@@ -18,9 +18,9 @@ function KpisSkeleton() {
       <ContentSectionHeaderSkeleton
         titleWidth='w-28'
         descriptionWidth='w-56'
-        className='px-5 py-3'
+        className='px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) pt-0 sm:grid-cols-2 xl:grid-cols-4'>
         {Array.from({ length: 4 }, (_, i) => `kpi-${i}`).map(key => (
           <ContentMetricCardSkeleton key={key} className='min-h-[112px]' />
         ))}
@@ -33,7 +33,7 @@ export default function AdminLeadsPage() {
   return (
     <PageShell>
       <PageContent noPadding>
-        <div className='flex flex-col gap-6 p-4 sm:p-6'>
+        <div className='flex flex-col gap-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <Suspense fallback={<KpisSkeleton />}>
             <LeadPipelineKpis />
           </Suspense>

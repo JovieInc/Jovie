@@ -92,11 +92,11 @@ function EngagementMetric({
   readonly value: string;
 }) {
   return (
-    <DrawerSurfaceCard className='flex min-w-0 flex-1 flex-col px-3 py-3'>
+    <DrawerSurfaceCard className='flex min-w-0 flex-1 flex-col border-0 shadow-none px-2.5 py-2'>
       <p className='text-3xl font-[590] tracking-[-0.02em] text-primary-token tabular-nums'>
         {value}
       </p>
-      <p className='mt-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='mt-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
         {label}
       </p>
     </DrawerSurfaceCard>
@@ -128,14 +128,14 @@ function FunnelSection() {
 
   return (
     <div className='space-y-2'>
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         Funnel
       </p>
       <div className='space-y-1.5'>
         {stages.map((stage, i) => (
           <div key={stage.label}>
             <div
-              className='flex items-center justify-between rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'
+              className='flex items-center justify-between rounded bg-surface-1 px-2.5 py-1.5'
               style={{ width: stage.width }}
             >
               <span className='text-[13px] text-secondary-token'>
@@ -200,7 +200,7 @@ function RankedList({
               {index + 1}
             </span>
             <IconComponent className='h-3.5 w-3.5 text-tertiary-token' />
-            <span className='truncate text-[13px] text-secondary-token transition-colors group-hover:text-primary-token'>
+            <span className='truncate text-[13px] text-secondary-token'>
               {item.name}
             </span>
           </div>
@@ -245,7 +245,7 @@ export function DemoAnalyticsSidebar({
       title='Analytics'
       onClose={onClose}
     >
-      <div className='space-y-4'>
+      <div className='space-y-2'>
         {/* Engagement metrics */}
         <div className='grid grid-cols-3 gap-2'>
           <EngagementMetric
@@ -282,7 +282,7 @@ export function DemoAnalyticsSidebar({
         </div>
 
         {/* Ranked lists */}
-        <DrawerSurfaceCard className='min-h-[212px] p-2'>
+        <DrawerSurfaceCard className='min-h-[212px] border-0 shadow-none p-1.5'>
           {activeTab === 'cities' && (
             <RankedList icon={MapPin} items={MOCK_ANALYTICS.topCities} />
           )}
@@ -295,8 +295,8 @@ export function DemoAnalyticsSidebar({
         </DrawerSurfaceCard>
 
         {/* Extra engagement stats */}
-        <DrawerSurfaceCard className='p-3'>
-          <p className='mb-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+        <DrawerSurfaceCard className='border-0 shadow-none p-2.5'>
+          <p className='mb-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
             Engagement
           </p>
           <div className='grid grid-cols-2 divide-x divide-(--linear-border-subtle)'>

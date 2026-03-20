@@ -13,7 +13,8 @@ export type {
   CardShadow,
   CardStatus,
   CardVariant,
+  LinearSurface,
 } from './card-tokens';
-export { cardTokens } from './card-tokens';
+export { cardTokens, LINEAR_SURFACE } from './card-tokens';
 
 export { mobileReleaseTokens } from './mobile-tokens';

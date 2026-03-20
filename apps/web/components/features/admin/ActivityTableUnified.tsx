@@ -127,7 +127,7 @@ export function ActivityTableUnified({
 
   return (
     <div
-      className='h-full border border-subtle bg-(--linear-app-content-surface)'
+      className='h-full border-0 bg-(--linear-app-content-surface)'
       data-testid='admin-activity-content'
     >
       <AdminTableHeader
@@ -159,7 +159,7 @@ export function ActivityTableUnified({
           getRowClassName={getRowClassName}
           enableVirtualization={true}
           minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-          className='text-[13px]'
+          className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
         />
       </div>
     </div>

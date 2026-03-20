@@ -9,7 +9,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
 const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-[24px] w-[24px] rounded-full border-subtle bg-surface-0 hover:bg-surface-1 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1';
+  'h-[22px] w-[22px] rounded-[8px] border border-transparent bg-transparent hover:border-(--linear-app-frame-seam) hover:bg-surface-1 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;

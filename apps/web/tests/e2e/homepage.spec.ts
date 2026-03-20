@@ -45,12 +45,10 @@ test.describe('Homepage', () => {
   test('hero section renders with headline and claim handle form', async ({
     page,
   }) => {
-    await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.'
-    );
+    await expect(page.locator('h1')).toContainText('Release More Music.');
     await expect(
       page.getByText(
-        /Import your catalog\. Fans get notified when you release\./i
+        /Connect Spotify once\. Jovie creates smart links for every song/i
       )
     ).toBeVisible();
 
@@ -69,6 +67,13 @@ test.describe('Homepage', () => {
 
     const bodyText = await page.locator('body').textContent();
     expect(bodyText && bodyText.length > 1000).toBe(true);
+
+    await scrollToLowerHomepageSections(page);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), {
+        message: 'Homepage should scroll past the hero section',
+      })
+      .toBeGreaterThan(0);
   });
 
   test('header navigation and footer visible', async ({ page }) => {
@@ -88,10 +93,9 @@ test.describe('Homepage', () => {
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
 
-    await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.',
-      { timeout: SMOKE_TIMEOUTS.VISIBILITY }
-    );
+    await expect(page.locator('h1')).toContainText('Release More Music.', {
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
 
     const heroSection = page.locator('main section').first();
     const input = heroSection.locator('input').first();

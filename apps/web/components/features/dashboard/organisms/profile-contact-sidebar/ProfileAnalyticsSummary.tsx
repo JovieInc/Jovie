@@ -8,19 +8,11 @@ import {
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
 import { useState } from 'react';
-import {
-  DrawerButton,
-  DrawerEmptyState,
-  DrawerStatGrid,
-  DrawerSurfaceCard,
-  StatTile,
-} from '@/components/molecules/drawer';
+import { DrawerButton, DrawerEmptyState } from '@/components/molecules/drawer';
+import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
-
-/** Minimum height to prevent CLS when switching time ranges */
-const STAT_MIN_HEIGHT = 'min-h-[52px]';
 
 const numberFormatter = new Intl.NumberFormat();
 
@@ -47,21 +39,18 @@ export function ProfileAnalyticsSummary() {
   const currentOption =
     RANGE_OPTIONS.find(o => o.value === range) ?? RANGE_OPTIONS[1];
 
-  // Only show skeleton on first load (no data yet)
   if (isLoading && !data) {
     return (
-      <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-        <DrawerStatGrid className={cn('p-3.5', STAT_MIN_HEIGHT)}>
-          <div className='pr-3'>
-            <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-6 w-14 rounded skeleton' />
-          </div>
-          <div className='pl-3'>
-            <div className='h-[10px] w-16 rounded skeleton' />
-            <div className='mt-2 h-6 w-14 rounded skeleton' />
-          </div>
-        </DrawerStatGrid>
-      </DrawerSurfaceCard>
+      <div className='space-y-1'>
+        <div className='flex items-center gap-2 px-1 py-px'>
+          <div className='h-3 w-20 rounded skeleton' />
+          <div className='h-3 w-8 rounded skeleton' />
+        </div>
+        <div className='flex items-center gap-2 px-1 py-px'>
+          <div className='h-3 w-16 rounded skeleton' />
+          <div className='h-3 w-8 rounded skeleton' />
+        </div>
+      </div>
     );
   }
 
@@ -73,36 +62,29 @@ export function ProfileAnalyticsSummary() {
   const totalClicks = data?.total_clicks ?? 0;
 
   return (
-    <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-      <DrawerStatGrid
-        className={cn(
-          'p-3.5 transition-opacity duration-150',
-          STAT_MIN_HEIGHT,
-          isFetching && 'opacity-50'
-        )}
-      >
-        <div className='pr-3'>
-          <StatTile
-            label='Profile views'
-            value={numberFormatter.format(profileViews)}
-          />
-        </div>
-        <div className='pl-3'>
-          <StatTile
-            label='Link clicks'
-            value={numberFormatter.format(totalClicks)}
-          />
-        </div>
-      </DrawerStatGrid>
+    <div
+      className={cn(
+        'space-y-0.5 transition-opacity duration-150',
+        isFetching && 'opacity-50'
+      )}
+    >
+      <DrawerPropertyRow
+        label='Profile views'
+        value={numberFormatter.format(profileViews)}
+      />
+      <DrawerPropertyRow
+        label='Link clicks'
+        value={numberFormatter.format(totalClicks)}
+      />
 
       {/* Time range selector */}
-      <div className='flex justify-end border-t border-subtle px-3 py-1.5'>
+      <div className='flex justify-end'>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <DrawerButton
               type='button'
               tone='ghost'
-              className='h-6 rounded-full border-transparent px-1.5 py-0.5 text-[11px] font-normal text-secondary-token hover:text-primary-token'
+              className='h-5 rounded-full border-transparent px-1.5 py-0 text-[11px] font-normal text-tertiary-token hover:text-secondary-token'
             >
               <span>Last {currentOption.label}</span>
               <ChevronDown
@@ -147,6 +129,6 @@ export function ProfileAnalyticsSummary() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </DrawerSurfaceCard>
+    </div>
   );
 }

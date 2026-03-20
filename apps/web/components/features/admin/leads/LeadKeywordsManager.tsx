@@ -5,6 +5,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import {
   queryKeys,
   useAddLeadKeywordsMutation,
@@ -89,106 +91,104 @@ export function LeadKeywordsManager() {
 
   if (isLoading) {
     return (
-      <div className='rounded-lg border border-subtle p-4 text-sm text-secondary-token'>
+      <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-sm text-secondary-token'>
         Loading keywords...
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <section className='rounded-lg border border-subtle p-4 sm:p-6'>
-      <div className='mb-4 flex items-center justify-between'>
-        <div>
-          <h2 className='text-sm font-semibold text-primary-token'>
-            Discovery keywords
-          </h2>
-          <p className='mt-1 text-xs text-secondary-token'>
-            Google CSE queries used to find new Linktree leads.{' '}
-            {keywords.length} keyword{keywords.length === 1 ? '' : 's'}{' '}
-            configured.
-          </p>
-        </div>
-        <Button
-          variant='outline'
-          size='sm'
-          onClick={() => void seedFeatureFm()}
-          disabled={seedFeatureFmMutation.isPending}
-        >
-          {seedFeatureFmMutation.isPending ? (
-            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-          ) : (
-            <Sparkles className='mr-2 h-4 w-4' />
-          )}
-          Seed Feature.fm
-        </Button>
-      </div>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Discovery keywords'
+        subtitle={`Google CSE queries used to find new Linktree leads. ${keywords.length} keyword${keywords.length === 1 ? '' : 's'} configured.`}
+        actions={
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => void seedFeatureFm()}
+            disabled={seedFeatureFmMutation.isPending}
+          >
+            {seedFeatureFmMutation.isPending ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Sparkles className='mr-2 h-4 w-4' />
+            )}
+            Seed Feature.fm
+          </Button>
+        }
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        actionsClassName='shrink-0'
+      />
 
-      {keywords.length > 0 && (
-        <div className='mb-4 max-h-64 space-y-1 overflow-y-auto'>
-          {keywords.map(keyword => (
-            <div
-              key={keyword.id}
-              className='flex items-center justify-between gap-2 rounded-md border border-subtle px-3 py-2'
-            >
-              <div className='flex min-w-0 flex-1 items-center gap-2'>
-                <Switch
-                  checked={keyword.enabled}
-                  onCheckedChange={checked =>
-                    void toggleKeyword(keyword.id, checked)
-                  }
-                  disabled={togglingId === keyword.id}
-                  aria-label={`Toggle ${keyword.query}`}
-                />
-                <code className='truncate text-xs text-primary-token'>
-                  {keyword.query}
-                </code>
+      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        {keywords.length > 0 && (
+          <div className='max-h-72 space-y-2 overflow-y-auto'>
+            {keywords.map(keyword => (
+              <div
+                key={keyword.id}
+                className='flex items-center justify-between gap-2 rounded-[10px] border border-subtle bg-surface-0 px-3 py-2.5'
+              >
+                <div className='flex min-w-0 flex-1 items-center gap-2'>
+                  <Switch
+                    checked={keyword.enabled}
+                    onCheckedChange={checked =>
+                      void toggleKeyword(keyword.id, checked)
+                    }
+                    disabled={togglingId === keyword.id}
+                    aria-label={`Toggle ${keyword.query}`}
+                  />
+                  <code className='truncate text-xs text-primary-token'>
+                    {keyword.query}
+                  </code>
+                </div>
+                <div className='flex items-center gap-2'>
+                  <Badge variant='secondary' className='text-2xs'>
+                    {keyword.resultsFoundTotal} results
+                  </Badge>
+                  <button
+                    type='button'
+                    onClick={() => void deleteKeyword(keyword.id)}
+                    disabled={deletingId === keyword.id}
+                    className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
+                    title='Delete keyword'
+                  >
+                    {deletingId === keyword.id ? (
+                      <Loader2 className='h-4 w-4 animate-spin' />
+                    ) : (
+                      <Trash2 className='h-4 w-4' />
+                    )}
+                  </button>
+                </div>
               </div>
-              <div className='flex items-center gap-2'>
-                <Badge variant='secondary' className='text-2xs'>
-                  {keyword.resultsFoundTotal} results
-                </Badge>
-                <button
-                  type='button'
-                  onClick={() => void deleteKeyword(keyword.id)}
-                  disabled={deletingId === keyword.id}
-                  className='rounded-md p-1 text-destructive hover:bg-destructive/10 disabled:opacity-50'
-                  title='Delete keyword'
-                >
-                  {deletingId === keyword.id ? (
-                    <Loader2 className='h-4 w-4 animate-spin' />
-                  ) : (
-                    <Trash2 className='h-4 w-4' />
-                  )}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
 
-      <div className='space-y-2'>
-        <Textarea
-          rows={3}
-          value={newQueries}
-          onChange={e => setNewQueries(e.target.value)}
-          placeholder='One keyword per line\nsite:linktr.ee "music" "spotify"\nsite:linktr.ee "artist" "tour"'
-          className='text-xs'
-        />
-        <Button
-          size='sm'
-          onClick={() => void addKeywords()}
-          disabled={
-            addKeywordsMutation.isPending || newQueries.trim().length === 0
-          }
-        >
-          {addKeywordsMutation.isPending ? (
-            <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-          ) : (
-            <Plus className='mr-2 h-4 w-4' />
-          )}
-          Add keywords
-        </Button>
+        <div className='space-y-2'>
+          <Textarea
+            rows={3}
+            value={newQueries}
+            onChange={e => setNewQueries(e.target.value)}
+            placeholder='One keyword per line\nsite:linktr.ee "music" "spotify"\nsite:linktr.ee "artist" "tour"'
+            className='text-xs'
+          />
+          <Button
+            size='sm'
+            onClick={() => void addKeywords()}
+            disabled={
+              addKeywordsMutation.isPending || newQueries.trim().length === 0
+            }
+          >
+            {addKeywordsMutation.isPending ? (
+              <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+            ) : (
+              <Plus className='mr-2 h-4 w-4' />
+            )}
+            Add keywords
+          </Button>
+        </div>
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }

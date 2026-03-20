@@ -29,8 +29,10 @@ import {
   DrawerSection,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { useReleaseTracksQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release, ReleaseSidebarTrack } from './types';
@@ -91,16 +93,19 @@ export function ReleaseTrackList({
       <div
         id={`release-tracklist-${release.id}`}
         hidden={!isExpanded}
-        className='space-y-px'
+        className='space-y-1'
       >
         {(isLoading || (isFetching && !tracks)) && (
-          <div className='space-y-0.5'>
+          <div className='space-y-1'>
             {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
               .slice(0, Math.min(release.totalTracks, 6))
               .map(id => (
                 <DrawerSurfaceCard
                   key={id}
-                  className='flex items-start gap-3 px-2.5 py-2'
+                  className={cn(
+                    LINEAR_SURFACE.drawerCardSm,
+                    'flex items-start gap-2.5 px-2.5 py-2'
+                  )}
                 >
                   <div className='w-7 shrink-0 pt-0.5'>
                     <div className='ml-auto h-3.5 w-4 rounded skeleton' />
@@ -237,7 +242,12 @@ function TrackItem({
   ]);
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
+    <div
+      className={cn(
+        LINEAR_SURFACE.drawerCardSm,
+        'group flex items-start gap-2.5 px-2.5 py-2 transition-[background-color,border-color] duration-150 hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0'
+      )}
+    >
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
@@ -246,12 +256,12 @@ function TrackItem({
         <button
           type='button'
           onClick={handleClick}
-          className='w-full rounded-[6px] text-left focus-visible:outline-none'
+          className='w-full rounded-md text-left focus-visible:outline-none'
         >
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[13.5px] font-[510] text-primary-token'
+              className='text-[12px] font-[510] text-primary-token'
               tooltipSide='top'
             >
               {track.title}
@@ -266,7 +276,7 @@ function TrackItem({
             )}
           </div>
 
-          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[10px] text-tertiary-token'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -277,7 +287,7 @@ function TrackItem({
                 {track.durationMs != null && (
                   <span className='text-quaternary-token'>|</span>
                 )}
-                <span className='font-mono text-[11px]'>{track.isrc}</span>
+                <span className='font-mono text-[10.5px]'>{track.isrc}</span>
               </>
             )}
           </div>
@@ -292,23 +302,23 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-5 w-5 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
-                  <Pause className='h-3 w-3' />
+                  <Pause className='h-[11px] w-[11px]' />
                 ) : (
-                  <Play className='h-3 w-3' />
+                  <Play className='h-[11px] w-[11px]' />
                 )}
               </button>
-              <div className='h-0.5 flex-1 rounded-full bg-surface-1'>
+              <div className='h-0.5 flex-1 rounded-full bg-surface-1/90'>
                 <div
                   className='h-full rounded-full bg-(--linear-accent) transition-[width]'
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
             </div>
-            <p className='text-[10.5px] text-tertiary-token'>
+            <p className='text-[10px] text-tertiary-token'>
               {track.audioFormat
                 ? `Audio preview · ${track.audioFormat.toUpperCase()}`
                 : 'Audio preview'}
@@ -343,9 +353,9 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <DrawerInlineIconButton
           aria-label={`Actions for ${track.title}`}
-          className='h-[22px] w-[22px] self-center group-hover:opacity-100'
+          className='h-5 w-5 self-center rounded-full border border-transparent opacity-60 group-hover:border-(--linear-app-frame-seam) group-hover:bg-surface-0 group-hover:opacity-100'
         >
-          <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
+          <MoreHorizontal className='h-3 w-3 text-tertiary-token' />
         </DrawerInlineIconButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-48'>

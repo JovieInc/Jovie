@@ -127,9 +127,8 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-subtle bg-(--linear-app-content-surface)/90 backdrop-blur-sm supports-backdrop-filter:bg-(--linear-app-content-surface)/80',
-              headerElevated &&
-                'shadow-[0_1px_0_rgba(0,0,0,0.035)] dark:shadow-inset-highlight'
+              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]/95 backdrop-blur-[12px] supports-backdrop-filter:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]/85',
+              headerElevated && 'dark:shadow-inset-highlight'
             )}
           >
             {toolbar}
@@ -139,7 +138,11 @@ export function AdminTableShell({
         {children({ headerElevated, stickyTopPx })}
       </div>
 
-      {footer ? <div className='border-t border-subtle'>{footer}</div> : null}
+      {footer ? (
+        <div className='border-t border-(--linear-app-frame-seam)'>
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }

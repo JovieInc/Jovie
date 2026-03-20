@@ -114,7 +114,7 @@ export function SendInviteDialog({
       <DialogBody>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {/* Profile info */}
-          <ContentSurfaceCard className='flex items-center gap-3 rounded-[10px] bg-surface-0 p-3'>
+          <ContentSurfaceCard className='flex items-center gap-3 rounded-lg bg-surface-0 p-3'>
             {profile.avatarUrl ? (
               <Image
                 src={profile.avatarUrl}

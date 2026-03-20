@@ -27,7 +27,7 @@ interface KpiCardsProps {
 function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex min-h-[22px] items-center gap-1 rounded-[8px] border border-warning/25 bg-warning/10 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-warning'
+      className='inline-flex min-h-[22px] items-center gap-1 rounded bg-warning/10 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-warning'
       title={message ?? 'Data source unavailable'}
     >
       <AlertTriangle className='size-3' aria-hidden='true' />
@@ -42,7 +42,7 @@ function UnavailableBadge({ message }: Readonly<{ message?: string }>) {
 function NotConfiguredBadge({ message }: Readonly<{ message?: string }>) {
   return (
     <span
-      className='inline-flex min-h-[22px] items-center gap-1 rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
+      className='inline-flex min-h-[22px] items-center gap-1 rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
       title={message ?? 'Data source not configured'}
     >
       <span className='hidden truncate max-w-[10rem] sm:inline'>
@@ -105,7 +105,7 @@ export function KpiCards({
   };
 
   return (
-    <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+    <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
       <KpiItem
         title='MRR'
         value={mrrLabel}

@@ -11,7 +11,6 @@ import { Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { ClerkExternalAccountResource, ClerkUserResource } from './types';
@@ -79,33 +78,31 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
 
   if (accounts.length === 0) {
     return (
-      <ContentSurfaceCard className='overflow-hidden'>
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
-            <p className='text-[13px] text-secondary-token'>
-              No connected accounts yet.
-            </p>
-          </ContentSurfaceCard>
+      <div>
+        <div className='px-1 py-1'>
+          <p className='text-[13px] text-secondary-token'>
+            No connected accounts yet.
+          </p>
         </div>
-      </ContentSurfaceCard>
+      </div>
     );
   }
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
-      <div className='space-y-3 px-4 py-3'>
+    <div>
+      <div className='space-y-1 px-1 py-1'>
         {accounts.map(account => {
           const label = getProviderLabel(account.provider);
           const identifier = getProviderIdentifier(account);
           const isVerified = account.verification?.status === 'verified';
 
           return (
-            <ContentSurfaceCard
+            <div
               key={account.id}
-              className='flex items-center justify-between gap-3 bg-surface-0 p-3.5'
+              className='flex items-center justify-between gap-3 py-2'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-1'>
                   <Link2 className='h-4 w-4 text-secondary-token' aria-hidden />
                 </div>
                 <div className='min-w-0'>
@@ -135,7 +132,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
                   ? 'Disconnecting\u2026'
                   : 'Disconnect'}
               </Button>
-            </ContentSurfaceCard>
+            </div>
           );
         })}
       </div>
@@ -153,6 +150,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </ContentSurfaceCard>
+    </div>
   );
 }

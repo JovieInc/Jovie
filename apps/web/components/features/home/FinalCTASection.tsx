@@ -46,7 +46,7 @@ export function FinalCTASection() {
             <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
               <span
                 aria-hidden='true'
-                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
+                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
               />{' '}
               Live in 60 seconds
             </p>

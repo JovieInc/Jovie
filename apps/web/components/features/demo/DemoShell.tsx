@@ -138,7 +138,7 @@ export function DemoShell({
                       >
                         <Inbox className='size-3.5' />
                         <span className='flex-1'>Inbox</span>
-                        <span className='rounded-[2px] border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
+                        <span className='rounded-sm border border-default bg-surface-2 px-1 py-px text-[10px] leading-none text-secondary-token [font-weight:var(--font-weight-medium)]'>
                           2
                         </span>
                       </SidebarMenuButton>
@@ -215,7 +215,7 @@ export function DemoShell({
                       <SidebarMenuButton className='h-7'>
                         <BrandLogo
                           size={14}
-                          className='rounded-[3px]'
+                          className='rounded-sm'
                           tone='auto'
                         />
                         <span className='font-medium'>Sora Vale</span>
@@ -319,7 +319,7 @@ export function DemoShell({
             <SidebarFooter className='px-2 pb-3.5 pt-1'>
               <a
                 href={APP_ROUTES.SIGNUP}
-                className='flex h-7 items-center justify-center rounded-sm border border-default bg-surface-2 text-[13px] text-secondary-token transition-colors [font-weight:var(--font-weight-medium)] hover:bg-surface-3 hover:text-primary-token'
+                className='flex h-7 items-center justify-center rounded-sm bg-surface-2 text-[13px] text-secondary-token [font-weight:var(--font-weight-medium)]'
               >
                 Sign up for Jovie
               </a>

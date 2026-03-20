@@ -42,14 +42,14 @@ export function IGComparisonAside() {
           </p>
         </div>
 
-        <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-[10px]'>
+        <div className='grid grid-cols-1 md:grid-cols-2 overflow-hidden bg-[var(--linear-border-subtle)] gap-px rounded-lg'>
           {/* Linktree side (dimmed) */}
-          <div className='flex flex-col gap-4 p-6 bg-surface-0 opacity-50'>
+          <div className='flex flex-col gap-3 p-4 bg-surface-0 opacity-50'>
             <span className='text-xs font-medium uppercase tracking-wider text-tertiary-token'>
               Linktree in your bio
             </span>
 
-            <div className='rounded-md px-3 py-2 font-mono text-sm bg-surface-1 text-tertiary-token'>
+            <div className='rounded-md px-2.5 py-1.5 font-mono text-sm bg-surface-1 text-tertiary-token'>
               linktr.ee/timwhite
             </div>
 
@@ -63,7 +63,7 @@ export function IGComparisonAside() {
           </div>
 
           {/* Jovie side (bright) */}
-          <div className='flex flex-col gap-4 p-6 bg-surface-0'>
+          <div className='flex flex-col gap-3 p-4 bg-surface-0'>
             <span
               className='inline-flex w-fit items-center rounded-full px-2.5 py-0.5 text-xs font-medium'
               style={{
@@ -78,7 +78,7 @@ export function IGComparisonAside() {
               {jovieLinks.map(link => (
                 <div
                   key={link.url}
-                  className='flex items-center gap-2.5 rounded-md px-3 py-2 text-sm bg-surface-1'
+                  className='flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm bg-surface-1'
                 >
                   <span>{link.emoji}</span>
                   <span className='text-secondary-token text-[length:var(--linear-body-sm-size)]'>

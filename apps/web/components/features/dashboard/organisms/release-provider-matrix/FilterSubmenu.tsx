@@ -10,6 +10,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 
 /**
@@ -57,11 +58,11 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
+    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-2'>
       <div className='relative'>
         <Icon
           name='Search'
-          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
+          className='pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
         />
         <input
           ref={inputRef}
@@ -70,12 +71,12 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-8 pr-7 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
+            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
           >
             <Icon name='X' className='h-3 w-3' />
           </DrawerInlineIconButton>
@@ -122,8 +123,9 @@ function SubmenuCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full justify-between',
-        checked && 'bg-(--linear-accent-subtle) text-primary-token'
+        'w-full justify-between rounded-[8px] border border-transparent',
+        checked &&
+          'border-(--linear-app-frame-seam) bg-surface-1 text-primary-token'
       )}
     >
       <div className='flex items-center gap-2'>
@@ -230,7 +232,7 @@ export function FilterSubmenu<T extends string = string>({
 
   return (
     <DropdownMenuSub onOpenChange={handleOpenChange}>
-      <DropdownMenuSubTrigger className='justify-between'>
+      <DropdownMenuSubTrigger className='justify-between rounded-[8px]'>
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
@@ -238,7 +240,7 @@ export function FilterSubmenu<T extends string = string>({
           />
           <span>{label}</span>
           {selectedCount > 0 && (
-            <span className='rounded-full bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
+            <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
               {selectedCount}
             </span>
           )}
@@ -249,7 +251,10 @@ export function FilterSubmenu<T extends string = string>({
         sideOffset={4}
         alignOffset={-4}
         collisionPadding={8}
-        className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
+        className={cn(
+          LINEAR_SURFACE.popover,
+          'flex max-h-[260px] min-w-[196px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+        )}
       >
         <SearchInput
           value={search}
@@ -262,7 +267,7 @@ export function FilterSubmenu<T extends string = string>({
           inputRef={searchRef}
         />
 
-        <div className='flex-1 overflow-y-auto p-1'>
+        <div className='flex-1 overflow-y-auto p-1.5'>
           {filteredOptions.length === 0 ? (
             <DropdownEmptyState message='No options found' />
           ) : (

@@ -10,7 +10,7 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
     >
       {/* Outer bezel */}
       <div
-        className='relative h-full w-full overflow-hidden rounded-[40px] p-[4px]'
+        className='relative h-full w-full overflow-hidden rounded-full p-px'
         style={{
           backgroundColor: 'var(--linear-bg-surface-1)',
           boxShadow: [
@@ -20,28 +20,6 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
           ].join(', '),
         }}
       >
-        {/* Shine border overlay — Linear's glass edge effect */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-0 rounded-[40px]'
-          style={{
-            border: '1px solid rgb(56, 59, 63)',
-            borderRadius: '40px',
-            zIndex: 5,
-          }}
-        />
-
-        {/* Top edge highlight — Linear-style glass reflection */}
-        <div
-          aria-hidden='true'
-          className='pointer-events-none absolute inset-x-0 top-0 h-px'
-          style={{
-            background:
-              'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 30%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.12) 70%, transparent)',
-            zIndex: 6,
-          }}
-        />
-
         {/* Notch */}
         <div
           aria-hidden='true'
@@ -56,7 +34,7 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
 
         {/* Inner screen */}
         <div
-          className='relative h-full w-full overflow-hidden rounded-[36px]'
+          className='relative h-full w-full overflow-hidden rounded-4xl'
           style={{ backgroundColor: 'var(--linear-bg-page)' }}
         >
           {children}

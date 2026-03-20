@@ -31,7 +31,7 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
   if (compact) {
     return (
       <div
-        className='inline-flex h-8 items-center gap-2 rounded-full border border-[#1DB954]/18 bg-[#1DB954]/8 px-3 text-[12px] text-primary-token'
+        className='inline-flex h-7.5 items-center gap-2 rounded-[7px] border border-[#1DB954]/16 bg-[#1DB954]/6 px-2.5 text-[11.5px] text-primary-token'
         aria-live='polite'
       >
         <ProviderIcon provider='spotify' className='h-3.5 w-3.5 shrink-0' />
@@ -58,9 +58,9 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='mx-4 mt-2 flex items-center gap-3 border-[#1DB954]/18 bg-[#1DB954]/6 px-4 py-3 transition-opacity duration-200'
+        className='mx-4 mt-2 flex items-center gap-3 rounded-[12px] border border-[#1DB954]/14 bg-[color-mix(in_oklab,#1DB954_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
       >
-        <ProviderIcon provider='spotify' className='h-5 w-5' />
+        <ProviderIcon provider='spotify' className='h-4.5 w-4.5' />
         <div className='flex min-w-0 flex-1 flex-col gap-1'>
           <div className='flex items-center gap-2 text-[13px] text-primary-token'>
             <span className='truncate'>
@@ -97,7 +97,8 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
       {enrichmentStatus === 'enriching' && (
         <DrawerSurfaceCard
           variant='card'
-          className='mx-4 mt-2 flex items-center gap-3 border-accent/18 bg-accent/6 px-4 py-3 transition-opacity duration-200'
+          data-testid='release-enrichment-progress-banner'
+          className='mx-4 mt-2 flex items-center gap-3 rounded-[12px] border border-accent/14 bg-[color-mix(in_oklab,var(--linear-accent)_4.5%,var(--linear-app-content-surface))] px-4 py-3 transition-opacity duration-200'
         >
           <div className='flex h-5 w-5 items-center justify-center'>
             <div className='h-4 w-4 animate-spin rounded-full border-2 border-accent/30 border-t-accent' />

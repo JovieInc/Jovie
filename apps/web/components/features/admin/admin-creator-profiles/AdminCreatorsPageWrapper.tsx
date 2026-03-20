@@ -23,7 +23,7 @@ function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
     <button
       type='button'
       onClick={onClick}
-      className='inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium text-secondary-token hover:bg-accent/10 hover:text-primary-token'
+      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-2 text-[12px] font-medium text-secondary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
     >
       <ListPlus className='h-3.5 w-3.5' />
       Batch Ingest
@@ -96,7 +96,7 @@ export function AdminCreatorsPageWrapper(
   // Register custom header actions on mount
   useEffect(() => {
     setHeaderActions(
-      <div className='flex items-center gap-1'>
+      <div className='flex items-center gap-1.5'>
         {isSearchOpen ? (
           <form
             onSubmit={handleSearchSubmit}
@@ -114,13 +114,13 @@ export function AdminCreatorsPageWrapper(
                   handleSearchClose();
                 }
               }}
-              className='h-8 w-[220px] border-subtle bg-surface text-[13px]'
+              className='h-7 w-[210px] border-subtle bg-surface-0 text-[12px]'
               aria-label='Search creators by handle'
             />
             <button
               type='button'
               onClick={handleSearchClose}
-              className='inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
               aria-label='Close search'
             >
               <X className='h-3.5 w-3.5' aria-hidden='true' />
@@ -130,7 +130,7 @@ export function AdminCreatorsPageWrapper(
           <button
             type='button'
             onClick={handleSearchToggle}
-            className='inline-flex h-8 w-8 items-center justify-center rounded-md text-secondary-token transition-colors hover:bg-interactive-hover hover:text-primary-token'
+            className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-secondary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
             aria-label='Open search'
           >
             <Search className='h-3.5 w-3.5' aria-hidden='true' />
@@ -139,10 +139,11 @@ export function AdminCreatorsPageWrapper(
         <BatchIngestButton onClick={handleOpenBatchModal} />
         <IngestProfileDropdown onIngestPending={handleIngestPending} />
 
-        {/* Vertical divider */}
-        <div className='h-6 w-px bg-border' aria-hidden='true' />
+        <div
+          className='h-5 w-px bg-(--linear-app-frame-seam)'
+          aria-hidden='true'
+        />
 
-        {/* Drawer toggle button */}
         <DrawerToggleButton />
       </div>
     );

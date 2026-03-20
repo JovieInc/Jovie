@@ -28,8 +28,8 @@ const numberFormatter = new Intl.NumberFormat();
 
 function SkeletonCards() {
   const skeletonMetric = (
-    <div className='space-y-2 py-1'>
-      <div className='flex items-center gap-2'>
+    <div className='space-y-1 py-1'>
+      <div className='flex items-center gap-1.5'>
         <div className='h-6 w-6 rounded-md skeleton' />
         <div className='h-3 w-20 rounded skeleton' />
       </div>
@@ -38,7 +38,7 @@ function SkeletonCards() {
     </div>
   );
   return (
-    <div className='grid grid-cols-2 gap-8'>
+    <div className='grid grid-cols-2 gap-2'>
       {skeletonMetric}
       {skeletonMetric}
     </div>
@@ -47,9 +47,9 @@ function SkeletonCards() {
 
 function ErrorCards() {
   return (
-    <div className='grid grid-cols-2 gap-8'>
-      <div className='space-y-2 py-1'>
-        <div className='flex items-center gap-2'>
+    <div className='grid grid-cols-2 gap-2'>
+      <div className='space-y-1 py-1'>
+        <div className='flex items-center gap-1.5'>
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-sky-500/10 dark:bg-sky-500/15'>
             <BarChart3 className='h-3.5 w-3.5 text-sky-600 dark:text-sky-400' />
           </div>
@@ -61,8 +61,8 @@ function ErrorCards() {
           Temporarily unavailable
         </p>
       </div>
-      <div className='space-y-2 py-1'>
-        <div className='flex items-center gap-2'>
+      <div className='space-y-1 py-1'>
+        <div className='flex items-center gap-1.5'>
           <div className='flex h-6 w-6 items-center justify-center rounded-md bg-emerald-500/10 dark:bg-emerald-500/15'>
             <Users className='h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400' />
           </div>
@@ -254,7 +254,7 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     }
     return (
       <div className={refreshing ? 'opacity-70 transition-opacity' : undefined}>
-        <div className='grid grid-cols-2 gap-8'>
+        <div className='grid grid-cols-2 gap-2'>
           <AnalyticsCard
             title='Profile views'
             value={profileViewsLabel}
@@ -332,11 +332,11 @@ export const DashboardAnalyticsCards = memo(function DashboardAnalyticsCards({
     <div
       ref={containerRef}
       data-testid='dashboard-analytics-cards'
-      className='space-y-4 min-h-[180px]'
+      className='space-y-1 min-h-[140px]'
     >
-      <div className='flex flex-wrap items-center justify-between gap-3'>
+      <div className='flex flex-wrap items-center justify-between gap-2'>
         <div className='space-y-0.5'>
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Overview
           </p>
           <p className='text-[13px] text-secondary-token'>{rangeLabel}</p>

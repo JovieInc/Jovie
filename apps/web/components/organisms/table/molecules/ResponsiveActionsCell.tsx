@@ -145,7 +145,7 @@ export function ResponsiveActionsCell({
           <DropdownMenuTrigger asChild>
             <button
               type='button'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 ease-out hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface-0 text-tertiary-token transition-[background-color,color,box-shadow] duration-150 ease-out hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
               aria-label='More actions'
             >
               <MoreVertical className='h-4 w-4' />

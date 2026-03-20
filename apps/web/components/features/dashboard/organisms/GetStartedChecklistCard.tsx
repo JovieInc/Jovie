@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Check,
-  Instagram,
-  Music,
-  QrCode,
-  UserPlus,
-  Wallet,
-} from 'lucide-react';
+import { Check } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -20,7 +13,6 @@ import { track } from '@/lib/analytics';
 
 interface ChecklistItem {
   id: string;
-  icon: React.ElementType;
   label: string;
   description: string;
   href?: string;
@@ -30,33 +22,28 @@ interface ChecklistItem {
 const CHECKLIST_ITEMS: ChecklistItem[] = [
   {
     id: 'share-instagram',
-    icon: Instagram,
     label: 'Share your profile on Instagram',
     description: 'Post your link to your story or bio',
   },
   {
     id: 'spotify-bio',
-    icon: Music,
     label: 'Add your Jovie link to your Spotify bio',
     description: 'Fans searching for you will find everything',
     action: 'copy-url',
   },
   {
     id: 'qr-code',
-    icon: QrCode,
     label: 'Download a QR code for your next show',
     description: 'Print it for merch tables and venues',
   },
   {
     id: 'invite-artist',
-    icon: UserPlus,
     label: 'Invite an artist friend',
     description: 'Earn 50% commission for 24 months',
     href: `${APP_ROUTES.SETTINGS}/referral`,
   },
   {
     id: 'connect-venmo',
-    icon: Wallet,
     label: 'Connect Venmo for tips',
     description: 'Let fans support you directly',
     href: APP_ROUTES.SETTINGS_ARTIST_PROFILE,
@@ -174,82 +161,107 @@ export function GetStartedChecklistCard({
   if (allDone || dismissed) return null;
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
-      <div className='flex items-center justify-between p-3 sm:p-4'>
-        <div>
-          <h3 className='text-[13px] font-[590] text-primary-token'>
+    <ContentSurfaceCard className='overflow-hidden p-0'>
+      <div className='flex items-center justify-between px-2 py-1'>
+        <div className='flex items-center gap-1.5'>
+          <h3 className='text-[11px] font-[510] text-secondary-token'>
             Get started
           </h3>
-          <p className='text-[12px] text-tertiary-token'>
-            {completedCount} of {CHECKLIST_ITEMS.length} complete
-          </p>
+          <span className='text-[11px] text-tertiary-token'>
+            {completedCount}/{CHECKLIST_ITEMS.length}
+          </span>
         </div>
-        <button
-          type='button'
-          onClick={handleDismiss}
-          className='text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
-        >
-          Later
-        </button>
+        <div className='flex items-center gap-2'>
+          {profileUrl && (
+            <a
+              href={profileUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='text-[11px] text-secondary-token transition-colors hover:text-primary-token'
+            >
+              View profile
+            </a>
+          )}
+          <button
+            type='button'
+            onClick={handleDismiss}
+            className='text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
+          >
+            Dismiss
+          </button>
+        </div>
       </div>
 
       {/* Progress bar */}
-      <div className='mx-3 mb-2 h-1 rounded-full bg-surface-2 sm:mx-4'>
+      <div className='mx-2 mb-px h-px rounded-full bg-surface-2'>
         <div
-          className='h-1 rounded-full bg-[var(--linear-accent)] transition-all duration-300'
+          className='h-px rounded-full bg-[var(--linear-accent)] transition-all duration-300'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
         />
       </div>
 
-      <ul className='space-y-0.5 px-2 pb-3 sm:px-3'>
+      <ul className='px-1 pb-0.5'>
         {CHECKLIST_ITEMS.map(item => {
           const isDone = completed.has(item.id);
 
-          const content = (
+          const checkboxEl = (
+            <button
+              type='button'
+              onClick={e => {
+                e.stopPropagation();
+                toggleItem(item.id);
+              }}
+              className={`flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
+                isDone
+                  ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
+                  : 'border-subtle hover:border-secondary-token'
+              }`}
+              aria-label={
+                isDone ? `Unmark ${item.label}` : `Mark ${item.label} as done`
+              }
+            >
+              {isDone ? (
+                <Check className='h-2 w-2 text-white' aria-hidden='true' />
+              ) : null}
+            </button>
+          );
+
+          const labelEl = (
+            <p
+              className={`min-w-0 flex-1 text-[11px] leading-tight ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
+            >
+              {item.label}
+            </p>
+          );
+
+          if (!isDone && item.href) {
+            return (
+              <li
+                key={item.id}
+                className='flex items-center gap-1.5 rounded px-1 py-px hover:bg-surface-0/60'
+              >
+                {checkboxEl}
+                <Link
+                  href={item.href}
+                  className='flex min-w-0 flex-1 items-center'
+                >
+                  {labelEl}
+                </Link>
+              </li>
+            );
+          }
+
+          return (
             <li
               key={item.id}
-              className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors ${
-                isDone ? 'opacity-60' : 'hover:bg-surface-1'
+              className={`flex items-center gap-1.5 rounded px-1 py-px transition-colors ${
+                isDone ? 'opacity-50' : 'hover:bg-surface-0/60'
               }`}
             >
-              <button
-                type='button'
-                onClick={e => {
-                  e.stopPropagation();
-                  toggleItem(item.id);
-                }}
-                className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
-                  isDone
-                    ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
-                    : 'border-subtle hover:border-secondary-token'
-                }`}
-                aria-label={
-                  isDone ? `Unmark ${item.label}` : `Mark ${item.label} as done`
-                }
-              >
-                {isDone ? (
-                  <Check className='h-3 w-3 text-white' aria-hidden='true' />
-                ) : null}
-              </button>
-
-              <item.icon
-                className='h-4 w-4 flex-shrink-0 text-tertiary-token'
-                aria-hidden='true'
-              />
-
-              <div className='min-w-0 flex-1'>
-                <p
-                  className={`text-[13px] font-[450] ${isDone ? 'line-through text-tertiary-token' : 'text-primary-token'}`}
-                >
-                  {item.label}
-                </p>
-                <p className='text-[11px] text-tertiary-token'>
-                  {item.description}
-                </p>
-              </div>
-
+              {checkboxEl}
+              {labelEl}
               {!isDone && item.action === 'copy-url' && (
                 <button
                   type='button'
@@ -257,66 +269,13 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='text-[11px] font-[510] text-secondary-token transition-colors hover:text-primary-token'
+                  className='text-[10px] text-tertiary-token transition-colors hover:text-secondary-token'
                 >
-                  Copy link
+                  Copy
                 </button>
               )}
             </li>
           );
-
-          if (!isDone && item.href) {
-            return (
-              <li
-                key={item.id}
-                className={`flex items-center gap-3 rounded-lg px-2 py-2 transition-colors ${
-                  isDone ? 'opacity-60' : 'hover:bg-surface-1'
-                }`}
-              >
-                <button
-                  type='button'
-                  onClick={e => {
-                    e.stopPropagation();
-                    toggleItem(item.id);
-                  }}
-                  className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
-                    isDone
-                      ? 'border-[var(--linear-accent)] bg-[var(--linear-accent)]'
-                      : 'border-subtle hover:border-secondary-token'
-                  }`}
-                  aria-label={
-                    isDone
-                      ? `Unmark ${item.label}`
-                      : `Mark ${item.label} as done`
-                  }
-                >
-                  {isDone ? (
-                    <Check className='h-3 w-3 text-white' aria-hidden='true' />
-                  ) : null}
-                </button>
-
-                <Link
-                  href={item.href}
-                  className='flex min-w-0 flex-1 items-center gap-3'
-                >
-                  <item.icon
-                    className='h-4 w-4 flex-shrink-0 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                  <div className='min-w-0 flex-1'>
-                    <p className='text-[13px] font-[450] text-primary-token'>
-                      {item.label}
-                    </p>
-                    <p className='text-[11px] text-tertiary-token'>
-                      {item.description}
-                    </p>
-                  </div>
-                </Link>
-              </li>
-            );
-          }
-
-          return content;
         })}
       </ul>
     </ContentSurfaceCard>

@@ -1,0 +1,48 @@
+{
+  "framework": "nextjs",
+  "installCommand": "corepack enable && corepack pnpm install",
+  "buildCommand": "corepack pnpm turbo build --filter=@jovie/web",
+  "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;[[ $R == main || $R == production || $R =~ ^(codex|claude|codegen-bot|linear)/ ]] && exit 0;npx turbo-ignore @jovie/web'",
+  "outputDirectory": "apps/web/.next",
+  "crons": [
+    {
+      "path": "/api/cron/frequent",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/daily-maintenance",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/generate-insights",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/process-ingestion-jobs",
+      "schedule": "* * * * *"
+    }
+  ],
+  "functions": {
+    "apps/web/app/api/**/*.ts": {
+      "maxDuration": 30
+    },
+    "apps/web/app/api/cron/**/*.ts": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/clerk/(.*)",
+      "destination": "https://clerk.jov.ie/$1"
+    },
+    {
+      "source": "/ingest/static/(.*)",
+      "destination": "https://us-assets.i.posthog.com/static/$1"
+    },
+    {
+      "source": "/ingest/(.*)",
+      "destination": "https://us.i.posthog.com/$1"
+    }
+  ],
+  "redirects": []
+}

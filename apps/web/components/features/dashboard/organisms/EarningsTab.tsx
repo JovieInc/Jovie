@@ -108,10 +108,10 @@ const StatCard = memo(function StatCard({
   iconColor,
 }: StatCardProps) {
   return (
-    <ContentSurfaceCard className='p-4'>
+    <ContentSurfaceCard className='p-2.5'>
       <div className='flex items-center gap-2'>
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${iconBg}`}
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${iconBg}`}
           aria-hidden='true'
         >
           <Icon className={`h-3.5 w-3.5 ${iconColor}`} />
@@ -139,11 +139,11 @@ const QrPreview = memo(function QrPreview({
   if (isLoading || !dataUrl) {
     return (
       <div
-        className='flex items-center justify-center rounded-xl bg-white'
+        className='flex items-center justify-center rounded-lg bg-white'
         style={{ width: QR_DISPLAY_SIZE, height: QR_DISPLAY_SIZE }}
         aria-hidden='true'
       >
-        <div className='h-16 w-16 rounded-lg bg-gray-200 animate-pulse motion-reduce:animate-none' />
+        <div className='h-16 w-16 rounded-md bg-gray-200 animate-pulse motion-reduce:animate-none' />
       </div>
     );
   }
@@ -154,7 +154,7 @@ const QrPreview = memo(function QrPreview({
       alt='QR code for tip page'
       width={QR_DISPLAY_SIZE}
       height={QR_DISPLAY_SIZE}
-      className='rounded-xl'
+      className='rounded-lg'
       unoptimized
     />
   );
@@ -263,9 +263,9 @@ export function EarningsTab() {
   // ── Empty state ──────────────────────────────────
   if (!handle) {
     return (
-      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-16 text-center'>
+      <ContentSurfaceCard className='flex flex-col items-center justify-center gap-3 px-6 py-12 text-center'>
         <div
-          className='flex h-12 w-12 items-center justify-center rounded-2xl border border-subtle bg-surface-0'
+          className='flex h-12 w-12 items-center justify-center rounded-xl bg-surface-0'
           aria-hidden='true'
         >
           <QrCode className='h-6 w-6 text-tertiary-token' />
@@ -285,18 +285,18 @@ export function EarningsTab() {
   const tippers = earnings?.tippers ?? [];
 
   return (
-    <div className='flex flex-col gap-6'>
+    <div className='flex flex-col gap-4'>
       {/* ── Earnings Stats ─────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         Revenue
       </p>
 
       {isEarningsLoading ? (
-        <div className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+        <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           {[1, 2, 3].map(i => (
-            <ContentSurfaceCard key={i} className='space-y-2 p-4'>
+            <ContentSurfaceCard key={i} className='space-y-2 p-2.5'>
               <div className='flex items-center gap-2'>
-                <div className='h-7 w-7 rounded-lg skeleton' />
+                <div className='h-7 w-7 rounded-md skeleton' />
                 <div className='h-3 w-16 rounded-sm skeleton' />
               </div>
               <div className='h-7 w-20 rounded-md skeleton' />
@@ -304,7 +304,7 @@ export function EarningsTab() {
           ))}
         </div>
       ) : (
-        <dl className='grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+        <dl className='grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2'>
           <StatCard
             label='Total revenue'
             value={formatCents(stats?.totalRevenueCents ?? 0)}
@@ -330,7 +330,7 @@ export function EarningsTab() {
       )}
 
       {/* ── Tippers Table ──────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         Recent tippers
       </p>
 
@@ -352,14 +352,14 @@ export function EarningsTab() {
       </ContentSurfaceCard>
 
       {/* ── QR Code Card ───────────────────────────── */}
-      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         QR Code
       </p>
 
-      <ContentSurfaceCard className='p-5 sm:p-6'>
-        <div className='flex items-center gap-2 mb-5'>
+      <ContentSurfaceCard className='p-3 sm:p-4'>
+        <div className='flex items-center gap-2 mb-4'>
           <div
-            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-subtle'
+            className='flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-accent-subtle'
             aria-hidden='true'
           >
             <QrCode className='h-3.5 w-3.5 text-accent-token' />
@@ -369,9 +369,9 @@ export function EarningsTab() {
           </h2>
         </div>
 
-        <div className='flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-8'>
+        <div className='flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:gap-6'>
           {/* Preview */}
-          <div className='shrink-0 rounded-[14px] border border-subtle bg-white p-3 shadow-subtle-bottom'>
+          <div className='shrink-0 rounded-lg bg-white p-2'>
             <QrPreview dataUrl={displayDataUrl} isLoading={isGenerating} />
           </div>
 
@@ -388,7 +388,7 @@ export function EarningsTab() {
             </div>
 
             {/* Tip URL display */}
-            <DrawerSurfaceCard className='flex items-center gap-2 rounded-[10px] bg-surface-0 px-3 py-2.5'>
+            <DrawerSurfaceCard className='flex items-center gap-2 rounded-md bg-surface-0 px-2.5 py-2'>
               <Link2 className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
               <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
                 {tipUrl}

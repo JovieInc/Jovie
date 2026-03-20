@@ -37,18 +37,18 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)/95 supports-[backdrop-filter]:backdrop-blur-md',
+        'z-20 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] backdrop-blur-[14px]',
         className
       )}
     >
       {/* Mobile: Large page title with action buttons + profile */}
       <div className='flex items-center justify-between px-4 pt-3 pb-2 sm:hidden'>
-        <h1 className='text-[20px] font-[570] tracking-[-0.018em] text-primary-token leading-tight'>
+        <h1 className='text-[18px] font-[570] leading-tight tracking-[-0.018em] text-primary-token'>
           {currentLabel}
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1.5 [&_button]:h-8 [&_button]:rounded-full [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1.5 [&_button]:h-8 [&_button]:rounded-[8px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -57,11 +57,11 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-(--linear-app-header-height) w-full items-center gap-1 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative hidden h-[36px] w-full items-center gap-2 px-4 sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
-          <div className='hidden lg:flex items-center'>{sidebarTrigger}</div>
+          <div className='hidden items-center lg:flex'>{sidebarTrigger}</div>
         ) : null}
         {/* Conditional vertical separator between sidebar trigger and actions */}
         {showDivider && sidebarTrigger && action ? (
@@ -70,23 +70,23 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.01em]'>
+        <div className='flex min-w-0 flex-1 items-center gap-1.5 tracking-[-0.01em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[13px] font-[510] tracking-[-0.01em] text-primary-token'>
+            <span className='truncate text-[12px] font-[560] tracking-[-0.012em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[12px] text-tertiary-token'>
+              <span className='shrink-0 text-[11px] text-tertiary-token'>
                 {rootLabel}
               </span>
               <ChevronRight className='size-3 shrink-0 text-quaternary-token' />
               {breadcrumbSuffix ? (
-                <div className='min-w-0 truncate text-[12px] text-secondary-token'>
+                <div className='min-w-0 truncate text-[11px] text-secondary-token'>
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-[12px] font-[510] text-primary-token'>
+                <span className='truncate text-[11px] font-[560] text-primary-token'>
                   {currentLabel}
                 </span>
               )}

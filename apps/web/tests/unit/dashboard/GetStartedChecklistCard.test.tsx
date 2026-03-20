@@ -52,7 +52,9 @@ describe('GetStartedChecklistCard', () => {
 
   it('shows "Later" dismiss button', () => {
     render(<GetStartedChecklistCard userId={userId} />);
-    expect(screen.getByRole('button', { name: /later/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /dismiss/i })
+    ).toBeInTheDocument();
   });
 
   it('toggling an item updates localStorage and shows strikethrough', () => {

@@ -83,7 +83,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 return (
                   <ContentSurfaceCard
                     key={ss.id}
-                    className='group overflow-hidden rounded-[10px] bg-surface-0'
+                    className='group overflow-hidden rounded-lg bg-surface-0'
                   >
                     <button
                       type='button'

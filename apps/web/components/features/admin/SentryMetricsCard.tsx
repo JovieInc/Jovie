@@ -44,8 +44,11 @@ export function SentryMetricsCard({
   if (!metrics.isConfigured || !metrics.isAvailable) {
     return (
       <ContentSurfaceCard className='overflow-hidden'>
-        <ContentSectionHeader title='Sentry' className='px-5 py-3' />
-        <div className='p-5 pt-4'>
+        <ContentSectionHeader
+          title='Sentry'
+          className='px-(--linear-app-header-padding-x) py-3'
+        />
+        <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <p className='text-app text-secondary-token'>
             {metrics.isConfigured
               ? (metrics.errorMessage ??
@@ -67,10 +70,10 @@ export function SentryMetricsCard({
       <ContentSectionHeader
         title='Sentry'
         subtitle='Production errors from the last 24 hours'
-        className='px-5 py-3'
+        className='px-(--linear-app-header-padding-x) py-3'
       />
-      <div className='space-y-4 p-5 pt-4'>
-        <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+      <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='grid gap-3 sm:grid-cols-2 xl:grid-cols-4'>
           <MetricBlock
             icon={Bug}
             iconClassName='text-info'

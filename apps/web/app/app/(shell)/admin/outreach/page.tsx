@@ -72,9 +72,9 @@ export default function AdminOutreachPage() {
           titleWidth='w-36'
           descriptionWidth='w-56'
           actionWidths={['w-16']}
-          className='min-h-0 px-4 py-3 sm:px-5'
+          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           {['total', 'email', 'dm', 'review'].map(key => (
             <ContentMetricCardSkeleton key={key} />
           ))}
@@ -86,7 +86,7 @@ export default function AdminOutreachPage() {
   return (
     <div className='flex flex-col gap-4'>
       {loadError && (
-        <ContentSurfaceCard className='px-4 py-3 text-[13px] leading-[18px] text-secondary-token'>
+        <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-3 text-[13px] leading-[18px] text-secondary-token'>
           <p>{loadError}</p>
         </ContentSurfaceCard>
       )}

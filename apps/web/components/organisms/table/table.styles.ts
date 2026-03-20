@@ -6,7 +6,7 @@
 // Typography Scale - Visual Hierarchy
 export const typography = {
   tableHeader:
-    'text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em] line-clamp-1',
+    'text-[13px] font-[510] text-secondary-token tracking-normal line-clamp-1',
   cellPrimary: 'text-[13px] font-[510] text-primary-token', // Main content
   cellSecondary: 'text-[13px] text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps
@@ -18,9 +18,9 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: '34px', // Fixed height for consistent alignment (Linear compact standard)
-  cellPadding: 'px-4 py-2', // Consistent padding for cells
-  headerPadding: 'px-4 py-1.5', // Compact padding for headers
+  rowHeight: 'h-[30px]', // Fixed height for consistent alignment (Linear compact standard)
+  cellPadding: 'px-3 py-0', // Dense padding for cells (Linear-density)
+  headerPadding: 'px-3 py-1', // Dense padding for headers (Linear-density)
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
@@ -69,12 +69,12 @@ export const columnWidths = {
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
-  rowHeight: '34px',
-  headerHeight: '30px', // Compact header with py-1.5 padding
+  rowHeight: '32px',
+  headerHeight: '28px', // Dense header (Linear-density)
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '34px', // Must match rowHeight
+  skeletonRowHeight: '32px', // Must match rowHeight
 } as const;
 
 // Border Styles
@@ -122,8 +122,8 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-(--linear-app-content-surface)',
-    'shadow-inset-divider',
+    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] backdrop-blur-[12px]',
+    'shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
     'align-middle'
   ),
   stickyGroupHeader: cn(
@@ -134,7 +134,7 @@ export const presets = {
   ),
   tableRow: cn(
     alignment.rowHeight,
-    borders.cell,
+    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)]',
     selection.unchecked,
     'last:border-b-0',
     'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'

@@ -36,7 +36,7 @@ export function AppSearchField({
   return (
     <div
       className={cn(
-        'flex h-(--linear-app-control-height-sm) items-center gap-2 rounded-(--linear-app-control-radius) border border-subtle bg-surface-0 px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
+        'flex h-(--linear-app-control-height-sm) items-center gap-1.5 rounded-[8px] border border-subtle bg-surface-0 px-2 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/20',
         className
       )}
     >
@@ -53,7 +53,7 @@ export function AppSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'h-full border-0 bg-transparent px-0 text-[13px] tracking-[-0.01em] shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0',
+          'h-full border-0 bg-transparent px-0 text-[12.5px] tracking-[-0.01em] shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0',
           inputClassName
         )}
       />

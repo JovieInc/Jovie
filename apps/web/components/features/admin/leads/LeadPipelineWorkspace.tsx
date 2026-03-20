@@ -11,9 +11,15 @@ export function LeadPipelineWorkspace() {
 
   return (
     <div className='space-y-4'>
-      <LeadPipelineControls />
-      <UnifiedUrlIntake onSubmitted={() => setRefreshKey(value => value + 1)} />
-      <LeadKeywordsManager />
+      <div className='grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(20rem,0.95fr)] xl:items-start'>
+        <div className='space-y-4'>
+          <LeadPipelineControls />
+          <UnifiedUrlIntake
+            onSubmitted={() => setRefreshKey(value => value + 1)}
+          />
+        </div>
+        <LeadKeywordsManager />
+      </div>
       <LeadTable refreshKey={refreshKey} />
     </div>
   );

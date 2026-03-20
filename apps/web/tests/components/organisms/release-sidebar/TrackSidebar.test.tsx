@@ -49,12 +49,15 @@ describe('TrackSidebar', () => {
       />
     );
 
+    expect(screen.getByText('Track')).toBeInTheDocument();
     expect(screen.getByText('Smart link')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
 
-    expect(screen.getByText('Available on')).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'Platforms' })
+    ).toBeInTheDocument();
     expect(screen.queryByText('Actions')).not.toBeInTheDocument();
   });
 
@@ -72,5 +75,20 @@ describe('TrackSidebar', () => {
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
 
     expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
+  });
+
+  it('keeps the track header and details cards visible together in the default view', () => {
+    render(
+      <TrackSidebar
+        track={buildTrack()}
+        isOpen={true}
+        onClose={vi.fn()}
+        onBackToRelease={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Track')).toBeInTheDocument();
+    expect(screen.getByText('Smart link')).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 });

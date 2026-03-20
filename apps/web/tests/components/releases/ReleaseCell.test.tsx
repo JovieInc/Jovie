@@ -5,14 +5,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
 const toggleTrack = vi.fn().mockResolvedValue(undefined);
+let playbackState = { activeTrackId: null as string | null, isPlaying: false };
 
 beforeEach(() => {
   toggleTrack.mockClear();
+  playbackState = { activeTrackId: null, isPlaying: false };
 });
 
 vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
-    playbackState: { activeTrackId: null, isPlaying: false },
+    playbackState,
     toggleTrack,
   }),
 }));
@@ -122,5 +124,26 @@ describe('ReleaseCell', () => {
       artistName: undefined,
       artworkUrl: undefined,
     });
+  });
+
+  it('keeps the active preview control visible while playing', () => {
+    playbackState = { activeTrackId: 'release-1', isPlaying: true };
+
+    render(
+      <ReleaseCell
+        release={{
+          ...baseRelease,
+          previewUrl: 'https://cdn.example.com/preview.mp3',
+        }}
+        artistName='Jovie Artist'
+      />
+    );
+
+    const pauseButton = screen.getByRole('button', {
+      name: 'Pause Skyline Dreams',
+    });
+
+    expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
+    expect(pauseButton.className).toContain('aria-[pressed=true]:opacity-100');
   });
 });

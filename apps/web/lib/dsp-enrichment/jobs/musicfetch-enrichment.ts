@@ -293,6 +293,7 @@ export async function processMusicFetchEnrichmentJob(
       return result;
     }
     // Transient errors (5xx, timeout, network) — re-throw to trigger retry
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     throw error;
   }
 

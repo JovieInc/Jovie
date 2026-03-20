@@ -7,7 +7,7 @@ import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
-  'min-h-[40px] min-w-[40px] flex items-center justify-center rounded-full border border-transparent text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-surface-1 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
+  'min-h-[32px] min-w-[32px] flex items-center justify-center rounded-[8px] border border-transparent text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-surface-1 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */
@@ -49,16 +49,13 @@ export function DrawerLinkSection({
   className,
 }: DrawerLinkSectionProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-1.5', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex min-h-[40px] items-center justify-between gap-2 lg:min-h-0'>
-        <DrawerSectionHeading
-          as='h4'
-          className='min-w-0 flex-1 truncate text-[11px] tracking-[0.08em]'
-        >
+      <div className='flex min-h-[32px] items-center justify-between gap-2 lg:min-h-0'>
+        <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
           {title}
         </DrawerSectionHeading>
-        <div className='flex shrink-0 items-center gap-1 lg:gap-0.5'>
+        <div className='flex shrink-0 items-center gap-0.5'>
           {headerActions}
           {onAdd && (
             <button
@@ -77,11 +74,11 @@ export function DrawerLinkSection({
       {isEmpty ? (
         <DrawerEmptyState
           message={emptyMessage}
-          className='min-h-[96px]'
+          className='min-h-[72px]'
           testId={emptyStateTestId}
         />
       ) : (
-        <div className='-mx-5 lg:mx-0'>{children}</div>
+        <div className='-mx-1'>{children}</div>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import { PanelRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { memo, type ReactNode, useCallback, useMemo } from 'react';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { AccountSettingsSection } from '@/features/dashboard/organisms/account-settings';
 import { DataPrivacySection } from '@/features/dashboard/organisms/DataPrivacySection';
@@ -51,10 +50,10 @@ interface SettingsSidebarProps {
 
 const SettingsSidebar = memo(({ groups }: SettingsSidebarProps) => (
   <aside className='h-fit'>
-    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
+    <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-md bg-surface-0/90 p-2 backdrop-blur-sm'>
       {groups.map(group => (
         <div key={group.id} className='mb-2.5 last:mb-0'>
-          <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='mb-1.5 px-2 text-[13px] font-[590] tracking-normal text-secondary-token'>
             {group.label}
           </p>
           <nav aria-label={`${group.label} settings`}>
@@ -92,7 +91,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[10px] border border-subtle/55 bg-surface-0 px-4 py-3.5 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
+      className='flex w-full items-center justify-between rounded-md bg-surface-0 px-3 py-3 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
     >
       <div>
         <p className='text-[14px] font-[510] text-primary-token'>
@@ -125,25 +124,20 @@ export function SettingsPolished({
   );
 
   const renderAccountSection = useCallback(
-    () => (
-      <div className='space-y-0'>
-        {publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
-          <AccountSettingsSection isGrowth={isGrowth} />
-        ) : (
-          <DashboardCard variant='settings'>
-            <div className='text-center py-4'>
-              <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
-                Account settings unavailable
-              </h3>
-              <p className='text-[13px] text-secondary'>
-                Clerk is not configured (missing publishable key). Set
-                NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
-              </p>
-            </div>
-          </DashboardCard>
-        )}
-      </div>
-    ),
+    () =>
+      publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+        <AccountSettingsSection isGrowth={isGrowth} />
+      ) : (
+        <div className='text-center py-4'>
+          <h3 className='text-[14px] font-[510] text-primary-token mb-3'>
+            Account settings unavailable
+          </h3>
+          <p className='text-[13px] text-secondary'>
+            Clerk is not configured (missing publishable key). Set
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to enable account management.
+          </p>
+        </div>
+      ),
     [isGrowth]
   );
 
@@ -191,7 +185,7 @@ export function SettingsPolished({
         title: 'Artist Profile',
         description: 'Photo, display name, username, and branding.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsArtistProfileSection
               artist={artist}
               onArtistUpdate={onArtistUpdate}
@@ -236,7 +230,7 @@ export function SettingsPolished({
         description:
           'Fan verification, opt-in preferences, and conversion pixel tracking.',
         render: () => (
-          <div className='space-y-6'>
+          <div className='space-y-4'>
             <SettingsAudienceSection />
             <SettingsAdPixelsSection isPro={isPro} />
           </div>
@@ -298,14 +292,14 @@ export function SettingsPolished({
     const section = allSections.find(s => s.id === focusSection);
     if (!section) {
       return (
-        <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
+        <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
           <SettingsErrorState message='This settings section could not be found.' />
         </div>
       );
     }
 
     return (
-      <div className='space-y-8 pb-6 sm:pb-8' data-testid='settings-polished'>
+      <div className='space-y-6 pb-6 sm:pb-8' data-testid='settings-polished'>
         <SettingsSection
           id={section.id}
           title={section.title}
@@ -328,17 +322,17 @@ export function SettingsPolished({
         <SettingsSidebar groups={sectionGroups} />
       </div>
 
-      <div className='space-y-10'>
+      <div className='space-y-6'>
         {sectionGroups.map(group => (
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
             className='px-1'
           >
-            <h3 className='mb-5 px-1 text-[12px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <h3 className='mb-2 px-1 text-[13px] font-[590] tracking-normal text-secondary-token'>
               {group.label}
             </h3>
-            <div className='space-y-8'>
+            <div className='space-y-4'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

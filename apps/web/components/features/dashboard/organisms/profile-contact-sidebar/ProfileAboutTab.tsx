@@ -94,7 +94,7 @@ function EditableBio({
       onKeyDown={handleKeyDown}
       maxLength={512}
       rows={4}
-      className='w-full rounded-md border border-subtle bg-surface-1 px-2.5 py-2 text-[13px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive resize-none'
+      className='w-full resize-none rounded-md border border-subtle bg-surface-0 px-2.5 py-2 text-[12.5px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
       placeholder='Write your bio...'
     />
   );
@@ -124,7 +124,7 @@ function LocationField({
           trigger={
             <button
               type='button'
-              className='flex items-center gap-2 text-[13px] text-secondary-token hover:text-primary-token transition-colors'
+              className='flex items-center gap-2 text-[12px] text-secondary-token transition-colors hover:text-primary-token'
             >
               <Icon
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -137,7 +137,7 @@ function LocationField({
       );
     }
     return (
-      <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
+      <div className='flex items-center gap-2 text-[12px] text-tertiary-token'>
         <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
         <span className='capitalize'>{label(value)}</span>
       </div>
@@ -153,7 +153,7 @@ function LocationField({
         trigger={
           <button
             type='button'
-            className='flex items-center gap-2 text-[13px] text-tertiary-token hover:text-secondary-token transition-colors'
+            className='flex items-center gap-2 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
           >
             <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>Add your {addLabel.toLowerCase()}</span>
@@ -184,26 +184,28 @@ export function ProfileAboutTab({
   const editable = Boolean(onLocationChange);
 
   return (
-    <div className='space-y-5'>
-      {/* Bio */}
-      <DrawerSection title='Bio' collapsible={false}>
+    <div className='space-y-4'>
+      <DrawerSection title='Bio' collapsible={false} className='space-y-1.5'>
         {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
         {!onBioChange && bio && (
-          <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
+          <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
             {bio}
           </p>
         )}
         {!onBioChange && !bio && (
-          <p className='text-[13px] text-tertiary-token'>
+          <p className='text-[12px] text-tertiary-token'>
             No bio yet. Use the chat to generate one.
           </p>
         )}
       </DrawerSection>
 
-      {/* Location / Hometown / Active Since */}
       {(hasMetadata || editable) && (
-        <DrawerSection title='Location' collapsible={false}>
-          <div className='space-y-2'>
+        <DrawerSection
+          title='Location'
+          collapsible={false}
+          className='space-y-1.5'
+        >
+          <div className='space-y-1.5'>
             <LocationField
               icon={MapPin}
               value={location}
@@ -219,9 +221,8 @@ export function ProfileAboutTab({
               onChange={onHometownChange}
             />
 
-            {/* Active since */}
             {Boolean(activeSinceYear) && (
-              <div className='flex items-center gap-2 text-[13px] text-tertiary-token'>
+              <div className='flex items-center gap-2 text-[12px] text-tertiary-token'>
                 <Calendar className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
                 <span>Active since {activeSinceYear}</span>
               </div>
@@ -230,15 +231,14 @@ export function ProfileAboutTab({
         </DrawerSection>
       )}
 
-      {/* Genres */}
-      <DrawerSection title='Genres' collapsible={false}>
+      <DrawerSection title='Genres' collapsible={false} className='space-y-1.5'>
         {hasGenres && (
           <div className='flex flex-wrap gap-1.5'>
             {genres.map(genre => (
               <Badge
                 key={genre}
                 variant='secondary'
-                className='capitalize gap-1'
+                className='gap-1 capitalize'
               >
                 {genre}
                 {onGenresChange && (
@@ -262,7 +262,7 @@ export function ProfileAboutTab({
                 trigger={
                   <button
                     type='button'
-                    className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-[11px] font-medium text-tertiary-token hover:text-secondary-token hover:border-secondary-token transition-colors'
+                    className='inline-flex items-center gap-0.5 rounded-full border border-dashed border-subtle px-2.5 py-0.5 text-[11px] font-medium text-tertiary-token transition-colors hover:border-secondary-token hover:text-secondary-token'
                   >
                     <Plus className='h-3 w-3' />
                     Add
@@ -279,7 +279,7 @@ export function ProfileAboutTab({
             trigger={
               <button
                 type='button'
-                className='flex items-center gap-1.5 text-[13px] text-tertiary-token hover:text-secondary-token transition-colors'
+                className='flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
               >
                 <Plus className='h-3.5 w-3.5' />
                 <span>Add genres</span>
@@ -288,14 +288,17 @@ export function ProfileAboutTab({
           />
         )}
         {!hasGenres && !onGenresChange && (
-          <p className='text-[13px] text-tertiary-token'>
+          <p className='text-[12px] text-tertiary-token'>
             Auto-detected from your music connections.
           </p>
         )}
       </DrawerSection>
 
-      {/* Settings */}
-      <DrawerSection title='Settings' collapsible={false}>
+      <DrawerSection
+        title='Settings'
+        collapsible={false}
+        className='space-y-1.5'
+      >
         <DrawerAsyncToggle
           label='Photo downloads'
           ariaLabel='Allow profile photo downloads on public pages'
