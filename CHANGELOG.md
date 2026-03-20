@@ -6,6 +6,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.18] - 2026-03-19
+
+### Added
+
+- Server-side pixel forwarding to Facebook CAPI, Google Measurement Protocol, and TikTok Events API with consent gating and retry logic
+- Pixel health monitoring API with per-platform health status (healthy/degraded/unhealthy/inactive)
+- Manual test event button to verify pixel credentials from the dashboard
+- First-touch conversion attribution: tracks which retargeting platform drove each subscriber
+- IP purge cron job: deletes raw IPs after 48 hours, retains hashed IPs for analytics
+- Pixel forwarding retry cron with exponential backoff (5 retries, max 3h) and dead-lettering
+- Unit tests for anonymizeIp, deriveAttributionSource, computeHealthStatus, parseConsentCookie, and forwarding orchestration
+
+### Changed
+
+- Pixel health endpoint now uses SQL aggregation instead of loading all events into memory
+- Replaced `drizzleSql.raw()` with safe parameterized query in IP purge cron
+- Deduplicated `NO_STORE_HEADERS` constant across 5 route files (now imports from shared module)
+- Added `retryCount` column to pixel_events for accurate dead-letter tracking
+- Added partial index on pixel_events for efficient IP purge queries
+- Attribution endpoint now requires Pro plan entitlement (consistent with all other pixel APIs)
+
+### Fixed
+
+- Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
+
 ## [26.4.17] - 2026-03-19
 
 ### Added

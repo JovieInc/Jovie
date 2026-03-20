@@ -144,3 +144,87 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Context:** Files: `apps/web/components/molecules/drawer/DrawerButton.tsx`, `apps/web/components/atoms/HeaderIconButton.tsx`, `apps/web/components/atoms/InlineIconButton.tsx`. Base Button at `packages/ui/atoms/button.tsx` already has CVA variants. HeaderIconButton already has tests at `apps/web/tests/unit/atoms/HeaderIconButton.test.tsx`.
 
 **Depends on:** Nothing. Independent initiative.
+
+---
+
+## Audience segmentation for retargeting
+
+**What:** Segment retargeting audiences by engagement level — high-intent (3+ visits and link clicks), cold (single page view), and tippers (sent money). Use segments to serve different ad creatives per audience tier.
+
+**Why:** A single retargeting audience treats all visitors equally. Segmenting lets creators show aggressive CTAs to high-intent fans and softer awareness ads to cold visitors, improving ad spend efficiency and conversion rates.
+
+**Context:** The `audience_members` table already tracks `visits`, `engagement_score`, `intent_level`, and `latest_actions`. Segmentation logic can be built on top of these fields. The retargeting ad creative endpoint can accept a segment parameter to generate tailored creatives. Custom Audience sync (if using Meta Marketing API) would create separate audiences per segment.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (conversion attribution + pixel forwarding).
+
+---
+
+## New ad platforms (Pinterest, Snapchat, X/Twitter)
+
+**What:** Add Pinterest Tag, Snapchat Pixel, and X/Twitter pixel forwarding. Follow the existing forwarder pattern established by `facebook.ts`, `google.ts`, and `tiktok.ts` in `lib/tracking/forwarding/`.
+
+**Why:** Creators advertise across more platforms than Meta/Google/TikTok. Supporting additional pixels broadens the retargeting funnel without changing the architecture.
+
+**Context:** Each new platform needs: a forwarder file in `lib/tracking/forwarding/`, credentials columns in `creator_pixels` schema, UI fields in the pixel settings section, and platform API account setup. The forwarding orchestrator (`index.ts`) already handles multi-platform dispatch — new platforms plug in via the same pattern.
+
+**Effort:** M per platform
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Auto-audience creation via Meta Marketing API
+
+**What:** Programmatically create and update Custom Audiences in Meta Ads Manager using the Marketing API, instead of requiring creators to manually configure Website Visitors and Subscribe exclusion audiences.
+
+**Why:** Manual Custom Audience setup in Ads Manager is the highest-friction step in the retargeting workflow. Automating it removes a multi-step process that most independent artists struggle with.
+
+**Context:** Requires Meta Marketing API integration with an OAuth flow for creators to grant `ads_management` permission. The API supports creating Website Custom Audiences and updating them with hashed user data. Scope includes audience creation, membership sync, and exclusion audience management.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Self-healing credential detection
+
+**What:** Periodically send test events to each creator's configured ad pixels. Auto-disable pixels that fail 3 consecutive test events. Notify the creator via dashboard banner and email. Re-enable automatically when credentials are updated.
+
+**Why:** Broken credentials silently waste the forwarding pipeline's resources and give creators a false sense that their ads are working. Proactive detection catches issues before the creator notices missing conversions.
+
+**Context:** The test event API (`/api/dashboard/pixels/test-event`) already exists for manual testing. This extends it into an automated health check, likely as a cron job that iterates over active `creator_pixels` rows. The `creator_pixels` table would need a `consecutive_failures` counter and `disabled_at` timestamp. Notification uses the existing dashboard notification pattern.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (pixel health status + test event button).
+
+---
+
+## Ad creative auto-refresh
+
+**What:** When an artist updates their profile photo, automatically regenerate cached retargeting ad creatives stored in Vercel Blob. Trigger from the profile update handler.
+
+**Why:** Stale creatives with outdated photos look unprofessional and reduce ad click-through rates. Auto-refresh keeps creatives current without requiring the artist to manually regenerate.
+
+**Context:** The ad creative endpoint (`/api/dashboard/retargeting/ad-creative`) generates images on demand and can cache them in Vercel Blob. The profile update handler in the dashboard settings flow is the trigger point. Implementation adds a post-update hook that invalidates/regenerates the 4 creative variants (fan-feed, fan-story, claim-feed, claim-story).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Weekly pixel digest email
+
+**What:** Send a weekly summary email to creators with active pixels: "This week: 423 page views forwarded, 89% success rate, 12 new subscribers from retargeting." Only sent if there's forwarding activity. Uses Resend.
+
+**Why:** Creators rarely check their dashboard daily. A weekly digest keeps them aware of their retargeting performance and nudges them back to the dashboard when numbers are interesting.
+
+**Context:** Requires aggregating `pixel_events` stats per creator for the past 7 days (forwarded count, success/failure rate) and joining with attribution data from `audience_members`. Uses the existing Resend integration. Should be a cron job (weekly, e.g. Monday 10am UTC). Needs an unsubscribe mechanism and should respect notification preferences.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (forwarding observability + conversion attribution).
