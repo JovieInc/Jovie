@@ -11,6 +11,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - "Delete account" button from the user dropdown menu — too easy to click accidentally. Delete account is still accessible via Settings > Data & Privacy.
+### Added
+
+- Persistent audio playback with Now Playing card in sidebar footer — shows artwork, track title, artist/release info, play/pause controls, and progress bar
+- Preview availability indicators in release tables — VolumeX muted icon shows which releases/tracks have no audio preview available
+- Audio error handling with toast notification when preview URLs fail to load
+- Fade-in entrance animation for Now Playing card (tw-animate-css)
+- Keyboard-accessible focus rings on all player buttons
+- Image fallback for missing/broken artwork URLs
+- 11 unit tests covering useTrackAudioPlayer hook and NowPlayingCard component states
+
+### Changed
+
+- Extended useTrackAudioPlayer hook with track metadata (title, release, artist, artwork) for any UI surface to render current track
+- All 5 toggleTrack callers now pass release metadata (ReleaseCell, ReleaseTrackList, TrackRow, ReleaseSidebar, NowPlayingCard)
 
 ## [26.4.19] - 2026-03-19
 
