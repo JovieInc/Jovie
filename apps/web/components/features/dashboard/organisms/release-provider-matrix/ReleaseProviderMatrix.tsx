@@ -31,6 +31,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 import { QueryErrorBoundary, usePlanGate } from '@/lib/queries';
@@ -45,6 +46,7 @@ import {
   DEFAULT_RELEASE_FILTERS,
   type ReleaseFilters,
   ReleaseTableSubheader,
+  type ReleaseView,
 } from './ReleaseTableSubheader';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
@@ -209,6 +211,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   const [filters, setFilters] = useState<ReleaseFilters>(
     DEFAULT_RELEASE_FILTERS
   );
+
+  // View toggle (releases vs tracks)
+  const [releaseView, setReleaseView] = useState<ReleaseView>('releases');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -492,45 +497,44 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // This is CRITICAL to prevent infinite render loops when updating context
   const headerActions = useMemo(
     () => (
-      <div className='flex min-w-0 items-center gap-1.5'>
-        <DashboardHeaderActionGroup className='min-w-0 flex-1'>
-          <HeaderSearchAction
-            searchValue={searchQuery}
-            onSearchValueChange={setSearchQuery}
-            onClearAction={() => setSearchQuery('')}
-            onApply={() => undefined}
-            placeholder='Search releases'
-            ariaLabel='Search releases'
-            submitAriaLabel='Search releases'
-            submitIcon={
-              <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
-            }
-            tooltipLabel='Search'
-            className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
-          />
-          {canCreateManualReleases ? (
-            <DashboardHeaderActionButton
-              ariaLabel='Create a new release'
-              onClick={handleNewRelease}
-              icon={
-                <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
-              }
-              label='New Release'
-              iconOnly
-              tooltipLabel='New Release'
-              className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-            />
-          ) : null}
-        </DashboardHeaderActionGroup>
-        <div className='ml-auto shrink-0'>
+      <DashboardHeaderActionGroup
+        className='min-w-0 flex-1 gap-2'
+        leadingClassName='min-w-0 gap-1.5'
+        trailing={
           <DrawerToggleButton
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
             className='h-7 w-7 text-tertiary-token hover:text-primary-token'
           />
-        </div>
-      </div>
+        }
+      >
+        <HeaderSearchAction
+          searchValue={searchQuery}
+          onSearchValueChange={setSearchQuery}
+          onClearAction={() => setSearchQuery('')}
+          onApply={() => undefined}
+          placeholder='Search releases'
+          ariaLabel='Search releases'
+          submitAriaLabel='Search releases'
+          submitIcon={
+            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
+          }
+          tooltipLabel='Search'
+          className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
+        />
+        {canCreateManualReleases ? (
+          <DashboardHeaderActionButton
+            ariaLabel='Create a new release'
+            onClick={handleNewRelease}
+            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
+            label='New Release'
+            iconOnly
+            tooltipLabel='New Release'
+            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
+          />
+        ) : null}
+      </DashboardHeaderActionGroup>
     ),
     [canCreateManualReleases, handleNewRelease, searchQuery]
   );
@@ -688,26 +692,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   return (
     <>
       <div
-        className='flex h-full min-h-0 min-w-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_68%,var(--linear-bg-surface-1))]'
+        className='flex h-full min-h-0 min-w-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
         data-testid='releases-matrix'
       >
         <h1 className='sr-only'>Releases</h1>
         <div className='flex-1 min-h-0 flex flex-col'>
-          {/* Sticky subheader - outside scroll container */}
-          {showReleasesTable && (
-            <ReleaseTableSubheader
-              releases={filteredRows}
-              selectedIds={selectedIds}
-              filters={filters}
-              onFiltersChange={setFilters}
-              groupByYear={groupByYear}
-              onGroupByYearChange={onGroupByYearChange}
-            />
-          )}
-
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            <div className='flex min-h-full flex-col px-3 pb-3 pt-2 lg:px-4 lg:pb-4 lg:pt-3'>
+            <div className='flex min-h-full flex-col px-3.5 pb-3.5 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3'>
               {(showReleasesTable || showImportProgress) && (
                 <ImportProgressBanner
                   artistName={artistName}
@@ -760,7 +752,22 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
               {showReleasesTable && (
                 <QueryErrorBoundary>
-                  <div className='mt-3 flex min-h-[420px] flex-1 overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_1px_0_rgba(0,0,0,0.02)]'>
+                  <div
+                    className={cn(
+                      LINEAR_SURFACE.contentContainer,
+                      'mt-3 flex min-h-[440px] flex-1 flex-col overflow-hidden'
+                    )}
+                  >
+                    <ReleaseTableSubheader
+                      releases={filteredRows}
+                      selectedIds={selectedIds}
+                      filters={filters}
+                      onFiltersChange={setFilters}
+                      groupByYear={groupByYear}
+                      onGroupByYearChange={onGroupByYearChange}
+                      releaseView={releaseView}
+                      onReleaseViewChange={setReleaseView}
+                    />
                     <ReleaseTable
                       releases={filteredRows}
                       providerConfig={providerConfig}
@@ -784,54 +791,62 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
               {/* Show "No releases" state when connected but no releases and not importing */}
               {isConnected && rows.length === 0 && !isImporting && (
-                <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                  <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-subtle bg-surface-1'>
-                    <Icon
-                      name='Disc3'
-                      className='h-8 w-8 text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </div>
-                  <h3 className='mt-4 text-lg font-[590] text-primary-token'>
-                    No releases yet
-                  </h3>
-                  <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
-                    {canCreateManualReleases
-                      ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
-                      : 'Sync your releases from Spotify to start generating smart links.'}
-                  </p>
-                  <div className='mt-4 flex items-center gap-3'>
-                    <DrawerButton
-                      tone='primary'
-                      disabled={isSyncing}
-                      onClick={experienceAdapter?.onSync ?? handleSync}
-                      className='inline-flex items-center gap-2'
-                      data-testid='sync-spotify-empty-state'
-                    >
+                <div className='mt-3 flex flex-1'>
+                  <div
+                    className={cn(
+                      LINEAR_SURFACE.contentContainer,
+                      'flex min-h-[280px] w-full flex-col items-center justify-center px-5 py-14 text-center'
+                    )}
+                  >
+                    <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
                       <Icon
-                        name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                        className={cn(
-                          'h-4 w-4',
-                          isSyncing && 'animate-spin motion-reduce:animate-none'
-                        )}
+                        name='Disc3'
+                        className='h-6 w-6 text-tertiary-token'
                         aria-hidden='true'
                       />
-                      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                    </DrawerButton>
-                    {canCreateManualReleases && (
+                    </div>
+                    <h3 className='mt-4 text-[14px] font-[590] tracking-[-0.012em] text-primary-token'>
+                      No releases yet
+                    </h3>
+                    <p className='mt-1 max-w-sm text-[12px] leading-[18px] text-secondary-token'>
+                      {canCreateManualReleases
+                        ? 'Sync from Spotify or create one manually to start generating smart links.'
+                        : 'Sync from Spotify to start generating smart links.'}
+                    </p>
+                    <div className='mt-4 flex flex-wrap items-center justify-center gap-2.5'>
                       <DrawerButton
-                        onClick={handleNewRelease}
+                        tone='primary'
+                        disabled={isSyncing}
+                        onClick={experienceAdapter?.onSync ?? handleSync}
                         className='inline-flex items-center gap-2'
-                        data-testid='create-release-empty-state'
+                        data-testid='sync-spotify-empty-state'
                       >
                         <Icon
-                          name='Plus'
-                          className='h-4 w-4'
+                          name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                          className={cn(
+                            'h-4 w-4',
+                            isSyncing &&
+                              'animate-spin motion-reduce:animate-none'
+                          )}
                           aria-hidden='true'
                         />
-                        Create Release
+                        {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
                       </DrawerButton>
-                    )}
+                      {canCreateManualReleases && (
+                        <DrawerButton
+                          onClick={handleNewRelease}
+                          className='inline-flex items-center gap-2'
+                          data-testid='create-release-empty-state'
+                        >
+                          <Icon
+                            name='Plus'
+                            className='h-4 w-4'
+                            aria-hidden='true'
+                          />
+                          Create Release
+                        </DrawerButton>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

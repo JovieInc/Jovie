@@ -30,7 +30,7 @@ export function TrackPlatformLinksSection({
       emptyMessage={emptyMessage}
       emptyStateTestId='track-platforms-empty'
     >
-      <div className='space-y-1'>
+      <div className='space-y-1.5'>
         {providers.map(provider => (
           <SidebarLinkRow
             key={provider.key}

@@ -26,13 +26,11 @@ export function DrawerTabs<T extends string>({
       value={value}
       onValueChange={onValueChange}
       options={options}
+      surface='ghost'
       aria-label={ariaLabel}
-      className={cn(
-        'w-full rounded-[9px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_78%,var(--linear-bg-surface-0))] p-0.5',
-        className
-      )}
+      className={cn('w-full', className)}
       triggerClassName={cn(
-        'h-[26px] rounded-[7px] px-2 text-[10.5px] font-[510] tracking-[-0.008em]',
+        'h-[26px] rounded-[7px] px-2.5 text-[11px] font-[510] tracking-[-0.008em] data-[state=active]:bg-surface-1',
         triggerClassName
       )}
     />

@@ -184,7 +184,13 @@ describe('DashboardOverview', () => {
     renderDashboard(profile, true);
 
     // The "View profile" link button should use the shared compact shell control sizing.
-    const viewProfileLink = screen.getByRole('link', { name: 'View profile' });
+    const headerEl = screen
+      .getByText('Keep your profile polished and ready to share')
+      .closest('header');
+    expect(headerEl).not.toBeNull();
+    const viewProfileLink = within(headerEl as HTMLElement).getByRole('link', {
+      name: 'View profile',
+    });
     const btnClass = viewProfileLink.className;
 
     expect(btnClass).toContain('h-(--linear-app-control-height-sm)');

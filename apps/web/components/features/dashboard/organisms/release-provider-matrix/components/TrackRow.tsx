@@ -57,11 +57,11 @@ export const TrackRow = memo(function TrackRow({
 }: TrackRowProps) {
   const { playbackState, toggleTrack } = useTrackAudioPlayer();
   const rowStateClassName = isSelected
-    ? 'bg-surface-1 shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_var(--linear-border-subtle)] hover:bg-surface-1'
-    : 'bg-transparent hover:bg-surface-1 transition-[background-color,box-shadow] duration-150 ease-out';
+    ? 'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))] shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_16%,var(--linear-app-frame-seam))] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]'
+    : 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_62%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] transition-[background-color,box-shadow] duration-150 ease-out';
 
   const rowClassName = [
-    'group rounded-md',
+    'group rounded-[10px]',
     onClick ? 'cursor-pointer' : '',
     rowStateClassName,
   ]
@@ -126,10 +126,15 @@ export const TrackRow = memo(function TrackRow({
   );
 
   return (
-    <tr className={rowClassName} onClick={onClick}>
+    <tr
+      className={rowClassName}
+      onClick={onClick}
+      data-testid={`track-row-${track.id}`}
+      data-state={isSelected ? 'selected' : 'idle'}
+    >
       {/* 1. Spacer for checkbox column (always visible) */}
       {isVisible('select') && (
-        <td className='w-14 py-1.5'>
+        <td className='w-14 py-2 align-top'>
           <div className='flex items-center justify-center'>
             {canPlay ? (
               <button
@@ -158,8 +163,12 @@ export const TrackRow = memo(function TrackRow({
 
       {/* 2. Track info - spans the release column width (always visible) */}
       {isVisible('release') && (
-        <td className='py-1.5 pr-3'>
-          <div className='flex items-center gap-2 pl-6'>
+        <td className='py-2 pr-3 align-top'>
+          <div className='relative flex items-center gap-2.5 pl-5'>
+            <span
+              aria-hidden='true'
+              className='absolute left-2 top-0.5 bottom-0.5 w-px rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_88%,transparent)]'
+            />
             {/* Track number */}
             <span className='w-7 shrink-0 text-right text-[11px] tabular-nums text-tertiary-token'>
               {trackLabel}.
@@ -170,7 +179,7 @@ export const TrackRow = memo(function TrackRow({
               <div className='flex items-center gap-2'>
                 <TruncatedText
                   lines={1}
-                  className='text-[13px] text-primary-token'
+                  className='text-[12.5px] font-[510] text-primary-token'
                   tooltipSide='top'
                   tooltipAlign='start'
                 >
@@ -195,7 +204,7 @@ export const TrackRow = memo(function TrackRow({
 
       {/* 4. Availability - compact provider dots */}
       {isVisible('availability') && (
-        <td className='py-1.5'>
+        <td className='py-2 align-top'>
           <div className='flex items-center gap-2'>
             {linkedProviders.length > 0 ? (
               <CompactLinkRail
@@ -234,7 +243,7 @@ export const TrackRow = memo(function TrackRow({
 
       {/* 7. Metrics - only duration for tracks */}
       {isVisible('metrics') && (
-        <td className='py-1.5'>
+        <td className='py-2 align-top'>
           {track.durationMs ? (
             <span className='text-[11px] tabular-nums text-secondary-token'>
               {formatDuration(track.durationMs)}
@@ -250,7 +259,7 @@ export const TrackRow = memo(function TrackRow({
 
       {/* 9. ISRC */}
       {isVisible('primaryIsrc') && (
-        <td className='py-1.5'>
+        <td className='py-2 align-top'>
           <CopyableMonospaceCell value={track.isrc} label='ISRC' size='sm' />
         </td>
       )}
@@ -315,10 +324,10 @@ export const TrackRowsContainer = memo(function TrackRowsContainer({
 
   if (tracks.length === 0) {
     return (
-      <tr className='bg-surface-1/60'>
+      <tr className='bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)]'>
         <td
           colSpan={columnCount}
-          className='py-2 pl-20 text-[11px] text-tertiary-token'
+          className='py-2.5 pl-20 text-[11px] text-tertiary-token'
         >
           <div className='flex items-center gap-2'>
             <Icon name='AlertCircle' className='h-3.5 w-3.5' />

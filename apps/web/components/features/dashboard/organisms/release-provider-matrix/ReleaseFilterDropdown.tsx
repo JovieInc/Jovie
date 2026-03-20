@@ -20,6 +20,7 @@ import { Icon } from '@/components/atoms/Icon';
 import { DropdownEmptyState } from '@/components/molecules/DropdownEmptyState';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS } from '@/components/organisms/table';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
 import { FilterSubmenu } from './FilterSubmenu';
@@ -103,7 +104,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-transparent px-1.5 pt-1.5 pb-1'>
+    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-2'>
       <div className='relative'>
         <Search className='absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -114,7 +115,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-md border border-transparent bg-surface-0 py-1 pl-7 pr-6 text-[13px]',
+            'w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
@@ -156,8 +157,8 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-md border border-subtle bg-surface-1 text-[11px]'>
-      <div className='flex items-center gap-1 py-0.5 pl-2 pr-0.5'>
+    <div className='flex items-center gap-0.5 rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] text-[11px]'>
+      <div className='flex items-center gap-1 py-1 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
             {icon}
@@ -171,7 +172,7 @@ function ActiveFilterPill({
       </div>
       <DrawerInlineIconButton
         onClick={onClear}
-        className='h-full rounded-r-md px-1 py-0.5 text-tertiary-token'
+        className='h-full rounded-r-[8px] px-1 py-1 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -239,7 +240,11 @@ function SubmenuCheckboxItem({
         onCheckedChange();
       }}
       onKeyDown={handleKeyDown}
-      className={cn(MENU_ITEM_BASE, 'w-full', checked && 'text-primary-token')}
+      className={cn(
+        MENU_ITEM_BASE,
+        'w-full rounded-[8px] border border-transparent',
+        checked && 'text-primary-token'
+      )}
     >
       <span
         className={cn(
@@ -309,7 +314,7 @@ function VirtualizedLabelList({
   if (!useVirtualization) {
     // For small lists, render normally without virtualization
     return (
-      <div className='flex-1 overflow-y-auto p-1'>
+      <div className='flex-1 overflow-y-auto p-1.5'>
         {options.map(opt => (
           <SubmenuCheckboxItem
             key={opt.label}
@@ -327,7 +332,7 @@ function VirtualizedLabelList({
 
   // For large lists, use virtualization
   return (
-    <div ref={parentRef} className='flex-1 overflow-y-auto p-1'>
+    <div ref={parentRef} className='flex-1 overflow-y-auto p-1.5'>
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -518,7 +523,10 @@ export function ReleaseFilterDropdown({
         <DropdownMenuContent
           align='start'
           sideOffset={4}
-          className='min-w-[200px] max-w-[calc(100vw-16px)] max-h-[280px] overflow-hidden flex flex-col'
+          className={cn(
+            LINEAR_SURFACE.popover,
+            'flex max-h-[280px] min-w-[212px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+          )}
           onCloseAutoFocus={e => e.preventDefault()}
         >
           {/* Main Menu Search */}
@@ -534,7 +542,7 @@ export function ReleaseFilterDropdown({
           />
 
           {/* Categories List */}
-          <div className='flex-1 overflow-y-auto p-1'>
+          <div className='flex-1 overflow-y-auto p-1.5'>
             {filteredCategories.length === 0 ? (
               <DropdownEmptyState message='No filters found' />
             ) : (
@@ -578,7 +586,7 @@ export function ReleaseFilterDropdown({
                       }
                     }}
                   >
-                    <DropdownMenuSubTrigger className='justify-between'>
+                    <DropdownMenuSubTrigger className='justify-between rounded-[8px]'>
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
@@ -596,7 +604,10 @@ export function ReleaseFilterDropdown({
                       sideOffset={4}
                       alignOffset={-4}
                       collisionPadding={8}
-                      className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
+                      className={cn(
+                        LINEAR_SURFACE.popover,
+                        'flex max-h-[300px] min-w-[196px] max-w-[calc(100vw-16px)] flex-col overflow-hidden'
+                      )}
                     >
                       <SearchInput
                         value={labelSearch}
@@ -630,7 +641,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='text-tertiary-token hover:text-primary-token'
+                  className='rounded-[8px] text-tertiary-token hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

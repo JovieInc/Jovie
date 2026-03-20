@@ -5,6 +5,7 @@ import {
   DrawerEmptyState,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
@@ -85,61 +86,69 @@ export function ReleaseSmartLinkAnalytics({
 
   return (
     <DrawerSurfaceCard
-      className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-2.5'
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
       testId='release-smart-link-analytics'
     >
-      {showSkeleton && (
-        <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
-          <div className='space-y-1 pr-3'>
-            <div className='h-[9px] w-12 rounded skeleton' />
-            <div className='h-4 w-8 rounded skeleton' />
-            <div className='h-[9px] w-10 rounded skeleton' />
-          </div>
-          <div className='space-y-1 pl-3'>
-            <div className='h-[9px] w-12 rounded skeleton' />
-            <div className='h-4 w-8 rounded skeleton' />
-            <div className='h-[9px] w-10 rounded skeleton' />
-          </div>
-        </div>
-      )}
+      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          Analytics
+        </p>
+      </div>
 
-      {!showSkeleton && hasError && (
-        <DrawerEmptyState
-          className='min-h-[52px] px-0 py-0'
-          message='Analytics unavailable'
-        />
-      )}
-
-      {!showSkeleton && !hasError && (
-        <div
-          className={cn(
-            'space-y-2 transition-opacity duration-100',
-            isSwitching && 'opacity-50'
-          )}
-        >
+      <div className='p-3'>
+        {showSkeleton && (
           <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
-            <AnalyticsMetric
-              label='Total clicks'
-              value={numberFormatter.format(totalClicks)}
-              hint='All time'
-              className='pr-3'
-            />
-            <AnalyticsMetric
-              label='Last 7 days'
-              value={numberFormatter.format(last7DaysClicks)}
-              hint='Recent'
-              className='pl-3'
-            />
+            <div className='space-y-1 pr-3'>
+              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-4 w-8 rounded skeleton' />
+              <div className='h-[9px] w-10 rounded skeleton' />
+            </div>
+            <div className='space-y-1 pl-3'>
+              <div className='h-[9px] w-12 rounded skeleton' />
+              <div className='h-4 w-8 rounded skeleton' />
+              <div className='h-[9px] w-10 rounded skeleton' />
+            </div>
           </div>
+        )}
 
-          {showEmpty && (
-            <DrawerEmptyState
-              className='min-h-[32px] px-0 py-0'
-              message='Share your smart link to start tracking clicks.'
-            />
-          )}
-        </div>
-      )}
+        {!showSkeleton && hasError && (
+          <DrawerEmptyState
+            className='min-h-[52px] px-0 py-0'
+            message='Analytics unavailable'
+          />
+        )}
+
+        {!showSkeleton && !hasError && (
+          <div
+            className={cn(
+              'space-y-2 transition-opacity duration-100',
+              isSwitching && 'opacity-50'
+            )}
+          >
+            <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
+              <AnalyticsMetric
+                label='Total clicks'
+                value={numberFormatter.format(totalClicks)}
+                hint='All time'
+                className='pr-3'
+              />
+              <AnalyticsMetric
+                label='Last 7 days'
+                value={numberFormatter.format(last7DaysClicks)}
+                hint='Recent'
+                className='pl-3'
+              />
+            </div>
+
+            {showEmpty && (
+              <DrawerEmptyState
+                className='min-h-[32px] px-0 py-0'
+                message='Share your smart link to start tracking clicks.'
+              />
+            )}
+          </div>
+        )}
+      </div>
     </DrawerSurfaceCard>
   );
 }
@@ -156,7 +165,7 @@ function AnalyticsMetric({
   readonly className?: string;
 }) {
   return (
-    <div className={cn('space-y-0.5', className)}>
+    <div className={cn('space-y-px', className)}>
       <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
         {label}
       </p>

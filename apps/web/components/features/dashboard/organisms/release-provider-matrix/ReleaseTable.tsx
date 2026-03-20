@@ -136,13 +136,13 @@ export function ReleaseTable({
       let baseClassName: string;
       if (isSelected) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-row-selected)_42%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_48%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_52%,transparent)]';
+          'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))] shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))] hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-row-selected)_32%,var(--linear-bg-surface-0))]';
       } else if (isRowExpanded) {
         baseClassName =
-          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_76%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_80%,var(--linear-bg-surface-0))]';
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,var(--linear-bg-surface-0))]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_75%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_82%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
       }
 
       const refreshClassName = isRefreshing
@@ -153,8 +153,8 @@ export function ReleaseTable({
         : '';
 
       return [
-        'rounded-none',
-        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_26%,transparent)]',
+        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
+        'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_30%,transparent)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
         refreshClassName,
@@ -207,7 +207,7 @@ export function ReleaseTable({
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
-      meta: { className: 'pl-5 pr-2' },
+      meta: { className: 'pl-4 pr-2.5' },
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -218,9 +218,9 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 292,
-      minSize: 216,
-      meta: { className: 'hidden px-2.5 sm:table-cell' },
+      size: 236,
+      minSize: 188,
+      meta: { className: 'hidden pl-2 pr-4 sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];
@@ -351,14 +351,14 @@ export function ReleaseTable({
       rowHeight={rowHeight}
       minWidth={minWidth}
       hideHeader
-      className='text-[13px] text-primary-token'
-      containerClassName='h-full'
+      className='text-[12.5px] text-primary-token'
+      containerClassName='h-full px-2.5 pb-2.5 pt-1 md:px-3 md:pb-3 md:pt-1.5'
       columnVisibility={tanstackColumnVisibility}
       onFocusedRowChange={handleFocusedRowChange}
       skeletonRows={14}
       skeletonColumnConfig={[
         { variant: 'release', width: '100%' },
-        { variant: 'meta', width: '240px' },
+        { variant: 'meta', width: '204px' },
       ]}
       groupingConfig={groupingConfig}
       expandedRowIds={expandedRowIds}

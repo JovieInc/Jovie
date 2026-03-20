@@ -4,6 +4,7 @@ import type { CommonDropdownItem } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
@@ -100,7 +101,12 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='sticky top-0 z-20 shrink-0 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
+        <div
+          className={cn(
+            LINEAR_SURFACE.stickyHeader,
+            'sticky top-0 z-20 shrink-0 border-b backdrop-blur-[10px]'
+          )}
+        >
           {/* Header bar — close is in the overflow dropdown */}
           <DrawerHeader
             title={title}
@@ -118,7 +124,7 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-4 pt-2.5 pb-1.5'>
+            <div className='overflow-visible px-4 pt-2 pb-1.5'>
               {entityHeader}
             </div>
           )}
@@ -144,13 +150,18 @@ export function EntitySidebarShell({
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-2.5 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-2.5'>
+            <div className='flex-1 min-h-0 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-2.5'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-1.5'>
+              <div
+                className={cn(
+                  LINEAR_SURFACE.toolbar,
+                  'shrink-0 border-t px-4 py-2'
+                )}
+              >
                 {footer}
               </div>
             )}

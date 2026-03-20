@@ -16,6 +16,7 @@ import {
   DrawerPropertyRow,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { CanvasStatus } from '@/lib/services/canvas/types';
 import { cn } from '@/lib/utils';
@@ -136,233 +137,242 @@ export function ReleaseMetadata({
     canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
 
   return (
-    <DrawerSurfaceCard className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-1.5'>
-      <div className='divide-y divide-(--linear-app-frame-seam)'>
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='Type'
-          value={<ReleaseTypeBadges release={release} />}
-          align='start'
-        />
+    <DrawerSurfaceCard
+      className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+    >
+      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+          Metadata
+        </p>
+      </div>
+      <div className='p-1.5'>
+        <div className='divide-y divide-(--linear-app-frame-seam)'>
+          <DrawerPropertyRow
+            {...METADATA_ROW_PROPS}
+            className={METADATA_ROW_CLASSNAME}
+            label='Type'
+            value={<ReleaseTypeBadges release={release} />}
+            align='start'
+          />
 
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='ISRC'
-          value={
-            <CopyableMonospaceCell
-              value={release.primaryIsrc}
-              label='ISRC'
-              size='sm'
-              maxWidth={140}
-            />
-          }
-        />
-
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='UPC'
-          value={
-            <CopyableMonospaceCell
-              value={release.upc}
-              label='UPC'
-              size='sm'
-              maxWidth={140}
-            />
-          }
-        />
-
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='Label'
-          value={
-            release.label ? (
+          <DrawerPropertyRow
+            {...METADATA_ROW_PROPS}
+            className={METADATA_ROW_CLASSNAME}
+            label='ISRC'
+            value={
               <CopyableMonospaceCell
-                value={release.label}
-                label='Label'
+                value={release.primaryIsrc}
+                label='ISRC'
                 size='sm'
                 maxWidth={140}
-                className='font-sans'
               />
-            ) : (
-              <MetadataFallbackValue>Unknown</MetadataFallbackValue>
-            )
-          }
-        />
-        {release.copyrightLine && (
+            }
+          />
+
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
-            label={
-              <CopyrightLabel
-                symbol='℗'
-                description='Sound recording copyright (phonogram rights)'
-              />
-            }
+            label='UPC'
             value={
-              <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
-                {formatCopyrightLine(release.copyrightLine, '℗')}
-              </span>
-            }
-            align='start'
-          />
-        )}
-
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='Tracks'
-          value={
-            <span className='text-[11px] tabular-nums text-secondary-token'>
-              {release.totalTracks}{' '}
-              {release.totalTracks === 1 ? 'track' : 'tracks'}
-            </span>
-          }
-        />
-        {release.distributor && (
-          <DrawerPropertyRow
-            {...METADATA_ROW_PROPS}
-            className={METADATA_ROW_CLASSNAME}
-            label={
-              <CopyrightLabel
-                symbol='©'
-                description='Composition copyright (musical work)'
+              <CopyableMonospaceCell
+                value={release.upc}
+                label='UPC'
+                size='sm'
+                maxWidth={140}
               />
             }
+          />
+
+          <DrawerPropertyRow
+            {...METADATA_ROW_PROPS}
+            className={METADATA_ROW_CLASSNAME}
+            label='Label'
             value={
-              <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
-                {formatCopyrightLine(release.distributor, '©')}
-              </span>
+              release.label ? (
+                <CopyableMonospaceCell
+                  value={release.label}
+                  label='Label'
+                  size='sm'
+                  maxWidth={140}
+                  className='font-sans'
+                />
+              ) : (
+                <MetadataFallbackValue>Unknown</MetadataFallbackValue>
+              )
             }
-            align='start'
           />
-        )}
+          {release.copyrightLine && (
+            <DrawerPropertyRow
+              {...METADATA_ROW_PROPS}
+              className={METADATA_ROW_CLASSNAME}
+              label={
+                <CopyrightLabel
+                  symbol='℗'
+                  description='Sound recording copyright (phonogram rights)'
+                />
+              }
+              value={
+                <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
+                  {formatCopyrightLine(release.copyrightLine, '℗')}
+                </span>
+              }
+              align='start'
+            />
+          )}
 
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='Canvas'
-          value={
-            onCanvasStatusChange ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <DrawerButton
-                    tone='ghost'
-                    size='sm'
-                    className='-mx-1 h-6 gap-1 rounded-md border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
-                  >
-                    <span>{canvasStatusDisplayLabel}</span>
-                    <ChevronDown
-                      size={12}
-                      className='text-tertiary-token'
-                      aria-hidden='true'
-                    />
-                  </DrawerButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='start' className='w-44'>
-                  {CANVAS_STATUS_OPTIONS.map(status => {
-                    const config = CANVAS_STATUS_CONFIG[status];
-                    const isActive = status === selectionStatus;
-                    return (
-                      <DropdownMenuItem
-                        key={status}
-                        onClick={() => onCanvasStatusChange(status)}
-                        className={cn(isActive && 'font-medium')}
-                      >
-                        <span className='flex w-full items-center gap-2'>
-                          <Badge
-                            variant='secondary'
-                            className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
-                          >
-                            {config.label}
-                          </Badge>
-                          {isActive && (
-                            <Check
-                              size={14}
-                              className='ml-auto text-primary-token'
-                              aria-hidden='true'
-                            />
-                          )}
-                        </span>
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Badge
-                variant='secondary'
-                className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
-              >
-                {canvasStatusDisplayLabel}
-              </Badge>
-            )
-          }
-        />
-
-        {release.spotifyPopularity != null && (
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
-            label='Popularity'
-            value={<PopularityScore value={release.spotifyPopularity} />}
-          />
-        )}
-        {release.totalDurationMs != null && release.totalDurationMs > 0 && (
-          <DrawerPropertyRow
-            {...METADATA_ROW_PROPS}
-            className={METADATA_ROW_CLASSNAME}
-            label='Duration'
+            label='Tracks'
             value={
               <span className='text-[11px] tabular-nums text-secondary-token'>
-                {formatDuration(release.totalDurationMs)}
+                {release.totalTracks}{' '}
+                {release.totalTracks === 1 ? 'track' : 'tracks'}
               </span>
             }
           />
-        )}
+          {release.distributor && (
+            <DrawerPropertyRow
+              {...METADATA_ROW_PROPS}
+              className={METADATA_ROW_CLASSNAME}
+              label={
+                <CopyrightLabel
+                  symbol='©'
+                  description='Composition copyright (musical work)'
+                />
+              }
+              value={
+                <span className={cn('truncate', METADATA_TEXT_CLASSNAME)}>
+                  {formatCopyrightLine(release.distributor, '©')}
+                </span>
+              }
+              align='start'
+            />
+          )}
 
-        <DrawerPropertyRow
-          {...METADATA_ROW_PROPS}
-          className={METADATA_ROW_CLASSNAME}
-          label='Released'
-          value={
-            release.releaseDate ? (
-              <span className={METADATA_TEXT_CLASSNAME}>
-                {new Date(release.releaseDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-                })}
-              </span>
-            ) : (
-              <MetadataFallbackValue>Unknown</MetadataFallbackValue>
-            )
-          }
-        />
-        {release.genres && release.genres.length > 0 && (
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
             className={METADATA_ROW_CLASSNAME}
-            label='Genres'
+            label='Canvas'
             value={
-              <div className='flex flex-wrap gap-1'>
-                {release.genres.slice(0, 3).map(genre => (
-                  <Badge
-                    key={genre}
-                    variant='secondary'
-                    className='rounded-md bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token'
-                  >
-                    {genre}
-                  </Badge>
-                ))}
-              </div>
+              onCanvasStatusChange ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <DrawerButton
+                      tone='ghost'
+                      size='sm'
+                      className='-mx-1 h-6 gap-1 rounded-md border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
+                    >
+                      <span>{canvasStatusDisplayLabel}</span>
+                      <ChevronDown
+                        size={12}
+                        className='text-tertiary-token'
+                        aria-hidden='true'
+                      />
+                    </DrawerButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align='start' className='w-44'>
+                    {CANVAS_STATUS_OPTIONS.map(status => {
+                      const config = CANVAS_STATUS_CONFIG[status];
+                      const isActive = status === selectionStatus;
+                      return (
+                        <DropdownMenuItem
+                          key={status}
+                          onClick={() => onCanvasStatusChange(status)}
+                          className={cn(isActive && 'font-medium')}
+                        >
+                          <span className='flex w-full items-center gap-2'>
+                            <Badge
+                              variant='secondary'
+                              className={`${METADATA_BADGE_CLASSNAME} ${config.className}`}
+                            >
+                              {config.label}
+                            </Badge>
+                            {isActive && (
+                              <Check
+                                size={14}
+                                className='ml-auto text-primary-token'
+                                aria-hidden='true'
+                              />
+                            )}
+                          </span>
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Badge
+                  variant='secondary'
+                  className={`${METADATA_BADGE_CLASSNAME} ${canvasStatusConfig.className}`}
+                >
+                  {canvasStatusDisplayLabel}
+                </Badge>
+              )
             }
-            align='start'
           />
-        )}
+
+          {release.spotifyPopularity != null && (
+            <DrawerPropertyRow
+              {...METADATA_ROW_PROPS}
+              className={METADATA_ROW_CLASSNAME}
+              label='Popularity'
+              value={<PopularityScore value={release.spotifyPopularity} />}
+            />
+          )}
+          {release.totalDurationMs != null && release.totalDurationMs > 0 && (
+            <DrawerPropertyRow
+              {...METADATA_ROW_PROPS}
+              className={METADATA_ROW_CLASSNAME}
+              label='Duration'
+              value={
+                <span className='text-[11px] tabular-nums text-secondary-token'>
+                  {formatDuration(release.totalDurationMs)}
+                </span>
+              }
+            />
+          )}
+
+          <DrawerPropertyRow
+            {...METADATA_ROW_PROPS}
+            className={METADATA_ROW_CLASSNAME}
+            label='Released'
+            value={
+              release.releaseDate ? (
+                <span className={METADATA_TEXT_CLASSNAME}>
+                  {new Date(release.releaseDate).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              ) : (
+                <MetadataFallbackValue>Unknown</MetadataFallbackValue>
+              )
+            }
+          />
+          {release.genres && release.genres.length > 0 && (
+            <DrawerPropertyRow
+              {...METADATA_ROW_PROPS}
+              className={METADATA_ROW_CLASSNAME}
+              label='Genres'
+              value={
+                <div className='flex flex-wrap gap-1'>
+                  {release.genres.slice(0, 3).map(genre => (
+                    <Badge
+                      key={genre}
+                      variant='secondary'
+                      className='rounded-md bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token'
+                    >
+                      {genre}
+                    </Badge>
+                  ))}
+                </div>
+              }
+              align='start'
+            />
+          )}
+        </div>
       </div>
     </DrawerSurfaceCard>
   );

@@ -29,8 +29,10 @@ import {
   DrawerSection,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { PROVIDER_LABELS } from '@/lib/discography/provider-labels';
 import { useReleaseTracksQuery } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release, ReleaseSidebarTrack } from './types';
@@ -91,16 +93,19 @@ export function ReleaseTrackList({
       <div
         id={`release-tracklist-${release.id}`}
         hidden={!isExpanded}
-        className='space-y-0.5'
+        className='space-y-1.5'
       >
         {(isLoading || (isFetching && !tracks)) && (
-          <div className='space-y-0.5'>
+          <div className='space-y-1.5'>
             {(['sk0', 'sk1', 'sk2', 'sk3', 'sk4', 'sk5'] as const)
               .slice(0, Math.min(release.totalTracks, 6))
               .map(id => (
                 <DrawerSurfaceCard
                   key={id}
-                  className='flex items-start gap-3 px-2 py-1.5'
+                  className={cn(
+                    LINEAR_SURFACE.drawerCardSm,
+                    'flex items-start gap-3 px-3 py-2.5'
+                  )}
                 >
                   <div className='w-7 shrink-0 pt-0.5'>
                     <div className='ml-auto h-3.5 w-4 rounded skeleton' />
@@ -237,7 +242,12 @@ function TrackItem({
   ]);
 
   return (
-    <div className='group flex items-start gap-2 rounded-md px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70'>
+    <div
+      className={cn(
+        LINEAR_SURFACE.drawerCardSm,
+        'group flex items-start gap-2.5 px-3 py-2.5 transition-[background-color,border-color] duration-150 hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0'
+      )}
+    >
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
@@ -251,7 +261,7 @@ function TrackItem({
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[13px] font-[510] text-primary-token'
+              className='text-[12.5px] font-[510] text-primary-token'
               tooltipSide='top'
             >
               {track.title}
@@ -266,7 +276,7 @@ function TrackItem({
             )}
           </div>
 
-          <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
+          <div className='mt-0.5 flex items-center gap-1.5 text-[10.5px] text-tertiary-token'>
             {track.durationMs != null && (
               <span className='tabular-nums'>
                 {formatDuration(track.durationMs)}
@@ -284,7 +294,7 @@ function TrackItem({
         </button>
 
         {playableUrl && (
-          <div className='mt-1.5 space-y-1'>
+          <div className='mt-2 space-y-1.5'>
             <div className='flex items-center gap-2'>
               <button
                 type='button'
@@ -292,7 +302,7 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-[22px] w-[22px] items-center justify-center rounded-full bg-surface-0 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,color,border-color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (
@@ -301,7 +311,7 @@ function TrackItem({
                   <Play className='h-3 w-3' />
                 )}
               </button>
-              <div className='h-0.5 flex-1 rounded-full bg-surface-1'>
+              <div className='h-0.5 flex-1 rounded-full bg-surface-1/90'>
                 <div
                   className='h-full rounded-full bg-(--linear-accent) transition-[width]'
                   style={{ width: `${progressPercent}%` }}
@@ -343,7 +353,7 @@ function TrackActionsMenu({
       <DropdownMenuTrigger asChild>
         <DrawerInlineIconButton
           aria-label={`Actions for ${track.title}`}
-          className='h-[22px] w-[22px] self-center group-hover:opacity-100'
+          className='h-[22px] w-[22px] self-center rounded-full border border-transparent opacity-60 group-hover:border-(--linear-app-frame-seam) group-hover:opacity-100'
         >
           <MoreHorizontal className='h-3.5 w-3.5 text-tertiary-token' />
         </DrawerInlineIconButton>

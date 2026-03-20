@@ -62,7 +62,7 @@ export function SidebarUpgradeBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
-      <div className='rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 px-2.5 py-2 text-sidebar-muted'>
+      <div className='rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/12 px-2.5 py-2 text-sidebar-muted'>
         <div className='flex items-start gap-1.5'>
           <BadgeCheck className='mt-0.5 size-3 shrink-0 text-sidebar-item-icon/60' />
           <div className='min-w-0'>

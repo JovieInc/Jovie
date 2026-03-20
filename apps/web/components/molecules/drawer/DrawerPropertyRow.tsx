@@ -32,14 +32,14 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[22px] gap-2 rounded px-1 py-px',
-      label: 'text-[10.5px] leading-[14px] tracking-normal',
-      value: 'text-[12px] leading-[15px]',
+      container: 'min-h-[21px] gap-1.5 rounded-[5px] px-1.5 py-px',
+      label: 'text-[10px] leading-[13px] tracking-normal',
+      value: 'text-[11.5px] leading-[15px]',
     },
     md: {
-      container: 'min-h-[24px] gap-2 rounded px-1 py-px',
-      label: 'text-[10.5px] leading-[14px] tracking-normal',
-      value: 'text-[12px] leading-[16px]',
+      container: 'min-h-[23px] gap-1.5 rounded-[5px] px-1.5 py-px',
+      label: 'text-[10px] leading-[13px] tracking-normal',
+      value: 'text-[11.5px] leading-[15px]',
     },
   } as const;
 
@@ -59,7 +59,7 @@ export function DrawerPropertyRow({
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&
-          'cursor-pointer hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none',
+          'cursor-pointer hover:bg-surface-1/80 focus-visible:bg-surface-1/80 focus-visible:outline-none',
         className
       )}
       style={gridStyle}

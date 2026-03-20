@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'px-3 text-[13px] [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-[8px] px-2.5 text-[12px] [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =

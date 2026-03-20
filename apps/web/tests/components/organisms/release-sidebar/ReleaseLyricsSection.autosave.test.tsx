@@ -24,6 +24,9 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </section>
   ),
+  DrawerSurfaceCard: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 vi.mock('sonner', () => ({

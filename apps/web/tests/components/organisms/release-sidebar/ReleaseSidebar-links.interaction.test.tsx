@@ -98,6 +98,19 @@ vi.mock('@/components/molecules/drawer', () => ({
     <div data-testid='async-toggle'>{label}</div>
   ),
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerSurfaceCard: ({
+    children,
+    className,
+    testId,
+  }: {
+    children?: React.ReactNode;
+    className?: string;
+    testId?: string;
+  }) => (
+    <div className={className} data-testid={testId}>
+      {children}
+    </div>
+  ),
   DrawerTabs: ({
     value,
     onValueChange,
@@ -316,5 +329,13 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
       'Smart Link Content'
     );
+  });
+
+  it('renders the release drawer as stacked header, analytics, and tab cards', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+    expect(screen.getByTestId('analytics')).toBeInTheDocument();
+    expect(screen.getByTestId('release-tab-panel-card')).toBeInTheDocument();
   });
 });

@@ -195,13 +195,14 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
           lockReason={lockReason}
         />
       }
-      className='border-b border-subtle'
-      contentClassName='bg-base'
+      className='border-b border-(--linear-app-frame-seam) last:border-b-0'
+      contentClassName='bg-transparent'
     >
       <button
         type='button'
         onClick={() => onEdit(release)}
         className={mobileReleaseTokens.row.container}
+        data-testid={`mobile-release-row-${release.id}`}
       >
         {/* Title + subtitle stacked — artwork hidden on mobile for density */}
         <div className='min-w-0 flex-1'>
@@ -246,7 +247,10 @@ function YearGroupHeader({
   count,
 }: Readonly<{ year: string; count: number }>) {
   return (
-    <div className={mobileReleaseTokens.groupHeader}>
+    <div
+      className={mobileReleaseTokens.groupHeader}
+      data-testid={`mobile-release-group-${year}`}
+    >
       <span className={mobileReleaseTokens.groupHeaderTitle}>{year}</span>
       <span className={mobileReleaseTokens.groupHeaderCount}>{count}</span>
     </div>
@@ -282,7 +286,10 @@ export const MobileReleaseList = memo(function MobileReleaseList({
   if (yearGroups) {
     return (
       <SwipeToRevealGroup>
-        <div className='flex flex-col'>
+        <div
+          className={mobileReleaseTokens.list}
+          data-testid='mobile-release-list'
+        >
           {yearGroups.map(group => (
             <div key={group.year}>
               <YearGroupHeader
@@ -309,7 +316,10 @@ export const MobileReleaseList = memo(function MobileReleaseList({
 
   return (
     <SwipeToRevealGroup>
-      <div className='flex flex-col'>
+      <div
+        className={mobileReleaseTokens.list}
+        data-testid='mobile-release-list'
+      >
         {releases.map(release => (
           <MobileReleaseRow
             key={release.id}

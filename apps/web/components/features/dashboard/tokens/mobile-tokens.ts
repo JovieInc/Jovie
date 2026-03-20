@@ -6,22 +6,23 @@
  * spacing/typography can evolve consistently without inline class drift.
  */
 export const mobileReleaseTokens = {
+  list: 'overflow-hidden rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))]',
   row: {
     container:
-      'flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-surface-2/50 focus-visible:outline-none focus-visible:bg-surface-2/50',
+      'flex w-full items-center gap-3 px-4 py-3 text-left transition-[background-color,border-color] active:bg-surface-0 focus-visible:outline-none focus-visible:bg-surface-0',
     title: 'text-[14px] font-[590] leading-tight text-primary-token',
     subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'shrink-0 rounded-full px-1.5 py-px text-[10px] font-[510] leading-[16px] tracking-normal',
+      'shrink-0 rounded-[6px] px-1.5 py-px text-[10px] font-[510] leading-[16px] tracking-normal',
     year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */
     dot: 'text-[10px] text-quaternary-token',
   },
   groupHeader:
-    'sticky top-0 z-10 flex items-center justify-between border-b border-subtle bg-base px-4 py-2',
-  groupHeaderTitle: 'text-[13px] font-[590] text-primary-token',
+    'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-2',
+  groupHeaderTitle: 'text-[12px] font-[590] text-primary-token',
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {
     container:
@@ -33,8 +34,9 @@ export const mobileReleaseTokens = {
     button:
       'flex w-16 flex-col items-center justify-center gap-1 text-white transition-colors',
     label: 'text-[10px] font-[510] tracking-normal',
-    edit: 'bg-indigo-500 active:bg-indigo-600',
-    link: 'bg-sky-500 active:bg-sky-600',
-    locked: 'bg-neutral-400 opacity-60',
+    edit: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,#5563d6)] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,#5563d6)]',
+    link: 'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)] active:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_58%,#3182ce)]',
+    locked:
+      'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,#7d8795)] opacity-75',
   },
 } as const;

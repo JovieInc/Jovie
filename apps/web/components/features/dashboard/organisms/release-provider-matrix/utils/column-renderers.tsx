@@ -266,7 +266,7 @@ export function createRightMetaCellRenderer(
     const yearTitle = year === null ? 'Unknown release year' : String(year);
 
     return (
-      <div className='grid min-w-[210px] grid-cols-[minmax(148px,1fr)_10px_32px] items-center justify-end gap-x-1.5 text-[12px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[236px] lg:grid-cols-[minmax(172px,1fr)_12px_34px] lg:gap-x-2'>
+      <div className='grid min-w-[188px] grid-cols-[minmax(124px,1fr)_10px_28px] items-center justify-end gap-x-1.5 text-[11.5px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[206px] lg:grid-cols-[minmax(140px,1fr)_12px_30px] lg:gap-x-2'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
@@ -280,7 +280,7 @@ export function createRightMetaCellRenderer(
         </div>
 
         <span
-          className='w-[32px] text-right tabular-nums text-[10px] font-[430] tracking-[0.01em] text-tertiary-token lg:w-[34px]'
+          className='w-[28px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-tertiary-token lg:w-[30px]'
           title={yearTitle}
         >
           {yearLabel}

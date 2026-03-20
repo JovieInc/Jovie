@@ -34,7 +34,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
     return (
       <div
         className={cn(
-          'flex h-7 items-center gap-1.5 rounded-md bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,transparent)] px-2',
+          'flex h-7 items-center gap-1.5 rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_78%,var(--linear-bg-surface-0))] px-2',
           'text-[11px] font-[430] tracking-[-0.01em] text-tertiary-token select-none transition-[background-color,border-color,color] duration-150'
         )}
         title={
@@ -61,7 +61,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
       url={smartLinkUrl}
       displayValue={release.smartLinkPath}
       size='sm'
-      className='w-full min-w-0 max-w-[156px] md:max-w-[176px] lg:max-w-[196px] xl:max-w-[220px]'
+      className='w-full min-w-0 max-w-[140px] md:max-w-[152px] lg:max-w-[164px] xl:max-w-[176px]'
       onCopySuccess={handleCopySuccess}
       copyButtonTitle='Copy smart link'
       openButtonTitle='Open smart link'

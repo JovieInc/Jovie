@@ -35,7 +35,9 @@ import {
   DrawerSurfaceCard,
   SidebarLinkRow,
 } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 import type { Release } from './types';
 import { isValidUrl } from './utils';
@@ -185,7 +187,7 @@ export function ReleaseDspLinks({
 
   return (
     <DrawerLinkSection
-      title='Links'
+      title='Platforms'
       onAdd={
         isEditable && availableProviders.length > 0
           ? () => onSetIsAddingLink(true)
@@ -198,7 +200,7 @@ export function ReleaseDspLinks({
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='space-y-1'>
+        <div className='space-y-1.5'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const isManual = provider.source === 'manual';
@@ -228,7 +230,9 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <DrawerSurfaceCard className='mt-1.5 space-y-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-2.5'>
+        <DrawerSurfaceCard
+          className={cn(LINEAR_SURFACE.drawerCardSm, 'mt-1.5 space-y-2.5 p-3')}
+        >
           <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
@@ -271,7 +275,7 @@ export function ReleaseDspLinks({
               className='h-8 rounded-md border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormGridRow>
-          <div className='flex justify-end gap-2 pt-1'>
+          <div className='flex justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-2'>
             <DrawerButton
               type='button'
               onClick={() => {

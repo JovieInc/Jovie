@@ -64,12 +64,12 @@ export const ReleaseCell = memo(function ReleaseCell({
   );
 
   return (
-    <div className='grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-start gap-x-2'>
-      <div className='flex w-[14px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2.5'>
+      <div className='flex w-[16px] items-center justify-center pt-0.5'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-[14px] w-[14px] rounded-sm p-0 text-quaternary-token opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 aria-[pressed=true]:opacity-100'
+            className='h-[16px] w-[16px] rounded-[4px] p-0 text-quaternary-token opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 aria-[pressed=true]:opacity-100'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -89,11 +89,11 @@ export const ReleaseCell = memo(function ReleaseCell({
         )}
       </div>
 
-      <div className='min-w-0 space-y-0.5'>
+      <div className='min-w-0 space-y-px'>
         <div className='flex min-w-0 items-center gap-1.5 leading-none'>
           <TruncatedText
             lines={1}
-            className='min-w-0 flex-1 text-[12.5px] font-[510] leading-[1.15] tracking-[-0.01em] text-primary-token'
+            className='min-w-0 flex-1 text-[12.5px] font-[510] leading-[1.1] tracking-[-0.012em] text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -119,7 +119,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[11.5px] font-[400] leading-[1.25] tracking-[-0.005em] text-tertiary-token'
+            className='text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-tertiary-token'
           >
             {artistLine}
           </TruncatedText>

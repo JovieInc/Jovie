@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex flex-1 min-h-0 overflow-hidden bg-surface-0 lg:m-3 lg:ml-1.5 lg:rounded-[16px] lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-2.5 lg:peer-data-[state=open]:rounded-l-[14px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset] lg:peer-data-[state=closed]:rounded-l-[16px]'
+        className='flex flex-1 min-h-0 overflow-hidden bg-surface-0 lg:m-2.5 lg:ml-1 lg:rounded-[18px] lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-2 lg:peer-data-[state=open]:rounded-l-[15px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset] lg:peer-data-[state=closed]:rounded-l-[18px]'
       >
         <div className='flex flex-1 min-h-0 overflow-hidden'>
           <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>

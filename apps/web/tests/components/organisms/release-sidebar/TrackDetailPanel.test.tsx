@@ -43,6 +43,7 @@ describe('TrackDetailPanel', () => {
       screen.getByRole('button', { name: /release title/i })
     ).toBeInTheDocument();
     expect(screen.getByText('Midnight Echo')).toBeInTheDocument();
+    expect(screen.getByText('Smart link')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /copy isrc/i })

@@ -24,7 +24,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const SWIPE_ACTION_BUTTON_CLASS =
-  'flex h-full items-center justify-center px-4 text-accent-foreground transition-colors active:opacity-80';
+  'flex h-full items-center justify-center px-4 text-white transition-colors active:opacity-80';
 
 export interface SidebarLinkRowProps {
   readonly deepLinkPlatform?: string;
@@ -106,7 +106,10 @@ export function SidebarLinkRow({
         type='button'
         onClick={handleCopy}
         disabled={!hasUrl}
-        className={cn(SWIPE_ACTION_BUTTON_CLASS, 'bg-accent')}
+        className={cn(
+          SWIPE_ACTION_BUTTON_CLASS,
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#3182ce)]'
+        )}
         aria-label={copied ? 'Copied!' : `Copy ${label} link`}
       >
         {copied ? (
@@ -121,7 +124,7 @@ export function SidebarLinkRow({
         disabled={!hasUrl}
         className={cn(
           SWIPE_ACTION_BUTTON_CLASS,
-          'bg-surface-2 text-primary-token'
+          'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-primary-token'
         )}
         aria-label={`Open ${label}`}
       >
@@ -134,7 +137,7 @@ export function SidebarLinkRow({
           disabled={isRemoving}
           className={cn(
             SWIPE_ACTION_BUTTON_CLASS,
-            'bg-destructive disabled:opacity-50'
+            'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_70%,#c43d4b)] disabled:opacity-50'
           )}
           aria-label={`Remove ${label}`}
         >
@@ -185,7 +188,7 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'rounded-full border border-transparent p-1 text-tertiary-token',
+                  'rounded-[8px] border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
                   'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'

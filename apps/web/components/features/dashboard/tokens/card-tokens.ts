@@ -207,6 +207,60 @@ export const cardTokens = {
   },
 } as const;
 
+/**
+ * Linear Surface Tokens
+ *
+ * Shared class strings for the Linear-style surface hierarchy.
+ * These use `color-mix(in_oklab)` for perceptually uniform blending
+ * between surface levels.
+ *
+ * Surface depth hierarchy (higher % = closer to the parent surface):
+ *   84-86%  — drawer section cards (nested inside sidebars)
+ *   88%     — content containers, result items (mid-level nesting)
+ *   90%     — banner/callout cards
+ *   92%     — dialog inner cards, app shell
+ *   94%     — sticky headers (with backdrop blur)
+ *   96%     — toolbars, popovers, dropdown menus
+ */
+export const LINEAR_SURFACE = {
+  /** Drawer section card — used inside sidebars for grouped content.
+   *  Compose with padding/overflow as needed: `cn(LINEAR_SURFACE.drawerCard, 'p-3.5')` */
+  drawerCard:
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))]',
+
+  /** Smaller drawer section card — used for inline property groups inside drawer cards. */
+  drawerCardSm:
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))]',
+
+  /** Primary sidebar card — slightly more contrast for header/analytics cards. */
+  sidebarCard:
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))]',
+
+  /** Content container — wraps tables, mobile lists, empty states. */
+  contentContainer:
+    'rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))]',
+
+  /** Banner/callout card — slightly quieter than content containers. */
+  bannerCard:
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_90%,var(--linear-bg-surface-0))]',
+
+  /** Dialog inner card — for card-like sections inside dialogs. */
+  dialogCard:
+    'rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]',
+
+  /** Sticky header — toolbar-like headers with backdrop blur. */
+  stickyHeader:
+    'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))]',
+
+  /** Toolbar / popover / dropdown — highest surface level. */
+  toolbar:
+    'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
+
+  /** Popover container — toolbar surface + shadow + rounded corners. */
+  popover:
+    'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
+} as const;
+
 // Type exports for TypeScript consumers
 export type CardPadding = keyof typeof cardTokens.padding;
 export type CardRadius = keyof typeof cardTokens.radius;
@@ -214,3 +268,4 @@ export type CardShadow = keyof typeof cardTokens.shadow;
 export type CardBorder = keyof typeof cardTokens.border;
 export type CardVariant = keyof typeof cardTokens.variants;
 export type CardStatus = keyof typeof cardTokens.status;
+export type LinearSurface = keyof typeof LINEAR_SURFACE;

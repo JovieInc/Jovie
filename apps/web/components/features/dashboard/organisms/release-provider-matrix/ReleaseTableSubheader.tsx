@@ -22,9 +22,9 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
-  PageToolbarTabButton,
 } from '@/components/organisms/table';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { cn } from '@/lib/utils';
@@ -90,28 +90,28 @@ function ReleaseViewButtons({
   readonly className?: string;
 }) {
   return (
-    <div className={cn('flex items-center gap-0.5', className)}>
-      {RELEASE_VIEW_OPTIONS.map(option => {
-        const isActive = value === option.value;
-
-        return (
-          <PageToolbarTabButton
-            key={option.value}
-            onClick={() => onChange(option.value)}
-            active={isActive}
-            className='h-7 rounded-full px-2 text-[12px] [&_svg]:h-3 [&_svg]:w-3'
-            icon={
-              <Icon
-                name={option.icon}
-                className={PAGE_TOOLBAR_ICON_CLASS}
-                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-              />
-            }
-            label={option.label}
-          />
-        );
-      })}
-    </div>
+    <AppSegmentControl
+      value={value}
+      onValueChange={onChange}
+      options={RELEASE_VIEW_OPTIONS.map(option => ({
+        value: option.value,
+        label: (
+          <span className='flex items-center justify-center gap-1.5'>
+            <Icon
+              name={option.icon}
+              className={PAGE_TOOLBAR_ICON_CLASS}
+              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+            />
+            <span>{option.label}</span>
+          </span>
+        ),
+      }))}
+      size='sm'
+      surface='ghost'
+      className={cn('w-full md:w-auto', className)}
+      triggerClassName='min-w-[88px] px-2.5'
+      aria-label='Choose releases view'
+    />
   );
 }
 
@@ -130,7 +130,7 @@ function ReleaseViewSegmentedControl({
       options={RELEASE_VIEW_OPTIONS.map(option => ({
         value: option.value,
         label: (
-          <span className='flex flex-col items-center gap-1'>
+          <span className='flex items-center justify-center gap-1.5'>
             <Icon name={option.icon} className='h-4 w-4' />
             <span>{option.label}</span>
           </span>
@@ -138,7 +138,7 @@ function ReleaseViewSegmentedControl({
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='h-auto min-h-[52px] px-2 py-2 text-[12.5px]'
+      triggerClassName='min-h-[36px] px-3 py-1.5 text-[12px]'
       aria-label='Choose releases view'
     />
   );
@@ -160,9 +160,11 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-full px-1 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
+      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
     >
-      <span className='text-[13px] text-secondary-token'>{label}</span>
+      <span className='text-[12px] font-[510] text-secondary-token'>
+        {label}
+      </span>
       <span
         className={cn(
           'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
@@ -217,7 +219,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3',
+              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -233,9 +235,12 @@ function LinearStyleDisplayMenu({
           </Button>
         </PopoverTrigger>
       </TooltipShortcut>
-      <PopoverContent align='end' className='w-[260px]'>
+      <PopoverContent
+        align='end'
+        className='w-[248px] rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+      >
         {/* Header */}
-        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+        <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
@@ -252,7 +257,7 @@ function LinearStyleDisplayMenu({
 
         {/* Release view toggle */}
         {onReleaseViewChange && (
-          <div className='border-b border-subtle px-3 py-2'>
+          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
             <ReleaseViewSegmentedControl
               value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
@@ -262,7 +267,7 @@ function LinearStyleDisplayMenu({
 
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-subtle px-3 py-1.5'>
+          <div className='border-b border-(--linear-app-frame-seam) px-3 py-1.5'>
             <p className='px-1 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               List options
             </p>
@@ -296,13 +301,13 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
-      className='min-h-[32px] border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
+      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px] border-b')}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons
             value={releaseView}
             onChange={onReleaseViewChange}
-            className='w-full overflow-x-auto pb-px md:w-auto'
+            className='w-full pb-px md:w-auto'
           />
         ) : null
       }
@@ -314,7 +319,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             counts={counts}
             buttonClassName={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
             )}
             iconOnly
           />
@@ -336,14 +341,14 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
           <DrawerToggleButton
             chrome='page-toolbar'
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
-            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>
       }
