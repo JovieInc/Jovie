@@ -131,25 +131,34 @@ export function AdminTablePagination({
               />
               <span className='hidden sm:inline'>Previous</span>
             </Button>
-          ) : (
+          ) : prevHref ? (
             <Button
               asChild
               size='sm'
               variant='ghost'
-              disabled={!canPrev}
               className={paginationButtonClassName}
             >
-              <Link
-                href={prevHref ?? '#'}
-                aria-disabled={!canPrev}
-                aria-label='Previous page'
-              >
+              <Link href={prevHref} aria-label='Previous page'>
                 <ChevronLeft
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
                 <span className='hidden sm:inline'>Previous</span>
               </Link>
+            </Button>
+          ) : (
+            <Button
+              size='sm'
+              variant='ghost'
+              disabled
+              className={paginationButtonClassName}
+              aria-label='Previous page'
+            >
+              <ChevronLeft
+                className='h-3.5 w-3.5 sm:hidden'
+                aria-hidden='true'
+              />
+              <span className='hidden sm:inline'>Previous</span>
             </Button>
           )}
           {onNextClick ? (
@@ -168,25 +177,34 @@ export function AdminTablePagination({
               />
               <span className='hidden sm:inline'>Next</span>
             </Button>
-          ) : (
+          ) : nextHref ? (
             <Button
               asChild
               size='sm'
               variant='ghost'
-              disabled={!canNext}
               className={paginationButtonClassName}
             >
-              <Link
-                href={nextHref ?? '#'}
-                aria-disabled={!canNext}
-                aria-label='Next page'
-              >
+              <Link href={nextHref} aria-label='Next page'>
                 <ChevronRight
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
                 <span className='hidden sm:inline'>Next</span>
               </Link>
+            </Button>
+          ) : (
+            <Button
+              size='sm'
+              variant='ghost'
+              disabled
+              className={paginationButtonClassName}
+              aria-label='Next page'
+            >
+              <ChevronRight
+                className='h-3.5 w-3.5 sm:hidden'
+                aria-hidden='true'
+              />
+              <span className='hidden sm:inline'>Next</span>
             </Button>
           )}
         </div>

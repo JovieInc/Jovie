@@ -330,9 +330,6 @@ export async function processMusicFetchEnrichmentJob(
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
 
-  // Mark enrichment as complete
-  await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
-
   return result;
 }
 

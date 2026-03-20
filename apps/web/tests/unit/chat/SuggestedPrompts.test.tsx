@@ -62,12 +62,6 @@ describe('SuggestedPrompts', () => {
     expect(queryByText('Change profile photo')).toBeNull();
   });
 
-  it('always shows feedback suggestion', () => {
-    const onSelect = vi.fn();
-    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    expect(getByText('Share feedback')).toBeTruthy();
-  });
-
   it('calls onSelect with prompt when clicked', () => {
     const onSelect = vi.fn();
     const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);

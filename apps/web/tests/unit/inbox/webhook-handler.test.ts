@@ -310,6 +310,8 @@ describe('POST /api/webhooks/resend-inbound', () => {
       'Inbound email processed',
       expect.objectContaining({
         username: 'testartist',
+        from: 'sender@example.com',
+        subject: 'Booking Inquiry',
       })
     );
   });
@@ -332,11 +334,13 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Should NOT classify on existing threads (classification only for new threads)
     expect(mockClassifyEmail).not.toHaveBeenCalled();
 
-    // Should log with isNewThread: false
+    // Should log success
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       'Inbound email processed',
       expect.objectContaining({
         username: 'testartist',
+        from: 'sender@example.com',
+        subject: 'Booking Inquiry',
       })
     );
   });

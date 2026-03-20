@@ -300,20 +300,17 @@ export function ProfileContactSidebar() {
           throw new Error('Failed to add link');
         }
 
-        // Replace the temp ID with the server-assigned ID so future deletes work
         const { linkId } = (await response.json()) as { linkId: string };
+        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
+          optimisticLink.id
+        );
 
-        // If user deleted this link while the add was in flight, fire a server
-        // delete now that we have the real ID, and skip the UI update.
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
+        if (wasDeletedWhilePending) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
           if (linkId && selectedProfile) {
             removeLinkMutation.mutate(
               { profileId: selectedProfile.id, linkId },
-              {
-                // Suppress global onError — user already saw "Link removed"
-                onError: () => {},
-              }
+              { onError: () => {} }
             );
           }
           return;

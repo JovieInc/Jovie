@@ -46,7 +46,10 @@ describe('admin creator toggle routes', () => {
           accept: 'application/json',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ profileId: 'profile_1', nextVerified: 'yes' }),
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          nextVerified: 'yes',
+        }),
       }
     );
 
@@ -82,7 +85,10 @@ describe('admin creator toggle routes', () => {
           accept: 'application/json',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ profileId: 'profile_1', nextVerified: true }),
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          nextVerified: true,
+        }),
       }
     );
 
@@ -95,7 +101,9 @@ describe('admin creator toggle routes', () => {
     const calledWith =
       adminActionsMock.toggleCreatorVerifiedAction.mock.calls[0][0];
     expect(calledWith).toBeInstanceOf(FormData);
-    expect(calledWith.get('profileId')).toBe('profile_1');
+    expect(calledWith.get('profileId')).toBe(
+      '00000000-0000-4000-8000-000000000001'
+    );
     expect(calledWith.get('nextVerified')).toBe('true');
   });
 
@@ -119,7 +127,10 @@ describe('admin creator toggle routes', () => {
           accept: 'application/json',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ profileId: 'profile_1', nextFeatured: true }),
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          nextFeatured: true,
+        }),
       }
     );
 
@@ -160,7 +171,10 @@ describe('admin creator toggle routes', () => {
           accept: 'application/json',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ profileId: 'profile_1', nextFeatured: false }),
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          nextFeatured: false,
+        }),
       }
     );
 
@@ -195,7 +209,10 @@ describe('admin creator toggle routes', () => {
           accept: 'application/json',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ profileId: 'profile_1', nextFeatured: true }),
+        body: JSON.stringify({
+          profileId: '00000000-0000-4000-8000-000000000001',
+          nextFeatured: true,
+        }),
       }
     );
 
@@ -225,7 +242,7 @@ describe('admin creator toggle routes', () => {
       {
         method: 'POST',
         body: new URLSearchParams({
-          profileId: 'profile_1',
+          profileId: '00000000-0000-4000-8000-000000000001',
           nextVerified: 'false',
         }),
       }

@@ -12,7 +12,6 @@ vi.mock('@/lib/services/link-wrapping', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: mockDetectBot,
-  checkRateLimit: vi.fn().mockResolvedValue(false),
   createBotResponse: vi.fn(),
   logBotDetection: vi.fn().mockResolvedValue(undefined),
 }));

@@ -14,7 +14,6 @@ vi.mock('@/lib/utils/url-encryption', () => ({
 
 vi.mock('@/lib/utils/bot-detection', () => ({
   detectBot: vi.fn().mockReturnValue({ isBot: false }),
-  checkRateLimit: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock('@/lib/error-tracking', () => ({

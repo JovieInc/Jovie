@@ -43,6 +43,11 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));
 
+// Mock waitlist settings to avoid DB calls from ensureSettingsRow
+vi.mock('@/lib/waitlist/settings', () => ({
+  isWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
+}));
+
 // Mock schema (just provide empty objects for the table references)
 vi.mock('@/lib/db/schema', () => ({
   users: {},

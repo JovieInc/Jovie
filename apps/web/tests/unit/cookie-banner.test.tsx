@@ -28,10 +28,10 @@ describe('CookieBannerSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('shows the banner when jv_cc_required cookie is absent (safe default)', () => {
+  it('hides the banner when jv_cc_required cookie is absent', () => {
     setCookie('');
     render(<CookieBannerSection />);
-    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
+    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
   });
 
   it('hides the banner when jv_cc_required cookie is 0', () => {

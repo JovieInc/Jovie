@@ -10,21 +10,24 @@ describe('admin payload parsers', () => {
     const request = new NextRequest('http://localhost/admin/verify', {
       method: 'POST',
       body: new URLSearchParams({
-        profileId: 'profile_1',
+        profileId: '00000000-0000-4000-8000-000000000001',
         nextVerified: 'false',
       }),
     });
 
     const payload = await parseToggleVerifyPayload(request);
 
-    expect(payload).toEqual({ profileId: 'profile_1', nextVerified: false });
+    expect(payload).toEqual({
+      profileId: '00000000-0000-4000-8000-000000000001',
+      nextVerified: false,
+    });
   });
 
   it('rejects invalid boolean strings for toggle verify form-data', async () => {
     const request = new NextRequest('http://localhost/admin/verify', {
       method: 'POST',
       body: new URLSearchParams({
-        profileId: 'profile_1',
+        profileId: '00000000-0000-4000-8000-000000000001',
         nextVerified: 'yes',
       }),
     });
@@ -38,7 +41,7 @@ describe('admin payload parsers', () => {
     const request = new NextRequest('http://localhost/admin/featured', {
       method: 'POST',
       body: new URLSearchParams({
-        profileId: 'profile_1',
+        profileId: '00000000-0000-4000-8000-000000000001',
         nextFeatured: '1',
       }),
     });
