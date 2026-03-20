@@ -7,12 +7,14 @@ const {
   mockDbSelect,
   mockDbInsert,
   mockEq,
+  mockIsWaitlistGateEnabled,
 } = vi.hoisted(() => ({
   mockCachedAuth: vi.fn(),
   mockCachedCurrentUser: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
   mockEq: vi.fn(),
+  mockIsWaitlistGateEnabled: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock('drizzle-orm', async importOriginal => {
@@ -43,9 +45,8 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: vi.fn(),
 }));
 
-// Mock waitlist settings to avoid DB calls from ensureSettingsRow
 vi.mock('@/lib/waitlist/settings', () => ({
-  isWaitlistGateEnabled: vi.fn().mockResolvedValue(false),
+  isWaitlistGateEnabled: mockIsWaitlistGateEnabled,
 }));
 
 // Mock schema (just provide empty objects for the table references)
@@ -90,6 +91,7 @@ const createSimpleQueryMock = (result: unknown[]) => ({
 describe('gate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsWaitlistGateEnabled.mockResolvedValue(true);
   });
 
   describe('UserState enum', () => {

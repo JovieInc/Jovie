@@ -1,7 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
@@ -28,16 +32,18 @@ import {
   type SpotifyArtistInput,
 } from './artist-parser';
 import {
+  processRecordingArtistCredits,
   processReleaseArtistCredits,
-  processTrackArtistCredits,
 } from './artist-queries';
 import { discoverLinksForRelease } from './discovery';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
+  syncProfileGenresFromReleases,
   upsertProviderLink,
+  upsertRecording,
   upsertRelease,
-  upsertTrack,
+  upsertReleaseTrack,
 } from './queries';
 import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
@@ -356,12 +362,25 @@ export async function importReleasesFromSpotify(
           result
         );
 
-        // 4. Discover cross-platform links
+        // 4. Sync profile genres from release data (best-effort)
+        try {
+          await syncProfileGenresFromReleases(creatorProfileId);
+        } catch (error) {
+          // Non-critical: don't fail the import if genre sync fails
+          Sentry.addBreadcrumb({
+            category: 'spotify-import',
+            message: 'Genre sync failed',
+            level: 'warning',
+            data: { creatorProfileId, error },
+          });
+        }
+
+        // 5. Discover cross-platform links
         if (discoverLinks && includeTracks) {
           await discoverLinksForReleases(creatorProfileId, market);
         }
 
-        // 5. Fetch the final state
+        // 6. Fetch the final state
         result.releases = await getReleasesForProfile(creatorProfileId);
         result.success = result.failed === 0;
 
@@ -474,32 +493,67 @@ async function fetchExistingTrackSlugs(
     return existingTracksBySpotifyId;
   }
 
-  const rows = await db
+  // Check new model (discogRecordings) first
+  const recordingRows = await db
     .select({
-      id: discogTracks.id,
-      slug: discogTracks.slug,
+      id: discogRecordings.id,
+      slug: discogRecordings.slug,
       spotifyTrackId:
-        drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+        drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`.as(
           'spotify_track_id'
         ),
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .where(
       and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
         inArray(
-          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+          drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`,
           spotifyTrackIds
         )
       )
     );
 
-  for (const row of rows) {
+  for (const row of recordingRows) {
     if (!row.spotifyTrackId) continue;
     existingTracksBySpotifyId.set(row.spotifyTrackId, {
       id: row.id,
       slug: row.slug,
     });
+  }
+
+  // Fall back to legacy tracks for any not found in recordings
+  const missingIds = spotifyTrackIds.filter(
+    id => !existingTracksBySpotifyId.has(id)
+  );
+  if (missingIds.length > 0) {
+    const rows = await db
+      .select({
+        id: discogTracks.id,
+        slug: discogTracks.slug,
+        spotifyTrackId:
+          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+            'spotify_track_id'
+          ),
+      })
+      .from(discogTracks)
+      .where(
+        and(
+          eq(discogTracks.creatorProfileId, creatorProfileId),
+          inArray(
+            drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+            missingIds
+          )
+        )
+      );
+
+    for (const row of rows) {
+      if (!row.spotifyTrackId) continue;
+      existingTracksBySpotifyId.set(row.spotifyTrackId, {
+        id: row.id,
+        slug: row.slug,
+      });
+    }
   }
 
   return existingTracksBySpotifyId;
@@ -553,20 +607,21 @@ async function processTracksForRelease(
     const audioFallbackUrl = sanitizedPreviewUrl;
     const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
-    const createdTrack = await upsertTrack({
-      releaseId: release.id,
+    const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
+    const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
+
+    // New model: upsert recording (canonical audio entity)
+    const createdRecording = await upsertRecording({
       creatorProfileId,
       title: sanitizedTrackTitle,
       slug: trackSlug,
-      trackNumber: sanitizeBoundedInteger(track.track_number, 1, 999, 1),
-      discNumber: sanitizeBoundedInteger(track.disc_number, 1, 99, 1),
+      isrc: sanitizedIsrc,
       durationMs: sanitizeBoundedNullableInteger(
         track.duration_ms,
         0,
         60 * 60 * 1000
       ),
       isExplicit: track.explicit,
-      isrc: sanitizedIsrc,
       previewUrl: sanitizedPreviewUrl,
       audioUrl: audioFallbackUrl,
       audioFormat: audioFallbackFormat,
@@ -577,8 +632,24 @@ async function processTracksForRelease(
       },
     });
 
+    // New model: upsert release track (recording appearance on release)
+    const createdReleaseTrack = await upsertReleaseTrack({
+      releaseId: release.id,
+      recordingId: createdRecording.id,
+      title: sanitizedTrackTitle,
+      slug: trackSlug,
+      trackNumber,
+      discNumber,
+      isExplicit: track.explicit,
+      sourceType: 'ingested',
+      metadata: {
+        spotifyId: track.id,
+      },
+    });
+
+    // Provider link on release_track (new model)
     await upsertProviderLink({
-      trackId: createdTrack.id,
+      releaseTrackId: createdReleaseTrack.id,
       providerId: 'spotify',
       url: buildSpotifyTrackUrl(track.id),
       externalId: null,
@@ -599,10 +670,14 @@ async function processTracksForRelease(
       track.name,
       trackArtistInputs
     );
-    await processTrackArtistCredits(createdTrack.id, trackArtistCredits, {
-      deleteExisting: true,
-      sourceType: 'ingested',
-    });
+    await processRecordingArtistCredits(
+      createdRecording.id,
+      trackArtistCredits,
+      {
+        deleteExisting: true,
+        sourceType: 'ingested',
+      }
+    );
   }
 
   // Update release explicit flag if any track is explicit

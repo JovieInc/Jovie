@@ -38,6 +38,7 @@ import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
+import { NowPlayingCard } from './sidebar/NowPlayingCard';
 
 export interface UnifiedSidebarProps {
   readonly section: 'admin' | 'dashboard' | 'settings';
@@ -297,6 +298,9 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       </SidebarContent>
 
       <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
+        <div className='px-2 pb-1'>
+          <NowPlayingCard />
+        </div>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 

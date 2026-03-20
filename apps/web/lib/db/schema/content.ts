@@ -84,7 +84,84 @@ export const discogReleases = pgTable(
   })
 );
 
-// Discography tracks table
+// Discography recordings table (canonical audio entity — MusicBrainz "recording")
+export const discogRecordings = pgTable(
+  'discog_recordings',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    isrc: text('isrc'),
+    durationMs: integer('duration_ms'),
+    isExplicit: boolean('is_explicit').default(false).notNull(),
+    previewUrl: text('preview_url'),
+    audioUrl: text('audio_url'),
+    audioFormat: text('audio_format'),
+    lyrics: text('lyrics'),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    creatorSlugUnique: uniqueIndex('discog_recordings_creator_slug_unique').on(
+      table.creatorProfileId,
+      table.slug
+    ),
+    creatorIsrcUnique: uniqueIndex('discog_recordings_creator_isrc_unique')
+      .on(table.creatorProfileId, table.isrc)
+      .where(drizzleSql`isrc IS NOT NULL`),
+    creatorIndex: index('discog_recordings_creator_profile_id_idx').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
+// Discography release tracks table (recording appearance on a release — MusicBrainz "track")
+export const discogReleaseTracks = pgTable(
+  'discog_release_tracks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    releaseId: uuid('release_id')
+      .notNull()
+      .references(() => discogReleases.id, { onDelete: 'cascade' }),
+    recordingId: uuid('recording_id')
+      .notNull()
+      .references(() => discogRecordings.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    trackNumber: integer('track_number').notNull(),
+    discNumber: integer('disc_number').default(1).notNull(),
+    isExplicit: boolean('is_explicit').default(false).notNull(),
+    sourceType: ingestionSourceTypeEnum('source_type')
+      .default('manual')
+      .notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  table => ({
+    releaseTrackPositionUnique: uniqueIndex(
+      'discog_release_tracks_position_unique'
+    ).on(table.releaseId, table.discNumber, table.trackNumber),
+    releaseSlugUnique: uniqueIndex(
+      'discog_release_tracks_release_slug_unique'
+    ).on(table.releaseId, table.slug),
+    releaseIndex: index('discog_release_tracks_release_id_idx').on(
+      table.releaseId
+    ),
+    recordingIndex: index('discog_release_tracks_recording_id_idx').on(
+      table.recordingId
+    ),
+  })
+);
+
+// Discography tracks table (LEGACY — kept for migration safety, stop writing to this)
 export const discogTracks = pgTable(
   'discog_tracks',
   {
@@ -146,6 +223,10 @@ export const providerLinks = pgTable(
     trackId: uuid('track_id').references(() => discogTracks.id, {
       onDelete: 'cascade',
     }),
+    releaseTrackId: uuid('release_track_id').references(
+      () => discogReleaseTracks.id,
+      { onDelete: 'cascade' }
+    ),
     externalId: text('external_id'),
     url: text('url').notNull(),
     country: text('country'),
@@ -166,16 +247,23 @@ export const providerLinks = pgTable(
       table.providerId,
       table.trackId
     ),
+    releaseTrackProviderUnique: uniqueIndex(
+      'provider_links_release_track_provider'
+    ).on(table.providerId, table.releaseTrackId),
     providerExternalUnique: uniqueIndex('provider_links_provider_external')
       .on(table.providerId, table.externalId)
       .where(drizzleSql`external_id IS NOT NULL`),
     releaseIndex: index('provider_links_release_id_idx').on(table.releaseId),
     trackIndex: index('provider_links_track_id_idx').on(table.trackId),
+    releaseTrackIndex: index('provider_links_release_track_id_idx').on(
+      table.releaseTrackId
+    ),
     ownerConstraint: check(
       'provider_links_owner_match',
       drizzleSql`
-        (owner_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL)
-        OR (owner_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL)
+        (owner_type::text = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+        OR (owner_type::text = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+        OR (owner_type::text = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
       `
     ),
   })
@@ -205,6 +293,10 @@ export const smartLinkTargets = pgTable(
     trackId: uuid('track_id').references(() => discogTracks.id, {
       onDelete: 'cascade',
     }),
+    releaseTrackId: uuid('release_track_id').references(
+      () => discogReleaseTracks.id,
+      { onDelete: 'cascade' }
+    ),
     url: text('url').notNull(),
     isFallback: boolean('is_fallback').default(false).notNull(),
     priority: integer('priority').default(0).notNull(),
@@ -225,11 +317,15 @@ export const smartLinkTargets = pgTable(
       table.releaseId
     ),
     trackIndex: index('smart_link_targets_track_id_idx').on(table.trackId),
+    releaseTrackIndex: index('smart_link_targets_release_track_id_idx').on(
+      table.releaseTrackId
+    ),
     ownerConstraint: check(
       'smart_link_targets_owner_match',
       drizzleSql`
-        (release_id IS NOT NULL AND track_id IS NULL)
-        OR (track_id IS NOT NULL AND release_id IS NULL)
+        (release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+        OR (track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+        OR (release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
       `
     ),
   })
@@ -251,6 +347,10 @@ export const contentSlugRedirects = pgTable(
     trackId: uuid('track_id').references(() => discogTracks.id, {
       onDelete: 'cascade',
     }),
+    releaseTrackId: uuid('release_track_id').references(
+      () => discogReleaseTracks.id,
+      { onDelete: 'cascade' }
+    ),
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
@@ -266,8 +366,9 @@ export const contentSlugRedirects = pgTable(
     contentConstraint: check(
       'content_slug_redirects_content_match',
       drizzleSql`
-        (content_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL)
-        OR (content_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL)
+        (content_type::text = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+        OR (content_type::text = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+        OR (content_type::text = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
       `
     ),
   })
@@ -387,6 +488,45 @@ export const trackArtists = pgTable(
 );
 
 /**
+ * Recording-Artist junction table - links recordings to artists with roles
+ *
+ * Parallel to track_artists but for the canonical recording entity.
+ */
+export const recordingArtists = pgTable(
+  'recording_artists',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recordingId: uuid('recording_id')
+      .notNull()
+      .references(() => discogRecordings.id, { onDelete: 'cascade' }),
+    artistId: uuid('artist_id')
+      .notNull()
+      .references(() => artists.id, { onDelete: 'cascade' }),
+    role: artistRoleEnum('role').notNull(),
+
+    // Display customization
+    creditName: text('credit_name'),
+    joinPhrase: text('join_phrase'),
+    position: integer('position').default(0).notNull(),
+
+    isPrimary: boolean('is_primary').default(false).notNull(),
+    sourceType: ingestionSourceTypeEnum('source_type').default('ingested'),
+
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    recordingArtistRoleUnique: uniqueIndex(
+      'recording_artists_recording_artist_role'
+    ).on(table.recordingId, table.artistId, table.role),
+    artistIndex: index('recording_artists_artist_id_idx').on(table.artistId),
+    recordingIndex: index('recording_artists_recording_id_idx').on(
+      table.recordingId
+    ),
+  })
+);
+
+/**
  * Release-Artist junction table - links releases to artists with roles
  *
  * Similar to track_artists but at the release level for album credits.
@@ -487,6 +627,29 @@ export type NewTrackArtist = typeof trackArtists.$inferInsert;
 
 export type ReleaseArtist = typeof releaseArtists.$inferSelect;
 export type NewReleaseArtist = typeof releaseArtists.$inferInsert;
+
+// Recording schemas & types
+export const insertDiscogRecordingSchema = createInsertSchema(discogRecordings);
+export const selectDiscogRecordingSchema = createSelectSchema(discogRecordings);
+
+export type DiscogRecording = typeof discogRecordings.$inferSelect;
+export type NewDiscogRecording = typeof discogRecordings.$inferInsert;
+
+// Release track schemas & types
+export const insertDiscogReleaseTrackSchema =
+  createInsertSchema(discogReleaseTracks);
+export const selectDiscogReleaseTrackSchema =
+  createSelectSchema(discogReleaseTracks);
+
+export type DiscogReleaseTrack = typeof discogReleaseTracks.$inferSelect;
+export type NewDiscogReleaseTrack = typeof discogReleaseTracks.$inferInsert;
+
+// Recording artist schemas & types
+export const insertRecordingArtistSchema = createInsertSchema(recordingArtists);
+export const selectRecordingArtistSchema = createSelectSchema(recordingArtists);
+
+export type RecordingArtist = typeof recordingArtists.$inferSelect;
+export type NewRecordingArtist = typeof recordingArtists.$inferInsert;
 
 // Enum value types (for type-safe use in queries and functions)
 export type ArtistRole = (typeof artistRoleEnum.enumValues)[number];

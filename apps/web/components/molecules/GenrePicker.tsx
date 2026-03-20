@@ -48,7 +48,7 @@ interface GenrePickerProps {
 export function GenrePicker({
   selected,
   onChange,
-  maxGenres = 10,
+  maxGenres = 3,
   trigger,
 }: GenrePickerProps) {
   const [open, setOpen] = useState(false);

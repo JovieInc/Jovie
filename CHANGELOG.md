@@ -6,6 +6,69 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.22] - 2026-03-20
+
+### Changed
+
+- Cap artist profile genres at 3 (was 10), populated by most frequent genres across releases
+- Genre picker UI default max reduced from 10 to 3
+- Onboarding review step shows top 3 genres instead of 5
+- Profile validation schema caps genres array at 3
+
+### Added
+
+- `syncProfileGenresFromReleases()` — aggregates genres from all releases by frequency and writes top 3 to profile
+- Genre sync automatically runs after Spotify import
+- Unit tests for genre aggregation (frequency sorting, tiebreak, null handling, deduplication)
+
+## [26.4.21] - 2026-03-20
+
+### Added
+
+- MusicBrainz-inspired recording/release-track data model: `discog_recordings` (canonical audio entity) and `discog_release_tracks` (recording's appearance on a release)
+- `recording_artists` junction table for artist credits on recordings
+- Recording and release-track upsert functions with ISRC/slug collision handling
+- Recording-artists CRUD module (upsert, get, delete, query by artist)
+- Backfill migration to populate new tables from existing `discog_tracks` data
+
+### Changed
+
+- Spotify import now writes directly to new model (recordings + release tracks) instead of dual-writing to both old and new tables
+- All platform readers migrated from `discog_tracks` to `discog_recordings`/`discog_release_tracks`: release enrichment, DSP artist discovery, platform stats, sitemap, ISRC route
+- Dashboard release table no longer shows single/track toggle — tracks are always children of releases
+- Smart link resolution uses recordings as primary lookup with legacy track fallback
+
+### Removed
+
+- Legacy dual-write to `discog_tracks` during Spotify import — new imports only populate the new model
+- `releaseView` toggle in release provider matrix (singles classified correctly as releases now)
+### Changed
+
+- Redesigned dev toolbar UX — unified searchable flag list (statsig + code flags combined), keyboard shortcuts (Cmd+Shift+D toggle, Escape to close panel), quick actions (copy SHA/route, theme picker, admin link) moved to always-visible bottom bar
+- Added toggle flash feedback when switching feature flags, auto-focus search on panel expand, responsive compacting for narrow viewports
+- Clickable override badge in bottom bar opens flag panel directly
+- 50 unit tests covering all toolbar interactions (up from ~10)
+
+## [26.4.20] - 2026-03-19
+
+### Removed
+
+- "Delete account" button from the user dropdown menu — too easy to click accidentally. Delete account is still accessible via Settings > Data & Privacy.
+### Added
+
+- Persistent audio playback with Now Playing card in sidebar footer — shows artwork, track title, artist/release info, play/pause controls, and progress bar
+- Preview availability indicators in release tables — VolumeX muted icon shows which releases/tracks have no audio preview available
+- Audio error handling with toast notification when preview URLs fail to load
+- Fade-in entrance animation for Now Playing card (tw-animate-css)
+- Keyboard-accessible focus rings on all player buttons
+- Image fallback for missing/broken artwork URLs
+- 11 unit tests covering useTrackAudioPlayer hook and NowPlayingCard component states
+
+### Changed
+
+- Extended useTrackAudioPlayer hook with track metadata (title, release, artist, artwork) for any UI surface to render current track
+- All 5 toggleTrack callers now pass release metadata (ReleaseCell, ReleaseTrackList, TrackRow, ReleaseSidebar, NowPlayingCard)
+
 ## [26.4.19] - 2026-03-19
 
 ### Added
@@ -24,6 +87,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Server-side pixel forwarding to Facebook CAPI, Google Measurement Protocol, and TikTok Events API with consent gating and retry logic
+- Pixel health monitoring API with per-platform health status (healthy/degraded/unhealthy/inactive)
+- Manual test event button to verify pixel credentials from the dashboard
+- First-touch conversion attribution: tracks which retargeting platform drove each subscriber
+- IP purge cron job: deletes raw IPs after 48 hours, retains hashed IPs for analytics
+- Pixel forwarding retry cron with exponential backoff (5 retries, max 3h) and dead-lettering
+- Unit tests for anonymizeIp, deriveAttributionSource, computeHealthStatus, parseConsentCookie, and forwarding orchestration
 - Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
 - Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
 - `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
@@ -31,6 +101,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Pixel health endpoint now uses SQL aggregation instead of loading all events into memory
+- Replaced `drizzleSql.raw()` with safe parameterized query in IP purge cron
+- Deduplicated `NO_STORE_HEADERS` constant across 5 route files (now imports from shared module)
+- Added `retryCount` column to pixel_events for accurate dead-letter tracking
+- Added partial index on pixel_events for efficient IP purge queries
+- Attribution endpoint now requires Pro plan entitlement (consistent with all other pixel APIs)
+
+### Fixed
+
+- Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
 - Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
 - Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
 - AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
@@ -40,6 +121,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
 - Added persistent "Claim your handle" ghost button during dashboard animation
 - Mobile dashboard uses stacked row layout for full smart link URL visibility
+- Onboarding checkout intercept: all users completing onboarding now see an upgrade page (gated by `ONBOARDING_CHECKOUT_STEP` feature flag)
+- Smart plan recommendation: Spotify followers determine suggested tier (Pro for <10K, Growth for 10K+)
+- Personalized checkout hint for organic users with their jov.ie handle
+- Founding member urgency callout with accent-tinted card
+- Annual billing pre-selected when savings exceed 25%
+- `&source=intent|organic` query param to disambiguate paid intent from organic upsell
+- Post-upgrade celebration: onboarding upgraders see "Your profile is live — and upgraded!" on the billing success page
+- Analytics segmentation via `intent_source` on checkout events
+
+### Changed
+
+- Skip button copy: "Start free, upgrade anytime" for organic users (was "Continue with Free")
+- Billing success page CTA: "Explore your dashboard" for onboarding upgraders
 
 ## [26.4.17] - 2026-03-19
 

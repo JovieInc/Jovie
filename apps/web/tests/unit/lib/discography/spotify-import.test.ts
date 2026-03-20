@@ -46,7 +46,10 @@ const mockGetBestSpotifyImage = vi
   .fn()
   .mockReturnValue('https://example.com/image.jpg');
 const mockUpsertRelease = vi.fn().mockResolvedValue({ id: 'release-1' });
-const mockUpsertTrack = vi.fn().mockResolvedValue({ id: 'track-1' });
+const mockUpsertRecording = vi.fn().mockResolvedValue({ id: 'recording-1' });
+const mockUpsertReleaseTrack = vi
+  .fn()
+  .mockResolvedValue({ id: 'release-track-1' });
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
@@ -76,9 +79,11 @@ vi.mock('@/lib/validation/schemas/spotify', () => ({
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleasesForProfile: vi.fn().mockResolvedValue([]),
+  syncProfileGenresFromReleases: vi.fn().mockResolvedValue(undefined),
   upsertProviderLink: vi.fn().mockResolvedValue({ id: 'link-1' }),
   upsertRelease: mockUpsertRelease,
-  upsertTrack: mockUpsertTrack,
+  upsertRecording: mockUpsertRecording,
+  upsertReleaseTrack: mockUpsertReleaseTrack,
 }));
 
 vi.mock('@/lib/discography/slug', () => ({
@@ -92,7 +97,7 @@ vi.mock('@/lib/discography/artist-parser', () => ({
 
 vi.mock('@/lib/discography/artist-queries', () => ({
   processReleaseArtistCredits: vi.fn().mockResolvedValue(undefined),
-  processTrackArtistCredits: vi.fn().mockResolvedValue(undefined),
+  processRecordingArtistCredits: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/discography/discovery', () => ({
@@ -108,7 +113,8 @@ describe('spotify-import', () => {
     mockGetSpotifyTracks.mockResolvedValue([]);
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
     mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
-    mockUpsertTrack.mockResolvedValue({ id: 'track-1' });
+    mockUpsertRecording.mockResolvedValue({ id: 'recording-1' });
+    mockUpsertReleaseTrack.mockResolvedValue({ id: 'release-track-1' });
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));
@@ -422,7 +428,7 @@ describe('spotify-import', () => {
       await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
 
       expect(mockGetSpotifyTracks).toHaveBeenCalledWith(['track-1'], 'US');
-      expect(mockUpsertTrack).toHaveBeenCalledWith(
+      expect(mockUpsertRecording).toHaveBeenCalledWith(
         expect.objectContaining({ isrc: 'USABC2412345' })
       );
     });
@@ -521,7 +527,7 @@ describe('spotify-import', () => {
 
       await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
 
-      expect(mockUpsertTrack).toHaveBeenCalledWith(
+      expect(mockUpsertRecording).toHaveBeenCalledWith(
         expect.objectContaining({
           previewUrl: 'https://p.scdn.co/mp3-preview/abc123',
           audioUrl: 'https://p.scdn.co/mp3-preview/abc123',
@@ -619,11 +625,15 @@ describe('spotify-import', () => {
 
       await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
 
-      expect(mockUpsertTrack).toHaveBeenCalledWith(
+      expect(mockUpsertRecording).toHaveBeenCalledWith(
+        expect.objectContaining({
+          durationMs: null,
+        })
+      );
+      expect(mockUpsertReleaseTrack).toHaveBeenCalledWith(
         expect.objectContaining({
           trackNumber: 1,
           discNumber: 1,
-          durationMs: null,
         })
       );
     });
@@ -720,7 +730,7 @@ describe('spotify-import', () => {
 
       await importReleasesFromSpotify('profile-123', '6Ghvu1VvMGScGpOUJBAHNH');
 
-      expect(mockUpsertTrack).toHaveBeenCalledWith(
+      expect(mockUpsertRecording).toHaveBeenCalledWith(
         expect.objectContaining({ isrc: null })
       );
     });

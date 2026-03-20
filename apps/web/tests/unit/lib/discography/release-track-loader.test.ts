@@ -3,15 +3,24 @@ import type { TrackWithProviders } from '@/lib/discography/queries';
 
 const mockGetReleaseById = vi.fn();
 const mockGetTracksForReleaseWithProviders = vi.fn();
+const mockGetReleaseTracksForReleaseWithProviders = vi.fn();
 
 vi.mock('@/lib/discography/queries', () => ({
   getReleaseById: mockGetReleaseById,
   getTracksForReleaseWithProviders: mockGetTracksForReleaseWithProviders,
+  getReleaseTracksForReleaseWithProviders:
+    mockGetReleaseTracksForReleaseWithProviders,
 }));
 
 describe('release-track-loader', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: new model returns empty, so loader falls back to legacy
+    mockGetReleaseTracksForReleaseWithProviders.mockResolvedValue({
+      tracks: [],
+      total: 0,
+      hasMore: false,
+    });
   });
 
   it('loads owned release tracks and maps canonical provider metadata', async () => {
@@ -41,6 +50,7 @@ describe('release-track-loader', () => {
             ownerType: 'track',
             releaseId: null,
             trackId: 'track-1',
+            releaseTrackId: null,
             providerId: 'spotify',
             externalId: null,
             url: 'https://open.spotify.com/track/abc',

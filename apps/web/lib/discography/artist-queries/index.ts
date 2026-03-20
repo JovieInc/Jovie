@@ -15,12 +15,19 @@ export {
 } from './artist-crud';
 // Import operations
 export {
+  processRecordingArtistCredits,
   processReleaseArtistCredits,
   processTrackArtistCredits,
 } from './artist-import';
 // Search operations
 export { getFrequentCollaborators, searchArtists } from './artist-search';
-
+// Recording-artist operations
+export {
+  deleteRecordingArtists,
+  getArtistsForRecording,
+  getRecordingsByArtist,
+  upsertRecordingArtist,
+} from './recording-artists';
 // Release-artist operations
 export {
   deleteReleaseArtists,
@@ -28,7 +35,7 @@ export {
   getReleasesByArtist,
   upsertReleaseArtist,
 } from './release-artists';
-// Track-artist operations
+// Track-artist operations (legacy)
 export {
   deleteTrackArtists,
   getArtistsForTrack,

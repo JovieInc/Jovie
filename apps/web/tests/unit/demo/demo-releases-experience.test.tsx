@@ -158,8 +158,7 @@ describe('DemoReleasesExperience', () => {
     // The sidebar nav has a Releases tab and it appears in the breadcrumb
     expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
-
+    // All releases are shown (no tracks/releases toggle)
     // Release titles should appear in the list
     expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
 
@@ -173,8 +172,7 @@ describe('DemoReleasesExperience', () => {
   it('renders release data in the table', () => {
     renderDemo();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Releases' }));
-
+    // All releases are shown directly (no view toggle)
     // The table should contain mock release titles
     expect(screen.getAllByText('Night Drive').length).toBeGreaterThan(0);
   });
