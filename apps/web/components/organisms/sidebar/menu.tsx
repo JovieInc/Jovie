@@ -36,17 +36,17 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-full px-2 text-left text-app leading-tight tracking-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[8px] border border-transparent px-2.5 text-left text-app leading-tight tracking-tight outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
     'transition-[background-color,color] duration-0 ease-interactive',
     // Default text color — keep non-active rows quiet
-    'text-sidebar-item-icon/75',
+    'text-sidebar-item-icon/78',
     // Hover state — Linear: rgba(255,255,255,0.02) bg
-    'hover:bg-sidebar-accent/70 hover:text-sidebar-item-foreground',
+    'hover:border-(--linear-app-frame-seam) hover:bg-sidebar-accent/72 hover:text-sidebar-item-foreground',
     // Active state — soft emphasis while keeping shell understated
-    'data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-item-foreground',
+    'data-[active=true]:bg-sidebar-accent/88 data-[active=true]:text-sidebar-item-foreground data-[active=true]:shadow-[inset_0_0_0_1px_var(--linear-app-frame-seam)]',
     // Focus state - subtle bg like Linear (no rings)
     'focus-visible:bg-sidebar-accent focus-visible:outline-none',
     // Disabled state
@@ -75,7 +75,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
-        default: 'h-7',
+        default: 'h-[30px]',
         sm: 'h-6 text-xs',
         lg: 'h-8 group-data-[collapsible=icon]:!size-8',
       },
@@ -219,7 +219,7 @@ export const SidebarMenuBadge = React.forwardRef<
     ref={ref}
     data-sidebar='menu-badge'
     className={cn(
-      'absolute right-2 top-1/2 -translate-y-1/2 flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon/70 select-none pointer-events-none',
+      'absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full border border-transparent bg-sidebar-accent/45 px-1.5 text-[11px] font-medium tabular-nums text-sidebar-item-icon/70 select-none pointer-events-none',
       'peer-hover/menu-button:text-sidebar-item-foreground peer-data-[active=true]/menu-button:text-sidebar-item-foreground',
       'peer-data-[size=sm]/menu-button:text-[10px]',
       'peer-data-[size=default]/menu-button:text-[11px]',

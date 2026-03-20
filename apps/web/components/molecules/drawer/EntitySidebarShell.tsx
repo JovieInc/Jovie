@@ -100,7 +100,7 @@ export function EntitySidebarShell({
       data-testid={testId}
     >
       <div className='flex h-full min-h-0 flex-col'>
-        <div className='sticky top-0 z-20 relative shrink-0 bg-transparent after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border-subtle'>
+        <div className='sticky top-0 z-20 shrink-0 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
           {/* Header bar — close is in the overflow dropdown */}
           <DrawerHeader
             title={title}
@@ -118,7 +118,7 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-3 pt-1.5 pb-1'>
+            <div className='overflow-visible px-4 pt-2.5 pb-1.5'>
               {entityHeader}
             </div>
           )}
@@ -127,7 +127,7 @@ export function EntitySidebarShell({
           {tabs && (
             <div
               className={cn(
-                'overflow-visible border-t border-subtle px-3 py-1.5 [&>*]:w-full',
+                'overflow-visible border-t border-(--linear-app-frame-seam) px-4 py-1.5 [&>*]:w-full',
                 tabsContainerClassName
               )}
             >
@@ -144,13 +144,13 @@ export function EntitySidebarShell({
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-1.5'>
+            <div className='flex-1 min-h-0 space-y-2.5 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-2.5'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-subtle bg-(--linear-bg-app) px-3 py-1.5'>
+              <div className='shrink-0 border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-1.5'>
                 {footer}
               </div>
             )}

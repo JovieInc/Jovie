@@ -198,7 +198,7 @@ export function ReleaseDspLinks({
     >
       {/* Providers list */}
       {release.providers.length > 0 && (
-        <div className='space-y-0.5'>
+        <div className='space-y-1'>
           {release.providers.map(provider => {
             const config = providerConfig[provider.key];
             const isManual = provider.source === 'manual';
@@ -228,7 +228,7 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <DrawerSurfaceCard className='mt-2 space-y-2 rounded-lg p-2.5'>
+        <DrawerSurfaceCard className='mt-1.5 space-y-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-2.5'>
           <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
@@ -238,7 +238,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-[12px]'>
+              <SelectTrigger className='h-[30px] w-full rounded-md border-subtle bg-surface-0 text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>

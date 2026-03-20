@@ -91,8 +91,8 @@ export function SidebarInstallBanner() {
       : 'New version available';
 
     return (
-      <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-        <div className='relative rounded-md bg-sidebar-accent/5 px-2 py-1.5 text-sidebar-muted'>
+      <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
+        <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 px-2.5 py-2 text-sidebar-muted'>
           <button
             type='button'
             aria-label='Dismiss version update banner'
@@ -129,8 +129,8 @@ export function SidebarInstallBanner() {
   if (!pwaInstallEnabled || !canPrompt) return null;
 
   return (
-    <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-      <div className='relative rounded-md bg-sidebar-accent/5 px-2 py-1.5 text-sidebar-muted'>
+    <div className='group-data-[collapsible=icon]:hidden px-2.5 pb-1.5'>
+      <div className='relative rounded-[10px] border border-sidebar-border/70 bg-sidebar-accent/35 px-2.5 py-2 text-sidebar-muted'>
         <button
           type='button'
           aria-label='Dismiss install banner'

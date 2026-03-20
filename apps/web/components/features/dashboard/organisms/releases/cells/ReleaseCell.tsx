@@ -54,33 +54,33 @@ export const ReleaseCell = memo(function ReleaseCell({
   );
 
   return (
-    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-1.5'>
-      <div className='flex w-4 items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[14px_minmax(0,1fr)] items-start gap-x-2'>
+      <div className='flex w-[14px] items-center justify-center pt-0.5'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-4 w-4 rounded-sm p-0 text-tertiary-token'
+            className='h-[14px] w-[14px] rounded-sm p-0 text-quaternary-token opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 aria-[pressed=true]:opacity-100'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-[9px] w-[9px]' />
+              <Pause className='h-[8px] w-[8px]' />
             ) : (
-              <Play className='h-[9px] w-[9px]' />
+              <Play className='h-[8px] w-[8px]' />
             )}
           </DrawerInlineIconButton>
         ) : (
-          <span className='h-4 w-4' />
+          <span className='h-[14px] w-[14px]' />
         )}
       </div>
 
       <div className='min-w-0 space-y-0.5'>
-        <div className='flex min-w-0 items-center gap-1 leading-none'>
+        <div className='flex min-w-0 items-center gap-1.5 leading-none'>
           <TruncatedText
             lines={1}
-            className='min-w-0 flex-1 text-[14px] font-[510] leading-[1.15] tracking-[-0.013em] text-primary-token'
+            className='min-w-0 flex-1 text-[12.5px] font-[510] leading-[1.15] tracking-[-0.01em] text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >
@@ -89,7 +89,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {showType && typeStyle && (
             <Badge
               size='sm'
-              className={`h-[17px] shrink-0 rounded-md px-1 text-[9px] font-[510] tracking-[-0.01em] ${typeStyle.bg} ${typeStyle.text}`}
+              className={`h-[16px] shrink-0 rounded-[6px] px-1.5 text-[9px] font-[510] tracking-normal ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
@@ -97,7 +97,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='hidden h-[17px] shrink-0 rounded-md bg-amber-500/10 px-1 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 xl:inline-flex dark:text-amber-300'
+              className='hidden h-[16px] shrink-0 rounded-[6px] bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-normal text-amber-700 xl:inline-flex dark:text-amber-300'
             >
               {manualOverrideCount} edited
             </Badge>
@@ -106,7 +106,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[12.5px] font-[400] leading-[1.3] tracking-[-0.01em] text-secondary-token'
+            className='text-[11.5px] font-[400] leading-[1.25] tracking-[-0.005em] text-tertiary-token'
           >
             {artistLine}
           </TruncatedText>

@@ -153,9 +153,9 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex items-center justify-between rounded-md',
-          'px-2.5 py-1.5 lg:px-2 lg:py-1',
-          'active:bg-surface-1 lg:active:bg-surface-1 lg:hover:bg-surface-1',
+          'group flex min-h-[36px] items-center justify-between rounded-[8px] border border-transparent',
+          'px-2.5 py-1.5 lg:px-2.5 lg:py-1.5',
+          'active:border-(--linear-app-frame-seam) active:bg-surface-1 lg:hover:border-(--linear-app-frame-seam) lg:hover:bg-surface-1',
           'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
           className
@@ -163,11 +163,13 @@ export function SidebarLinkRow({
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex min-w-0 flex-1 items-center gap-2.5 lg:gap-2'>
+        <div className='flex min-w-0 flex-1 items-center gap-2.5'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
-          <span className='text-[13px] text-secondary-token'>{label}</span>
+          <span className='text-[12.5px] font-[500] text-secondary-token'>
+            {label}
+          </span>
           {badge && (
             <span className='shrink-0 text-[10px] text-tertiary-token'>
               {badge}
@@ -177,7 +179,7 @@ export function SidebarLinkRow({
         </div>
 
         {/* Right: Kebab dropdown (desktop only — mobile uses swipe-to-reveal) */}
-        <div className='hidden lg:flex items-center shrink-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100 transition-opacity'>
+        <div className='hidden shrink-0 items-center opacity-0 transition-opacity group-focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 lg:flex'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

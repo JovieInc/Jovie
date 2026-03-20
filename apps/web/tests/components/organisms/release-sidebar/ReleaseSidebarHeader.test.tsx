@@ -8,12 +8,20 @@ vi.stubGlobal('open', openSpy);
 
 vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
   DrawerHeaderActions: ({
+    primaryActions,
     overflowActions,
   }: {
     primaryActions: { id: string; label: string; onClick: () => void }[];
     overflowActions: { id: string; label: string; onClick: () => void }[];
   }) => (
     <div>
+      {primaryActions.map(
+        (a: { id: string; label: string; onClick: () => void }) => (
+          <button key={a.id} type='button' onClick={a.onClick}>
+            {a.label}
+          </button>
+        )
+      )}
       {overflowActions.map(
         (a: { id: string; label: string; onClick: () => void }) => (
           <button key={a.id} type='button' onClick={a.onClick}>

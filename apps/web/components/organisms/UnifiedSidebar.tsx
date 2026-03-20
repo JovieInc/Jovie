@@ -179,7 +179,7 @@ function SidebarHeaderNav({
           href={APP_ROUTES.DASHBOARD}
           aria-label='Back to dashboard'
           className={cn(
-            'inline-flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+            'inline-flex h-8 w-full items-center gap-2 rounded-[10px] px-2.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/72 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/72 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
             'group-data-[collapsible=icon]:justify-center'
           )}
         >
@@ -200,7 +200,7 @@ function SidebarHeaderNav({
               type='button'
               aria-label='Open workspace menu'
               className={cn(
-                'flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                'flex h-8 w-full items-center gap-2 rounded-[10px] px-2.5 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/72 focus-visible:outline-none focus-visible:bg-sidebar-accent/72',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
@@ -225,7 +225,7 @@ function SidebarHeaderNav({
         <Link
           href={APP_ROUTES.CHAT}
           aria-label='New thread'
-          className='ml-auto flex size-6 shrink-0 items-center justify-center rounded-md bg-transparent text-sidebar-item-icon/58 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 group-data-[collapsible=icon]:hidden'
+          className='ml-auto flex size-8 shrink-0 items-center justify-center rounded-[10px] bg-transparent text-sidebar-item-icon/58 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/72 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/72 focus-visible:text-sidebar-item-foreground/95 group-data-[collapsible=icon]:hidden'
         >
           <SquarePen className='size-3' />
         </Link>
@@ -255,12 +255,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       variant='sidebar'
       collapsible='offcanvas'
       className={cn(
-        'bg-base',
-        '[--sidebar-width:232px]',
+        'bg-transparent',
+        '[--sidebar-width:244px]',
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 py-0'>
+      <SidebarHeader className='relative h-11 justify-center gap-0 px-3 py-1'>
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}
@@ -269,8 +269,8 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2 pb-1'>
-        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2.5 pb-1.5'>
+        <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-1'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
               <DashboardNav />
@@ -286,7 +286,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         <SidebarInstallBanner />
 
         {isUserAdmin && (
-          <div className='px-2 pb-1.5 pt-0.5'>
+          <div className='px-3 pb-2 pt-0.5'>
             <span className='text-2xs text-sidebar-muted/80 select-none'>
               v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
               {process.env.NEXT_PUBLIC_BUILD_SHA

@@ -15,7 +15,11 @@ export function DrawerBackButton({
   ...props
 }: DrawerBackButtonProps) {
   return (
-    <DrawerButton tone='ghost' className={className} {...props}>
+    <DrawerButton
+      tone='ghost'
+      className={className ?? 'h-7 rounded-full px-2 text-[11px]'}
+      {...props}
+    >
       <ArrowLeft className='h-3.5 w-3.5' aria-hidden='true' />
       <span className='max-w-[200px] truncate'>{label}</span>
     </DrawerButton>

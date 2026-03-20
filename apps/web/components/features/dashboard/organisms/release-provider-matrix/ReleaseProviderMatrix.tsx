@@ -704,7 +704,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   return (
     <>
       <div
-        className='flex h-full min-h-0 min-w-0 flex-col'
+        className='flex h-full min-h-0 min-w-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_68%,var(--linear-bg-surface-1))]'
         data-testid='releases-matrix'
       >
         <h1 className='sr-only'>Releases</h1>
@@ -725,131 +725,135 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
           {/* Scrollable content area */}
           <div className='flex-1 min-h-0 overflow-auto'>
-            {(showReleasesTable || showImportProgress) && (
-              <ImportProgressBanner
-                artistName={artistName}
-                importedCount={importedCount}
-                totalCount={totalCount}
-                visible={showImportProgress}
-              />
-            )}
-            {showReleasesTable &&
-              rows[0]?.profileId &&
-              !isAmConnected &&
-              !isImporting && (
-                <AppleMusicSyncBanner
-                  profileId={rows[0].profileId}
-                  spotifyConnected={isConnected}
-                  releases={rows}
-                  onMatchStatusChange={handleMatchStatusChange}
-                  className='mx-4 mt-2'
-                />
-              )}
-            {showEmptyState && (
-              <ReleasesEmptyState
-                onConnectSpotify={() => setSpotifySearchOpen(true)}
-              />
-            )}
-
-            {/* Soft-cap banner: request higher limit when over 100 smart links */}
-            {showReleasesTable &&
-              !isPro &&
-              releasedCount > SMART_LINK_SOFT_CAP && (
-                <SmartLinkGateBanner
-                  mode='soft-cap'
-                  releasedCount={releasedCount}
-                  softCap={SMART_LINK_SOFT_CAP}
-                  className='mx-4 mt-2'
-                />
-              )}
-
-            {/* Pre-release upsell for free users with unreleased music */}
-            {showReleasesTable &&
-              !isPro &&
-              !canAccessFutureReleases &&
-              unreleasedCount > 0 && (
-                <SmartLinkGateBanner
-                  mode='unreleased'
-                  unreleasedCount={unreleasedCount}
-                  className='mx-4 mt-2'
-                />
-              )}
-
-            {showReleasesTable && (
-              <QueryErrorBoundary>
-                <ReleaseTable
-                  releases={filteredRows}
-                  providerConfig={providerConfig}
+            <div className='flex min-h-full flex-col px-3 pb-3 pt-2 lg:px-4 lg:pb-4 lg:pt-3'>
+              {(showReleasesTable || showImportProgress) && (
+                <ImportProgressBanner
                   artistName={artistName}
-                  onCopy={copyHandler}
-                  onEdit={openEditor}
-                  columnVisibility={columnVisibility}
-                  rowHeight={rowHeight}
-                  groupByYear={groupByYear}
-                  selectedReleaseId={editingRelease?.id}
-                  selectedTrackId={editingTrack?.id}
-                  refreshingReleaseId={refreshingReleaseId}
-                  flashedReleaseId={flashedReleaseId}
-                  isSmartLinkLocked={isSmartLinkLocked}
-                  getSmartLinkLockReason={getSmartLinkLockReason}
-                  onTrackClick={openTrackDrawer}
+                  importedCount={importedCount}
+                  totalCount={totalCount}
+                  visible={showImportProgress}
                 />
-              </QueryErrorBoundary>
-            )}
-
-            {/* Show "No releases" state when connected but no releases and not importing */}
-            {isConnected && rows.length === 0 && !isImporting && (
-              <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
-                <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-subtle bg-surface-1'>
-                  <Icon
-                    name='Disc3'
-                    className='h-8 w-8 text-tertiary-token'
-                    aria-hidden='true'
+              )}
+              {showReleasesTable &&
+                rows[0]?.profileId &&
+                !isAmConnected &&
+                !isImporting && (
+                  <AppleMusicSyncBanner
+                    profileId={rows[0].profileId}
+                    spotifyConnected={isConnected}
+                    releases={rows}
+                    onMatchStatusChange={handleMatchStatusChange}
+                    className='mt-3'
                   />
-                </div>
-                <h3 className='mt-4 text-lg font-[590] text-primary-token'>
-                  No releases yet
-                </h3>
-                <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
-                  {canCreateManualReleases
-                    ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
-                    : 'Sync your releases from Spotify to start generating smart links.'}
-                </p>
-                <div className='mt-4 flex items-center gap-3'>
-                  <DrawerButton
-                    tone='primary'
-                    disabled={isSyncing}
-                    onClick={experienceAdapter?.onSync ?? handleSync}
-                    className='inline-flex items-center gap-2'
-                    data-testid='sync-spotify-empty-state'
-                  >
+                )}
+              {showEmptyState && (
+                <ReleasesEmptyState
+                  onConnectSpotify={() => setSpotifySearchOpen(true)}
+                />
+              )}
+
+              {/* Soft-cap banner: request higher limit when over 100 smart links */}
+              {showReleasesTable &&
+                !isPro &&
+                releasedCount > SMART_LINK_SOFT_CAP && (
+                  <SmartLinkGateBanner
+                    mode='soft-cap'
+                    releasedCount={releasedCount}
+                    softCap={SMART_LINK_SOFT_CAP}
+                    className='mt-3'
+                  />
+                )}
+
+              {/* Pre-release upsell for free users with unreleased music */}
+              {showReleasesTable &&
+                !isPro &&
+                !canAccessFutureReleases &&
+                unreleasedCount > 0 && (
+                  <SmartLinkGateBanner
+                    mode='unreleased'
+                    unreleasedCount={unreleasedCount}
+                    className='mt-3'
+                  />
+                )}
+
+              {showReleasesTable && (
+                <QueryErrorBoundary>
+                  <div className='mt-3 flex min-h-[420px] flex-1 overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_1px_0_rgba(0,0,0,0.02)]'>
+                    <ReleaseTable
+                      releases={filteredRows}
+                      providerConfig={providerConfig}
+                      artistName={artistName}
+                      onCopy={copyHandler}
+                      onEdit={openEditor}
+                      columnVisibility={columnVisibility}
+                      rowHeight={rowHeight}
+                      groupByYear={groupByYear}
+                      selectedReleaseId={editingRelease?.id}
+                      selectedTrackId={editingTrack?.id}
+                      refreshingReleaseId={refreshingReleaseId}
+                      flashedReleaseId={flashedReleaseId}
+                      isSmartLinkLocked={isSmartLinkLocked}
+                      getSmartLinkLockReason={getSmartLinkLockReason}
+                      onTrackClick={openTrackDrawer}
+                    />
+                  </div>
+                </QueryErrorBoundary>
+              )}
+
+              {/* Show "No releases" state when connected but no releases and not importing */}
+              {isConnected && rows.length === 0 && !isImporting && (
+                <div className='flex flex-1 flex-col items-center justify-center px-4 py-16 text-center'>
+                  <div className='flex h-16 w-16 items-center justify-center rounded-[14px] border border-subtle bg-surface-1'>
                     <Icon
-                      name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                      className={cn(
-                        'h-4 w-4',
-                        isSyncing && 'animate-spin motion-reduce:animate-none'
-                      )}
+                      name='Disc3'
+                      className='h-8 w-8 text-tertiary-token'
                       aria-hidden='true'
                     />
-                    {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                  </DrawerButton>
-                  {canCreateManualReleases && (
+                  </div>
+                  <h3 className='mt-4 text-lg font-[590] text-primary-token'>
+                    No releases yet
+                  </h3>
+                  <p className='mt-1 max-w-sm text-[13px] text-secondary-token'>
+                    {canCreateManualReleases
+                      ? 'Sync your releases from Spotify or create one manually to start generating smart links.'
+                      : 'Sync your releases from Spotify to start generating smart links.'}
+                  </p>
+                  <div className='mt-4 flex items-center gap-3'>
                     <DrawerButton
-                      onClick={handleNewRelease}
+                      tone='primary'
+                      disabled={isSyncing}
+                      onClick={experienceAdapter?.onSync ?? handleSync}
                       className='inline-flex items-center gap-2'
-                      data-testid='create-release-empty-state'
+                      data-testid='sync-spotify-empty-state'
                     >
                       <Icon
-                        name='Plus'
-                        className='h-4 w-4'
+                        name={isSyncing ? 'Loader2' : 'RefreshCw'}
+                        className={cn(
+                          'h-4 w-4',
+                          isSyncing && 'animate-spin motion-reduce:animate-none'
+                        )}
                         aria-hidden='true'
                       />
-                      Create Release
+                      {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
                     </DrawerButton>
-                  )}
+                    {canCreateManualReleases && (
+                      <DrawerButton
+                        onClick={handleNewRelease}
+                        className='inline-flex items-center gap-2'
+                        data-testid='create-release-empty-state'
+                      >
+                        <Icon
+                          name='Plus'
+                          className='h-4 w-4'
+                          aria-hidden='true'
+                        />
+                        Create Release
+                      </DrawerButton>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>

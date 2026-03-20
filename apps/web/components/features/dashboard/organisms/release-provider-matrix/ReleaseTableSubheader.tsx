@@ -296,7 +296,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
-      className='border-b border-(--linear-app-frame-seam)/80 bg-(--linear-app-content-surface)/95 backdrop-blur supports-[backdrop-filter]:bg-(--linear-app-content-surface)/90'
+      className='min-h-[32px] border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons

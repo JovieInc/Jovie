@@ -33,13 +33,13 @@ export function DrawerPropertyRow({
   const sizeClasses = {
     sm: {
       container: 'min-h-[22px] gap-2 rounded px-1 py-px',
-      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
-      value: 'text-[11px] leading-[14px]',
+      label: 'text-[10.5px] leading-[14px] tracking-normal',
+      value: 'text-[12px] leading-[15px]',
     },
     md: {
       container: 'min-h-[24px] gap-2 rounded px-1 py-px',
-      label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
-      value: 'text-[11.5px] leading-[15px]',
+      label: 'text-[10.5px] leading-[14px] tracking-normal',
+      value: 'text-[12px] leading-[16px]',
     },
   } as const;
 
@@ -66,7 +66,7 @@ export function DrawerPropertyRow({
     >
       <span
         className={cn(
-          'font-[510] text-tertiary-token',
+          'font-[500] text-tertiary-token',
           styles.label,
           labelClassName
         )}

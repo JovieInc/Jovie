@@ -100,8 +100,8 @@ function ReleaseEntityHeader({
   const artistLine = formatReleaseArtistLine(release.artistNames, artistName);
 
   return (
-    <div className='space-y-2'>
-      <div className='flex items-start gap-3 px-1 py-1'>
+    <div className='space-y-2.5'>
+      <div className='flex items-start gap-3'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -127,8 +127,8 @@ function ReleaseEntityHeader({
               <DrawerMediaThumb
                 src={release.artworkUrl}
                 alt={artworkAlt}
-                sizeClassName='h-[88px] w-[88px]'
-                sizes='88px'
+                sizeClassName='h-[76px] w-[76px] rounded-[11px]'
+                sizes='76px'
                 fallback={
                   <Icon
                     name='Disc3'
@@ -178,19 +178,21 @@ function ReleaseEntityHeader({
               platformCount={release.providers.length}
             />
           }
-          className='min-w-0 flex-1 gap-0.5'
-          bodyClassName='pt-0'
+          className='min-w-0 flex-1'
+          bodyClassName='pt-0.5'
         />
       </div>
 
-      {/* Smart link — full width */}
-      <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
+      <div className='space-y-2'>
+        {/* Smart link — full width */}
+        <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
 
-      {/* Analytics card — above tabs, always visible */}
-      <ReleaseSmartLinkAnalytics
-        release={release}
-        analyticsOverride={analyticsOverride}
-      />
+        {/* Analytics card — above tabs, always visible */}
+        <ReleaseSmartLinkAnalytics
+          release={release}
+          analyticsOverride={analyticsOverride}
+        />
+      </div>
     </div>
   );
 }

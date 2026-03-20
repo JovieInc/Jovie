@@ -35,10 +35,10 @@ const VARIANT_STYLES: Record<
     meta: 'text-[11px]',
   },
   drawer: {
-    container: 'space-y-1',
-    number: 'text-[11px]',
-    title: 'text-[13px]',
-    meta: 'text-[11px]',
+    container: 'space-y-1.5',
+    number: 'text-[10.5px]',
+    title: 'text-[14px] tracking-[-0.01em]',
+    meta: 'text-[10.5px]',
   },
 };
 

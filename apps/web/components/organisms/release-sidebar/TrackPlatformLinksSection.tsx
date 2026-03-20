@@ -25,7 +25,7 @@ export function TrackPlatformLinksSection({
 }: TrackPlatformLinksSectionProps) {
   return (
     <DrawerLinkSection
-      title='Available on'
+      title='Platforms'
       isEmpty={providers.length === 0}
       emptyMessage={emptyMessage}
       emptyStateTestId='track-platforms-empty'

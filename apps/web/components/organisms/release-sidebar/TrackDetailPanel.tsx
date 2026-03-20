@@ -8,6 +8,7 @@ import {
   DrawerActionRow,
   DrawerBackButton,
   DrawerSection,
+  DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import type { ProviderKey } from '@/lib/discography/types';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
@@ -50,19 +51,23 @@ export function TrackDetailPanel({
   }, [track.isrc]);
 
   return (
-    <div className='space-y-4'>
+    <div className='space-y-3'>
       <DrawerBackButton label={releaseTitle} onClick={onBack} />
 
-      <TrackMetaSummary
-        title={track.title}
-        trackNumber={track.trackNumber}
-        discNumber={track.discNumber}
-        durationMs={track.durationMs}
-        isExplicit={track.isExplicit}
-      />
+      <DrawerSurfaceCard className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-3'>
+        <TrackMetaSummary
+          title={track.title}
+          trackNumber={track.trackNumber}
+          discNumber={track.discNumber}
+          durationMs={track.durationMs}
+          isrc={track.isrc}
+          isExplicit={track.isExplicit}
+          variant='drawer'
+        />
+      </DrawerSurfaceCard>
 
       <DrawerSection title='Actions'>
-        <div className='space-y-1'>
+        <DrawerSurfaceCard className='space-y-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] p-1.5'>
           {track.isrc && (
             <DrawerActionRow
               onClick={handleCopyIsrc}
@@ -77,7 +82,9 @@ export function TrackDetailPanel({
           )}
           <CopyableUrlRow
             url={smartLinkUrl}
-            size='lg'
+            size='md'
+            className='rounded-[8px]'
+            surface='boxed'
             copyButtonTitle='Copy smart link'
             openButtonTitle='Open smart link'
             onCopySuccess={() => {
@@ -87,7 +94,7 @@ export function TrackDetailPanel({
               toast.error('Failed to copy link');
             }}
           />
-        </div>
+        </DrawerSurfaceCard>
       </DrawerSection>
 
       <TrackPlatformLinksSection providers={streamingProviders} />

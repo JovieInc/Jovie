@@ -207,6 +207,7 @@ export function ReleaseTable({
       minSize: 200,
       size: 9999, // Large value to make it flex and fill available space
       enableSorting: false,
+      meta: { className: 'pl-5 pr-2' },
     });
 
     const rightMetaColumn = columnHelper.display({
@@ -217,9 +218,9 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 356,
-      minSize: 240,
-      meta: { className: 'hidden sm:table-cell' },
+      size: 292,
+      minSize: 216,
+      meta: { className: 'hidden px-2.5 sm:table-cell' },
     });
 
     return [releaseColumn, rightMetaColumn];

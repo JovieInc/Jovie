@@ -41,10 +41,13 @@ export function DrawerSettingsToggle({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded py-px transition-[background-color] duration-150',
+        'flex items-center justify-between gap-3 rounded-[8px] border py-px transition-[background-color,border-color] duration-150',
+        density === 'compact'
+          ? 'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'
+          : 'border-transparent',
         !disabled && 'hover:bg-surface-1 focus-within:bg-surface-1',
         density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
-        density === 'compact' ? 'px-1' : 'px-1.5',
+        density === 'compact' ? 'px-2' : 'px-1.5',
         disabled && 'opacity-60',
         className
       )}
@@ -54,7 +57,7 @@ export function DrawerSettingsToggle({
         className={cn(
           'select-none text-secondary-token',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-          density === 'compact' ? 'text-[11px]' : 'text-[12px]'
+          density === 'compact' ? 'text-[11.5px] font-[500]' : 'text-[12px]'
         )}
       >
         {label}
