@@ -32,7 +32,7 @@ export function DspPresenceCard({
     <ContentSurfaceCard
       className={cn(
         'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-150',
-        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-(--linear-border-default) hover:bg-(--linear-bg-surface-0)',
+        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-(--linear-bg-surface-0)',
         isSelected &&
           'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-(--linear-border-focus)'
       )}
@@ -46,7 +46,7 @@ export function DspPresenceCard({
         <div className='flex items-start justify-between gap-2.5'>
           <div className='flex items-center gap-2.5'>
             {item.externalArtistImageUrl ? (
-              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+              <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <Image
                   src={item.externalArtistImageUrl}
                   alt={item.externalArtistName ?? label}
@@ -57,18 +57,18 @@ export function DspPresenceCard({
                 />
               </div>
             ) : (
-              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
                 <DspProviderIcon provider={item.providerId} size='lg' />
               </div>
             )}
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-[13px] font-[510] text-(--linear-text-primary)'>
+                <span className='truncate text-[13px] font-[510] text-primary-token'>
                   {item.externalArtistName ?? 'Unknown Artist'}
                 </span>
               </div>
-              <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-(--linear-text-tertiary)'>
+              <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
                 <span>{label}</span>
               </div>
@@ -80,7 +80,7 @@ export function DspPresenceCard({
           </div>
         </div>
 
-        <div className='flex min-h-5 items-center gap-2.5 text-[12px] text-(--linear-text-tertiary)'>
+        <div className='flex min-h-5 items-center gap-2.5 text-[12px] text-tertiary-token'>
           {isConfirmed && (
             <ConfidenceBadge score={item.confidenceScore} size='sm' />
           )}
@@ -91,12 +91,12 @@ export function DspPresenceCard({
       </button>
 
       {item.externalArtistUrl && (
-        <div className='border-t border-(--linear-border-subtle) pt-2.5'>
+        <div className='border-t border-subtle pt-2.5'>
           <a
             href={item.externalArtistUrl}
             target='_blank'
             rel='noopener noreferrer'
-            className='inline-flex items-center gap-1.5 text-[12px] text-(--linear-text-tertiary) transition-colors hover:text-(--linear-text-primary)'
+            className='inline-flex items-center gap-1.5 text-[12px] text-tertiary-token transition-colors hover:text-primary-token'
           >
             <Icon name='ExternalLink' className='h-3.5 w-3.5' />
             <span>View on {label}</span>
