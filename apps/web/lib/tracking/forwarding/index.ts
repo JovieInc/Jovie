@@ -69,7 +69,8 @@ const joviePlatformMap: Record<Platform, JoviePlatform> = {
 async function forwardToPlatforms(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   configs: Partial<Record<Platform, PlatformConfig | null>>,
-  isJovie = false
+  isJovie = false,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   const tasks: Array<{
     platform: Platform;
@@ -80,9 +81,11 @@ async function forwardToPlatforms(
     Platform,
     PlatformConfig | null,
   ][]) {
-    if (config) {
-      tasks.push({ platform, config });
-    }
+    if (!config) continue;
+    // Skip platforms already successfully sent (prevents duplicate events on retry)
+    const key = isJovie ? joviePlatformMap[platform] : platform;
+    if (alreadySent?.has(key)) continue;
+    tasks.push({ platform, config });
   }
 
   if (tasks.length === 0) return [];
@@ -189,10 +192,11 @@ async function markEventSkipped(
  * Forward event to Jovie's own pixels
  */
 async function forwardToJoviePixels(
-  normalizedEvent: ReturnType<typeof normalizeEvent>
+  normalizedEvent: ReturnType<typeof normalizeEvent>,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   const jovieConfigs = getJoviePixelConfigs();
-  return forwardToPlatforms(normalizedEvent, jovieConfigs, true);
+  return forwardToPlatforms(normalizedEvent, jovieConfigs, true, alreadySent);
 }
 
 /**
@@ -225,7 +229,8 @@ function decryptCreatorConfig(
 async function forwardToCreatorPixels(
   normalizedEvent: ReturnType<typeof normalizeEvent>,
   profileId: string,
-  creatorConfigMap?: Map<string, CreatorPixel>
+  creatorConfigMap?: Map<string, CreatorPixel>,
+  alreadySent?: Set<string>
 ): Promise<ForwardingResult[]> {
   let creatorConfig: CreatorPixel | undefined;
 
@@ -256,7 +261,12 @@ async function forwardToCreatorPixels(
   }
 
   const platformConfigs = decryptCreatorConfig(creatorConfig);
-  return forwardToPlatforms(normalizedEvent, platformConfigs);
+  return forwardToPlatforms(
+    normalizedEvent,
+    platformConfigs,
+    false,
+    alreadySent
+  );
 }
 
 /**
@@ -314,15 +324,30 @@ export async function forwardEvent(
     return [];
   }
 
+  // On retries, skip platforms already marked 'sent' to avoid duplicate events
+  const alreadySent = new Set(
+    Object.entries(event.forwardingStatus ?? {})
+      .filter(([, v]) => v?.status === 'sent')
+      .map(([k]) => k)
+  );
+
   // Forward to all configured platforms in parallel
   const [jovieResults, creatorResults] = await Promise.all([
-    forwardToJoviePixels(normalizedEvent),
-    forwardToCreatorPixels(normalizedEvent, event.profileId, creatorConfigMap),
+    forwardToJoviePixels(normalizedEvent, alreadySent),
+    forwardToCreatorPixels(
+      normalizedEvent,
+      event.profileId,
+      creatorConfigMap,
+      alreadySent
+    ),
   ]);
   const results = [...jovieResults, ...creatorResults];
 
-  // Update event with forwarding status
-  const forwardingStatus = buildForwardingStatus(results);
+  // Merge new results with prior statuses (preserve 'sent' from earlier runs)
+  const forwardingStatus = {
+    ...(event.forwardingStatus ?? {}),
+    ...buildForwardingStatus(results),
+  };
   await db
     .update(pixelEvents)
     .set({ forwardingStatus })

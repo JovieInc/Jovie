@@ -52,21 +52,17 @@ function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
  */
 function anonymizeIp(ip: string): string {
   if (ip.includes(':')) {
-    // IPv6: expand to 8 groups, zero last 5
-    const parts = ip.split(':');
-    // Handle :: shorthand by expanding
-    const fullParts: string[] = [];
-    for (const part of parts) {
-      if (part === '') {
-        const missing = 8 - parts.filter(p => p !== '').length;
-        for (let i = 0; i < missing; i++) fullParts.push('0000');
-      } else {
-        fullParts.push(part);
-      }
-    }
-    // Ensure we have 8 groups, then zero last 5
-    while (fullParts.length < 8) fullParts.push('0000');
-    return fullParts.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
+    // IPv6: split on '::' once, expand the gap to fill 8 groups, zero last 5
+    const [left, right = ''] = ip.split('::');
+    const leftParts = left ? left.split(':') : [];
+    const rightParts = right ? right.split(':') : [];
+    const missing = 8 - leftParts.length - rightParts.length;
+    const full = [
+      ...leftParts,
+      ...Array(Math.max(0, missing)).fill('0000'),
+      ...rightParts,
+    ];
+    return full.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
   }
   // IPv4: zero last octet
   const parts = ip.split('.');
@@ -213,9 +209,12 @@ export async function POST(request: NextRequest) {
       undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
 
-    // Determine marketing consent from jv_cc cookie
+    // Determine marketing consent from jv_cc cookie.
+    // When the cookie banner is not shown (non-regulated jurisdictions),
+    // jv_cc is absent — treat absent cookie as consent given (default-allow).
+    // Only explicit marketing=false (user rejected) blocks audience tracking.
     const consent = parseConsentCookie(request);
-    const hasMarketingConsent = consent?.marketing === true;
+    const hasMarketingConsent = consent === null || consent.marketing === true;
 
     // Without marketing consent: anonymize IP and use generic fingerprint.
     // With consent: full behavior (store real IP, create audience members).

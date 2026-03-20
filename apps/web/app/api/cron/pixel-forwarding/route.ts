@@ -38,22 +38,29 @@ export async function GET(request: Request) {
 
     const duration = Date.now() - startTime;
 
-    // Query retry queue depth: events scheduled for future retry that aren't dead-lettered
-    const [retryQueueResult] = await db
-      .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(pixelEvents)
-      .where(
-        and(
-          gt(pixelEvents.forwardAt, new Date()),
-          drizzleSql`NOT (${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"dead_letter"}}'::jsonb
-            OR ${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"dead_letter"}}'::jsonb
-            OR ${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"dead_letter"}}'::jsonb
-            OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_facebook":{"status":"dead_letter"}}'::jsonb
-            OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_google":{"status":"dead_letter"}}'::jsonb
-            OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_tiktok":{"status":"dead_letter"}}'::jsonb)`
-        )
-      );
-    const retryQueueDepth = retryQueueResult?.count ?? 0;
+    // Query retry queue depth (non-critical — degrade gracefully on failure)
+    let retryQueueDepth = 0;
+    try {
+      const [retryQueueResult] = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(pixelEvents)
+        .where(
+          and(
+            gt(pixelEvents.forwardAt, new Date()),
+            drizzleSql`NOT (${pixelEvents.forwardingStatus}::jsonb @> '{"facebook":{"status":"dead_letter"}}'::jsonb
+              OR ${pixelEvents.forwardingStatus}::jsonb @> '{"google":{"status":"dead_letter"}}'::jsonb
+              OR ${pixelEvents.forwardingStatus}::jsonb @> '{"tiktok":{"status":"dead_letter"}}'::jsonb
+              OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_facebook":{"status":"dead_letter"}}'::jsonb
+              OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_google":{"status":"dead_letter"}}'::jsonb
+              OR ${pixelEvents.forwardingStatus}::jsonb @> '{"jovie_tiktok":{"status":"dead_letter"}}'::jsonb)`
+          )
+        );
+      retryQueueDepth = retryQueueResult?.count ?? 0;
+    } catch (queueErr) {
+      logger.warn('[pixel-forwarding] Failed to fetch retry queue depth', {
+        error: queueErr,
+      });
+    }
 
     logger.info('[pixel-forwarding] Processing complete', {
       ...result,

@@ -11,18 +11,16 @@ import { describe, expect, it } from 'vitest';
 
 function anonymizeIp(ip: string): string {
   if (ip.includes(':')) {
-    const parts = ip.split(':');
-    const fullParts: string[] = [];
-    for (const part of parts) {
-      if (part === '') {
-        const missing = 8 - parts.filter(p => p !== '').length;
-        for (let i = 0; i < missing; i++) fullParts.push('0000');
-      } else {
-        fullParts.push(part);
-      }
-    }
-    while (fullParts.length < 8) fullParts.push('0000');
-    return fullParts.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
+    const [left, right = ''] = ip.split('::');
+    const leftParts = left ? left.split(':') : [];
+    const rightParts = right ? right.split(':') : [];
+    const missing = 8 - leftParts.length - rightParts.length;
+    const full = [
+      ...leftParts,
+      ...Array(Math.max(0, missing)).fill('0000'),
+      ...rightParts,
+    ];
+    return full.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
   }
   const parts = ip.split('.');
   if (parts.length === 4) {

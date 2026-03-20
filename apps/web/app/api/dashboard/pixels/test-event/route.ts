@@ -1,12 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { withDbSessionTx } from '@/lib/auth/session';
-import { users } from '@/lib/db/schema/auth';
 import { creatorPixels } from '@/lib/db/schema/pixels';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
-import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { forwardToFacebook } from '@/lib/tracking/forwarding/facebook';
@@ -16,6 +11,7 @@ import type {
   NormalizedEvent,
   PlatformConfig,
 } from '@/lib/tracking/forwarding/types';
+import { withPixelSession } from '@/lib/tracking/with-pixel-session';
 import { logger } from '@/lib/utils/logger';
 import { decryptPII } from '@/lib/utils/pii-encryption';
 
@@ -34,19 +30,9 @@ type TestEventInput = z.infer<typeof testEventSchema>;
  * pixel configuration and credentials. Does not store in pixel_events.
  */
 export async function POST(req: Request) {
-  try {
-    const entitlements = await getCurrentUserEntitlements();
-    if (!entitlements.canAccessAdPixels) {
-      return NextResponse.json(
-        {
-          error:
-            'Ad pixels require a Pro plan. Upgrade to unlock this feature.',
-        },
-        { status: 403, headers: NO_STORE_HEADERS }
-      );
-    }
-
-    return await withDbSessionTx(async (tx, clerkUserId) => {
+  return withPixelSession(
+    'Pixels Test',
+    async (tx, { profileId, username }) => {
       // Parse request body
       const parsedBody = await parseJsonBody<TestEventInput>(req, {
         route: 'POST /api/dashboard/pixels/test-event',
@@ -68,29 +54,11 @@ export async function POST(req: Request) {
 
       const { platform } = validation.data;
 
-      // Get user's profile with username
-      const [userProfile] = await tx
-        .select({
-          profileId: creatorProfiles.id,
-          username: creatorProfiles.username,
-        })
-        .from(creatorProfiles)
-        .innerJoin(users, eq(users.id, creatorProfiles.userId))
-        .where(eq(users.clerkId, clerkUserId))
-        .limit(1);
-
-      if (!userProfile) {
-        return NextResponse.json(
-          { error: 'Profile not found' },
-          { status: 404, headers: NO_STORE_HEADERS }
-        );
-      }
-
       // Fetch pixel config
       const [pixelConfig] = await tx
         .select()
         .from(creatorPixels)
-        .where(eq(creatorPixels.profileId, userProfile.profileId))
+        .where(eq(creatorPixels.profileId, profileId))
         .limit(1);
 
       if (!pixelConfig) {
@@ -136,9 +104,9 @@ export async function POST(req: Request) {
 
       // Build synthetic test event
       const testEvent: NormalizedEvent = {
-        eventId: `test_${userProfile.profileId}_${Date.now()}`,
+        eventId: `test_${profileId}_${Date.now()}`,
         eventType: 'page_view',
-        sourceUrl: `https://jov.ie/${userProfile.username}`,
+        sourceUrl: `https://jov.ie/${username}`,
         eventTime: Math.floor(Date.now() / 1000),
         ipHash: 'test',
       };
@@ -154,7 +122,7 @@ export async function POST(req: Request) {
       }
 
       logger.info('[Pixels Test] Test event sent', {
-        profileId: userProfile.profileId,
+        profileId,
         platform,
         success: result.success,
         error: result.error,
@@ -168,24 +136,6 @@ export async function POST(req: Request) {
         },
         { headers: NO_STORE_HEADERS }
       );
-    });
-  } catch (error) {
-    logger.error('[Pixels Test] Error sending test event:', error);
-    if (!(error instanceof Error && error.message === 'Unauthorized')) {
-      await captureError('Pixel test event failed', error, {
-        route: '/api/dashboard/pixels/test-event',
-        method: 'POST',
-      });
     }
-    if (error instanceof Error && error.message === 'Unauthorized') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-    return NextResponse.json(
-      { error: 'Failed to send test event' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
+  );
 }
