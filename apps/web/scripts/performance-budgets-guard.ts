@@ -107,10 +107,9 @@ const loadAuthCookies = (
   const cookieValue = process.env.CLERK_SESSION_COOKIE;
   if (cookieValue) {
     const domain = new URL(baseUrl).hostname;
-    return [
-      { name: '__session', value: cookieValue, domain, path: '/' },
-      { name: '__clerk_db_jwt', value: cookieValue, domain, path: '/' },
-    ];
+    // Only inject __session; __clerk_db_jwt is a separate JWT and cannot be derived
+    // from the session cookie value. Use .auth/session.json for full cookie fidelity.
+    return [{ name: '__session', value: cookieValue, domain, path: '/' }];
   }
 
   if (existsSync(AUTH_STORAGE_PATH)) {
@@ -177,13 +176,12 @@ const collectMetrics = async (
     if (needsAuth) {
       const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
-        console.warn(
-          '  ⚠ No auth cookies found. Set CLERK_SESSION_COOKIE or run: doppler run -- pnpm perf:auth'
+        throw new Error(
+          'No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or run: doppler run -- pnpm perf:auth'
         );
-      } else {
-        await context.addCookies(cookies);
-        console.log(`  🔐 Injected ${cookies.length} auth cookies`);
       }
+      await context.addCookies(cookies);
+      console.log(`  🔐 Injected ${cookies.length} auth cookies`);
     }
 
     page = await context.newPage();
@@ -242,7 +240,8 @@ const collectMetrics = async (
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Start skeleton-to-content measurement from navigation
+    // Start skeleton-to-content measurement from DOMContentLoaded (not navigation start —
+    // measures only the time the skeleton is visible while data streams in).
     const skeletonToContentPromise = measureSkeletonToContent(page);
 
     // Best-effort networkidle wait; fall back gracefully for dynamic pages
