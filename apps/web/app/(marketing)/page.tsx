@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -9,7 +8,7 @@ import { LogoBar } from '@/features/home/LogoBar';
 import { PricingSection } from '@/features/home/PricingSection';
 import { RecentlyShippedSection } from '@/features/home/RecentlyShippedSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { SeeItInActionSafe } from '@/features/home/SeeItInActionSafe';
+import { SeeItInAction } from '@/features/home/SeeItInAction';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import {
   buildOrganizationSchema,
@@ -229,9 +228,7 @@ export default function HomePage() {
         </>
       )}
 
-      <Suspense fallback={null}>
-        <SeeItInActionSafe />
-      </Suspense>
+      <SeeItInAction />
 
       <FinalCTASection />
     </div>

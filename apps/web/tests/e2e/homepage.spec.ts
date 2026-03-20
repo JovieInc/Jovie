@@ -16,41 +16,6 @@ test.skip(
   'Homepage coverage runs in the lighter smoke-public and content-gate fast lanes'
 );
 
-/**
- * Force all DeferredSections to render by patching IntersectionObserver
- * before the page loads (headless mode doesn't trigger IO reliably).
- */
-async function forceDeferredSections(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const OriginalIO = window.IntersectionObserver;
-    window.IntersectionObserver = class extends OriginalIO {
-      constructor(
-        callback: IntersectionObserverCallback,
-        options?: IntersectionObserverInit
-      ) {
-        super(callback, options);
-        const self = this;
-        const origObserve = this.observe.bind(this);
-        this.observe = (target: Element) => {
-          origObserve(target);
-          setTimeout(() => {
-            callback(
-              [
-                {
-                  isIntersecting: true,
-                  target,
-                  intersectionRatio: 1,
-                } as IntersectionObserverEntry,
-              ],
-              self
-            );
-          }, 50);
-        };
-      }
-    } as unknown as typeof IntersectionObserver;
-  });
-}
-
 async function interceptAnalytics(page: import('@playwright/test').Page) {
   await page.route('**/api/profile/view', r =>
     r.fulfill({ status: 200, body: '{}' })
@@ -59,6 +24,15 @@ async function interceptAnalytics(page: import('@playwright/test').Page) {
     r.fulfill({ status: 200, body: '{}' })
   );
   await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
+}
+
+async function scrollToLowerHomepageSections(
+  page: import('@playwright/test').Page
+) {
+  await page.evaluate(() => {
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+  await page.waitForTimeout(500);
 }
 
 test.describe('Homepage', () => {
@@ -76,7 +50,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       page.getByText(
-        /Import your catalog, capture every fan, and own the relationship/i
+        /Import your catalog\. Fans get notified when you release\./i
       )
     ).toBeVisible();
 
@@ -133,28 +107,44 @@ test.describe('Homepage', () => {
   });
 });
 
-test.describe('Homepage - Featured Creators Carousel', () => {
-  test('showcase section loads and displays creators', async ({ page }) => {
+test.describe('Homepage - See It In Action', () => {
+  test('showcase section loads with Tim White profile and releases', async ({
+    page,
+  }) => {
     await interceptAnalytics(page);
-    await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await scrollToLowerHomepageSections(page);
 
     await expect(
       page.getByRole('heading', { name: /See it in action/i })
     ).toBeVisible({
       timeout: 20000,
     });
-    await expect(
-      page.getByRole('link', { name: /Tim White's profile/i })
-    ).toBeVisible({
+    await expect(page.getByText('Tim White', { exact: true })).toBeVisible({
       timeout: 20000,
     });
+    await expect(page.getByText(/^Artist$/)).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole('link', { name: /jov\.ie\/tim/i })).toBeVisible(
+      {
+        timeout: 20000,
+      }
+    );
+    await expect(
+      page.getByRole('link', { name: /View Profile/i })
+    ).toHaveAttribute('href', '/tim');
+    await expect(page.getByText(/Never Say A Word/i)).toBeVisible();
+    await expect(page.getByText(/The Deep End/i)).toBeVisible();
+    await expect(page.getByText(/Take Me Over/i)).toBeVisible();
   });
 
-  test('showcase section has images with alt text', async ({ page }) => {
+  test('showcase section has profile and release artwork with alt text', async ({
+    page,
+  }) => {
     await interceptAnalytics(page);
-    await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await scrollToLowerHomepageSections(page);
 
     await expect(
       page.getByRole('heading', { name: /See it in action/i })
@@ -163,17 +153,22 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     });
 
     await expect(
-      page.getByRole('img', { name: /Tim White's profile/i })
+      page.getByRole('img', { name: /Tim White profile photo/i })
     ).toBeVisible({
       timeout: 20000,
     });
     await expect(
-      page.getByRole('img', { name: /Nova Lane's profile/i })
+      page.getByRole('img', { name: /Never Say A Word artwork/i })
     ).toBeVisible({
       timeout: 20000,
     });
     await expect(
-      page.getByRole('img', { name: /Kai Rivers's profile/i })
+      page.getByRole('img', { name: /The Deep End artwork/i })
+    ).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(
+      page.getByRole('img', { name: /Take Me Over artwork/i })
     ).toBeVisible({
       timeout: 20000,
     });
@@ -186,7 +181,6 @@ test.describe('Homepage - Featured Creators Carousel', () => {
     });
 
     await interceptAnalytics(page);
-    await forceDeferredSections(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForHydration(page);
 
