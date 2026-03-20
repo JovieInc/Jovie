@@ -157,11 +157,13 @@ jobs:
             core.setOutput('summary', shouldAlert ? 'Main CI health issue detected.' : 'Main CI is healthy.');
             core.setOutput('details', shouldAlert ? reasons.join('\n') : 'No stale, failed, or blocked main CI conditions were detected.');
             core.setOutput('run_url', runUrl);
-            // Only emit failed_run_id when the alert is specifically for an unresolved
-            // failure — not for stale runs or no-success conditions. This prevents
-            // the auto-rerun step from rerunning an old failure while a newer run is
-            // queued/in-progress, which could race the production-deploy concurrency group.
-            core.setOutput('failed_run_id', failedForTooLong && latestFailure ? String(latestFailure.id) : '');
+            // Only emit failed_run_id when:
+            // 1. The alert reason is an unresolved failure (failedForTooLong)
+            // 2. No stale run exists (a stale run means a newer commit is already
+            //    queued/in-progress — rerunning the older failure would race the
+            //    production-deploy concurrency group and potentially deploy stale code)
+            const safeToRerun = failedForTooLong && !staleRun && latestFailure;
+            core.setOutput('failed_run_id', safeToRerun ? String(latestFailure.id) : '');
 
       - name: Slack alert (main CI unhealthy)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
@@ -196,15 +198,28 @@ jobs:
           FAILED_RUN_ID: ${{ steps.evaluate.outputs.failed_run_id }}
           GH_REPO: ${{ github.repository }}
         run: |
-          echo "Attempting to re-run failed CI run $FAILED_RUN_ID (failed jobs only)..."
-          # Only re-run once per failed run to avoid infinite retry loops.
-          # Check if this run has already been re-run by looking at run_attempt.
+          echo "Evaluating failed CI run $FAILED_RUN_ID for auto-rerun..."
+
+          # Guard 1: Only re-run once per failed run to avoid infinite retry loops.
           ATTEMPT=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt' 2>/dev/null || echo "1")
           if [ "$ATTEMPT" -gt 1 ]; then
-            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping auto-rerun."
-          else
-            gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
+            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping."
+            exit 0
           fi
+
+          # Guard 2: Do not rerun if canary or sentry gate failed.
+          # Those gates trigger auto-rollback on failure. Rerunning with --failed
+          # would also rerun the deploy job (as a dependency), redeploying the same
+          # bad SHA and undoing the rollback that just protected production.
+          FAILED_JOBS=$(gh api "repos/$GH_REPO/actions/runs/$FAILED_RUN_ID/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | .name] | join(",")' 2>/dev/null || echo "")
+          if echo "$FAILED_JOBS" | grep -qiE 'canary|sentry'; then
+            echo "Canary/Sentry gate failed (rollback already triggered) — skipping auto-rerun to avoid redeploying bad SHA."
+            exit 0
+          fi
+
+          echo "Re-running failed CI run $FAILED_RUN_ID (failed jobs only)..."
+          gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
 
       - name: Fail job when unhealthy
         if: ${{ steps.evaluate.outputs.should_alert == 'true' }}
