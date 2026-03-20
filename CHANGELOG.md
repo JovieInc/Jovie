@@ -20,6 +20,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `pnpm version:bump` and `pnpm changelog:generate` commands from package.json
 - `getUnreleased`, `hasUnreleasedEntries`, `replaceUnreleased` from changelog parser (only used by removed scripts)
 - `[Unreleased]` section requirement from version-check validation
+### Fixed
+
+- Admin creator table: UUID validation on all profileId inputs (single and bulk operations)
+- Admin creator table: email send failure during verification no longer crashes the action
+- Admin creator table: self-deletion prevention — admins cannot delete their own account
+- Admin creator table: double-delete guard rejects re-deleting already soft-deleted users
+- Admin creator table: cache invalidation added to delete and marketing toggle actions
+- Admin creator table: JSON.parse wrapped in try-catch for bulk operation payloads
+- Payload parsers: UUID validation and whitespace-only profileId rejection
 
 ## [26.4.15] - 2026-03-19
 
