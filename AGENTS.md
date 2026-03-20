@@ -17,6 +17,31 @@ This idempotent script checks Node.js (22.x), pnpm (9.15.4), and Doppler CLI, in
 On every fresh Git worktree, run `./scripts/setup.sh` again before doing anything else.
 Worktrees do not share `node_modules`, so dependency installation is per-worktree even when Turbo cache is shared.
 
+### Database Isolation for Agents
+
+Do **NOT** create Neon ephemeral branches automatically in `./scripts/setup.sh`.
+
+`setup.sh` must stay a fast, idempotent local bootstrap:
+- verify/install required tools
+- install dependencies
+- verify Doppler auth/config
+- avoid creating remote infrastructure by default
+
+Creating an isolated database branch for every fresh worktree is wasteful and can exhaust Neon branch limits. Most agent tasks do not need a private mutable database.
+
+Use an ephemeral Neon branch **only when the task actually requires isolated DB state**, such as:
+- mutation-heavy QA or crawling
+- end-to-end flows that create/update/delete data
+- migration validation
+- debugging issues caused by shared state
+
+Default policy:
+- normal coding/review/docs tasks: use the standard local/dev configuration
+- local tasks needing isolated mutable state: provision a DB branch explicitly via a dedicated command or script
+- PR preview / CI QA: prefer per-PR ephemeral databases in CI or preview workflows, not local worktree bootstrap
+
+If a dedicated helper is added later (for example `./scripts/dev-db-branch.sh`), agents should run it explicitly when needed rather than baking branch creation into `setup.sh`.
+
 ### Running tests and commands requiring secrets
 
 ALL commands that need secrets MUST be prefixed with `doppler run --`:
@@ -420,6 +445,27 @@ Do NOT push code that fails any of these. Fix first, push once.
 - This maximizes throughput: N PRs x parallel CI > 1 large PR x serial CI
 - If a PR fails CI, the agent can fix it while other PRs continue merging
 - Each PR must still pass /verify locally before pushing
+
+### PR Labels (Required)
+
+Agents must apply PR labels intentionally. Labels are part of the CI control plane, not just project organization.
+
+- Add `testing` when a PR needs the heavyweight verification lanes beyond the default fast merge gate.
+- Add `testing` for changes affecting public routes, rendering, deploy behavior, migrations, auth, billing, middleware/proxy logic, environment/config loading, or any flow that should get preview QA and extended CI before merge.
+- Add `testing` when agent QA, browser crawling, or preview-environment validation should run against the PR before it merges.
+
+- Add `needs-human` when the PR should be held for human review or automation must stop.
+- Add `needs-human` for risky or ambiguous changes, incidents/hotfixes needing human judgment, unexpected CI/deploy behavior, security-sensitive changes, or any case where the agent is not confident the PR should continue through auto-merge.
+- If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+
+- Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
+- Do **NOT** add `automerge` to high-risk paths or to PRs that also need `needs-human`.
+
+- Use `deploy-preview` only when a PR specifically needs the build/preview lane for review or QA and `testing` is not otherwise warranted.
+- Do **NOT** rely on `deploy-preview` as a substitute for `testing` on risky changes.
+
+- Do **NOT** add `skip-migration-guard` unless a human explicitly instructs you to bypass the migration guard for that PR.
+- If a migration-related PR seems to require `skip-migration-guard`, stop and escalate with `needs-human` instead of applying the bypass yourself.
 
 ### Auto-Merge Path Guardrails
 
