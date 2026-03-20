@@ -261,9 +261,9 @@ export const providerLinks = pgTable(
     ownerConstraint: check(
       'provider_links_owner_match',
       drizzleSql`
-        (owner_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
-        OR (owner_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
-        OR (owner_type = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
+        (owner_type::text = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+        OR (owner_type::text = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+        OR (owner_type::text = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
       `
     ),
   })
@@ -366,9 +366,9 @@ export const contentSlugRedirects = pgTable(
     contentConstraint: check(
       'content_slug_redirects_content_match',
       drizzleSql`
-        (content_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
-        OR (content_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
-        OR (content_type = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
+        (content_type::text = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+        OR (content_type::text = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+        OR (content_type::text = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
       `
     ),
   })
