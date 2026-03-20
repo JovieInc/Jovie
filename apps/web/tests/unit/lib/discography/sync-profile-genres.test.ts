@@ -67,7 +67,7 @@ vi.mock('@/lib/discography/track-provider-links', () => ({
 
 describe('syncProfileGenresFromReleases', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
   });
 
   it('aggregates genres by frequency and takes top 3', async () => {
@@ -128,7 +128,7 @@ describe('syncProfileGenresFromReleases', () => {
     );
   });
 
-  it('sets empty array when no releases have genres', async () => {
+  it('preserves existing genres when no releases have genres', async () => {
     mockSelect.mockReturnValue([]);
 
     const { syncProfileGenresFromReleases } = await import(
@@ -137,11 +137,8 @@ describe('syncProfileGenresFromReleases', () => {
 
     await syncProfileGenresFromReleases('profile-1');
 
-    expect(mockSet).toHaveBeenCalledWith(
-      expect.objectContaining({
-        genres: [],
-      })
-    );
+    // Should not update the profile when there are no genres to write
+    expect(mockSet).not.toHaveBeenCalled();
   });
 
   it('handles releases with null genres gracefully', async () => {

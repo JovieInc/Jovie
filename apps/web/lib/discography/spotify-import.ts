@@ -362,8 +362,12 @@ export async function importReleasesFromSpotify(
           result
         );
 
-        // 4. Sync profile genres from release data
-        await syncProfileGenresFromReleases(creatorProfileId);
+        // 4. Sync profile genres from release data (best-effort)
+        try {
+          await syncProfileGenresFromReleases(creatorProfileId);
+        } catch {
+          // Non-critical: don't fail the import if genre sync fails
+        }
 
         // 5. Discover cross-platform links
         if (discoverLinks && includeTracks) {

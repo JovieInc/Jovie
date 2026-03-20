@@ -1432,6 +1432,11 @@ export async function syncProfileGenresFromReleases(
     .slice(0, 3)
     .map(([genre]) => genre);
 
+  // Don't overwrite existing genres if no release genres were found
+  if (topGenres.length === 0) {
+    return;
+  }
+
   await db
     .update(creatorProfiles)
     .set({ genres: topGenres, updatedAt: new Date() })
