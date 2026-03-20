@@ -512,6 +512,13 @@
       "when": 1774600000000,
       "tag": "0073_add_product_update_subscribers",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1774700000000,
+      "tag": "0074_add_audience_attribution_source",
+      "breakpoints": true
     }
   ]
 }
