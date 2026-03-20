@@ -13,9 +13,30 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 // Mock Sentry
+const mockAddBreadcrumb = vi.fn();
+const mockCaptureException = vi.fn();
+const mockStartSpan = vi.fn(
+  async (
+    _options: unknown,
+    callback: (span: {
+      setStatus: (status: unknown) => void;
+    }) => Promise<unknown>
+  ) =>
+    callback({
+      setStatus: vi.fn(),
+    })
+);
 vi.mock('@sentry/nextjs', () => ({
   getClient: vi.fn(() => undefined),
-  addBreadcrumb: vi.fn(),
+  addBreadcrumb: (breadcrumb: unknown) => mockAddBreadcrumb(breadcrumb),
+  captureException: (error: unknown, context?: unknown) =>
+    mockCaptureException(error, context),
+  startSpan: (
+    options: unknown,
+    callback: (span: {
+      setStatus: (status: unknown) => void;
+    }) => Promise<unknown>
+  ) => mockStartSpan(options, callback),
 }));
 
 // Mock circuit breaker
@@ -31,13 +52,61 @@ vi.mock('@/lib/discography/musicfetch-circuit-breaker', () => ({
   },
 }));
 
+const mockMusicfetchRequest = vi.fn();
+vi.mock('@/lib/musicfetch/resilient-client', () => {
+  class MusicfetchRequestError extends Error {
+    statusCode?: number;
+    retryAfterSeconds?: number;
+
+    constructor(
+      message: string,
+      statusCode?: number,
+      retryAfterSeconds?: number
+    ) {
+      super(message);
+      this.name = 'MusicfetchRequestError';
+      this.statusCode = statusCode;
+      this.retryAfterSeconds = retryAfterSeconds;
+    }
+  }
+
+  class MusicfetchBudgetExceededError extends MusicfetchRequestError {
+    budgetScope: 'daily' | 'monthly' | 'backend_unavailable';
+
+    constructor(
+      message: string,
+      budgetScope: 'daily' | 'monthly' | 'backend_unavailable',
+      retryAfterSeconds?: number
+    ) {
+      super(message, 429, retryAfterSeconds);
+      this.name = 'MusicfetchBudgetExceededError';
+      this.budgetScope = budgetScope;
+    }
+  }
+
+  return {
+    musicfetchRequest: (...args: unknown[]) => mockMusicfetchRequest(...args),
+    MusicfetchRequestError,
+    MusicfetchBudgetExceededError,
+  };
+});
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
 let mockToken: string | undefined = 'test-token';
 
 describe('musicfetch client', () => {
   beforeEach(() => {
+    vi.resetModules();
     mockToken = 'test-token';
     mockExecute.mockReset();
     mockGetState.mockReturnValue('CLOSED');
+    mockMusicfetchRequest.mockReset();
+    mockAddBreadcrumb.mockReset();
+    mockCaptureException.mockReset();
+    mockStartSpan.mockClear();
   });
 
   describe('isMusicfetchConfigured', () => {
@@ -193,6 +262,87 @@ describe('musicfetch client', () => {
       expect(result!.links).toEqual({
         spotify: 'https://open.spotify.com/track/abc',
       });
+    });
+  });
+
+  describe('fetchArtistBySpotifyUrl', () => {
+    it('returns null on a permanent 400 response', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 400', 400)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).resolves.toBeNull();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows a 429 without capturing it in Sentry', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 429', 429, 60)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('MusicFetch API error: 429');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows budget exhaustion without capturing it in Sentry', async () => {
+      const { MusicfetchBudgetExceededError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchBudgetExceededError(
+          'MusicFetch daily hard budget exhausted',
+          'daily',
+          3600
+        )
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toMatchObject({
+        name: 'MusicfetchBudgetExceededError',
+        budgetScope: 'daily',
+      });
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('rethrows 500 errors for job retry handling', async () => {
+      const { MusicfetchRequestError } = await import(
+        '@/lib/musicfetch/resilient-client'
+      );
+      mockMusicfetchRequest.mockRejectedValue(
+        new MusicfetchRequestError('MusicFetch API error: 500', 500)
+      );
+
+      const { fetchArtistBySpotifyUrl } = await import(
+        '@/lib/dsp-enrichment/providers/musicfetch'
+      );
+
+      await expect(
+        fetchArtistBySpotifyUrl('https://open.spotify.com/artist/123')
+      ).rejects.toThrow('MusicFetch API error: 500');
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
   });
 });
