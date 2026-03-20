@@ -38,6 +38,11 @@ interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
 }
 
+function isMissingActiveProfileIdColumn(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('active_profile_id');
+}
+
 const TEST_PROFILES: TestProfile[] = [
   {
     username: 'dualipa',
@@ -689,72 +694,85 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
         );
       } else {
         console.log('  Creating E2E test user...');
-        const [existingUser] = await db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.clerkId, E2E_CLERK_USER_ID))
-          .limit(1);
-
-        if (!existingUser) {
-          // Create the user record with admin privileges for E2E tests
-          const [createdUser] = await db
-            .insert(users)
-            .values({
-              clerkId: E2E_CLERK_USER_ID,
-              email: E2E_EMAIL,
-              name: 'E2E Test',
-              userStatus: 'active', // Active user with completed onboarding
-              isAdmin: true, // Grant admin for E2E admin tests
-            })
-            .returning({ id: users.id });
-
-          console.log(
-            `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
-          );
-
-          // Create a creator profile for the E2E user
-          const [createdProfile] = await db
-            .insert(creatorProfiles)
-            .values({
-              userId: createdUser.id,
-              username: E2E_USERNAME,
-              usernameNormalized: E2E_USERNAME.toLowerCase(),
-              displayName: 'E2E Test User',
-              bio: 'Automated test user',
-              creatorType: 'artist',
-              isPublic: true,
-              isVerified: false,
-              isClaimed: true,
-              ingestionStatus: 'idle',
-              onboardingCompletedAt: new Date(), // Mark onboarding as complete
-            })
-            .returning({ id: creatorProfiles.id });
-
-          console.log(
-            `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
-          );
-
-          await seedReleasesForProfile(db, createdProfile.id);
-          await seedTourDatesForProfile(db, createdProfile.id);
-        } else {
-          await db
-            .update(users)
-            .set({ isAdmin: true, name: 'E2E Test' })
-            .where(eq(users.clerkId, E2E_CLERK_USER_ID));
-          console.log('    ✓ E2E test user exists, ensured admin privileges');
-
-          const [existingProfile] = await db
-            .select({ id: creatorProfiles.id })
-            .from(creatorProfiles)
-            .where(
-              eq(creatorProfiles.usernameNormalized, E2E_USERNAME.toLowerCase())
-            )
+        try {
+          const [existingUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.clerkId, E2E_CLERK_USER_ID))
             .limit(1);
 
-          if (existingProfile) {
-            await seedReleasesForProfile(db, existingProfile.id);
-            await seedTourDatesForProfile(db, existingProfile.id);
+          if (!existingUser) {
+            // Create the user record with admin privileges for E2E tests
+            const [createdUser] = await db
+              .insert(users)
+              .values({
+                clerkId: E2E_CLERK_USER_ID,
+                email: E2E_EMAIL,
+                name: 'E2E Test',
+                userStatus: 'active', // Active user with completed onboarding
+                isAdmin: true, // Grant admin for E2E admin tests
+              })
+              .returning({ id: users.id });
+
+            console.log(
+              `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
+            );
+
+            // Create a creator profile for the E2E user
+            const [createdProfile] = await db
+              .insert(creatorProfiles)
+              .values({
+                userId: createdUser.id,
+                username: E2E_USERNAME,
+                usernameNormalized: E2E_USERNAME.toLowerCase(),
+                displayName: 'E2E Test User',
+                bio: 'Automated test user',
+                creatorType: 'artist',
+                isPublic: true,
+                isVerified: false,
+                isClaimed: true,
+                ingestionStatus: 'idle',
+                onboardingCompletedAt: new Date(), // Mark onboarding as complete
+              })
+              .returning({ id: creatorProfiles.id });
+
+            console.log(
+              `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
+            );
+
+            await seedReleasesForProfile(db, createdProfile.id);
+            await seedTourDatesForProfile(db, createdProfile.id);
+          } else {
+            await db
+              .update(users)
+              .set({ isAdmin: true, name: 'E2E Test' })
+              .where(eq(users.clerkId, E2E_CLERK_USER_ID));
+            console.log('    ✓ E2E test user exists, ensured admin privileges');
+
+            const [existingProfile] = await db
+              .select({ id: creatorProfiles.id })
+              .from(creatorProfiles)
+              .where(
+                eq(
+                  creatorProfiles.usernameNormalized,
+                  E2E_USERNAME.toLowerCase()
+                )
+              )
+              .limit(1);
+
+            if (existingProfile) {
+              await seedReleasesForProfile(db, existingProfile.id);
+              await seedTourDatesForProfile(db, existingProfile.id);
+            }
           }
+        } catch (error) {
+          if (!isMissingActiveProfileIdColumn(error)) {
+            throw error;
+          }
+
+          console.warn(
+            '    ⚠ Skipping E2E user creation because the preview database is missing users.active_profile_id'
+          );
         }
       }
     }
