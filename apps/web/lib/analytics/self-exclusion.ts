@@ -25,7 +25,7 @@ async function getAuthenticatedUserProfile(): Promise<{
       settings: creatorProfiles.settings,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
