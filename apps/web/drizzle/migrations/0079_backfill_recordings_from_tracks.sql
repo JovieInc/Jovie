@@ -26,17 +26,33 @@ ALTER TABLE "content_slug_redirects" ADD CONSTRAINT "content_slug_redirects_cont
 
 -- Step 1: Backfill discog_recordings from discog_tracks (1:1)
 -- Strategy: Reuse discog_tracks.id as discog_recordings.id for easy FK migration.
--- Each track becomes exactly one recording (no ISRC dedup in backfill).
+-- ISRC dedup: if multiple tracks for the same creator share an ISRC (e.g., same song
+-- on a single and album), keep ISRC on the earliest track and null it on duplicates
+-- to avoid violating the discog_recordings_creator_isrc_unique partial index.
 INSERT INTO "discog_recordings" (
   "id", "creator_profile_id", "title", "slug", "isrc", "duration_ms",
   "is_explicit", "preview_url", "audio_url", "audio_format", "lyrics",
   "source_type", "metadata", "created_at", "updated_at"
 )
 SELECT
-  "id", "creator_profile_id", "title", "slug", "isrc", "duration_ms",
+  "id", "creator_profile_id", "title", "slug",
+  CASE
+    WHEN isrc IS NULL THEN NULL
+    WHEN rn = 1 THEN isrc
+    ELSE NULL
+  END AS "isrc",
+  "duration_ms",
   "is_explicit", "preview_url", "audio_url", "audio_format", "lyrics",
   "source_type", "metadata", "created_at", "updated_at"
-FROM "discog_tracks"
+FROM (
+  SELECT *,
+    ROW_NUMBER() OVER (
+      PARTITION BY "creator_profile_id",
+        CASE WHEN isrc IS NOT NULL THEN isrc ELSE id::text END
+      ORDER BY "created_at" ASC
+    ) AS rn
+  FROM "discog_tracks"
+) ranked
 ON CONFLICT ("id") DO NOTHING;
 
 -- Step 2: Backfill discog_release_tracks from discog_tracks

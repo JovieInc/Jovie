@@ -48,10 +48,6 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'creatorProfileId',
     id: 'id',
   },
-  discogReleaseTracks: {
-    recordingId: 'recordingId',
-    releaseId: 'releaseId',
-  },
 }));
 
 vi.mock('@/lib/db/schema/profiles', () => ({
@@ -94,13 +90,11 @@ describe('sitemap', () => {
           username: 'tim',
           slug: 'album',
           updatedAt: new Date('2026-01-03'),
-          artworkUrl: 'https://cdn.example.com/art.jpg',
         },
         {
           username: 'tim',
           slug: 'single',
           updatedAt: new Date('2026-01-04'),
-          artworkUrl: null,
         },
       ]);
 

@@ -330,14 +330,21 @@ const fetchContentBySlug = async (
     .limit(1);
 
   if (recording) {
-    // Find a release_track to get the parent release
+    // Find a release_track to get the parent release.
+    // Pick the earliest release (by release date) for deterministic selection
+    // when a recording appears on multiple releases (e.g., single + album).
     const [rt] = await db
       .select({
         id: discogReleaseTracks.id,
         releaseId: discogReleaseTracks.releaseId,
       })
       .from(discogReleaseTracks)
+      .innerJoin(
+        discogReleases,
+        eq(discogReleaseTracks.releaseId, discogReleases.id)
+      )
       .where(eq(discogReleaseTracks.recordingId, recording.id))
+      .orderBy(discogReleases.releaseDate)
       .limit(1);
 
     const releaseId = rt?.releaseId;
