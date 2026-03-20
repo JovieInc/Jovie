@@ -2,8 +2,7 @@
  * Shared Changelog Parser
  *
  * Single source of truth for parsing CHANGELOG.md across the project.
- * Used by: version-bump.mjs, generate-changelog.mjs, send-changelog-email.mjs,
- * and the /changelog page (server component).
+ * Used by: send-changelog-email.mjs and the /changelog page (server component).
  */
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
