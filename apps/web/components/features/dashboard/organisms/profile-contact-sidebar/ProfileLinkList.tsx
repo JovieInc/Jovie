@@ -243,7 +243,7 @@ export function ProfileLinkList({
     }
 
     return (
-      <div className='space-y-2 -mx-3 lg:mx-0'>
+      <div className='space-y-0.5 -mx-3 lg:mx-0'>
         {filteredLinks.map(link => (
           <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
         ))}
@@ -265,7 +265,7 @@ export function ProfileLinkList({
             onAdd={onAddLink ? () => onAddLink(section) : undefined}
             addLabel={`Add ${SECTION_LABELS[section]} link`}
           >
-            <div className='space-y-2'>
+            <div className='space-y-0.5'>
               {sectionLinks.map(link => (
                 <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
               ))}

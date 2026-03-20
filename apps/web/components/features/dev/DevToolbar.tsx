@@ -231,7 +231,7 @@ export function DevToolbar({
       </div>
 
       {/* Bottom bar (always visible) */}
-      <div className='flex items-center h-9 px-4 border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+      <div className='flex items-center h-9 px-4 border-t border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)]'>
         {/* Left: env info */}
         <div className='flex items-center gap-2 flex-1 min-w-0'>
           <span

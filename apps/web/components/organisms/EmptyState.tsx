@@ -196,14 +196,14 @@ export function EmptyState({
       aria-describedby={description ? descriptionId : undefined}
       data-testid={testId}
       className={cn(
-        'flex flex-1 flex-col items-center justify-center px-4 py-12 text-center',
+        'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
         className
       )}
     >
       {icon && (
         <div
           className={cn(
-            'mb-3 flex h-8 w-8 items-center justify-center rounded-[8px] bg-surface-1/30',
+            'mb-3 flex h-8 w-8 items-center justify-center rounded-md bg-surface-1/30',
             styles.iconWrapper
           )}
           aria-hidden='true'

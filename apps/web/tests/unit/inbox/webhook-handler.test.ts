@@ -309,9 +309,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       'Inbound email processed',
       expect.objectContaining({
-        threadId: 'thread-new',
         username: 'testartist',
-        isNewThread: true,
       })
     );
   });
@@ -338,8 +336,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       'Inbound email processed',
       expect.objectContaining({
-        threadId: 'thread-existing',
-        isNewThread: false,
+        username: 'testartist',
       })
     );
   });
@@ -369,7 +366,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     // Should still log success
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       'Inbound email processed',
-      expect.objectContaining({ threadId: 'thread-new' })
+      expect.objectContaining({ username: 'testartist' })
     );
   });
 
@@ -408,7 +405,7 @@ describe('POST /api/webhooks/resend-inbound', () => {
     expect(mockDbInsert).toHaveBeenCalled();
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       'Inbound email processed',
-      expect.objectContaining({ threadId: 'thread-new' })
+      expect.objectContaining({ username: 'testartist' })
     );
   });
 

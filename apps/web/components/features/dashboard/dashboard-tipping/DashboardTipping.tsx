@@ -497,7 +497,7 @@ export function DashboardTipping() {
       {hasVenmoHandle && (
         <div className='flex flex-col gap-5'>
           {/* Section label */}
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Activity
           </p>
 
@@ -530,7 +530,7 @@ export function DashboardTipping() {
           </div>
 
           {/* Sharing tools */}
-          <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Share
           </p>
 
@@ -548,7 +548,7 @@ export function DashboardTipping() {
 
       {/* ── Shopify Store ────────────────────────────────── */}
       <div className='flex flex-col gap-5'>
-        <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-text-tertiary)'>
+        <p className='text-[13px] font-[510] tracking-normal text-(--linear-text-tertiary)'>
           Shop
         </p>
         <ShopifyStoreCard />

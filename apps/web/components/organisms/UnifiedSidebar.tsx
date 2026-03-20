@@ -207,7 +207,7 @@ function SidebarHeaderNav({
               <BrandLogo
                 size={13}
                 tone='auto'
-                className='rounded-[4px] shrink-0'
+                className='rounded-sm shrink-0'
               />
               <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
@@ -269,7 +269,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         />
       </SidebarHeader>
 
-      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2 pb-1.5'>
+      <SidebarContent className='min-h-0 flex-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden px-2 pb-1'>
         <SidebarGroup className='flex min-h-0 flex-1 flex-col pb-0.5'>
           <SidebarGroupContent className='flex-1'>
             {isDashboardOrAdmin ? (
@@ -281,12 +281,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0'>
         <SidebarUpgradeBanner />
         <SidebarInstallBanner />
 
         {isUserAdmin && (
-          <div className='pl-2 pr-3.5 pb-2 pt-1'>
+          <div className='px-2 pb-1.5 pt-0.5'>
             <span className='text-2xs text-sidebar-muted/80 select-none'>
               v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'}
               {process.env.NEXT_PUBLIC_BUILD_SHA

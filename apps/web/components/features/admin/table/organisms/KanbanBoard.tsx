@@ -212,7 +212,7 @@ function KanbanColumn<TData>({
         {(() => {
           if (column.items.length === 0) {
             return (
-              <div className='flex h-32 items-center justify-center rounded-[10px] border border-dashed border-subtle bg-surface-0'>
+              <div className='flex h-32 items-center justify-center rounded-lg border border-dashed border-subtle bg-surface-0'>
                 <div className='text-sm text-tertiary-token'>
                   {emptyState ?? 'No items'}
                 </div>

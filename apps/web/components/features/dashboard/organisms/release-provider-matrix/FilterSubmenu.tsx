@@ -57,11 +57,11 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-transparent px-1.5 pt-1.5 pb-1'>
       <div className='relative'>
         <Icon
           name='Search'
-          className='pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
+          className='pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token'
         />
         <input
           ref={inputRef}
@@ -70,12 +70,12 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-8 pr-7 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          className='w-full rounded-md border border-transparent bg-surface-0 py-1 pl-7 pr-6 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
+            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
           >
             <Icon name='X' className='h-3 w-3' />
           </DrawerInlineIconButton>
@@ -249,7 +249,7 @@ export function FilterSubmenu<T extends string = string>({
         sideOffset={4}
         alignOffset={-4}
         collisionPadding={8}
-        className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[300px] overflow-hidden flex flex-col'
+        className='min-w-[180px] max-w-[calc(100vw-16px)] max-h-[260px] overflow-hidden flex flex-col'
       >
         <SearchInput
           value={search}

@@ -63,7 +63,7 @@ export function ReleaseEditDialog({
 }: ReleaseEditDialogProps) {
   return (
     <Dialog open={Boolean(release)} onClose={onClose} size='3xl'>
-      <DialogTitle className='flex items-center gap-3 text-xl font-[590] text-primary-token'>
+      <DialogTitle className='flex items-center gap-2.5 text-xl font-[590] text-primary-token'>
         <Icon
           name='Link'
           className='h-5 w-5 text-secondary-token'
@@ -75,14 +75,14 @@ export function ReleaseEditDialog({
         Swap in a preferred DSP link or revert back to our detected URL. All
         changes are live for your smart link immediately.
       </DialogDescription>
-      <DialogBody className='space-y-4'>
+      <DialogBody className='space-y-3'>
         {release ? (
-          <div className='space-y-4'>
+          <div className='space-y-3'>
             {/* Release info header */}
-            <DrawerSurfaceCard variant='card' className='rounded-[12px] p-4'>
+            <DrawerSurfaceCard variant='card' className='rounded-lg p-2.5'>
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-subtle bg-surface-0 shadow-none'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-md bg-surface-0'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -98,7 +98,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='border border-subtle bg-transparent text-[11px] text-secondary-token'
+                    className='bg-transparent text-[11px] text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -109,7 +109,7 @@ export function ReleaseEditDialog({
             </DrawerSurfaceCard>
 
             {/* Provider inputs grid */}
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+            <div className='grid grid-cols-1 gap-2.5 md:grid-cols-2'>
               {providerList.map(provider => {
                 const value = drafts[provider.key] ?? '';
                 const existing = release.providers.find(
@@ -124,7 +124,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-[10px] p-3 shadow-none'
+                    className='rounded-md p-2'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
@@ -140,7 +140,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='border border-(--color-warning) bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
+                          className='bg-(--color-warning-subtle) text-[10px] text-(--color-warning-foreground)'
                         >
                           Manual
                         </Badge>

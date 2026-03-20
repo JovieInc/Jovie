@@ -106,8 +106,8 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-[7px] border border-subtle bg-surface-1 text-[11px]'>
-      <div className='flex items-center gap-1.5 py-1 pl-2 pr-1'>
+    <div className='flex items-center gap-0.5 rounded bg-surface-1 text-[11px]'>
+      <div className='flex items-center gap-1.5 py-0.5 pl-1.5 pr-0.5'>
         <span className='text-tertiary-token'>{groupLabel}</span>
         <span className='text-tertiary-token'>is</span>
         <span className='font-[510] text-primary-token'>{displayValue}</span>
@@ -115,7 +115,7 @@ function ActiveFilterPill({
       <button
         type='button'
         onClick={onClear}
-        className='flex h-full items-center rounded-r-[7px] px-1.5 py-1 text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-0'
+        className='flex h-full items-center rounded-r px-1 py-0.5 text-tertiary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-0'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <Icon name='X' className='h-3 w-3' strokeWidth={2} />

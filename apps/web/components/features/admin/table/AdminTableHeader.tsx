@@ -28,10 +28,7 @@ export function AdminTableHeader({
       title={title}
       subtitle={subtitle}
       actions={actions}
-      className={cn(
-        'bg-(--linear-app-content-surface) shadow-[inset_0_-1px_0_0_var(--linear-app-frame-seam)]',
-        className
-      )}
+      className={cn('bg-(--linear-app-content-surface)', className)}
     />
   );
 }

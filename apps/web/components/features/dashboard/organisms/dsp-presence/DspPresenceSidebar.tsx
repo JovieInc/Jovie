@@ -54,20 +54,20 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-2.5'>
       {item.externalArtistImageUrl ? (
-        <div className='relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-(--linear-bg-surface-0)'>
           <Image
             src={item.externalArtistImageUrl}
             alt={item.externalArtistName ?? label}
             fill
-            sizes='56px'
+            sizes='40px'
             className='object-cover'
             unoptimized={isExternalDspImage(item.externalArtistImageUrl)}
           />
         </div>
       ) : (
-        <div className='flex h-14 w-14 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='flex h-10 w-10 items-center justify-center rounded-full bg-(--linear-bg-surface-0)'>
           <DspProviderIcon provider={item.providerId} size='lg' />
         </div>
       )}
@@ -89,10 +89,10 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   const label = PROVIDER_LABELS[item.providerId];
 
   return (
-    <>
+    <div className='space-y-2'>
       {/* Match Status */}
       <DrawerSection title='Match Status'>
-        <div className='space-y-3'>
+        <div className='space-y-2'>
           <div className='flex items-center justify-between'>
             <span className='text-[13px] text-(--linear-text-tertiary)'>
               Status
@@ -160,7 +160,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
         </div>
       </DrawerSection>
-    </>
+    </div>
   );
 }
 

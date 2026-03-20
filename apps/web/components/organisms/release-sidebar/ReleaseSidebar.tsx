@@ -101,7 +101,7 @@ function ReleaseEntityHeader({
 
   return (
     <div className='space-y-2'>
-      <div className='flex items-start gap-3 rounded-[10px] bg-surface-0/70 px-1.5 py-1.5'>
+      <div className='flex items-start gap-3 px-1 py-1'>
         {/* Artwork with hover play overlay */}
         <div className='group/artwork relative shrink-0'>
           <AlbumArtworkContextMenu
@@ -473,7 +473,6 @@ export function ReleaseSidebar({
           />
         ) : undefined
       }
-      tabsContainerClassName='border-t border-subtle/45 pt-1.5 pb-2'
       tabs={
         release && !selectedTrack ? (
           <DrawerTabs
@@ -481,7 +480,6 @@ export function ReleaseSidebar({
             onValueChange={value => setActiveTab(value as SidebarTab)}
             options={SIDEBAR_TAB_OPTIONS}
             ariaLabel='Release sidebar view'
-            triggerClassName='h-7 px-2.5 text-[11px] font-[500]'
           />
         ) : undefined
       }

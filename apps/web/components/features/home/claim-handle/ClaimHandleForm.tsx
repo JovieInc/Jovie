@@ -195,7 +195,7 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isHero ? 'rounded-2xl p-1.5 sm:p-2' : 'rounded-[14px] p-1.5',
+          isHero ? 'rounded-2xl p-1 sm:p-1.5' : 'rounded-xl p-1',
           isAvailable && 'claim-input-row--available'
         )}
         style={inputRowStyle}
@@ -210,18 +210,10 @@ export function ClaimHandleForm({
                   'linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0.18) 80%, transparent)',
               }}
             />
-            <div
-              aria-hidden='true'
-              className='pointer-events-none absolute inset-y-2 right-[5rem] hidden w-px sm:block'
-              style={{
-                background:
-                  'linear-gradient(180deg, transparent, rgba(255,255,255,0.08), transparent)',
-              }}
-            />
           </>
         )}
 
-        <div className='flex items-center flex-1 min-w-0 pl-3.5 pr-1 gap-0'>
+        <div className='flex items-center flex-1 min-w-0 pl-3 pr-1 gap-0'>
           {/* Domain prefix — etched, permanent feel */}
           <span
             className='shrink-0 select-none'
@@ -277,7 +269,7 @@ export function ClaimHandleForm({
           disabled={isDisabled}
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
-            isHero ? 'rounded-[14px] px-6' : 'rounded-[10px] px-4 sm:px-5',
+            isHero ? 'rounded-xl px-5' : 'rounded-lg px-3.5 sm:px-4',
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'
@@ -295,7 +287,7 @@ export function ClaimHandleForm({
         <p
           id='handle-hint'
           className={cn(
-            'mt-2.5 pl-1 transition-colors duration-200',
+            'mt-2 pl-1 transition-colors duration-200',
             helperToneClass
           )}
           aria-live={helperState.tone === 'error' ? 'assertive' : 'polite'}

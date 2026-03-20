@@ -99,7 +99,7 @@ function FunnelStage({
     return (
       <div className='flex w-full flex-col items-center'>
         <div className='w-full' style={{ maxWidth: width }}>
-          <DrawerSurfaceCard className='px-4 py-3 text-center'>
+          <DrawerSurfaceCard className='px-3 py-2 text-center'>
             <LoadingSkeleton
               height='h-3'
               width='w-20'
@@ -123,11 +123,11 @@ function FunnelStage({
       <div className='w-full' style={{ maxWidth: width }}>
         <DrawerSurfaceCard
           className={cn(
-            'relative overflow-hidden px-4 py-3 text-center',
+            'relative overflow-hidden px-3 py-2 text-center',
             isLast ? 'border-default bg-surface-1' : 'bg-surface-1'
           )}
         >
-          <p className='mb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='mb-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
             {label}
           </p>
           <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
@@ -140,7 +140,7 @@ function FunnelStage({
       </div>
 
       {!isLast && (
-        <div className='flex min-h-[40px] flex-col items-center py-2'>
+        <div className='flex min-h-[32px] flex-col items-center py-1.5'>
           <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
           <span
             className={cn(
@@ -175,7 +175,7 @@ function RankedList({
 }) {
   if (loading) {
     return (
-      <ul className='min-h-[196px] space-y-1.5'>
+      <ul className='min-h-[196px] space-y-1'>
         {[1, 2, 3, 4, 5].map(i => (
           <li
             key={i}
@@ -207,7 +207,7 @@ function RankedList({
           key={item.key}
           className='group flex h-8 items-center justify-between rounded-full px-2'
         >
-          <div className='flex min-w-0 flex-1 items-center gap-2'>
+          <div className='flex min-w-0 flex-1 items-center gap-1.5'>
             <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
               {index + 1}
             </span>
@@ -237,7 +237,7 @@ function EngagementMetricCard({
   const showSkeleton = loading || !value;
 
   return (
-    <DrawerSurfaceCard className='min-h-[68px] p-3'>
+    <DrawerSurfaceCard className='min-h-[68px] p-2.5'>
       {showSkeleton ? (
         <>
           <LoadingSkeleton
@@ -311,7 +311,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     >
       <div
         className={cn(
-          'space-y-4 transition-opacity duration-150',
+          'space-y-2 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
@@ -338,7 +338,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           })}
         </div>
 
-        <div className='grid grid-cols-3 gap-2'>
+        <div className='grid grid-cols-3 gap-1.5'>
           <EngagementMetricCard
             label='Total Clicks'
             value={formatEngagementValue(loading, data?.total_clicks)}

@@ -372,7 +372,7 @@ export function SettingsAdPixelsSection({
           actionsClassName='w-auto shrink-0'
           actions={
             <div className='flex items-center gap-2'>
-              <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
                 {pixelData.enabled ? 'Enabled' : 'Disabled'}
               </span>
               <Switch

@@ -26,7 +26,7 @@ export function ContentSectionHeader({
       )}
     >
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
-        <h2 className='truncate text-[12px] font-[560] tracking-[-0.008em] text-primary-token'>
+        <h2 className='truncate text-[13px] font-[500] text-secondary-token'>
           {title}
         </h2>
         {subtitle ? (

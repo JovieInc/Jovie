@@ -33,18 +33,18 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-1.5 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
     >
       <span className='text-[13px] text-secondary-token'>{label}</span>
       <span
         className={cn(
-          'flex h-[18px] w-[30px] shrink-0 items-center rounded-full p-[3px] transition-colors',
+          'flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
           checked ? 'bg-primary' : 'bg-surface-2'
         )}
       >
         <span
           className={cn(
-            'h-3 w-3 rounded-full bg-white shadow-sm transition-transform',
+            'h-3 w-3 rounded-full bg-white transition-transform',
             checked && 'translate-x-3'
           )}
         />
@@ -77,10 +77,10 @@ const ColumnToggleButton = memo(function ColumnToggleButton({
       aria-pressed={isVisible}
       aria-label={`${isVisible ? 'Hide' : 'Show'} ${label} column`}
       className={cn(
-        'rounded-full border border-transparent px-2 py-0.5 text-[11px] font-[510] transition-[background-color,border-color,color] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1',
+        'rounded-full px-2 py-0.5 text-[11px] font-[510] transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:bg-surface-1',
         isVisible
-          ? 'border-subtle bg-surface-1 text-secondary-token'
-          : 'text-tertiary-token hover:border-subtle hover:bg-surface-1 hover:text-secondary-token'
+          ? 'bg-surface-1 text-secondary-token'
+          : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
       )}
     >
       {label}
@@ -140,7 +140,7 @@ export function DisplayMenuDropdown({
   const defaultTrigger = (
     <button
       type='button'
-      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-[13px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
+      className='inline-flex items-center gap-1.5 rounded-full border border-transparent px-2 py-1 text-[13px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
     >
       <Settings2 className='h-4 w-4' />
       Display
@@ -152,7 +152,7 @@ export function DisplayMenuDropdown({
       <PopoverTrigger asChild>{trigger ?? defaultTrigger}</PopoverTrigger>
       <PopoverContent align='end' className='w-[280px]'>
         {/* ── Header ─────────────────────────────────────────────── */}
-        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
+        <div className='flex items-center justify-between border-b border-subtle px-2.5 py-1.5'>
           <span className='text-[13px] font-[590] text-primary-token'>
             Display
           </span>
@@ -166,15 +166,15 @@ export function DisplayMenuDropdown({
 
         {/* ── View Mode ──────────────────────────────────────────── */}
         {hasViewModeOptions && (
-          <div className='border-b border-subtle px-3 py-2'>
+          <div className='border-b border-subtle px-2.5 py-1.5'>
             <fieldset
-              className='relative inline-flex w-full items-center rounded-[8px] border border-subtle bg-surface-1 p-0.5'
+              className='relative inline-flex w-full items-center rounded bg-surface-1 p-0.5'
               aria-label='View mode toggle'
             >
               {/* Sliding background indicator */}
               <div
                 className={cn(
-                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded-[6px] border border-subtle bg-surface-0 shadow-none transition-all duration-200 ease-out',
+                  'absolute inset-y-0.5 w-[calc(50%-2px)] rounded bg-surface-0 transition-all duration-200 ease-out',
                   viewMode === 'list' ? 'left-0.5' : 'left-[calc(50%+0.5px)]'
                 )}
                 aria-hidden='true'
@@ -184,7 +184,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('list')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'list'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -200,7 +200,7 @@ export function DisplayMenuDropdown({
                 type='button'
                 onClick={() => onViewModeChange?.('board')}
                 className={cn(
-                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-[510] transition-colors duration-150',
+                  'relative z-10 inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2.5 py-1 text-[12px] font-[510] transition-colors duration-150',
                   viewMode === 'board'
                     ? 'text-primary-token'
                     : 'text-tertiary-token hover:text-secondary-token'
@@ -217,7 +217,7 @@ export function DisplayMenuDropdown({
 
         {/* ── Grouping Toggle ────────────────────────────────────── */}
         {hasGroupingOption && (
-          <div className='border-b border-subtle px-3 py-1.5'>
+          <div className='border-b border-subtle px-2.5 py-1'>
             <ToggleSwitch
               label={groupingLabel}
               checked={groupingEnabled}
@@ -230,14 +230,14 @@ export function DisplayMenuDropdown({
         {hasColumnOptions && (
           <div
             className={cn(
-              'px-3 py-2',
+              'px-2.5 py-1.5',
               hasDensityOptions && 'border-b border-subtle'
             )}
           >
-            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='px-0.5 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               Display properties
             </p>
-            <div className='flex flex-wrap gap-1 px-0.5'>
+            <div className='flex flex-wrap gap-1'>
               {availableColumns.map(column => (
                 <ColumnToggleButton
                   key={column.id}
@@ -253,8 +253,8 @@ export function DisplayMenuDropdown({
 
         {/* ── Density ────────────────────────────────────────────── */}
         {hasDensityOptions && (
-          <div className='px-3 py-2'>
-            <p className='px-1 pb-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <div className='px-2.5 py-1.5'>
+            <p className='px-0.5 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               Density
             </p>
             <div className='grid grid-cols-3 gap-1'>
@@ -265,10 +265,10 @@ export function DisplayMenuDropdown({
                   onClick={() => onDensityChange?.(option.value)}
                   aria-pressed={density === option.value}
                   className={cn(
-                    'rounded-md px-2 py-1 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1',
+                    'rounded px-1.5 py-0.5 text-[11px] font-[510] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
                     density === option.value
-                      ? 'border border-subtle bg-surface-2 text-primary-token'
-                      : 'border border-transparent text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
+                      ? 'bg-surface-2 text-primary-token'
+                      : 'text-tertiary-token hover:bg-surface-1 hover:text-secondary-token'
                   )}
                 >
                   {option.label}

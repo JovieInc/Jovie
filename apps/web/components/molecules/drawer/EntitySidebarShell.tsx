@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
+import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerHeader } from './DrawerHeader';
 
@@ -117,7 +118,7 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-3.5 pt-[10px] pb-2'>
+            <div className='overflow-visible px-3 pt-1.5 pb-1'>
               {entityHeader}
             </div>
           )}
@@ -125,12 +126,10 @@ export function EntitySidebarShell({
           {/* Tabs */}
           {tabs && (
             <div
-              className={[
-                'overflow-visible border-t border-subtle px-3.5 py-2 [&>*]:w-full',
-                tabsContainerClassName,
-              ]
-                .filter(Boolean)
-                .join(' ')}
+              className={cn(
+                'overflow-visible border-t border-subtle px-3 py-1.5 [&>*]:w-full',
+                tabsContainerClassName
+              )}
             >
               {tabs}
             </div>
@@ -139,19 +138,19 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           /* Empty state */
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-5 py-5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 py-4'>
             <DrawerEmptyState message={emptyMessage} />
           </div>
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 py-3'>
+            <div className='flex-1 min-h-0 space-y-1.5 overflow-y-auto overflow-x-hidden overscroll-contain px-3 py-1.5'>
               {children}
             </div>
 
             {/* Footer */}
             {footer && (
-              <div className='shrink-0 border-t border-subtle bg-(--linear-bg-app) px-3 py-2'>
+              <div className='shrink-0 border-t border-subtle bg-(--linear-bg-app) px-3 py-1.5'>
                 {footer}
               </div>
             )}

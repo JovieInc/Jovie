@@ -28,7 +28,7 @@ export function DrawerTabs<T extends string>({
       options={options}
       aria-label={ariaLabel}
       className={cn('w-full', className)}
-      triggerClassName={cn('h-[34px] px-3.5 text-[12.5px]', triggerClassName)}
+      triggerClassName={cn('h-[28px] px-3 text-[12px]', triggerClassName)}
     />
   );
 }

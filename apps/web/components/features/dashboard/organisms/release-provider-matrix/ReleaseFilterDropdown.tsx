@@ -103,9 +103,9 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 bg-transparent p-2 pb-1'>
+    <div className='sticky top-0 z-10 bg-transparent px-1.5 pt-1.5 pb-1'>
       <div className='relative'>
-        <Search className='absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
+        <Search className='absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
           ref={inputRef}
           type='text'
@@ -114,7 +114,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-8 pr-7 text-[13px]',
+            'w-full rounded-md border border-transparent bg-surface-0 py-1 pl-7 pr-6 text-[13px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
@@ -124,7 +124,7 @@ function SearchInput({
         {value && (
           <DrawerInlineIconButton
             onClick={onClear}
-            className='absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
+            className='absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-tertiary-token'
             aria-label='Clear search'
           >
             <X className='h-3 w-3' />
@@ -156,8 +156,8 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-[7px] border border-subtle bg-surface-1 text-[11px]'>
-      <div className='flex items-center gap-1.5 py-1 pl-2.5 pr-1'>
+    <div className='flex items-center gap-0.5 rounded-md border border-subtle bg-surface-1 text-[11px]'>
+      <div className='flex items-center gap-1 py-0.5 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
             {icon}
@@ -171,7 +171,7 @@ function ActiveFilterPill({
       </div>
       <DrawerInlineIconButton
         onClick={onClear}
-        className='h-full rounded-r-[7px] px-1.5 py-1 text-tertiary-token'
+        className='h-full rounded-r-md px-1 py-0.5 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -518,7 +518,7 @@ export function ReleaseFilterDropdown({
         <DropdownMenuContent
           align='start'
           sideOffset={4}
-          className='min-w-[200px] max-w-[calc(100vw-16px)] max-h-[320px] overflow-hidden flex flex-col'
+          className='min-w-[200px] max-w-[calc(100vw-16px)] max-h-[280px] overflow-hidden flex flex-col'
           onCloseAutoFocus={e => e.preventDefault()}
         >
           {/* Main Menu Search */}

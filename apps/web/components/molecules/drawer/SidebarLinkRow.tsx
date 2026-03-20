@@ -23,10 +23,8 @@ import {
 } from '@/lib/deep-links';
 import { cn } from '@/lib/utils';
 
-const SWIPE_ACTION_BUTTON_CLASS = [
-  'flex h-full items-center justify-center px-4',
-  'text-accent-foreground transition-colors active:opacity-80',
-].join(' ');
+const SWIPE_ACTION_BUTTON_CLASS =
+  'flex h-full items-center justify-center px-4 text-accent-foreground transition-colors active:opacity-80';
 
 export interface SidebarLinkRowProps {
   readonly deepLinkPlatform?: string;
@@ -155,8 +153,8 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex items-center justify-between rounded-[8px]',
-          'px-4 py-3 lg:px-3 lg:py-2',
+          'group flex items-center justify-between rounded-md',
+          'px-2.5 py-1.5 lg:px-2 lg:py-1',
           'active:bg-surface-1 lg:active:bg-surface-1 lg:hover:bg-surface-1',
           'transition-[background-color,box-shadow,border-color] duration-150 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
@@ -165,7 +163,7 @@ export function SidebarLinkRow({
         data-testid={testId}
       >
         {/* Left: Icon + Label */}
-        <div className='flex min-w-0 flex-1 items-center gap-3 lg:gap-2.5'>
+        <div className='flex min-w-0 flex-1 items-center gap-2.5 lg:gap-2'>
           <span className='shrink-0 w-5 flex items-center justify-center'>
             {icon}
           </span>
@@ -179,13 +177,7 @@ export function SidebarLinkRow({
         </div>
 
         {/* Right: Kebab dropdown (desktop only — mobile uses swipe-to-reveal) */}
-        <div
-          className={[
-            'hidden lg:flex items-center shrink-0 opacity-0',
-            'group-hover:opacity-100 group-focus:opacity-100',
-            'group-focus-within:opacity-100 transition-opacity',
-          ].join(' ')}
-        >
+        <div className='hidden lg:flex items-center shrink-0 opacity-0 group-hover:opacity-100 group-focus:opacity-100 group-focus-within:opacity-100 transition-opacity'>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

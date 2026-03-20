@@ -35,7 +35,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
     (utm.source || utm.medium || utm.campaign || utm.content || utm.term);
 
   return (
-    <div className='space-y-3'>
+    <div className='space-y-2'>
       <DrawerPropertyRow
         label='Location'
         value={

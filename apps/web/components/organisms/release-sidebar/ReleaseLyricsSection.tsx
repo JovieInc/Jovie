@@ -204,7 +204,7 @@ export function ReleaseLyricsSection({
         )}
       </div>
 
-      <div className='mt-3 flex items-center gap-2'>
+      <div className='flex items-center gap-2 pt-1'>
         {/* Copy button */}
         <DrawerButton
           type='button'
@@ -221,7 +221,7 @@ export function ReleaseLyricsSection({
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-1 shadow-none'>
+          <div className='inline-flex items-center rounded-md bg-surface-1'>
             {/* Primary format action — uses the most recently selected format */}
             <DrawerButton
               type='button'

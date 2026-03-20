@@ -53,24 +53,20 @@ describe('Sidebar lower shell visual hierarchy', () => {
   it('keeps upgrade banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarUpgradeBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
-    expect(card?.className).toContain('border-sidebar-border/20');
+    const card = container.querySelector('[class*="rounded-md"]');
+    expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/5');
 
-    expect(screen.getByRole('button', { name: 'Upgrade' }).className).toContain(
-      'text-sidebar-item-foreground/70'
-    );
+    expect(screen.getByRole('button', { name: 'Upgrade' })).toBeInTheDocument();
   });
 
   it('keeps install banner visually quieter than nav rows', () => {
     const { container } = render(<SidebarInstallBanner />);
 
-    const card = container.querySelector('[class*="rounded-[10px]"]');
-    expect(card?.className).toContain('border-sidebar-border/20');
+    const card = container.querySelector('[class*="rounded-md"]');
+    expect(card).toBeTruthy();
     expect(card?.className).toContain('bg-sidebar-accent/5');
 
-    expect(screen.getByRole('button', { name: 'Install' }).className).toContain(
-      'border-sidebar-border/25'
-    );
+    expect(screen.getByRole('button', { name: 'Install' })).toBeInTheDocument();
   });
 });

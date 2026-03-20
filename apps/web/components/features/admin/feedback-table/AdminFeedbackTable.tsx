@@ -107,8 +107,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded-[8px] border border-default bg-surface-1 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
@@ -237,8 +237,8 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'cursor-pointer bg-surface-1 shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-surface-1'
-        : 'group cursor-pointer bg-transparent hover:bg-surface-1',
+        ? 'cursor-pointer bg-surface-1'
+        : 'group cursor-pointer bg-transparent',
     [selectedId]
   );
 
@@ -380,13 +380,13 @@ export function AdminFeedbackTable({
             </DrawerSection>
 
             <DrawerSection title='Feedback' collapsible={false}>
-              <DrawerSurfaceCard className='rounded-[12px] bg-surface-0 px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+              <DrawerSurfaceCard className='rounded-lg bg-surface-0 px-3 py-2 text-[13px] leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
               </DrawerSurfaceCard>
             </DrawerSection>
 
             <DrawerSection title='Context' collapsible={false}>
-              <DrawerSurfaceCard className='overflow-auto rounded-[12px] bg-surface-0 p-0'>
+              <DrawerSurfaceCard className='overflow-auto rounded-lg bg-surface-0 p-0'>
                 <pre className='p-3 text-[11px] leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>

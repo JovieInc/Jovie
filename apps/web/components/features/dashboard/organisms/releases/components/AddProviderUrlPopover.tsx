@@ -83,7 +83,7 @@ export function AddProviderUrlPopover({
           aria-label={`Add ${providerLabel} link`}
           tone='ghost'
           size='sm'
-          className='group/add h-7 min-w-[76px] gap-1.5 rounded-full px-2.5 text-[11px] font-[400] text-tertiary-token'
+          className='group/add h-7 min-w-[68px] gap-1 rounded-md px-1.5 text-[11px] font-[400] text-tertiary-token'
         >
           <Icon
             name='Plus'
@@ -100,14 +100,14 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[288px] border-0 bg-transparent p-0 shadow-none'
+        className='w-[288px] rounded-lg border-0 bg-transparent p-0'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();
         }}
       >
-        <DrawerSurfaceCard variant='card' className='p-3'>
-          <form onSubmit={handleSubmit} className='space-y-3'>
+        <DrawerSurfaceCard variant='card' className='rounded-lg p-2'>
+          <form onSubmit={handleSubmit} className='space-y-2'>
             <div className='flex items-center gap-2'>
               <span
                 className='h-2 w-2 shrink-0 rounded-full'
@@ -139,7 +139,7 @@ export function AddProviderUrlPopover({
                 }}
                 disabled={isSaving}
                 autoComplete='off'
-                className='h-8 rounded-[8px] border-subtle bg-surface-1 text-[12px]'
+                className='h-7 rounded-md bg-surface-1 text-[12px]'
               />
             </DrawerFormField>
             <div className='flex justify-end gap-2'>
@@ -157,7 +157,7 @@ export function AddProviderUrlPopover({
                 type='submit'
                 tone='primary'
                 disabled={!url.trim() || isSaving}
-                className='min-w-[68px]'
+                className='min-w-[60px]'
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </DrawerButton>

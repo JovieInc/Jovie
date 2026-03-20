@@ -148,9 +148,9 @@ export function DashboardOverview({
             Welcome back, {greetingName}
           </span>
         }
-        subtitle='Keep your profile polished and ready to share.'
+        subtitle='Keep your profile polished and ready to share'
         actions={
-          <div className='flex w-full flex-wrap items-center justify-between gap-2 sm:w-auto sm:flex-nowrap sm:justify-end'>
+          <div className='flex w-full flex-wrap items-center justify-between gap-1 sm:w-auto sm:flex-nowrap sm:justify-end'>
             <div className='flex items-center gap-1'>
               <Button
                 asChild
@@ -191,17 +191,17 @@ export function DashboardOverview({
     return (
       <DashboardOverviewControlsProvider>
         <div
-          className='flex min-h-[60vh] items-center justify-center px-4 py-6 sm:px-0'
+          className='flex items-center justify-center px-4 py-1 sm:px-0'
           data-testid='dashboard-overview'
         >
-          <ContentSurfaceCard className='w-full max-w-md overflow-hidden'>
+          <ContentSurfaceCard className='w-full max-w-sm overflow-hidden'>
             <ContentSectionHeader
               title='Complete your setup'
               subtitle={`${completedCount} of ${totalSteps} complete`}
               bodyClassName='space-y-0'
             />
 
-            <ul className='space-y-1 p-2 sm:p-3'>
+            <ul className='space-y-0 p-1 sm:p-1.5'>
               <SetupTaskItem
                 isComplete={isHandleClaimed}
                 stepNumber={1}
@@ -232,7 +232,7 @@ export function DashboardOverview({
 
   return (
     <DashboardOverviewControlsProvider>
-      <div className='space-y-6' data-testid='dashboard-overview'>
+      <div className='space-y-1' data-testid='dashboard-overview'>
         {header}
 
         {artist.owner_user_id && (

@@ -317,15 +317,15 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               Contact type
             </Label>
             <Select value={contact.role} onValueChange={handleRoleChange}>
-              <SelectTrigger className='h-9 rounded-lg border border-subtle bg-surface-1 px-3 text-[13px]'>
+              <SelectTrigger className='h-8 rounded-md bg-surface-1 px-2.5 text-[13px]'>
                 <SelectValue>{roleLabel}</SelectValue>
               </SelectTrigger>
-              <SelectContent className='p-1'>
+              <SelectContent className='p-0.5'>
                 {CONTACT_ROLE_OPTIONS.map(option => (
                   <SelectItem
                     key={option.value}
                     value={option.value}
-                    className='rounded-md px-2.5 py-2 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                    className='rounded px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                   >
                     <div className='flex items-center gap-2'>
                       <Icon
@@ -340,10 +340,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </Select>
           </DrawerSection>
 
-          <DrawerSection
-            title='Contact Info'
-            className='border-t border-subtle/65 pt-4'
-          >
+          <DrawerSection title='Contact Info' className='space-y-2'>
             <div className='space-y-1'>
               {renderEditableField(
                 'personName',
@@ -364,10 +361,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Preferred Channel */}
           {hasEmailAndPhone && (
-            <DrawerSection
-              title='Preferred Contact'
-              className='border-t border-subtle/65 pt-4'
-            >
+            <DrawerSection title='Preferred Contact' className='space-y-2'>
               <div className='space-y-2'>
                 <Label className='text-[13px] text-secondary-token'>
                   Default action
@@ -376,7 +370,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                   value={contact.preferredChannel || ''}
                   onValueChange={handlePreferredChannelChange}
                 >
-                  <SelectTrigger className='h-9 text-[13px]'>
+                  <SelectTrigger className='h-8 rounded-md bg-surface-1 px-2.5 text-[13px]'>
                     <SelectValue placeholder='Select preferred channel'>
                       {getPreferredChannelLabel(contact.preferredChannel)}
                     </SelectValue>
@@ -390,11 +384,8 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </DrawerSection>
           )}
 
-          <DrawerSection
-            title='Territories'
-            className='border-t border-subtle/65 pt-4'
-          >
-            <div className='space-y-3'>
+          <DrawerSection title='Territories' className='space-y-2'>
+            <div className='space-y-2'>
               <DrawerPropertyRow
                 label='Coverage'
                 value={<Badge size='sm'>{territorySummary}</Badge>}
@@ -410,10 +401,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       type='button'
                       onClick={() => handleTerritoryToggle(territory)}
                       className={cn(
-                        'rounded-[8px] border px-2 py-1 text-[13px] transition-[background-color,border-color,color] duration-150',
+                        'rounded-md px-2 py-1 text-[13px] transition-[background-color,color] duration-150',
                         isSelected
-                          ? 'border-(--linear-border-focus) bg-surface-1 text-primary-token'
-                          : 'border-subtle bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1'
+                          ? 'bg-surface-1 text-primary-token'
+                          : 'bg-surface-0 text-secondary-token hover:bg-surface-1'
                       )}
                     >
                       {territory}
@@ -426,7 +417,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Error display */}
           {contact.error && (
-            <div className='rounded-[10px] border border-red-500/20 bg-red-500/5 p-3'>
+            <div className='rounded-md bg-red-500/5 p-2'>
               <p className='text-[13px] text-destructive'>{contact.error}</p>
             </div>
           )}

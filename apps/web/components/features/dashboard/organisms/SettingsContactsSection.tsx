@@ -306,7 +306,7 @@ function ContactRow({
     >
       <div className='min-w-0 flex-1'>
         <div className='flex items-center gap-2'>
-          <span className='text-[11px] font-[510] text-tertiary-token uppercase tracking-[0.08em]'>
+          <span className='text-[13px] font-[510] text-secondary-token tracking-normal'>
             {roleLabel}
           </span>
         </div>

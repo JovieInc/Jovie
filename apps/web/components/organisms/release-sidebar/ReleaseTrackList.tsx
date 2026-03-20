@@ -91,7 +91,7 @@ export function ReleaseTrackList({
       <div
         id={`release-tracklist-${release.id}`}
         hidden={!isExpanded}
-        className='space-y-px'
+        className='space-y-0.5'
       >
         {(isLoading || (isFetching && !tracks)) && (
           <div className='space-y-0.5'>
@@ -100,7 +100,7 @@ export function ReleaseTrackList({
               .map(id => (
                 <DrawerSurfaceCard
                   key={id}
-                  className='flex items-start gap-3 px-2.5 py-2'
+                  className='flex items-start gap-3 px-2 py-1.5'
                 >
                   <div className='w-7 shrink-0 pt-0.5'>
                     <div className='ml-auto h-3.5 w-4 rounded skeleton' />
@@ -220,7 +220,7 @@ function TrackItem({
   }, [onToggleTrack, playableUrl, track.id, track.title]);
 
   return (
-    <div className='group flex items-start gap-2.5 rounded-[8px] px-2 py-1.5 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70 focus-within:shadow-[inset_0_0_0_1px_var(--linear-border-subtle)]'>
+    <div className='group flex items-start gap-2 rounded-md px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1/70 focus-within:bg-surface-1/70'>
       <span className='w-6 shrink-0 pt-0.5 text-right text-[10.5px] tabular-nums text-tertiary-token'>
         {trackLabel}.
       </span>
@@ -229,12 +229,12 @@ function TrackItem({
         <button
           type='button'
           onClick={handleClick}
-          className='w-full rounded-[6px] text-left focus-visible:outline-none'
+          className='w-full rounded-md text-left focus-visible:outline-none'
         >
           <div className='flex items-center gap-1.5'>
             <TruncatedText
               lines={1}
-              className='text-[13.5px] font-[510] text-primary-token'
+              className='text-[13px] font-[510] text-primary-token'
               tooltipSide='top'
             >
               {track.title}
@@ -275,7 +275,7 @@ function TrackItem({
                   event.stopPropagation();
                   handleTogglePlayback();
                 }}
-                className='flex h-[22px] w-[22px] items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                className='flex h-[22px] w-[22px] items-center justify-center rounded-full bg-surface-0 text-secondary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
                 aria-label={isTrackPlaying ? 'Pause preview' : 'Play preview'}
               >
                 {isTrackPlaying ? (

@@ -43,7 +43,7 @@ function SearchDropdownState({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[64px] items-center rounded-[10px] px-3'
+        className='flex min-h-[56px] items-center rounded-lg px-2'
       >
         <p
           className={cn(
@@ -61,7 +61,7 @@ function SearchDropdownState({
 function SearchResultsLoadingSkeleton() {
   return (
     <output
-      className='block p-3 space-y-1.5'
+      className='block p-2.5 space-y-1'
       aria-live='polite'
       aria-label='Loading Spotify artist results'
       aria-busy='true'
@@ -70,7 +70,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
+          className='flex min-h-[56px] items-center gap-2.5 rounded-lg px-2'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -422,8 +422,8 @@ export function SpotifyConnectDialog({
         Search for your artist profile to import releases.
       </DialogDescription>
 
-      <DialogBody className='space-y-4'>
-        <div className='space-y-1'>
+      <DialogBody className='space-y-3'>
+        <div className='space-y-0.5'>
           <p className='text-[13px] text-secondary-token'>
             Search by artist name or paste your Spotify artist URL to connect
             instantly.
@@ -436,8 +436,8 @@ export function SpotifyConnectDialog({
           </label>
           <div
             className={cn(
-              'flex min-h-12 w-full items-center gap-3 rounded-xl border border-default bg-surface-0 px-4 py-3',
-              'transition-all duration-200',
+              'flex min-h-11 w-full items-center gap-2.5 rounded-lg border border-default bg-surface-0 px-2.5 py-2',
+              'transition-[border-color,box-shadow] duration-150',
               shouldShowDropdown
                 ? 'border-(--linear-border-focus) ring-2 ring-(--linear-border-focus)/20'
                 : 'hover:border-(--linear-border-focus)',
@@ -493,13 +493,13 @@ export function SpotifyConnectDialog({
           </div>
 
           {formState.error && (
-            <p className='mt-2 text-[13px] text-error' role='alert'>
+            <p className='mt-1.5 text-[13px] text-error' role='alert'>
               {formState.error}
             </p>
           )}
 
           {shouldShowDropdown && (
-            <div className='absolute z-50 mt-2 w-full overflow-hidden rounded-xl border border-default bg-surface-0 shadow-(--linear-shadow-card-elevated)'>
+            <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-default bg-surface-0'>
               <select
                 id='spotify-connect-results'
                 className='sr-only'
@@ -574,7 +574,7 @@ export function SpotifyConnectDialog({
                       tabIndex={artist.isClaimed ? -1 : 0}
                       disabled={artist.isClaimed}
                       className={cn(
-                        'flex w-full items-center gap-3 border-0 bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                        'flex w-full items-center gap-2.5 border-0 bg-transparent px-2.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
                         index === formState.activeResultIndex &&
                           !artist.isClaimed &&
                           'bg-surface-1',
@@ -649,7 +649,7 @@ export function SpotifyConnectDialog({
                 type='button'
                 tabIndex={0}
                 className={cn(
-                  'flex w-full cursor-pointer items-center gap-3 border-t border-subtle bg-transparent p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
+                  'flex w-full cursor-pointer items-center gap-2.5 border-t border-subtle bg-transparent px-2.5 py-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset',
                   formState.activeResultIndex === pasteUrlIndex &&
                     'bg-surface-1'
                 )}

@@ -18,14 +18,14 @@ export function BillingLoadingSkeleton() {
         <Skeleton className='h-5 w-80' rounded='sm' />
       </div>
 
-      <ContentSurfaceCard className='p-4'>
+      <ContentSurfaceCard className='px-3 py-3'>
         <div className='flex items-start gap-3.5'>
-          <Skeleton className='h-11 w-11 shrink-0 rounded-[12px]' />
+          <Skeleton className='h-11 w-11 shrink-0 rounded-lg' />
           <div className='min-w-0 flex-1 space-y-2'>
             <Skeleton className='h-5 w-32' rounded='md' />
             <Skeleton className='h-4 w-72' rounded='sm' />
           </div>
-          <Skeleton className='h-8 w-32 rounded-[8px]' rounded='md' />
+          <Skeleton className='h-8 w-32' rounded='md' />
         </div>
       </ContentSurfaceCard>
 
@@ -37,9 +37,9 @@ export function BillingLoadingSkeleton() {
               descriptionWidth={card.descriptionWidth}
               className='px-4 py-3'
             />
-            <div className='space-y-4 px-4 py-4'>
+            <div className='space-y-3 px-3 py-3'>
               <Skeleton className='h-9 w-24' rounded='md' />
-              <Skeleton className='h-8 w-full rounded-[8px]' rounded='md' />
+              <Skeleton className='h-8 w-full' rounded='md' />
               <div className='h-px bg-(--linear-app-frame-seam)' />
               <LoadingSkeleton lines={5} height='h-4' rounded='md' />
             </div>
@@ -53,9 +53,9 @@ export function BillingLoadingSkeleton() {
           descriptionWidth='w-56'
           className='px-4 py-3'
         />
-        <div className='flex flex-col gap-3 px-4 py-4 sm:flex-row'>
-          <Skeleton className='h-8 w-40 rounded-[8px]' rounded='md' />
-          <Skeleton className='h-8 w-40 rounded-[8px]' rounded='md' />
+        <div className='flex flex-col gap-3 px-3 py-3 sm:flex-row'>
+          <Skeleton className='h-8 w-40' rounded='md' />
+          <Skeleton className='h-8 w-40' rounded='md' />
         </div>
       </ContentSurfaceCard>
 
@@ -65,7 +65,7 @@ export function BillingLoadingSkeleton() {
           descriptionWidth='w-52'
           className='px-4 py-3'
         />
-        <div className='px-4 py-4'>
+        <div className='px-3 py-3'>
           <LoadingSkeleton lines={3} height='h-14' rounded='md' />
         </div>
       </ContentSurfaceCard>

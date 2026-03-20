@@ -4,11 +4,11 @@
  */
 
 const TASK_CONTAINER_BASE =
-  'group flex items-center gap-3 rounded-[10px] px-3 py-2.5 transition-[background-color,border-color] duration-150';
+  'group flex items-center gap-1.5 rounded-md px-1.5 py-px transition-[background-color,border-color] duration-100';
 const TASK_INDICATOR_BASE =
-  'flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[11px] font-[560]';
+  'flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-[560]';
 const TASK_LABEL_BASE =
-  'text-[13px] leading-[18px] tracking-[-0.01em] text-primary-token';
+  'text-[12.5px] leading-[15px] tracking-[-0.01em] text-primary-token';
 
 /**
  * Get the container class for a completed setup task item.
@@ -21,7 +21,7 @@ export function getCompletedTaskContainerClass(): string {
  * Get the container class for an incomplete setup task item.
  */
 export function getIncompleteTaskContainerClass(): string {
-  return `${TASK_CONTAINER_BASE} hover:bg-surface-0`;
+  return `${TASK_CONTAINER_BASE} hover:bg-surface-0/60`;
 }
 
 /**

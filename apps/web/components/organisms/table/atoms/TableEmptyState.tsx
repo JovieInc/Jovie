@@ -55,12 +55,12 @@ export function TableEmptyState({
     <DrawerSurfaceCard
       variant='card'
       className={cn(
-        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-[10px] bg-surface-1/25 px-4 py-10 text-center',
+        'flex min-h-[220px] flex-1 flex-col items-center justify-center gap-3 rounded-lg bg-surface-1/25 px-4 py-10 text-center',
         className
       )}
     >
       {icon && (
-        <div className='flex h-9 w-9 items-center justify-center rounded-[8px] bg-surface-0/55 text-tertiary-token'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-md bg-surface-0/55 text-tertiary-token'>
           {icon}
         </div>
       )}

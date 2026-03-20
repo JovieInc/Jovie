@@ -32,12 +32,12 @@ export function DrawerPropertyRow({
 
   const sizeClasses = {
     sm: {
-      container: 'min-h-[22px] gap-2 rounded-[7px] px-1.5 py-0.5',
+      container: 'min-h-[22px] gap-2 rounded px-1 py-px',
       label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
       value: 'text-[11px] leading-[14px]',
     },
     md: {
-      container: 'min-h-[24px] gap-2 rounded-[7px] px-1.5 py-0.5',
+      container: 'min-h-[24px] gap-2 rounded px-1 py-px',
       label: 'text-[9.5px] leading-[12px] tracking-[0.05em]',
       value: 'text-[11.5px] leading-[15px]',
     },
@@ -55,18 +55,18 @@ export function DrawerPropertyRow({
       type={interactive ? 'button' : undefined}
       onClick={interactive ? onClick : undefined}
       className={cn(
-        'grid w-full text-left transition-[background-color,box-shadow,border-color] duration-150',
+        'grid w-full text-left transition-[background-color] duration-150',
         align === 'start' ? 'items-start' : 'items-center',
         styles.container,
         interactive &&
-          'cursor-pointer border border-transparent hover:border-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+          'cursor-pointer hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none',
         className
       )}
       style={gridStyle}
     >
       <span
         className={cn(
-          'font-[510] uppercase text-tertiary-token',
+          'font-[510] text-tertiary-token',
           styles.label,
           labelClassName
         )}

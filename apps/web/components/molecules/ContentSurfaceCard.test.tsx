@@ -12,7 +12,7 @@ describe('ContentSurfaceCard', () => {
   it('applies default surface variant', () => {
     render(<ContentSurfaceCard data-testid='card'>Content</ContentSurfaceCard>);
     const card = screen.getByTestId('card');
-    expect(card.className).toContain('rounded-[10px]');
+    expect(card.className).toContain('rounded-lg');
   });
 
   it('applies marketing surface variant', () => {
@@ -32,7 +32,7 @@ describe('ContentSurfaceCard', () => {
       </ContentSurfaceCard>
     );
     const card = screen.getByTestId('card');
-    expect(card.className).toContain('rounded-[11px]');
+    expect(card.className).toContain('rounded-lg');
   });
 
   it('renders as custom element', () => {

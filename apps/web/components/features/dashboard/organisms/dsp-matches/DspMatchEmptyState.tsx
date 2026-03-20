@@ -50,9 +50,9 @@ export function DspMatchEmptyState({ status }: DspMatchEmptyStateProps) {
   const { title, description, icon } = EMPTY_STATE_MESSAGES[status];
 
   return (
-    <ContentSurfaceCard className='flex flex-col items-center justify-center gap-4 px-4 py-12 text-center'>
-      <div className='flex h-12 w-12 items-center justify-center rounded-[10px] border border-subtle bg-surface-0 text-tertiary-token'>
-        <Icon name={icon} className='h-6 w-6' />
+    <ContentSurfaceCard className='flex flex-col items-center justify-center gap-2 px-3 py-4 text-center'>
+      <div className='flex h-10 w-10 items-center justify-center rounded-md bg-surface-0 text-tertiary-token'>
+        <Icon name={icon} className='h-5 w-5' />
       </div>
 
       <div className='space-y-1'>

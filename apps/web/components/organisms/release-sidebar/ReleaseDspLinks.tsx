@@ -17,7 +17,14 @@ import {
   SimpleTooltip,
 } from '@jovie/ui';
 import { Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  type ChangeEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import { ProviderIcon } from '@/components/atoms/ProviderIcon';
 import {
@@ -53,9 +60,7 @@ interface ReleaseDspLinksProps {
   readonly onSetSelectedProvider: (value: ProviderKey | null) => void;
   readonly onAddLink: () => Promise<void>;
   readonly onRemoveLink: (provider: ProviderKey) => Promise<void>;
-  readonly onNewLinkKeyDown: (
-    event: React.KeyboardEvent<HTMLInputElement>
-  ) => void;
+  readonly onNewLinkKeyDown: (event: KeyboardEvent<HTMLInputElement>) => void;
   readonly onRescanIsrc?: () => void;
   readonly isRescanningIsrc?: boolean;
 }
@@ -223,7 +228,7 @@ export function ReleaseDspLinks({
 
       {/* Add link form */}
       {isEditable && isAddingLink && (
-        <DrawerSurfaceCard className='mt-2 space-y-2.5 rounded-[10px] p-3'>
+        <DrawerSurfaceCard className='mt-2 space-y-2 rounded-lg p-2.5'>
           <DrawerFormGridRow label='Provider'>
             <Select
               value={selectedProvider ?? ''}
@@ -233,7 +238,7 @@ export function ReleaseDspLinks({
                 }
               }}
             >
-              <SelectTrigger className='h-8 w-full rounded-[8px] border-subtle bg-surface-0 text-[12px]'>
+              <SelectTrigger className='h-8 w-full rounded-md border-subtle bg-surface-0 text-[12px]'>
                 <SelectValue placeholder='Select provider' />
               </SelectTrigger>
               <SelectContent>
@@ -254,7 +259,7 @@ export function ReleaseDspLinks({
             <Input
               type='url'
               value={newLinkUrl}
-              onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              onChange={(event: ChangeEvent<HTMLInputElement>) =>
                 onSetNewLinkUrl(event.target.value)
               }
               onKeyDown={onNewLinkKeyDown}
@@ -263,7 +268,7 @@ export function ReleaseDspLinks({
               autoCapitalize='none'
               autoCorrect='off'
               autoFocus
-              className='h-8 rounded-[8px] border-subtle bg-surface-0 text-[12px]'
+              className='h-8 rounded-md border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormGridRow>
           <div className='flex justify-end gap-2 pt-1'>

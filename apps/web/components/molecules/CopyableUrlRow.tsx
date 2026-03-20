@@ -69,21 +69,21 @@ export function CopyableUrlRow({
 
   const sizeClasses = {
     sm: {
-      container: 'h-[24px] gap-[3px] rounded-[7px] px-[5px]',
+      container: 'h-[22px] gap-[3px] rounded-md px-1',
       icon: 'h-[11px] w-[11px]',
       value: 'text-[11px]',
       button: 'h-4 w-4 rounded-full',
       glyph: 'h-[10px] w-[10px]',
     },
     md: {
-      container: 'h-[26px] gap-1.5 rounded-[8px] px-2',
+      container: 'h-[24px] gap-1 rounded-md px-1.5',
       icon: 'h-3 w-3',
       value: 'text-[10.5px]',
       button: 'h-4.5 w-4.5 rounded-full',
       glyph: 'h-3 w-3',
     },
     lg: {
-      container: 'h-7 gap-1.5 rounded-[8px] px-2',
+      container: 'h-[26px] gap-1 rounded-md px-1.5',
       icon: 'h-3.5 w-3.5',
       value: 'text-[10.5px]',
       button: 'h-4.5 w-4.5 rounded-full',
@@ -97,10 +97,10 @@ export function CopyableUrlRow({
     <div
       data-testid={testId}
       className={cn(
-        'flex items-center transition-[background-color,border-color] duration-150',
+        'flex items-center transition-[background-color] duration-150',
         surface === 'boxed'
-          ? 'border border-subtle bg-surface-1 hover:border-default hover:bg-surface-0'
-          : 'border border-transparent bg-surface-0 hover:bg-surface-1',
+          ? 'bg-surface-1 hover:bg-surface-0'
+          : 'bg-surface-0 hover:bg-surface-1',
         styles.container,
         className
       )}

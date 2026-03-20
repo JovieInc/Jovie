@@ -89,13 +89,13 @@ function AdminUserMobileCard({
       as='article'
       className='overflow-hidden bg-surface-0 p-0'
     >
-      <div className='flex items-start justify-between gap-3 border-b border-subtle px-4 py-3'>
+      <div className='flex items-start justify-between gap-3 px-3 py-2.5'>
         <label className='flex min-w-0 flex-1 cursor-pointer items-start gap-3'>
           <input
             type='checkbox'
             checked={isSelected}
             onChange={() => onToggleSelect(user.id)}
-            className='mt-0.5 h-4 w-4 rounded-[4px] border-subtle bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
+            className='mt-0.5 h-4 w-4 rounded border-subtle bg-surface-0 text-(--linear-accent) focus:ring-(--linear-border-focus) focus:ring-1'
             aria-label={`Select ${user.name ?? user.email ?? 'user'}`}
           />
           <div className='min-w-0'>
@@ -110,7 +110,7 @@ function AdminUserMobileCard({
         <TableActionMenu items={actionItems} align='end' />
       </div>
 
-      <div className='flex flex-wrap items-center gap-2 px-4 py-3 text-[12px]'>
+      <div className='flex flex-wrap items-center gap-2 px-3 py-2 text-[12px]'>
         <Badge
           size='sm'
           variant={user.plan === 'pro' ? 'primary' : 'secondary'}
@@ -471,8 +471,8 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
       row.id === selectedUser?.id
-        ? 'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_2px_0_0_0_var(--linear-border-focus)]'
-        : 'group cursor-pointer hover:bg-(--linear-row-hover)',
+        ? 'group cursor-pointer bg-(--linear-row-selected)'
+        : 'group cursor-pointer',
     [selectedUser?.id]
   );
 
@@ -523,7 +523,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           >
             {() =>
               isMobile ? (
-                <div className='space-y-3 p-3'>
+                <div className='space-y-2 p-3'>
                   {users.length === 0 ? (
                     <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-10 text-center'>
                       <Users className='h-6 w-6' />

@@ -45,7 +45,7 @@ const StatusBadge = memo(function StatusBadge({
 }) {
   if (isPastDate) {
     return (
-      <span className='inline-flex items-center rounded-[7px] border border-subtle bg-surface-0 px-2 py-0.5 text-[12px] font-[510] text-tertiary-token'>
+      <span className='inline-flex items-center rounded-md bg-surface-0 px-2 py-0.5 text-[12px] font-[510] text-tertiary-token'>
         Past
       </span>
     );
@@ -54,19 +54,19 @@ const StatusBadge = memo(function StatusBadge({
   switch (status) {
     case 'sold_out':
       return (
-        <span className='inline-flex items-center rounded-[7px] border border-amber-500/20 bg-amber-500/8 px-2 py-0.5 text-[12px] font-[510] text-amber-600 dark:text-amber-300'>
+        <span className='inline-flex items-center rounded-md bg-amber-500/8 px-2 py-0.5 text-[12px] font-[510] text-amber-600 dark:text-amber-300'>
           Sold Out
         </span>
       );
     case 'cancelled':
       return (
-        <span className='inline-flex items-center rounded-[7px] border border-red-500/20 bg-red-500/8 px-2 py-0.5 text-[12px] font-[510] text-red-600 dark:text-red-400'>
+        <span className='inline-flex items-center rounded-md bg-red-500/8 px-2 py-0.5 text-[12px] font-[510] text-red-600 dark:text-red-400'>
           Cancelled
         </span>
       );
     default:
       return (
-        <span className='inline-flex items-center rounded-[7px] border border-emerald-500/20 bg-emerald-500/8 px-2 py-0.5 text-[12px] font-[510] text-emerald-600 dark:text-emerald-400'>
+        <span className='inline-flex items-center rounded-md bg-emerald-500/8 px-2 py-0.5 text-[12px] font-[510] text-emerald-600 dark:text-emerald-400'>
           On Sale
         </span>
       );
@@ -192,7 +192,7 @@ const ActionsHeader = memo(function ActionsHeader({
           disabled={isSyncing}
           variant='ghost'
           size='sm'
-          className='h-8 gap-1 rounded-full px-2.5 text-[13px] text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+          className='h-8 gap-1 rounded-md px-2.5 text-[13px] text-secondary-token hover:bg-surface-0 hover:text-primary-token'
         >
           <Icon
             name='RefreshCw'
@@ -353,7 +353,7 @@ export function TourDatesTable({
       className='text-[13px]'
       emptyState={
         <div className='px-4 py-8'>
-          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-4 py-8 text-center text-[13px] text-secondary-token'>
+          <ContentSurfaceCard className='flex flex-col items-center gap-3 bg-surface-0 px-3 py-6 text-center text-[13px] text-secondary-token'>
             <Icon name='Calendar' className='h-6 w-6 text-tertiary-token' />
             <div>
               <div className='font-[510] text-primary-token'>No tour dates</div>

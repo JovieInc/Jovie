@@ -36,14 +36,14 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
     <DrawerSurfaceCard
       as='aside'
       variant='card'
-      className={cn('flex items-start gap-3 rounded-[10px] p-3', className)}
+      className={cn('flex items-start gap-2 rounded-lg p-2', className)}
       aria-label={
         mode === 'soft-cap'
           ? 'Smart link limit notice'
           : 'Smart link upgrade prompt'
       }
     >
-      <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10'>
+      <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10'>
         <Icon
           name='Sparkles'
           className='h-4 w-4 text-(--linear-accent)'
@@ -63,7 +63,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               asChild
               tone='ghost'
               size='sm'
-              className='mt-2 h-7 w-fit px-2 text-[11px]'
+              className='mt-1.5 h-7 w-fit px-2 text-[11px]'
             >
               <a href='mailto:support@jov.ie?subject=Smart%20link%20limit%20increase%20request'>
                 Email support
@@ -83,7 +83,7 @@ export function SmartLinkGateBanner(props: SmartLinkGateBannerProps) {
               asChild
               tone='ghost'
               size='sm'
-              className='mt-2 h-7 w-fit px-2 text-[11px]'
+              className='mt-1.5 h-7 w-fit px-2 text-[11px]'
             >
               <Link href={APP_ROUTES.LAUNCH_PRICING}>Upgrade to Pro</Link>
             </DrawerButton>

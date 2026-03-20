@@ -5,6 +5,7 @@ import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AuthButton } from '@/features/auth';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { cn } from '@/lib/utils';
 
 interface HandleValidationState {
   readonly available: boolean;
@@ -199,11 +200,11 @@ export function OnboardingHandleStep({
   return (
     <div className='flex flex-col items-center justify-center h-full'>
       <div className={`w-full max-w-md ${FORM_LAYOUT.formContainer}`}>
-        <div className={FORM_LAYOUT.headerSection}>
+        <div className={cn(FORM_LAYOUT.headerSection, 'mb-6')}>
           <h1 className={FORM_LAYOUT.title}>{title}</h1>
           {prompt ? <p className={FORM_LAYOUT.hint}>{prompt}</p> : null}
           {isReservedHandle ? (
-            <ContentSurfaceCard className='mt-4 flex flex-col items-center gap-2 px-5 py-5 text-center'>
+            <ContentSurfaceCard className='mt-3 flex flex-col items-center gap-1 px-3 py-2.5 text-center'>
               <p className='text-2xl font-[590] tracking-[-0.022em] text-primary-token sm:text-3xl'>
                 @{handleInput}
               </p>
@@ -215,11 +216,14 @@ export function OnboardingHandleStep({
           ) : null}
         </div>
 
-        <form className={FORM_LAYOUT.formInner} onSubmit={onSubmit}>
+        <form
+          className={cn(FORM_LAYOUT.formInner, 'space-y-2.5')}
+          onSubmit={onSubmit}
+        >
           <div>
             <div
               className={[
-                'flex w-full items-center gap-2 rounded-[8px] border bg-surface-1 px-4 py-2.5',
+                'flex w-full items-center gap-2 rounded-md border bg-surface-1 px-4 py-2.5',
                 'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/30 focus-within:ring-offset-1 focus-within:ring-offset-(--linear-app-content-surface)',
                 stateError || handleValidation.error
                   ? 'border-error'
@@ -280,7 +284,7 @@ export function OnboardingHandleStep({
                         ? onSuggestionClick(suggestion)
                         : onHandleChange(suggestion)
                     }
-                    className='rounded-full border border-subtle bg-surface-1 px-3 py-1 text-[11px] text-secondary-token transition-colors hover:border-default hover:bg-surface-0 hover:text-primary-token'
+                    className='rounded-full border border-subtle bg-surface-1 px-2.5 py-0.5 text-[11px] text-secondary-token'
                   >
                     @{suggestion}
                   </button>
@@ -305,7 +309,10 @@ export function OnboardingHandleStep({
           </AuthButton>
         </form>
 
-        <output className={FORM_LAYOUT.footerHint} aria-live='polite'>
+        <output
+          className={cn(FORM_LAYOUT.footerHint, 'mt-4')}
+          aria-live='polite'
+        >
           {stateError ?? null}
         </output>
         <span id={disabledReasonId} className='sr-only' aria-live='polite'>

@@ -50,7 +50,7 @@ const ACTION_ICONS: Record<ActivityAction, typeof Plus> = {
 function ActivityIcon({ action }: { readonly action: ActivityAction }) {
   const IconComponent = ACTION_ICONS[action] ?? Plus;
   return (
-    <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0 transition-colors group-hover:border-default'>
+    <div className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0'>
       <IconComponent className='h-3 w-3 text-tertiary-token' aria-hidden />
     </div>
   );
@@ -60,15 +60,15 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
   const safeRows = Math.max(0, rows);
 
   return (
-    <div className='space-y-1' aria-busy='true'>
+    <div className='space-y-0.5' aria-busy='true'>
       {Array.from({ length: safeRows }, (_, index) => (
         <div
           key={`activity-skeleton-${index + 1}`}
-          className='relative flex items-start gap-3 rounded-[8px] px-2 py-2'
+          className='relative flex items-start gap-3 rounded-md px-1.5 py-1'
           aria-hidden='true'
         >
           <div className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)' />
-          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0 skeleton' />
+          <div className='relative z-10 h-6 w-6 shrink-0 rounded-full bg-surface-0 skeleton' />
           <div className='min-w-0 flex-1 space-y-1.5 pt-0.5'>
             <div className='h-3 w-[72%] rounded skeleton' />
             <div className='h-2.5 w-[24%] rounded skeleton' />
@@ -82,7 +82,7 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
 function ActivityEventRow({ event }: { readonly event: ActivityEvent }) {
   const isSystem = event.actor?.type === 'system';
   return (
-    <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus'>
+    <div className='group relative flex items-start gap-3 rounded-md px-1.5 py-1 transition-[background-color] duration-150 hover:bg-surface-1 focus-within:bg-surface-1'>
       <div
         aria-hidden='true'
         className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle) group-last:hidden'
@@ -123,7 +123,7 @@ export function ActivityFeed({
   if (isLoading) {
     return (
       <div
-        className='space-y-1'
+        className='space-y-0.5'
         role='feed'
         aria-label='Activity feed'
         aria-busy='true'
@@ -135,7 +135,7 @@ export function ActivityFeed({
 
   if (events.length === 0) {
     return (
-      <div className='flex min-h-[140px] items-center rounded-[8px] border border-subtle bg-surface-1 px-3'>
+      <div className='flex min-h-[120px] items-center rounded-md bg-surface-1 px-2.5'>
         <p className='text-[12px] leading-[17px] text-secondary-token'>
           {emptyMessage}
         </p>
@@ -148,7 +148,7 @@ export function ActivityFeed({
   );
 
   return (
-    <div className='space-y-1' role='feed' aria-label='Activity feed'>
+    <div className='space-y-0.5' role='feed' aria-label='Activity feed'>
       {sorted.map(event => (
         <ActivityEventRow key={event.id} event={event} />
       ))}

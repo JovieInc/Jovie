@@ -149,7 +149,7 @@ export function ReleaseTable({
         ? 'relative overflow-hidden skeleton'
         : '';
       const flashClassName = isFlashed
-        ? 'bg-emerald-500/5 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.18)] transition-colors duration-700'
+        ? 'bg-emerald-500/5 transition-colors duration-700'
         : '';
 
       return [
@@ -317,7 +317,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='mx-4 my-4 min-h-[200px]'
+          className='mx-4 my-3 min-h-[160px]'
         />
       );
     }
@@ -368,7 +368,7 @@ export function ReleaseTable({
           icon={<Icon name='Disc3' className='h-6 w-6' />}
           title='No releases'
           description='Your releases will appear here once synced.'
-          className='m-4 min-h-[200px]'
+          className='m-3 min-h-[160px]'
         />
       }
     />

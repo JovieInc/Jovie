@@ -15,7 +15,7 @@ export interface AudienceRowSelectionCellProps {
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'rounded-[3px] border border-subtle bg-surface-0 text-(--linear-accent) transition-all duration-100 ease-out data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white data-[state=indeterminate]:border-(--linear-accent) data-[state=indeterminate]:bg-(--linear-accent) data-[state=indeterminate]:text-white focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+  'rounded-sm border border-subtle bg-surface-0 text-(--linear-accent) transition-all duration-100 ease-out data-[state=checked]:border-(--linear-accent) data-[state=checked]:bg-(--linear-accent) data-[state=checked]:text-white data-[state=indeterminate]:border-(--linear-accent) data-[state=indeterminate]:bg-(--linear-accent) data-[state=indeterminate]:text-white focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
 );
 
 export function AudienceRowSelectionCell({
@@ -28,7 +28,7 @@ export function AudienceRowSelectionCell({
   return (
     <div
       className={cn(
-        'relative flex h-7 w-7 items-center justify-center',
+        'relative flex h-6 w-6 items-center justify-center',
         className
       )}
     >

@@ -8,7 +8,7 @@ export const DRAWER_FORM_GRID_ROW_CLASSNAME =
   'grid grid-cols-[88px,minmax(0,1fr)] items-center gap-2.5';
 
 export const DRAWER_FORM_GRID_LABEL_CLASSNAME =
-  'text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token';
+  'text-[13px] font-[510] tracking-normal text-secondary-token';
 
 export interface DrawerFormGridRowProps {
   readonly label: ReactNode;

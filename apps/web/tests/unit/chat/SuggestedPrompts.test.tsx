@@ -4,17 +4,20 @@ import { SuggestedPrompts } from '@/components/jovie/components/SuggestedPrompts
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('SuggestedPrompts', () => {
-  it('renders default prompts when first-session mode is off', () => {
+  it('renders default prompts', () => {
     const onSelect = vi.fn();
     const { getByText, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
 
+    // Current default suggestion
     expect(getByText('Change profile photo')).toBeTruthy();
+
+    // First-session suggestions should not appear in default mode
     expect(queryByText('Preview my profile')).toBeNull();
   });
 
-  it('renders first-session prompts with release title personalization', () => {
+  it('renders first-session prompts including all suggestions', () => {
     const onSelect = vi.fn();
     const { getByRole } = fastRender(
       <SuggestedPrompts
@@ -24,8 +27,11 @@ describe('SuggestedPrompts', () => {
       />
     );
 
+    // First-session suggestions
     expect(
-      getByRole('button', { name: 'Set up a link for “Midnight Drive”' })
+      getByRole('button', {
+        name: 'Set up a link for \u201CMidnight Drive\u201D',
+      })
     ).toBeTruthy();
     expect(getByRole('button', { name: 'Preview my profile' })).toBeTruthy();
     expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
@@ -52,6 +58,20 @@ describe('SuggestedPrompts', () => {
         name: 'Which release is getting traction right now?',
       })
     ).toBeTruthy();
+    // Default prompts should not appear when custom suggestions are provided
     expect(queryByText('Change profile photo')).toBeNull();
+  });
+
+  it('always shows feedback suggestion', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    expect(getByText('Share feedback')).toBeTruthy();
+  });
+
+  it('calls onSelect with prompt when clicked', () => {
+    const onSelect = vi.fn();
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByText('Change profile photo').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Help me change my profile photo.');
   });
 });

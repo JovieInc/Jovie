@@ -45,8 +45,8 @@ interface AvailabilityCellProps {
 
 function AvailabilityEmptyAction() {
   return (
-    <div className='flex min-w-[150px] justify-end'>
-      <div className='h-8 w-[84px] rounded-[8px] border border-dashed border-subtle bg-surface-1' />
+    <div className='flex min-w-[140px] justify-end'>
+      <div className='h-7 w-[76px] rounded-md border border-dashed border-subtle bg-surface-1' />
     </div>
   );
 }
@@ -208,7 +208,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
           aria-label='Show provider availability details'
           aria-haspopup='listbox'
           aria-expanded={open}
-          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-[7px] border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-1 text-[12px] font-[400] tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-default hover:bg-surface-2 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
+          className='inline-flex min-w-0 max-w-full items-center gap-1 rounded-md border border-(--linear-app-frame-seam) bg-surface-1 px-1.5 py-1 text-[12px] font-[400] tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-default hover:bg-surface-2 hover:text-primary-token focus-visible:border-(--color-accent) focus-visible:bg-surface-2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--color-accent)'
         >
           <CompactLinkRail
             items={compactProviders.map(providerKey => ({
@@ -244,13 +244,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-(--linear-radius-lg) border border-default bg-surface-0 p-0 shadow-(--linear-shadow-card-elevated)'
+        className='w-[320px] rounded-lg bg-surface-0 p-0'
       >
-        <div className='border-b border-subtle px-3 py-2.5'>
+        <div className='border-b border-subtle px-2.5 py-1.5'>
           <p className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>
             Platform Availability
           </p>
-          <p className='text-[12px] text-secondary-token'>
+          <p className='text-[11px] text-secondary-token'>
             {availableCount} of {totalCount} platforms linked
           </p>
         </div>
@@ -267,13 +267,13 @@ export const AvailabilityCell = memo(function AvailabilityCell({
             return (
               <div
                 key={providerKey}
-                className='flex min-h-11 items-center justify-between border-b border-subtle px-3 py-2 last:border-b-0'
+                className='flex min-h-9 items-center justify-between border-b border-subtle px-2.5 py-1 last:border-b-0'
               >
                 <div className='flex min-w-0 items-center gap-2.5'>
                   {/* Status dot with screen reader text */}
                   {status === 'missing' ? (
                     <span
-                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-1'
+                      className='flex h-2.5 w-2.5 items-center justify-center rounded-full bg-surface-1'
                       aria-hidden='true'
                     >
                       <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
@@ -308,7 +308,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                 {(() => {
                   if (provider?.url) {
                     return (
-                      <div className='flex min-w-[150px] items-center justify-end gap-1'>
+                      <div className='flex min-w-[140px] items-center justify-end gap-1'>
                         <DrawerInlineIconButton
                           aria-label={`Open ${config.label} in new tab`}
                           onClick={() =>
@@ -334,7 +334,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                           }
                           onClick={createCopyHandler(providerKey, testId)}
                           className={cn(
-                            'rounded-full border border-transparent p-1.5 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+                            'rounded-full p-1.5 text-tertiary-token transition-[background-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
                             isCopied && 'text-emerald-600 dark:text-emerald-400'
                           )}
                         >
@@ -352,7 +352,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                     return (
                       <form
                         onSubmit={handleAddUrl}
-                        className='flex min-w-[150px] items-center justify-end gap-1'
+                        className='flex min-w-[140px] items-center justify-end gap-1'
                       >
                         <Input
                           ref={inputRef}
@@ -365,7 +365,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                             setValidationError('');
                           }}
                           disabled={isAddingUrl}
-                          className='h-8 w-[150px] rounded-[8px] border-subtle bg-surface-1 text-[12px]'
+                          className='h-8 w-[150px] rounded-md border-subtle bg-surface-1 text-[12px]'
                           autoFocus
                         />
                         <DrawerButton
@@ -410,7 +410,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
                         onClick={() => setAddingProvider(providerKey)}
                         tone='secondary'
                         size='sm'
-                        className='min-w-[84px] rounded-[8px] text-[11px] font-[510]'
+                        className='min-w-[76px] rounded-md text-[11px] font-[510]'
                       >
                         + Add link
                       </DrawerButton>
@@ -425,7 +425,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
         </div>
 
         {validationError && (
-          <div className='min-h-[36px] border-t border-subtle px-3 py-2'>
+          <div className='min-h-[28px] border-t border-subtle px-2.5 py-1'>
             <p className='text-[11px] text-error'>{validationError}</p>
           </div>
         )}

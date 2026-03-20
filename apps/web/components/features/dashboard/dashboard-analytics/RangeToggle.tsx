@@ -68,7 +68,7 @@ export function RangeToggle({
     <div
       role='tablist'
       aria-label='Select analytics range'
-      className='inline-flex items-center rounded-(--linear-app-control-radius) border border-subtle bg-surface-1 p-0.5'
+      className='inline-flex items-center rounded-md border border-subtle bg-surface-1 p-0.5'
     >
       {RANGE_OPTIONS.map((opt, index) => {
         const active = opt.value === value;
@@ -79,8 +79,7 @@ export function RangeToggle({
         if (disabled) {
           stateClass = 'cursor-not-allowed text-tertiary-token/40';
         } else if (active) {
-          stateClass =
-            'border-default bg-surface-0 text-primary-token shadow-[0_1px_0_rgba(255,255,255,0.02)]';
+          stateClass = 'border-default bg-surface-0 text-primary-token';
         } else {
           stateClass =
             'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
@@ -105,7 +104,7 @@ export function RangeToggle({
             title={
               disabled ? 'Upgrade to Pro for extended analytics' : undefined
             }
-            className={`relative h-[26px] rounded-[calc(var(--linear-app-control-radius)-1px)] border border-transparent px-2 text-[12px] font-[510] tracking-[-0.01em] transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
+            className={`relative h-[26px] rounded-[5px] border border-transparent px-2 text-[12px] font-[510] tracking-[-0.01em] transition-[background-color,color,border-color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface) ${stateClass}`}
           >
             {opt.label}
           </button>

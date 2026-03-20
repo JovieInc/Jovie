@@ -72,7 +72,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: '',
         outline:
-          'bg-sidebar-background shadow-[0_0_0_1px_rgb(var(--sidebar-border))] hover:shadow-[0_0_0_1px_rgb(var(--sidebar-accent))]',
+          'bg-sidebar-background border border-sidebar-border hover:border-sidebar-accent',
       },
       size: {
         default: 'h-7',

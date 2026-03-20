@@ -100,7 +100,7 @@ function CampaignCallout({
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-[10px] border px-4 py-3',
+        'flex items-start gap-2 rounded-lg border px-4 py-3',
         toneClassName,
         className
       )}
@@ -141,7 +141,7 @@ function CampaignDataTable({
   children: ReactNode;
 }>) {
   return (
-    <div className='overflow-hidden rounded-[10px] border border-subtle bg-surface-0'>
+    <div className='overflow-hidden rounded-lg bg-surface-0'>
       <table className='w-full text-sm'>{children}</table>
     </div>
   );
@@ -153,7 +153,7 @@ function CampaignTableHeaderCell({
   children: ReactNode;
 }>) {
   return (
-    <th className='px-4 py-2 text-left text-[11px] font-[560] uppercase tracking-[0.04em] text-tertiary-token'>
+    <th className='px-4 py-2 text-left text-[13px] font-[560] tracking-normal text-secondary-token'>
       {children}
     </th>
   );

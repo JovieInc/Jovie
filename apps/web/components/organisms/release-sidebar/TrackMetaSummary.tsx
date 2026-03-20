@@ -29,16 +29,16 @@ const VARIANT_STYLES: Record<
   }
 > = {
   compact: {
-    container: 'space-y-0.5',
-    number: 'text-[10.5px]',
-    title: 'text-[12.5px]',
-    meta: 'text-[10.5px]',
+    container: 'space-y-1',
+    number: 'text-[11px]',
+    title: 'text-[12px]',
+    meta: 'text-[11px]',
   },
   drawer: {
     container: 'space-y-1',
     number: 'text-[11px]',
-    title: 'text-[14px]',
-    meta: 'text-[10.5px]',
+    title: 'text-[13px]',
+    meta: 'text-[11px]',
   },
 };
 
@@ -60,7 +60,7 @@ export function TrackMetaSummary({
   return (
     <div
       className={cn(
-        artwork ? 'flex items-start gap-3.5' : styles.container,
+        artwork ? 'flex items-start gap-3' : styles.container,
         className
       )}
     >
@@ -82,7 +82,7 @@ export function TrackMetaSummary({
           {isExplicit ? (
             <Badge
               variant='secondary'
-              className='shrink-0 rounded-[6px] border border-subtle bg-surface-1 px-1.5 py-0 text-[9px] font-[510] text-tertiary-token shadow-none'
+              className='shrink-0 rounded-md bg-surface-1 px-1.5 py-0 text-[9px] font-[510] text-tertiary-token'
             >
               E
             </Badge>
@@ -92,7 +92,7 @@ export function TrackMetaSummary({
         {durationMs != null || isrc ? (
           <div
             className={cn(
-              'flex items-center gap-3 text-secondary-token',
+              'flex items-center gap-2 text-secondary-token',
               styles.meta
             )}
           >

@@ -46,7 +46,7 @@ const METADATA_TEXT_CLASSNAME =
   'text-[11px] leading-[14px] text-secondary-token';
 const METADATA_MUTED_TEXT_CLASSNAME =
   'text-[10.5px] leading-[14px] text-tertiary-token';
-const METADATA_BADGE_CLASSNAME = 'border text-[9.5px] font-[510] shadow-none';
+const METADATA_BADGE_CLASSNAME = 'text-[9.5px] font-[510]';
 
 function PopularityScore({ value }: { readonly value: number }) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -63,14 +63,14 @@ function ReleaseTypeBadges({ release }: { readonly release: Release }) {
     <div className='flex flex-wrap items-center gap-1.5'>
       <Badge
         size='sm'
-        className={`h-5 rounded-[6px] px-1.5 text-[9.5px] font-[510] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+        className={`h-5 rounded-md px-1.5 text-[9.5px] font-[510] ${typeStyle.bg} ${typeStyle.text}`}
       >
         {typeStyle.label}
       </Badge>
       {release.isExplicit && (
         <Badge
           size='sm'
-          className='h-5 rounded-[6px] border-red-500/20 bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 shadow-none dark:text-red-300'
+          className='h-5 rounded-md bg-red-500/10 px-1.5 text-[9.5px] font-[510] text-red-600 dark:text-red-300'
         >
           E
         </Badge>
@@ -130,7 +130,7 @@ export function ReleaseMetadata({
     canvasStatusConfig.displayLabel ?? canvasStatusConfig.label;
 
   return (
-    <div className='space-y-px'>
+    <div className='space-y-2'>
       <DrawerPropertyRow
         {...METADATA_ROW_PROPS}
         label='Type'
@@ -238,7 +238,7 @@ export function ReleaseMetadata({
                 <DrawerButton
                   tone='ghost'
                   size='sm'
-                  className='-mx-1 h-6 gap-1 rounded-[6px] border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
+                  className='-mx-1 h-6 gap-1 rounded-md border-transparent px-1 py-0.5 text-[11px] font-[400] leading-[14px] text-secondary-token'
                 >
                   <span>{canvasStatusDisplayLabel}</span>
                   <ChevronDown
@@ -311,7 +311,7 @@ export function ReleaseMetadata({
                 <Badge
                   key={genre}
                   variant='secondary'
-                  className='rounded-[6px] border border-subtle bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token shadow-none'
+                  className='rounded-md bg-surface-1 px-1.5 py-0 text-[9.5px] font-[510] text-secondary-token'
                 >
                   {genre}
                 </Badge>

@@ -59,7 +59,7 @@ function ProfileCompletenessBar({
   return (
     <div className='space-y-3'>
       <div className='flex items-center justify-between'>
-        <span className='text-xs font-medium text-secondary-token uppercase tracking-wide'>
+        <span className='text-[13px] font-medium text-secondary-token tracking-normal'>
           Profile completeness
         </span>
         <span className='text-sm font-semibold text-primary-token'>

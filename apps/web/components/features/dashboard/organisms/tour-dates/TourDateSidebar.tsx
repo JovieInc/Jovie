@@ -231,7 +231,6 @@ export function TourDateSidebar({
     <>
       <EntitySidebarShell
         isOpen={Boolean(tourDate)}
-        width={320}
         ariaLabel='Edit tour date'
         title='Edit Tour Date'
         onClose={onClose}
@@ -241,7 +240,7 @@ export function TourDateSidebar({
         contextMenuItems={contextMenuItems}
       >
         {tourDate && (
-          <div className='space-y-4'>
+          <div className='space-y-2'>
             {/* Source indicator */}
             {tourDate.provider === 'bandsintown' && (
               <div className='flex items-center gap-2 rounded-md bg-teal-50 px-3 py-2 text-[13px] text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'>
@@ -266,7 +265,7 @@ export function TourDateSidebar({
             </div>
 
             {/* Date, Time, and Timezone */}
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-2 gap-2'>
               <div className='space-y-1.5'>
                 <Label htmlFor='startDate'>Date</Label>
                 <Input
@@ -333,7 +332,7 @@ export function TourDateSidebar({
             </div>
 
             {/* Location */}
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-2 gap-2'>
               <div className='space-y-1.5'>
                 <Label htmlFor='city'>City</Label>
                 <Input
@@ -426,10 +425,10 @@ export function TourDateSidebar({
             </div>
 
             {/* Analytics */}
-            <div className='border-t border-subtle pt-4'>
+            <div className='border-t border-subtle pt-2'>
               <DrawerSection title='Analytics'>
                 {analyticsLoading && (
-                  <DrawerSurfaceCard className='space-y-3 p-3'>
+                  <DrawerSurfaceCard className='space-y-2 p-3'>
                     <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
                     <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
                     <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
@@ -441,7 +440,7 @@ export function TourDateSidebar({
                   </p>
                 )}
                 {!analyticsLoading && !analyticsError && (
-                  <div className='space-y-3'>
+                  <div className='space-y-2'>
                     <DrawerStatGrid>
                       <StatTile
                         label='Ticket Clicks'

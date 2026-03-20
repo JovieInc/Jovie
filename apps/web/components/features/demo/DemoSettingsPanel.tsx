@@ -16,8 +16,8 @@ const PLATFORM_CONNECTIONS = [
 
 export function DemoSettingsPanel() {
   return (
-    <div className='h-full overflow-y-auto p-4'>
-      <div className='space-y-4'>
+    <div className='h-full overflow-y-auto p-3'>
+      <div className='space-y-3'>
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <ContentSectionHeader
             title='Artist Profile'
@@ -48,7 +48,7 @@ export function DemoSettingsPanel() {
             {PLATFORM_CONNECTIONS.map(platform => (
               <ContentSurfaceCard
                 key={platform.name}
-                className='flex items-center justify-between px-3 py-2.5'
+                className='flex items-center justify-between border-0 shadow-none px-2.5 py-2'
               >
                 <div className='flex min-w-0 items-center gap-2'>
                   <span
@@ -140,7 +140,7 @@ function ToggleRow({
   return (
     <label
       aria-label={label}
-      className='flex cursor-pointer items-start justify-between gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'
+      className='flex cursor-pointer items-start justify-between gap-3 rounded-md bg-surface-0 px-2.5 py-2'
     >
       <div>
         <p className='text-[13px] font-[510] text-primary-token'>{label}</p>
@@ -149,7 +149,7 @@ function ToggleRow({
       <input
         type='checkbox'
         defaultChecked={defaultChecked}
-        className='mt-0.5 size-4 shrink-0 rounded accent-[var(--color-accent)]'
+        className='mt-0.5 size-4 shrink-0 rounded-sm accent-[var(--color-accent)]'
         onChange={() =>
           runDemoAction({ successMessage: `Setting updated (demo).` })
         }

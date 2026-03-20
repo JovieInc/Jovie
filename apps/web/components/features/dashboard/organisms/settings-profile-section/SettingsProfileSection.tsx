@@ -3,7 +3,7 @@
 import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
@@ -15,7 +15,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-[8px] border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'block w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export function SettingsProfileSection({
   artist,
@@ -58,16 +58,16 @@ export function SettingsProfileSection({
   };
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
+    <div>
       <ContentSectionHeader
         title='Profile identity'
         subtitle='Control the display name, username, image, and place details fans see.'
-        className='min-h-0 px-4 py-3'
+        className='min-h-0 px-1 py-1'
         actions={<SettingsStatusPill status={profileSaveStatus} />}
         actionsClassName='w-auto shrink-0'
       />
-      <div className='space-y-3 px-4 py-3'>
-        <ContentSurfaceCard className='flex items-center justify-between gap-4 bg-surface-0 px-4 py-3.5'>
+      <div className='space-y-1 px-1 py-1'>
+        <div className='flex items-center justify-between gap-4 py-2'>
           <span className='text-[13px] text-primary-token'>
             Profile picture
           </span>
@@ -84,9 +84,9 @@ export function SettingsProfileSection({
             maxFileSize={AVATAR_MAX_FILE_SIZE_BYTES}
             acceptedTypes={SUPPORTED_IMAGE_MIME_TYPES}
           />
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
           <label
             htmlFor='displayName'
             className='shrink-0 text-[13px] text-primary-token'
@@ -103,9 +103,9 @@ export function SettingsProfileSection({
             placeholder='The name your fans will see'
             className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
           <div className='shrink-0'>
             <label
               htmlFor='username'
@@ -117,8 +117,8 @@ export function SettingsProfileSection({
               Used in your profile URL
             </p>
           </div>
-          <div className='flex w-full rounded-[8px] sm:max-w-[280px]'>
-            <span className='inline-flex select-none items-center rounded-l-[8px] border border-r-0 border-subtle bg-surface-1 px-3 text-[13px] text-secondary-token'>
+          <div className='flex w-full rounded-md sm:max-w-[280px]'>
+            <span className='inline-flex select-none items-center rounded-l-md border border-r-0 border-subtle bg-surface-1 px-3 text-[13px] text-secondary-token'>
               {profileDomain}/
             </span>
             <Input
@@ -131,12 +131,12 @@ export function SettingsProfileSection({
               onChange={e => handleFieldChange('username', e.target.value)}
               onBlur={() => flushSave()}
               placeholder='yourname'
-              className={`min-w-0 flex-1 rounded-none rounded-r-[8px] border-l-0 ${PROFILE_INPUT_CLASS}`}
+              className={`min-w-0 flex-1 rounded-none rounded-r-md border-l-0 ${PROFILE_INPUT_CLASS}`}
             />
           </div>
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
           <div className='shrink-0'>
             <label
               htmlFor='location'
@@ -158,9 +158,9 @@ export function SettingsProfileSection({
             placeholder='Los Angeles, CA'
             className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
-        </ContentSurfaceCard>
+        </div>
 
-        <ContentSurfaceCard className='flex flex-col gap-3 bg-surface-0 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
           <div className='shrink-0'>
             <label
               htmlFor='hometown'
@@ -182,8 +182,8 @@ export function SettingsProfileSection({
             placeholder='Nashville, TN'
             className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
-        </ContentSurfaceCard>
+        </div>
       </div>
-    </ContentSurfaceCard>
+    </div>
   );
 }

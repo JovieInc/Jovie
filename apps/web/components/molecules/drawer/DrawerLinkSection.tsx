@@ -52,10 +52,7 @@ export function DrawerLinkSection({
     <div className={cn('space-y-2', className)}>
       {/* Section header: title + action buttons */}
       <div className='flex min-h-[40px] items-center justify-between gap-2 lg:min-h-0'>
-        <DrawerSectionHeading
-          as='h4'
-          className='min-w-0 flex-1 truncate text-[11px] tracking-[0.08em]'
-        >
+        <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
           {title}
         </DrawerSectionHeading>
         <div className='flex shrink-0 items-center gap-1 lg:gap-0.5'>

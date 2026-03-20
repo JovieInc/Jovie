@@ -529,7 +529,7 @@ export const UniversalLinkInput = forwardRef<
                           {groupIndex > 0 && (
                             <div className='mx-3 my-1 border-t border-default' />
                           )}
-                          <div className='px-3 pb-1 pt-2 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                          <div className='px-3 pb-1 pt-2 text-[13px] font-[510] tracking-normal text-secondary-token'>
                             {group.label}
                           </div>
                           {group.options.map((option, indexInGroup) => {

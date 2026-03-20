@@ -1,8 +1,7 @@
 import type { ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-export const DRAWER_SURFACE_CARD_CLASSNAME =
-  'rounded-[12px] border border-subtle bg-surface-0';
+export const DRAWER_SURFACE_CARD_CLASSNAME = 'rounded-lg bg-surface-0';
 
 export interface DrawerSurfaceCardProps {
   readonly children: ReactNode;

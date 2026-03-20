@@ -61,7 +61,7 @@ export function GrowthAccessRequestModal({
     <Dialog open={open} onClose={() => handleClose(false)} size='md'>
       {submitted ? (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] border border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-400'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-400'>
             <CheckCircle className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>Request received</DialogTitle>
@@ -81,7 +81,7 @@ export function GrowthAccessRequestModal({
         </>
       ) : (
         <>
-          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[12px] border border-violet-500/20 bg-violet-500/10 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-400'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 dark:bg-violet-400/10 dark:text-violet-400'>
             <Sparkles className='h-6 w-6' />
           </div>
           <DialogTitle className='text-center'>
@@ -94,7 +94,7 @@ export function GrowthAccessRequestModal({
           </DialogDescription>
 
           <DialogBody>
-            <ContentSurfaceCard className='space-y-2 bg-surface-0 p-3.5'>
+            <ContentSurfaceCard className='space-y-2 bg-surface-0 p-2.5'>
               <Label htmlFor='growth-reason'>
                 What feature are you most excited about?
               </Label>

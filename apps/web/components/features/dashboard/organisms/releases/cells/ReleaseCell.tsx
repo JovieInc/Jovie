@@ -54,12 +54,12 @@ export const ReleaseCell = memo(function ReleaseCell({
   );
 
   return (
-    <div className='grid min-w-0 grid-cols-[18px_minmax(0,1fr)] items-start gap-x-2'>
-      <div className='flex w-[16px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-1.5'>
+      <div className='flex w-4 items-center justify-center pt-0.5'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-4 w-4 rounded-[4px] p-0 text-tertiary-token'
+            className='h-4 w-4 rounded-sm p-0 text-tertiary-token'
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
@@ -89,7 +89,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {showType && typeStyle && (
             <Badge
               size='sm'
-              className={`h-[17px] shrink-0 rounded-[5px] border px-1.5 text-[9px] font-[510] tracking-[-0.01em] shadow-none ${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`}
+              className={`h-[17px] shrink-0 rounded-md px-1 text-[9px] font-[510] tracking-[-0.01em] ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
@@ -97,7 +97,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='hidden h-[17px] shrink-0 rounded-[5px] border border-amber-500/15 bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 shadow-none xl:inline-flex dark:text-amber-300'
+              className='hidden h-[17px] shrink-0 rounded-md bg-amber-500/10 px-1 text-[9px] font-[510] tracking-[-0.01em] text-amber-700 xl:inline-flex dark:text-amber-300'
             >
               {manualOverrideCount} edited
             </Badge>

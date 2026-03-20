@@ -15,7 +15,7 @@ export type CheckboxState = 'checked' | 'unchecked' | 'indeterminate' | boolean;
 // Shared checkbox styling for consistent appearance (uses design tokens)
 const CHECKBOX_STYLES = cn(
   alignment.checkboxSize,
-  'rounded-[4px] border border-subtle bg-surface-0 text-secondary-token shadow-none transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
+  'rounded-sm border border-subtle bg-surface-0 text-secondary-token transition-all duration-100 ease-out data-[state=checked]:border-primary data-[state=checked]:bg-primary data-[state=checked]:text-white data-[state=indeterminate]:border-primary data-[state=indeterminate]:bg-primary data-[state=indeterminate]:text-white'
 );
 
 // Legacy props (backwards compatibility)
@@ -152,8 +152,8 @@ function LegacyCheckboxCell({
   return (
     <Component
       className={cn(
-        'w-14 border-b border-subtle px-4 py-3 align-middle text-center',
-        isHeader && 'sticky z-20 bg-surface-1/80 backdrop-blur',
+        'w-12 border-b border-subtle px-3 py-2 align-middle text-center',
+        isHeader && 'sticky z-20 bg-surface-1',
         !isHeader && 'group-hover:bg-transparent',
         className
       )}

@@ -55,7 +55,7 @@ export function AdminCreatorsTableHeader({
 
   return (
     <thead className='text-left text-secondary-token'>
-      <tr className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <tr className='text-[13px] font-[510] tracking-normal text-secondary-token'>
         <th className={cn(headerCellClass, 'w-14')} style={stickyStyle}>
           <Checkbox
             aria-label='Select all creators'
@@ -86,7 +86,7 @@ export function AdminCreatorsTableHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
                 Creator
               </span>
             )}
@@ -96,7 +96,7 @@ export function AdminCreatorsTableHeader({
           className={cn(headerCellClass, 'hidden lg:table-cell')}
           style={stickyStyle}
         >
-          <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+          <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Social
           </span>
         </th>
@@ -117,7 +117,7 @@ export function AdminCreatorsTableHeader({
           {headerActions ? (
             <div className='flex items-center justify-end'>{headerActions}</div>
           ) : (
-            <span className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
               Actions
             </span>
           )}

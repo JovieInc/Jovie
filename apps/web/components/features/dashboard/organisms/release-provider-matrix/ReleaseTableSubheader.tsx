@@ -263,7 +263,7 @@ function LinearStyleDisplayMenu({
         {/* List options */}
         {onGroupByYearChange && (
           <div className='border-b border-subtle px-3 py-1.5'>
-            <p className='px-1 pb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='px-1 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               List options
             </p>
             <ToggleSwitch

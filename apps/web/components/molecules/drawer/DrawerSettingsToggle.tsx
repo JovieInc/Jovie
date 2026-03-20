@@ -1,7 +1,7 @@
 'use client';
 
 import { Switch } from '@jovie/ui';
-import * as React from 'react';
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface DrawerSettingsToggleProps {
@@ -36,16 +36,15 @@ export function DrawerSettingsToggle({
   density = 'default',
   className,
 }: DrawerSettingsToggleProps) {
-  const id = React.useId();
+  const id = useId();
 
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[7px] py-0.5 transition-[background-color,box-shadow] duration-150',
-        !disabled &&
-          'hover:bg-surface-1 focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
+        'flex items-center justify-between gap-3 rounded py-px transition-[background-color] duration-150',
+        !disabled && 'hover:bg-surface-1 focus-within:bg-surface-1',
         density === 'compact' ? 'min-h-[28px]' : 'min-h-[36px] lg:min-h-0',
-        density === 'compact' ? 'px-1.5' : 'px-2',
+        density === 'compact' ? 'px-1' : 'px-1.5',
         disabled && 'opacity-60',
         className
       )}

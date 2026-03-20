@@ -29,7 +29,7 @@ export function DialogLoadingSkeleton({
       <DialogBody className='space-y-4'>
         <div className='h-4 w-80 max-w-full rounded skeleton' />
 
-        <div className='rounded-xl border border-subtle bg-surface-0 px-4 py-3'>
+        <div className='rounded-xl bg-surface-0 px-3 py-2.5'>
           <div className='flex items-center gap-3'>
             <div className='h-6 w-6 rounded-full skeleton' />
             <div className='h-4 flex-1 rounded skeleton' />
@@ -37,13 +37,13 @@ export function DialogLoadingSkeleton({
           </div>
         </div>
 
-        <div className='rounded-xl border border-default bg-surface-0 p-3 shadow-(--linear-shadow-card-elevated)'>
+        <div className='rounded-xl bg-surface-0 p-2.5'>
           <div className='space-y-1.5'>
             {rowIds.map(rowId => (
               <DrawerSurfaceCard
                 key={rowId}
                 variant='card'
-                className='flex min-h-[64px] items-center gap-3 rounded-[10px] px-3'
+                className='flex min-h-[56px] items-center gap-3 rounded-lg px-2.5'
               >
                 <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
                 <div className='min-w-0 flex-1 space-y-1.5'>

@@ -50,7 +50,7 @@ function TipsHero() {
         <p className='mt-3 flex items-center justify-center gap-2 text-(--linear-label-size) font-(--linear-font-weight-medium) tracking-(--linear-tracking-wide) text-tertiary-token'>
           <span
             aria-hidden='true'
-            className='inline-block h-1.5 w-1.5 rounded-full bg-success shadow-[0_0_8px_var(--linear-success)]'
+            className='inline-block h-1.5 w-1.5 rounded-full bg-success'
           />{' '}
           Free forever. No credit card.
         </p>

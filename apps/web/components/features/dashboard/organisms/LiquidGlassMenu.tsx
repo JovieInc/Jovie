@@ -291,7 +291,7 @@ export function LiquidGlassMenu({
               {hasAdminItems && (
                 <>
                   <div className='my-2 mx-1 border-t border-default/30' />
-                  <p className='px-3 py-1.5 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+                  <p className='px-3 py-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
                     Admin
                   </p>
                   {adminItems.map(item => (

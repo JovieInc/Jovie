@@ -17,7 +17,7 @@ export function ReleaseSmartLinkSection({
       url={smartLinkUrl}
       displayValue={smartLinkPath}
       size='lg'
-      className='rounded-[8px] border-subtle/45 bg-surface-0/70'
+      className='rounded-md'
       valueClassName='text-tertiary-token'
       copyButtonTitle='Copy link'
       openButtonTitle='Open smart link'

@@ -129,7 +129,7 @@ https://www.instagram.com/artistname, https://artist-website.com'
           </div>
 
           {result && (
-            <div className='space-y-2 rounded-[10px] border border-subtle bg-surface-0 p-3 text-[12px] text-secondary-token'>
+            <div className='space-y-2 rounded-lg bg-surface-0 p-3 text-[12px] text-secondary-token'>
               {/* Summary badges */}
               <div className='flex flex-wrap items-center gap-3'>
                 {result.summary.success > 0 && (

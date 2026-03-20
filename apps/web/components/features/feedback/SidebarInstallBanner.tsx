@@ -92,12 +92,12 @@ export function SidebarInstallBanner() {
 
     return (
       <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-        <div className='relative rounded-[10px] border border-sidebar-border/20 bg-sidebar-accent/5 px-2.5 py-2 text-sidebar-muted shadow-none'>
+        <div className='relative rounded-md bg-sidebar-accent/5 px-2 py-1.5 text-sidebar-muted'>
           <button
             type='button'
             aria-label='Dismiss version update banner'
             onClick={dismissVersionUpdate}
-            className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/70 transition-colors duration-normal hover:text-sidebar-item-foreground/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+            className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
           >
             <X className='size-3' />
           </button>
@@ -114,7 +114,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={reload}
-                className='mt-1 inline-flex min-h-6 items-center rounded-full border border-sidebar-border/25 bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 transition-colors duration-normal hover:border-sidebar-border/45 hover:bg-sidebar-accent/25 hover:text-sidebar-item-foreground/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                className='mt-1 inline-flex min-h-6 items-center rounded-full bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Reload
               </button>
@@ -130,12 +130,12 @@ export function SidebarInstallBanner() {
 
   return (
     <div className='group-data-[collapsible=icon]:hidden px-2 pb-1'>
-      <div className='relative rounded-[10px] border border-sidebar-border/20 bg-sidebar-accent/5 px-2.5 py-2 text-sidebar-muted shadow-none'>
+      <div className='relative rounded-md bg-sidebar-accent/5 px-2 py-1.5 text-sidebar-muted'>
         <button
           type='button'
           aria-label='Dismiss install banner'
           onClick={dismissPwa}
-          className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/70 transition-colors duration-normal hover:text-sidebar-item-foreground/85 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+          className='absolute top-1 right-1 flex size-6 items-center justify-center rounded text-sidebar-muted/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
         >
           <X className='size-3' />
         </button>
@@ -155,7 +155,7 @@ export function SidebarInstallBanner() {
               <button
                 type='button'
                 onClick={install}
-                className='mt-1 inline-flex min-h-6 items-center rounded-full border border-sidebar-border/25 bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 transition-colors duration-normal hover:border-sidebar-border/45 hover:bg-sidebar-accent/25 hover:text-sidebar-item-foreground/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
+                className='mt-1 inline-flex min-h-6 items-center rounded-full bg-transparent px-1.5 text-[10px] font-medium text-sidebar-item-foreground/70 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring'
               >
                 Install
               </button>

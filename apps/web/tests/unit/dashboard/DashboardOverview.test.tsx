@@ -136,7 +136,7 @@ describe('DashboardOverview', () => {
 
     // Copy flow - header copy control is icon-only (sr-only label)
     const headerEl = screen
-      .getByText('Keep your profile polished and ready to share.')
+      .getByText('Keep your profile polished and ready to share')
       .closest('header');
     expect(headerEl).not.toBeNull();
     const copyBtn = within(headerEl as HTMLElement).getByRole('button', {
