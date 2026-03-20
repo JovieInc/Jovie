@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.20] - 2026-03-19
+
+### Removed
+
+- "Delete account" button from the user dropdown menu — too easy to click accidentally. Delete account is still accessible via Settings > Data & Privacy.
+### Added
+
+- Persistent audio playback with Now Playing card in sidebar footer — shows artwork, track title, artist/release info, play/pause controls, and progress bar
+- Preview availability indicators in release tables — VolumeX muted icon shows which releases/tracks have no audio preview available
+- Audio error handling with toast notification when preview URLs fail to load
+- Fade-in entrance animation for Now Playing card (tw-animate-css)
+- Keyboard-accessible focus rings on all player buttons
+- Image fallback for missing/broken artwork URLs
+- 11 unit tests covering useTrackAudioPlayer hook and NowPlayingCard component states
+
+### Changed
+
+- Extended useTrackAudioPlayer hook with track metadata (title, release, artist, artwork) for any UI surface to render current track
+- All 5 toggleTrack callers now pass release metadata (ReleaseCell, ReleaseTrackList, TrackRow, ReleaseSidebar, NowPlayingCard)
+
 ## [26.4.19] - 2026-03-19
 
 ### Added
@@ -58,6 +78,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
 - Added persistent "Claim your handle" ghost button during dashboard animation
 - Mobile dashboard uses stacked row layout for full smart link URL visibility
+- Onboarding checkout intercept: all users completing onboarding now see an upgrade page (gated by `ONBOARDING_CHECKOUT_STEP` feature flag)
+- Smart plan recommendation: Spotify followers determine suggested tier (Pro for <10K, Growth for 10K+)
+- Personalized checkout hint for organic users with their jov.ie handle
+- Founding member urgency callout with accent-tinted card
+- Annual billing pre-selected when savings exceed 25%
+- `&source=intent|organic` query param to disambiguate paid intent from organic upsell
+- Post-upgrade celebration: onboarding upgraders see "Your profile is live — and upgraded!" on the billing success page
+- Analytics segmentation via `intent_source` on checkout events
+
+### Changed
+
+- Skip button copy: "Start free, upgrade anytime" for organic users (was "Continue with Free")
+- Billing success page CTA: "Explore your dashboard" for onboarding upgraders
 
 ## [26.4.17] - 2026-03-19
 

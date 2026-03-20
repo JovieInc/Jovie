@@ -336,22 +336,24 @@ describe('@critical session.ts', () => {
 
   describe('getProfileByDbUserId', () => {
     it('returns profile when found', async () => {
-      const mockProfile = {
+      const onboardingDate = new Date();
+      const mockQueryResult = {
         id: 'profile-123',
-        userId: 'db-user-123',
         username: 'testuser',
         usernameNormalized: 'testuser',
         displayName: 'Test User',
         avatarUrl: 'https://example.com/avatar.jpg',
         isPublic: true,
         isClaimed: true,
-        onboardingCompletedAt: new Date(),
+        onboardingCompletedAt: onboardingDate,
       };
 
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([mockProfile]),
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([mockQueryResult]),
+            }),
           }),
         }),
       });
@@ -359,14 +361,16 @@ describe('@critical session.ts', () => {
       const { getProfileByDbUserId } = await import('@/lib/auth/session');
       const result = await getProfileByDbUserId('db-user-123');
 
-      expect(result).toEqual(mockProfile);
+      expect(result).toEqual({ ...mockQueryResult, isClaimed: true });
     });
 
     it('returns null when profile not found', async () => {
       mockDbSelect.mockReturnValue({
         from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            limit: vi.fn().mockResolvedValue([]),
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
           }),
         }),
       });

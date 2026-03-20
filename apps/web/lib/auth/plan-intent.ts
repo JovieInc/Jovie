@@ -147,3 +147,27 @@ export function clearPlanIntent(): void {
 export function isPaidIntent(plan: PlanIntentTier | null): boolean {
   return plan !== null && plan !== 'free';
 }
+
+/**
+ * Default plan for organic users who didn't express paid intent.
+ */
+export const DEFAULT_UPSELL_PLAN: PlanIntentTier = 'pro';
+
+/**
+ * Spotify follower threshold for recommending Growth over Pro.
+ */
+export const GROWTH_FOLLOWER_THRESHOLD = 10_000;
+
+/**
+ * Recommend a plan tier based on Spotify follower count.
+ * Artists with 10K+ followers get Growth; everyone else gets Pro.
+ */
+export function recommendPlan(spotifyFollowers: number | null): PlanIntentTier {
+  if (
+    spotifyFollowers !== null &&
+    spotifyFollowers >= GROWTH_FOLLOWER_THRESHOLD
+  ) {
+    return 'growth';
+  }
+  return DEFAULT_UPSELL_PLAN;
+}
