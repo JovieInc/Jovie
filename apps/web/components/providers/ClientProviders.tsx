@@ -20,6 +20,17 @@ interface ClientProvidersProps {
   readonly skipCoreProviders?: boolean;
 }
 
+function getClerkProxyUrl(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  const { hostname } = window.location;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return undefined;
+  }
+
+  return '/clerk';
+}
+
 function isMockPublishableKey(publishableKey: string): boolean {
   const lower = publishableKey.toLowerCase();
   return (
@@ -158,6 +169,7 @@ export function ClientProviders({
   return (
     <ClerkProvider
       publishableKey={publishableKey}
+      proxyUrl={getClerkProxyUrl()}
       appearance={clerkAppearance}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}

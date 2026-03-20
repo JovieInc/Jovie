@@ -3,6 +3,10 @@ import { clerkSetup } from '@clerk/testing/playwright';
 import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
+import {
+  isExternalBaseUrl,
+  isSafePreviewBaseUrl,
+} from './helpers/vercel-preview';
 import { seedTestData } from './seed-test-data';
 
 // Load environment variables in priority order (first-loaded wins with override: false)
@@ -89,6 +93,9 @@ function writeWarmupStamp(baseURL: string) {
 
 async function globalSetup() {
   const startTime = Date.now();
+  const baseURL = process.env.BASE_URL;
+  const hasExternalBaseUrl = isExternalBaseUrl(baseURL);
+  const shouldSeedExternalPreview = isSafePreviewBaseUrl(baseURL);
   console.log('Starting E2E global setup...');
   if (isAuthRefreshOnly) {
     console.log('  Running auth-refresh-only setup');
@@ -145,12 +152,6 @@ async function globalSetup() {
     );
   }
 
-  if (isCI && process.env.BASE_URL) {
-    console.log(`CI mode with external BASE_URL: ${process.env.BASE_URL}`);
-    console.log('  Skipping local env overrides and warmup');
-    return;
-  }
-
   Object.assign(process.env, {
     NODE_ENV: process.env.NODE_ENV || 'test',
     NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:
@@ -168,7 +169,10 @@ async function globalSetup() {
 
   if (shouldSkipSeeding) {
     console.log('Skipping test data seeding for fast local iteration');
-  } else if (process.env.DATABASE_URL) {
+  } else if (
+    process.env.DATABASE_URL &&
+    (!hasExternalBaseUrl || shouldSeedExternalPreview)
+  ) {
     try {
       console.log('Seeding test data...');
       await seedTestData({ publicProfilesOnly: isPublicNoAuthOnly });
@@ -185,12 +189,22 @@ async function globalSetup() {
     console.log('DATABASE_URL not set, skipping test data seeding');
   }
 
+  if (hasExternalBaseUrl) {
+    console.log(`External BASE_URL detected: ${baseURL}`);
+    console.log('  Skipping local env overrides and route warmup');
+    const elapsed = Date.now() - startTime;
+    console.log(`E2E global setup complete in ${elapsed}ms`);
+    return;
+  }
+
   if (shouldSkipWarmup) {
     console.log('Skipping route warmup for fast local iteration');
   } else {
-    const baseURL = process.env.BASE_URL || 'http://localhost:3100';
+    const localBaseURL = process.env.BASE_URL || 'http://localhost:3100';
     const canReuseWarmup =
-      isFastIteration && !isPublicNoAuthOnly && hasFreshWarmupStamp(baseURL);
+      isFastIteration &&
+      !isPublicNoAuthOnly &&
+      hasFreshWarmupStamp(localBaseURL);
 
     if (canReuseWarmup) {
       console.log('Skipping route warmup because hot-server warmup is fresh');
@@ -238,7 +252,7 @@ async function globalSetup() {
 
     for (const route of warmupRoutes) {
       try {
-        const res = await fetch(`${baseURL}${route}`, {
+        const res = await fetch(`${localBaseURL}${route}`, {
           signal: AbortSignal.timeout(120_000),
           redirect: 'follow',
         });
@@ -252,7 +266,7 @@ async function globalSetup() {
 
     if (isFastIteration && !isCuratedFastLane) {
       try {
-        const wrapLinkResponse = await fetch(`${baseURL}/api/wrap-link`, {
+        const wrapLinkResponse = await fetch(`${localBaseURL}/api/wrap-link`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -276,7 +290,7 @@ async function globalSetup() {
 
             for (const route of [`/go/${wrappedLink.shortId}`]) {
               try {
-                const res = await fetch(`${baseURL}${route}`, {
+                const res = await fetch(`${localBaseURL}${route}`, {
                   signal: AbortSignal.timeout(120_000),
                   redirect: 'manual',
                 });
@@ -290,7 +304,7 @@ async function globalSetup() {
 
             try {
               const outResponse = await fetch(
-                `${baseURL}/out/${wrappedLink.shortId}`,
+                `${localBaseURL}/out/${wrappedLink.shortId}`,
                 {
                   signal: AbortSignal.timeout(120_000),
                   redirect: 'manual',
@@ -309,7 +323,7 @@ async function globalSetup() {
             if (challengeToken) {
               try {
                 const linkApiResponse = await fetch(
-                  `${baseURL}/api/link/${wrappedLink.shortId}`,
+                  `${localBaseURL}/api/link/${wrappedLink.shortId}`,
                   {
                     method: 'POST',
                     headers: {
@@ -344,7 +358,7 @@ async function globalSetup() {
     }
 
     if (isFastIteration && !isPublicNoAuthOnly) {
-      writeWarmupStamp(baseURL);
+      writeWarmupStamp(localBaseURL);
     }
   }
 

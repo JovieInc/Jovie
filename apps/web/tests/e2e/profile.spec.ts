@@ -387,6 +387,8 @@ test.describe('Profile Modes @smoke @critical', () => {
       { mode: 'tip', path: 'tip' },
       { mode: 'subscribe', path: 'subscribe' },
       { mode: 'about', path: 'about' },
+      { mode: 'contact', path: 'contact' },
+      { mode: 'tour', path: 'tour' },
     ] as const;
 
     for (const deepLink of deepLinks) {
@@ -413,5 +415,55 @@ test.describe('Profile Modes @smoke @critical', () => {
         );
       });
     }
+  });
+
+  test('notifications route renders subscription UI for a seeded profile', async ({
+    page,
+  }) => {
+    await interceptAnalytics(page);
+
+    const handle = process.env.E2E_NOTIFICATIONS_PROFILE || 'testartist';
+    const response = await smokeNavigate(page, `/${handle}/notifications`);
+    expect(response?.status() ?? 0).toBeLessThan(500);
+
+    await waitForHydration(page);
+    const bodyText = await assertProfilePageHealthy(page);
+    if (isUnavailablePage(bodyText)) {
+      test.skip(true, 'Notifications profile unavailable');
+      return;
+    }
+
+    const notificationsUi = page
+      .getByRole('button', { name: /turn on notifications/i })
+      .or(page.getByRole('button', { name: /get notified/i }))
+      .or(page.locator('input[type="email"], input[type="tel"]').first());
+    await expect(
+      notificationsUi.first(),
+      'Notifications route did not render a subscription CTA'
+    ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+  });
+
+  test('shop route falls back gracefully when no shop is configured', async ({
+    page,
+  }) => {
+    await interceptAnalytics(page);
+
+    const handle = process.env.E2E_SHOP_PROFILE || TEST_PROFILES.DUALIPA;
+    const response = await smokeNavigate(page, `/${handle}/shop`);
+    expect(response?.status() ?? 0).toBeLessThan(500);
+
+    await page.waitForURL(new RegExp(`/${handle}(?:$|\\?)`), {
+      timeout: SMOKE_TIMEOUTS.URL_STABLE,
+    });
+    await waitForHydration(page);
+    const bodyText = await assertProfilePageHealthy(page);
+    if (isUnavailablePage(bodyText)) {
+      test.skip(true, 'Shop profile unavailable');
+      return;
+    }
+
+    await expect(page.locator('h1').first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 });

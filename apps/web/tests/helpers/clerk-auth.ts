@@ -2,6 +2,7 @@ import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { smokeNavigateWithRetry } from '../e2e/utils/smoke-test-utils';
+import { primeVercelBypassCookie } from './vercel-preview';
 
 const AUTH_READY_ROUTE = APP_ROUTES.DASHBOARD;
 
@@ -149,6 +150,16 @@ export async function signInUser(
   // Set up Clerk testing token BEFORE navigation
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
+
+  await primeVercelBypassCookie(
+    page,
+    process.env.BASE_URL,
+    APP_ROUTES.SIGNIN
+  ).catch(() => {
+    console.log(
+      '  Preview bypass priming failed, continuing with direct signin'
+    );
+  });
 
   // Navigate to a page that loads ClerkProvider
   // IMPORTANT: The marketing page (/) does NOT have ClerkProvider, but /signin does

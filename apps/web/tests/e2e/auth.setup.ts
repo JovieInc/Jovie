@@ -1,6 +1,7 @@
 import { clerk, setupClerkTestingToken } from '@clerk/testing/playwright';
 import { expect, test as setup } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { smokeNavigateWithRetry } from './utils/smoke-test-utils';
 
 const AUTH_FILE = 'tests/.auth/user.json';
@@ -23,6 +24,16 @@ setup('authenticate', async ({ page, baseURL }) => {
 
   // 1. Set up testing token BEFORE navigation
   await setupClerkTestingToken({ page });
+
+  await primeVercelBypassCookie(
+    page,
+    baseURL ?? process.env.BASE_URL,
+    APP_ROUTES.SIGNIN
+  ).catch(() => {
+    console.log(
+      '  Preview bypass priming failed, continuing with direct signin'
+    );
+  });
 
   // 2. Navigate to sign-in page (has ClerkProvider)
   // Turbopack cold compilation can cause the first navigation to hang even after

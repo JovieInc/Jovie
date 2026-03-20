@@ -211,6 +211,15 @@ function analyzeHost(hostname: string): HostInfo {
   return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
 }
 
+function getClerkProxyUrl(req: NextRequest): string | undefined {
+  const hostname = req.nextUrl.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return undefined;
+  }
+
+  return '/clerk';
+}
+
 /** Dashboard is always at /app in single-domain architecture */
 const DASHBOARD_URL = '/app';
 
@@ -866,10 +875,15 @@ function buildFinalResponse(
   return res;
 }
 
-const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
-  return handleRequest(req, userId);
-});
+const clerkWrappedMiddleware = clerkMiddleware(
+  async (auth, req) => {
+    const { userId } = await auth();
+    return handleRequest(req, userId);
+  },
+  req => ({
+    proxyUrl: getClerkProxyUrl(req),
+  })
+);
 
 export default async function middleware(
   req: NextRequest,
