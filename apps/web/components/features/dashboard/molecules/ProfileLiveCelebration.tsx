@@ -4,6 +4,7 @@ import { PartyPopper } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { track } from '@/lib/analytics';
+import { CelebrationCardPreview } from './CelebrationCardPreview';
 import { CopyToClipboardButton } from './CopyToClipboardButton';
 
 interface ProfileLiveCelebrationProps {
@@ -60,6 +61,14 @@ export function ProfileLiveCelebration({
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
+
+  /** Cancel auto-advance permanently on first user interaction with the card. */
+  const cancelAutoAdvance = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
 
   const completeCelebration = useCallback(() => {
     if (hasCompletedRef.current) return;
@@ -199,6 +208,12 @@ export function ProfileLiveCelebration({
             iconName='Copy'
           />
         </div>
+
+        {/* Shareable celebration card */}
+        <CelebrationCardPreview
+          username={username}
+          onInteraction={cancelAutoAdvance}
+        />
 
         <button
           ref={continueRef}

@@ -1,5 +1,19 @@
 # TODOs
 
+## Project-level /ship override mechanism
+
+**What:** Create a project-level `/ship` override mechanism (e.g., `.claude/skills/overrides/ship.md`) that customizes the generic gstack `/ship` template (CalVer format, `version.json` instead of `VERSION` file) without forking the template — so gstack upgrades don't lose project customizations and new gstack features aren't blocked.
+
+**Why:** The gstack `/ship` Step 4 references a 4-digit `VERSION` file (`MAJOR.MINOR.PATCH.MICRO`) but this project uses CalVer `YY.M.PATCH` in `version.json`. Currently handled by AGENTS.md prose override, which is fragile and could confuse agents.
+
+**Context:** The mismatch is between the generic gstack ship template (designed for all repos) and Jovie's project-specific versioning. The ideal solution would be a composable override that gstack's template system reads automatically, so upgrading gstack doesn't clobber project customizations. Could be a `ship.project.md` file that gets included by the template, or a config-driven mechanism in gstack itself.
+
+**Effort:** M (human ~1 day / CC ~30 min)
+**Priority:** P3
+**Depends on:** Nothing blocking.
+
+---
+
 ## Wrong-artist detection + multi-candidate DSP matching
 
 **What:** Change `dsp_artist_matches` unique constraint from `(creator_profile_id, provider_id)` to `(creator_profile_id, provider_id, external_artist_id)`. Update the discovery job to store the top-2 candidates per provider (best = auto_confirmed/suggested, 2nd = suggested). Surface secondary candidates in the presence page with "X tracks matched this profile" context. Detect split catalogs (e.g. "400 tracks on one David Guetta Apple Music profile, 2 on another").
@@ -51,16 +65,6 @@
 **Context:** `MUSICFETCH_LINK_MAPPINGS` excludes metadata services by design (they're stored in the registry as `category: 'metadata'`). Genius URLs from MusicFetch are available in `artistData.services.genius.link`. Need: (1) persist Genius URL during enrichment, (2) fetch lyrics via Genius API or scraping, (3) display component on profile/release pages. Needs design.
 
 **Depends on:** DSP registry PR. Also needs Genius API key or scraping strategy.
-
-## Re-enrichment of existing artists
-
-**What:** Run MusicFetch re-enrichment for all ~30 existing artists to populate newly supported DSP links.
-
-**Why:** Existing artists were enriched with only 10 MusicFetch services. After this PR, the pipeline requests all 40 services. Existing profiles won't have links for the 30 new services until re-enriched.
-
-**Context:** Use the existing dashboard refresh button (which calls `enqueueMusicFetchEnrichmentJob()`) to manually trigger re-enrichment for each artist. With ~30 artists this is feasible manually. For larger scale, a batch script would be needed.
-
-**Depends on:** DSP registry PR must be deployed first.
 
 ## Post-signup birthday capture
 
@@ -119,20 +123,6 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 ---
 
-## Shareable "profile is live" social card
-
-**What:** After onboarding completion, auto-generate a social media-ready graphic (OG-image style) with the creator's avatar, name, and profile URL. Show it prominently with "Share on Instagram / Twitter / Copy Image" buttons. Think Spotify Wrapped cards — designed to be screenshotted and shared.
-
-**Why:** Turns every new signup into a distribution event. Creator posts card → their fans see Jovie → some fans are also artists → viral loop.
-
-**Context:** The share menu exists (14+ UTM-tagged platforms in `profileLinkShareMenu.tsx`) but it's buried in the dashboard sidebar. This would make sharing the primary post-onboarding action. Needs image generation (could use `@vercel/og` or a canvas-based approach).
-
-**Effort:** M (human ~1.5 days / CC ~20 min)
-**Priority:** P2
-**Depends on:** Nothing blocking.
-
----
-
 ## Weekly creator digest email
 
 **What:** A weekly email to creators summarizing their week — "12 new fans subscribed, 347 profile views, your top city is Los Angeles, 2 tips received." Simple, data-driven, with a CTA back to the dashboard.
@@ -144,20 +134,6 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M (human ~2 days / CC ~20 min)
 **Priority:** P1
 **Depends on:** Analytics data flowing post-launch. Build week 2-3.
-
----
-
-## Win-back email for checkout skippers
-
-**What:** When a user has plan intent (clicked a paid pricing CTA) but clicks "Skip" on the onboarding checkout step, enqueue a follow-up email 24h later with their profile link + "Ready to unlock Pro?" CTA.
-
-**Why:** These users expressed purchase intent then bailed — warmest leads. The `onboarding_checkout_skipped` analytics event provides the trigger signal.
-
-**Context:** Requires GDPR/CCPA consent classification (marketing vs transactional), opt-in/opt-out rules by jurisdiction, privacy policy updates, and unsubscribe handling. Significant compliance work needed before implementation.
-
-**Effort:** L (human ~3 days including compliance / CC ~1 hr)
-**Priority:** P3
-**Depends on:** Onboarding checkout step PR + email sending infrastructure + GDPR compliance review.
 
 ---
 
@@ -182,3 +158,87 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Context:** Files: `apps/web/components/molecules/drawer/DrawerButton.tsx`, `apps/web/components/atoms/HeaderIconButton.tsx`, `apps/web/components/atoms/InlineIconButton.tsx`. Base Button at `packages/ui/atoms/button.tsx` already has CVA variants. HeaderIconButton already has tests at `apps/web/tests/unit/atoms/HeaderIconButton.test.tsx`.
 
 **Depends on:** Nothing. Independent initiative.
+
+---
+
+## Audience segmentation for retargeting
+
+**What:** Segment retargeting audiences by engagement level — high-intent (3+ visits and link clicks), cold (single page view), and tippers (sent money). Use segments to serve different ad creatives per audience tier.
+
+**Why:** A single retargeting audience treats all visitors equally. Segmenting lets creators show aggressive CTAs to high-intent fans and softer awareness ads to cold visitors, improving ad spend efficiency and conversion rates.
+
+**Context:** The `audience_members` table already tracks `visits`, `engagement_score`, `intent_level`, and `latest_actions`. Segmentation logic can be built on top of these fields. The retargeting ad creative endpoint can accept a segment parameter to generate tailored creatives. Custom Audience sync (if using Meta Marketing API) would create separate audiences per segment.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (conversion attribution + pixel forwarding).
+
+---
+
+## New ad platforms (Pinterest, Snapchat, X/Twitter)
+
+**What:** Add Pinterest Tag, Snapchat Pixel, and X/Twitter pixel forwarding. Follow the existing forwarder pattern established by `facebook.ts`, `google.ts`, and `tiktok.ts` in `lib/tracking/forwarding/`.
+
+**Why:** Creators advertise across more platforms than Meta/Google/TikTok. Supporting additional pixels broadens the retargeting funnel without changing the architecture.
+
+**Context:** Each new platform needs: a forwarder file in `lib/tracking/forwarding/`, credentials columns in `creator_pixels` schema, UI fields in the pixel settings section, and platform API account setup. The forwarding orchestrator (`index.ts`) already handles multi-platform dispatch — new platforms plug in via the same pattern.
+
+**Effort:** M per platform
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Auto-audience creation via Meta Marketing API
+
+**What:** Programmatically create and update Custom Audiences in Meta Ads Manager using the Marketing API, instead of requiring creators to manually configure Website Visitors and Subscribe exclusion audiences.
+
+**Why:** Manual Custom Audience setup in Ads Manager is the highest-friction step in the retargeting workflow. Automating it removes a multi-step process that most independent artists struggle with.
+
+**Context:** Requires Meta Marketing API integration with an OAuth flow for creators to grant `ads_management` permission. The API supports creating Website Custom Audiences and updating them with hashed user data. Scope includes audience creation, membership sync, and exclusion audience management.
+
+**Effort:** L
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Self-healing credential detection
+
+**What:** Periodically send test events to each creator's configured ad pixels. Auto-disable pixels that fail 3 consecutive test events. Notify the creator via dashboard banner and email. Re-enable automatically when credentials are updated.
+
+**Why:** Broken credentials silently waste the forwarding pipeline's resources and give creators a false sense that their ads are working. Proactive detection catches issues before the creator notices missing conversions.
+
+**Context:** The test event API (`/api/dashboard/pixels/test-event`) already exists for manual testing. This extends it into an automated health check, likely as a cron job that iterates over active `creator_pixels` rows. The `creator_pixels` table would need a `consecutive_failures` counter and `disabled_at` timestamp. Notification uses the existing dashboard notification pattern.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (pixel health status + test event button).
+
+---
+
+## Ad creative auto-refresh
+
+**What:** When an artist updates their profile photo, automatically regenerate cached retargeting ad creatives stored in Vercel Blob. Trigger from the profile update handler.
+
+**Why:** Stale creatives with outdated photos look unprofessional and reduce ad click-through rates. Auto-refresh keeps creatives current without requiring the artist to manually regenerate.
+
+**Context:** The ad creative endpoint (`/api/dashboard/retargeting/ad-creative`) generates images on demand and can cache them in Vercel Blob. The profile update handler in the dashboard settings flow is the trigger point. Implementation adds a post-update hook that invalidates/regenerates the 4 creative variants (fan-feed, fan-story, claim-feed, claim-story).
+
+**Effort:** S
+**Priority:** P3
+**Depends on:** Retargeting hardening PR.
+
+---
+
+## Weekly pixel digest email
+
+**What:** Send a weekly summary email to creators with active pixels: "This week: 423 page views forwarded, 89% success rate, 12 new subscribers from retargeting." Only sent if there's forwarding activity. Uses Resend.
+
+**Why:** Creators rarely check their dashboard daily. A weekly digest keeps them aware of their retargeting performance and nudges them back to the dashboard when numbers are interesting.
+
+**Context:** Requires aggregating `pixel_events` stats per creator for the past 7 days (forwarded count, success/failure rate) and joining with attribution data from `audience_members`. Uses the existing Resend integration. Should be a cron job (weekly, e.g. Monday 10am UTC). Needs an unsubscribe mechanism and should respect notification preferences.
+
+**Effort:** M
+**Priority:** P2
+**Depends on:** Retargeting hardening PR (forwarding observability + conversion attribution).

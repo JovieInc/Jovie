@@ -34,7 +34,20 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
       this.retryAfterSeconds = retryAfterSeconds;
     }
   }
-  return { MusicfetchRequestError };
+  class MusicfetchBudgetExceededError extends MusicfetchRequestError {
+    budgetScope: 'daily' | 'monthly' | 'backend_unavailable';
+
+    constructor(
+      message: string,
+      budgetScope: 'daily' | 'monthly' | 'backend_unavailable',
+      retryAfterSeconds?: number
+    ) {
+      super(message, 429, retryAfterSeconds);
+      this.name = 'MusicfetchBudgetExceededError';
+      this.budgetScope = budgetScope;
+    }
+  }
+  return { MusicfetchRequestError, MusicfetchBudgetExceededError };
 });
 
 // MusicFetch provider
@@ -85,6 +98,18 @@ const mockNormalizeAndMergeExtraction = vi.fn().mockResolvedValue({
 vi.mock('@/lib/ingestion/merge', () => ({
   normalizeAndMergeExtraction: (...args: unknown[]) =>
     mockNormalizeAndMergeExtraction(...args),
+}));
+
+const mockImportReleasesFromSpotify = vi.fn().mockResolvedValue({
+  imported: 0,
+  failed: 0,
+  releases: [],
+  errors: [],
+});
+
+vi.mock('@/lib/discography/spotify-import', () => ({
+  importReleasesFromSpotify: (...args: unknown[]) =>
+    mockImportReleasesFromSpotify(...args),
 }));
 
 // DB schema
@@ -158,7 +183,10 @@ import {
   musicFetchEnrichmentPayloadSchema,
 } from '@/lib/dsp-enrichment/jobs/musicfetch-enrichment';
 import type { MusicFetchArtistResult } from '@/lib/dsp-enrichment/providers/musicfetch';
-import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
+import {
+  MusicfetchBudgetExceededError,
+  MusicfetchRequestError,
+} from '@/lib/musicfetch/resilient-client';
 
 // Helper to build valid payload
 function makePayload(
@@ -232,6 +260,12 @@ describe('musicfetch-enrichment', () => {
     mockNormalizeAndMergeExtraction.mockResolvedValue({
       inserted: 0,
       updated: 0,
+    });
+    mockImportReleasesFromSpotify.mockResolvedValue({
+      imported: 0,
+      failed: 0,
+      releases: [],
+      errors: [],
     });
     mockTxLimit.mockResolvedValue([makeProfile()]);
   });
@@ -356,6 +390,52 @@ describe('musicfetch-enrichment', () => {
       ).rejects.toThrow('MusicFetch API error: 500');
     });
 
+    it('re-throws on 429 response (rate-limited, should retry)', async () => {
+      mockFetchArtistBySpotifyUrl.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch local/global rate limit exceeded',
+          429,
+          60
+        )
+      );
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await expect(
+        processMusicFetchEnrichmentJob(
+          mockTx as unknown as Parameters<
+            typeof processMusicFetchEnrichmentJob
+          >[0],
+          makePayload()
+        )
+      ).rejects.toThrow('MusicFetch local/global rate limit exceeded');
+    });
+
+    it('re-throws on budget exhaustion (should retry later)', async () => {
+      mockFetchArtistBySpotifyUrl.mockRejectedValue(
+        new MusicfetchBudgetExceededError(
+          'MusicFetch daily hard budget exhausted',
+          'daily',
+          3600
+        )
+      );
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await expect(
+        processMusicFetchEnrichmentJob(
+          mockTx as unknown as Parameters<
+            typeof processMusicFetchEnrichmentJob
+          >[0],
+          makePayload()
+        )
+      ).rejects.toThrow('MusicFetch daily hard budget exhausted');
+    });
+
     it('maps DSP fields from MusicFetch to profile when all fields are null', async () => {
       const musicFetchResult = makeMusicFetchResult();
       mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
@@ -456,6 +536,31 @@ describe('musicfetch-enrichment', () => {
             // instagram and tiktok are category 'video', not included in streaming link mappings
           ]),
         })
+      );
+    });
+
+    it('imports Spotify releases without cross-platform discovery fan-out', async () => {
+      const musicFetchResult = makeMusicFetchResult();
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({ spotifyId: 'artist-spotify-id' }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      expect(mockImportReleasesFromSpotify).toHaveBeenCalledWith(
+        '550e8400-e29b-41d4-a716-446655440000',
+        'artist-spotify-id',
+        { discoverLinks: false }
       );
     });
 

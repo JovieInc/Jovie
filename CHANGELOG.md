@@ -6,22 +6,155 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.13] - 2026-03-19
+## [26.4.19] - 2026-03-19
 
 ### Added
 
-- Music-first dashboard: hero card showing recent releases with album art carousel and import status
-- AI-powered insight one-liner on dashboard (e.g., "3 people viewed your profile today")
-- Smart action cards that adapt based on profile state (Venmo setup, Shopify connect, share profile)
-- Lightweight `/api/dashboard/recent-releases` endpoint for dashboard hero card
-- `useRecentReleasesQuery` TanStack Query hook for client-side release data
-- Chat overlay mode: dashboard is the default view, chat activates on input focus (Spotlight model)
-- DSP match suggestions carousel relocated to Music tab in right drawer
+- Performance budget for releases page (`/app/dashboard/releases`) with Gmail-rule targets: 500ms skeleton-to-content, 1500ms FCP/TTFB
+- Authenticated route support in perf guard script: Clerk session cookie injection via `CLERK_SESSION_COOKIE` env or `.auth/session.json`
+- Custom skeleton-to-content timing metric: measures time from navigation to `[data-testid="releases-loading"]` disappearing
+- Browser warm-up in perf guard to eliminate Playwright launch overhead from measurements
 
 ### Changed
 
-- Dashboard center panel redesigned from chat-first to music-first layout
-- Chat suggestions cleaned up: removed "Set up a link" and "How do I get paid?", added "Write me a bio" and "Show my top insights"
+- Releases page now uses Suspense streaming: auth gate blocks navigation, all data fetches fire in parallel inside a Suspense boundary (eliminates sequential waterfall)
+- Removed duplicate `ReleasesClientBoundary` wrapper from `ReleasesContent` component
+
+## [26.4.18] - 2026-03-19
+
+### Added
+
+- Server-side pixel forwarding to Facebook CAPI, Google Measurement Protocol, and TikTok Events API with consent gating and retry logic
+- Pixel health monitoring API with per-platform health status (healthy/degraded/unhealthy/inactive)
+- Manual test event button to verify pixel credentials from the dashboard
+- First-touch conversion attribution: tracks which retargeting platform drove each subscriber
+- IP purge cron job: deletes raw IPs after 48 hours, retains hashed IPs for analytics
+- Pixel forwarding retry cron with exponential backoff (5 retries, max 3h) and dead-lettering
+- Unit tests for anonymizeIp, deriveAttributionSource, computeHealthStatus, parseConsentCookie, and forwarding orchestration
+- Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
+- Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
+- `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
+- End-of-workflow summary shows count of auto-resolved vs asked decisions
+
+### Changed
+
+- Pixel health endpoint now uses SQL aggregation instead of loading all events into memory
+- Replaced `drizzleSql.raw()` with safe parameterized query in IP purge cron
+- Deduplicated `NO_STORE_HEADERS` constant across 5 route files (now imports from shared module)
+- Added `retryCount` column to pixel_events for accurate dead-letter tracking
+- Added partial index on pixel_events for efficient IP purge queries
+- Attribution endpoint now requires Pro plan entitlement (consistent with all other pixel APIs)
+
+### Fixed
+
+- Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
+- Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
+- Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
+- AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
+- Pricing headline: "Get live for free. Grow when you're ready"
+- Final CTA: "Every day without Jovie is fans you'll never see again"
+- Meta title, description, and structured data updated to match new positioning
+- Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
+- Added persistent "Claim your handle" ghost button during dashboard animation
+- Mobile dashboard uses stacked row layout for full smart link URL visibility
+
+## [26.4.17] - 2026-03-19
+
+### Added
+
+- Demo account seed scripts: `setup-demo-user.ts` (Clerk user creation) and `seed-demo-account.ts` (comprehensive DB seeding)
+- Seeds 18 entity types with realistic data: profile, releases, social links, tour dates, subscribers (150), audience (200), tips (30), clicks (500+), profile views (90 days), contacts, inbox threads (8), AI insights, chat history, referrals, email engagement, pre-save tokens, DSP matches
+- Hockey-stick date distributions for convincing growth narrative on sales calls
+- Realistic fan names, heartfelt tip messages, and authentic email bodies for inbox threads
+- Production safety: `--allow-production` flag required for live Clerk keys
+- Username reservation: script aborts if `timwhite` username belongs to a different user
+- Hardcoded fallback profile data so script works without `/tim` in the database
+- Idempotent re-runs with delete-then-insert and batch inserts
+- Shareable celebration card: Spotify Wrapped-style card auto-generated for each artist profile, with feed (1080x1080) and story (1080x1920) sizes, download + share buttons in the post-onboarding celebration screen
+- Shared `profileCardLayout` function: DRY layout used by both OG images and celebration cards
+- Re-enrichment script: one-off script to enqueue MusicFetch enrichment jobs for all existing artists with dedup safety
+- `genres` field on `CreatorProfile` interface for Artist type removal phase 1
+
+### Fixed
+
+- `convertCreatorProfileToArtist` now passes through `venmoHandle` and `genres` (previously silently dropped)
+- Celebration screen auto-advance timer cancels on user interaction (prevents mid-download dismissal)
+
+### Changed
+
+- Refactored `opengraph-image.tsx` to use shared `profileCardLayout` instead of inline JSX (net -120 lines)
+- Cleaned up TODOS.md: removed completed items (re-enrichment, social card) and duplicate win-back email entry
+
+## [26.4.18] - 2026-03-19
+
+### Changed
+
+- CHANGELOG.md now uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs
+- Version bumping and changelog generation handled entirely by `/ship` workflow — removed standalone `version:bump` and `changelog:generate` scripts
+
+### Removed
+
+- `scripts/generate-changelog.mjs` — AI changelog rewriting script (superseded by `/ship` inline generation)
+- `scripts/version-bump.mjs` — standalone version bump script (superseded by `/ship` workflow)
+- `pnpm version:bump` and `pnpm changelog:generate` commands from package.json
+- `getUnreleased`, `hasUnreleasedEntries`, `replaceUnreleased` from changelog parser (only used by removed scripts)
+- `[Unreleased]` section requirement from version-check validation
+### Fixed
+
+- Admin creator table: UUID validation on all profileId inputs (single and bulk operations)
+- Admin creator table: email send failure during verification no longer crashes the action
+- Admin creator table: self-deletion prevention — admins cannot delete their own account
+- Admin creator table: double-delete guard rejects re-deleting already soft-deleted users
+- Admin creator table: cache invalidation added to delete and marketing toggle actions
+- Admin creator table: JSON.parse wrapped in try-catch for bulk operation payloads
+- Payload parsers: UUID validation and whitespace-only profileId rejection
+
+## [26.4.15] - 2026-03-19
+
+### Removed
+
+- AI-generated dashboard components: MusicImportHero, InsightOneLiner, SmartActionCards, and recent-releases API — AI slop adding complexity without user value
+- 3-state chat (dashboard/chatActive/chat) simplified to 2-state (empty/chat) — removes confusing intermediate state
+- Wordy error boundary messages replaced with concise default
+- Verbose modal/dialog copy trimmed across feedback, growth access, and cookie modals
+- Inline styles in CookieModal replaced with Tailwind classes and Button component
+
+### Changed
+
+- CI: unit tests now gate PR merges — runs on PRs and merge queue, not just post-merge on main
+- Chat prompts restored to practical defaults: "Change profile photo", "Set up a link", "How do I get paid?"
+- SuggestedProfilesCarousel relocated from sidebar to chat empty state
+- Pagination buttons use conditional rendering instead of disabled links to "#"
+
+### Fixed
+
+- DSP match status validated against allowlist (was unchecked type cast)
+- MusicFetch enrichment: removed duplicate complete-status call
+- MusicFetch enrichment: transient errors no longer pre-mark job as failed before retry
+- Feedback modal shows toast on failure instead of faking success
+
+## [26.4.14] - 2026-03-19
+
+### Fixed
+
+- Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
+- Added "Delete account" link to user profile menu with destructive styling
+- Added direct `/app/settings/delete-account` route for deep-linking
+- Backend cleanup expanded: preSaveTokens, feedbackItems, and emailSuppressions now explicitly deleted on account deletion (previously orphaned with null userId)
+- Added 7 unit tests for the account deletion API route
+- Changelog verify and unsubscribe routes now return friendly HTML error pages instead of raw 500s on DB failures
+- Removed dead bot-detection stubs (checkMetaASN, checkRateLimit, isSuspiciousRequest) that shadowed real implementations
+
+### Removed
+
+- Deleted unauthenticated `/api/waitlist-debug` endpoint and its tests
+- Removed unused domain-categorizer functions (addSensitiveDomain, containsSensitiveKeywords, sanitizeForCrawlers, getAllSensitiveDomains)
+
+## [26.4.13] - 2026-03-19
+
+### Changed
+
 - Cookie consent banner now only appears in jurisdictions where legally required: EU/EEA, UK, Brazil (LGPD), South Korea (PIPA), US privacy states (CA, CO, VA, CT, UT), and Quebec (Law 25)
 - Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
 - When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)

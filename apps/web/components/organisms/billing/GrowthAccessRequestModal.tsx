@@ -88,9 +88,7 @@ export function GrowthAccessRequestModal({
             Growth is in early access
           </DialogTitle>
           <DialogDescription className='text-center'>
-            We&apos;re building Growth features based on artist feedback. Tell
-            us what you&apos;re most excited about and we&apos;ll prioritize
-            accordingly.
+            Growth is coming soon. What matters most to you?
           </DialogDescription>
 
           <DialogBody>

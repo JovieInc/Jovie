@@ -41,6 +41,7 @@ export const APP_ROUTES = {
   SETTINGS_AUDIENCE: '/app/settings/audience',
   SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
   SETTINGS_ADMIN: '/app/settings/admin',
+  SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
   // Admin
   ADMIN: '/app/admin',

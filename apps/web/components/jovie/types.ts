@@ -166,15 +166,9 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
-    icon: 'Pencil',
-    label: 'Write me a bio',
-    prompt: 'Write me an artist bio.',
-    accent: 'blue',
-  },
-  {
-    icon: 'Sparkles',
-    label: 'Show my top insights',
-    prompt: 'Show me my top insights.',
+    icon: 'Camera',
+    label: 'Change profile photo',
+    prompt: 'Help me change my profile photo.',
     accent: 'purple',
   },
 ] as const;
@@ -192,9 +186,21 @@ export const FEEDBACK_SUGGESTION: ChatSuggestion = {
 
 export const FIRST_SESSION_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Link2',
+    label: 'Set up a link for my latest release',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
+  },
+  {
     icon: 'Eye',
     label: 'Preview my profile',
     prompt: 'Preview my profile.',
     accent: 'purple',
+  },
+  {
+    icon: 'DollarSign',
+    label: 'How do I get paid?',
+    prompt: 'How do I get paid?',
+    accent: 'green',
   },
 ] as const;

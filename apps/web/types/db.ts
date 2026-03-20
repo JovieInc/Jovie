@@ -487,6 +487,7 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     deezerId: profile.deezer_id,
     tidalId: profile.tidal_id,
     soundcloudId: profile.soundcloud_id,
+    venmoHandle: profile.venmo_handle,
     location: profile.location,
     activeSinceYear: profile.active_since_year,
     genres: profile.genres,

@@ -175,8 +175,6 @@ export const queryKeys = {
   // Releases queries
   releases: {
     all: ['releases'] as const,
-    recent: (profileId: string) =>
-      [...queryKeys.releases.all, 'recent', profileId] as const,
     matrix: (profileId: string) =>
       [...queryKeys.releases.all, 'matrix', profileId] as const,
     tracks: (releaseId: string) =>
@@ -309,6 +307,7 @@ export const queryKeys = {
   pixels: {
     all: ['pixels'] as const,
     settings: () => [...queryKeys.pixels.all, 'settings'] as const,
+    health: () => [...queryKeys.pixels.all, 'health'] as const,
   },
 
   // Earnings / tipping data

@@ -48,47 +48,58 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [subscriber] = await db
-    .select()
-    .from(productUpdateSubscribers)
-    .where(
-      and(
-        eq(productUpdateSubscribers.verificationToken, token),
-        gt(productUpdateSubscribers.tokenExpiresAt, new Date())
+  try {
+    const [subscriber] = await db
+      .select()
+      .from(productUpdateSubscribers)
+      .where(
+        and(
+          eq(productUpdateSubscribers.verificationToken, token),
+          gt(productUpdateSubscribers.tokenExpiresAt, new Date())
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!subscriber) {
+    if (!subscriber) {
+      return new NextResponse(
+        htmlPage(
+          'Link expired',
+          'This verification link has expired or was already used. Please subscribe again.',
+          {
+            text: 'Resubscribe',
+            href: `${APP_URL}/changelog#changelog-subscribe`,
+          }
+        ),
+        { status: 410, headers: { 'Content-Type': 'text/html' } }
+      );
+    }
+
+    await db
+      .update(productUpdateSubscribers)
+      .set({
+        verified: true,
+        verificationToken: null,
+        tokenExpiresAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(productUpdateSubscribers.id, subscriber.id));
+
     return new NextResponse(
       htmlPage(
-        'Link expired',
-        'This verification link has expired or was already used. Please subscribe again.',
-        {
-          text: 'Resubscribe',
-          href: `${APP_URL}/changelog#changelog-subscribe`,
-        }
+        "You're subscribed!",
+        `You'll receive an email whenever we ship something new at ${APP_NAME}. Welcome aboard.`,
+        { text: "See what's new", href: `${APP_URL}/changelog` }
       ),
-      { status: 410, headers: { 'Content-Type': 'text/html' } }
+      { status: 200, headers: { 'Content-Type': 'text/html' } }
+    );
+  } catch {
+    return new NextResponse(
+      htmlPage(
+        'Something went wrong',
+        'We couldn\u2019t verify your subscription right now. Please try again later.',
+        { text: 'Go to changelog', href: `${APP_URL}/changelog` }
+      ),
+      { status: 500, headers: { 'Content-Type': 'text/html' } }
     );
   }
-
-  await db
-    .update(productUpdateSubscribers)
-    .set({
-      verified: true,
-      verificationToken: null,
-      tokenExpiresAt: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(productUpdateSubscribers.id, subscriber.id));
-
-  return new NextResponse(
-    htmlPage(
-      "You're subscribed!",
-      `You'll receive an email whenever we ship something new at ${APP_NAME}. Welcome aboard.`,
-      { text: "See what's new", href: `${APP_URL}/changelog` }
-    ),
-    { status: 200, headers: { 'Content-Type': 'text/html' } }
-  );
 }

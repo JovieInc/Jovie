@@ -180,7 +180,10 @@ async function importDiscography(
   try {
     const importResult = await importReleasesFromSpotify(
       creatorProfileId,
-      spotifyId
+      spotifyId,
+      {
+        discoverLinks: false,
+      }
     );
     result.releasesImported = importResult.imported;
     result.releasesFailed = importResult.failed;
@@ -290,7 +293,6 @@ export async function processMusicFetchEnrichmentJob(
       return result;
     }
     // Transient errors (5xx, timeout, network) — re-throw to trigger retry
-    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
     throw error;
   }
 
@@ -326,9 +328,6 @@ export async function processMusicFetchEnrichmentJob(
     creatorProfileId,
     result
   );
-
-  // Mark enrichment as complete
-  await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');
 
   // Mark enrichment as complete
   await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'complete');

@@ -33,7 +33,17 @@ export async function GET(request: Request) {
     // Parse query params
     const { searchParams } = new URL(request.url);
     const profileId = searchParams.get('profileId');
-    const statusFilter = searchParams.get('status') as DspMatchStatus | null;
+    const DSP_MATCH_STATUSES: ReadonlySet<string> = new Set([
+      'suggested',
+      'confirmed',
+      'rejected',
+      'auto_confirmed',
+    ]);
+    const rawStatus = searchParams.get('status');
+    const statusFilter =
+      rawStatus && DSP_MATCH_STATUSES.has(rawStatus)
+        ? (rawStatus as DspMatchStatus)
+        : null;
 
     if (!profileId) {
       return NextResponse.json(

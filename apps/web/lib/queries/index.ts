@@ -385,6 +385,12 @@ export {
   useUpdateSubscriberNameMutation,
   useVerifyEmailOtpMutation,
 } from './useNotificationStatusQuery';
+// Pixel health query
+export {
+  type PixelHealthData,
+  type PlatformHealth,
+  usePixelHealthQuery,
+} from './usePixelHealthQuery';
 export {
   type PixelSettingsInput,
   type PixelSettingsResponse,
@@ -424,11 +430,6 @@ export {
 } from './usePublicProfileQuery';
 // QR code download mutation
 export { useQrCodeDownloadMutation } from './useQrCodeDownloadMutation';
-// Recent releases query (dashboard hero card)
-export {
-  type RecentRelease,
-  useRecentReleasesQuery,
-} from './useRecentReleasesQuery';
 export {
   useFormatReleaseLyricsMutation,
   useRefreshReleaseMutation,

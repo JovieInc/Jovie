@@ -144,8 +144,6 @@ interface ChatInputProps {
   readonly onRemoveImage?: (id: string) => void;
   /** Handle paste events for image content */
   readonly onPaste?: (e: React.ClipboardEvent) => void;
-  /** Called when the input receives focus */
-  readonly onFocus?: () => void;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -163,7 +161,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       pendingImages,
       onRemoveImage,
       onPaste,
-      onFocus,
     },
     ref
   ) {
@@ -282,7 +279,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               ref={ref}
               value={value}
               onChange={e => onChange(e.target.value)}
-              onFocus={onFocus}
               placeholder={placeholder}
               rows={1}
               className={cn(

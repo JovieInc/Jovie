@@ -47,44 +47,55 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const [subscriber] = await db
-    .select()
-    .from(productUpdateSubscribers)
-    .where(
-      and(
-        eq(productUpdateSubscribers.unsubscribeToken, token),
-        isNull(productUpdateSubscribers.unsubscribedAt)
+  try {
+    const [subscriber] = await db
+      .select()
+      .from(productUpdateSubscribers)
+      .where(
+        and(
+          eq(productUpdateSubscribers.unsubscribeToken, token),
+          isNull(productUpdateSubscribers.unsubscribedAt)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!subscriber) {
+    if (!subscriber) {
+      return new NextResponse(
+        htmlPage(
+          'Already unsubscribed',
+          "You've already been unsubscribed from product updates.",
+          { text: 'Go to homepage', href: APP_URL }
+        ),
+        { status: 200, headers: { 'Content-Type': 'text/html' } }
+      );
+    }
+
+    await db
+      .update(productUpdateSubscribers)
+      .set({
+        unsubscribedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(productUpdateSubscribers.id, subscriber.id));
+
     return new NextResponse(
       htmlPage(
-        'Already unsubscribed',
-        "You've already been unsubscribed from product updates.",
+        'Unsubscribed',
+        "You've been unsubscribed from product updates. You won't receive any more emails from us.",
         { text: 'Go to homepage', href: APP_URL }
       ),
       { status: 200, headers: { 'Content-Type': 'text/html' } }
     );
+  } catch {
+    return new NextResponse(
+      htmlPage(
+        'Something went wrong',
+        'We couldn\u2019t process your unsubscribe request right now. Please try again later.',
+        { text: 'Go to homepage', href: APP_URL }
+      ),
+      { status: 500, headers: { 'Content-Type': 'text/html' } }
+    );
   }
-
-  await db
-    .update(productUpdateSubscribers)
-    .set({
-      unsubscribedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(productUpdateSubscribers.id, subscriber.id));
-
-  return new NextResponse(
-    htmlPage(
-      'Unsubscribed',
-      "You've been unsubscribed from product updates. You won't receive any more emails from us.",
-      { text: 'Go to homepage', href: APP_URL }
-    ),
-    { status: 200, headers: { 'Content-Type': 'text/html' } }
-  );
 }
 
 // RFC 8058: Support POST for one-click unsubscribe
