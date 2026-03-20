@@ -41,6 +41,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Server-side pixel forwarding to Facebook CAPI, Google Measurement Protocol, and TikTok Events API with consent gating and retry logic
+- Pixel health monitoring API with per-platform health status (healthy/degraded/unhealthy/inactive)
+- Manual test event button to verify pixel credentials from the dashboard
+- First-touch conversion attribution: tracks which retargeting platform drove each subscriber
+- IP purge cron job: deletes raw IPs after 48 hours, retains hashed IPs for analytics
+- Pixel forwarding retry cron with exponential backoff (5 retries, max 3h) and dead-lettering
+- Unit tests for anonymizeIp, deriveAttributionSource, computeHealthStatus, parseConsentCookie, and forwarding orchestration
 - Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
 - Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
 - `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
@@ -48,6 +55,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Pixel health endpoint now uses SQL aggregation instead of loading all events into memory
+- Replaced `drizzleSql.raw()` with safe parameterized query in IP purge cron
+- Deduplicated `NO_STORE_HEADERS` constant across 5 route files (now imports from shared module)
+- Added `retryCount` column to pixel_events for accurate dead-letter tracking
+- Added partial index on pixel_events for efficient IP purge queries
+- Attribution endpoint now requires Pro plan entitlement (consistent with all other pixel APIs)
+
+### Fixed
+
+- Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
+- Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
 - Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
 - Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
 - AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
@@ -57,6 +75,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
 - Added persistent "Claim your handle" ghost button during dashboard animation
 - Mobile dashboard uses stacked row layout for full smart link URL visibility
+- Onboarding checkout intercept: all users completing onboarding now see an upgrade page (gated by `ONBOARDING_CHECKOUT_STEP` feature flag)
+- Smart plan recommendation: Spotify followers determine suggested tier (Pro for <10K, Growth for 10K+)
+- Personalized checkout hint for organic users with their jov.ie handle
+- Founding member urgency callout with accent-tinted card
+- Annual billing pre-selected when savings exceed 25%
+- `&source=intent|organic` query param to disambiguate paid intent from organic upsell
+- Post-upgrade celebration: onboarding upgraders see "Your profile is live — and upgraded!" on the billing success page
+- Analytics segmentation via `intent_source` on checkout events
+
+### Changed
+
+- Skip button copy: "Start free, upgrade anytime" for organic users (was "Continue with Free")
+- Billing success page CTA: "Explore your dashboard" for onboarding upgraders
 
 ## [26.4.17] - 2026-03-19
 

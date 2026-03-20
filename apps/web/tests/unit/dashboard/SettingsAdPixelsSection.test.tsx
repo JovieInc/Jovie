@@ -94,6 +94,11 @@ vi.mock('@/lib/queries', () => ({
     isPending: false,
   }),
   usePixelSettingsQuery: usePixelSettingsQueryMock,
+  usePixelHealthQuery: () => ({
+    data: null,
+    isLoading: false,
+    isError: false,
+  }),
 }));
 
 describe('SettingsAdPixelsSection', () => {

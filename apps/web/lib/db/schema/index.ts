@@ -319,6 +319,25 @@ export {
   selectAiInsightSchema,
   selectInsightGenerationRunSchema,
 } from './insights';
+// Investor Portal (investors.jov.ie)
+export {
+  type InvestorLink,
+  type InvestorSettings,
+  type InvestorView,
+  insertInvestorLinkSchema,
+  insertInvestorSettingsSchema,
+  insertInvestorViewSchema,
+  investorLinks,
+  investorSettings,
+  investorStageEnum,
+  investorViews,
+  type NewInvestorLink,
+  type NewInvestorSettings,
+  type NewInvestorView,
+  selectInvestorLinkSchema,
+  selectInvestorSettingsSchema,
+  selectInvestorViewSchema,
+} from './investors';
 // Leads (Discovery Pipeline)
 export {
   type DiscoveryKeyword,
@@ -337,7 +356,6 @@ export {
   selectLeadPipelineSettingsSchema,
   selectLeadSchema,
 } from './leads';
-
 // Links (Social, Wrapped, Signed)
 export {
   type DashboardIdempotencyKey,
@@ -364,7 +382,6 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
-
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
@@ -380,7 +397,6 @@ export {
   selectCreatorPixelSchema,
   selectPixelEventSchema,
 } from './pixels';
-
 // Pre-save campaigns (Spotify, Apple Music)
 export {
   type NewPreSaveToken,

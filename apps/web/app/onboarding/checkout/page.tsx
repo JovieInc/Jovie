@@ -6,13 +6,16 @@ import { AuthLayout } from '@/features/auth';
 import { resolveUserState, UserState } from '@/lib/auth/gate';
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
 import {
+  DEFAULT_UPSELL_PLAN,
   getPlanIntentFromCookies,
   isPaidIntent,
+  recommendPlan,
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { PRICING } from '@/lib/config/pricing';
 import { checkGate } from '@/lib/feature-flags/server';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { isGrowthPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -83,31 +86,28 @@ export default async function OnboardingCheckoutPage({
   }
 
   // Read plan intent from cookie, falling back to ?plan= query param
-  // (handles browsers where cookies are blocked but sessionStorage worked client-side)
   const cookieStore = await cookies();
   const cookieHeader = cookieStore
     .getAll()
     .map(c => `${c.name}=${c.value}`)
     .join('; ');
-  let planIntent = getPlanIntentFromCookies(cookieHeader);
+  let planIntent: PlanIntentTier | null =
+    getPlanIntentFromCookies(cookieHeader);
 
+  const params = await searchParams;
   if (!planIntent) {
-    const params = await searchParams;
     const planParam = typeof params.plan === 'string' ? params.plan : null;
     planIntent = validatePlan(planParam);
   }
 
-  // No paid intent — go to dashboard
+  // Determine if this is an organic upsell vs explicit paid intent
+  // source= query param is authoritative (set by navigateAfterOnboarding)
+  const sourceParam = typeof params.source === 'string' ? params.source : null;
+  const isDefaultUpsell = sourceParam !== 'intent';
+
+  // If no paid intent, temporarily default to pro (may be overridden by recommendPlan below)
   if (!planIntent || !isPaidIntent(planIntent)) {
-    redirect(APP_ROUTES.DASHBOARD);
-  }
-
-  // Resolve Stripe price IDs server-side (secure — never exposed as raw env vars)
-  const pricing = resolvePriceIds(planIntent);
-
-  if (!pricing.monthlyPriceId) {
-    // Price not configured — skip to dashboard
-    redirect(APP_ROUTES.DASHBOARD);
+    planIntent = DEFAULT_UPSELL_PLAN;
   }
 
   // Get profile data for the value preview
@@ -141,6 +141,28 @@ export default async function OnboardingCheckoutPage({
     // Profile load failed — proceed with empty data
   }
 
+  // Smart plan recommendation only for organic users with no expressed paid intent.
+  // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
+  // with recommendPlan. Also fall back to pro if Growth plan is disabled.
+  const hadPaidIntentFromCookie = isPaidIntent(
+    getPlanIntentFromCookies(cookieHeader)
+  );
+  if (isDefaultUpsell && !hadPaidIntentFromCookie) {
+    let recommended = recommendPlan(profileData.spotifyFollowers);
+    if (recommended === 'growth' && !isGrowthPlanEnabled()) {
+      recommended = DEFAULT_UPSELL_PLAN;
+    }
+    planIntent = recommended;
+  }
+
+  // Resolve Stripe price IDs server-side (secure — never exposed as raw env vars)
+  const pricing = resolvePriceIds(planIntent);
+
+  if (!pricing.monthlyPriceId) {
+    // Price not configured — skip to dashboard
+    redirect(APP_ROUTES.DASHBOARD);
+  }
+
   return (
     <AuthLayout
       formTitle='Upgrade your profile'
@@ -158,6 +180,7 @@ export default async function OnboardingCheckoutPage({
         username={profileData.username}
         avatarUrl={profileData.avatarUrl}
         spotifyFollowers={profileData.spotifyFollowers}
+        isDefaultUpsell={isDefaultUpsell}
       />
     </AuthLayout>
   );
