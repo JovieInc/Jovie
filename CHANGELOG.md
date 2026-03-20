@@ -33,8 +33,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Refactored `opengraph-image.tsx` to use shared `profileCardLayout` instead of inline JSX (net -120 lines)
 - Cleaned up TODOS.md: removed completed items (re-enrichment, social card) and duplicate win-back email entry
 
-## [26.4.16] - 2026-03-19
+## [26.4.18] - 2026-03-19
 
+### Changed
+
+- CHANGELOG.md now uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs
+- Version bumping and changelog generation handled entirely by `/ship` workflow — removed standalone `version:bump` and `changelog:generate` scripts
+
+### Removed
+
+- `scripts/generate-changelog.mjs` — AI changelog rewriting script (superseded by `/ship` inline generation)
+- `scripts/version-bump.mjs` — standalone version bump script (superseded by `/ship` workflow)
+- `pnpm version:bump` and `pnpm changelog:generate` commands from package.json
+- `getUnreleased`, `hasUnreleasedEntries`, `replaceUnreleased` from changelog parser (only used by removed scripts)
+- `[Unreleased]` section requirement from version-check validation
 ### Fixed
 
 - Admin creator table: UUID validation on all profileId inputs (single and bulk operations)

@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getLatestRelease,
-  getUnreleased,
-  hasUnreleasedEntries,
-  parseChangelog,
-  replaceUnreleased,
-} from '../changelog-parser.mjs';
+import { getLatestRelease, parseChangelog } from '../changelog-parser.mjs';
 
 const SAMPLE_CHANGELOG = `# Changelog
 
@@ -154,19 +148,6 @@ describe('parseChangelog', () => {
   });
 });
 
-describe('getUnreleased', () => {
-  it('returns raw unreleased content', () => {
-    const raw = getUnreleased(SAMPLE_CHANGELOG);
-    expect(raw).toContain('New dashboard widget');
-    expect(raw).toContain('Profile page loading speed');
-  });
-
-  it('returns empty string for empty unreleased', () => {
-    const raw = getUnreleased('## [Unreleased]\n\n## [1.0.0] - 2026-01-01\n');
-    expect(raw).toBe('');
-  });
-});
-
 describe('getLatestRelease', () => {
   it('returns the first release after unreleased', () => {
     const release = getLatestRelease(SAMPLE_CHANGELOG);
@@ -178,35 +159,5 @@ describe('getLatestRelease', () => {
   it('returns null when no releases exist', () => {
     const release = getLatestRelease('## [Unreleased]\n\n- Something\n');
     expect(release).toBeNull();
-  });
-});
-
-describe('replaceUnreleased', () => {
-  it('replaces unreleased content while preserving the rest', () => {
-    const newContent = '### Added\n\n- Replaced entry\n';
-    const result = replaceUnreleased(SAMPLE_CHANGELOG, newContent);
-
-    expect(result).toContain('## [Unreleased]');
-    expect(result).toContain('Replaced entry');
-    expect(result).not.toContain('New dashboard widget');
-    // Original releases should be preserved
-    expect(result).toContain('## [26.4.8]');
-    expect(result).toContain('Conductor workspace archive script');
-  });
-
-  it('throws if no [Unreleased] section exists', () => {
-    expect(() => replaceUnreleased('# Changelog\n', 'new stuff')).toThrow(
-      '[Unreleased]'
-    );
-  });
-});
-
-describe('hasUnreleasedEntries', () => {
-  it('returns true when there are entries', () => {
-    expect(hasUnreleasedEntries(SAMPLE_CHANGELOG)).toBe(true);
-  });
-
-  it('returns false when unreleased is empty template', () => {
-    expect(hasUnreleasedEntries(EMPTY_UNRELEASED)).toBe(false);
   });
 });
