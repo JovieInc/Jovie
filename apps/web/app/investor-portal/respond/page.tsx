@@ -23,9 +23,14 @@ export default async function InvestorRespondPage({
     notFound();
   }
 
-  // Validate token
+  // Validate token (active + not expired)
+  const now = new Date();
   const [link] = await db
-    .select({ id: investorLinks.id, stage: investorLinks.stage })
+    .select({
+      id: investorLinks.id,
+      stage: investorLinks.stage,
+      expiresAt: investorLinks.expiresAt,
+    })
     .from(investorLinks)
     .where(
       and(eq(investorLinks.token, token), eq(investorLinks.isActive, true))
@@ -33,6 +38,11 @@ export default async function InvestorRespondPage({
     .limit(1);
 
   if (!link) {
+    notFound();
+  }
+
+  // Reject expired tokens
+  if (link.expiresAt && new Date(link.expiresAt) < now) {
     notFound();
   }
 

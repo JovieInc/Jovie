@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { investorLinks, investorViews } from '@/lib/db/schema/investors';
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
           eq(investorViews.pagePath, pagePath)
         )
       )
-      .orderBy(investorViews.viewedAt)
+      .orderBy(desc(investorViews.viewedAt))
       .limit(1);
 
     if (latestView) {

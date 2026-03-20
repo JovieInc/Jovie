@@ -230,7 +230,8 @@ const INVESTOR_TOKEN_PARAM = 't';
  * Returns null if the request is NOT for the investor portal.
  */
 async function handleInvestorRequest(
-  req: NextRequest
+  req: NextRequest,
+  event?: NextFetchEvent
 ): Promise<NextResponse | null> {
   const hostname = req.nextUrl.hostname;
   const hostInfo = analyzeHost(hostname);
@@ -310,8 +311,12 @@ async function handleInvestorRequest(
   res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
   res.headers.set('Cache-Control', 'private, no-store');
 
-  // Fire-and-forget: record view (non-blocking)
-  recordInvestorView(tokenCookie, pathname, req).catch(() => {});
+  // Record view — use waitUntil for edge runtime reliability
+  if (event) {
+    event.waitUntil(recordInvestorView(tokenCookie, pathname, req));
+  } else {
+    await recordInvestorView(tokenCookie, pathname, req);
+  }
 
   return res;
 }
@@ -874,7 +879,7 @@ export default async function middleware(
   // Investor portal: handle before Clerk (no auth needed)
   // investors.jov.ie uses token-based access, not Clerk sessions
   // ========================================================================
-  const investorResponse = await handleInvestorRequest(req);
+  const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
 
   if (process.env.NODE_ENV === 'test') {

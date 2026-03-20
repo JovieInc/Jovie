@@ -71,5 +71,5 @@ CREATE INDEX IF NOT EXISTS "idx_investor_views_link_viewed" ON "investor_views" 
 
 -- Seed default settings row
 INSERT INTO "investor_settings" ("id", "show_progress_bar", "followup_enabled", "followup_delay_hours", "engaged_threshold")
-VALUES (gen_random_uuid(), false, false, 48, 50)
-ON CONFLICT DO NOTHING;
+VALUES ('00000000-0000-0000-0000-000000000001', false, false, 48, 50)
+ON CONFLICT (id) DO NOTHING;
