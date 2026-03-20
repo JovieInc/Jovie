@@ -1,5 +1,19 @@
 # TODOs
 
+## Project-level /ship override mechanism
+
+**What:** Create a project-level `/ship` override mechanism (e.g., `.claude/skills/overrides/ship.md`) that customizes the generic gstack `/ship` template (CalVer format, `version.json` instead of `VERSION` file) without forking the template — so gstack upgrades don't lose project customizations and new gstack features aren't blocked.
+
+**Why:** The gstack `/ship` Step 4 references a 4-digit `VERSION` file (`MAJOR.MINOR.PATCH.MICRO`) but this project uses CalVer `YY.M.PATCH` in `version.json`. Currently handled by AGENTS.md prose override, which is fragile and could confuse agents.
+
+**Context:** The mismatch is between the generic gstack ship template (designed for all repos) and Jovie's project-specific versioning. The ideal solution would be a composable override that gstack's template system reads automatically, so upgrading gstack doesn't clobber project customizations. Could be a `ship.project.md` file that gets included by the template, or a config-driven mechanism in gstack itself.
+
+**Effort:** M (human ~1 day / CC ~30 min)
+**Priority:** P3
+**Depends on:** Nothing blocking.
+
+---
+
 ## Wrong-artist detection + multi-candidate DSP matching
 
 **What:** Change `dsp_artist_matches` unique constraint from `(creator_profile_id, provider_id)` to `(creator_profile_id, provider_id, external_artist_id)`. Update the discovery job to store the top-2 candidates per provider (best = auto_confirmed/suggested, 2nd = suggested). Surface secondary candidates in the presence page with "X tracks matched this profile" context. Detect split catalogs (e.g. "400 tracks on one David Guetta Apple Music profile, 2 on another").
