@@ -8,6 +8,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.20] - 2026-03-19
 
+### Removed
+
+- "Delete account" button from the user dropdown menu — too easy to click accidentally. Delete account is still accessible via Settings > Data & Privacy.
 ### Added
 
 - Persistent audio playback with Now Playing card in sidebar footer — shows artwork, track title, artist/release info, play/pause controls, and progress bar
