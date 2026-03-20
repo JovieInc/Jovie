@@ -58,9 +58,9 @@ export async function LeadPipelineKpis() {
         <ContentSectionHeader
           title='Lead pipeline'
           subtitle='Discovery volume, qualification depth, and automation health'
-          className='px-5 py-3'
+          className='px-(--linear-app-header-padding-x) py-3'
         />
-        <div className='grid gap-4 px-5 py-4 pt-3 sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           <KpiItem
             title='TOTAL LEADS'
             value={String(kpis.total)}

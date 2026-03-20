@@ -4,6 +4,8 @@ import { Button, Textarea } from '@jovie/ui';
 import { Loader2, Upload } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useQueueLeadUrlsMutation } from '@/lib/queries';
 
 interface UnifiedUrlIntakeProps {
@@ -38,15 +40,13 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
   }
 
   return (
-    <section className='rounded-lg border border-subtle bg-surface-1 p-4 sm:p-6'>
-      <h2 className='text-sm font-semibold text-primary-token'>
-        Unified URL intake
-      </h2>
-      <p className='mt-1 text-xs text-secondary-token'>
-        Paste Linktree, Spotify, Instagram, Apple Music, or website URLs. The
-        pipeline classifies and queues them in one place.
-      </p>
-      <div className='mt-3 space-y-3'>
+    <ContentSurfaceCard className='overflow-hidden'>
+      <ContentSectionHeader
+        title='Unified URL intake'
+        subtitle='Paste Linktree, Spotify, Instagram, Apple Music, or site URLs for one shared queue.'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+      />
+      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
         <Textarea
           rows={5}
           value={input}
@@ -67,6 +67,6 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
           Queue URLs
         </Button>
       </div>
-    </section>
+    </ContentSurfaceCard>
   );
 }

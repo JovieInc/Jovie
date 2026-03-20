@@ -66,10 +66,15 @@ function CampaignSection({
         title={title}
         subtitle={subtitle}
         actions={actions}
-        className='min-h-0 px-5 py-3'
+        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         actionsClassName='w-auto shrink-0'
       />
-      <div className={cn('space-y-4 px-5 py-4 pt-3', bodyClassName)}>
+      <div
+        className={cn(
+          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          bodyClassName
+        )}
+      >
         {children}
       </div>
     </ContentSurfaceCard>
@@ -100,7 +105,7 @@ function CampaignCallout({
   return (
     <div
       className={cn(
-        'flex items-start gap-2 rounded-lg border px-4 py-3',
+        'flex items-start gap-2 rounded-[10px] border px-4 py-3',
         toneClassName,
         className
       )}
@@ -141,7 +146,7 @@ function CampaignDataTable({
   children: ReactNode;
 }>) {
   return (
-    <div className='overflow-hidden rounded-lg bg-surface-0'>
+    <div className='overflow-hidden rounded-[12px] border border-subtle bg-surface-0'>
       <table className='w-full text-sm'>{children}</table>
     </div>
   );
@@ -153,7 +158,7 @@ function CampaignTableHeaderCell({
   children: ReactNode;
 }>) {
   return (
-    <th className='px-4 py-2 text-left text-[13px] font-[560] tracking-normal text-secondary-token'>
+    <th className='px-4 py-2.5 text-left text-[12px] font-[560] tracking-normal text-secondary-token'>
       {children}
     </th>
   );
@@ -167,7 +172,7 @@ function CampaignTableCell({
   className?: string;
 }>) {
   return (
-    <td className={cn('px-4 py-2 text-secondary-token', className)}>
+    <td className={cn('px-4 py-2.5 text-secondary-token', className)}>
       {children}
     </td>
   );
@@ -258,7 +263,7 @@ export function InviteCampaignManager() {
     (stats?.jobQueue?.processing ?? 0) > 0;
 
   return (
-    <div className='space-y-8' data-testid='admin-campaigns-content'>
+    <div className='space-y-4' data-testid='admin-campaigns-content'>
       <CampaignSection
         title='Campaign Results'
         subtitle='Live invite throughput and conversion outcomes'
@@ -273,7 +278,7 @@ export function InviteCampaignManager() {
         }
       >
         {stats && (
-          <div className='grid gap-4 md:grid-cols-3 lg:grid-cols-6'>
+          <div className='grid gap-3 md:grid-cols-3 lg:grid-cols-6'>
             <CampaignMetric
               label='Total Invites'
               value={stats.campaign.total}
@@ -326,7 +331,7 @@ export function InviteCampaignManager() {
             />
           }
         >
-          <div className='grid gap-4 md:grid-cols-4'>
+          <div className='grid gap-3 md:grid-cols-4'>
             <CampaignMetric
               label='Jobs Pending'
               value={stats.jobQueue.pending}
@@ -388,7 +393,7 @@ export function InviteCampaignManager() {
         title='Claim Funnel'
         subtitle='Invite-to-claim performance across recent sends'
       >
-        <div className='grid gap-4 md:grid-cols-4'>
+        <div className='grid gap-3 md:grid-cols-4'>
           <CampaignMetric
             label='Invites sent'
             value={campaignOverview?.invites.sent ?? 0}
@@ -500,7 +505,7 @@ export function InviteCampaignManager() {
         {preview && (
           <div className='space-y-4'>
             {/* Stats */}
-            <div className='grid gap-4 md:grid-cols-3'>
+            <div className='grid gap-3 md:grid-cols-3'>
               <CampaignMetric
                 label='Total eligible'
                 value={preview.totalEligible}
