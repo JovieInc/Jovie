@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { neonConfig, Pool, type PoolClient } from '@neondatabase/serverless';
 import { execSync } from 'child_process';
 import { config } from 'dotenv';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 import { existsSync, readFileSync } from 'fs';
@@ -41,6 +42,70 @@ const migrationsJournalPath = path.join(migrationsDir, 'meta', '_journal.json');
 
 type DrizzleMigrationsSchema = 'drizzle' | 'public';
 type JournalEntry = { idx: number; tag: string; when: number };
+type LoadedMigration = {
+  tag: string;
+  sql: string[];
+  folderMillis: number;
+  hash: string;
+};
+type MigrationPlan =
+  | { mode: 'noop'; boundaryMigrations: LoadedMigration[]; remainingCount: 0 }
+  | {
+      mode: 'batch';
+      boundaryMigrations: LoadedMigration[];
+      remainingCount: number;
+    }
+  | {
+      mode: 'boundary-then-batch';
+      boundaryMigrations: LoadedMigration[];
+      remainingCount: number;
+    }
+  | {
+      mode: 'boundary-only';
+      boundaryMigrations: LoadedMigration[];
+      remainingCount: 0;
+    };
+
+const COMMIT_BOUNDARY_AFTER = new Set([
+  '0078_add_recordings_and_release_tracks',
+]);
+
+function planMigrationExecution(
+  pendingMigrations: LoadedMigration[]
+): MigrationPlan {
+  if (pendingMigrations.length === 0) {
+    return { mode: 'noop', boundaryMigrations: [], remainingCount: 0 };
+  }
+
+  const boundaryIndex = pendingMigrations.findIndex(migration =>
+    COMMIT_BOUNDARY_AFTER.has(migration.tag)
+  );
+
+  if (boundaryIndex === -1) {
+    return {
+      mode: 'batch',
+      boundaryMigrations: [],
+      remainingCount: pendingMigrations.length,
+    };
+  }
+
+  const boundaryMigrations = pendingMigrations.slice(0, boundaryIndex + 1);
+  const remainingCount = pendingMigrations.length - boundaryMigrations.length;
+
+  if (remainingCount === 0) {
+    return {
+      mode: 'boundary-only',
+      boundaryMigrations,
+      remainingCount: 0,
+    };
+  }
+
+  return {
+    mode: 'boundary-then-batch',
+    boundaryMigrations,
+    remainingCount,
+  };
+}
 
 // ANSI color codes for terminal output
 const colors = {
@@ -234,6 +299,7 @@ async function runMigrations() {
   let db: Parameters<typeof migrate>[0];
   let client: PoolClient | null = null;
   let migrationsSchema: DrizzleMigrationsSchema = 'drizzle';
+  const migrationsTable = '__drizzle_migrations';
 
   try {
     log.info('Connecting to database...');
@@ -246,7 +312,6 @@ async function runMigrations() {
 
     client = await pool.connect();
     await client.query("SET app.allow_schema_changes = 'true'");
-
     db = drizzle(client);
 
     // Using default public schema
@@ -478,6 +543,81 @@ async function runMigrations() {
     log.success('Bootstrapped drizzle migration history');
   }
 
+  function loadMigrations(): LoadedMigration[] {
+    const journal = JSON.parse(readFileSync(migrationsJournalPath, 'utf8')) as {
+      entries?: JournalEntry[];
+    };
+
+    return readMigrationFiles({ migrationsFolder: migrationsDir }).map(
+      (migration, index) => ({
+        tag: journal.entries?.[index]?.tag ?? `migration_${index}`,
+        sql: migration.sql,
+        folderMillis: migration.folderMillis,
+        hash: migration.hash,
+      })
+    );
+  }
+
+  async function getPendingMigrations(): Promise<LoadedMigration[]> {
+    const activeClient = client;
+    if (!activeClient) {
+      throw new Error('Migration client not initialized');
+    }
+
+    const migrationsTableRef = `"${migrationsSchema}"."${migrationsTable}"`;
+    const result = await activeClient.query<{ created_at: string | null }>(
+      `SELECT created_at::text FROM ${migrationsTableRef} ORDER BY created_at DESC LIMIT 1`
+    );
+    const lastAppliedMillis = Number.parseInt(
+      result.rows[0]?.created_at ?? '0',
+      10
+    );
+
+    const pendingMigrations = loadMigrations().filter(
+      migration => migration.folderMillis > lastAppliedMillis
+    );
+
+    return pendingMigrations;
+  }
+
+  async function applyMigrationsIndividually(
+    migrations: LoadedMigration[]
+  ): Promise<void> {
+    const activeClient = client;
+    if (!activeClient) {
+      throw new Error('Migration client not initialized');
+    }
+
+    const migrationsTableRef = `"${migrationsSchema}"."${migrationsTable}"`;
+
+    for (const migration of migrations) {
+      log.info(`Applying ${colors.bright}${migration.tag}${colors.reset}...`);
+
+      await activeClient.query('BEGIN');
+
+      try {
+        for (const statement of migration.sql) {
+          if (statement.trim().length === 0) {
+            continue;
+          }
+
+          await activeClient.query(statement);
+        }
+
+        await activeClient.query(
+          `INSERT INTO ${migrationsTableRef} (hash, created_at) VALUES ($1, $2)`,
+          [migration.hash, migration.folderMillis]
+        );
+        await activeClient.query('COMMIT');
+
+        log.success(`Applied ${migration.tag}`);
+      } catch (error) {
+        await activeClient.query('ROLLBACK');
+        throw error;
+      }
+    }
+  }
+
   // Run migrations
   try {
     log.info('Running migrations...');
@@ -489,11 +629,32 @@ async function runMigrations() {
     );
 
     const start = Date.now();
-    await migrate(db, {
-      migrationsFolder: migrationsDir,
-      migrationsSchema,
-      migrationsTable: '__drizzle_migrations',
-    });
+    const pendingMigrations = await getPendingMigrations();
+    const migrationPlan = planMigrationExecution(pendingMigrations);
+
+    if (migrationPlan.mode === 'noop') {
+      log.info('No pending migrations found');
+    } else if (migrationPlan.mode === 'batch') {
+      log.info('No commit-boundary migrations pending; using Drizzle batching');
+      await migrate(db, {
+        migrationsFolder: migrationsDir,
+        migrationsSchema,
+        migrationsTable,
+      });
+    } else {
+      await applyMigrationsIndividually(migrationPlan.boundaryMigrations);
+
+      if (migrationPlan.remainingCount > 0) {
+        log.info(
+          'Boundary committed; resuming Drizzle batching for remaining migrations'
+        );
+        await migrate(db, {
+          migrationsFolder: migrationsDir,
+          migrationsSchema,
+          migrationsTable,
+        });
+      }
+    }
     const duration = ((Date.now() - start) / 1000).toFixed(2);
 
     log.success(`Migrations completed successfully in ${duration}s`);
@@ -595,3 +756,4 @@ if (require.main === module) {
 }
 
 export { runMigrations };
+export { planMigrationExecution };
