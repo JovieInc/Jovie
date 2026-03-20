@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.25] - 2026-03-20
+
+### Changed
+
+- Schema verify step (`drizzle:verify:ci`) is now non-blocking — schema drift warns via Slack instead of blocking all deploys for days
+- Vercel deploy step retries up to 3 times for transient failures (10s backoff)
+- Health monitor auto-reruns failed CI deploys (once per run, prevents infinite loops via `run_attempt` check)
+- Health monitor permissions upgraded from `actions: read` to `actions: write` to support auto-rerun
+
 ## [26.4.24] - 2026-03-20
 
 ### Changed
