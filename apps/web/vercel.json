@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/process-ingestion-jobs",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/purge-pixel-ips",
+      "schedule": "0 3 * * *"
     }
   ],
   "functions": {

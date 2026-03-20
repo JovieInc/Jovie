@@ -15,7 +15,10 @@ import { pixelEventPayloadSchema } from '@/lib/validation/schemas';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store',
+  'Access-Control-Allow-Origin': '*',
+} as const;
 
 function getClaimRetargetingLink(pageUrl: string | undefined): string | null {
   if (!pageUrl) return null;

@@ -21,6 +21,62 @@ import {
 } from '../audience/lib/audience-utils';
 import { validateTrackRequest } from './validation';
 
+// ---------------------------------------------------------------------------
+// Consent helpers
+// ---------------------------------------------------------------------------
+
+const CONSENT_COOKIE_NAME = 'jv_cc';
+
+interface ConsentPreferences {
+  essential: boolean;
+  analytics: boolean;
+  marketing: boolean;
+}
+
+function parseConsentCookie(request: NextRequest): ConsentPreferences | null {
+  try {
+    const raw = request.cookies?.get(CONSENT_COOKIE_NAME)?.value;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ConsentPreferences;
+    if (typeof parsed?.marketing !== 'boolean') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Anonymize an IP address for privacy:
+ * - IPv4: zero last octet (e.g. "1.2.3.4" → "1.2.3.0")
+ * - IPv6: truncate last 80 bits (zero last 5 groups)
+ */
+function anonymizeIp(ip: string): string {
+  if (ip.includes(':')) {
+    // IPv6: expand to 8 groups, zero last 5
+    const parts = ip.split(':');
+    // Handle :: shorthand by expanding
+    const fullParts: string[] = [];
+    for (const part of parts) {
+      if (part === '') {
+        const missing = 8 - parts.filter(p => p !== '').length;
+        for (let i = 0; i < missing; i++) fullParts.push('0000');
+      } else {
+        fullParts.push(part);
+      }
+    }
+    // Ensure we have 8 groups, then zero last 5
+    while (fullParts.length < 8) fullParts.push('0000');
+    return fullParts.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
+  }
+  // IPv4: zero last octet
+  const parts = ip.split('.');
+  if (parts.length === 4) {
+    parts[3] = '0';
+    return parts.join('.');
+  }
+  return '0.0.0.0';
+}
+
 // API routes should be dynamic
 export const dynamic = 'force-dynamic';
 
@@ -54,6 +110,26 @@ function inferAudienceDeviceType(
     return 'mobile';
   }
   return 'desktop';
+}
+
+// ---------------------------------------------------------------------------
+// Attribution helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive retargeting attribution source from UTM params.
+ * Returns null when UTM params don't match a known retargeting pattern.
+ */
+function deriveAttributionSource(
+  utmParams: { utm_source?: string; utm_medium?: string } | null | undefined
+): string | null {
+  if (!utmParams?.utm_source || utmParams.utm_medium !== 'retargeting')
+    return null;
+  const src = utmParams.utm_source.toLowerCase();
+  if (src === 'meta' || src === 'facebook') return 'retargeting_meta';
+  if (src === 'google') return 'retargeting_google';
+  if (src === 'tiktok') return 'retargeting_tiktok';
+  return null;
 }
 
 const ACTION_ICONS: Record<string, string> = {
@@ -136,7 +212,19 @@ export async function POST(request: NextRequest) {
       request.headers.get('cf-ipcountry') ??
       undefined;
     const audienceDeviceType = inferAudienceDeviceType(userAgent);
-    const fingerprint = createFingerprint(ipAddress, userAgent);
+
+    // Determine marketing consent from jv_cc cookie
+    const consent = parseConsentCookie(request);
+    const hasMarketingConsent = consent?.marketing === true;
+
+    // Without marketing consent: anonymize IP and use generic fingerprint.
+    // With consent: full behavior (store real IP, create audience members).
+    const effectiveIp = hasMarketingConsent
+      ? ipAddress
+      : anonymizeIp(ipAddress);
+    const fingerprint = hasMarketingConsent
+      ? createFingerprint(ipAddress, userAgent)
+      : 'anonymous';
 
     // Find the creator profile
     const [profile] = await db
@@ -153,113 +241,130 @@ export async function POST(request: NextRequest) {
     }
 
     const [clickEvent] = await withSystemIngestionSession(async tx => {
-      const [insertedMember] = await tx
-        .insert(audienceMembers)
-        .values({
-          creatorProfileId: profile.id,
-          fingerprint,
-          type: 'anonymous',
-          displayName: 'Visitor',
-          firstSeenAt: new Date(),
-          lastSeenAt: new Date(),
-          visits: 0,
-          engagementScore: 0,
-          intentLevel: 'low',
-          deviceType: audienceDeviceType,
-          referrerHistory: referrer
-            ? [
-                {
-                  url: referrer.trim(),
-                  timestamp: new Date().toISOString(),
-                },
-              ]
-            : [],
-          latestActions: [],
-          geoCity: geoCity ?? null,
-          geoCountry: geoCountry ?? null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflictDoNothing({
-          target: [
-            audienceMembers.creatorProfileId,
-            audienceMembers.fingerprint,
-          ],
-        })
-        .returning({
-          id: audienceMembers.id,
-          visits: audienceMembers.visits,
-          engagementScore: audienceMembers.engagementScore,
-          latestActions: audienceMembers.latestActions,
-          geoCity: audienceMembers.geoCity,
-          geoCountry: audienceMembers.geoCountry,
-          deviceType: audienceMembers.deviceType,
-          spotifyConnected: audienceMembers.spotifyConnected,
-        });
+      let audienceMemberId: string | null = null;
 
-      const resolvedMember =
-        insertedMember ??
-        (
-          await tx
-            .select({
-              id: audienceMembers.id,
-              visits: audienceMembers.visits,
-              engagementScore: audienceMembers.engagementScore,
-              latestActions: audienceMembers.latestActions,
-              geoCity: audienceMembers.geoCity,
-              geoCountry: audienceMembers.geoCountry,
-              deviceType: audienceMembers.deviceType,
-              spotifyConnected: audienceMembers.spotifyConnected,
-            })
-            .from(audienceMembers)
-            .where(
-              and(
-                eq(audienceMembers.creatorProfileId, profile.id),
-                eq(audienceMembers.fingerprint, fingerprint)
+      // Only create/update audience member records when marketing consent is given
+      if (hasMarketingConsent) {
+        // Derive retargeting attribution (first-touch: only set on insert)
+        const attribution = deriveAttributionSource(utmParams);
+
+        const [insertedMember] = await tx
+          .insert(audienceMembers)
+          .values({
+            creatorProfileId: profile.id,
+            fingerprint,
+            type: 'anonymous',
+            displayName: 'Visitor',
+            firstSeenAt: new Date(),
+            lastSeenAt: new Date(),
+            visits: 0,
+            engagementScore: 0,
+            intentLevel: 'low',
+            deviceType: audienceDeviceType,
+            referrerHistory: referrer
+              ? [
+                  {
+                    url: referrer.trim(),
+                    timestamp: new Date().toISOString(),
+                  },
+                ]
+              : [],
+            latestActions: [],
+            geoCity: geoCity ?? null,
+            geoCountry: geoCountry ?? null,
+            ...(attribution ? { attributionSource: attribution } : {}),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .onConflictDoNothing({
+            target: [
+              audienceMembers.creatorProfileId,
+              audienceMembers.fingerprint,
+            ],
+          })
+          .returning({
+            id: audienceMembers.id,
+            visits: audienceMembers.visits,
+            engagementScore: audienceMembers.engagementScore,
+            latestActions: audienceMembers.latestActions,
+            geoCity: audienceMembers.geoCity,
+            geoCountry: audienceMembers.geoCountry,
+            deviceType: audienceMembers.deviceType,
+            spotifyConnected: audienceMembers.spotifyConnected,
+            attributionSource: audienceMembers.attributionSource,
+          });
+
+        const resolvedMember =
+          insertedMember ??
+          (
+            await tx
+              .select({
+                id: audienceMembers.id,
+                visits: audienceMembers.visits,
+                engagementScore: audienceMembers.engagementScore,
+                latestActions: audienceMembers.latestActions,
+                geoCity: audienceMembers.geoCity,
+                geoCountry: audienceMembers.geoCountry,
+                deviceType: audienceMembers.deviceType,
+                spotifyConnected: audienceMembers.spotifyConnected,
+                attributionSource: audienceMembers.attributionSource,
+              })
+              .from(audienceMembers)
+              .where(
+                and(
+                  eq(audienceMembers.creatorProfileId, profile.id),
+                  eq(audienceMembers.fingerprint, fingerprint)
+                )
               )
-            )
-            .limit(1)
-        )?.[0];
+              .limit(1)
+          )?.[0];
 
-      if (!resolvedMember) {
-        throw new Error('Unable to resolve audience member');
+        if (!resolvedMember) {
+          throw new Error('Unable to resolve audience member');
+        }
+
+        audienceMemberId = resolvedMember.id;
+
+        const now = new Date();
+        const existingActions = Array.isArray(resolvedMember.latestActions)
+          ? resolvedMember.latestActions
+          : [];
+        const actionEntry = {
+          label: ACTION_LABELS[linkType] ?? 'interacted',
+          type: linkType,
+          platform: target,
+          emoji: ACTION_ICONS[linkType] ?? '⭐',
+          timestamp: now.toISOString(),
+        };
+        const latestActions = trimHistory([actionEntry, ...existingActions], 5);
+        const actionCount = latestActions.length;
+        const weight = getActionWeight(linkType);
+        const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
+        const intentLevel = deriveIntentLevel(
+          resolvedMember.visits ?? 0,
+          actionCount
+        );
+
+        await tx
+          .update(audienceMembers)
+          .set({
+            lastSeenAt: now,
+            updatedAt: now,
+            engagementScore: updatedScore,
+            intentLevel,
+            latestActions,
+            deviceType: audienceDeviceType,
+            geoCity: geoCity ?? resolvedMember.geoCity ?? null,
+            geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
+            spotifyConnected:
+              Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
+            // First-touch attribution: only set if not already attributed
+            ...(attribution && !resolvedMember.attributionSource
+              ? { attributionSource: attribution }
+              : {}),
+          })
+          .where(eq(audienceMembers.id, resolvedMember.id));
       }
-
-      const now = new Date();
-      const existingActions = Array.isArray(resolvedMember.latestActions)
-        ? resolvedMember.latestActions
-        : [];
-      const actionEntry = {
-        label: ACTION_LABELS[linkType] ?? 'interacted',
-        type: linkType,
-        platform: target,
-        emoji: ACTION_ICONS[linkType] ?? '⭐',
-        timestamp: now.toISOString(),
-      };
-      const latestActions = trimHistory([actionEntry, ...existingActions], 5);
-      const actionCount = latestActions.length;
-      const weight = getActionWeight(linkType);
-      const updatedScore = (resolvedMember.engagementScore ?? 0) + weight;
-      const intentLevel = deriveIntentLevel(
-        resolvedMember.visits ?? 0,
-        actionCount
-      );
-
-      await tx
-        .update(audienceMembers)
-        .set({
-          lastSeenAt: now,
-          updatedAt: now,
-          engagementScore: updatedScore,
-          intentLevel,
-          latestActions,
-          deviceType: audienceDeviceType,
-          geoCity: geoCity ?? resolvedMember.geoCity ?? null,
-          geoCountry: geoCountry ?? resolvedMember.geoCountry ?? null,
-          spotifyConnected:
-            Boolean(resolvedMember.spotifyConnected) || linkType === 'listen',
-        })
-        .where(eq(audienceMembers.id, resolvedMember.id));
 
       const metadata: Record<string, unknown> = {
         target,
@@ -288,20 +393,22 @@ export async function POST(request: NextRequest) {
         metadata.tipAmountCents = rawTipAmount;
       }
 
+      // Always record the click event (preserves link click counts),
+      // but use the anonymized IP when marketing consent is absent.
       const [insertedClickEvent] = await tx
         .insert(clickEvents)
         .values({
           creatorProfileId: profile.id,
           linkType: linkType as 'listen' | 'social' | 'tip' | 'other',
           linkId: linkId || null,
-          ipAddress,
+          ipAddress: effectiveIp,
           userAgent,
           referrer,
           country: geoCountry,
           city: geoCity,
           deviceType: platformDetected,
           metadata,
-          audienceMemberId: resolvedMember.id,
+          audienceMemberId,
         })
         .returning({ id: clickEvents.id });
 
