@@ -10,6 +10,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Demo account seed scripts: `setup-demo-user.ts` (Clerk user creation) and `seed-demo-account.ts` (comprehensive DB seeding)
+- Seeds 18 entity types with realistic data: profile, releases, social links, tour dates, subscribers (150), audience (200), tips (30), clicks (500+), profile views (90 days), contacts, inbox threads (8), AI insights, chat history, referrals, email engagement, pre-save tokens, DSP matches
+- Hockey-stick date distributions for convincing growth narrative on sales calls
+- Realistic fan names, heartfelt tip messages, and authentic email bodies for inbox threads
+- Production safety: `--allow-production` flag required for live Clerk keys
+- Username reservation: script aborts if `timwhite` username belongs to a different user
+- Hardcoded fallback profile data so script works without `/tim` in the database
+- Idempotent re-runs with delete-then-insert and batch inserts
 - Shareable celebration card: Spotify Wrapped-style card auto-generated for each artist profile, with feed (1080x1080) and story (1080x1920) sizes, download + share buttons in the post-onboarding celebration screen
 - Shared `profileCardLayout` function: DRY layout used by both OG images and celebration cards
 - Re-enrichment script: one-off script to enqueue MusicFetch enrichment jobs for all existing artists with dedup safety
