@@ -433,12 +433,35 @@ export async function processPendingEvents(limit = 100): Promise<{
         const allSuccessful = results.every(r => r.success);
         if (allSuccessful) {
           successful++;
+          // If no platforms were forwarded (all disabled/skipped) but old
+          // failed statuses remain, clear them so cron stops reprocessing.
+          if (results.length === 0) {
+            const hasStaleFailures = Object.values(
+              event.forwardingStatus ?? {}
+            ).some(p => p?.status === 'failed');
+            if (hasStaleFailures) {
+              const cleaned: PixelForwardingStatus = {};
+              for (const [k, v] of Object.entries(
+                event.forwardingStatus ?? {}
+              )) {
+                cleaned[k] =
+                  v?.status === 'failed'
+                    ? { ...v, status: 'skipped', error: 'platform_unavailable' }
+                    : v;
+              }
+              await db
+                .update(pixelEvents)
+                .set({ forwardingStatus: cleaned })
+                .where(eq(pixelEvents.id, event.id));
+            }
+          }
         } else {
           failed++;
           const retryCount = event.retryCount ?? 0;
 
           if (retryCount >= MAX_RETRIES) {
-            // Dead letter — stop retrying this event
+            // Dead letter — stop retrying. Merge with existing status
+            // to preserve prior 'sent' entries from other platforms.
             const deadLetterStatus: PixelForwardingStatus = {};
             for (const result of results) {
               deadLetterStatus[result.platform] = {
@@ -449,7 +472,12 @@ export async function processPendingEvents(limit = 100): Promise<{
             }
             await db
               .update(pixelEvents)
-              .set({ forwardingStatus: deadLetterStatus })
+              .set({
+                forwardingStatus: {
+                  ...(event.forwardingStatus ?? {}),
+                  ...deadLetterStatus,
+                },
+              })
               .where(eq(pixelEvents.id, event.id));
 
             logger.warn('[Pixel Metrics] Dead letter', {

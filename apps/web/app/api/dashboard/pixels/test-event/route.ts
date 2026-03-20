@@ -70,6 +70,18 @@ export async function POST(req: Request) {
         );
       }
 
+      // Respect the master pixel toggle — live traffic is skipped when disabled,
+      // so the test button should reflect the same behavior.
+      if (!pixelConfig.enabled) {
+        return NextResponse.json(
+          {
+            error:
+              'Pixel tracking is globally disabled. Enable it first in settings.',
+          },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
+      }
+
       // Extract and decrypt credentials for the specified platform
       let config: PlatformConfig | null = null;
 
