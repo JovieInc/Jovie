@@ -226,7 +226,7 @@ const INVESTOR_TOKEN_PARAM = 't';
 
 /**
  * Handle investor portal requests.
- * Validates token from URL param or cookie, sets cookie, rewrites to /(investors).
+ * Validates token from URL param or cookie, sets cookie, rewrites to /investors.
  * Returns null if the request is NOT for the investor portal.
  */
 async function handleInvestorRequest(
@@ -297,11 +297,11 @@ async function handleInvestorRequest(
     return res;
   }
 
-  // Valid token: rewrite to /(investors) route group
+  // Valid token: rewrite to /investors route group
   const rewriteUrl = req.nextUrl.clone();
-  // Map / to /(investors), /ai to /(investors)/ai, etc.
+  // Map / to /investors, /ai to /investors/ai, etc.
   const investorPath =
-    pathname === '/' ? '/(investors)' : `/(investors)${pathname}`;
+    pathname === '/' ? '/investors' : `/investors${pathname}`;
   rewriteUrl.pathname = investorPath;
 
   const res = NextResponse.rewrite(rewriteUrl);

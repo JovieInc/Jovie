@@ -19,7 +19,7 @@ const DISALLOW_PATHS = [
   '/app/',
   '/api/',
   '/out/',
-  '/(investors)/',
+  '/investors/',
   '/*?ref=*',
   '/*&ref=*',
   '/*?utm_*',
@@ -58,7 +58,7 @@ export default function robots(): MetadataRoute.Robots {
         ...AI_CRAWLERS.map(crawler => ({
           userAgent: crawler,
           allow: ['/', '/llms.txt'],
-          disallow: [...DISALLOW_PATHS, '/(investors)/'],
+          disallow: [...DISALLOW_PATHS, '/investors/'],
         })),
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,
