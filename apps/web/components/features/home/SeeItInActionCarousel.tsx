@@ -3,7 +3,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Container } from '@/components/site/Container';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
@@ -153,7 +153,7 @@ function ReleasePopoverContent({
               key={provider}
               label={DSP_LABELS[provider]}
               iconPath={config.iconPath}
-              href={releaseHref}
+              href={`${releaseHref}?dsp=${provider}`}
               className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
             />
           );
@@ -161,7 +161,7 @@ function ReleasePopoverContent({
       </div>
 
       <Link
-        href={releaseHref}
+        href={`${releaseHref}?noredirect=1`}
         className='mt-4 inline-flex text-sm font-medium text-secondary-token transition-colors duration-[var(--linear-duration-normal)] hover:text-primary-token'
       >
         All platforms
@@ -205,7 +205,7 @@ function ReleaseCard({
                 onHoverEnd(release.id);
               }
             }}
-            className='group flex w-full flex-col rounded-xl p-6 text-left transition-all duration-[var(--linear-duration-normal)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
+            className='group flex w-full flex-col rounded-xl p-6 text-left no-underline transition-all duration-[var(--linear-duration-normal)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--linear-text-secondary)]'
             style={{
               backgroundColor: 'var(--linear-bg-surface-0)',
               border: '1px solid var(--linear-border-subtle)',
@@ -261,31 +261,34 @@ export function SeeItInActionCarousel({
     };
   }, []);
 
-  const handleReleaseOpenChange = (releaseId: string, nextOpen: boolean) => {
-    if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
-    }
+  const handleReleaseOpenChange = useCallback(
+    (releaseId: string, nextOpen: boolean) => {
+      if (closeTimeoutRef.current !== null) {
+        window.clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
 
-    setOpenReleaseId(currentOpenReleaseId =>
-      nextOpen
-        ? releaseId
-        : currentOpenReleaseId === releaseId
-          ? null
-          : currentOpenReleaseId
-    );
-  };
+      setOpenReleaseId(currentOpenReleaseId =>
+        nextOpen
+          ? releaseId
+          : currentOpenReleaseId === releaseId
+            ? null
+            : currentOpenReleaseId
+      );
+    },
+    []
+  );
 
-  const handleReleaseHoverStart = (releaseId: string) => {
+  const handleReleaseHoverStart = useCallback((releaseId: string) => {
     if (closeTimeoutRef.current !== null) {
       window.clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
 
     setOpenReleaseId(releaseId);
-  };
+  }, []);
 
-  const handleReleaseHoverEnd = (releaseId: string) => {
+  const handleReleaseHoverEnd = useCallback((releaseId: string) => {
     if (closeTimeoutRef.current !== null) {
       window.clearTimeout(closeTimeoutRef.current);
     }
@@ -296,7 +299,7 @@ export function SeeItInActionCarousel({
       );
       closeTimeoutRef.current = null;
     }, 120);
-  };
+  }, []);
 
   return (
     <section className='section-spacing-linear-sm relative overflow-hidden bg-page'>
