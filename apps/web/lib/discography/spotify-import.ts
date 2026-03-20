@@ -365,8 +365,14 @@ export async function importReleasesFromSpotify(
         // 4. Sync profile genres from release data (best-effort)
         try {
           await syncProfileGenresFromReleases(creatorProfileId);
-        } catch {
+        } catch (error) {
           // Non-critical: don't fail the import if genre sync fails
+          Sentry.addBreadcrumb({
+            category: 'spotify-import',
+            message: 'Genre sync failed',
+            level: 'warning',
+            data: { creatorProfileId, error },
+          });
         }
 
         // 5. Discover cross-platform links
