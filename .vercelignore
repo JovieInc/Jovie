@@ -42,9 +42,7 @@ chromatic.config.json
 *.pem
 .DS_Store
 .eslintcache
-patches/
 scripts/
 *.mjs
 *.cjs
 cleanup_old_branches*.sh
-pnpm-lock.yaml
