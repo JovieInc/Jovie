@@ -307,6 +307,7 @@ export const queryKeys = {
   pixels: {
     all: ['pixels'] as const,
     settings: () => [...queryKeys.pixels.all, 'settings'] as const,
+    health: () => [...queryKeys.pixels.all, 'health'] as const,
   },
 
   // Earnings / tipping data
