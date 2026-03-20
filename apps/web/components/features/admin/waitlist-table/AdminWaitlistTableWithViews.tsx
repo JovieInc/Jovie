@@ -260,6 +260,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     <QueryErrorBoundary fallback={TableErrorFallback}>
       <AdminTableShell
         testId='admin-waitlist-table'
+        className='rounded-none border-0'
         toolbar={
           <>
             {/* Bulk actions toolbar (shows when rows selected) */}
@@ -353,6 +354,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
               getItemId={entry => entry.id}
               onItemMove={handleItemMove}
               cardHeight={200}
+              className='bg-(--linear-app-content-surface)'
               emptyState={
                 <div className='text-center text-secondary-token'>
                   <p className='text-sm font-medium text-primary-token'>
