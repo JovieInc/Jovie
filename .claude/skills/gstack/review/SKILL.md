@@ -284,6 +284,23 @@ Run `git diff origin/<base>` to get the full diff. This includes both committed 
 
 ---
 
+## Step 3.5: Simplify pass
+
+Before the main review, do a narrow simplify pass on the changed code:
+
+1. Read the touched hunks with enough surrounding context to understand them.
+2. Apply low-risk clarity cleanups that do **not** change behavior or scope:
+   - remove dead imports / dead branches introduced in this branch
+   - collapse obvious duplication
+   - flatten mechanical conditionals
+   - tighten naming or comments when they add noise
+3. Do **not** turn this into a speculative refactor or architecture rewrite.
+4. If you simplify anything, report it in Step 5 using the same `[AUTO-FIXED]` format as other automatic fixes.
+
+Then review the updated working tree diff against `origin/<base>`.
+
+---
+
 ## Step 4: Two-pass review
 
 Apply the checklist against the diff in two passes:
