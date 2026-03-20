@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  actions: read
+  actions: write
   contents: read
   pull-requests: read
 
@@ -19,6 +19,7 @@ jobs:
       summary: ${{ steps.evaluate.outputs.summary }}
       details: ${{ steps.evaluate.outputs.details }}
       run_url: ${{ steps.evaluate.outputs.run_url }}
+      failed_run_id: ${{ steps.evaluate.outputs.failed_run_id }}
     steps:
       - name: Evaluate main CI health
         id: evaluate
@@ -156,6 +157,7 @@ jobs:
             core.setOutput('summary', shouldAlert ? 'Main CI health issue detected.' : 'Main CI is healthy.');
             core.setOutput('details', shouldAlert ? reasons.join('\n') : 'No stale, failed, or blocked main CI conditions were detected.');
             core.setOutput('run_url', runUrl);
+            core.setOutput('failed_run_id', latestFailure ? String(latestFailure.id) : '');
 
       - name: Slack alert (main CI unhealthy)
         if: ${{ steps.evaluate.outputs.should_alert == 'true' && env.SLACK_WEBHOOK_URL != '' }}
@@ -182,6 +184,22 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Auto-rerun failed deploy (self-healing)
+        if: ${{ steps.evaluate.outputs.should_alert == 'true' && steps.evaluate.outputs.failed_run_id != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FAILED_RUN_ID="${{ steps.evaluate.outputs.failed_run_id }}"
+          echo "Attempting to re-run failed CI run $FAILED_RUN_ID (failed jobs only)..."
+          # Only re-run once per failed run to avoid infinite retry loops.
+          # Check if this run has already been re-run by looking at run_attempt.
+          ATTEMPT=$(gh api "repos/${{ github.repository }}/actions/runs/$FAILED_RUN_ID" --jq '.run_attempt' 2>/dev/null || echo "1")
+          if [ "$ATTEMPT" -gt 1 ]; then
+            echo "Run $FAILED_RUN_ID already re-attempted (attempt $ATTEMPT), skipping auto-rerun."
+          else
+            gh run rerun "$FAILED_RUN_ID" --failed || echo "Auto-rerun failed (may require manual intervention)"
+          fi
 
       - name: Fail job when unhealthy
         if: ${{ steps.evaluate.outputs.should_alert == 'true' }}

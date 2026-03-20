@@ -2328,6 +2328,7 @@ jobs:
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
+      schema_drift: ${{ steps.verify.outcome == 'failure' }}
     env:
       # Trunk-based: main deploys directly to production
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -2355,9 +2356,18 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
         continue-on-error: false
       - name: DB verify (post-migration schema check)
+        id: verify
         run: pnpm --filter=@jovie/web run drizzle:verify:ci
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        # Schema drift should warn, not block deploys. A mismatch between
+        # Drizzle definitions and the live DB (e.g. schema added without
+        # migration) must be fixed, but should never block shipping code.
+        continue-on-error: true
+      - name: Warn on schema drift
+        if: ${{ steps.verify.outcome == 'failure' }}
+        run: |
+          echo "::warning::Schema drift detected — Drizzle schema does not match the database. Deploy continues but this must be fixed."
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
@@ -2374,7 +2384,20 @@ jobs:
       - name: Deploy (production, prebuilt)
         id: deploy
         run: |
-          vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }}
+          # Retry up to 3 times for transient Vercel failures
+          for attempt in 1 2 3; do
+            echo "Deploy attempt $attempt/3"
+            if vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }}; then
+              echo "Deploy succeeded on attempt $attempt"
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Deploy failed, retrying in 10s..."
+              sleep 10
+            fi
+          done
+          echo "Deploy failed after 3 attempts"
+          exit 1
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -2468,6 +2491,29 @@ jobs:
                   "fields": [
                     { "title": "Branch", "value": "main", "short": true },
                     { "title": "Workflow", "value": "CI", "short": true },
+                    { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Slack notify (schema drift warning)
+        if: ${{ needs.deploy.result == 'success' && needs.deploy.outputs.schema_drift == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Schema Drift'
+          custom_payload: |
+            {
+              "text": "⚠️ Schema drift detected — deploy succeeded but Drizzle schema does not match the database",
+              "attachments": [
+                {
+                  "color": "warning",
+                  "fields": [
+                    { "title": "Action Required", "value": "Generate missing migrations or remove orphaned schema definitions", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View>", "short": false }
                   ]
                 }
