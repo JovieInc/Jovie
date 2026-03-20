@@ -40,6 +40,8 @@ export type {
   PlatformConfig,
 } from './types';
 
+const MAX_RETRIES = 5;
+
 type Platform = 'facebook' | 'google' | 'tiktok';
 type JoviePlatform = 'jovie_facebook' | 'jovie_google' | 'jovie_tiktok';
 
@@ -88,8 +90,17 @@ async function forwardToPlatforms(
   const settled = await Promise.allSettled(
     tasks.map(async ({ platform, config }) => {
       const forwarder = platformForwarders[platform];
-      const result = await forwarder(normalizedEvent, config);
       const platformName = isJovie ? joviePlatformMap[platform] : platform;
+      const start = Date.now();
+      const result = await forwarder(normalizedEvent, config);
+      const latencyMs = Date.now() - start;
+      logger.info('[Pixel Metrics] Event forwarded', {
+        platform: platformName,
+        success: result.success,
+        latency_ms: latencyMs,
+        event_type: normalizedEvent.eventType,
+        event_id: normalizedEvent.eventId,
+      });
       return { ...result, platform: platformName };
     })
   );
@@ -99,6 +110,13 @@ async function forwardToPlatforms(
     const platformName = isJovie
       ? joviePlatformMap[tasks[i].platform]
       : tasks[i].platform;
+    logger.info('[Pixel Metrics] Event forwarded', {
+      platform: platformName,
+      success: false,
+      latency_ms: -1,
+      event_type: normalizedEvent.eventType,
+      event_id: normalizedEvent.eventId,
+    });
     return {
       success: false,
       platform: platformName,
@@ -324,10 +342,13 @@ export async function processPendingEvents(limit = 100): Promise<{
   processed: number;
   successful: number;
   failed: number;
+  dead_lettered: number;
 }> {
+  const batchStart = Date.now();
   let processed = 0;
   let successful = 0;
   let failed = 0;
+  let deadLettered = 0;
 
   try {
     // Get events that need forwarding:
@@ -353,14 +374,14 @@ export async function processPendingEvents(limit = 100): Promise<{
       .limit(limit);
 
     if (pendingEvents.length === 0) {
-      return { processed, successful, failed };
+      return { processed, successful, failed, dead_lettered: deadLettered };
     }
 
     // Batch-fetch all creator pixel configs upfront (eliminates N+1).
     // Only include configs for creators on a paid plan (canAccessAdPixels).
     const profileIds = [...new Set(pendingEvents.map(e => e.profileId))];
     const creatorConfigRows = await db
-      .select({ pixels: creatorPixels })
+      .select({ pixels: creatorPixels, plan: users.plan })
       .from(creatorPixels)
       .innerJoin(
         creatorProfiles,
@@ -370,12 +391,13 @@ export async function processPendingEvents(limit = 100): Promise<{
       .where(
         and(
           inArray(creatorPixels.profileId, profileIds),
-          eq(creatorPixels.enabled, true),
-          eq(users.isPro, true)
+          eq(creatorPixels.enabled, true)
         )
       );
     const creatorConfigMap = new Map(
-      creatorConfigRows.map(r => [r.pixels.profileId, r.pixels])
+      creatorConfigRows
+        .filter(r => checkBoolean(r.plan, 'canAccessAdPixels'))
+        .map(r => [r.pixels.profileId, r.pixels])
     );
 
     for (const event of pendingEvents) {
@@ -388,19 +410,48 @@ export async function processPendingEvents(limit = 100): Promise<{
           successful++;
         } else {
           failed++;
-          // Schedule retry with exponential backoff
-          // Count retries by number of existing failed statuses
-          const failedCount = Object.values(
-            event.forwardingStatus || {}
-          ).filter(p => p?.status === 'failed').length;
-          const retryCount = failedCount > 0 ? Math.min(failedCount, 5) : 0;
-          const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
-          const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+          const retryCount = event.retryCount ?? 0;
 
-          await db
-            .update(pixelEvents)
-            .set({ forwardAt: nextRetry })
-            .where(eq(pixelEvents.id, event.id));
+          if (retryCount >= MAX_RETRIES) {
+            // Dead letter — stop retrying this event
+            const deadLetterStatus: PixelForwardingStatus = {};
+            for (const result of results) {
+              deadLetterStatus[result.platform] = {
+                status: result.success ? 'sent' : 'dead_letter',
+                sentAt: new Date().toISOString(),
+                ...(result.error && { error: result.error }),
+              };
+            }
+            await db
+              .update(pixelEvents)
+              .set({ forwardingStatus: deadLetterStatus })
+              .where(eq(pixelEvents.id, event.id));
+
+            logger.warn('[Pixel Metrics] Dead letter', {
+              eventId: event.id,
+              platforms: results.filter(r => !r.success).map(r => r.platform),
+              totalAttempts: retryCount + 1,
+            });
+            deadLettered++;
+          } else {
+            // Schedule retry with exponential backoff
+            const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
+            const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+
+            await db
+              .update(pixelEvents)
+              .set({
+                forwardAt: nextRetry,
+                retryCount: retryCount + 1,
+              })
+              .where(eq(pixelEvents.id, event.id));
+
+            logger.info('[Pixel Metrics] Retry scheduled', {
+              event_id: event.id,
+              retry_count: retryCount + 1,
+              next_retry_at: nextRetry.toISOString(),
+            });
+          }
         }
       } catch (error) {
         logger.error('[Pixel Forwarding] Event processing error', {
@@ -415,5 +466,13 @@ export async function processPendingEvents(limit = 100): Promise<{
     logger.error('[Pixel Forwarding] Batch processing error', { error });
   }
 
-  return { processed, successful, failed };
+  logger.info('[Pixel Metrics] Batch complete', {
+    processed,
+    successful,
+    failed,
+    dead_lettered: deadLettered,
+    duration_ms: Date.now() - batchStart,
+  });
+
+  return { processed, successful, failed, dead_lettered: deadLettered };
 }

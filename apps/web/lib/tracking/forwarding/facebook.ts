@@ -59,9 +59,13 @@ export async function forwardToFacebook(
   }
 
   try {
-    const url = `${FACEBOOK_API_URL}/${FACEBOOK_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
+    const url = `${FACEBOOK_API_URL}/${FACEBOOK_API_VERSION}/${pixelId}/events`;
 
     const payload = {
+      // access_token in the POST body instead of URL query string to avoid
+      // credential leakage in server logs, CDN caches, and error reports.
+      // Facebook CAPI accepts access_token in the request body.
+      access_token: accessToken,
       data: [
         {
           event_name: mapEventToFacebook(event.eventType),

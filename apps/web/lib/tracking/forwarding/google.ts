@@ -59,6 +59,9 @@ export async function forwardToGoogle(
     // Client ID is required - we use the IP hash as a pseudo-anonymous identifier
     const clientId = event.ipHash.substring(0, 36) || 'anonymous';
 
+    // api_secret must be in the URL query string — Google Measurement Protocol
+    // requires it there and does not support passing it in the request body.
+    // https://developers.google.com/analytics/devguides/collection/protocol/ga4/reference#payload_query_parameters
     const url = `${GOOGLE_MP_URL}?measurement_id=${measurementId}&api_secret=${apiSecret}`;
 
     const payload = {
