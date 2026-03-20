@@ -456,6 +456,28 @@ export const tipStatusEnum = pgEnum('tip_status', [
   'refunded',
 ]);
 
+// Release Task Enums
+export const releaseTaskStatusEnum = pgEnum('release_task_status', [
+  'backlog',
+  'todo',
+  'in_progress',
+  'done',
+  'cancelled',
+]);
+
+export const releaseTaskPriorityEnum = pgEnum('release_task_priority', [
+  'urgent',
+  'high',
+  'medium',
+  'low',
+  'none',
+]);
+
+export const releaseTaskAssigneeTypeEnum = pgEnum(
+  'release_task_assignee_type',
+  ['human', 'ai_workflow']
+);
+
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [
   'pending', // Referred user signed up but not yet subscribed

@@ -303,6 +303,15 @@ export const queryKeys = {
       ] as const,
   },
 
+  // Release tasks
+  releaseTasks: {
+    all: ['release-tasks'] as const,
+    byRelease: (releaseId: string) =>
+      [...queryKeys.releaseTasks.all, 'release', releaseId] as const,
+    summary: (profileId: string) =>
+      [...queryKeys.releaseTasks.all, 'summary', profileId] as const,
+  },
+
   // Ad pixel settings
   pixels: {
     all: ['pixels'] as const,
