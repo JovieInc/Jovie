@@ -106,11 +106,12 @@ export function useReleaseHeaderParts({
     }
   }, [release]);
 
+  const primaryActions: DrawerHeaderAction[] = [];
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
     /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
-    overflowActions.push(
+    primaryActions.push(
       {
         id: 'copy',
         label: isCopied ? 'Copied!' : 'Copy smart link',
@@ -124,14 +125,14 @@ export function useReleaseHeaderParts({
         label: 'Open smart link',
         icon: ExternalLink,
         onClick: handleOpenSmartLink,
-      },
-      {
-        id: 'refresh',
-        label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
-        icon: RefreshCw,
-        onClick: handleRefreshClick,
       }
     );
+    overflowActions.push({
+      id: 'refresh',
+      label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
+      icon: RefreshCw,
+      onClick: handleRefreshClick,
+    });
     /* eslint-enable react-hooks/refs */
   }
 
@@ -162,7 +163,7 @@ export function useReleaseHeaderParts({
 
   const title = (
     <span className='group/isrc flex min-w-0 items-center gap-1'>
-      <span className='truncate font-mono text-[11.5px] tracking-[0.04em] text-tertiary-token'>
+      <span className='truncate font-mono text-[10.5px] tracking-[0.025em] text-tertiary-token'>
         {titleText}
       </span>
       {isrcValue && (
@@ -183,9 +184,9 @@ export function useReleaseHeaderParts({
   );
 
   const actions =
-    overflowActions.length > 0 || onClose ? (
+    primaryActions.length > 0 || overflowActions.length > 0 || onClose ? (
       <DrawerHeaderActions
-        primaryActions={[]}
+        primaryActions={primaryActions}
         overflowActions={overflowActions}
         onClose={onClose}
       />

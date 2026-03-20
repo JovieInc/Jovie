@@ -12,7 +12,7 @@ export const ProviderStatusDot = memo(function ProviderStatusDot({
 }: Readonly<ProviderStatusDotProps>) {
   if (status === 'missing') {
     return (
-      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-surface-1'>
+      <span className='flex h-2.5 w-2.5 items-center justify-center rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
         <span className='h-1 w-1 rounded-full bg-(--linear-text-tertiary)' />
       </span>
     );
@@ -22,7 +22,7 @@ export const ProviderStatusDot = memo(function ProviderStatusDot({
     <span
       className={cn(
         'relative flex h-2.5 w-2.5 items-center justify-center rounded-full',
-        status === 'manual' && 'ring-2 ring-amber-400/30'
+        status === 'manual' && 'ring-2 ring-amber-400/20'
       )}
       style={{ backgroundColor: accent }}
     >

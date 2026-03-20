@@ -68,10 +68,11 @@ export function buildReleaseActions({
   const items: ContextMenuItemType[] = [
     {
       id: 'edit',
-      label: 'Edit links',
+      label: 'Edit release links',
       icon: menuIcon('PencilLine'),
       onClick: () => onEdit(release),
     },
+    { type: 'separator' },
   ];
 
   // ── Copy / share group ──
@@ -79,7 +80,9 @@ export function buildReleaseActions({
     items.push({
       id: 'copy-smart-link',
       label:
-        lockReason === 'scheduled' ? 'Scheduled (Pro)' : 'Smart link (Pro)',
+        lockReason === 'scheduled'
+          ? 'Scheduled smart link (Pro)'
+          : 'Smart link (Pro)',
       icon: menuIcon(lockReason === 'scheduled' ? 'Clock' : 'Lock'),
       disabled: true,
       onClick: () => {},

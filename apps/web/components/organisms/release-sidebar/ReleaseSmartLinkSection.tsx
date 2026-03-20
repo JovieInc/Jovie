@@ -16,12 +16,12 @@ export function ReleaseSmartLinkSection({
     <CopyableUrlRow
       url={smartLinkUrl}
       displayValue={smartLinkPath}
-      size='lg'
-      className='rounded-[8px] border-subtle/45 bg-surface-0/70'
+      size='md'
+      className='rounded-[10px]'
       valueClassName='text-tertiary-token'
       copyButtonTitle='Copy link'
       openButtonTitle='Open smart link'
-      surface='flat'
+      surface='boxed'
     />
   );
 }

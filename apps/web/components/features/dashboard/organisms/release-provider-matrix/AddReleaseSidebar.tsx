@@ -17,6 +17,7 @@ import {
   DrawerButton,
   DrawerFormField,
   DrawerMediaThumb,
+  DrawerSurfaceCard,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -28,6 +29,9 @@ const RELEASE_TYPE_OPTIONS = [
   { value: 'compilation', label: 'Compilation' },
   { value: 'live', label: 'Live' },
 ] as const;
+
+const ADD_RELEASE_CARD_CLASSNAME =
+  'overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))]';
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 
@@ -144,34 +148,42 @@ export function AddReleaseSidebar({
       title='Add Release'
       onClose={handleClose}
       entityHeader={
-        <EntityHeaderCard
-          image={
-            <DrawerMediaThumb
-              src={artworkUrl.trim() || undefined}
-              alt='New release artwork'
-              sizeClassName='h-10 w-10'
-              sizes='40px'
-              fallback={
-                <Icon
-                  name='Disc3'
-                  className='h-5 w-5 text-tertiary-token'
-                  aria-hidden='true'
+        <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
+          <div className='p-3.5'>
+            <p className='mb-2 text-[11px] font-[510] leading-none text-tertiary-token'>
+              Preview
+            </p>
+            <EntityHeaderCard
+              image={
+                <DrawerMediaThumb
+                  src={artworkUrl.trim() || undefined}
+                  alt='New release artwork'
+                  sizeClassName='h-[44px] w-[44px] rounded-[10px]'
+                  sizes='44px'
+                  fallback={
+                    <Icon
+                      name='Disc3'
+                      className='h-5 w-5 text-tertiary-token'
+                      aria-hidden='true'
+                    />
+                  }
                 />
               }
+              title={title || 'New Release'}
+              subtitle={
+                RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)
+                  ?.label ?? 'Single'
+              }
+              className='gap-2.5'
+              bodyClassName='pt-0.5'
             />
-          }
-          title={title || 'New Release'}
-          subtitle={
-            RELEASE_TYPE_OPTIONS.find(o => o.value === releaseType)?.label ??
-            'Single'
-          }
-          className='gap-2'
-        />
+          </div>
+        </DrawerSurfaceCard>
       }
       footer={
         <DrawerButton
           tone='primary'
-          className='w-full'
+          className='h-8 w-full'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
@@ -186,58 +198,75 @@ export function AddReleaseSidebar({
         </DrawerButton>
       }
     >
-      <div className='space-y-5'>
-        <DrawerFormField label='Title' htmlFor='release-title'>
-          <Input
-            id='release-title'
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder='My New Release'
-            autoFocus
-          />
-        </DrawerFormField>
-
-        <DrawerFormField label='Release Type' htmlFor='release-type'>
-          <Select
-            value={releaseType}
-            onValueChange={v => setReleaseType(v as ReleaseType)}
-          >
-            <SelectTrigger id='release-type'>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RELEASE_TYPE_OPTIONS.map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </DrawerFormField>
-
-        <DrawerFormField label='Release Date' htmlFor='release-date'>
-          <Input
-            id='release-date'
-            type='date'
-            value={releaseDate}
-            onChange={e => setReleaseDate(e.target.value)}
-          />
-        </DrawerFormField>
-
-        <DrawerFormField label='Artwork URL (optional)' htmlFor='artwork-url'>
-          <Input
-            id='artwork-url'
-            type='url'
-            value={artworkUrl}
-            onChange={e => setArtworkUrl(e.target.value)}
-            placeholder='https://example.com/artwork.jpg'
-          />
-        </DrawerFormField>
-
-        <div className='space-y-3'>
-          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
-            Platform Links (optional)
+      <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
+        <div className='border-b border-(--linear-app-frame-seam) px-3.5 py-2'>
+          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+            Details
           </p>
+        </div>
+        <div className='space-y-3.5 p-3.5'>
+          <DrawerFormField label='Title' htmlFor='release-title'>
+            <Input
+              id='release-title'
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder='My New Release'
+              autoFocus
+              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          <DrawerFormField label='Release Type' htmlFor='release-type'>
+            <Select
+              value={releaseType}
+              onValueChange={v => setReleaseType(v as ReleaseType)}
+            >
+              <SelectTrigger
+                id='release-type'
+                className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {RELEASE_TYPE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </DrawerFormField>
+
+          <DrawerFormField label='Release Date' htmlFor='release-date'>
+            <Input
+              id='release-date'
+              type='date'
+              value={releaseDate}
+              onChange={e => setReleaseDate(e.target.value)}
+              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+
+          <DrawerFormField label='Artwork URL (optional)' htmlFor='artwork-url'>
+            <Input
+              id='artwork-url'
+              type='url'
+              value={artworkUrl}
+              onChange={e => setArtworkUrl(e.target.value)}
+              placeholder='https://example.com/artwork.jpg'
+              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+            />
+          </DrawerFormField>
+        </div>
+      </DrawerSurfaceCard>
+
+      <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
+        <div className='border-b border-(--linear-app-frame-seam) px-3.5 py-2'>
+          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+            Platform Links
+          </p>
+        </div>
+        <div className='space-y-2.5 p-3.5'>
           {PROVIDER_FIELDS.map(provider => (
             <DrawerFormField
               key={provider.key}
@@ -253,11 +282,12 @@ export function AddReleaseSidebar({
                   handleProviderUrlChange(provider.key, e.target.value)
                 }
                 placeholder={provider.placeholder}
+                className='h-[32px] border-subtle bg-surface-0 text-[12px]'
               />
             </DrawerFormField>
           ))}
         </div>
-      </div>
+      </DrawerSurfaceCard>
     </EntitySidebarShell>
   );
 }

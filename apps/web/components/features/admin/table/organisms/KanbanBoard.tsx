@@ -95,7 +95,7 @@ export function KanbanBoard<TData>({
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 gap-4 overflow-x-auto px-4 py-4 sm:px-6',
+        'flex h-full min-h-0 gap-3 overflow-x-auto px-3 py-3 sm:px-4',
         className
       )}
     >
@@ -147,7 +147,7 @@ function KanbanColumn<TData>({
   enableVirtualization,
 }: Readonly<KanbanColumnProps<TData>>) {
   const containerRef = useRef<HTMLFieldSetElement>(null);
-  const itemGap = 12; // 0.75rem to match `space-y-3` / `pb-3`
+  const itemGap = 10;
 
   const accentStyle = useMemo<React.CSSProperties | undefined>(
     () => (column.accent ? { backgroundColor: column.accent } : undefined),
@@ -181,9 +181,8 @@ function KanbanColumn<TData>({
   }, []);
 
   return (
-    <ContentSurfaceCard className='flex min-w-[320px] max-w-[400px] flex-1 flex-col overflow-hidden bg-surface-1'>
-      {/* Column Header */}
-      <div className='flex items-center justify-between border-b border-subtle px-4 py-3'>
+    <ContentSurfaceCard className='flex min-w-[300px] max-w-[380px] flex-1 flex-col overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_96%,transparent)]'>
+      <div className='flex items-center justify-between border-b border-subtle px-3 py-2.5'>
         <div className='flex items-center gap-2'>
           {accentStyle && (
             <span
@@ -192,19 +191,18 @@ function KanbanColumn<TData>({
               aria-hidden='true'
             />
           )}
-          <h3 className='text-sm font-[560] tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
             {column.title}
           </h3>
         </div>
-        <span className='text-xs tabular-nums text-tertiary-token'>
+        <span className='text-[11px] tabular-nums text-tertiary-token'>
           {column.count}
         </span>
       </div>
 
-      {/* Column Content */}
       <fieldset
         ref={containerRef}
-        className='m-0 min-w-0 flex-1 overflow-y-auto border-0 p-3'
+        className='m-0 min-w-0 flex-1 overflow-y-auto border-0 p-2.5'
         onDrop={handleDrop}
         onDragOver={handleDragOver}
       >
@@ -212,8 +210,8 @@ function KanbanColumn<TData>({
         {(() => {
           if (column.items.length === 0) {
             return (
-              <div className='flex h-32 items-center justify-center rounded-[10px] border border-dashed border-subtle bg-surface-0'>
-                <div className='text-sm text-tertiary-token'>
+              <div className='flex h-28 items-center justify-center rounded-md border border-dashed border-subtle bg-surface-0'>
+                <div className='text-[12px] text-tertiary-token'>
                   {emptyState ?? 'No items'}
                 </div>
               </div>
@@ -238,7 +236,7 @@ function KanbanColumn<TData>({
                       data-index={virtualRow.index}
                       ref={rowVirtualizer.measureElement}
                       className={cn(
-                        'absolute top-0 left-0 w-full pb-3',
+                        'absolute top-0 left-0 w-full pb-2.5',
                         onItemMove &&
                           'cursor-move transition-opacity hover:opacity-80'
                       )}
@@ -261,7 +259,7 @@ function KanbanColumn<TData>({
           }
 
           return (
-            <ul className='m-0 list-none space-y-3 p-0'>
+            <ul className='m-0 list-none space-y-2.5 p-0'>
               {column.items.map((item, index) => (
                 <li
                   key={getItemId(item)}

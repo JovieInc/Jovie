@@ -24,7 +24,7 @@ export function DashboardRemoveBrandingCard({
       <div className='space-y-2'>
         <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex items-center gap-2'>
-            <span className='inline-flex items-center rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] font-[510] uppercase tracking-[0.08em] text-sidebar-muted'>
+            <span className='inline-flex items-center rounded-md border border-sidebar-border px-1.5 py-0.5 text-[10px] font-[510] tracking-normal text-sidebar-muted'>
               Pro
             </span>
             <span className='text-[10px] font-[510] text-sidebar-muted'>

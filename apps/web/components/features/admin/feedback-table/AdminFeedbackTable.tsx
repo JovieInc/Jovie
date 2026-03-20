@@ -107,8 +107,8 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
     <span
       className={
         status === 'dismissed'
-          ? 'inline-flex min-h-[22px] items-center rounded-[8px] border border-subtle bg-surface-0 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
-          : 'inline-flex min-h-[22px] items-center rounded-[8px] border border-default bg-surface-1 px-2 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
+          ? 'inline-flex min-h-[22px] items-center rounded bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'
+          : 'inline-flex min-h-[22px] items-center rounded bg-surface-1 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'
       }
     >
       {status}
@@ -237,8 +237,8 @@ export function AdminFeedbackTable({
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
-        ? 'cursor-pointer bg-surface-1 shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_rgba(91,140,255,0.18)] hover:bg-surface-1'
-        : 'group cursor-pointer bg-transparent hover:bg-surface-1',
+        ? 'group cursor-pointer bg-(--linear-row-selected) hover:bg-(--linear-row-selected)'
+        : 'group cursor-pointer bg-transparent hover:bg-(--linear-row-hover)',
     [selectedId]
   );
 
@@ -278,7 +278,7 @@ export function AdminFeedbackTable({
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px]'
+              className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               emptyState={
                 <TableEmptyState
                   icon={
@@ -304,7 +304,7 @@ export function AdminFeedbackTable({
         emptyMessage='Select a feedback row to view details.'
         entityHeader={
           selected ? (
-            <div className='space-y-2'>
+            <div className='space-y-1.5'>
               <p className='text-[12px] leading-[16px] text-secondary-token'>
                 Source: {selected.source} ·{' '}
                 {new Date(selected.createdAtIso).toLocaleString()}
@@ -322,7 +322,7 @@ export function AdminFeedbackTable({
         }
         footer={
           selected ? (
-            <div className='space-y-3'>
+            <div className='space-y-2'>
               <div className='flex items-center gap-2'>
                 <DrawerButton
                   type='button'
@@ -359,7 +359,7 @@ export function AdminFeedbackTable({
       >
         {selected ? (
           <>
-            <DrawerSection title='User'>
+            <DrawerSection title='User' className='space-y-1.5'>
               <div className='space-y-1'>
                 <DrawerPropertyRow
                   label='User'
@@ -379,15 +379,23 @@ export function AdminFeedbackTable({
               </div>
             </DrawerSection>
 
-            <DrawerSection title='Feedback' collapsible={false}>
-              <DrawerSurfaceCard className='rounded-[12px] bg-surface-0 px-3 py-2.5 text-[13px] leading-[19px] whitespace-pre-wrap text-primary-token'>
+            <DrawerSection
+              title='Feedback'
+              collapsible={false}
+              className='space-y-1.5'
+            >
+              <DrawerSurfaceCard className='rounded-md bg-surface-0 px-2.5 py-2 text-[12.5px] leading-[19px] whitespace-pre-wrap text-primary-token'>
                 {selected.message}
               </DrawerSurfaceCard>
             </DrawerSection>
 
-            <DrawerSection title='Context' collapsible={false}>
-              <DrawerSurfaceCard className='overflow-auto rounded-[12px] bg-surface-0 p-0'>
-                <pre className='p-3 text-[11px] leading-[16px] text-secondary-token'>
+            <DrawerSection
+              title='Context'
+              collapsible={false}
+              className='space-y-1.5'
+            >
+              <DrawerSurfaceCard className='overflow-auto rounded-md bg-surface-0 p-0'>
+                <pre className='p-2.5 text-[10.5px] leading-[16px] text-secondary-token'>
                   {JSON.stringify(selected.context, null, 2)}
                 </pre>
               </DrawerSurfaceCard>

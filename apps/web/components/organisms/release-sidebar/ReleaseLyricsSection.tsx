@@ -17,8 +17,10 @@ import {
   useState,
 } from 'react';
 import { toast } from 'sonner';
-import { DrawerButton, DrawerSection } from '@/components/molecules/drawer';
+import { DrawerButton, DrawerSurfaceCard } from '@/components/molecules/drawer';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { LYRICS_FORMAT_LABELS, type LyricsFormat } from '@/lib/lyrics/types';
+import { cn } from '@/lib/utils';
 
 /** Auto-save debounce delay in milliseconds */
 const AUTO_SAVE_DELAY_MS = 1500;
@@ -175,41 +177,54 @@ export function ReleaseLyricsSection({
   const showFormatOptions = isEditable && onFormatLyrics;
 
   return (
-    <DrawerSection title='Lyrics'>
-      <div className='space-y-2'>
-        <Textarea
-          placeholder='Paste your lyrics here'
-          value={draftLyrics}
-          onChange={event => setDraftLyrics(event.target.value)}
-          rows={draftLyrics ? 10 : 4}
-          disabled={!isEditable || isSaving}
-          className='resize-y'
-        />
-        {/* Auto-save status indicator */}
-        {saveStatus !== 'idle' && (
-          <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
-            {saveStatus === 'saving' && (
-              <>
-                <Loader2 className='h-3 w-3 animate-spin' aria-hidden='true' />
-                <span>Saving…</span>
-              </>
-            )}
-            {saveStatus === 'saved' && (
-              <>
-                <Check className='h-3 w-3 text-success' aria-hidden='true' />
-                <span>Saved</span>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+    <div className='space-y-2'>
+      <DrawerSurfaceCard
+        className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+      >
+        <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+          <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+            Editor
+          </p>
+        </div>
+        <div className='space-y-2.5 p-3'>
+          <Textarea
+            placeholder='Paste your lyrics here'
+            value={draftLyrics}
+            onChange={event => setDraftLyrics(event.target.value)}
+            rows={draftLyrics ? 10 : 4}
+            disabled={!isEditable || isSaving}
+            className='min-h-[140px] resize-y border-(--linear-app-frame-seam) bg-surface-0 text-[12px]'
+          />
+          {/* Auto-save status indicator */}
+          {saveStatus !== 'idle' && (
+            <div className='flex items-center gap-1 text-2xs text-tertiary-token'>
+              {saveStatus === 'saving' && (
+                <>
+                  <Loader2
+                    className='h-3 w-3 animate-spin'
+                    aria-hidden='true'
+                  />
+                  <span>Saving…</span>
+                </>
+              )}
+              {saveStatus === 'saved' && (
+                <>
+                  <Check className='h-3 w-3 text-success' aria-hidden='true' />
+                  <span>Saved</span>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </DrawerSurfaceCard>
 
-      <div className='mt-3 flex items-center gap-2'>
+      <div className='flex flex-wrap items-center gap-2 pt-0.5'>
         {/* Copy button */}
         <DrawerButton
           type='button'
           disabled={isActionsDisabled || isCopying}
           onClick={handleCopy}
+          className='h-7 px-2 text-[11px]'
         >
           {isCopying ? (
             <Check className='h-3.5 w-3.5 text-success' />
@@ -221,13 +236,13 @@ export function ReleaseLyricsSection({
 
         {/* Format split button: primary action + dropdown chevron */}
         {showFormatOptions && (
-          <div className='inline-flex items-center rounded-[8px] border border-subtle bg-surface-1 shadow-none'>
+          <div className='inline-flex items-center rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))]'>
             {/* Primary format action — uses the most recently selected format */}
             <DrawerButton
               type='button'
               disabled={isActionsDisabled || isFormatting}
               onClick={() => handleFormat(selectedFormat)}
-              className='rounded-r-none border-r border-r-(--linear-border-subtle)'
+              className='h-7 rounded-r-none border-r border-r-(--linear-border-subtle) px-2 text-[11px]'
             >
               {isFormatting ? (
                 <Loader2 className='h-3.5 w-3.5 animate-spin' />
@@ -246,7 +261,7 @@ export function ReleaseLyricsSection({
                   type='button'
                   size='icon'
                   disabled={isActionsDisabled || isFormatting}
-                  className='rounded-l-none px-1.5'
+                  className='h-7 w-7 rounded-l-none px-1.5'
                   aria-label='Choose format'
                 >
                   <ChevronDown className='h-3.5 w-3.5' />
@@ -275,6 +290,6 @@ export function ReleaseLyricsSection({
           </div>
         )}
       </div>
-    </DrawerSection>
+    </div>
   );
 }

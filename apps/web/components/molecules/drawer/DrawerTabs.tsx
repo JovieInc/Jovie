@@ -26,9 +26,13 @@ export function DrawerTabs<T extends string>({
       value={value}
       onValueChange={onValueChange}
       options={options}
+      surface='ghost'
       aria-label={ariaLabel}
       className={cn('w-full', className)}
-      triggerClassName={cn('h-[34px] px-3.5 text-[12.5px]', triggerClassName)}
+      triggerClassName={cn(
+        'h-[26px] rounded-[7px] px-2.5 text-[11px] font-[510] tracking-[-0.008em] data-[state=active]:bg-surface-1',
+        triggerClassName
+      )}
     />
   );
 }

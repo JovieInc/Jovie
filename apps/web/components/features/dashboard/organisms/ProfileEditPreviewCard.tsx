@@ -90,9 +90,9 @@ export function ProfileEditPreviewCard({
   // Show completed state
   if (applied) {
     return (
-      <ContentSurfaceCard className='p-4'>
-        <div className='flex items-center justify-between gap-3'>
-          <div className='min-w-0 space-y-1'>
+      <ContentSurfaceCard className='p-2.5'>
+        <div className='flex items-center justify-between gap-2'>
+          <div className='min-w-0 space-y-0.5'>
             <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
@@ -100,7 +100,7 @@ export function ProfileEditPreviewCard({
               Updated successfully
             </p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-success/20 bg-success-subtle px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-success'>
+          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-success-subtle px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-success'>
             <Check className='h-3.5 w-3.5' />
             Applied
           </span>
@@ -112,15 +112,15 @@ export function ProfileEditPreviewCard({
   // Show cancelled state
   if (cancelled) {
     return (
-      <ContentSurfaceCard className='p-4 opacity-70'>
-        <div className='flex items-center justify-between gap-3'>
-          <div className='min-w-0 space-y-1'>
+      <ContentSurfaceCard className='p-2.5 opacity-70'>
+        <div className='flex items-center justify-between gap-2'>
+          <div className='min-w-0 space-y-0.5'>
             <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
               {preview.fieldLabel}
             </p>
             <p className='text-[12px] text-secondary-token'>Edit cancelled</p>
           </div>
-          <span className='inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-subtle bg-surface-0 px-2 py-1 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
+          <span className='inline-flex shrink-0 items-center gap-1 rounded-md bg-surface-0 px-1.5 py-0.5 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
             <X className='h-3.5 w-3.5' />
             Cancelled
           </span>
@@ -131,7 +131,7 @@ export function ProfileEditPreviewCard({
 
   return (
     <ContentSurfaceCard className='overflow-hidden'>
-      <div className='border-b border-subtle px-4 py-3'>
+      <div className='px-2.5 py-1.5'>
         <div className='space-y-0.5'>
           <h4 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
             Update {preview.fieldLabel}
@@ -144,9 +144,9 @@ export function ProfileEditPreviewCard({
         </div>
       </div>
 
-      <div className='space-y-2 px-4 py-3'>
-        <div className='rounded-[10px] border border-subtle bg-surface-0 px-3 py-3'>
-          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
+      <div className='space-y-1 px-2.5 py-1.5'>
+        <div className='rounded-md bg-surface-0 px-2.5 py-2'>
+          <div className='mb-0.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
             Current
           </div>
           <div
@@ -158,8 +158,8 @@ export function ProfileEditPreviewCard({
             {formatValue(preview.currentValue)}
           </div>
         </div>
-        <div className='rounded-[10px] border border-(--linear-accent)/20 bg-(--linear-accent)/8 px-3 py-3'>
-          <div className='mb-1 text-[11px] font-[510] uppercase tracking-[0.08em] text-(--linear-accent)'>
+        <div className='rounded-md bg-(--linear-accent)/8 px-2.5 py-2'>
+          <div className='mb-0.5 text-[13px] font-[510] tracking-normal text-(--linear-accent)'>
             New
           </div>
           <div className='text-[13px] tracking-[-0.01em] text-primary-token'>
@@ -168,7 +168,7 @@ export function ProfileEditPreviewCard({
         </div>
       </div>
 
-      <div className='flex items-center gap-2 border-t border-subtle px-4 py-3'>
+      <div className='flex items-center gap-1.5 px-2.5 py-1.5'>
         <DrawerButton
           type='button'
           tone='primary'

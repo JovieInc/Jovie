@@ -34,7 +34,7 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center gap-1 rounded-[8px] border border-subtle bg-surface-1 px-1 py-1'>
+    <div className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1 py-0.5'>
       <DrawerInlineIconButton
         title='Open'
         onClick={event => {
@@ -205,7 +205,7 @@ export const ProviderCell = memo(function ProviderCell({
   };
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-2.5'>
       <ProviderStatusDot status={status} accent={config.accent} />
       {renderProviderContent()}
     </div>

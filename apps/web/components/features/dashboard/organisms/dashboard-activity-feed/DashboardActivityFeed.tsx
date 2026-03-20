@@ -14,7 +14,7 @@ function ActivityEmptyState({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <div className='flex min-h-[140px] items-center rounded-[8px] border border-subtle bg-surface-1 px-3'>
+      <div className='flex min-h-[140px] items-center rounded-md bg-surface-1 px-2'>
         <p className='text-[12px] leading-[17px] text-secondary-token'>
           No recent activity. Share your profile to see engagement here.
         </p>
@@ -32,7 +32,7 @@ function ActivityList({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <ul className='space-y-1'>
+      <ul className='space-y-0.5'>
         {activities.map(activity => (
           <ActivityItem key={activity.id} activity={activity} />
         ))}
@@ -46,7 +46,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
     <>
       <span
         aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-0 text-base shadow-ring-surface-0 group-hover:shadow-ring-surface-1 group-focus-visible:shadow-ring-surface-1'
+        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-base'
       >
         <span className='scale-90 text-tertiary-token'>{activity.icon}</span>
       </span>
@@ -71,7 +71,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         />
         <Link
           href={activity.href}
-          className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2 transition-[background-color,box-shadow] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-150 hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none'
         >
           {content}
         </Link>
@@ -85,7 +85,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         aria-hidden='true'
         className='absolute left-3 top-0 bottom-0 w-px bg-(--linear-border-subtle)'
       />
-      <div className='group relative flex items-start gap-3 rounded-[8px] px-2 py-2'>
+      <div className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5'>
         {content}
       </div>
     </li>
@@ -109,10 +109,10 @@ export function DashboardActivityFeed({
   const isRefreshing = isFetching && !isLoading;
 
   return (
-    <div className='space-y-3' data-testid='dashboard-activity-feed'>
+    <div className='space-y-1.5' data-testid='dashboard-activity-feed'>
       <div className='flex items-center justify-between gap-4'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 shadow-ring-surface-0'>
+          <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
             <Zap className='h-3.5 w-3.5 text-tertiary-token' />
           </div>
           <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>

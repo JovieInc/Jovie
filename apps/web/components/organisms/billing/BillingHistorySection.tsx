@@ -38,7 +38,7 @@ export function BillingHistorySection({
 
         {historyQuery.isLoading && (
           <Card className='border-0 shadow-none'>
-            <CardContent className='p-4'>
+            <CardContent className='px-3 py-2'>
               <LoadingSkeleton lines={4} height='h-12' rounded='md' />
             </CardContent>
           </Card>
@@ -46,7 +46,7 @@ export function BillingHistorySection({
 
         {!historyQuery.isLoading && historyQuery.error && (
           <Card className='border-0 shadow-none'>
-            <CardContent className='p-4'>
+            <CardContent className='px-3 py-2'>
               <p className='text-[13px] text-tertiary-token'>
                 Unable to load billing history.
               </p>
@@ -79,7 +79,7 @@ export function BillingHistorySection({
                           className='flex items-center justify-between px-4 py-3 transition-colors hover:bg-surface-1'
                         >
                           <div className='flex items-center gap-3'>
-                            <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                            <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-1'>
                               <IconComponent className='h-4 w-4 text-secondary-token' />
                             </div>
                             <div>
@@ -107,7 +107,7 @@ export function BillingHistorySection({
             </Card>
           ) : (
             <Card className='border-0 shadow-none'>
-              <CardContent className='p-8 text-center'>
+              <CardContent className='px-3 py-5 text-center'>
                 <Clock className='mx-auto h-8 w-8 text-tertiary-token' />
                 <p className='mt-3 text-[13px] text-secondary-token'>
                   No billing events yet.

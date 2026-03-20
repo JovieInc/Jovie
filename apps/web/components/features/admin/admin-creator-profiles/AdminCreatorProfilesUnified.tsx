@@ -375,12 +375,12 @@ export function AdminCreatorProfilesUnified({
 
     if (isChecked || isSelected) {
       return cn(
-        'group bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
+        'group cursor-pointer bg-(--linear-row-selected) shadow-[inset_1px_0_0_0_var(--linear-border-focus)] hover:bg-(--linear-row-selected)'
       );
     }
 
     return cn(
-      'group bg-transparent hover:bg-(--linear-row-hover) transition-colors duration-100 ease-out'
+      'group cursor-pointer bg-transparent transition-colors duration-100 ease-out hover:bg-(--linear-row-hover)'
     );
   }, []);
 
@@ -425,7 +425,7 @@ export function AdminCreatorProfilesUnified({
       <div className='flex-1 min-h-0 overflow-hidden min-w-0 h-full'>
         <AdminTableShell
           testId='admin-creators-content'
-          className='rounded-none'
+          className='rounded-none border-0'
           scrollContainerProps={{
             tabIndex: 0,
             onKeyDown: handleKeyDown,
@@ -489,7 +489,7 @@ export function AdminCreatorProfilesUnified({
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-              className='text-[13px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
+              className='text-[12.5px] [&_thead_th]:py-1 [&_thead_th]:text-[10px] [&_thead_th]:tracking-[0.07em]'
               hasNextPage={hasNextPage}
               isFetchingNextPage={isFetchingNextPage}
               onLoadMore={() => {

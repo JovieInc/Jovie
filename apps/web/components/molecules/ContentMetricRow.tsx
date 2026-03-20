@@ -23,7 +23,7 @@ export function ContentMetricRow({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 rounded-[10px] border border-subtle bg-surface-0 px-3 py-2.5',
+        'flex items-center justify-between gap-3 rounded-lg bg-surface-0 px-2.5 py-2',
         className
       )}
     >

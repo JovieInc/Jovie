@@ -31,7 +31,7 @@ export default function AdminPage() {
     <PageShell>
       <PageContent>
         <div
-          className='flex h-full flex-col gap-6'
+          className='flex h-full flex-col gap-4'
           data-testid='admin-dashboard-content'
         >
           {/* Row 0: Platform bragging rights — labels, distributors, stats */}
@@ -63,7 +63,7 @@ export default function AdminPage() {
                 actionsClassName='shrink-0'
               />
             </summary>
-            <div className='space-y-4 border-t border-subtle px-(--linear-app-header-padding-x) py-4'>
+            <div className='space-y-3 border-t border-subtle px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
               <p className='text-app text-secondary-token'>
                 Secondary platform stats are intentionally below the fold so
                 core business KPIs stay front and center.
@@ -76,7 +76,7 @@ export default function AdminPage() {
 
           {/* Row 3: Outreach pipeline + Reliability side by side */}
 
-          <div className='grid min-h-0 flex-1 gap-6 lg:grid-cols-3'>
+          <div className='grid min-h-0 flex-1 gap-4 lg:grid-cols-3'>
             <div className='lg:col-span-2'>
               <Suspense fallback={<AdminOutreachSectionSkeleton />}>
                 <AdminOutreachSection />

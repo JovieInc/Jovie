@@ -21,7 +21,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
     >
       <div className='flex items-center justify-between gap-3'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-subtle bg-surface-0'>
+          <div className='flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
             <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
           </div>
           <div>

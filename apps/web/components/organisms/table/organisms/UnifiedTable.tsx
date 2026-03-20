@@ -84,7 +84,7 @@ export interface UnifiedTableProps<TData> {
 
   /**
    * Estimated row height for virtualization
-   * @default 40
+   * @default 32
    */
   readonly rowHeight?: number;
 
@@ -324,7 +324,7 @@ export function UnifiedTable<TData>({
   sorting,
   onSortingChange,
   enableVirtualization,
-  rowHeight = 40,
+  rowHeight = 32,
   overscan = 5,
   renderRow,
   getRowId,
@@ -493,6 +493,7 @@ export function UnifiedTable<TData>({
           .getRowModel()
           .rows.map(r => [getRowId ? getRowId(r.original) : r.original, r])
       ),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `rows` triggers table model rebuild
     [rows, getRowId, table]
   );
 
@@ -713,7 +714,7 @@ export function UnifiedTable<TData>({
               <tr>
                 <td
                   colSpan={columnCount}
-                  className='py-3 text-center text-[11px] text-tertiary-token'
+                  className='py-1.5 text-center text-[11px] text-tertiary-token'
                 >
                   <span className='inline-flex items-center gap-1.5'>
                     <LoadingSpinner

@@ -4,7 +4,6 @@ import { Share2, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { captureWarning } from '@/lib/error-tracking';
 
 const STORAGE_KEY_PREFIX = 'jovie_social_bio_nudge_dismissed';
@@ -47,16 +46,16 @@ export const SocialBioNudge = memo(function SocialBioNudge({
   }
 
   return (
-    <ContentSurfaceCard className='flex items-start gap-3 p-4 sm:p-5'>
+    <div className='flex items-start gap-2 rounded-md border border-subtle px-2 py-1.5'>
       <div
-        className='shrink-0 rounded-[10px] border border-subtle bg-surface-0 p-2.5'
+        className='shrink-0 rounded-md bg-surface-0 p-1.5'
         aria-hidden='true'
       >
-        <Share2 className='h-4 w-4 text-secondary-token' />
+        <Share2 className='h-3.5 w-3.5 text-secondary-token' />
       </div>
-      <div className='min-w-0 flex-1 space-y-2'>
-        <div className='space-y-1'>
-          <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+      <div className='min-w-0 flex-1 space-y-1'>
+        <div className='space-y-0.5'>
+          <p className='text-[13px] font-[560] tracking-normal text-secondary-token'>
             Grow your audience
           </p>
           <p className='text-[14px] font-[590] leading-5 text-primary-token'>
@@ -118,6 +117,6 @@ export const SocialBioNudge = memo(function SocialBioNudge({
       >
         <X className='h-4 w-4' aria-hidden='true' />
       </AppIconButton>
-    </ContentSurfaceCard>
+    </div>
   );
 });

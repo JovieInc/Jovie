@@ -18,7 +18,7 @@ export function AudienceMemberActivityFeed({
   if (actions.length === 0) {
     return (
       <DrawerEmptyState
-        className='min-h-[120px]'
+        className='min-h-[104px]'
         message='Activity will appear here as this contact interacts with your profile.'
       />
     );
@@ -34,36 +34,33 @@ export function AudienceMemberActivityFeed({
 
   return (
     <div className='relative'>
-      {/* Timeline line */}
       <div
-        className='absolute top-3 bottom-3 left-[13px] w-px bg-(--linear-border-subtle)'
+        className='absolute top-2.5 bottom-2.5 left-[11px] w-px bg-(--linear-border-subtle)'
         aria-hidden='true'
       />
 
-      <ul className='space-y-0.5'>
+      <ul className='space-y-px'>
         {sorted.map((action, index) => (
           <li
             key={`${member.id}-activity-${action.label}-${action.timestamp ?? index}`}
-            className='relative flex items-start gap-3 py-2'
+            className='relative flex items-start gap-2.5 py-1.5'
           >
-            {/* Icon circle */}
             <span
-              className='relative z-10 inline-flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
+              className='relative z-10 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
               aria-hidden='true'
             >
               <Icon
                 name={resolveAudienceActionIcon(action.label)}
-                className='h-3 w-3'
+                className='h-[11px] w-[11px]'
               />
             </span>
 
-            {/* Content */}
-            <div className='min-w-0 flex-1 pt-0.5'>
-              <p className='text-[13px] leading-tight text-primary-token'>
+            <div className='min-w-0 flex-1 pt-px'>
+              <p className='text-[12px] leading-4 text-primary-token'>
                 {formatActionLabel(action.label)}
               </p>
               {action.timestamp && (
-                <p className='mt-0.5 text-[11px] text-tertiary-token'>
+                <p className='mt-0.5 text-[10.5px] text-tertiary-token'>
                   {formatTimeAgo(action.timestamp)}
                 </p>
               )}

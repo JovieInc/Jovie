@@ -26,7 +26,7 @@ export function DrawerMediaThumb({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded-[10px] border border-subtle bg-surface-1 shadow-none',
+        'relative shrink-0 overflow-hidden rounded-lg bg-surface-1',
         sizeClassName,
         className
       )}

@@ -411,7 +411,9 @@ export const DashboardAudienceTableUnified = memo(
         const isSelected = selectedMember?.id === row.id;
         return cn(
           'h-8',
-          isSelected ? 'bg-white/[0.04]' : 'hover:bg-white/[0.02]'
+          isSelected
+            ? 'bg-(--linear-row-selected)'
+            : 'bg-transparent hover:bg-(--linear-row-hover)'
         );
       },
       [selectedMember]
@@ -577,7 +579,7 @@ export const DashboardAudienceTableUnified = memo(
                         enableKeyboardNavigation={true}
                         hideHeader={true}
                         minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                        className='text-[13px]'
+                        className='text-[12.5px]'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}
                         onFocusedRowChange={handleFocusedRowChange}
