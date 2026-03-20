@@ -230,4 +230,58 @@ describe('release artist links', () => {
 
     expect(screen.queryByText('Is this your music?')).not.toBeInTheDocument();
   });
+
+  it('opens credits dialog and renders grouped collaborators', () => {
+    renderWithQueryClient(
+      <ReleaseLandingPage
+        release={{
+          title: 'Test Release',
+          artworkUrl: null,
+          releaseDate: '2026-01-10',
+        }}
+        artist={{
+          name: 'Test Artist',
+          handle: 'test-artist',
+          avatarUrl: null,
+        }}
+        providers={[]}
+        credits={[
+          {
+            role: 'producer',
+            label: 'Producer',
+            entries: [
+              {
+                artistId: 'producer-1',
+                name: 'Producer One',
+                handle: 'producer-one',
+                role: 'producer',
+                position: 1,
+              },
+              {
+                artistId: 'producer-2',
+                name: 'Producer Two',
+                handle: null,
+                role: 'producer',
+                position: 2,
+              },
+            ],
+          },
+        ]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /view credits/i }));
+
+    expect(screen.getByText('Credits')).toBeInTheDocument();
+    expect(
+      screen.getByText('View all credited collaborators for this release')
+    ).toBeInTheDocument();
+    expect(screen.getByText('Producer')).toBeInTheDocument();
+    expect(screen.getByTestId('credits-scroll-container')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Producer One' })).toHaveAttribute(
+      'href',
+      '/producer-one'
+    );
+    expect(screen.getByText('Producer Two')).toBeInTheDocument();
+  });
 });

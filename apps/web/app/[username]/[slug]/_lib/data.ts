@@ -10,15 +10,147 @@ import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
 import {
+  type ArtistRole,
+  artists,
   discogReleases,
   discogTracks,
   providerLinks,
+  releaseArtists,
 } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getCreatorEntitlements } from '@/lib/entitlements/creator-plan';
 import { toISOStringOrNull } from '@/lib/utils/date';
 
 export type ContentType = 'release' | 'track';
+type HiddenCreditRole = 'vs' | 'with';
+type SmartLinkCreditRole = Exclude<ArtistRole, HiddenCreditRole>;
+
+const CREDIT_ROLE_ORDER: SmartLinkCreditRole[] = [
+  'main_artist',
+  'featured_artist',
+  'producer',
+  'co_producer',
+  'composer',
+  'lyricist',
+  'arranger',
+  'conductor',
+  'remixer',
+  'mix_engineer',
+  'mastering_engineer',
+  'other',
+];
+
+const CREDIT_ROLE_LABELS: Record<SmartLinkCreditRole, string> = {
+  main_artist: 'Primary artist',
+  featured_artist: 'Featured artist',
+  producer: 'Producer',
+  co_producer: 'Co-producer',
+  composer: 'Composer',
+  lyricist: 'Lyricist',
+  arranger: 'Arranger',
+  conductor: 'Conductor',
+  remixer: 'Remixer',
+  mix_engineer: 'Mix engineer',
+  mastering_engineer: 'Mastering engineer',
+  other: 'Additional credits',
+};
+
+function normalizeCreditRole(role: ArtistRole): SmartLinkCreditRole {
+  if (role === 'vs' || role === 'with') {
+    return 'other';
+  }
+
+  return role;
+}
+
+function getRoleOrder(role: SmartLinkCreditRole): number {
+  return CREDIT_ROLE_ORDER.indexOf(role);
+}
+
+export interface SmartLinkCreditEntry {
+  artistId: string;
+  name: string;
+  handle: string | null;
+  role: SmartLinkCreditRole;
+  position: number;
+}
+
+export interface SmartLinkCreditGroup {
+  role: SmartLinkCreditRole;
+  label: string;
+  entries: SmartLinkCreditEntry[];
+}
+
+function groupReleaseCredits(
+  rows: Array<{
+    artistId: string;
+    artistName: string;
+    creditName: string | null;
+    handle: string | null;
+    role: ArtistRole;
+    position: number;
+  }>
+): SmartLinkCreditGroup[] {
+  const groups = new Map<SmartLinkCreditRole, SmartLinkCreditEntry[]>();
+  const seenByRole = new Map<SmartLinkCreditRole, Set<string>>();
+
+  for (const row of rows) {
+    const name = (row.creditName ?? row.artistName).trim();
+    if (!name) continue;
+
+    const role = normalizeCreditRole(row.role);
+    const dedupeKey = `${name.toLowerCase()}::${row.handle ?? ''}`;
+    const seen = seenByRole.get(role) ?? new Set<string>();
+
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    seenByRole.set(role, seen);
+
+    const entries = groups.get(role) ?? [];
+    entries.push({
+      artistId: row.artistId,
+      name,
+      handle: row.handle,
+      role,
+      position: row.position,
+    });
+    groups.set(role, entries);
+  }
+
+  return Array.from(groups.entries())
+    .sort(([leftRole], [rightRole]) => {
+      return getRoleOrder(leftRole) - getRoleOrder(rightRole);
+    })
+    .map(([role, entries]) => ({
+      role,
+      label: CREDIT_ROLE_LABELS[role],
+      entries,
+    }));
+}
+
+async function fetchReleaseCredits(
+  releaseId: string
+): Promise<SmartLinkCreditGroup[]> {
+  const rows = await db
+    .select({
+      artistId: artists.id,
+      artistName: artists.name,
+      creditName: releaseArtists.creditName,
+      handle: creatorProfiles.usernameNormalized,
+      role: releaseArtists.role,
+      position: releaseArtists.position,
+    })
+    .from(releaseArtists)
+    .innerJoin(artists, eq(releaseArtists.artistId, artists.id))
+    .leftJoin(creatorProfiles, eq(artists.creatorProfileId, creatorProfiles.id))
+    .where(eq(releaseArtists.releaseId, releaseId))
+    .orderBy(releaseArtists.position);
+
+  return groupReleaseCredits(rows);
+}
 
 export interface ContentData {
   type: ContentType;
@@ -33,6 +165,7 @@ export interface ContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   releaseId?: string | null;
+  credits?: SmartLinkCreditGroup[];
   creator: {
     id: string;
     displayName: string | null;
@@ -59,6 +192,7 @@ export interface CachedContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   releaseId?: string | null;
+  credits?: SmartLinkCreditGroup[];
 }
 
 /**
@@ -140,18 +274,21 @@ const fetchContentBySlug = async (
     .limit(1);
 
   if (release) {
-    const links = await db
-      .select({
-        providerId: providerLinks.providerId,
-        url: providerLinks.url,
-      })
-      .from(providerLinks)
-      .where(
-        and(
-          eq(providerLinks.ownerType, 'release'),
-          eq(providerLinks.releaseId, release.id)
-        )
-      );
+    const [links, credits] = await Promise.all([
+      db
+        .select({
+          providerId: providerLinks.providerId,
+          url: providerLinks.url,
+        })
+        .from(providerLinks)
+        .where(
+          and(
+            eq(providerLinks.ownerType, 'release'),
+            eq(providerLinks.releaseId, release.id)
+          )
+        ),
+      fetchReleaseCredits(release.id),
+    ]);
 
     const metadata = release.metadata as Record<string, unknown> | null;
     const artworkSizes =
@@ -169,6 +306,7 @@ const fetchContentBySlug = async (
       releaseType: release.releaseType,
       totalTracks: release.totalTracks,
       releaseId: release.id,
+      credits,
     };
   }
 
