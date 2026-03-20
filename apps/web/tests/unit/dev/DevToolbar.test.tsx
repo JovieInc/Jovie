@@ -1,39 +1,77 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockSetTheme = vi.fn();
+
 // Mock next-themes
 vi.mock('next-themes', () => ({
-  useTheme: () => ({ theme: 'dark', setTheme: vi.fn() }),
+  useTheme: () => ({ theme: 'dark', setTheme: mockSetTheme }),
 }));
+
+const mockSetOverride = vi.fn();
+const mockRemoveOverride = vi.fn();
+const mockClearOverrides = vi.fn();
+let mockOverrides: Record<string, boolean> = {};
 
 // Mock feature flag overrides
 vi.mock('@/lib/feature-flags/client', () => ({
   useFeatureFlagOverrides: () => ({
-    overrides: {},
-    setOverride: vi.fn(),
-    removeOverride: vi.fn(),
-    clearOverrides: vi.fn(),
+    overrides: mockOverrides,
+    setOverride: mockSetOverride,
+    removeOverride: mockRemoveOverride,
+    clearOverrides: mockClearOverrides,
   }),
 }));
 
 vi.mock('@/lib/feature-flags/shared', () => ({
-  FEATURE_FLAG_KEYS: {},
-  CODE_FLAG_KEYS: {},
-  FEATURE_FLAGS: {},
+  FEATURE_FLAG_KEYS: {
+    CLAIM_HANDLE: 'feature_claim_handle',
+    HERO_SPOTIFY: 'feature_hero_spotify',
+    BILLING_UPGRADE: 'billing.upgradeDirect',
+  },
+  CODE_FLAG_KEYS: {
+    THREADS_ENABLED: 'code:THREADS_ENABLED',
+    PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
+  },
+  FEATURE_FLAGS: {
+    THREADS_ENABLED: false,
+    PWA_INSTALL_BANNER: false,
+  },
 }));
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
+const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
 
-function renderToolbar() {
-  return render(<DevToolbar env='development' sha='abc123' version='1.0.0' />);
+function renderToolbar(
+  props?: Partial<{ env: string; sha: string; version: string }>
+) {
+  return render(
+    <DevToolbar
+      env={props?.env ?? 'development'}
+      sha={props?.sha ?? 'abc1234'}
+      version={props?.version ?? '1.0.0'}
+    />
+  );
 }
 
-describe('DevToolbar hide/show', () => {
+describe('DevToolbar', () => {
   beforeEach(() => {
     localStorage.clear();
     document.body.style.paddingBottom = '';
+    mockOverrides = {};
+    mockSetOverride.mockClear();
+    mockRemoveOverride.mockClear();
+    mockClearOverrides.mockClear();
+    mockSetTheme.mockClear();
+
+    // Mock clipboard API
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
   afterEach(() => {
@@ -41,69 +79,526 @@ describe('DevToolbar hide/show', () => {
     document.body.style.paddingBottom = '';
   });
 
-  it('shows the full toolbar when no localStorage key is set (first visit)', () => {
-    renderToolbar();
-    // After mount effect, hidden=false (null !== '1'), so toolbar is visible
-    expect(screen.getByText('Dev Toolbar')).toBeInTheDocument();
+  // ─── Show/Hide ───────────────────────────────────────────────
+
+  describe('show/hide', () => {
+    it('shows the full toolbar when no localStorage key is set (first visit)', () => {
+      renderToolbar();
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('shows the "Dev" pill when localStorage says hidden', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('shows the full toolbar when the Dev pill is clicked', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('persists hidden=false to localStorage when shown', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
+      expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('0');
+    });
+
+    it('hides the toolbar when the X button is clicked', () => {
+      renderToolbar();
+      expect(screen.getByText('development')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('persists hidden=true to localStorage when hidden via X', () => {
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('1');
+    });
+
+    it('restores visible state from localStorage on mount', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+      renderToolbar();
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('restores hidden state from localStorage on mount', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('clears body paddingBottom when toolbar is hidden', () => {
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
+      expect(document.body.style.paddingBottom).toBe('');
+    });
   });
 
-  it('shows the "Dev" pill when localStorage says hidden', () => {
-    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-    renderToolbar();
-    expect(
-      screen.getByRole('button', { name: 'Show dev toolbar' })
-    ).toBeInTheDocument();
-    expect(screen.queryByText('Dev Toolbar')).not.toBeInTheDocument();
+  // ─── Keyboard Shortcut ──────────────────────────────────────
+
+  describe('keyboard shortcut (Cmd+Shift+D)', () => {
+    it('shows toolbar when hidden via Cmd+Shift+D', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+
+      fireEvent.keyDown(document, {
+        key: 'd',
+        shiftKey: true,
+        metaKey: true,
+      });
+
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('hides toolbar when visible via Cmd+Shift+D', () => {
+      renderToolbar();
+      expect(screen.getByText('development')).toBeInTheDocument();
+
+      fireEvent.keyDown(document, {
+        key: 'd',
+        shiftKey: true,
+        metaKey: true,
+      });
+
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('works with Ctrl+Shift+D (non-Mac)', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.keyDown(document, {
+        key: 'd',
+        shiftKey: true,
+        ctrlKey: true,
+      });
+
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('does not trigger on other key combinations', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+
+      // Just Shift+D (no meta/ctrl)
+      fireEvent.keyDown(document, { key: 'd', shiftKey: true });
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+
+      // Cmd+D (no shift)
+      fireEvent.keyDown(document, { key: 'd', metaKey: true });
+      expect(
+        screen.getByRole('button', { name: 'Show dev toolbar' })
+      ).toBeInTheDocument();
+    });
+
+    it('persists state to localStorage', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.keyDown(document, {
+        key: 'd',
+        shiftKey: true,
+        metaKey: true,
+      });
+
+      expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('0');
+    });
+
+    it('shows shortcut hint on pill button title', () => {
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
+      renderToolbar();
+      const pill = screen.getByRole('button', { name: 'Show dev toolbar' });
+      expect(pill).toHaveAttribute('title', 'Show dev toolbar (⌘⇧D)');
+    });
+
+    it('closes expanded panel on Escape without hiding toolbar', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      // Panel should be expanded
+      expect(
+        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+      ).toBeInTheDocument();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      // Panel collapsed, but toolbar still visible
+      expect(
+        screen.getByRole('button', { name: 'Expand dev toolbar' })
+      ).toBeInTheDocument();
+      expect(screen.getByText('development')).toBeInTheDocument();
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
+    });
+
+    it('does not close panel on Escape when already collapsed', () => {
+      renderToolbar();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      // Toolbar still visible, not hidden
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
   });
 
-  it('shows the full toolbar when the Dev pill is clicked', () => {
-    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-    renderToolbar();
-    fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
-    expect(screen.getByText('Dev Toolbar')).toBeInTheDocument();
+  // ─── Search ─────────────────────────────────────────────────
+
+  describe('search', () => {
+    it('renders search input when expanded', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+      expect(
+        screen.getByPlaceholderText('Search flags...')
+      ).toBeInTheDocument();
+    });
+
+    it('filters flags by search query', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const searchInput = screen.getByPlaceholderText('Search flags...');
+      fireEvent.change(searchInput, { target: { value: 'claim' } });
+
+      expect(screen.getByText('claim handle')).toBeInTheDocument();
+      expect(screen.queryByText('hero spotify')).not.toBeInTheDocument();
+    });
+
+    it('is case-insensitive', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const searchInput = screen.getByPlaceholderText('Search flags...');
+      fireEvent.change(searchInput, { target: { value: 'CLAIM' } });
+
+      expect(screen.getByText('claim handle')).toBeInTheDocument();
+    });
+
+    it('shows empty state when no flags match', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const searchInput = screen.getByPlaceholderText('Search flags...');
+      fireEvent.change(searchInput, { target: { value: 'zzzzz' } });
+
+      expect(screen.getByText(/No flags match/)).toBeInTheDocument();
+    });
+
+    it('shows match count', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      // Should show "5 of 5" initially (3 statsig + 2 code)
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+
+      const searchInput = screen.getByPlaceholderText('Search flags...');
+      fireEvent.change(searchInput, { target: { value: 'claim' } });
+
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+    });
+
+    it('clears search when clear button is clicked', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const searchInput = screen.getByPlaceholderText('Search flags...');
+      fireEvent.change(searchInput, { target: { value: 'claim' } });
+
+      expect(screen.getByText('1 of 5')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+
+      expect(screen.getByText('5 of 5')).toBeInTheDocument();
+    });
+
+    it('does not show clear button when search is empty', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+      expect(
+        screen.queryByRole('button', { name: 'Clear search' })
+      ).not.toBeInTheDocument();
+    });
   });
 
-  it('persists hidden=false to localStorage when shown', () => {
-    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-    renderToolbar();
-    fireEvent.click(screen.getByRole('button', { name: 'Show dev toolbar' }));
-    expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('0');
+  // ─── Unified Flag List ──────────────────────────────────────
+
+  describe('unified flag list', () => {
+    it('shows both statsig and code flags in one list', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.getByText('claim handle')).toBeInTheDocument();
+      expect(screen.getByText('threads enabled')).toBeInTheDocument();
+    });
+
+    it('shows source label for each non-overridden flag', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const sourceLabels = screen.getAllByText(/^(statsig|code)$/);
+      expect(sourceLabels.length).toBe(5); // 3 statsig + 2 code
+    });
   });
 
-  it('hides the toolbar when the X button is clicked', () => {
-    renderToolbar();
-    expect(screen.getByText('Dev Toolbar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
-    expect(screen.queryByText('Dev Toolbar')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Show dev toolbar' })
-    ).toBeInTheDocument();
+  // ─── Override Sorting ───────────────────────────────────────
+
+  describe('override sorting', () => {
+    it('shows overrides group when flags are overridden', () => {
+      mockOverrides = { feature_claim_handle: true };
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.getByText('Overrides (1)')).toBeInTheDocument();
+    });
+
+    it('does not show overrides group when no flags are overridden', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.queryByText(/Overrides/)).not.toBeInTheDocument();
+    });
+
+    it('shows server default for overridden flags', () => {
+      mockOverrides = { feature_claim_handle: true };
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.getByText('server: off')).toBeInTheDocument();
+    });
+
+    it('shows clear all button in overrides group', () => {
+      mockOverrides = { feature_claim_handle: true };
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.getByText('clear all')).toBeInTheDocument();
+    });
+
+    it('calls clearOverrides when clear all is clicked', () => {
+      mockOverrides = { feature_claim_handle: true };
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.click(screen.getByText('clear all'));
+      expect(mockClearOverrides).toHaveBeenCalledOnce();
+    });
+
+    it('shows correct override count for multiple overrides', () => {
+      mockOverrides = {
+        feature_claim_handle: true,
+        'code:THREADS_ENABLED': true,
+      };
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(screen.getByText('Overrides (2)')).toBeInTheDocument();
+    });
   });
 
-  it('persists hidden=true to localStorage when hidden via X', () => {
-    renderToolbar();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
-    expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('1');
+  // ─── Copy Actions ───────────────────────────────────────────
+
+  describe('copy actions', () => {
+    it('copies SHA to clipboard when SHA button is clicked', async () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      // Expand to see the actions row
+      fireEvent.click(screen.getByRole('button', { name: 'Copy SHA' }));
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('abc1234');
+    });
+
+    it('copies route to clipboard when route button is clicked', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Copy route' }));
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith('/');
+    });
+
+    it('does not crash when clipboard fails', () => {
+      Object.assign(navigator, {
+        clipboard: {
+          writeText: vi.fn().mockRejectedValue(new Error('Not allowed')),
+        },
+      });
+
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      // Should not throw
+      expect(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Copy SHA' }));
+      }).not.toThrow();
+    });
   });
 
-  it('restores visible state from localStorage on mount', () => {
-    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
-    renderToolbar();
-    expect(screen.getByText('Dev Toolbar')).toBeInTheDocument();
+  // ─── Toggle Flash Feedback ─────────────────────────────────
+
+  describe('toggle flash feedback', () => {
+    it('applies flash class when flag is toggled', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const switches = screen.getAllByRole('switch');
+      fireEvent.click(switches[0]);
+
+      // The parent row should have the flash background class
+      const row = switches[0].closest('[class*="rounded-sm"]');
+      expect(row?.className).toContain('bg-[var(--color-accent)]/10');
+    });
   });
 
-  it('restores hidden state from localStorage on mount', () => {
-    localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-    renderToolbar();
-    expect(screen.queryByText('Dev Toolbar')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Show dev toolbar' })
-    ).toBeInTheDocument();
+  // ─── Override Badge (collapsed) ─────────────────────────────
+
+  describe('override badge', () => {
+    it('shows override count in collapsed bar when overrides exist', () => {
+      mockOverrides = { feature_claim_handle: true };
+      renderToolbar();
+
+      expect(screen.getByText('1 override')).toBeInTheDocument();
+    });
+
+    it('uses plural for multiple overrides', () => {
+      mockOverrides = {
+        feature_claim_handle: true,
+        'code:THREADS_ENABLED': true,
+      };
+      renderToolbar();
+
+      expect(screen.getByText('2 overrides')).toBeInTheDocument();
+    });
+
+    it('does not show badge when no overrides', () => {
+      renderToolbar();
+
+      expect(screen.queryByText(/override/)).not.toBeInTheDocument();
+    });
+
+    it('opens panel when badge is clicked and panel is collapsed', () => {
+      mockOverrides = { feature_claim_handle: true };
+      renderToolbar();
+
+      // Panel should be collapsed
+      expect(
+        screen.getByRole('button', { name: 'Expand dev toolbar' })
+      ).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText('1 override'));
+
+      // Panel should now be expanded
+      expect(
+        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+      ).toBeInTheDocument();
+    });
   });
 
-  it('clears body paddingBottom when toolbar is hidden', () => {
-    renderToolbar();
-    fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
-    expect(document.body.style.paddingBottom).toBe('');
+  // ─── Theme Picker ───────────────────────────────────────────
+
+  describe('theme picker', () => {
+    it('renders icon-only theme buttons', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      expect(
+        screen.getByRole('button', { name: 'Dark theme' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Light theme' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'System theme' })
+      ).toBeInTheDocument();
+    });
+
+    it('calls setTheme when theme button is clicked', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Light theme' }));
+      expect(mockSetTheme).toHaveBeenCalledWith('light');
+    });
+  });
+
+  // ─── Env Info ───────────────────────────────────────────────
+
+  describe('env info', () => {
+    it('shows env badge', () => {
+      renderToolbar();
+      expect(screen.getByText('development')).toBeInTheDocument();
+    });
+
+    it('shows SHA', () => {
+      renderToolbar();
+      expect(screen.getByText('abc1234')).toBeInTheDocument();
+    });
+
+    it('shows version', () => {
+      renderToolbar();
+      expect(screen.getByText('v1.0.0')).toBeInTheDocument();
+    });
+
+    it('applies red styling for production env', () => {
+      renderToolbar({ env: 'production' });
+      const badge = screen.getByText('production');
+      expect(badge.className).toContain('text-red-400');
+    });
+
+    it('applies yellow styling for preview env', () => {
+      renderToolbar({ env: 'preview' });
+      const badge = screen.getByText('preview');
+      expect(badge.className).toContain('text-yellow-400');
+    });
+
+    it('applies green styling for development env', () => {
+      renderToolbar({ env: 'development' });
+      const badge = screen.getByText('development');
+      expect(badge.className).toContain('text-green-400');
+    });
+  });
+
+  // ─── Admin Link ─────────────────────────────────────────────
+
+  describe('admin link', () => {
+    it('renders admin link in expanded actions row', () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      renderToolbar();
+
+      const adminLink = screen.getByRole('link', { name: 'Admin panel' });
+      expect(adminLink).toHaveAttribute('href', '/app/admin');
+    });
+  });
+
+  // ─── Expand/Collapse ───────────────────────────────────────
+
+  describe('expand/collapse', () => {
+    it('toggles expand state', () => {
+      renderToolbar();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Expand dev toolbar' })
+      );
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('1');
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Collapse dev toolbar' })
+      );
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
+    });
   });
 });

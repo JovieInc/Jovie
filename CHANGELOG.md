@@ -27,6 +27,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Legacy dual-write to `discog_tracks` during Spotify import — new imports only populate the new model
 - `releaseView` toggle in release provider matrix (singles classified correctly as releases now)
+### Changed
+
+- Redesigned dev toolbar UX — unified searchable flag list (statsig + code flags combined), keyboard shortcuts (Cmd+Shift+D toggle, Escape to close panel), quick actions (copy SHA/route, theme picker, admin link) moved to always-visible bottom bar
+- Added toggle flash feedback when switching feature flags, auto-focus search on panel expand, responsive compacting for narrow viewports
+- Clickable override badge in bottom bar opens flag panel directly
+- 50 unit tests covering all toolbar interactions (up from ~10)
 
 ## [26.4.20] - 2026-03-19
 
