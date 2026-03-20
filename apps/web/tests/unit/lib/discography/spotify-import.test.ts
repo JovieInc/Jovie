@@ -47,6 +47,10 @@ const mockGetBestSpotifyImage = vi
   .mockReturnValue('https://example.com/image.jpg');
 const mockUpsertRelease = vi.fn().mockResolvedValue({ id: 'release-1' });
 const mockUpsertTrack = vi.fn().mockResolvedValue({ id: 'track-1' });
+const mockUpsertRecording = vi.fn().mockResolvedValue({ id: 'recording-1' });
+const mockUpsertReleaseTrack = vi
+  .fn()
+  .mockResolvedValue({ id: 'release-track-1' });
 
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtistAlbums: mockGetSpotifyArtistAlbums,
@@ -79,6 +83,8 @@ vi.mock('@/lib/discography/queries', () => ({
   upsertProviderLink: vi.fn().mockResolvedValue({ id: 'link-1' }),
   upsertRelease: mockUpsertRelease,
   upsertTrack: mockUpsertTrack,
+  upsertRecording: mockUpsertRecording,
+  upsertReleaseTrack: mockUpsertReleaseTrack,
 }));
 
 vi.mock('@/lib/discography/slug', () => ({
@@ -109,6 +115,8 @@ describe('spotify-import', () => {
     mockGetBestSpotifyImage.mockReturnValue('https://example.com/image.jpg');
     mockUpsertRelease.mockResolvedValue({ id: 'release-1' });
     mockUpsertTrack.mockResolvedValue({ id: 'track-1' });
+    mockUpsertRecording.mockResolvedValue({ id: 'recording-1' });
+    mockUpsertReleaseTrack.mockResolvedValue({ id: 'release-track-1' });
     mockSafeParse.mockImplementation((id: unknown) => ({
       success: typeof id === 'string' && id.length > 0,
     }));

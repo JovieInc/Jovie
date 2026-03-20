@@ -59,6 +59,7 @@ export const discogReleaseTypeEnum = pgEnum('discog_release_type', [
 export const providerLinkOwnerEnum = pgEnum('provider_link_owner_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Billing & Subscription Enums
@@ -318,6 +319,7 @@ export const artistRoleEnum = pgEnum('artist_role', [
 export const contentSlugTypeEnum = pgEnum('content_slug_type', [
   'release',
   'track',
+  'release_track',
 ]);
 
 // Sender Reputation Enums

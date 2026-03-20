@@ -10,7 +10,9 @@ import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { db } from '@/lib/db';
 import {
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
   providerLinks,
 } from '@/lib/db/schema/content';
@@ -172,7 +174,78 @@ const fetchContentBySlug = async (
     };
   }
 
-  // Try track
+  // Try recording (new model) — look up via discog_recordings + discog_release_tracks
+  const [recording] = await db
+    .select({
+      id: discogRecordings.id,
+      title: discogRecordings.title,
+      slug: discogRecordings.slug,
+      previewUrl: discogRecordings.previewUrl,
+    })
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.slug, slug)
+      )
+    )
+    .limit(1);
+
+  if (recording) {
+    // Find a release_track to get the parent release
+    const [rt] = await db
+      .select({
+        id: discogReleaseTracks.id,
+        releaseId: discogReleaseTracks.releaseId,
+      })
+      .from(discogReleaseTracks)
+      .where(eq(discogReleaseTracks.recordingId, recording.id))
+      .limit(1);
+
+    const releaseId = rt?.releaseId;
+
+    const [releaseData, links] = await Promise.all([
+      releaseId
+        ? db
+            .select({
+              artworkUrl: discogReleases.artworkUrl,
+              releaseDate: discogReleases.releaseDate,
+            })
+            .from(discogReleases)
+            .where(eq(discogReleases.id, releaseId))
+            .limit(1)
+            .then(rows => rows[0])
+        : Promise.resolve(undefined),
+      rt
+        ? db
+            .select({
+              providerId: providerLinks.providerId,
+              url: providerLinks.url,
+            })
+            .from(providerLinks)
+            .where(
+              and(
+                eq(providerLinks.ownerType, 'release_track'),
+                eq(providerLinks.releaseTrackId, rt.id)
+              )
+            )
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      type: 'track',
+      id: recording.id,
+      title: recording.title,
+      slug: recording.slug,
+      artworkUrl: releaseData?.artworkUrl ?? null,
+      releaseDate: toISOStringOrNull(releaseData?.releaseDate),
+      providerLinks: links,
+      previewUrl: recording.previewUrl,
+      releaseId: releaseId ?? null,
+    };
+  }
+
+  // Fall back to legacy track
   const [track] = await db
     .select({
       id: discogTracks.id,

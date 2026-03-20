@@ -3,10 +3,16 @@ import { db, doesTableExist } from '@/lib/db';
 import { isUniqueViolation as isUniqueViolationUtil } from '@/lib/db/errors';
 import {
   artists,
+  type DiscogRecording,
   type DiscogRelease,
+  type DiscogReleaseTrack,
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
+  type NewDiscogRecording,
   type NewDiscogRelease,
+  type NewDiscogReleaseTrack,
   type NewDiscogTrack,
   type NewProviderLink,
   type ProviderLink,
@@ -92,16 +98,26 @@ export interface UpsertReleaseProviderLinkInput extends UpsertProviderLinkBase {
   trackId?: never;
 }
 
-// Track-level provider link input
+// Track-level provider link input (LEGACY — use ReleaseTrack variant for new code)
 export interface UpsertTrackProviderLinkInput extends UpsertProviderLinkBase {
   trackId: string;
   releaseId?: never;
+  releaseTrackId?: never;
+}
+
+// ReleaseTrack-level provider link input
+export interface UpsertReleaseTrackProviderLinkInput
+  extends UpsertProviderLinkBase {
+  releaseTrackId: string;
+  releaseId?: never;
+  trackId?: never;
 }
 
 // Union type for the function
 export type UpsertProviderLinkInput =
   | UpsertReleaseProviderLinkInput
-  | UpsertTrackProviderLinkInput;
+  | UpsertTrackProviderLinkInput
+  | UpsertReleaseTrackProviderLinkInput;
 
 function isUniqueConstraintViolation(
   error: unknown,
@@ -523,16 +539,24 @@ export async function upsertProviderLink(
   const now = new Date();
 
   // Determine owner type based on which ID is provided
+  const isReleaseTrackLink = 'releaseTrackId' in input && input.releaseTrackId;
   const isTrackLink = 'trackId' in input && input.trackId;
-  const ownerType = isTrackLink ? 'track' : 'release';
+  const ownerType = isReleaseTrackLink
+    ? 'release_track'
+    : isTrackLink
+      ? 'track'
+      : 'release';
 
   const insertData: NewProviderLink = {
     providerId: input.providerId,
     ownerType,
-    releaseId: isTrackLink
+    releaseId: isReleaseTrackLink
       ? null
-      : (input as UpsertReleaseProviderLinkInput).releaseId,
+      : isTrackLink
+        ? null
+        : (input as UpsertReleaseProviderLinkInput).releaseId,
     trackId: isTrackLink ? input.trackId : null,
+    releaseTrackId: isReleaseTrackLink ? input.releaseTrackId : null,
     url: input.url,
     externalId: input.externalId ?? null,
     sourceType: input.sourceType ?? 'ingested',
@@ -543,9 +567,11 @@ export async function upsertProviderLink(
   };
 
   // Use the appropriate unique constraint target
-  const conflictTarget = isTrackLink
-    ? [providerLinks.providerId, providerLinks.trackId]
-    : [providerLinks.providerId, providerLinks.releaseId];
+  const conflictTarget = isReleaseTrackLink
+    ? [providerLinks.providerId, providerLinks.releaseTrackId]
+    : isTrackLink
+      ? [providerLinks.providerId, providerLinks.trackId]
+      : [providerLinks.providerId, providerLinks.releaseId];
 
   try {
     const [result] = await db
@@ -958,4 +984,408 @@ export async function getTracksForReleaseWithProviders(
     total,
     hasMore: offset + limit < total,
   };
+}
+
+// ============================================================================
+// Recording & Release-Track Functions (new model)
+// ============================================================================
+
+export interface UpsertRecordingInput {
+  creatorProfileId: string;
+  title: string;
+  slug: string;
+  isrc?: string | null;
+  durationMs?: number | null;
+  isExplicit?: boolean;
+  previewUrl?: string | null;
+  audioUrl?: string | null;
+  audioFormat?: string | null;
+  lyrics?: string | null;
+  sourceType?: ReleaseSourceType;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Upsert a recording (canonical audio entity).
+ * Conflict resolution: (creatorProfileId, slug).
+ * Falls back on ISRC collision by nulling ISRC.
+ */
+export async function upsertRecording(
+  input: UpsertRecordingInput
+): Promise<DiscogRecording> {
+  const now = new Date();
+
+  const insertData: NewDiscogRecording = {
+    creatorProfileId: input.creatorProfileId,
+    title: input.title,
+    slug: input.slug,
+    isrc: input.isrc ?? null,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    lyrics: input.lyrics ?? null,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const baseSet = {
+    title: input.title,
+    isrc: input.isrc ?? null,
+    durationMs: input.durationMs ?? null,
+    isExplicit: input.isExplicit ?? false,
+    previewUrl: input.previewUrl ?? null,
+    audioUrl: input.audioUrl ?? null,
+    audioFormat: input.audioFormat ?? null,
+    ...('lyrics' in input ? { lyrics: input.lyrics ?? null } : {}),
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
+
+  try {
+    const [result] = await db
+      .insert(discogRecordings)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
+        set: baseSet,
+      })
+      .returning();
+
+    return result;
+  } catch (error) {
+    if (
+      !isUniqueConstraintViolation(
+        error,
+        'discog_recordings_creator_isrc_unique'
+      )
+    ) {
+      throw error;
+    }
+
+    // ISRC collision — another recording for this creator already has this ISRC.
+    // Store without ISRC; the existing recording is the canonical one.
+    const [result] = await db
+      .insert(discogRecordings)
+      .values({ ...insertData, isrc: null })
+      .onConflictDoUpdate({
+        target: [discogRecordings.creatorProfileId, discogRecordings.slug],
+        set: { ...baseSet, isrc: null },
+      })
+      .returning();
+
+    return result;
+  }
+}
+
+export interface UpsertReleaseTrackInput {
+  releaseId: string;
+  recordingId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber?: number;
+  isExplicit?: boolean;
+  sourceType?: ReleaseSourceType;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Upsert a release track (recording's appearance on a release).
+ * Conflict resolution: (releaseId, discNumber, trackNumber).
+ */
+export async function upsertReleaseTrack(
+  input: UpsertReleaseTrackInput
+): Promise<DiscogReleaseTrack> {
+  const now = new Date();
+  const discNumber = input.discNumber ?? 1;
+  const fallbackSlug = `${input.slug}-${discNumber}-${input.trackNumber}`;
+
+  const insertData: NewDiscogReleaseTrack = {
+    releaseId: input.releaseId,
+    recordingId: input.recordingId,
+    title: input.title,
+    slug: input.slug,
+    trackNumber: input.trackNumber,
+    discNumber,
+    isExplicit: input.isExplicit ?? false,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const baseSet = {
+    recordingId: input.recordingId,
+    title: input.title,
+    slug: input.slug,
+    isExplicit: input.isExplicit ?? false,
+    sourceType: input.sourceType ?? 'ingested',
+    metadata: input.metadata ?? {},
+    updatedAt: now,
+  };
+
+  try {
+    const [result] = await db
+      .insert(discogReleaseTracks)
+      .values(insertData)
+      .onConflictDoUpdate({
+        target: [
+          discogReleaseTracks.releaseId,
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber,
+        ],
+        set: baseSet,
+      })
+      .returning();
+
+    return result;
+  } catch (error) {
+    if (
+      !isUniqueConstraintViolation(
+        error,
+        'discog_release_tracks_release_slug_unique'
+      )
+    ) {
+      throw error;
+    }
+
+    // Slug collision within release — use fallback slug
+    const [result] = await db
+      .insert(discogReleaseTracks)
+      .values({ ...insertData, slug: fallbackSlug })
+      .onConflictDoUpdate({
+        target: [
+          discogReleaseTracks.releaseId,
+          discogReleaseTracks.discNumber,
+          discogReleaseTracks.trackNumber,
+        ],
+        set: { ...baseSet, slug: fallbackSlug },
+      })
+      .returning();
+
+    return result;
+  }
+}
+
+/**
+ * Update lyrics on a recording by ID.
+ */
+export async function updateRecordingLyrics(
+  recordingId: string,
+  lyrics: string
+): Promise<void> {
+  await db
+    .update(discogRecordings)
+    .set({ lyrics, updatedAt: new Date() })
+    .where(eq(discogRecordings.id, recordingId));
+}
+
+/**
+ * Get a recording by slug within a creator's profile.
+ */
+export async function getRecordingBySlug(
+  creatorProfileId: string,
+  slug: string
+): Promise<DiscogRecording | null> {
+  const [recording] = await db
+    .select()
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.slug, slug)
+      )
+    )
+    .limit(1);
+
+  return recording ?? null;
+}
+
+/** Release track with recording data and provider links */
+export interface ReleaseTrackWithProviders {
+  id: string;
+  releaseId: string;
+  recordingId: string;
+  title: string;
+  slug: string;
+  trackNumber: number;
+  discNumber: number;
+  isExplicit: boolean;
+  // Recording fields (denormalized for display)
+  durationMs: number | null;
+  isrc: string | null;
+  previewUrl: string | null;
+  audioUrl: string | null;
+  audioFormat: string | null;
+  providerLinks: ProviderLink[];
+}
+
+export interface ReleaseTracksWithProvidersResult {
+  tracks: ReleaseTrackWithProviders[];
+  total: number;
+  hasMore: boolean;
+}
+
+/**
+ * Get release tracks for a release with recording data and provider links.
+ * Joins discog_release_tracks → discog_recordings, resolves provider links.
+ */
+export async function getReleaseTracksForReleaseWithProviders(
+  releaseId: string,
+  options?: { limit?: number; offset?: number }
+): Promise<ReleaseTracksWithProvidersResult> {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+
+  // Get total count
+  const [countResult] = await db
+    .select({ count: drizzleSql<number>`COUNT(*)` })
+    .from(discogReleaseTracks)
+    .where(eq(discogReleaseTracks.releaseId, releaseId));
+
+  const total = Number(countResult?.count ?? 0);
+
+  if (total === 0) {
+    return { tracks: [], total: 0, hasMore: false };
+  }
+
+  // Fetch paginated release tracks joined with recordings
+  const rows = await db
+    .select({
+      rt: discogReleaseTracks,
+      rec: discogRecordings,
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(eq(discogReleaseTracks.releaseId, releaseId))
+    .orderBy(discogReleaseTracks.discNumber, discogReleaseTracks.trackNumber)
+    .limit(limit)
+    .offset(offset);
+
+  if (rows.length === 0) {
+    return { tracks: [], total, hasMore: false };
+  }
+
+  // Fetch provider links for release_tracks and release-level links
+  const releaseTrackIds = rows.map(r => r.rt.id);
+  let rtProviderLinks: ProviderLink[] = [];
+  let releaseProviderLinks: ProviderLink[] = [];
+
+  [rtProviderLinks, releaseProviderLinks] = await Promise.all([
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release_track'),
+          inArray(providerLinks.releaseTrackId, releaseTrackIds)
+        )
+      ),
+    db
+      .select()
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release'),
+          eq(providerLinks.releaseId, releaseId)
+        )
+      ),
+  ]);
+
+  // Group links by release track ID
+  const linksByReleaseTrack = new Map<string, ProviderLink[]>();
+  for (const link of rtProviderLinks) {
+    if (!link.releaseTrackId) continue;
+    const existing = linksByReleaseTrack.get(link.releaseTrackId) ?? [];
+    existing.push(link);
+    linksByReleaseTrack.set(link.releaseTrackId, existing);
+  }
+
+  // Combine tracks with recordings and provider links
+  const tracks: ReleaseTrackWithProviders[] = rows.map(({ rt, rec }) => ({
+    id: rt.id,
+    releaseId: rt.releaseId,
+    recordingId: rt.recordingId,
+    title: rt.title,
+    slug: rt.slug,
+    trackNumber: rt.trackNumber,
+    discNumber: rt.discNumber,
+    isExplicit: rt.isExplicit,
+    durationMs: rec.durationMs,
+    isrc: rec.isrc,
+    previewUrl: rec.previewUrl,
+    audioUrl: rec.audioUrl,
+    audioFormat: rec.audioFormat,
+    providerLinks: resolveTrackProviderLinks(
+      linksByReleaseTrack.get(rt.id) ?? [],
+      releaseProviderLinks
+    ),
+  }));
+
+  return {
+    tracks,
+    total,
+    hasMore: offset + limit < total,
+  };
+}
+
+/**
+ * Get track summaries from release_tracks + recordings (new model).
+ * Falls back to discog_tracks if release_tracks is empty.
+ */
+export async function getReleaseTrackSummariesForReleases(
+  releaseIds: string[]
+): Promise<Map<string, TrackSummary>> {
+  if (releaseIds.length === 0) {
+    return new Map();
+  }
+
+  const summaries = await db
+    .select({
+      releaseId: discogReleaseTracks.releaseId,
+      totalDurationMs:
+        drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
+          'total_duration_ms'
+        ),
+      primaryIsrc:
+        drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
+          'primary_isrc'
+        ),
+    })
+    .from(discogReleaseTracks)
+    .innerJoin(
+      discogRecordings,
+      eq(discogReleaseTracks.recordingId, discogRecordings.id)
+    )
+    .where(inArray(discogReleaseTracks.releaseId, releaseIds))
+    .groupBy(discogReleaseTracks.releaseId);
+
+  const summaryMap = new Map<string, TrackSummary>();
+  for (const row of summaries) {
+    summaryMap.set(row.releaseId, {
+      totalDurationMs: row.totalDurationMs ?? null,
+      primaryIsrc: row.primaryIsrc ?? null,
+    });
+  }
+
+  // Fall back to old table for any releases not found in new model
+  if (summaryMap.size < releaseIds.length) {
+    const missingIds = releaseIds.filter(id => !summaryMap.has(id));
+    if (missingIds.length > 0) {
+      const fallback = await getTrackSummariesForReleases(missingIds);
+      for (const [id, summary] of fallback) {
+        summaryMap.set(id, summary);
+      }
+    }
+  }
+
+  return summaryMap;
 }

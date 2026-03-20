@@ -1,7 +1,11 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { discogReleases, discogTracks } from '@/lib/db/schema/content';
+import {
+  discogRecordings,
+  discogReleases,
+  discogTracks,
+} from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import {
   buildSpotifyAlbumUrl,
@@ -36,7 +40,9 @@ import {
   getReleasesForProfile,
   type ReleaseWithProviders,
   upsertProviderLink,
+  upsertRecording,
   upsertRelease,
+  upsertReleaseTrack,
   upsertTrack,
 } from './queries';
 import { classifySpotifyReleaseType } from './release-type';
@@ -474,32 +480,67 @@ async function fetchExistingTrackSlugs(
     return existingTracksBySpotifyId;
   }
 
-  const rows = await db
+  // Check new model (discogRecordings) first
+  const recordingRows = await db
     .select({
-      id: discogTracks.id,
-      slug: discogTracks.slug,
+      id: discogRecordings.id,
+      slug: discogRecordings.slug,
       spotifyTrackId:
-        drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+        drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`.as(
           'spotify_track_id'
         ),
     })
-    .from(discogTracks)
+    .from(discogRecordings)
     .where(
       and(
-        eq(discogTracks.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
         inArray(
-          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+          drizzleSql<string>`${discogRecordings.metadata} ->> 'spotifyId'`,
           spotifyTrackIds
         )
       )
     );
 
-  for (const row of rows) {
+  for (const row of recordingRows) {
     if (!row.spotifyTrackId) continue;
     existingTracksBySpotifyId.set(row.spotifyTrackId, {
       id: row.id,
       slug: row.slug,
     });
+  }
+
+  // Fall back to legacy tracks for any not found in recordings
+  const missingIds = spotifyTrackIds.filter(
+    id => !existingTracksBySpotifyId.has(id)
+  );
+  if (missingIds.length > 0) {
+    const rows = await db
+      .select({
+        id: discogTracks.id,
+        slug: discogTracks.slug,
+        spotifyTrackId:
+          drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`.as(
+            'spotify_track_id'
+          ),
+      })
+      .from(discogTracks)
+      .where(
+        and(
+          eq(discogTracks.creatorProfileId, creatorProfileId),
+          inArray(
+            drizzleSql<string>`${discogTracks.metadata} ->> 'spotifyId'`,
+            missingIds
+          )
+        )
+      );
+
+    for (const row of rows) {
+      if (!row.spotifyTrackId) continue;
+      existingTracksBySpotifyId.set(row.spotifyTrackId, {
+        id: row.id,
+        slug: row.slug,
+      });
+    }
   }
 
   return existingTracksBySpotifyId;
@@ -553,13 +594,54 @@ async function processTracksForRelease(
     const audioFallbackUrl = sanitizedPreviewUrl;
     const audioFallbackFormat = audioFallbackUrl ? 'mp3' : null;
 
+    const trackNumber = sanitizeBoundedInteger(track.track_number, 1, 999, 1);
+    const discNumber = sanitizeBoundedInteger(track.disc_number, 1, 99, 1);
+
+    // New model: upsert recording (canonical audio entity)
+    const createdRecording = await upsertRecording({
+      creatorProfileId,
+      title: sanitizedTrackTitle,
+      slug: trackSlug,
+      isrc: sanitizedIsrc,
+      durationMs: sanitizeBoundedNullableInteger(
+        track.duration_ms,
+        0,
+        60 * 60 * 1000
+      ),
+      isExplicit: track.explicit,
+      previewUrl: sanitizedPreviewUrl,
+      audioUrl: audioFallbackUrl,
+      audioFormat: audioFallbackFormat,
+      sourceType: 'ingested',
+      metadata: {
+        spotifyId: track.id,
+        spotifyUri: track.uri,
+      },
+    });
+
+    // New model: upsert release track (recording appearance on release)
+    const createdReleaseTrack = await upsertReleaseTrack({
+      releaseId: release.id,
+      recordingId: createdRecording.id,
+      title: sanitizedTrackTitle,
+      slug: trackSlug,
+      trackNumber,
+      discNumber,
+      isExplicit: track.explicit,
+      sourceType: 'ingested',
+      metadata: {
+        spotifyId: track.id,
+      },
+    });
+
+    // Legacy: also write to discog_tracks for backward compat during migration
     const createdTrack = await upsertTrack({
       releaseId: release.id,
       creatorProfileId,
       title: sanitizedTrackTitle,
       slug: trackSlug,
-      trackNumber: sanitizeBoundedInteger(track.track_number, 1, 999, 1),
-      discNumber: sanitizeBoundedInteger(track.disc_number, 1, 99, 1),
+      trackNumber,
+      discNumber,
       durationMs: sanitizeBoundedNullableInteger(
         track.duration_ms,
         0,
@@ -577,6 +659,21 @@ async function processTracksForRelease(
       },
     });
 
+    // Provider link on release_track (new model)
+    await upsertProviderLink({
+      releaseTrackId: createdReleaseTrack.id,
+      providerId: 'spotify',
+      url: buildSpotifyTrackUrl(track.id),
+      externalId: null,
+      sourceType: 'ingested',
+      isPrimary: true,
+      metadata: {
+        providerExternalId: track.id,
+        isrc: sanitizedIsrc,
+      },
+    });
+
+    // Legacy provider link on track (backward compat)
     await upsertProviderLink({
       trackId: createdTrack.id,
       providerId: 'spotify',
