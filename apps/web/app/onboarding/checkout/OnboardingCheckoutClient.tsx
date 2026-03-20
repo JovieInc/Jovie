@@ -291,9 +291,9 @@ export function OnboardingCheckoutClient({
     // Preserve the dashboard handoff query so ChatPageClient auto-submits
     // the onboarding prompt (mirrors AppleStyleOnboardingForm behavior)
     const initialQuery =
-      spotifyFollowers != null
-        ? 'Show me my latest releases'
-        : 'Connect my Spotify';
+      spotifyFollowers == null
+        ? 'Connect my Spotify'
+        : 'Show me my latest releases';
     globalThis.location.href = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
   }, [plan, isDefaultUpsell, spotifyFollowers]);
 
