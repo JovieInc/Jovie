@@ -2328,6 +2328,8 @@ jobs:
     outputs:
       migration_status: ${{ steps.migrate.outcome }}
       preflight_status: ${{ steps.preflight.outcome }}
+      # Note: if deploy is cancelled before verify completes, outcome is '' (not 'failure'),
+      # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
     env:
       # Trunk-based: main deploys directly to production
@@ -2363,6 +2365,8 @@ jobs:
         # Schema drift should warn, not block deploys. A mismatch between
         # Drizzle definitions and the live DB (e.g. schema added without
         # migration) must be fixed, but should never block shipping code.
+        # Safety net: canary health gate + Sentry error gate catch runtime
+        # failures from missing columns and trigger auto-rollback.
         continue-on-error: true
       - name: Warn on schema drift
         if: ${{ steps.verify.outcome == 'failure' }}
