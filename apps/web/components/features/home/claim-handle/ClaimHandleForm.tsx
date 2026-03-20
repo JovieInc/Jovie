@@ -201,16 +201,14 @@ export function ClaimHandleForm({
         style={inputRowStyle}
       >
         {isHero && (
-          <>
-            <div
-              aria-hidden='true'
-              className='pointer-events-none absolute inset-x-2 top-0 h-px rounded-full'
-              style={{
-                background:
-                  'linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0.18) 80%, transparent)',
-              }}
-            />
-          </>
+          <div
+            aria-hidden='true'
+            className='pointer-events-none absolute inset-x-2 top-0 h-px rounded-full'
+            style={{
+              background:
+                'linear-gradient(90deg, transparent, rgba(255,255,255,0.2) 20%, rgba(255,255,255,0.24) 50%, rgba(255,255,255,0.18) 80%, transparent)',
+            }}
+          />
         )}
 
         <div className='flex items-center flex-1 min-w-0 pl-3 pr-1 gap-0'>

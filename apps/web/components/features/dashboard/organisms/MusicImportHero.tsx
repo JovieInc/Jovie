@@ -47,7 +47,10 @@ function LoadingCards() {
   return (
     <>
       {Array.from({ length: 4 }, (_, i) => (
-        <div key={i} className='flex w-28 shrink-0 flex-col gap-1.5'>
+        <div
+          key={`loading-card-${i}`}
+          className='flex w-28 shrink-0 flex-col gap-1.5'
+        >
           <div className='aspect-square w-full animate-pulse rounded-lg bg-surface-2' />
           <div className='h-3 w-20 animate-pulse rounded bg-surface-2' />
         </div>
