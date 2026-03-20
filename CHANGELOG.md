@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.18] - 2026-03-19
+
+### Removed
+
+- "Delete account" button from the user dropdown menu — too easy to click accidentally. Delete account is still accessible via Settings > Data & Privacy.
+
 ## [26.4.17] - 2026-03-19
 
 ### Added
