@@ -45,7 +45,6 @@ import {
   DEFAULT_RELEASE_FILTERS,
   type ReleaseFilters,
   ReleaseTableSubheader,
-  type ReleaseView,
 } from './ReleaseTableSubheader';
 import { SmartLinkGateBanner } from './SmartLinkGateBanner';
 import type { ReleaseProviderMatrixProps } from './types';
@@ -211,29 +210,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     DEFAULT_RELEASE_FILTERS
   );
 
-  // Release view filter state (Tracks / Releases)
-  const [releaseView, setReleaseView] = useState<ReleaseView>('tracks');
-
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  // Apply filters and search to rows
+  // Apply filters and search to rows — all releases shown (no tracks/releases split)
   const filteredRows = useMemo(() => {
-    const baseRows = filterReleases(rows, filters, deferredSearchQuery);
-
-    if (releaseView === 'tracks') {
-      return baseRows.filter(
-        release =>
-          release.releaseType === 'single' ||
-          (release.totalTracks > 0 && release.totalTracks <= 1)
-      );
-    }
-
-    return baseRows.filter(
-      release => release.releaseType !== 'single' && release.totalTracks !== 1
-    );
-  }, [rows, filters, deferredSearchQuery, releaseView]);
+    return filterReleases(rows, filters, deferredSearchQuery);
+  }, [rows, filters, deferredSearchQuery]);
 
   // Smart link gating
   const planGate = usePlanGate();
@@ -718,8 +702,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               onFiltersChange={setFilters}
               groupByYear={groupByYear}
               onGroupByYearChange={onGroupByYearChange}
-              releaseView={releaseView}
-              onReleaseViewChange={setReleaseView}
             />
           )}
 

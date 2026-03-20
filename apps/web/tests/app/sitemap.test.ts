@@ -42,11 +42,11 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'creatorProfileId',
     id: 'id',
   },
-  discogTracks: {
+  discogRecordings: {
     slug: 'slug',
     updatedAt: 'updatedAt',
-    releaseId: 'releaseId',
     creatorProfileId: 'creatorProfileId',
+    id: 'id',
   },
 }));
 
@@ -90,13 +90,11 @@ describe('sitemap', () => {
           username: 'tim',
           slug: 'album',
           updatedAt: new Date('2026-01-03'),
-          artworkUrl: 'https://cdn.example.com/art.jpg',
         },
         {
           username: 'tim',
           slug: 'single',
           updatedAt: new Date('2026-01-04'),
-          artworkUrl: null,
         },
       ]);
 

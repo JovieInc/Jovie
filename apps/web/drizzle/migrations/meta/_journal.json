@@ -540,6 +540,20 @@
       "when": 1775000000000,
       "tag": "0077_release_tasks",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1775100000000,
+      "tag": "0078_add_recordings_and_release_tracks",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1775200000000,
+      "tag": "0079_backfill_recordings_from_tracks",
+      "breakpoints": true
     }
   ]
 }

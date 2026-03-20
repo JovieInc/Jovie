@@ -14,6 +14,7 @@ describe('resolveTrackProviderLinks', () => {
     ownerType,
     releaseId: ownerType === 'release' ? 'release-1' : null,
     trackId: ownerType === 'track' ? 'track-1' : null,
+    releaseTrackId: ownerType === 'release_track' ? 'rt-1' : null,
     externalId: null,
     url: `https://example.com/${providerId}/${urlSuffix}`,
     country: null,

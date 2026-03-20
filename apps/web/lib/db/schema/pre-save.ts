@@ -7,7 +7,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { users } from './auth';
-import { discogReleases, discogTracks } from './content';
+import { discogReleases, discogReleaseTracks, discogTracks } from './content';
 
 export const preSaveTokens = pgTable(
   'pre_save_tokens',
@@ -22,6 +22,10 @@ export const preSaveTokens = pgTable(
     trackId: uuid('track_id').references(() => discogTracks.id, {
       onDelete: 'cascade',
     }),
+    releaseTrackId: uuid('release_track_id').references(
+      () => discogReleaseTracks.id,
+      { onDelete: 'cascade' }
+    ),
     provider: text('provider').notNull(),
     spotifyAccountId: text('spotify_account_id'),
     encryptedAccessToken: text('encrypted_access_token'),

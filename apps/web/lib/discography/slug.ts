@@ -9,11 +9,13 @@ import { and, eq, ne } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   contentSlugRedirects,
+  discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 
-export type ContentType = 'release' | 'track';
+export type ContentType = 'release' | 'track' | 'release_track';
 
 /**
  * Generate a URL-safe slug from a title.
@@ -54,9 +56,11 @@ export async function isSlugAvailable(
   options?: {
     excludeReleaseId?: string;
     excludeTrackId?: string;
+    excludeRecordingId?: string;
   }
 ): Promise<boolean> {
-  const { excludeReleaseId, excludeTrackId } = options ?? {};
+  const { excludeReleaseId, excludeTrackId, excludeRecordingId } =
+    options ?? {};
 
   // Check releases
   const releaseConditions = [
@@ -75,7 +79,24 @@ export async function isSlugAvailable(
 
   if (existingRelease) return false;
 
-  // Check tracks
+  // Check recordings (new model)
+  const recordingConditions = [
+    eq(discogRecordings.creatorProfileId, creatorProfileId),
+    eq(discogRecordings.slug, slug),
+  ];
+  if (excludeRecordingId) {
+    recordingConditions.push(ne(discogRecordings.id, excludeRecordingId));
+  }
+
+  const [existingRecording] = await db
+    .select({ id: discogRecordings.id })
+    .from(discogRecordings)
+    .where(and(...recordingConditions))
+    .limit(1);
+
+  if (existingRecording) return false;
+
+  // Check legacy tracks
   const trackConditions = [
     eq(discogTracks.creatorProfileId, creatorProfileId),
     eq(discogTracks.slug, slug),
@@ -125,7 +146,9 @@ export async function generateUniqueSlug(
   const excludeOptions =
     contentType === 'release'
       ? { excludeReleaseId: existingId }
-      : { excludeTrackId: existingId };
+      : contentType === 'release_track'
+        ? { excludeRecordingId: existingId }
+        : { excludeTrackId: existingId };
 
   // Try the base slug first
   if (await isSlugAvailable(creatorProfileId, baseSlug, excludeOptions)) {
@@ -169,7 +192,23 @@ export async function findContentBySlug(
     return { type: 'release', id: release.id };
   }
 
-  // Check tracks
+  // Check recordings (new model)
+  const [recording] = await db
+    .select({ id: discogRecordings.id })
+    .from(discogRecordings)
+    .where(
+      and(
+        eq(discogRecordings.creatorProfileId, creatorProfileId),
+        eq(discogRecordings.slug, slug)
+      )
+    )
+    .limit(1);
+
+  if (recording) {
+    return { type: 'release_track', id: recording.id };
+  }
+
+  // Check legacy tracks
   const [track] = await db
     .select({ id: discogTracks.id })
     .from(discogTracks)
@@ -201,6 +240,7 @@ export async function findRedirectByOldSlug(
       contentType: contentSlugRedirects.contentType,
       releaseId: contentSlugRedirects.releaseId,
       trackId: contentSlugRedirects.trackId,
+      releaseTrackId: contentSlugRedirects.releaseTrackId,
     })
     .from(contentSlugRedirects)
     .where(
@@ -223,6 +263,28 @@ export async function findRedirectByOldSlug(
 
     if (release) {
       return { type: 'release', currentSlug: release.slug };
+    }
+  } else if (
+    redirect.contentType === 'release_track' &&
+    redirect.releaseTrackId
+  ) {
+    // New model: look up recording slug via release_track
+    const [rt] = await db
+      .select({ recordingId: discogReleaseTracks.recordingId })
+      .from(discogReleaseTracks)
+      .where(eq(discogReleaseTracks.id, redirect.releaseTrackId))
+      .limit(1);
+
+    if (rt) {
+      const [recording] = await db
+        .select({ slug: discogRecordings.slug })
+        .from(discogRecordings)
+        .where(eq(discogRecordings.id, rt.recordingId))
+        .limit(1);
+
+      if (recording) {
+        return { type: 'release_track', currentSlug: recording.slug };
+      }
     }
   } else if (redirect.contentType === 'track' && redirect.trackId) {
     const [track] = await db
@@ -259,6 +321,7 @@ export async function createSlugRedirect(params: {
       contentType,
       releaseId: contentType === 'release' ? contentId : null,
       trackId: contentType === 'track' ? contentId : null,
+      releaseTrackId: contentType === 'release_track' ? contentId : null,
     })
     .onConflictDoNothing(); // Ignore if redirect already exists
 }
@@ -294,7 +357,9 @@ export async function updateSlugWithRedirect(params: {
   const excludeOptions =
     contentType === 'release'
       ? { excludeReleaseId: contentId }
-      : { excludeTrackId: contentId };
+      : contentType === 'release_track'
+        ? { excludeRecordingId: contentId }
+        : { excludeTrackId: contentId };
 
   const available = await isSlugAvailable(
     creatorProfileId,
@@ -317,6 +382,7 @@ export async function updateSlugWithRedirect(params: {
       contentType,
       releaseId: contentType === 'release' ? contentId : null,
       trackId: contentType === 'track' ? contentId : null,
+      releaseTrackId: contentType === 'release_track' ? contentId : null,
     })
     .onConflictDoNothing(); // Ignore if redirect already exists
 
@@ -325,6 +391,11 @@ export async function updateSlugWithRedirect(params: {
       .update(discogReleases)
       .set({ slug: sanitizedSlug, updatedAt: new Date() })
       .where(eq(discogReleases.id, contentId));
+  } else if (contentType === 'release_track') {
+    await db
+      .update(discogRecordings)
+      .set({ slug: sanitizedSlug, updatedAt: new Date() })
+      .where(eq(discogRecordings.id, contentId));
   } else {
     await db
       .update(discogTracks)
