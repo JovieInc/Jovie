@@ -5,6 +5,10 @@ import {
   getCreatorProfileIdFromJob,
 } from '@/lib/ingestion/scheduler';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import {
+  MusicfetchBudgetExceededError,
+  MusicfetchRequestError,
+} from '@/lib/musicfetch/errors';
 
 describe('ingestion scheduler helpers', () => {
   it('uses larger backoff profile for rate-limited failures', () => {
@@ -25,6 +29,32 @@ describe('ingestion scheduler helpers', () => {
     });
   });
 
+  it('classifies MusicFetch 429 errors as rate_limited', () => {
+    const error = new MusicfetchRequestError(
+      'MusicFetch local/global rate limit exceeded',
+      429,
+      60
+    );
+
+    expect(determineJobFailure(error)).toEqual({
+      message: 'MusicFetch local/global rate limit exceeded',
+      reason: 'rate_limited',
+    });
+  });
+
+  it('classifies MusicFetch budget exhaustion as rate_limited', () => {
+    const error = new MusicfetchBudgetExceededError(
+      'MusicFetch daily hard budget exhausted',
+      'daily',
+      3600
+    );
+
+    expect(determineJobFailure(error)).toEqual({
+      message: 'MusicFetch daily hard budget exhausted',
+      reason: 'rate_limited',
+    });
+  });
+
   it('extracts creatorProfileId for valid ingestion payloads', () => {
     const creatorProfileId = '7e093f2b-a8f9-4559-a9df-8f789b4432f8';
 
@@ -40,9 +70,24 @@ describe('ingestion scheduler helpers', () => {
     expect(result).toBe(creatorProfileId);
   });
 
-  it('returns null for unsupported job types', () => {
+  it('extracts creatorProfileId for musicfetch enrichment payloads', () => {
+    const creatorProfileId = '7e093f2b-a8f9-4559-a9df-8f789b4432f8';
+
     const result = getCreatorProfileIdFromJob({
       jobType: 'musicfetch_enrichment',
+      payload: {
+        creatorProfileId,
+        spotifyUrl: 'https://open.spotify.com/artist/123',
+        dedupKey: 'musicfetch_enrichment:123',
+      },
+    } as never);
+
+    expect(result).toBe(creatorProfileId);
+  });
+
+  it('returns null for unsupported job types', () => {
+    const result = getCreatorProfileIdFromJob({
+      jobType: 'unsupported',
       payload: {},
     } as never);
 

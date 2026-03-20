@@ -21,6 +21,7 @@ interface OnboardingCheckoutClientProps {
   readonly username: string;
   readonly avatarUrl: string | null;
   readonly spotifyFollowers: number | null;
+  readonly isDefaultUpsell: boolean;
 }
 
 function formatPrice(cents: number): string {
@@ -208,8 +209,14 @@ export function OnboardingCheckoutClient({
   username,
   avatarUrl,
   spotifyFollowers,
+  isDefaultUpsell,
 }: OnboardingCheckoutClientProps) {
-  const [isAnnual, setIsAnnual] = useState(false);
+  // Pre-compute savings to determine annual default
+  const hasAnnualOption = annualPriceId !== null && annualAmount !== null;
+  const annualSavingsPercent = hasAnnualOption
+    ? getAnnualSavingsPercent(monthlyAmount, annualAmount)
+    : 0;
+  const [isAnnual, setIsAnnual] = useState(annualSavingsPercent > 25);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBranding, setShowBranding] = useState(true);
@@ -217,11 +224,6 @@ export function OnboardingCheckoutClient({
   const planMarketing =
     ENTITLEMENT_REGISTRY[plan]?.marketing ??
     ENTITLEMENT_REGISTRY.founding.marketing;
-
-  const hasAnnual = annualPriceId !== null && annualAmount !== null;
-  const savingsPercent = hasAnnual
-    ? getAnnualSavingsPercent(monthlyAmount, annualAmount)
-    : 0;
 
   const currentPriceId =
     isAnnual && annualPriceId !== null ? annualPriceId : monthlyPriceId;
@@ -236,9 +238,10 @@ export function OnboardingCheckoutClient({
     track('onboarding_checkout_shown', {
       plan,
       has_spotify: !!spotifyFollowers,
-      has_annual: !!hasAnnual,
+      has_annual: !!hasAnnualOption,
+      intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
-  }, [plan, spotifyFollowers, hasAnnual]);
+  }, [plan, spotifyFollowers, hasAnnualOption, isDefaultUpsell]);
 
   const handleCheckout = useCallback(async () => {
     setIsLoading(true);
@@ -248,13 +251,14 @@ export function OnboardingCheckoutClient({
       plan,
       price_id: currentPriceId,
       interval,
+      intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
 
     try {
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: currentPriceId }),
+        body: JSON.stringify({ priceId: currentPriceId, source: 'onboarding' }),
       });
 
       if (!response.ok) {
@@ -276,13 +280,22 @@ export function OnboardingCheckoutClient({
       );
       setIsLoading(false);
     }
-  }, [plan, currentPriceId, interval]);
+  }, [plan, currentPriceId, interval, isDefaultUpsell]);
 
   const handleSkip = useCallback(() => {
-    track('onboarding_checkout_skipped', { plan });
+    track('onboarding_checkout_skipped', {
+      plan,
+      intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
+    });
     clearPlanIntent();
-    globalThis.location.href = APP_ROUTES.DASHBOARD;
-  }, [plan]);
+    // Preserve the dashboard handoff query so ChatPageClient auto-submits
+    // the onboarding prompt (mirrors AppleStyleOnboardingForm behavior)
+    const initialQuery =
+      spotifyFollowers == null
+        ? 'Connect my Spotify'
+        : 'Show me my latest releases';
+    globalThis.location.href = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
+  }, [plan, isDefaultUpsell, spotifyFollowers]);
 
   return (
     <div className='flex flex-col items-center justify-center'>
@@ -292,7 +305,9 @@ export function OnboardingCheckoutClient({
             Upgrade to {planMarketing.displayName}
           </h1>
           <p className={FORM_LAYOUT.hint}>
-            Your profile is live. See what {planMarketing.displayName} unlocks.
+            {isDefaultUpsell && username
+              ? `Congrats! Your profile is live at jov.ie/${username}. Want to make it even better?`
+              : `Your profile is live. See what ${planMarketing.displayName} unlocks.`}
           </p>
         </div>
 
@@ -305,6 +320,19 @@ export function OnboardingCheckoutClient({
           username={username}
           onToggleBranding={handleToggleBranding}
         />
+
+        {/* Founding urgency callout */}
+        {plan === 'founding' ? (
+          <ContentSurfaceCard className='mb-4 border-[var(--linear-accent)]/30 px-4 py-3'>
+            <div className='flex items-center gap-2.5'>
+              <Sparkles className='h-4 w-4 shrink-0 text-(--linear-accent)' />
+              <p className='text-[13px] font-medium text-primary-token'>
+                Lock in founding member pricing — {formatPrice(monthlyAmount)}
+                /mo forever
+              </p>
+            </div>
+          </ContentSurfaceCard>
+        ) : null}
 
         {/* Pro highlights */}
         <div className='mb-6 space-y-2.5'>
@@ -324,10 +352,10 @@ export function OnboardingCheckoutClient({
         </div>
 
         {/* Annual toggle */}
-        {hasAnnual ? (
+        {hasAnnualOption ? (
           <BillingIntervalSelector
             isAnnual={isAnnual}
-            savingsPercent={savingsPercent}
+            savingsPercent={annualSavingsPercent}
             onSelect={setIsAnnual}
           />
         ) : null}
@@ -373,7 +401,9 @@ export function OnboardingCheckoutClient({
           disabled={isLoading}
           className='mt-4 w-full text-center text-[13px] text-tertiary-token hover:text-secondary-token transition-colors disabled:opacity-50'
         >
-          Continue with Free
+          {isDefaultUpsell
+            ? 'Start free, upgrade anytime'
+            : 'Continue with Free'}
         </button>
       </div>
     </div>

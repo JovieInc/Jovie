@@ -25,6 +25,8 @@ touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
 _CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
+_AUTO_LAKE=$(~/.claude/skills/gstack/bin/gstack-config get auto_lake 2>/dev/null || echo "false")
+echo "AUTO_LAKE: $_AUTO_LAKE"
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
@@ -46,6 +48,8 @@ touch ~/.gstack/.completeness-intro-seen
 Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
 
 ## AskUserQuestion Format
+
+**Before calling AskUserQuestion:** If `AUTO_LAKE` is `true`, classify the decision using the Auto-Lake Decision Tree below. If it is a resource-cost decision, auto-resolve it (choose the complete option) and log with `[AUTO-LAKE]` instead of asking. Only proceed with AskUserQuestion for human decisions.
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
@@ -81,6 +85,43 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 - BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
 - BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
 - BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+
+## Auto-Lake Protocol
+
+If `AUTO_LAKE` is `true`: automatically choose the complete option for **resource-cost decisions** without calling AskUserQuestion. The user has opted into this because the answer to "should we add tests / error handling / edge cases?" is always "yes" — the only cost is AI compute time, not human effort.
+
+### Decision Tree: Resource-Cost vs. Human
+
+**AUTO-RESOLVE (resource-cost — just do it, do NOT ask):**
+- Test coverage gaps — add the tests
+- Error handling / missing edge cases — handle them
+- DRY violations — fix the duplication
+- Linting / formatting issues — fix them
+- Documentation updates for changed code — update the docs
+- Missing type safety / null guards / validation — add them
+- Logging / observability gaps — add logging
+- Dead code — remove it
+- Performance fixes with obvious solutions (N+1 queries, missing indexes) — fix them
+- Stale comments or diagrams — update them
+
+**ALWAYS ASK (human decisions — even with auto-lake):**
+- Architecture direction — which approach to take
+- Scope changes — adding or removing features from the plan
+- Feature behavior — how something should work for users
+- UX / UI choices — visual design, user flow decisions
+- Whether to ship / merge / deploy
+- Choosing between approaches where tradeoffs involve product direction
+- Breaking changes or public API modifications
+- Hard-to-reverse decisions
+- Adding new dependencies or infrastructure
+- Anything a skill template explicitly marks as `ALWAYS_ASK`
+
+**How to log auto-decisions:**
+When auto-resolving, output a one-liner instead of calling AskUserQuestion:
+`[AUTO-LAKE] {issue description} -> {action taken} (resource-cost, auto-resolved)`
+
+At the end of the skill workflow, include a summary line:
+`Auto-Lake: N resource-cost decisions auto-resolved, M human decisions asked`
 
 ## Contributor Mode
 

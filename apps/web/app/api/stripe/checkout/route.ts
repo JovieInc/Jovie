@@ -134,7 +134,9 @@ export async function POST(request: NextRequest) {
     if (!userId) return jsonError('Unauthorized', 401);
 
     const body = await request.json();
-    const { priceId, referralCode: rawReferralCode } = body;
+    const { priceId, referralCode: rawReferralCode, source: rawSource } = body;
+    const checkoutSource =
+      rawSource === 'onboarding' ? 'onboarding' : undefined;
 
     if (!priceId || typeof priceId !== 'string') {
       return jsonError('Invalid price ID', 400);
@@ -190,14 +192,14 @@ export async function POST(request: NextRequest) {
     const baseUrl = publicEnv.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const idempotencyBucket = Math.floor(Date.now() / (5 * 60 * 1000));
 
-    const idempotencyKey = `checkout:${userId}:${priceId}:${idempotencyBucket}`;
+    const idempotencyKey = `checkout:${userId}:${priceId}:${checkoutSource ?? 'default'}:${idempotencyBucket}`;
 
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({
         customerId,
         priceId,
         userId,
-        successUrl: `${baseUrl}/billing/success`,
+        successUrl: `${baseUrl}/billing/success${checkoutSource === 'onboarding' ? '?source=onboarding' : ''}`,
         cancelUrl: `${baseUrl}/billing/cancel`,
         idempotencyKey,
         referralCode,

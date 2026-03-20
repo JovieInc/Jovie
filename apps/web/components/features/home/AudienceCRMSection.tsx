@@ -19,9 +19,9 @@ const STATS = [
   { label: 'Tips earned', value: '$1,204', icon: DollarSign },
 ];
 const BENEFITS = [
-  'See who clicked',
+  'Capture fans automatically',
   'Know where they came from',
-  'Re-engage high-intent fans',
+  'Reach them on every release',
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -109,13 +109,15 @@ export function AudienceCRMSection() {
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
             <h2 className='max-w-md marketing-h2-linear text-primary-token reveal-on-scroll'>
-              See every fan. Reach them again.
+              You&apos;re losing fans every day.
             </h2>
             <div className='max-w-lg reveal-on-scroll' data-delay='80'>
               <p className='marketing-lead-linear text-secondary-token'>
-                Streaming apps don&apos;t tell you who&apos;s listening. Jovie
-                does — and when fans turn on notifications, you own that
-                relationship.
+                Those 10 people from your show last night? Gone forever. The
+                fans who tapped your Linktree but didn&apos;t know which link to
+                click? Lost. Jovie captures every fan across every touchpoint —
+                profile visits, smart links, QR codes — into one list you
+                actually own.
               </p>
               <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
                 Built-in fan CRM
