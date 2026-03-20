@@ -110,19 +110,17 @@ async function ReleasesContent({
       ? profileSettings.spotifyImportTotal
       : 0;
   return (
-    <ReleasesClientBoundary>
-      <ReleasesExperience
-        releases={releases}
-        providerConfig={providerConfig}
-        primaryProviders={primaryProviderKeys}
-        spotifyConnected={spotifyStatus.connected}
-        spotifyArtistName={spotifyStatus.artistName}
-        appleMusicConnected={appleMusicStatus.connected}
-        appleMusicArtistName={appleMusicStatus.artistName}
-        allowArtworkDownloads={allowArtworkDownloads}
-        initialImporting={spotifyImportStatus === 'importing'}
-        initialTotalCount={spotifyImportTotal}
-      />
-    </ReleasesClientBoundary>
+    <ReleasesExperience
+      releases={releases}
+      providerConfig={providerConfig}
+      primaryProviders={primaryProviderKeys}
+      spotifyConnected={spotifyStatus.connected}
+      spotifyArtistName={spotifyStatus.artistName}
+      appleMusicConnected={appleMusicStatus.connected}
+      appleMusicArtistName={appleMusicStatus.artistName}
+      allowArtworkDownloads={allowArtworkDownloads}
+      initialImporting={spotifyImportStatus === 'importing'}
+      initialTotalCount={spotifyImportTotal}
+    />
   );
 }
