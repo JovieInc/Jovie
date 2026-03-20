@@ -15,6 +15,13 @@
       "when": 1774034157661,
       "tag": "0001_custom_functions_and_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774310400000,
+      "tag": "0002_fix_tim_white_avatar",
+      "breakpoints": true
     }
   ]
 }

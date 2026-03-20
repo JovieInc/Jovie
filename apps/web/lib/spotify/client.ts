@@ -394,8 +394,11 @@ class SpotifyClientManager {
       `/search?${params}`
     );
 
-    // Sanitize all results before returning
-    return response.artists.items.map(sanitizeSearchResult);
+    // Filter blacklisted artists before sanitization and caching
+    const { isBlacklistedSpotifyId } = await import('./blacklist');
+    return response.artists.items
+      .filter(artist => !isBlacklistedSpotifyId(artist.id))
+      .map(sanitizeSearchResult);
   }
 
   /**
