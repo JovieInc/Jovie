@@ -401,6 +401,9 @@ export function ReleaseSidebar({
       id: release.id,
       title: release.title,
       audioUrl: release.previewUrl,
+      releaseTitle: release.title,
+      artistName: release.artistNames?.[0],
+      artworkUrl: release.artworkUrl,
     }).catch(() => {});
   }, [toggleTrack, release]);
 
