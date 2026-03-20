@@ -1049,9 +1049,36 @@ body {
   }
 }
 
+/* URL reveal shimmer (hero dashboard animation) */
+
+@keyframes url-shimmer-flash {
+  0% {
+    background-position: -100% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.url-reveal-shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: url-shimmer-flash 0.6s ease-out forwards;
+}
+
 /* Motion preference utility for accessibility */
 
 @media (prefers-reduced-motion: reduce) {
+  .url-reveal-shimmer {
+    animation: none;
+    background-image: none;
+  }
+
   .transition-all,
   .transform,
   [data-state] {
