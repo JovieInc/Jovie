@@ -15,6 +15,7 @@ import {
 import { track } from '@/lib/analytics';
 import {
   clearPlanIntent,
+  DEFAULT_UPSELL_PLAN,
   getPlanIntent,
   isPaidIntent,
 } from '@/lib/auth/plan-intent';
@@ -208,14 +209,18 @@ export function AppleStyleOnboardingForm({
       return;
     }
 
-    // If user expressed paid intent and checkout step is enabled, go to checkout
-    const planIntent = getPlanIntent();
-    if (checkoutStepEnabled && isPaidIntent(planIntent)) {
-      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${planIntent}`;
+    // Always route to checkout when flag is on
+    // &source= disambiguates organic upsell from explicit paid intent for analytics
+    if (checkoutStepEnabled) {
+      const planIntent = getPlanIntent();
+      const hasIntent = isPaidIntent(planIntent);
+      const plan = hasIntent ? planIntent : DEFAULT_UPSELL_PLAN;
+      const source = hasIntent ? 'intent' : 'organic';
+      globalThis.location.href = `${APP_ROUTES.ONBOARDING_CHECKOUT}?plan=${plan}&source=${source}`;
       return;
     }
 
-    // Free flow: clear any stale intent and go to dashboard
+    // Free flow (flag off): clear any stale intent and go to dashboard
     clearPlanIntent();
     const initialQuery = getOnboardingDashboardInitialQuery(
       spotifyImportState.status

@@ -179,11 +179,13 @@ interface HostInfo {
   isMainHost: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
+  isInvestorPortal: boolean;
 }
 
 /**
  * Analyze hostname once for all routing decisions.
  * Single domain architecture: everything on jov.ie.
+ * Investor portal: investors.jov.ie (subdomain, bypasses Clerk auth)
  */
 function analyzeHost(hostname: string): HostInfo {
   const isDevOrPreview =
@@ -201,11 +203,213 @@ function analyzeHost(hostname: string): HostInfo {
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
 
-  return { isMainHost, isDevOrPreview, isMeetJovie };
+  const isInvestorPortal =
+    hostname === `investors.${PROFILE_HOSTNAME}` ||
+    hostname === 'investors.localhost' ||
+    hostname === 'investors.jov.ie';
+
+  return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
 }
 
 /** Dashboard is always at /app in single-domain architecture */
 const DASHBOARD_URL = '/app';
+
+// ============================================================================
+// Investor Portal — Token-gated subdomain (investors.jov.ie)
+// ============================================================================
+// Bypasses Clerk entirely. Auth is via a secret token in URL param or cookie.
+// Token validated against investor_links table on every request (volume is tiny).
+// ============================================================================
+
+const INVESTOR_TOKEN_COOKIE = '__investor_token';
+const INVESTOR_TOKEN_PARAM = 't';
+
+/**
+ * Handle investor portal requests.
+ * Validates token from URL param or cookie, sets cookie, rewrites to /investor-portal.
+ * Returns null if the request is NOT for the investor portal.
+ */
+async function handleInvestorRequest(
+  req: NextRequest,
+  event?: NextFetchEvent
+): Promise<NextResponse | null> {
+  const hostname = req.nextUrl.hostname;
+  const hostInfo = analyzeHost(hostname);
+
+  if (!hostInfo.isInvestorPortal) {
+    return null;
+  }
+
+  const pathname = req.nextUrl.pathname;
+
+  // Allow Next.js internals and static files to pass through
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon') ||
+    pathname.endsWith('.ico') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.svg')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Check for token in URL param (first visit from shared link)
+  const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
+
+  if (tokenParam) {
+    // Validate token against DB
+    const isValid = await validateInvestorToken(tokenParam);
+
+    if (!isValid) {
+      return new NextResponse(null, { status: 404 });
+    }
+
+    // Valid token: set cookie and redirect to strip ?t= from URL
+    const cleanUrl = req.nextUrl.clone();
+    cleanUrl.searchParams.delete(INVESTOR_TOKEN_PARAM);
+
+    const res = NextResponse.redirect(cleanUrl);
+    res.cookies.set(INVESTOR_TOKEN_COOKIE, tokenParam, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: '/',
+    });
+
+    return res;
+  }
+
+  // Check for token in cookie (return visits)
+  const tokenCookie = req.cookies.get(INVESTOR_TOKEN_COOKIE)?.value;
+
+  if (!tokenCookie) {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  // Validate cookie token against DB
+  const isValid = await validateInvestorToken(tokenCookie);
+
+  if (!isValid) {
+    // Invalid/expired/deactivated token: clear cookie, return 404
+    const res = new NextResponse(null, { status: 404 });
+    res.cookies.delete(INVESTOR_TOKEN_COOKIE);
+    return res;
+  }
+
+  // Valid token: rewrite to /investor-portal route group
+  const rewriteUrl = req.nextUrl.clone();
+  // Map / to /investor-portal, /ai to /investor-portal/ai, etc.
+  const investorPath =
+    pathname === '/' ? '/investor-portal' : `/investor-portal${pathname}`;
+  rewriteUrl.pathname = investorPath;
+
+  const res = NextResponse.rewrite(rewriteUrl);
+
+  // Anti-scraping headers
+  res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  res.headers.set('Cache-Control', 'private, no-store');
+
+  // Record view — use waitUntil for edge runtime reliability
+  if (event) {
+    event.waitUntil(recordInvestorView(tokenCookie, pathname, req));
+  } else {
+    await recordInvestorView(tokenCookie, pathname, req);
+  }
+
+  return res;
+}
+
+/**
+ * Validate an investor token against the database.
+ * Checks: exists, is_active, not expired.
+ * Returns true if valid.
+ */
+async function validateInvestorToken(token: string): Promise<boolean> {
+  try {
+    // Lazy import to avoid loading DB in every middleware invocation
+    const { db } = await import('@/lib/db');
+    const { investorLinks } = await import('@/lib/db/schema/investors');
+    const { eq, and } = await import('drizzle-orm');
+
+    const [link] = await db
+      .select({
+        id: investorLinks.id,
+        isActive: investorLinks.isActive,
+        expiresAt: investorLinks.expiresAt,
+      })
+      .from(investorLinks)
+      .where(
+        and(eq(investorLinks.token, token), eq(investorLinks.isActive, true))
+      )
+      .limit(1);
+
+    if (!link) return false;
+
+    // Check expiry
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    // Fail closed: if DB is down, deny access
+    await captureError('Investor token validation failed', error, {
+      context: 'investor_portal',
+    });
+    return false;
+  }
+}
+
+/**
+ * Record an investor page view (fire-and-forget).
+ * Also updates stage from 'shared' to 'viewed' on first view.
+ */
+async function recordInvestorView(
+  token: string,
+  pagePath: string,
+  req: NextRequest
+): Promise<void> {
+  try {
+    const { db } = await import('@/lib/db');
+    const { investorLinks, investorViews } = await import(
+      '@/lib/db/schema/investors'
+    );
+    const { eq } = await import('drizzle-orm');
+
+    // Find the link
+    const [link] = await db
+      .select({ id: investorLinks.id, stage: investorLinks.stage })
+      .from(investorLinks)
+      .where(eq(investorLinks.token, token))
+      .limit(1);
+
+    if (!link) return;
+
+    // Insert view record
+    await db.insert(investorViews).values({
+      investorLinkId: link.id,
+      pagePath,
+      userAgent: req.headers.get('user-agent') ?? undefined,
+      referrer: req.headers.get('referer') ?? undefined,
+    });
+
+    // Auto-advance stage: shared → viewed on first view
+    if (link.stage === 'shared') {
+      await db
+        .update(investorLinks)
+        .set({ stage: 'viewed', updatedAt: new Date() })
+        .where(eq(investorLinks.id, link.id));
+    }
+  } catch (error) {
+    // Swallow errors — view tracking should never block the response
+    await captureError('Investor view tracking failed', error, {
+      context: 'investor_portal',
+      pagePath,
+    });
+  }
+}
 
 const CLERK_SENSITIVE_PATTERNS = [
   'dummy',
@@ -667,7 +871,17 @@ const clerkWrappedMiddleware = clerkMiddleware(async (auth, req) => {
   return handleRequest(req, userId);
 });
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
+export default async function middleware(
+  req: NextRequest,
+  event: NextFetchEvent
+) {
+  // ========================================================================
+  // Investor portal: handle before Clerk (no auth needed)
+  // investors.jov.ie uses token-based access, not Clerk sessions
+  // ========================================================================
+  const investorResponse = await handleInvestorRequest(req, event);
+  if (investorResponse) return investorResponse;
+
   if (process.env.NODE_ENV === 'test') {
     const testMode = req.headers.get(TEST_MODE_HEADER)?.trim();
     if (testMode === TEST_AUTH_BYPASS_MODE) {

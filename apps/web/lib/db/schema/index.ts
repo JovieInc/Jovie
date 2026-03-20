@@ -258,6 +258,9 @@ export {
   referralStatusEnum,
   releaseNotificationStatusEnum,
   releaseNotificationTypeEnum,
+  releaseTaskAssigneeTypeEnum,
+  releaseTaskPriorityEnum,
+  releaseTaskStatusEnum,
   scraperStrategyEnum,
   senderStatusEnum,
   socialAccountStatusEnum,
@@ -321,6 +324,25 @@ export {
   selectAiInsightSchema,
   selectInsightGenerationRunSchema,
 } from './insights';
+// Investor Portal (investors.jov.ie)
+export {
+  type InvestorLink,
+  type InvestorSettings,
+  type InvestorView,
+  insertInvestorLinkSchema,
+  insertInvestorSettingsSchema,
+  insertInvestorViewSchema,
+  investorLinks,
+  investorSettings,
+  investorStageEnum,
+  investorViews,
+  type NewInvestorLink,
+  type NewInvestorSettings,
+  type NewInvestorView,
+  selectInvestorLinkSchema,
+  selectInvestorSettingsSchema,
+  selectInvestorViewSchema,
+} from './investors';
 // Leads (Discovery Pipeline)
 export {
   type DiscoveryKeyword,
@@ -339,7 +361,6 @@ export {
   selectLeadPipelineSettingsSchema,
   selectLeadSchema,
 } from './leads';
-
 // Links (Social, Wrapped, Signed)
 export {
   type DashboardIdempotencyKey,
@@ -366,7 +387,6 @@ export {
   type WrappedLink,
   wrappedLinks,
 } from './links';
-
 // Pixel Tracking (Events, Creator Configs)
 export {
   type CreatorPixel,
@@ -382,7 +402,6 @@ export {
   selectCreatorPixelSchema,
   selectPixelEventSchema,
 } from './pixels';
-
 // Pre-save campaigns (Spotify, Apple Music)
 export {
   type NewPreSaveToken,
@@ -462,6 +481,24 @@ export {
   selectReferralCommissionSchema,
   selectReferralSchema,
 } from './referrals';
+// Release Tasks (Templates, Template Items, Tasks)
+export {
+  insertReleaseTaskSchema,
+  insertReleaseTaskTemplateItemSchema,
+  insertReleaseTaskTemplateSchema,
+  type NewReleaseTask,
+  type NewReleaseTaskTemplate,
+  type NewReleaseTaskTemplateItem,
+  type ReleaseTask,
+  type ReleaseTaskTemplate,
+  type ReleaseTaskTemplateItem,
+  releaseTasks,
+  releaseTaskTemplateItems,
+  releaseTaskTemplates,
+  selectReleaseTaskSchema,
+  selectReleaseTaskTemplateItemSchema,
+  selectReleaseTaskTemplateSchema,
+} from './release-tasks';
 // Sender (Email Quotas, Sending Reputation, Send Attribution)
 export {
   type CreatorEmailQuota,
