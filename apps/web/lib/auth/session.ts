@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
@@ -283,13 +283,9 @@ export async function getProfileByDbUserId(
       isClaimed: creatorProfiles.isClaimed,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
-    .from(creatorProfiles)
-    .where(
-      and(
-        eq(creatorProfiles.userId, dbUserId),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
+    .from(users)
+    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .where(eq(users.id, dbUserId))
     .limit(1);
 
   return profile ?? null;
@@ -338,23 +334,15 @@ export async function getSessionContext(options?: {
       userStatus: users.userStatus,
       // Profile fields (nullable from LEFT JOIN)
       profileId: creatorProfiles.id,
-      profileUserId: creatorProfiles.userId,
       profileUsername: creatorProfiles.username,
       profileUsernameNormalized: creatorProfiles.usernameNormalized,
       profileDisplayName: creatorProfiles.displayName,
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileIsPublic: creatorProfiles.isPublic,
-      profileIsClaimed: creatorProfiles.isClaimed,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(users)
-    .leftJoin(
-      creatorProfiles,
-      and(
-        eq(creatorProfiles.userId, users.id),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
+    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
@@ -385,13 +373,13 @@ export async function getSessionContext(options?: {
   const profile: ProfileContext | null = result.profileId
     ? {
         id: result.profileId,
-        userId: result.profileUserId,
+        userId: result.userId, // from users table, not profile
         username: result.profileUsername,
         usernameNormalized: result.profileUsernameNormalized,
         displayName: result.profileDisplayName,
         avatarUrl: result.profileAvatarUrl,
         isPublic: result.profileIsPublic,
-        isClaimed: result.profileIsClaimed,
+        isClaimed: true, // joined via activeProfileId = claimed
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
       }
     : null;
