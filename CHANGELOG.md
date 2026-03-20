@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.23] - 2026-03-20
+
+### Changed
+
+- Agent autonomy rules: agents now handle tests, error handling, edge cases, and linting without asking — questions reserved for real product/architecture decisions
+- Scope rule updated: agents include hardening (error handling, edge cases, tests) for code they touch, not just the literal task asked
+- Simplified changelog automation docs in AGENTS.md
+
 ## [26.4.22] - 2026-03-20
 
 ### Changed
