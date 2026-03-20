@@ -463,6 +463,7 @@ function ContentPageBody({
         avatarUrl: creator.avatarUrl,
       }}
       providers={allProviders}
+      credits={content.credits}
       utmParams={utmParams}
       artworkSizes={content.artworkSizes}
       allowDownloads={
