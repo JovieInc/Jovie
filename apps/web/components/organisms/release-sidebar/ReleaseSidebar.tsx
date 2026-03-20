@@ -69,7 +69,7 @@ const SIDEBAR_TAB_OPTIONS = [
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden'
+  'overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)]'
 );
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
@@ -112,12 +112,11 @@ function ReleaseEntityHeader({
       className={RELEASE_SIDEBAR_CARD_CLASSNAME}
       testId='release-header-card'
     >
-      <div className='p-3'>
-        <p className='mb-1.5 text-[11px] font-[510] leading-none text-tertiary-token'>
+      <div className='p-2.5'>
+        <p className='mb-1 text-[10.5px] font-[510] leading-none text-tertiary-token'>
           Release
         </p>
         <div className='flex items-start gap-2.5'>
-          {/* Artwork with hover play overlay */}
           <div className='group/artwork relative shrink-0'>
             <AlbumArtworkContextMenu
               title={release.title}
@@ -142,8 +141,8 @@ function ReleaseEntityHeader({
                 <DrawerMediaThumb
                   src={release.artworkUrl}
                   alt={artworkAlt}
-                  sizeClassName='h-[72px] w-[72px] rounded-[10px]'
-                  sizes='72px'
+                  sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+                  sizes='68px'
                   fallback={
                     <Icon
                       name='Disc3'
@@ -198,7 +197,7 @@ function ReleaseEntityHeader({
         </div>
       </div>
 
-      <div className='border-t border-(--linear-app-frame-seam) bg-surface-0/35 px-3 py-2'>
+      <div className='border-t border-(--linear-app-frame-seam) bg-surface-0/35 px-2.5 py-2'>
         <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
       </div>
     </DrawerSurfaceCard>
@@ -499,7 +498,7 @@ export function ReleaseSidebar({
             className={RELEASE_SIDEBAR_CARD_CLASSNAME}
             testId='release-tab-panel-card'
           >
-            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <div className='border-b border-(--linear-app-frame-seam) px-2.5 py-1.5'>
               <DrawerTabs
                 value={activeTab}
                 onValueChange={value => setActiveTab(value as SidebarTab)}
@@ -508,7 +507,7 @@ export function ReleaseSidebar({
               />
             </div>
 
-            <div className='space-y-2.5 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_92%,transparent)] p-2.5'>
+            <div className='space-y-2 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_92%,transparent)] p-2'>
               {activeTab === 'tracklist' && (
                 <ReleaseTrackList
                   release={release}

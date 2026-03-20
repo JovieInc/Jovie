@@ -497,8 +497,8 @@ export function ProfileContactSidebar() {
       title={headerTitle}
       headerActions={headerActions}
       entityHeader={
-        <div className='space-y-2'>
-          <div className='py-1'>
+        <div className='space-y-1.5'>
+          <div className='pt-0.5'>
             <ProfileContactHeader
               displayName={displayName}
               username={username}
@@ -512,7 +512,6 @@ export function ProfileContactSidebar() {
           {/* Analytics summary */}
           <ProfileAnalyticsSummary />
 
-          {/* Profile URL */}
           <DrawerPropertyRow
             label='Profile link'
             value={
@@ -521,11 +520,11 @@ export function ProfileContactSidebar() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-6 px-2 py-1 text-[11px]'
+                  inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
+                  className='shrink-0 rounded-md border border-transparent p-1 text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -542,7 +541,7 @@ export function ProfileContactSidebar() {
                   trigger={
                     <button
                       type='button'
-                      className='shrink-0 rounded p-0.5 text-tertiary-token hover:text-secondary-token transition-colors'
+                      className='shrink-0 rounded-md border border-transparent p-1 text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
                       aria-label='Open profile share options'
                     >
                       <MoreHorizontal className='h-3 w-3' aria-hidden='true' />
@@ -555,7 +554,7 @@ export function ProfileContactSidebar() {
         </div>
       }
       tabs={
-        <div className='flex items-center gap-1.5'>
+        <div className='flex items-center gap-1'>
           <DrawerTabs
             value={resolvedCategory}
             onValueChange={value =>
@@ -565,15 +564,15 @@ export function ProfileContactSidebar() {
             className='flex-1'
             ariaLabel='Profile sidebar view'
           />
-          <div className='h-7 w-7 shrink-0'>
+          <div className='h-[26px] w-[26px] shrink-0'>
             {supportsAddAction && (
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-7 w-7 border-subtle bg-surface-1 text-tertiary-token hover:text-primary-token'
+                className='h-[26px] w-[26px] rounded-md border-subtle bg-surface-0 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
                 ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
-                <Plus className='h-4 w-4' />
+                <Plus className='h-3.5 w-3.5' />
               </AppIconButton>
             )}
           </div>
@@ -603,9 +602,8 @@ export function ProfileContactSidebar() {
             dspConnections={dspConnections}
           />
 
-          {/* Smart add link input with platform suggestions */}
           {isAddingLink && (
-            <div className='mt-3'>
+            <div className='mt-2.5'>
               <SidebarLinkInput
                 categoryFilter={
                   resolvedCategory === 'social' ||
