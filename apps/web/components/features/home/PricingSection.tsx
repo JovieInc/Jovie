@@ -30,10 +30,11 @@ export function PricingSection() {
               Pricing
             </Badge>
             <h2 className='marketing-h2-linear text-primary-token'>
-              Simple pricing.
+              Get live for free. Grow when you&apos;re ready.
             </h2>
             <p className='max-w-md marketing-lead-linear text-secondary-token'>
-              Get live for free. Upgrade for deeper analytics and full control.
+              Smart links, fan notifications, and your profile — all free.
+              Upgrade to own your full fan list and remove branding.
             </p>
           </div>
 

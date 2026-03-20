@@ -29,6 +29,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
 - End-of-workflow summary shows count of auto-resolved vs asked decisions
 
+### Changed
+
+- Landing page copy rewritten to pain-first messaging: "Stop setting up smart links for every release"
+- Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
+- AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
+- Pricing headline: "Get live for free. Grow when you're ready"
+- Final CTA: "Every day without Jovie is fans you'll never see again"
+- Meta title, description, and structured data updated to match new positioning
+- Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
+- Added persistent "Claim your handle" ghost button during dashboard animation
+- Mobile dashboard uses stacked row layout for full smart link URL visibility
+
 ## [26.4.17] - 2026-03-19
 
 ### Added
