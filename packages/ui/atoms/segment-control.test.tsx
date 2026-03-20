@@ -303,7 +303,7 @@ describe('SegmentControl', () => {
       );
       const root = container.firstChild;
       expect((root as HTMLElement).className).toContain('inline-flex');
-      expect((root as HTMLElement).className).toContain('rounded-full');
+      expect((root as HTMLElement).className).toContain('rounded-[9px]');
     });
 
     it('merges custom className', () => {
