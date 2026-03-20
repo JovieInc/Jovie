@@ -1,8 +1,32 @@
--- Migration: Backfill discog_recordings and discog_release_tracks from discog_tracks
--- Strategy: Reuse discog_tracks.id as discog_recordings.id for easy FK migration.
--- Each track becomes exactly one recording (no ISRC dedup in backfill).
+-- Migration: Backfill recordings + add CHECK constraints referencing 'release_track' enum
+-- The enum value was added in migration 0078 but PostgreSQL requires it to be committed
+-- in a prior transaction before it can be referenced in CHECK constraints.
+
+-- Step 0: Add CHECK constraints (deferred from 0078 due to enum transaction restriction)
+ALTER TABLE "provider_links" DROP CONSTRAINT IF EXISTS "provider_links_owner_match";
+ALTER TABLE "provider_links" ADD CONSTRAINT "provider_links_owner_match" CHECK (
+  (owner_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+  OR (owner_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+  OR (owner_type = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
+);
+
+ALTER TABLE "smart_link_targets" DROP CONSTRAINT IF EXISTS "smart_link_targets_owner_match";
+ALTER TABLE "smart_link_targets" ADD CONSTRAINT "smart_link_targets_owner_match" CHECK (
+  (release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+  OR (track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+  OR (release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
+);
+
+ALTER TABLE "content_slug_redirects" DROP CONSTRAINT IF EXISTS "content_slug_redirects_content_match";
+ALTER TABLE "content_slug_redirects" ADD CONSTRAINT "content_slug_redirects_content_match" CHECK (
+  (content_type = 'release' AND release_id IS NOT NULL AND track_id IS NULL AND release_track_id IS NULL)
+  OR (content_type = 'track' AND track_id IS NOT NULL AND release_id IS NULL AND release_track_id IS NULL)
+  OR (content_type = 'release_track' AND release_track_id IS NOT NULL AND release_id IS NULL AND track_id IS NULL)
+);
 
 -- Step 1: Backfill discog_recordings from discog_tracks (1:1)
+-- Strategy: Reuse discog_tracks.id as discog_recordings.id for easy FK migration.
+-- Each track becomes exactly one recording (no ISRC dedup in backfill).
 INSERT INTO "discog_recordings" (
   "id", "creator_profile_id", "title", "slug", "isrc", "duration_ms",
   "is_explicit", "preview_url", "audio_url", "audio_format", "lyrics",
