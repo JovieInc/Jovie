@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.22] - 2026-03-20
+
+### Changed
+
+- Releases route visual overhaul: Linear-style surfaces, squircle corners, tighter spacing across table, sidebar drawers, toolbar, dialogs, banners, and mobile views
+- Shared segment control and drawer primitives aligned to Linear design language (flatter controls, stacked drawer cards, quieter chrome)
+- Extracted `LINEAR_SURFACE` token set for reusable card/popover/toolbar surface classes
+- Release sidebar now uses stacked card layout (header, analytics, tabs as separate cards)
+- Track sidebar uses stacked card layout (track card, details card)
+- Release table subheader moved inside the table card container
+- Lower-shell sidebar banners (upgrade, install) use quieter background treatment
+
+### Added
+
+- `LINEAR_SURFACE` design token constants for consistent surface hierarchy across the dashboard
+- Comprehensive test coverage for releases route: AddReleaseSidebar, MobileReleaseList, ReleaseTable, ReleasesEmptyState, SmartLinkGateBanner, TrackRow, ReleaseEditDialog, AddProviderUrlPopover, DialogLoadingSkeleton, DrawerLoadingSkeleton, ArtistSearchCommandPalette
+- Test hooks (`data-testid`) for drawer loading skeleton cards, dialog loading cards, mobile release list
+
 ## [26.4.21] - 2026-03-20
 
 ### Added
