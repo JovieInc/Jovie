@@ -104,6 +104,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     username: 'creatorProfiles.username',
     usernameNormalized: 'creatorProfiles.usernameNormalized',
   },
+  userProfileClaims: {
+    userId: 'userProfileClaims.userId',
+    creatorProfileId: 'userProfileClaims.creatorProfileId',
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -642,14 +646,19 @@ describe('admin/actions.ts', () => {
   // deleteCreatorOrUserAction
   // =========================================================================
   describe('deleteCreatorOrUserAction', () => {
-    it('soft-deletes a claimed creator (has userId)', async () => {
-      // First call: select to get profile
-      createSelectChain([{ userId: 'user_abc', username: 'claimed_user' }]);
-
-      // Second call: update for soft delete
-      const updateWhere = vi.fn().mockResolvedValue(undefined);
-      const updateSet = vi.fn().mockReturnValue({ where: updateWhere });
-      mockDbUpdate.mockReturnValue({ set: updateSet });
+    it('deletes a claimed creator profile without affecting the user', async () => {
+      // First select: profile lookup; second select: claims check (not admin's profile)
+      const profileWhere = vi
+        .fn()
+        .mockResolvedValue([{ username: 'claimed_user' }]);
+      const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+      const claimsLimit = vi.fn().mockResolvedValue([{ userId: 'other_user' }]);
+      const claimsWhere = vi.fn().mockReturnValue({ limit: claimsLimit });
+      const claimsFrom = vi.fn().mockReturnValue({ where: claimsWhere });
+      mockDbSelect
+        .mockReturnValueOnce({ from: profileFrom })
+        .mockReturnValueOnce({ from: claimsFrom });
+      createDeleteChain();
 
       const { deleteCreatorOrUserAction } = await import(
         '@/app/app/(shell)/admin/actions'
@@ -658,22 +667,25 @@ describe('admin/actions.ts', () => {
       const fd = makeFormData({ profileId: 'p1' });
       await deleteCreatorOrUserAction(fd);
 
-      expect(mockDbSelect).toHaveBeenCalled();
-      expect(mockDbUpdate).toHaveBeenCalled();
-      expect(updateSet).toHaveBeenCalledWith(
-        expect.objectContaining({
-          deletedAt: expect.any(Date),
-          updatedAt: expect.any(Date),
-        })
-      );
-      // Hard delete should NOT be called
-      expect(mockDbDelete).not.toHaveBeenCalled();
+      expect(mockDbSelect).toHaveBeenCalledTimes(2);
+      expect(mockDbDelete).toHaveBeenCalled();
+      // User should NOT be soft-deleted
+      expect(mockDbUpdate).not.toHaveBeenCalled();
       expect(mockRevalidatePath).toHaveBeenCalledWith('/admin');
     });
 
-    it('hard-deletes an unclaimed creator (no userId)', async () => {
-      // Profile has no userId
-      createSelectChain([{ userId: null, username: 'unclaimed_user' }]);
+    it('deletes an unclaimed creator profile', async () => {
+      // First select: profile lookup; second select: no claims
+      const profileWhere = vi
+        .fn()
+        .mockResolvedValue([{ username: 'unclaimed_user' }]);
+      const profileFrom = vi.fn().mockReturnValue({ where: profileWhere });
+      const claimsLimit = vi.fn().mockResolvedValue([]);
+      const claimsWhere = vi.fn().mockReturnValue({ limit: claimsLimit });
+      const claimsFrom = vi.fn().mockReturnValue({ where: claimsWhere });
+      mockDbSelect
+        .mockReturnValueOnce({ from: profileFrom })
+        .mockReturnValueOnce({ from: claimsFrom });
       createDeleteChain();
 
       const { deleteCreatorOrUserAction } = await import(

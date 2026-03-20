@@ -23,6 +23,8 @@ import {
   outreachChannelEnum,
   outreachStatusEnum,
   photoStatusEnum,
+  profileClaimRoleEnum,
+  profileOwnershipActionEnum,
 } from './enums';
 // eslint-disable-next-line import/no-cycle -- mutual FK references between profiles and waitlist tables
 import { waitlistEntries } from './waitlist';
@@ -88,6 +90,9 @@ export const creatorProfiles = pgTable(
   'creator_profiles',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // @deprecated — ownership now tracked via userProfileClaims join table.
+    // Kept for backward compatibility during migration. Will be removed once
+    // all consumers are migrated to use userProfileClaims/activeProfileId.
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'set null',
     }),
@@ -122,6 +127,8 @@ export const creatorProfiles = pgTable(
     isVerified: boolean('is_verified').default(false),
     isFeatured: boolean('is_featured').default(false),
     marketingOptOut: boolean('marketing_opt_out').default(false),
+    // @deprecated — claimed status now derived from userProfileClaims.
+    // Kept for backward compatibility during migration.
     isClaimed: boolean('is_claimed').default(false),
     claimToken: text('claim_token'),
     claimedAt: timestamp('claimed_at'),
@@ -195,26 +202,13 @@ export const creatorProfiles = pgTable(
     )
       .on(table.usernameNormalized)
       .where(drizzleSql`username_normalized IS NOT NULL`),
-    oneClaimedProfilePerUser: uniqueIndex(
-      'idx_creator_profiles_one_claimed_per_user'
-    )
-      .on(table.userId)
-      .where(drizzleSql`is_claimed = true`),
-    // Index for GTM prioritization - sort unclaimed profiles by fit score
-    fitScoreUnclaimedIndex: index('idx_creator_profiles_fit_score_unclaimed')
-      .on(table.fitScore, table.id)
-      .where(drizzleSql`is_claimed = false`),
-    userIdClaimedIndex: index('idx_creator_profiles_user_id_claimed').on(
-      table.userId,
-      table.isClaimed
-    ),
-    userIdCreatedAtIndex: index('idx_creator_profiles_user_id_created_at').on(
-      table.userId,
-      table.createdAt
+    // Index for GTM prioritization - sort profiles by fit score (unclaimed = no claims row)
+    fitScoreIndex: index('idx_creator_profiles_fit_score').on(
+      table.fitScore,
+      table.id
     ),
     // Performance index: Outreach dashboard filtering
     outreachStatusIndex: index('idx_creator_profiles_outreach_status').on(
-      table.isClaimed,
       table.outreachStatus,
       table.createdAt
     ),
@@ -405,6 +399,55 @@ export const creatorClaimInvites = pgTable(
   })
 );
 
+// User-to-profile ownership claims (many-to-many with roles)
+export const userProfileClaims = pgTable(
+  'user_profile_claims',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    role: profileClaimRoleEnum('role').notNull().default('owner'),
+    claimedAt: timestamp('claimed_at').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Each profile can only be claimed once (one owner/manager/viewer at a time per profile)
+    uniqueProfile: uniqueIndex('idx_user_profile_claims_unique_profile').on(
+      table.creatorProfileId
+    ),
+    userIdx: index('idx_user_profile_claims_user_id').on(table.userId),
+  })
+);
+
+// Audit log for ownership changes
+export const profileOwnershipLog = pgTable(
+  'profile_ownership_log',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id')
+      .notNull()
+      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    action: profileOwnershipActionEnum('action').notNull(),
+    performedBy: uuid('performed_by').references(() => users.id, {
+      onDelete: 'set null',
+    }),
+    reason: text('reason'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  table => ({
+    profileIdx: index('idx_profile_ownership_log_profile').on(
+      table.creatorProfileId
+    ),
+  })
+);
+
 // Schema validations
 export const insertCreatorProfileSchema = createInsertSchema(creatorProfiles);
 export const selectCreatorProfileSchema = createSelectSchema(creatorProfiles);
@@ -456,3 +499,19 @@ export type NewCreatorProfileAttribute =
 
 export type CreatorClaimInvite = typeof creatorClaimInvites.$inferSelect;
 export type NewCreatorClaimInvite = typeof creatorClaimInvites.$inferInsert;
+
+export type UserProfileClaim = typeof userProfileClaims.$inferSelect;
+export type NewUserProfileClaim = typeof userProfileClaims.$inferInsert;
+
+export type ProfileOwnershipLog = typeof profileOwnershipLog.$inferSelect;
+export type NewProfileOwnershipLog = typeof profileOwnershipLog.$inferInsert;
+
+export const insertUserProfileClaimSchema =
+  createInsertSchema(userProfileClaims);
+export const selectUserProfileClaimSchema =
+  createSelectSchema(userProfileClaims);
+
+export const insertProfileOwnershipLogSchema =
+  createInsertSchema(profileOwnershipLog);
+export const selectProfileOwnershipLogSchema =
+  createSelectSchema(profileOwnershipLog);

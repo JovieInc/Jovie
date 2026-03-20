@@ -456,6 +456,21 @@ export const tipStatusEnum = pgEnum('tip_status', [
   'refunded',
 ]);
 
+// Profile Claim Enums
+export const profileClaimRoleEnum = pgEnum('profile_claim_role', [
+  'owner',
+  'manager',
+  'viewer',
+]);
+
+export const profileOwnershipActionEnum = pgEnum('profile_ownership_action', [
+  'claimed',
+  'linked',
+  'unlinked',
+  'transferred',
+  'role_changed',
+]);
+
 // Referral Program Enums
 export const referralStatusEnum = pgEnum('referral_status', [
   'pending', // Referred user signed up but not yet subscribed

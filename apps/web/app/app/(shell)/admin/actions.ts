@@ -9,10 +9,18 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isAllowedAvatarHostname } from '@/lib/images/avatar-hosts';
 import { enqueueMusicFetchEnrichmentJob } from '@/lib/ingestion/jobs';
 import { sendVerificationApprovedEmail } from '@/lib/verification/notifications';
+
+function safeParseJsonArray(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new TypeError('profileIds must be valid JSON');
+  }
+}
 
 class AdminUnauthorizedError extends Error {
   constructor(message: string = 'Unauthorized') {
@@ -45,7 +53,7 @@ function validateAvatarUrl(url: string): string {
   }
 }
 
-async function requireAdmin(): Promise<void> {
+async function requireAdmin(): Promise<string> {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
@@ -57,6 +65,8 @@ async function requireAdmin(): Promise<void> {
   if (!adminStatus) {
     throw new AdminUnauthorizedError();
   }
+
+  return userId;
 }
 
 export async function toggleCreatorVerifiedAction(
@@ -119,7 +129,7 @@ export async function bulkRerunCreatorIngestionAction(
     throw new TypeError('profileIds is required');
   }
 
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  const parsed = safeParseJsonArray(profileIdsRaw);
   if (!Array.isArray(parsed)) {
     throw new TypeError('profileIds must be an array');
   }
@@ -194,7 +204,7 @@ export async function bulkSetCreatorsVerifiedAction(
   const isVerified =
     typeof nextVerifiedRaw === 'string' ? nextVerifiedRaw === 'true' : true;
 
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  const parsed = safeParseJsonArray(profileIdsRaw);
   if (!Array.isArray(parsed)) {
     throw new TypeError('profileIds must be an array');
   }
@@ -300,7 +310,7 @@ export async function bulkSetCreatorsFeaturedAction(
   const isFeatured =
     typeof nextFeaturedRaw === 'string' ? nextFeaturedRaw === 'true' : true;
 
-  const parsed = JSON.parse(profileIdsRaw) as unknown;
+  const parsed = safeParseJsonArray(profileIdsRaw);
   if (!Array.isArray(parsed)) {
     throw new TypeError('profileIds must be an array');
   }
@@ -368,7 +378,7 @@ export async function toggleCreatorMarketingAction(
 export async function deleteCreatorOrUserAction(
   formData: FormData
 ): Promise<void> {
-  await requireAdmin();
+  const adminUserId = await requireAdmin();
 
   const profileId = formData.get('profileId');
 
@@ -376,10 +386,9 @@ export async function deleteCreatorOrUserAction(
     throw new TypeError('profileId is required');
   }
 
-  // Check if profile is claimed (has userId)
+  // Check if profile exists
   const [profile] = await db
     .select({
-      userId: creatorProfiles.userId,
       username: creatorProfiles.username,
     })
     .from(creatorProfiles)
@@ -389,19 +398,20 @@ export async function deleteCreatorOrUserAction(
     throw new TypeError('Profile not found');
   }
 
-  if (profile.userId) {
-    // Claimed creator: Soft delete user (set deletedAt timestamp)
-    await db
-      .update(users)
-      .set({
-        deletedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, profile.userId));
-  } else {
-    // Unclaimed creator: Hard delete profile (will cascade to social links, etc.)
-    await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
+  // Prevent admin from deleting a profile linked to their own account
+  const [claim] = await db
+    .select({ userId: userProfileClaims.userId })
+    .from(userProfileClaims)
+    .where(eq(userProfileClaims.creatorProfileId, profileId))
+    .limit(1);
+
+  if (claim?.userId === adminUserId) {
+    throw new TypeError('Cannot delete your own profile');
   }
+
+  // Delete the creator profile (cascades to social links, claims, etc.)
+  // This does NOT delete or soft-delete the associated user account.
+  await db.delete(creatorProfiles).where(eq(creatorProfiles.id, profileId));
 
   revalidatePath(APP_ROUTES.ADMIN);
   revalidatePath(APP_ROUTES.ADMIN_CREATORS);

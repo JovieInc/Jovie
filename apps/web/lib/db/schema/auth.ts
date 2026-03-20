@@ -1,3 +1,4 @@
+import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
   index,
@@ -42,6 +43,8 @@ export const users = pgTable(
     // Growth plan beta access request
     growthAccessRequestedAt: timestamp('growth_access_requested_at'),
     growthAccessReason: text('growth_access_reason'),
+    // Active creator profile (FK added post-create to avoid circular dependency)
+    activeProfileId: uuid('active_profile_id'),
     // Referral tracking
     referredByCode: text('referred_by_code'), // The referral code used at signup
     deletedAt: timestamp('deleted_at'),
@@ -50,6 +53,9 @@ export const users = pgTable(
   },
   table => ({
     userStatusIdx: index('idx_users_user_status').on(table.userStatus),
+    activeProfileIdx: index('idx_users_active_profile_id')
+      .on(table.activeProfileId)
+      .where(drizzleSql`active_profile_id IS NOT NULL`),
   })
 );
 

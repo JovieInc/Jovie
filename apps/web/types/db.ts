@@ -81,9 +81,12 @@ export interface AppUser {
   created_at: string;
 }
 
+export type ProfileClaimRole = 'owner' | 'manager' | 'viewer';
+
 export interface CreatorProfile {
   id: string;
-  user_id: string | null; // Nullable to support unclaimed profiles
+  /** @deprecated — ownership now tracked via user_profile_claims */
+  user_id: string | null;
   creator_type: CreatorType;
   username: string;
   display_name: string | null;
@@ -110,12 +113,14 @@ export interface CreatorProfile {
   is_featured: boolean;
   marketing_opt_out: boolean;
   // Claiming functionality
+  /** @deprecated — claimed status now derived from user_profile_claims */
   is_claimed: boolean;
   claim_token: string | null;
   claimed_at: string | null;
   // About / bio metadata
   location?: string | null;
   active_since_year?: number | null;
+  genres?: string[] | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -385,7 +390,7 @@ export function isPodcasterProfile(
 
 type CanonicalArtistProfileShape = {
   id: string;
-  userId: string | null;
+  ownerUserId?: string | null;
   username: string;
   displayName: string | null;
   bio: string | null;
@@ -436,7 +441,7 @@ function mapCanonicalProfileToArtist(
 
   return {
     id: profile.id,
-    owner_user_id: profile.userId || '',
+    owner_user_id: profile.ownerUserId || '',
     handle: profile.username,
     spotify_id: profile.spotifyId || '',
     name: profile.displayName || profile.username,
@@ -468,7 +473,7 @@ function mapCanonicalProfileToArtist(
 export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
   return mapCanonicalProfileToArtist({
     id: profile.id,
-    userId: profile.user_id,
+    ownerUserId: profile.user_id, // @deprecated — use user_profile_claims
     username: profile.username,
     displayName: profile.display_name,
     avatarUrl: profile.avatar_url,
@@ -484,6 +489,7 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     soundcloudId: profile.soundcloud_id,
     location: profile.location,
     activeSinceYear: profile.active_since_year,
+    genres: profile.genres,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,
@@ -533,7 +539,7 @@ export function convertDrizzleCreatorProfileToArtist(
 ): Artist {
   return mapCanonicalProfileToArtist({
     id: profile.id,
-    userId: profile.userId,
+    ownerUserId: profile.userId, // @deprecated — use user_profile_claims
     username: profile.username,
     displayName: profile.displayName,
     avatarUrl: profile.avatarUrl,
