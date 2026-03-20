@@ -153,12 +153,20 @@ function CreateLinkButton() {
   );
 }
 
+const TABLE_SKELETON_KEYS = [
+  'investor-skeleton-1',
+  'investor-skeleton-2',
+  'investor-skeleton-3',
+  'investor-skeleton-4',
+  'investor-skeleton-5',
+];
+
 function TableSkeleton() {
   return (
     <div className='space-y-2'>
-      {Array.from({ length: 5 }).map((_, i) => (
+      {TABLE_SKELETON_KEYS.map(skeletonKey => (
         <div
-          key={`skeleton-${i}`}
+          key={skeletonKey}
           className='h-12 animate-pulse rounded bg-muted/30'
         />
       ))}
