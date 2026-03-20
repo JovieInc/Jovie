@@ -64,10 +64,6 @@ const DSP_LABELS: Record<(typeof SMART_LINK_DSPS)[number], string> = {
 
 type Release = (typeof RELEASES)[number];
 
-interface SeeItInActionCarouselProps {
-  readonly creators?: unknown[];
-}
-
 function useHoverCapable() {
   const [isHoverCapable, setIsHoverCapable] = useState(false);
 
@@ -246,9 +242,7 @@ function ReleaseCard({
   );
 }
 
-export function SeeItInActionCarousel({
-  creators: _creators,
-}: Readonly<SeeItInActionCarouselProps>) {
+export function SeeItInActionCarousel() {
   const isHoverCapable = useHoverCapable();
   const [openReleaseId, setOpenReleaseId] = useState<string | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
