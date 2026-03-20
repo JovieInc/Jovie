@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -77,7 +77,6 @@ type UserLifecycleStatus =
 /** Data structure for existing user profile information */
 interface ExistingUserData {
   profileId: string | null;
-  profileClaimed: boolean | null;
   onboardingComplete: Date | null;
 }
 
@@ -93,8 +92,7 @@ function determineUserStatus(
   if (!waitlistEntryId) {
     // When waitlist is disabled, skip waitlist states — treat as approved
     if (!waitlistGateEnabled) {
-      const hasClaimedProfile =
-        existingUserData?.profileId && existingUserData.profileClaimed;
+      const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
       if (!hasClaimedProfile) {
         return 'waitlist_approved';
       }
@@ -105,8 +103,7 @@ function determineUserStatus(
     return 'waitlist_pending';
   }
 
-  const hasClaimedProfile =
-    existingUserData?.profileId && existingUserData.profileClaimed;
+  const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
   if (!hasClaimedProfile) {
     return 'waitlist_approved';
   }
@@ -267,16 +264,12 @@ async function createUserWithRetry(
           userId: users.id,
           currentStatus: users.userStatus,
           profileId: creatorProfiles.id,
-          profileClaimed: creatorProfiles.isClaimed,
           onboardingComplete: creatorProfiles.onboardingCompletedAt,
         })
         .from(users)
         .leftJoin(
           creatorProfiles,
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(creatorProfiles.isClaimed, true)
-          )
+          eq(creatorProfiles.id, users.activeProfileId)
         )
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
@@ -492,16 +485,9 @@ export async function resolveUserState(
       profileIsPublic: creatorProfiles.isPublic,
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
-      profileIsClaimed: creatorProfiles.isClaimed,
     })
     .from(users)
-    .leftJoin(
-      creatorProfiles,
-      and(
-        eq(creatorProfiles.userId, users.id),
-        eq(creatorProfiles.isClaimed, true)
-      )
-    )
+    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
@@ -570,7 +556,7 @@ export async function resolveUserState(
         avatarUrl: dbResult.profileAvatarUrl,
         isPublic: dbResult.profileIsPublic,
         onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
-        isClaimed: dbResult.profileIsClaimed,
+        isClaimed: true, // joined via activeProfileId = claimed
       }
     : null;
 
