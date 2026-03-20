@@ -6,10 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.18] - 2026-03-19
+
+### Added
+
+- Auto-Lake protocol for gstack: resource-cost decisions (test coverage, error handling, edge cases, DRY fixes) are now auto-resolved without prompting when `auto_lake` is enabled — only genuine human decisions (architecture, scope, UX) still ask for input
+- Decision tree in the shared gstack preamble distinguishes 10 auto-resolve categories from 10 always-ask categories
+- `[AUTO-LAKE]` log lines provide a visible audit trail of every auto-resolved decision
+- End-of-workflow summary shows count of auto-resolved vs asked decisions
+
 ## [26.4.17] - 2026-03-19
 
 ### Added
 
+- Demo account seed scripts: `setup-demo-user.ts` (Clerk user creation) and `seed-demo-account.ts` (comprehensive DB seeding)
+- Seeds 18 entity types with realistic data: profile, releases, social links, tour dates, subscribers (150), audience (200), tips (30), clicks (500+), profile views (90 days), contacts, inbox threads (8), AI insights, chat history, referrals, email engagement, pre-save tokens, DSP matches
+- Hockey-stick date distributions for convincing growth narrative on sales calls
+- Realistic fan names, heartfelt tip messages, and authentic email bodies for inbox threads
+- Production safety: `--allow-production` flag required for live Clerk keys
+- Username reservation: script aborts if `timwhite` username belongs to a different user
+- Hardcoded fallback profile data so script works without `/tim` in the database
+- Idempotent re-runs with delete-then-insert and batch inserts
 - Shareable celebration card: Spotify Wrapped-style card auto-generated for each artist profile, with feed (1080x1080) and story (1080x1920) sizes, download + share buttons in the post-onboarding celebration screen
 - Shared `profileCardLayout` function: DRY layout used by both OG images and celebration cards
 - Re-enrichment script: one-off script to enqueue MusicFetch enrichment jobs for all existing artists with dedup safety
@@ -25,8 +42,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Refactored `opengraph-image.tsx` to use shared `profileCardLayout` instead of inline JSX (net -120 lines)
 - Cleaned up TODOS.md: removed completed items (re-enrichment, social card) and duplicate win-back email entry
 
-## [26.4.16] - 2026-03-19
+## [26.4.18] - 2026-03-19
 
+### Changed
+
+- CHANGELOG.md now uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs
+- Version bumping and changelog generation handled entirely by `/ship` workflow — removed standalone `version:bump` and `changelog:generate` scripts
+
+### Removed
+
+- `scripts/generate-changelog.mjs` — AI changelog rewriting script (superseded by `/ship` inline generation)
+- `scripts/version-bump.mjs` — standalone version bump script (superseded by `/ship` workflow)
+- `pnpm version:bump` and `pnpm changelog:generate` commands from package.json
+- `getUnreleased`, `hasUnreleasedEntries`, `replaceUnreleased` from changelog parser (only used by removed scripts)
+- `[Unreleased]` section requirement from version-check validation
 ### Fixed
 
 - Admin creator table: UUID validation on all profileId inputs (single and bulk operations)
@@ -49,6 +78,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- CI: unit tests now gate PR merges — runs on PRs and merge queue, not just post-merge on main
 - Chat prompts restored to practical defaults: "Change profile photo", "Set up a link", "How do I get paid?"
 - SuggestedProfilesCarousel relocated from sidebar to chat empty state
 - Pagination buttons use conditional rendering instead of disabled links to "#"
