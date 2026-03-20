@@ -18,6 +18,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Username reservation: script aborts if `timwhite` username belongs to a different user
 - Hardcoded fallback profile data so script works without `/tim` in the database
 - Idempotent re-runs with delete-then-insert and batch inserts
+- Shareable celebration card: Spotify Wrapped-style card auto-generated for each artist profile, with feed (1080x1080) and story (1080x1920) sizes, download + share buttons in the post-onboarding celebration screen
+- Shared `profileCardLayout` function: DRY layout used by both OG images and celebration cards
+- Re-enrichment script: one-off script to enqueue MusicFetch enrichment jobs for all existing artists with dedup safety
+- `genres` field on `CreatorProfile` interface for Artist type removal phase 1
+
+### Fixed
+
+- `convertCreatorProfileToArtist` now passes through `venmoHandle` and `genres` (previously silently dropped)
+- Celebration screen auto-advance timer cancels on user interaction (prevents mid-download dismissal)
+
+### Changed
+
+- Refactored `opengraph-image.tsx` to use shared `profileCardLayout` instead of inline JSX (net -120 lines)
+- Cleaned up TODOS.md: removed completed items (re-enrichment, social card) and duplicate win-back email entry
 
 ## [26.4.16] - 2026-03-19
 
