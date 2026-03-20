@@ -10,6 +10,7 @@ export default defineConfig({
     include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)'],
     exclude: ['node_modules/**', 'dist/**'],
     globals: false,
+    passWithNoTests: true,
   },
   resolve: {
     alias: {
