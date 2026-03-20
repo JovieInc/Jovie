@@ -545,14 +545,21 @@
       "idx": 77,
       "version": "7",
       "when": 1775100000000,
-      "tag": "0078_add_recordings_and_release_tracks",
+      "tag": "0078_add_release_track_enum_values",
       "breakpoints": true
     },
     {
       "idx": 78,
       "version": "7",
+      "when": 1775150000000,
+      "tag": "0079_add_recordings_and_release_tracks",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
       "when": 1775200000000,
-      "tag": "0079_backfill_recordings_from_tracks",
+      "tag": "0080_backfill_recordings_from_tracks",
       "breakpoints": true
     }
   ]

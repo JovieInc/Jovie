@@ -3,11 +3,10 @@
 -- discog_recordings = canonical audio entity (ISRC, duration, lyrics, audio)
 -- discog_release_tracks = a recording's appearance on a specific release
 
--- Step 1: Extend enums
-ALTER TYPE "provider_link_owner_type" ADD VALUE IF NOT EXISTS 'release_track';
-ALTER TYPE "content_slug_type" ADD VALUE IF NOT EXISTS 'release_track';
+-- Note: enum values 'release_track' were added in migration 0078.
+-- They must be committed in a separate transaction before use in CHECK constraints.
 
--- Step 2: Create discog_recordings table
+-- Step 1: Create discog_recordings table
 CREATE TABLE IF NOT EXISTS "discog_recordings" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "creator_profile_id" uuid NOT NULL REFERENCES "creator_profiles"("id") ON DELETE CASCADE,
