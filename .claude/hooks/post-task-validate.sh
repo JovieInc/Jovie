@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Post-task validation hook (Stop event)
-# Runs core verification from /ship, /verify, /simplify, and /coderabbit:review
-# before allowing Claude to complete a task.
-#
-# First stop:  Runs automated checks → if pass, blocks to request simplify + coderabbit
-# Second stop: Runs automated checks → if pass, allows completion
-# No changes:  Allows completion immediately
+# Runs automated checks (typecheck, lint, boundaries, tests) before allowing
+# Claude to complete a task. Single pass — allows completion if all checks pass.
+# No changes: allows completion immediately.
 
 set -uo pipefail
 
@@ -13,8 +10,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null |
 cd "$PROJECT_DIR"
 
 # Read hook input from stdin
-INPUT=$(cat)
-STOP_HOOK_ACTIVE=$(echo "$INPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('stop_hook_active', False))" 2>/dev/null || echo "False")
+cat > /dev/null
 
 # Check if there are any code changes to validate
 CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || true)
@@ -64,19 +60,6 @@ print(json.dumps({'continue': False, 'stopReason': sys.argv[1]}))
   exit 0
 fi
 
-# Validation passed
-if [ "$STOP_HOOK_ACTIVE" = "False" ]; then
-  # First stop — request simplify + coderabbit before allowing completion
-  python3 -c "
-import json
-print(json.dumps({
-    'continue': False,
-    'stopReason': 'All automated checks passed (typecheck, lint, boundaries, tests). Before completing, please also:\n1. Run /simplify on your changes to clean up recently modified code\n2. Run /coderabbit:review to catch issues static analysis misses\n3. Fix any findings from above, then complete.'
-}))
-"
-  exit 0
-fi
-
-# Second stop (stop_hook_active=True) — validation passed, allow completion
+# All checks passed — allow completion
 echo '{"continue": true}'
 exit 0
