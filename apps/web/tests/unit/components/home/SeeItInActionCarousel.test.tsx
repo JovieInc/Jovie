@@ -79,19 +79,19 @@ describe('SeeItInActionCarousel', () => {
     expect(await screen.findByTestId('popover-content')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Open Spotify/i })).toHaveAttribute(
       'href',
-      '/tim/never-say-a-word'
+      '/tim/never-say-a-word?dsp=spotify'
     );
     expect(
       screen.getByRole('link', { name: /Open Apple Music/i })
-    ).toHaveAttribute('href', '/tim/never-say-a-word');
+    ).toHaveAttribute('href', '/tim/never-say-a-word?dsp=apple_music');
     expect(
       screen.getByRole('link', { name: /Open YouTube Music/i })
-    ).toHaveAttribute('href', '/tim/never-say-a-word');
+    ).toHaveAttribute('href', '/tim/never-say-a-word?dsp=youtube_music');
     expect(
       screen.getByRole('link', { name: /Open Amazon Music/i })
-    ).toHaveAttribute('href', '/tim/never-say-a-word');
+    ).toHaveAttribute('href', '/tim/never-say-a-word?dsp=amazon_music');
     expect(
       screen.getByRole('link', { name: /All platforms/i })
-    ).toHaveAttribute('href', '/tim/never-say-a-word');
+    ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
   });
 });
