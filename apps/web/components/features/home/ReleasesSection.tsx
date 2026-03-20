@@ -1,161 +1,18 @@
 'use client';
 
 import { Check, Zap } from 'lucide-react';
-import Image from 'next/image';
 import { useState } from 'react';
 import { Container } from '@/components/site/Container';
-import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import { DashboardMockup } from './DashboardMockup';
 import { PhoneFrame } from './PhoneFrame';
-import {
-  DSP_LABELS,
-  getDspConfig,
-  RELEASES,
-  SMART_LINK_DSPS,
-} from './releases-data';
+import { ReleasePhoneContent } from './ReleasePhoneContent';
+import { RELEASES } from './releases-data';
 
 const RELEASE_PROOF_POINTS = [
   'Catalog sync',
   'Smart links per release',
   'Fan notifications',
 ] as const;
-
-function DashboardMockup({ activeIndex }: { readonly activeIndex: number }) {
-  return (
-    <div
-      className='relative overflow-hidden rounded-xl md:rounded-2xl'
-      style={{
-        border: '1px solid var(--linear-border-subtle)',
-        backgroundColor: 'var(--linear-bg-surface-0)',
-        boxShadow: [
-          '0 0 0 1px rgba(255,255,255,0.03)',
-          '0 8px 40px rgba(0,0,0,0.35)',
-          '0 24px 80px rgba(0,0,0,0.25)',
-        ].join(', '),
-      }}
-    >
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px'
-        style={{
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
-        }}
-      />
-
-      <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-5'>
-        <div className='flex gap-2'>
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
-        </div>
-        <div className='flex-1 text-center text-xs text-tertiary-token'>
-          Jovie - Releases
-        </div>
-        <div className='w-[52px]' />
-      </div>
-
-      <div
-        className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'
-        style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
-      >
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
-          Release
-        </span>
-        <span />
-        <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
-          Smart link
-        </span>
-      </div>
-
-      {RELEASES.map((release, i) => {
-        const isActive = i === activeIndex;
-        return (
-          <div
-            key={release.id}
-            className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-3 transition-colors duration-300'
-            style={{
-              backgroundColor: isActive
-                ? 'rgba(255,255,255,0.035)'
-                : 'transparent',
-              borderBottom:
-                i < RELEASES.length - 1
-                  ? '1px solid var(--linear-border-subtle)'
-                  : undefined,
-            }}
-          >
-            <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md'>
-              <Image
-                src={release.artwork}
-                alt={release.title}
-                fill
-                className='object-cover'
-                sizes='40px'
-              />
-            </div>
-
-            <div className='min-w-0'>
-              <div className='flex items-center gap-2'>
-                <p className='truncate text-sm font-medium text-primary-token'>
-                  {release.title}
-                </p>
-                {release.isNew && (
-                  <span className='shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400'>
-                    New
-                  </span>
-                )}
-              </div>
-              <p className='text-xs text-tertiary-token'>
-                {release.type} - {release.year}
-              </p>
-            </div>
-
-            <div
-              className='flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition-all duration-300'
-              style={{
-                backgroundColor: isActive
-                  ? 'rgba(255,255,255,0.07)'
-                  : 'rgba(255,255,255,0.03)',
-                border: `1px solid ${isActive ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
-              }}
-            >
-              <svg
-                width='11'
-                height='11'
-                viewBox='0 0 24 24'
-                fill='none'
-                stroke='currentColor'
-                strokeWidth='2.5'
-                strokeLinecap='round'
-                strokeLinejoin='round'
-                className='text-tertiary-token'
-                aria-hidden='true'
-              >
-                <path d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' />
-                <path d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' />
-              </svg>
-              <span
-                className='font-mono text-xs transition-colors duration-300'
-                style={{
-                  color: isActive
-                    ? 'var(--linear-text-secondary)'
-                    : 'var(--linear-text-tertiary)',
-                }}
-              >
-                jov.ie/{release.slug}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-
-      <div className='flex items-center justify-center px-5 py-3'>
-        <p className='text-xs text-quaternary-token'>
-          + every past and future release, automatically
-        </p>
-      </div>
-    </div>
-  );
-}
 
 function ReleasePhone({
   release,
@@ -164,54 +21,7 @@ function ReleasePhone({
 }) {
   return (
     <PhoneFrame>
-      <div
-        className='mx-4 mt-10 mb-1 flex items-center justify-center rounded-full bg-surface-1 px-3 py-1.5'
-        style={{ border: '1px solid var(--linear-border-subtle)' }}
-      >
-        <span className='truncate text-[10px] text-tertiary-token'>
-          jov.ie/{release.slug}
-        </span>
-      </div>
-
-      <div className='px-6 py-4'>
-        <div
-          className='relative aspect-square w-full overflow-hidden rounded-2xl'
-          style={{
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
-          }}
-        >
-          <Image
-            src={release.artwork}
-            alt={release.title}
-            fill
-            className='object-cover'
-            sizes='220px'
-          />
-        </div>
-      </div>
-
-      <div className='px-6 pb-4 text-center'>
-        <p className='text-[15px] font-semibold tracking-tight text-primary-token'>
-          {release.title}
-        </p>
-        <p className='mt-0.5 text-xs text-tertiary-token'>Tim White</p>
-      </div>
-
-      <div className='flex flex-col gap-2 px-5'>
-        {SMART_LINK_DSPS.map(key => {
-          const config = getDspConfig(key);
-          if (!config) return null;
-          return (
-            <SmartLinkProviderButton
-              key={key}
-              label={DSP_LABELS[key] ?? 'Spotify'}
-              iconPath={config.iconPath}
-              className='bg-surface-1 ring-[color:var(--linear-border-subtle)] hover:bg-hover'
-            />
-          );
-        })}
-      </div>
-
+      <ReleasePhoneContent release={release} />
       <div className='pb-3 pt-3 text-center'>
         <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
           Powered by Jovie
