@@ -6,14 +6,15 @@
  */
 
 import { logger } from '@/lib/utils/logger';
-import type {
-  ForwardingResult,
-  NormalizedEvent,
-  PlatformConfig,
+import {
+  type ForwardingResult,
+  fetchWithTimeout,
+  forwardingError,
+  type NormalizedEvent,
+  type PlatformConfig,
 } from './types';
 
 const GOOGLE_MP_URL = 'https://www.google-analytics.com/mp/collect';
-const FETCH_TIMEOUT_MS = 10_000; // 10 seconds
 
 /**
  * Map our event types to Google GA4 events
@@ -94,23 +95,11 @@ export async function forwardToGoogle(
       ],
     };
 
-    // Create abort controller with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    const response = await fetchWithTimeout(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
     // Google MP returns 204 No Content on success
     if (response.status === 204 || response.ok) {
@@ -137,11 +126,6 @@ export async function forwardToGoogle(
       error,
       eventId: event.eventId,
     });
-
-    return {
-      platform: 'google',
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return forwardingError('google', error);
   }
 }
