@@ -56,7 +56,7 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
   return (
     <div className='flex items-center gap-2'>
       {item.externalArtistImageUrl ? (
-        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
           <Image
             src={item.externalArtistImageUrl}
             alt={item.externalArtistName ?? label}
@@ -67,15 +67,15 @@ function SidebarEntityHeader({ item }: { readonly item: DspPresenceItem }) {
           />
         </div>
       ) : (
-        <div className='flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-border-subtle) bg-(--linear-bg-surface-0)'>
+        <div className='flex h-9 w-9 items-center justify-center rounded-full border border-subtle bg-(--linear-bg-surface-0)'>
           <DspProviderIcon provider={item.providerId} size='lg' />
         </div>
       )}
       <div className='min-w-0 flex-1'>
-        <div className='truncate text-[14px] font-[590] text-(--linear-text-primary)'>
+        <div className='truncate text-[14px] font-[590] text-primary-token'>
           {item.externalArtistName ?? 'Unknown Artist'}
         </div>
-        <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-(--linear-text-tertiary)'>
+        <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
           <DspProviderIcon provider={item.providerId} size='sm' />
           <span>{label}</span>
         </div>
@@ -93,31 +93,25 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
       <DrawerSection title='Match Status' className='space-y-1.5'>
         <div className='space-y-2'>
           <div className='flex items-center justify-between'>
-            <span className='text-[12px] text-(--linear-text-tertiary)'>
-              Status
-            </span>
+            <span className='text-[12px] text-tertiary-token'>Status</span>
             <MatchStatusBadge status={item.status} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
-            <span className='text-[12px] text-(--linear-text-tertiary)'>
-              Confidence
-            </span>
+            <span className='text-[12px] text-tertiary-token'>Confidence</span>
             <ConfidenceBadge score={item.confidenceScore} size='sm' />
           </div>
           <div className='flex items-center justify-between'>
-            <span className='text-[12px] text-(--linear-text-tertiary)'>
+            <span className='text-[12px] text-tertiary-token'>
               ISRC Matches
             </span>
-            <span className='text-[12px] text-(--linear-text-primary)'>
+            <span className='text-[12px] text-primary-token'>
               {item.matchingIsrcCount}
             </span>
           </div>
           {item.confirmedAt && (
             <div className='flex items-center justify-between'>
-              <span className='text-[12px] text-(--linear-text-tertiary)'>
-                Confirmed
-              </span>
-              <span className='text-[12px] text-(--linear-text-primary)'>
+              <span className='text-[12px] text-tertiary-token'>Confirmed</span>
+              <span className='text-[12px] text-primary-token'>
                 {formatDate(item.confirmedAt)}
               </span>
             </div>
