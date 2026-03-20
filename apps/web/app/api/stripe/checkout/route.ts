@@ -134,7 +134,9 @@ export async function POST(request: NextRequest) {
     if (!userId) return jsonError('Unauthorized', 401);
 
     const body = await request.json();
-    const { priceId, referralCode: rawReferralCode } = body;
+    const { priceId, referralCode: rawReferralCode, source: rawSource } = body;
+    const checkoutSource =
+      rawSource === 'onboarding' ? 'onboarding' : undefined;
 
     if (!priceId || typeof priceId !== 'string') {
       return jsonError('Invalid price ID', 400);
@@ -197,7 +199,7 @@ export async function POST(request: NextRequest) {
         customerId,
         priceId,
         userId,
-        successUrl: `${baseUrl}/billing/success`,
+        successUrl: `${baseUrl}/billing/success${checkoutSource === 'onboarding' ? '?source=onboarding' : ''}`,
         cancelUrl: `${baseUrl}/billing/cancel`,
         idempotencyKey,
         referralCode,

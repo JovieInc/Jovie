@@ -3,6 +3,7 @@
 import { Button } from '@jovie/ui';
 import { BarChart3, Eye, PartyPopper, ShieldCheck, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { APP_ROUTES } from '@/constants/routes';
@@ -47,6 +48,8 @@ function getVerificationButtonLabel(state: string): string {
 /* ------------------------------------------------------------------ */
 
 export default function CheckoutSuccessPage() {
+  const searchParams = useSearchParams();
+  const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
@@ -75,7 +78,10 @@ export default function CheckoutSuccessPage() {
   useEffect(() => {
     if (!billingData?.plan) return;
     track('checkout_celebration_shown', { planType: billingData.plan });
-  }, [billingData?.plan]);
+    if (isOnboardingUpgrade) {
+      track('onboarding_upgrade_success', { plan: billingData.plan });
+    }
+  }, [billingData?.plan, isOnboardingUpgrade]);
 
   const handleRequestVerification = async () => {
     if (requestState === 'submitting') return;
@@ -130,11 +136,15 @@ export default function CheckoutSuccessPage() {
         </div>
 
         <h1 className='mt-6 text-3xl font-bold text-primary-token'>
-          Welcome to {planName}!
+          {isOnboardingUpgrade
+            ? 'Your profile is live — and upgraded!'
+            : `Welcome to ${planName}!`}
         </h1>
 
         <p className='mt-3 text-lg text-secondary-token'>
-          Your plan is active. Here&apos;s what you just unlocked:
+          {isOnboardingUpgrade
+            ? "You're all set. Here's what you just unlocked:"
+            : "Your plan is active. Here's what you just unlocked:"}
         </p>
 
         {/* Feature cards */}
@@ -161,7 +171,11 @@ export default function CheckoutSuccessPage() {
         {/* CTAs */}
         <div className='mt-8 flex flex-col items-center gap-3'>
           <Button asChild>
-            <Link href={APP_ROUTES.DASHBOARD}>Go to Dashboard</Link>
+            <Link href={APP_ROUTES.DASHBOARD}>
+              {isOnboardingUpgrade
+                ? 'Explore your dashboard'
+                : 'Go to Dashboard'}
+            </Link>
           </Button>
 
           {billingData?.isPro ? (
