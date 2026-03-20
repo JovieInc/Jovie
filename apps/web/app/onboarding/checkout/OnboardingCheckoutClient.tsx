@@ -324,7 +324,8 @@ export function OnboardingCheckoutClient({
             <div className='flex items-center gap-2.5'>
               <Sparkles className='h-4 w-4 shrink-0 text-(--linear-accent)' />
               <p className='text-[13px] font-medium text-primary-token'>
-                Lock in founding member pricing — $12/mo forever
+                Lock in founding member pricing — {formatPrice(monthlyAmount)}
+                /mo forever
               </p>
             </div>
           </ContentSurfaceCard>

@@ -15,6 +15,7 @@ import {
 import { PRICING } from '@/lib/config/pricing';
 import { checkGate } from '@/lib/feature-flags/server';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
+import { isGrowthPlanEnabled } from '@/lib/stripe/config';
 import { OnboardingCheckoutClient } from './OnboardingCheckoutClient';
 
 /**
@@ -140,9 +141,18 @@ export default async function OnboardingCheckoutPage({
     // Profile load failed — proceed with empty data
   }
 
-  // Smart plan recommendation for organic users based on Spotify followers
-  if (isDefaultUpsell) {
-    planIntent = recommendPlan(profileData.spotifyFollowers);
+  // Smart plan recommendation only for organic users with no expressed paid intent.
+  // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
+  // with recommendPlan. Also fall back to pro if Growth plan is disabled.
+  const hadPaidIntentFromCookie = isPaidIntent(
+    getPlanIntentFromCookies(cookieHeader)
+  );
+  if (isDefaultUpsell && !hadPaidIntentFromCookie) {
+    let recommended = recommendPlan(profileData.spotifyFollowers);
+    if (recommended === 'growth' && !isGrowthPlanEnabled()) {
+      recommended = DEFAULT_UPSELL_PLAN;
+    }
+    planIntent = recommended;
   }
 
   // Resolve Stripe price IDs server-side (secure — never exposed as raw env vars)

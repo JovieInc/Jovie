@@ -24,6 +24,7 @@ function resolveCheckoutPlan(params: {
   planParam: string | null;
   sourceParam: string | null;
   spotifyFollowers: number | null;
+  growthPlanEnabled?: boolean;
 }): { plan: PlanIntentTier; isDefaultUpsell: boolean } {
   // Step 1: Read plan intent from cookie
   let planIntent: PlanIntentTier | null = getPlanIntentFromCookies(
@@ -43,9 +44,16 @@ function resolveCheckoutPlan(params: {
     planIntent = DEFAULT_UPSELL_PLAN;
   }
 
-  // Step 5: Smart recommendation for organic users
-  if (isDefaultUpsell) {
-    planIntent = recommendPlan(params.spotifyFollowers);
+  // Step 5: Smart recommendation only for organic users with no expressed paid intent
+  const hadPaidIntentFromCookie = isPaidIntent(
+    getPlanIntentFromCookies(params.cookieHeader)
+  );
+  if (isDefaultUpsell && !hadPaidIntentFromCookie) {
+    let recommended = recommendPlan(params.spotifyFollowers);
+    if (recommended === 'growth' && params.growthPlanEnabled === false) {
+      recommended = DEFAULT_UPSELL_PLAN;
+    }
+    planIntent = recommended;
   }
 
   return { plan: planIntent, isDefaultUpsell };
@@ -127,6 +135,41 @@ describe('onboarding checkout page plan resolution', () => {
       spotifyFollowers: 10_000,
     });
     expect(result.plan).toBe('growth');
+    expect(result.isDefaultUpsell).toBe(true);
+  });
+
+  it('founding plan cookie is NOT overridden when source param is absent', () => {
+    const result = resolveCheckoutPlan({
+      cookieHeader: 'jovie_plan_intent=founding',
+      planParam: 'founding',
+      sourceParam: null,
+      spotifyFollowers: 50_000,
+    });
+    // Founding cookie = paid intent, so recommendPlan must NOT override it
+    expect(result.plan).toBe('founding');
+    expect(result.isDefaultUpsell).toBe(true);
+  });
+
+  it('founding plan cookie preserved even with source=organic', () => {
+    const result = resolveCheckoutPlan({
+      cookieHeader: 'jovie_plan_intent=founding',
+      planParam: null,
+      sourceParam: 'organic',
+      spotifyFollowers: 15_000,
+    });
+    expect(result.plan).toBe('founding');
+    expect(result.isDefaultUpsell).toBe(true);
+  });
+
+  it('falls back to pro when Growth plan is disabled', () => {
+    const result = resolveCheckoutPlan({
+      cookieHeader: '',
+      planParam: null,
+      sourceParam: 'organic',
+      spotifyFollowers: 50_000,
+      growthPlanEnabled: false,
+    });
+    expect(result.plan).toBe('pro');
     expect(result.isDefaultUpsell).toBe(true);
   });
 });

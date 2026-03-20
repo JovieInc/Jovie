@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { BarChart3, Eye, PartyPopper, ShieldCheck, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
@@ -75,10 +75,12 @@ export default function CheckoutSuccessPage() {
   }, []);
 
   // Track celebration event only after billing data loads so planType is accurate
+  const onboardingTrackedRef = useRef(false);
   useEffect(() => {
     if (!billingData?.plan) return;
     track('checkout_celebration_shown', { planType: billingData.plan });
-    if (isOnboardingUpgrade) {
+    if (isOnboardingUpgrade && !onboardingTrackedRef.current) {
+      onboardingTrackedRef.current = true;
       track('onboarding_upgrade_success', { plan: billingData.plan });
     }
   }, [billingData?.plan, isOnboardingUpgrade]);
