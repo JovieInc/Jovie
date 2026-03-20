@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
 import { QueryTimeoutError } from '@/lib/db/query-timeout';
@@ -314,10 +314,7 @@ async function executeUserStateQuery(clerkUserId: string) {
         .from(users)
         .leftJoin(
           creatorProfiles,
-          and(
-            eq(creatorProfiles.userId, users.id),
-            eq(creatorProfiles.isClaimed, true)
-          )
+          eq(creatorProfiles.id, users.activeProfileId)
         )
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);

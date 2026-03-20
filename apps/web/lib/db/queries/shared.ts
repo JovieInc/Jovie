@@ -59,13 +59,13 @@ export async function getAuthenticatedProfile(
     .select({
       id: creatorProfiles.id,
       usernameNormalized: creatorProfiles.usernameNormalized,
-      userId: creatorProfiles.userId,
+      userId: users.id,
       avatarUrl: creatorProfiles.avatarUrl,
       avatarLockedByUser: creatorProfiles.avatarLockedByUser,
       displayNameLocked: creatorProfiles.displayNameLocked,
     })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
     .where(
       and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
     )
@@ -237,7 +237,7 @@ export async function verifyProfileOwnership(
   const [profile] = await tx
     .select({ id: creatorProfiles.id })
     .from(creatorProfiles)
-    .innerJoin(users, eq(users.id, creatorProfiles.userId))
+    .innerJoin(users, eq(users.activeProfileId, creatorProfiles.id))
     .where(
       and(eq(creatorProfiles.id, profileId), eq(users.clerkId, clerkUserId))
     )
