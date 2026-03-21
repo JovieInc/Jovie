@@ -39,7 +39,7 @@ export function LazyProviders({
   children,
   enableAnalytics = true,
 }: LazyProvidersProps) {
-  const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  const isPassiveRuntime = env.IS_TEST || env.IS_E2E || env.IS_LIGHTHOUSE;
   const showAnalytics = enableAnalytics && !isPassiveRuntime;
 
   return (

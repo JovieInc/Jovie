@@ -148,16 +148,21 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+  const isLighthouseMode = process.env.NEXT_PUBLIC_LIGHTHOUSE_MODE === '1';
 
   // Dev toolbar: shown in dev/preview, or in production when __dev_toolbar cookie is set.
   // Dynamic import means zero bundle cost for production users without the cookie.
-  const { cookies } = await import('next/headers');
-  const devCookieSet = (await cookies()).get('__dev_toolbar')?.value === '1';
   const isProductionEnv =
     process.env.NODE_ENV === 'production' &&
     process.env.VERCEL_ENV === 'production';
-  const showDevToolbar =
-    (!isProductionEnv || devCookieSet) && !isE2EClientRuntime;
+  let showDevToolbar = false;
+
+  if (!isLighthouseMode) {
+    const { cookies } = await import('next/headers');
+    const devCookieSet = (await cookies()).get('__dev_toolbar')?.value === '1';
+    showDevToolbar = (!isProductionEnv || devCookieSet) && !isE2EClientRuntime;
+  }
+
   const DevToolbar = showDevToolbar
     ? (await import('@/features/dev/DevToolbar')).DevToolbar
     : null;
@@ -175,26 +180,14 @@ export default async function RootLayout({
 
   const headContent = (
     <head>
-      {isE2EClientRuntime ? null : (
+      {isE2EClientRuntime || isLighthouseMode ? null : (
         // eslint-disable-next-line @next/next/no-sync-scripts -- blocking theme script prevents FOUC; nonce hydration mismatch requires native <script> with suppressHydrationWarning
         <script src='/theme-init.js' suppressHydrationWarning />
       )}
       {/* Icons and manifest are now handled by Next.js metadata export */}
 
       {/* DNS Prefetch and Preconnect for critical external resources */}
-      {/* Spotify CDN - artist images */}
-      <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='anonymous' />
       {/* Note: Font preloading is handled automatically by Next.js localFont */}
-      {/* Spotify API */}
-      <link rel='dns-prefetch' href='https://api.spotify.com' />
-      {/* Vercel Blob Storage - avatar images */}
-      <link rel='dns-prefetch' href='https://public.blob.vercel-storage.com' />
-      <link
-        rel='preconnect'
-        href='https://public.blob.vercel-storage.com'
-        crossOrigin='anonymous'
-      />
       {/* Clerk Auth - authentication */}
       <link rel='dns-prefetch' href='https://clerk.jov.ie' />
       <link
@@ -219,16 +212,39 @@ export default async function RootLayout({
         href='https://images.clerk.dev'
         crossOrigin='anonymous'
       />
-      {/* Unsplash - fallback images */}
-      <link rel='dns-prefetch' href='https://images.unsplash.com' />
-      <link
-        rel='preconnect'
-        href='https://images.unsplash.com'
-        crossOrigin='anonymous'
-      />
+      {isLighthouseMode ? null : (
+        <>
+          {/* Spotify CDN - artist images */}
+          <link rel='dns-prefetch' href='https://i.scdn.co' />
+          <link
+            rel='preconnect'
+            href='https://i.scdn.co'
+            crossOrigin='anonymous'
+          />
+          {/* Spotify API */}
+          <link rel='dns-prefetch' href='https://api.spotify.com' />
+          {/* Vercel Blob Storage - avatar images */}
+          <link
+            rel='dns-prefetch'
+            href='https://public.blob.vercel-storage.com'
+          />
+          <link
+            rel='preconnect'
+            href='https://public.blob.vercel-storage.com'
+            crossOrigin='anonymous'
+          />
+          {/* Unsplash - fallback images */}
+          <link rel='dns-prefetch' href='https://images.unsplash.com' />
+          <link
+            rel='preconnect'
+            href='https://images.unsplash.com'
+            crossOrigin='anonymous'
+          />
+        </>
+      )}
 
       {/* Structured Data: WebSite + Organization (global, all pages) */}
-      {isE2EClientRuntime ? null : (
+      {isE2EClientRuntime || isLighthouseMode ? null : (
         <>
           <Script
             id='website-schema'
@@ -336,7 +352,7 @@ export default async function RootLayout({
           )}
         </CoreProviders>
 
-        <CookieBannerSection />
+        {isLighthouseMode ? null : <CookieBannerSection />}
       </body>
     </html>
   );

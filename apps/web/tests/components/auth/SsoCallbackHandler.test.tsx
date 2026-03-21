@@ -5,8 +5,8 @@ import { SsoCallbackHandler } from '@/features/auth/SsoCallbackHandler';
 const replaceMock = vi.fn();
 const handleRedirectCallbackMock = vi.fn();
 
-vi.mock('@clerk/nextjs', () => ({
-  useClerk: () => ({
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useClerkSafe: () => ({
     handleRedirectCallback: handleRedirectCallbackMock,
   }),
 }));

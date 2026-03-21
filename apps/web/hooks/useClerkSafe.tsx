@@ -1,18 +1,14 @@
 'use client';
 
-import {
-  useAuth as useAuthOriginal,
-  useSession as useSessionOriginal,
-  useSignIn as useSignInOriginal,
-  useUser as useUserOriginal,
-} from '@clerk/nextjs';
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, useContext } from 'react';
 
-// Derive types from the actual hook return types
-type UseUserReturn = ReturnType<typeof useUserOriginal>;
-type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
-type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
-type UseSignInReturn = ReturnType<typeof useSignInOriginal>;
+type ClerkModule = typeof import('@clerk/nextjs');
+type UseUserReturn = ReturnType<ClerkModule['useUser']>;
+type UseAuthReturn = ReturnType<ClerkModule['useAuth']>;
+type UseClerkReturn = ReturnType<ClerkModule['useClerk']>;
+type UseSessionReturn = ReturnType<ClerkModule['useSession']>;
+type UseSignInReturn = ReturnType<ClerkModule['useSignIn']>;
+type UseSignUpReturn = ReturnType<ClerkModule['useSignUp']>;
 
 /**
  * Context to track whether Clerk is available in the current provider tree.
@@ -97,6 +93,30 @@ const DEFAULT_SIGN_IN_RETURN = {
   setActive: async () => {},
 } as unknown as UseSignInReturn;
 
+/**
+ * Default return value when Clerk is not available.
+ * Matches the shape of useSignUp() return type.
+ */
+const DEFAULT_SIGN_UP_RETURN = {
+  isLoaded: true,
+  signUp: undefined,
+  setActive: async () => {},
+} as unknown as UseSignUpReturn;
+
+/**
+ * Default return value when Clerk is not available.
+ * Matches the minimal shape used by useClerk().
+ */
+const DEFAULT_CLERK_RETURN = {
+  loaded: true,
+  client: undefined,
+  session: undefined,
+  user: undefined,
+  organization: undefined,
+  signOut: async () => undefined,
+  handleRedirectCallback: async () => undefined,
+} as unknown as UseClerkReturn;
+
 // ============================================================================
 // Context-based Safe Hooks
 // ============================================================================
@@ -109,30 +129,27 @@ const DEFAULT_SIGN_IN_RETURN = {
 // call Clerk hooks.
 // ============================================================================
 
-interface ClerkSafeContextValue {
+export interface ClerkSafeContextValue {
+  clerk: UseClerkReturn;
   user: UseUserReturn;
   auth: UseAuthReturn;
   session: UseSessionReturn;
   signIn: UseSignInReturn;
+  signUp: UseSignUpReturn;
 }
 
 const ClerkSafeContext = createContext<ClerkSafeContextValue | null>(null);
 
 /**
  * Provider that supplies Clerk hook values via context.
- * Use this inside ClerkProvider to enable safe hooks.
  */
-export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
-  const user = useUserOriginal();
-  const auth = useAuthOriginal();
-  const session = useSessionOriginal();
-  const signIn = useSignInOriginal();
-
-  const value = useMemo(
-    () => ({ user, auth, session, signIn }),
-    [user, auth, session, signIn]
-  );
-
+export function ClerkSafeContextProvider({
+  children,
+  value,
+}: {
+  readonly children: ReactNode;
+  readonly value: ClerkSafeContextValue;
+}) {
   return (
     <ClerkSafeContext.Provider value={value}>
       {children}
@@ -151,10 +168,12 @@ export function ClerkSafeDefaultsProvider({
   return (
     <ClerkSafeContext.Provider
       value={{
+        clerk: DEFAULT_CLERK_RETURN,
         user: DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
         signIn: DEFAULT_SIGN_IN_RETURN,
+        signUp: DEFAULT_SIGN_UP_RETURN,
       }}
     >
       {children}
@@ -225,5 +244,37 @@ export function useSignInSafe(): UseSignInReturn {
   return context.signIn;
 }
 
+/**
+ * Safe version of useSignUp that returns defaults when Clerk is unavailable.
+ * Use this instead of useSignUp from @clerk/nextjs to prevent provider errors
+ * on routes rendered in mock/bypass mode.
+ */
+export function useSignUpSafe(): UseSignUpReturn {
+  const context = useContext(ClerkSafeContext);
+  if (!context) {
+    return DEFAULT_SIGN_UP_RETURN;
+  }
+  return context.signUp;
+}
+
+/**
+ * Safe version of useClerk that returns a noop callback handler when Clerk
+ * is unavailable. This allows mock/test routes to render without a provider.
+ */
+export function useClerkSafe(): UseClerkReturn {
+  const context = useContext(ClerkSafeContext);
+  if (!context) {
+    return DEFAULT_CLERK_RETURN;
+  }
+  return context.clerk;
+}
+
 // Re-export types for convenience
-export type { UseAuthReturn, UseSessionReturn, UseSignInReturn, UseUserReturn };
+export type {
+  UseAuthReturn,
+  UseClerkReturn,
+  UseSessionReturn,
+  UseSignInReturn,
+  UseSignUpReturn,
+  UseUserReturn,
+};

@@ -1,48 +1,33 @@
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
-import { Footer } from '@/components/site/Footer';
-import { Header } from '@/components/site/Header';
 
 export default function NotFound() {
   return (
-    <div className='min-h-screen bg-base'>
-      <Header />
-
-      <main style={{ paddingTop: 'var(--linear-header-height, 64px)' }}>
-        <Container className='flex min-h-[calc(100vh-8rem)] items-center justify-center'>
-          <div className='w-full max-w-md mx-auto text-center px-4 py-16'>
-            {/* Error code — oversized, muted, architectural */}
-            <div className='mb-8 select-none'>
-              <span
-                className='block text-[120px] md:text-[160px] font-semibold leading-none tracking-tighter text-primary-token/[0.06]'
-                aria-hidden='true'
-              >
-                404
-              </span>
-            </div>
-
-            {/* Content — positioned to overlap the number visually */}
-            <div className='-mt-16 relative'>
-              <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
-                Page not found
-              </h1>
-              <p className='text-[13px] text-tertiary-token leading-relaxed mb-8'>
-                The link you followed may be broken, or the page may have been
-                removed.
-              </p>
-
-              <Link
-                href='/'
-                className='inline-flex items-center justify-center h-8 px-4 text-[13px] font-medium rounded-lg bg-[var(--color-btn-primary-bg)] text-[var(--color-btn-primary-fg)] hover:bg-[var(--color-btn-primary-hover)] transition-colors duration-100'
-              >
-                Return home
-              </Link>
-            </div>
-          </div>
-        </Container>
-      </main>
-
-      <Footer />
-    </div>
+    <main className='min-h-screen bg-base text-primary-token'>
+      <div className='mx-auto flex min-h-screen w-full max-w-lg flex-col items-center justify-center px-6 py-16 text-center'>
+        <p className='mb-4 text-[12px] uppercase tracking-[0.22em] text-tertiary-token'>
+          404
+        </p>
+        <h1 className='text-[28px] font-[520] tracking-[-0.03em] text-primary-token'>
+          Page not found
+        </h1>
+        <p className='mt-3 max-w-sm text-[14px] leading-relaxed text-secondary-token'>
+          The link may be broken, expired, or no longer available.
+        </p>
+        <div className='mt-8 flex flex-col gap-3 sm:flex-row'>
+          <Link
+            href='/'
+            className='inline-flex min-h-10 items-center justify-center rounded-(--linear-radius-sm) border border-subtle px-4 text-[13px] font-medium text-primary-token'
+          >
+            Return home
+          </Link>
+          <Link
+            href='/signin'
+            className='inline-flex min-h-10 items-center justify-center rounded-(--linear-radius-sm) border border-subtle px-4 text-[13px] font-medium text-primary-token'
+          >
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }

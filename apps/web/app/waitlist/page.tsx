@@ -1,6 +1,5 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -23,6 +22,7 @@ import { WaitlistPrimaryGoalStep } from '@/features/waitlist/WaitlistPrimaryGoal
 import { WaitlistSkeleton } from '@/features/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/features/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/features/waitlist/WaitlistSuccessView';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   FetchError,
@@ -33,7 +33,7 @@ import {
 type StepNumber = 0 | 1 | 2;
 
 export default function WaitlistPage() {
-  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { isLoaded, isSignedIn, userId } = useAuthSafe();
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedPlan = useMemo(() => {

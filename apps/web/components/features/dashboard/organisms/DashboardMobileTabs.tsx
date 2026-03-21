@@ -1,6 +1,5 @@
 'use client';
 
-import { useClerk } from '@clerk/nextjs';
 import { useCallback } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
@@ -9,6 +8,7 @@ import {
   mobilePrimaryNavigation,
 } from '@/features/dashboard/dashboard-nav';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { useClerkSafe } from '@/hooks/useClerkSafe';
 import { cn } from '@/lib/utils';
 
 import { LiquidGlassMenu, type LiquidGlassMenuItem } from './LiquidGlassMenu';
@@ -29,7 +29,7 @@ export function DashboardMobileTabs({
   className,
 }: DashboardMobileTabsProps): React.JSX.Element {
   const { isAdmin } = useDashboardData();
-  const { signOut } = useClerk();
+  const { signOut } = useClerkSafe();
 
   const handleSignOut = useCallback(async () => {
     await signOut({ redirectUrl: '/' });

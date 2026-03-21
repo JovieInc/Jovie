@@ -13,8 +13,8 @@ const { mockPush, mockReplace, mockFetch } = vi.hoisted(() => ({
 
 let mockUserId = 'user-one';
 
-vi.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useAuthSafe: () => ({
     isLoaded: true,
     isSignedIn: true,
     userId: mockUserId,

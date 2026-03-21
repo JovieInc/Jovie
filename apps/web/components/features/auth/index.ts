@@ -17,9 +17,9 @@ export {
   AuthTextInput,
 } from './atoms';
 export { ButtonSpinner } from './ButtonSpinner';
-
 // Forms (Clerk Core API implementation)
 export { SignInForm, SignUpForm } from './forms';
+export { PublicAuthLayout } from './PublicAuthLayout';
 
 // SSO Callback Handler
 export { SsoCallbackHandler } from './SsoCallbackHandler';

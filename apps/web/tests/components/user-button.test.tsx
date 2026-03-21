@@ -21,9 +21,9 @@ vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
 }));
 
-vi.mock('@clerk/nextjs', () => ({
-  useUser: vi.fn(),
-  useClerk: vi.fn(),
+vi.mock('@/hooks/useClerkSafe', () => ({
+  useUserSafe: vi.fn(),
+  useClerkSafe: vi.fn(),
 }));
 
 // Mock Sonner toast
@@ -43,9 +43,9 @@ vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
 }));
 
-import { useClerk, useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { UserButton } from '@/components/organisms/user-button';
+import { useClerkSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { track } from '@/lib/analytics';
 import {
   useBillingStatusQuery,
@@ -65,8 +65,8 @@ const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
 const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
 const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
 const mockUsePortalMutation = vi.mocked(usePortalMutation);
-const mockUseUser = vi.mocked(useUser);
-const mockUseClerk = vi.mocked(useClerk);
+const mockUseUser = vi.mocked(useUserSafe);
+const mockUseClerk = vi.mocked(useClerkSafe);
 const mockUseRouter = vi.mocked(useRouter);
 
 const originalLocation = window.location;

@@ -1,7 +1,8 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
@@ -11,9 +12,32 @@ import { getOAuthErrorMessage } from '@/lib/auth/clerk-errors';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
-import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
-import { VerificationStep } from './VerificationStep';
+
+function AuthStepLoading() {
+  return (
+    <div
+      aria-hidden='true'
+      className='rounded-[28px] border border-subtle/60 bg-surface-0 p-6 shadow-sm'
+    >
+      <div className='space-y-3'>
+        <div className='mx-auto h-8 w-44 skeleton rounded-md' />
+        <div className='h-12 w-full skeleton rounded-xl' />
+        <div className='h-12 w-full skeleton rounded-xl' />
+      </div>
+    </div>
+  );
+}
+
+const EmailStep = dynamic(
+  () => import('./EmailStep').then(mod => mod.EmailStep),
+  { loading: () => <AuthStepLoading /> }
+);
+
+const VerificationStep = dynamic(
+  () => import('./VerificationStep').then(mod => mod.VerificationStep),
+  { loading: () => <AuthStepLoading /> }
+);
 
 /**
  * Sign-up form using Clerk Core API.
@@ -41,7 +65,6 @@ export function SignUpForm() {
   } = useSignUpFlow();
 
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClerkStalled = useLoadingStall(isLoaded);
@@ -54,9 +77,13 @@ export function SignUpForm() {
   // Shared auth page setup (hash cleanup, redirect URL storage)
   useAuthPageSetup();
 
+  const getLocationSearchParam = useCallback((key: string) => {
+    return new URL(globalThis.location.href).searchParams.get(key);
+  }, []);
+
   // Handle OAuth callback errors passed via query param from SsoCallbackHandler
   useEffect(() => {
-    const oauthError = searchParams.get('oauth_error');
+    const oauthError = getLocationSearchParam('oauth_error');
     if (oauthError) {
       setOauthCallbackError(oauthError);
       // Clean the URL param so it doesn't persist on refresh
@@ -64,7 +91,7 @@ export function SignUpForm() {
       url.searchParams.delete('oauth_error');
       router.replace(url.pathname + url.search);
     }
-  }, [searchParams, router]);
+  }, [getLocationSearchParam, router]);
 
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
@@ -75,14 +102,14 @@ export function SignUpForm() {
         signInUrl.searchParams.set('email', emailToPass);
       }
       // Preserve original redirect URL (sanitized to strip hash fragments)
-      const redirectUrl = searchParams.get('redirect_url');
+      const redirectUrl = getLocationSearchParam('redirect_url');
       const sanitized = sanitizeRedirectUrl(redirectUrl);
       if (sanitized) {
         signInUrl.searchParams.set('redirect_url', sanitized);
       }
       return signInUrl.pathname + signInUrl.search;
     },
-    [searchParams]
+    [getLocationSearchParam]
   );
 
   // Auto-redirect to sign-in when account already exists

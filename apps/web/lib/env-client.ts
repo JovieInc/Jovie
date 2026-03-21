@@ -5,4 +5,5 @@ export const env = {
   IS_DEV: (process.env.NODE_ENV ?? 'development') === 'development',
   IS_TEST: process.env.NODE_ENV === 'test',
   IS_E2E: process.env.NEXT_PUBLIC_E2E_MODE === '1',
+  IS_LIGHTHOUSE: process.env.NEXT_PUBLIC_LIGHTHOUSE_MODE === '1',
 } as const;

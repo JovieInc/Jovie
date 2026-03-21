@@ -5,7 +5,6 @@
  * Uses shared base logic from useAuthFlowBase.
  */
 
-import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
@@ -19,6 +18,7 @@ import {
 import type { LoadingState } from '@/lib/auth/types';
 import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
+import { useSignUpSafe } from './useClerkSafe';
 
 /** Use current origin for OAuth callbacks so localhost works correctly */
 const getOAuthBaseUrl = () =>
@@ -102,7 +102,7 @@ export interface UseSignUpFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
-  const { signUp, setActive, isLoaded } = useSignUp();
+  const { signUp, setActive, isLoaded } = useSignUpSafe();
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup

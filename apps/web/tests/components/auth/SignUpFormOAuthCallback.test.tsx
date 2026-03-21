@@ -1,13 +1,13 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SignUpForm } from '@/features/auth/forms/SignUpForm';
 
 const replaceMock = vi.fn();
 const pushMock = vi.fn();
+const originalLocation = window.location;
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: replaceMock }),
-  useSearchParams: () => new URLSearchParams('oauth_error=account_exists'),
 }));
 
 vi.mock('@/hooks/useAuthPageSetup', () => ({
@@ -50,6 +50,15 @@ vi.mock('@/features/auth/forms/MethodSelector', () => ({
 }));
 
 describe('SignUpForm OAuth callback error handling', () => {
+  beforeEach(() => {
+    replaceMock.mockReset();
+    Object.defineProperty(window, 'location', {
+      value: new URL('https://jov.ie/signup?oauth_error=account_exists'),
+      writable: true,
+      configurable: true,
+    });
+  });
+
   it('shows account exists error when oauth_error=account_exists query param is present', () => {
     render(<SignUpForm />);
 
@@ -81,5 +90,13 @@ describe('SignUpForm OAuth callback error handling', () => {
     render(<SignUpForm />);
 
     expect(replaceMock).toHaveBeenCalled();
+  });
+});
+
+afterAll(() => {
+  Object.defineProperty(window, 'location', {
+    value: originalLocation,
+    writable: true,
+    configurable: true,
   });
 });

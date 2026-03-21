@@ -1,17 +1,9 @@
 'use client';
 
-import { SignOutButton } from '@clerk/nextjs';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@jovie/ui';
-import { MoreHorizontal } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
 import { cn } from '@/lib/utils';
@@ -33,6 +25,12 @@ interface AuthLayoutProps {
 }
 
 const LINK_FOCUS_CLASSES = 'focus-ring-themed rounded-md';
+
+const AuthLogoutMenu = dynamic(
+  () =>
+    import('./AuthLogoutMenu').then(mod => ({ default: mod.AuthLogoutMenu })),
+  { ssr: false }
+);
 
 export function AuthLayout({
   children,
@@ -140,22 +138,7 @@ export function AuthLayout({
 
       {showLogoutButton ? (
         <div className='absolute top-4 right-4 z-50'>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <CircleIconButton
-                size='sm'
-                variant='outline'
-                ariaLabel='Open menu'
-              >
-                <MoreHorizontal />
-              </CircleIconButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align='end' sideOffset={8}>
-              <SignOutButton redirectUrl={logoutRedirectUrl}>
-                <DropdownMenuItem>Log out</DropdownMenuItem>
-              </SignOutButton>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <AuthLogoutMenu logoutRedirectUrl={logoutRedirectUrl} />
         </div>
       ) : null}
 
@@ -180,7 +163,7 @@ export function AuthLayout({
               shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
             }
           >
-            <BrandLogo size={32} tone='auto' priority />
+            <BrandLogo size={32} tone='auto' />
           </span>
         </Link>
       </div>
@@ -220,7 +203,7 @@ export function AuthLayout({
           {footerPrompt}{' '}
           <Link
             href={footerLinkHref}
-            className={`text-primary-token underline ${LINK_FOCUS_CLASSES}`}
+            className={`inline-flex min-h-6 items-center px-1 py-1 text-primary-token underline ${LINK_FOCUS_CLASSES}`}
           >
             {footerLinkText}
           </Link>

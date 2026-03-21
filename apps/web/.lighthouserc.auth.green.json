@@ -1,0 +1,85 @@
+{
+  "ci": {
+    "collect": {
+      "numberOfRuns": 3,
+      "startServerCommand": "pnpm exec next start -p 3000",
+      "startServerReadyPattern": "http://localhost:3000",
+      "startServerReadyTimeout": 120000,
+      "url": ["http://localhost:3000/signin", "http://localhost:3000/signup"]
+    },
+    "assert": {
+      "assertMatrix": [
+        {
+          "matchingUrlPattern": "http://localhost:3000/(signin|signup)$",
+          "assertions": {
+            "categories:performance": [
+              "error",
+              {
+                "minScore": 0.8
+              }
+            ],
+            "categories:accessibility": [
+              "error",
+              {
+                "minScore": 0.95
+              }
+            ],
+            "categories:best-practices": [
+              "error",
+              {
+                "minScore": 0.95
+              }
+            ],
+            "first-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 1800
+              }
+            ],
+            "largest-contentful-paint": [
+              "error",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "total-blocking-time": [
+              "error",
+              {
+                "maxNumericValue": 200
+              }
+            ],
+            "speed-index": [
+              "error",
+              {
+                "maxNumericValue": 3000
+              }
+            ],
+            "cumulative-layout-shift": [
+              "error",
+              {
+                "maxNumericValue": 0.05
+              }
+            ],
+            "interactive": [
+              "error",
+              {
+                "maxNumericValue": 4000
+              }
+            ],
+            "errors-in-console": "error",
+            "target-size": "error",
+            "document-title": "error",
+            "meta-description": "error",
+            "viewport": "error",
+            "html-has-lang": "error",
+            "http-status-code": "error",
+            "crawlable-anchors": "error"
+          }
+        }
+      ]
+    },
+    "upload": {
+      "target": "temporary-public-storage"
+    }
+  }
+}

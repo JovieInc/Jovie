@@ -1,10 +1,10 @@
 'use client';
 
-import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { useClerkSafe } from '@/hooks/useClerkSafe';
 import {
   isAccessDeniedError,
   isAccountExistsError,
@@ -83,7 +83,7 @@ export function SsoCallbackHandler({
   signInFallbackRedirectUrl,
   signUpFallbackRedirectUrl,
 }: Readonly<SsoCallbackHandlerProps>) {
-  const clerk = useClerk();
+  const clerk = useClerkSafe();
   const router = useRouter();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
   const [isStalled, setIsStalled] = useState(false);

@@ -1,7 +1,7 @@
 'use client';
 
-import { useClerk } from '@clerk/nextjs';
 import { useEffect, useState } from 'react';
+import { useClerkSafe } from '@/hooks/useClerkSafe';
 import type { AuthMethod } from '@/lib/auth/types';
 
 // Re-export type for backwards compatibility
@@ -38,7 +38,7 @@ export function useLastAuthMethod(): [
   AuthMethod | null,
   (method: AuthMethod) => void,
 ] {
-  const clerk = useClerk();
+  const clerk = useClerkSafe();
   const [lastAuthMethod, setLastAuthMethod] = useState<AuthMethod | null>(null);
 
   useEffect(() => {

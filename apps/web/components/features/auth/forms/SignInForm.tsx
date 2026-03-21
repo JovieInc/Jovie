@@ -1,15 +1,38 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useEffect, useRef } from 'react';
 import { useAuthPageSetup } from '@/hooks/useAuthPageSetup';
 import { useLoadingStall } from '@/hooks/useLoadingStall';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 import { AccessibleStepWrapper } from '../AccessibleStepWrapper';
 import { AuthLoadingState } from '../AuthLoadingState';
-import { EmailStep } from './EmailStep';
 import { MethodSelector } from './MethodSelector';
-import { VerificationStep } from './VerificationStep';
+
+function AuthStepLoading() {
+  return (
+    <div
+      aria-hidden='true'
+      className='rounded-[28px] border border-subtle/60 bg-surface-0 p-6 shadow-sm'
+    >
+      <div className='space-y-3'>
+        <div className='mx-auto h-8 w-44 skeleton rounded-md' />
+        <div className='h-12 w-full skeleton rounded-xl' />
+        <div className='h-12 w-full skeleton rounded-xl' />
+      </div>
+    </div>
+  );
+}
+
+const EmailStep = dynamic(
+  () => import('./EmailStep').then(mod => mod.EmailStep),
+  { loading: () => <AuthStepLoading /> }
+);
+
+const VerificationStep = dynamic(
+  () => import('./VerificationStep').then(mod => mod.VerificationStep),
+  { loading: () => <AuthStepLoading /> }
+);
 
 /**
  * Sign-in form using Clerk Core API.
@@ -35,7 +58,6 @@ export function SignInForm() {
     goBack,
   } = useSignInFlow();
 
-  const searchParams = useSearchParams();
   const hasHandledEmailParam = useRef(false);
   const isClerkStalled = useLoadingStall(isLoaded);
 
@@ -45,13 +67,15 @@ export function SignInForm() {
   // Handle email query parameter (e.g., from signup redirect)
   useEffect(() => {
     if (hasHandledEmailParam.current) return;
-    const emailParam = searchParams.get('email');
+    const emailParam = new URL(globalThis.location.href).searchParams.get(
+      'email'
+    );
     if (emailParam?.includes('@')) {
       hasHandledEmailParam.current = true;
       setEmail(emailParam);
       setStep('email');
     }
-  }, [searchParams, setEmail, setStep]);
+  }, [setEmail, setStep]);
 
   // Show loading skeleton while Clerk initializes
   if (!isLoaded) {
