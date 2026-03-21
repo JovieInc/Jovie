@@ -21,7 +21,8 @@ const MIN_SCORE = 2;
  */
 function keywordMatches(text: string, keyword: string): boolean {
   if (keyword.includes(' ')) return text.includes(keyword);
-  const boundary = new RegExp(`(?<![a-z])${keyword}(?![a-z])`, 'i');
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const boundary = new RegExp(`(?<![a-z])${escaped}(?![a-z])`, 'i');
   return boundary.test(text);
 }
 

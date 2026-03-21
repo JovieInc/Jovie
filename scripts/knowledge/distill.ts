@@ -22,7 +22,14 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const CACHE_DIR = join(__dirname, '.cache');
-const TOPICS_DIR = join(__dirname, 'topics');
+// Output directly to the directory the app reads from at runtime.
+// This is the single source of truth — no copy/sync step needed.
+const TOPICS_DIR = join(
+  __dirname,
+  '..',
+  '..',
+  'apps/web/lib/chat/knowledge/topics'
+);
 const MANIFEST_PATH = join(CACHE_DIR, 'manifest.json');
 const MAX_ARTICLES_PER_TOPIC = 25;
 
@@ -427,25 +434,45 @@ async function distillTopic(
     `  Distilling ${topic.id}: ${articles.length} articles, ~${approxTokens.toLocaleString()} tokens input`
   );
 
-  const apiKey =
-    process.env.ANTHROPIC_API_KEY ?? process.env.AI_GATEWAY_API_KEY;
-  if (!apiKey) {
-    throw new Error(
-      'Missing API credentials. Set ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY via Doppler.'
-    );
+  // Prefer direct Anthropic SDK when ANTHROPIC_API_KEY is available
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 16384,
+      temperature: 0.3,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const block = response.content.find(b => b.type === 'text');
+    return block && 'text' in block ? block.text : '';
   }
 
-  const { default: Anthropic } = await import('@anthropic-ai/sdk');
-  const client = new Anthropic({ apiKey });
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 16384,
-    temperature: 0.3,
-    messages: [{ role: 'user', content: prompt }],
-  });
+  // Fall back to Vercel AI Gateway (the commonly available key in this repo)
+  const gatewayKey = process.env.AI_GATEWAY_API_KEY;
+  if (gatewayKey) {
+    const repoRoot = join(__dirname, '..', '..');
+    const gatewayPath = join(
+      repoRoot,
+      'apps/web/node_modules/@ai-sdk/gateway/dist/index.mjs'
+    );
+    const aiPath = join(repoRoot, 'apps/web/node_modules/ai/dist/index.mjs');
+    const { gateway } = await import(gatewayPath);
+    const { generateText } = await import(aiPath);
+    const model = gateway('anthropic/claude-sonnet-4-20250514');
+    const result = await generateText({
+      model,
+      prompt,
+      maxTokens: 16384,
+      temperature: 0.3,
+    });
+    return result.text;
+  }
 
-  const block = response.content.find(b => b.type === 'text');
-  return block && 'text' in block ? block.text : '';
+  throw new Error(
+    'Missing API credentials. Set ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY via Doppler.'
+  );
 }
 
 // ---------------------------------------------------------------------------
