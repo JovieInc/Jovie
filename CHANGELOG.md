@@ -20,6 +20,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Refactored golden-path.spec.ts to import helpers from shared module instead of inlining them
 - `ensureDbUser()` now accepts optional `knownSpotifyArtistIds` parameter for caller-specific Spotify ID cleanup
 - `createFreshUser()` no longer calls `ensureDbUser()` internally — callers handle DB setup explicitly
+## [26.4.29] - 2026-03-21
+
+### Fixed
+
+- Stop capture-tip infinite Stripe retry loop — return 200 with fire-and-forget Sentry alert instead of 500 when creator profile not found
+- Store immutable profile_id in Stripe payment intent metadata so capture-tip webhook can resolve creators without relying on mutable handle lookups
+- Validate profile_id still exists before tip insert to prevent FK violation causing 500 retry loops
+- Check isPublic flag on creator profile in create-tip-intent to match checkout flow behavior
+- Add auth-first guards (getCachedAuth before getDashboardData) on dashboard pages to prevent unauthenticated access during DB outages
+- Escalate stripe-tips webhook from logger.warn to captureCriticalError with redacted email context
+- Dashboard pages (earnings, audience, releases, presence) show PageErrorState with consistent captureError telemetry instead of redirecting to signin on DB failure
+- Add error tracking to batchUpdateSequential with succeeded count and failed item context
+- Use APP_ROUTES.ONBOARDING constant instead of hardcoded paths
 
 ## [26.4.28] - 2026-03-20
 
