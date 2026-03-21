@@ -22,7 +22,7 @@ function SignUpClaimDataPersistence() {
   const searchParams = useSearchParams();
   const handle = searchParams.get('handle');
   const [availability, setAvailability] = useState<
-    'checking' | 'available' | 'taken' | null
+    'checking' | 'available' | 'taken' | 'error' | null
   >(null);
 
   useEffect(() => {
@@ -82,8 +82,10 @@ function SignUpClaimDataPersistence() {
       .then(data => {
         setAvailability(data.available ? 'available' : 'taken');
       })
-      .catch(() => {
-        setAvailability(null);
+      .catch((err: unknown) => {
+        // Aborts from cleanup are expected control flow, not errors
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setAvailability('error');
       });
 
     return () => controller.abort();
@@ -109,6 +111,12 @@ function SignUpClaimDataPersistence() {
         <p className='text-[13px] font-[450] text-secondary-token'>
           @{normalizedHandle} is already taken. You can pick another handle
           after signing up.
+        </p>
+      )}
+      {availability === 'error' && (
+        <p className='text-[13px] font-[450] text-secondary-token'>
+          Couldn&apos;t check if @{normalizedHandle} is available. You can still
+          sign up and choose a handle.
         </p>
       )}
     </div>
