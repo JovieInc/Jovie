@@ -1047,8 +1047,14 @@
   --color-border-focus: var(--linear-border-focus);
 }
 
-.jovie-homepage-marketing {
+/* Propagate homepage content-max to the marketing layout root so the header
+   aligns with page content. :has() bubbles the override from the page-level
+   .jovie-homepage-marketing up to the layout wrapper that contains HeaderNav. */
+.linear-marketing:has(.jovie-homepage-marketing) {
   --linear-content-max: 1104px;
+}
+
+.jovie-homepage-marketing {
   --linear-section-pt-sm: 44px;
   --linear-section-pb-sm: 52px;
   --linear-section-pt-md: 64px;

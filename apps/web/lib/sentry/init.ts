@@ -46,10 +46,7 @@
  */
 
 import type { FullSentryConfig } from './client-full';
-import {
-  initLiteSentry as initLiteSentrySyncImpl,
-  type LiteSentryConfig,
-} from './client-lite';
+import type { LiteSentryConfig } from './client-lite';
 import { getCurrentPathname, getSdkMode } from './route-detector';
 import {
   getSentryMode,
@@ -280,8 +277,12 @@ export function initSentrySync(
     };
   }
 
-  // For sync initialization, we always use lite SDK
-  const success = initLiteSentrySyncImpl(liteOptions);
+  // For sync initialization, we always use lite SDK.
+  // Uses require() to keep client-lite lazily loaded — static ESM import would
+  // eagerly bundle the lite SDK for every consumer of this module (e.g., error
+  // boundaries on public routes that only read getSentryMode()).
+  const { initLiteSentry } = require('./client-lite');
+  const success = initLiteSentry(liteOptions);
 
   if (success) {
     setCurrentMode('lite');
