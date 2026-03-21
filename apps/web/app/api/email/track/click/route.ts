@@ -6,7 +6,7 @@
  */
 
 import { headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
 import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
@@ -95,10 +95,10 @@ export async function GET(request: NextRequest) {
     const country = headersList.get('x-vercel-ip-country') ?? undefined;
     const city = headersList.get('x-vercel-ip-city') ?? undefined;
 
-    // Record the click event (fire and forget for performance)
-    recordEngagement({
+    // Record the click event after response is sent (survives serverless teardown)
+    const engagementData = {
       emailType: payload.emailType,
-      eventType: 'click',
+      eventType: 'click' as const,
       referenceId: payload.referenceId,
       recipientEmail: payload.email,
       providerMessageId: payload.messageId,
@@ -117,12 +117,17 @@ export async function GET(request: NextRequest) {
         country,
         city,
       },
-    }).catch(error => {
-      logger.error('[Email Click Track] Failed to record engagement', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        emailType: payload.emailType,
-        referenceId: payload.referenceId,
-      });
+    };
+    after(async () => {
+      try {
+        await recordEngagement(engagementData);
+      } catch (error) {
+        logger.error('[Email Click Track] Failed to record engagement', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          emailType: payload.emailType,
+          referenceId: payload.referenceId,
+        });
+      }
     });
 
     // Redirect to the target URL

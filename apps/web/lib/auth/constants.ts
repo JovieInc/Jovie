@@ -55,6 +55,8 @@ export const AUTH_CLASSES = {
  * Validates and sanitizes a redirect URL.
  * - Must start with "/" (relative path)
  * - Must not start with "//" (protocol-relative URL)
+ * - Rejects backslashes (browsers normalize \ to /, enabling //evil.com bypass)
+ * - Single-pass decodes to catch encoded bypass attempts (%5C → \, %2F → //)
  * - Strips hash fragments to prevent malformed redirects (e.g., /signin#/reset-password)
  *
  * @param url - The URL to sanitize
@@ -65,6 +67,16 @@ export function sanitizeRedirectUrl(
 ): string | null {
   if (!url) return null;
   if (!url.startsWith('/') || url.startsWith('//')) return null;
+
+  // Single-pass decode to catch encoded bypass attempts (%5C → \, %2F → /)
+  // We only decode once to avoid breaking valid URLs with encoded % (%25)
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(url);
+  } catch {
+    return null; // Malformed percent-encoding
+  }
+  if (decoded.includes('\\') || decoded.startsWith('//')) return null;
 
   // Strip hash fragment to prevent malformed URLs like /signin#/reset-password
   const hashIndex = url.indexOf('#');
