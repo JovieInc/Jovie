@@ -23,7 +23,7 @@ const authInputClasses = cn(
   // Base styling - subtle borders for premium feel
   'border border-subtle bg-surface-0 text-primary-token',
   'placeholder:text-tertiary-token',
-  'rounded-(--linear-radius-sm)',
+  'rounded-full',
   // Focus ring
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40 focus-visible:ring-offset-2',
   // Mobile-optimized sizing
