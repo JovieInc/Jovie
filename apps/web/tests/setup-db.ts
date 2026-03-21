@@ -1,5 +1,5 @@
 import { neonConfig, Pool } from '@neondatabase/serverless';
-/* eslint-disable no-restricted-imports, @jovie/no-manual-db-pooling, @jovie/no-db-transaction -- Test requires full schema access, pooling for WebSocket driver, and transactions for RLS testing */
+/* eslint-disable no-restricted-imports, @jovie/no-manual-db-pooling -- Test requires full schema access and pooling for WebSocket driver */
 import type { NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
@@ -66,6 +66,12 @@ export async function setupDatabase() {
     );
     await db.execute(
       "ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS ingestion_status ingestion_status NOT NULL DEFAULT 'idle'"
+    );
+    await db.execute(
+      'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS discovered_pixels jsonb'
+    );
+    await db.execute(
+      'ALTER TABLE creator_profiles ADD COLUMN IF NOT EXISTS discovered_pixels_at timestamp'
     );
     await db.execute('ALTER TABLE users ENABLE ROW LEVEL SECURITY');
     await db.execute('ALTER TABLE users FORCE ROW LEVEL SECURITY');

@@ -1,23 +1,23 @@
 'use client';
 
-import { SignInButton, SignUpButton, useAuth } from '@clerk/nextjs';
+import { SignInButton, SignUpButton } from '@clerk/nextjs';
 import { UserButton } from '@/components/organisms/user-button';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 
 /**
  * Client-side component to render Clerk authentication buttons.
  */
 export default function ClerkAuth() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isSignedIn } = useAuthSafe();
+
+  if (isSignedIn) {
+    return <UserButton />;
+  }
 
   return (
     <>
-      {(!isLoaded || !isSignedIn) && (
-        <>
-          <SignInButton mode='redirect'>Sign In</SignInButton>
-          <SignUpButton mode='redirect'>Sign Up</SignUpButton>
-        </>
-      )}
-      {isLoaded && isSignedIn ? <UserButton /> : null}
+      <SignInButton mode='redirect'>Sign In</SignInButton>
+      <SignUpButton mode='redirect'>Sign Up</SignUpButton>
     </>
   );
 }
