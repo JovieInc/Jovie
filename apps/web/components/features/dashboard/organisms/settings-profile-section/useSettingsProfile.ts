@@ -56,6 +56,7 @@ interface ProfileUpdateData {
   username: string;
   location: string;
   hometown: string;
+  pitchContext: string;
 }
 
 function normalizePlace(value: string): string | null {
@@ -90,6 +91,7 @@ export function useSettingsProfile({
     displayName: identityFields.displayName,
     location: identityFields.location,
     hometown: identityFields.hometown,
+    pitchContext: identityFields.pitchContext,
   });
 
   const [profileSaveStatus, setProfileSaveStatus] = useState<ProfileSaveStatus>(
@@ -102,6 +104,7 @@ export function useSettingsProfile({
     username: identityFields.username,
     location: identityFields.location,
     hometown: identityFields.hometown,
+    pitchContext: identityFields.pitchContext,
   });
 
   // Store artist ref for async operations
@@ -141,6 +144,7 @@ export function useSettingsProfile({
       const username = data.username?.trim() ?? '';
       const location = normalizePlace(data.location);
       const hometown = normalizePlace(data.hometown);
+      const pitchContext = data.pitchContext?.trim() ?? '';
 
       if (!displayName || !username) {
         return;
@@ -164,7 +168,8 @@ export function useSettingsProfile({
         lastSaved?.displayName === displayName &&
         lastSaved?.username === username &&
         lastSaved?.location === (location ?? '') &&
-        lastSaved?.hometown === (hometown ?? '')
+        lastSaved?.hometown === (hometown ?? '') &&
+        lastSaved?.pitchContext === pitchContext
       ) {
         return;
       }
@@ -180,6 +185,7 @@ export function useSettingsProfile({
             displayName,
             location,
             hometown,
+            pitchContext: pitchContext || undefined,
           },
         });
       } catch (error) {
@@ -196,6 +202,7 @@ export function useSettingsProfile({
         username,
         location: location ?? '',
         hometown: hometown ?? '',
+        pitchContext,
       };
 
       const nextSettings = {
@@ -328,12 +335,14 @@ export function useSettingsProfile({
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
+      pitchContext: identityFields.pitchContext,
     };
     setFormData({
       displayName: identityFields.displayName,
       username: identityFields.username,
       location: identityFields.location,
       hometown: identityFields.hometown,
+      pitchContext: identityFields.pitchContext,
     });
     setProfileSaveStatus(buildProfileSaveState());
   }, [
@@ -341,6 +350,7 @@ export function useSettingsProfile({
     identityFields.hometown,
     identityFields.location,
     identityFields.username,
+    identityFields.pitchContext,
   ]);
 
   // Clear success status after delay

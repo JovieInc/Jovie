@@ -23,4 +23,5 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
   'theme',
   'venmo_handle',
   'genres',
+  'pitchContext',
 ]);
