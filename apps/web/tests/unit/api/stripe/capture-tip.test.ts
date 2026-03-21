@@ -104,7 +104,7 @@ describe('/api/capture-tip', () => {
     expect(mockInsert).toHaveBeenCalled();
   });
 
-  it('returns 500 when creator profile not found (CRITICAL bug prevention)', async () => {
+  it('returns 200 with warning when creator profile not found (stops infinite retries)', async () => {
     const event = {
       type: 'payment_intent.succeeded',
       data: {
@@ -136,10 +136,12 @@ describe('/api/capture-tip', () => {
 
     const response = await POST(request);
 
-    // MUST return 500 to trigger Stripe retry, preventing silent payment loss
-    expect(response.status).toBe(500);
+    // Return 200 to acknowledge receipt and stop Stripe retries (returning 500
+    // would cause infinite retry loops if creator is permanently deleted).
+    // Critical error is logged to Sentry for manual reconciliation.
+    expect(response.status).toBe(200);
     const data = await response.json();
-    expect(data.error).toBe('Creator profile not found');
+    expect(data.warning).toBe('Creator profile not found');
     expect(data.payment_intent).toBe('pi_456');
 
     // Should not attempt to insert tip when profile missing

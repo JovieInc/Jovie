@@ -55,12 +55,30 @@ export async function POST(req: NextRequest) {
         pi as Stripe.PaymentIntent & { charges?: { data: Stripe.Charge[] } }
       ).charges?.data?.[0];
 
+      // Resolve creator profile: prefer immutable profile_id from metadata,
+      // fall back to handle lookup for backward compatibility with older intents
+      const metadataProfileId =
+        typeof pi.metadata?.profile_id === 'string'
+          ? pi.metadata.profile_id
+          : null;
       const handle =
         typeof pi.metadata?.handle === 'string' ? pi.metadata.handle : null;
 
       let creatorProfileId: string | null = null;
 
-      if (handle) {
+      // Validate profile_id from metadata still exists (creator may have been deleted)
+      if (metadataProfileId) {
+        const [profile] = await db
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, metadataProfileId))
+          .limit(1);
+
+        creatorProfileId = profile?.id ?? null;
+      }
+
+      // Fallback: try handle lookup for backward compatibility with older intents
+      if (!creatorProfileId && handle) {
         const [profile] = await db
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)
@@ -71,21 +89,28 @@ export async function POST(req: NextRequest) {
       }
 
       if (!creatorProfileId) {
-        // CRITICAL: If no profile found, we MUST return 500 to trigger Stripe retry
-        // Otherwise customer payment succeeds but tip is lost
-        await captureCriticalError(
+        // Creator profile not found for this tip. Return 200 to acknowledge receipt
+        // and stop Stripe retries — returning 500 here would cause infinite retry
+        // loops if the creator profile was deleted or the handle is permanently invalid.
+        // Fire-and-forget so telemetry failure can't cause 500 → retry loop.
+        void captureCriticalError(
           'Tip payment succeeded but no creator profile found',
           new Error('Creator profile not found for tip'),
           {
             route: '/api/capture-tip',
             handle,
+            metadata_profile_id: metadataProfileId,
             payment_intent: pi.id,
             amount_cents: pi.amount_received,
           }
-        );
+        ).catch(() => {});
         return NextResponse.json(
-          { error: 'Creator profile not found', payment_intent: pi.id },
-          { status: 500, headers: NO_STORE_HEADERS }
+          {
+            received: true,
+            warning: 'Creator profile not found',
+            payment_intent: pi.id,
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 
