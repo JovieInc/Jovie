@@ -199,8 +199,6 @@ vi.mock('@headlessui/react', async () => {
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
-  Show: ({ when, children }: { when: string; children: unknown }) =>
-    when === 'signed-out' ? children : null,
   ClerkProvider: ({ children }: { children: unknown }) => children,
 }));
 
