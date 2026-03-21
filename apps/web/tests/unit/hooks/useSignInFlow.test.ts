@@ -228,4 +228,71 @@ describe('useSignInFlow – status handling', () => {
 
     expect(result.current.verificationReason).toBe('code');
   });
+
+  it('uses phone_code strategy when that is the supported second factor', async () => {
+    // Override to only support phone_code as second factor
+    signInMock.supportedSecondFactors = [{ strategy: 'phone_code' }];
+
+    const { result } = renderHook(() => useSignInFlow());
+    await setupVerificationStep(result);
+
+    attemptFirstFactorMock.mockResolvedValue({
+      status: 'needs_second_factor',
+    });
+    prepareSecondFactorMock.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.verifyCode('123456');
+    });
+
+    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
+      strategy: 'phone_code',
+    });
+
+    // Second verification should use phone_code strategy
+    attemptSecondFactorMock.mockResolvedValue({
+      status: 'complete',
+      createdSessionId: 'sess_phone',
+    });
+
+    await act(async () => {
+      await result.current.verifyCode('789012');
+    });
+
+    expect(attemptSecondFactorMock).toHaveBeenCalledWith({
+      strategy: 'phone_code',
+      code: '789012',
+    });
+
+    // Restore for other tests
+    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
+  });
+
+  it('resends second-factor challenge instead of first-factor when in second-factor state', async () => {
+    const { result } = renderHook(() => useSignInFlow());
+    await setupVerificationStep(result);
+
+    // Enter second-factor state
+    attemptFirstFactorMock.mockResolvedValue({
+      status: 'needs_second_factor',
+    });
+    prepareSecondFactorMock.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.verifyCode('123456');
+    });
+
+    // Clear mock to track the resend call
+    prepareSecondFactorMock.mockClear();
+    prepareSecondFactorMock.mockResolvedValue(undefined);
+
+    await act(async () => {
+      await result.current.resendCode();
+    });
+
+    // Should resend second factor, not first factor
+    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
+      strategy: 'email_code',
+    });
+  });
 });

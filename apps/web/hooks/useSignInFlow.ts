@@ -82,6 +82,9 @@ export function useSignInFlow(): UseSignInFlowReturn {
   // Sign-in specific state
   const [shouldSuggestSignUp, setShouldSuggestSignUp] = useState(false);
   const [isSecondFactor, setIsSecondFactor] = useState(false);
+  const [secondFactorStrategy, setSecondFactorStrategy] = useState<
+    'email_code' | 'phone_code'
+  >('email_code');
   const [verificationReason, setVerificationReason] =
     useState<VerificationReason>('code');
 
@@ -99,6 +102,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
       clearError();
       setIsSecondFactor(false);
+      setSecondFactorStrategy('email_code');
       setVerificationReason('code');
       base.setLoadingState({ type: 'submitting' });
       base.setEmail(emailAddress);
@@ -177,7 +181,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
         // If we're in a second-factor state, verify via attemptSecondFactor
         if (isSecondFactor) {
           const result = await signIn.attemptSecondFactor({
-            strategy: 'email_code',
+            strategy: secondFactorStrategy,
             code: verificationCode,
           });
 
@@ -225,10 +229,12 @@ export function useSignInFlow(): UseSignInFlowReturn {
           );
 
           if (secondFactor) {
-            await signIn.prepareSecondFactor({
-              strategy: secondFactor.strategy as 'email_code' | 'phone_code',
-            });
+            const strategy = secondFactor.strategy as
+              | 'email_code'
+              | 'phone_code';
+            await signIn.prepareSecondFactor({ strategy });
             setIsSecondFactor(true);
+            setSecondFactorStrategy(strategy);
             setVerificationReason(
               (result.status as string) === 'needs_client_trust'
                 ? 'device_trust'
@@ -277,7 +283,15 @@ export function useSignInFlow(): UseSignInFlowReturn {
         return false;
       }
     },
-    [signIn, setActive, isLoaded, isSecondFactor, clearError, base]
+    [
+      signIn,
+      setActive,
+      isLoaded,
+      isSecondFactor,
+      secondFactorStrategy,
+      clearError,
+      base,
+    ]
   );
 
   /**
@@ -291,6 +305,16 @@ export function useSignInFlow(): UseSignInFlowReturn {
     base.setCode('');
 
     try {
+      // If we're in a second-factor state, resend the second-factor
+      // challenge instead of the first-factor email code.
+      if (isSecondFactor) {
+        await signIn.prepareSecondFactor({
+          strategy: secondFactorStrategy,
+        });
+        base.setLoadingState({ type: 'idle' });
+        return true;
+      }
+
       // Find email_code factor
       const emailCodeFactor = signIn.supportedFirstFactors?.find(
         (factor: { strategy: string }) => factor.strategy === 'email_code'
@@ -316,7 +340,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.setLoadingState({ type: 'idle' });
       return false;
     }
-  }, [signIn, isLoaded, clearError, base]);
+  }, [
+    signIn,
+    isLoaded,
+    isSecondFactor,
+    secondFactorStrategy,
+    clearError,
+    base,
+  ]);
 
   /**
    * Start OAuth flow (Google)
@@ -361,6 +392,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
   const goBack = useCallback(() => {
     clearError();
     setIsSecondFactor(false);
+    setSecondFactorStrategy('email_code');
     setVerificationReason('code');
     base.goBack();
   }, [clearError, base]);
