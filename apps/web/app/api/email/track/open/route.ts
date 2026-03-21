@@ -8,7 +8,12 @@
 import { headers } from 'next/headers';
 import { after, NextRequest, NextResponse } from 'next/server';
 
-import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
+import {
+  hashIP,
+  inferDeviceType,
+  recordEngagement,
+  verifyTrackingToken,
+} from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -29,18 +34,6 @@ const GIF_HEADERS = {
   Pragma: 'no-cache',
   Expires: '0',
 } as const;
-
-function inferDeviceType(
-  userAgent: string | null
-): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
-  if (!userAgent) return 'unknown';
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
-    return 'mobile';
-  }
-  return 'desktop';
-}
 
 export async function GET(request: NextRequest) {
   // Always return the GIF, even on errors (to avoid broken images)
@@ -79,13 +72,7 @@ export async function GET(request: NextRequest) {
       providerMessageId: payload.messageId,
       metadata: {
         userAgent: userAgent ?? undefined,
-        ipHash: ipAddress
-          ? (await import('node:crypto'))
-              .createHash('sha256')
-              .update(ipAddress)
-              .digest('hex')
-              .slice(0, 16)
-          : undefined,
+        ipHash: hashIP(ipAddress),
         deviceType: inferDeviceType(userAgent),
         country,
         city,

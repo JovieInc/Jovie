@@ -41,13 +41,8 @@ export async function GET(
     }
 
     // Increment click count after response is sent (survives serverless teardown)
-    after(async () => {
-      try {
-        await incrementClickCount(shortId);
-      } catch (error) {
-        Sentry.captureException(error);
-      }
-    });
+    // incrementClickCount handles errors internally via captureError
+    after(() => incrementClickCount(shortId));
 
     // Create redirect response with anti-cloaking headers
     const response = NextResponse.redirect(wrappedLink.originalUrl, {
