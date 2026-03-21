@@ -11,15 +11,12 @@ import {
   type FormErrors,
   isValidUrl,
   normalizeUrl,
-  PRIMARY_GOAL_OPTIONS,
-  type PrimaryGoal,
   resolvePrimarySocialUrl,
   SOCIAL_PLATFORM_OPTIONS,
   type SocialPlatform,
   WAITLIST_STORAGE_KEYS,
 } from '@/features/waitlist/types';
 import { WaitlistAdditionalInfoStep } from '@/features/waitlist/WaitlistAdditionalInfoStep';
-import { WaitlistPrimaryGoalStep } from '@/features/waitlist/WaitlistPrimaryGoalStep';
 import { WaitlistSkeleton } from '@/features/waitlist/WaitlistSkeleton';
 import { WaitlistSocialStep } from '@/features/waitlist/WaitlistSocialStep';
 import { WaitlistSuccessView } from '@/features/waitlist/WaitlistSuccessView';
@@ -30,7 +27,7 @@ import {
   useWaitlistSubmitMutation,
 } from '@/lib/queries';
 
-type StepNumber = 0 | 1 | 2;
+type StepNumber = 0 | 1;
 
 export default function WaitlistPage() {
   const { isLoaded, isSignedIn, userId } = useAuth();
@@ -44,8 +41,6 @@ export default function WaitlistPage() {
 
   const [isHydrating, setIsHydrating] = useState(true);
   const [step, setStep] = useState<StepNumber>(0);
-  const [primaryGoal, setPrimaryGoal] = useState<PrimaryGoal | null>(null);
-  const [primaryGoalFocusIndex, setPrimaryGoalFocusIndex] = useState(0);
   const [socialPlatform, setSocialPlatform] =
     useState<SocialPlatform>('instagram');
   const [primarySocialUrl, setPrimarySocialUrl] = useState('');
@@ -67,16 +62,9 @@ export default function WaitlistPage() {
     isLoaded && isSignedIn === true
   );
 
-  const primaryGoalButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const socialPlatformButtonRefs = useRef<Array<HTMLInputElement | null>>([]);
   const primarySocialUrlInputRef = useRef<HTMLInputElement | null>(null);
   const spotifyUrlInputRef = useRef<HTMLInputElement | null>(null);
-
-  const selectedPrimaryGoalIndex = useMemo(() => {
-    if (!primaryGoal) return 0;
-    const index = PRIMARY_GOAL_OPTIONS.findIndex(o => o.value === primaryGoal);
-    return Math.max(index, 0);
-  }, [primaryGoal]);
 
   const selectedSocialPlatformIndex = useMemo(() => {
     const index = SOCIAL_PLATFORM_OPTIONS.findIndex(
@@ -84,12 +72,6 @@ export default function WaitlistPage() {
     );
     return Math.max(index, 0);
   }, [socialPlatform]);
-
-  useEffect(() => {
-    if (step !== 0) return;
-    if (!primaryGoal) return;
-    setPrimaryGoalFocusIndex(selectedPrimaryGoalIndex);
-  }, [primaryGoal, selectedPrimaryGoalIndex, step]);
 
   useEffect(() => {
     setIsHydrating(false);
@@ -108,19 +90,8 @@ export default function WaitlistPage() {
       const storedStep = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.step
       );
-      if (storedStep === '0' || storedStep === '1' || storedStep === '2') {
+      if (storedStep === '0' || storedStep === '1') {
         setStep(Number.parseInt(storedStep, 10) as StepNumber);
-      }
-
-      const storedGoal = globalThis.sessionStorage.getItem(
-        WAITLIST_STORAGE_KEYS.primaryGoal
-      );
-      if (
-        storedGoal === 'streams' ||
-        storedGoal === 'merch' ||
-        storedGoal === 'tickets'
-      ) {
-        setPrimaryGoal(storedGoal);
       }
 
       const storedPlatform = globalThis.sessionStorage.getItem(
@@ -167,7 +138,7 @@ export default function WaitlistPage() {
     }
   }, []);
 
-  // Persist form state to sessionStorage (consolidated from 6 separate effects)
+  // Persist form state to sessionStorage
   useEffect(() => {
     const persist = (key: string, value: string | null) => {
       try {
@@ -182,7 +153,6 @@ export default function WaitlistPage() {
     };
 
     persist(WAITLIST_STORAGE_KEYS.step, String(step));
-    persist(WAITLIST_STORAGE_KEYS.primaryGoal, primaryGoal);
     persist(WAITLIST_STORAGE_KEYS.socialPlatform, socialPlatform);
     persist(WAITLIST_STORAGE_KEYS.primarySocialUrl, primarySocialUrl || null);
     persist(WAITLIST_STORAGE_KEYS.spotifyUrl, spotifyUrl || null);
@@ -190,7 +160,6 @@ export default function WaitlistPage() {
     persist(WAITLIST_STORAGE_KEYS.heardAbout, heardAbout || null);
   }, [
     step,
-    primaryGoal,
     socialPlatform,
     primarySocialUrl,
     spotifyUrl,
@@ -257,12 +226,6 @@ export default function WaitlistPage() {
       const errors: FormErrors = {};
 
       if (targetStep === 0) {
-        if (!primaryGoal) {
-          errors.primaryGoal = ['Primary goal is required'];
-        }
-      }
-
-      if (targetStep === 1) {
         const resolvedUrl = resolvePrimarySocialUrl(
           primarySocialUrl,
           socialPlatform
@@ -275,7 +238,7 @@ export default function WaitlistPage() {
         }
       }
 
-      if (targetStep === 2) {
+      if (targetStep === 1) {
         if (spotifyUrl.trim() && !isValidUrl(spotifyUrl)) {
           errors.spotifyUrl = ['Please enter a valid Spotify URL'];
         }
@@ -283,7 +246,7 @@ export default function WaitlistPage() {
 
       return errors;
     },
-    [primaryGoal, primarySocialUrl, socialPlatform, spotifyUrl]
+    [primarySocialUrl, socialPlatform, spotifyUrl]
   );
 
   const handleNext = () => {
@@ -293,15 +256,10 @@ export default function WaitlistPage() {
       setFieldErrors(errors);
 
       if (step === 0) {
-        const fallback = primaryGoalButtonRefs.current[primaryGoalFocusIndex];
-        fallback?.focus();
-      }
-
-      if (step === 1) {
         primarySocialUrlInputRef.current?.focus();
       }
 
-      if (step === 2) {
+      if (step === 1) {
         spotifyUrlInputRef.current?.focus();
       }
 
@@ -310,41 +268,13 @@ export default function WaitlistPage() {
 
     setFieldErrors({});
 
-    if (step < 2) setStep((step + 1) as StepNumber);
+    if (step < 1) setStep((step + 1) as StepNumber);
   };
 
   const handleBack = () => {
     setError('');
     setFieldErrors({});
     if (step > 0) setStep((step - 1) as StepNumber);
-  };
-
-  const handlePrimaryGoalSelect = (goal: PrimaryGoal) => {
-    if (isSubmitting) return;
-    setPrimaryGoal(goal);
-    setError('');
-    setFieldErrors({});
-
-    const index = PRIMARY_GOAL_OPTIONS.findIndex(o => o.value === goal);
-    if (index >= 0) {
-      setPrimaryGoalFocusIndex(index);
-    }
-
-    setStep(prev => (prev === 0 ? 1 : prev));
-  };
-
-  const handlePrimaryGoalKeyDown = (e: React.KeyboardEvent) => {
-    if (isSubmitting) return;
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    e.preventDefault();
-
-    const delta = e.key === 'ArrowDown' ? 1 : -1;
-    const nextIndex =
-      (primaryGoalFocusIndex + delta + PRIMARY_GOAL_OPTIONS.length) %
-      PRIMARY_GOAL_OPTIONS.length;
-
-    setPrimaryGoalFocusIndex(nextIndex);
-    primaryGoalButtonRefs.current[nextIndex]?.focus();
   };
 
   const handleSocialPlatformSelect = (next: SocialPlatform) => {
@@ -379,7 +309,6 @@ export default function WaitlistPage() {
     const allErrors: FormErrors = {
       ...validateStep(0),
       ...validateStep(1),
-      ...validateStep(2),
     };
 
     if (Object.keys(allErrors).length > 0) {
@@ -396,7 +325,7 @@ export default function WaitlistPage() {
 
     submitWaitlist(
       {
-        primaryGoal: primaryGoal!,
+        primaryGoal: null,
         primarySocialUrl: resolvedPrimarySocialUrl,
         spotifyUrl: normalizedSpotifyUrl,
         spotifyArtistName: spotifyArtistName || null,
@@ -425,7 +354,6 @@ export default function WaitlistPage() {
             setFieldErrors(fetchErr.errors as FormErrors);
           } else {
             void captureWarning('Waitlist signup error', err, {
-              primaryGoal,
               socialPlatform,
             });
             setError(
@@ -448,7 +376,6 @@ export default function WaitlistPage() {
   const allErrors: FormErrors = {
     ...validateStep(0),
     ...validateStep(1),
-    ...validateStep(2),
   };
   const isReadyToSubmit = Object.keys(allErrors).length === 0;
 
@@ -468,21 +395,6 @@ export default function WaitlistPage() {
       <div className='w-full'>
         <form onSubmit={handleSubmit} className='space-y-4'>
           {step === 0 && (
-            <WaitlistPrimaryGoalStep
-              primaryGoal={primaryGoal}
-              primaryGoalFocusIndex={primaryGoalFocusIndex}
-              fieldErrors={fieldErrors}
-              isSubmitting={isSubmitting}
-              isHydrating={isHydrating}
-              onSelect={handlePrimaryGoalSelect}
-              onKeyDown={handlePrimaryGoalKeyDown}
-              setButtonRef={(index, el) => {
-                primaryGoalButtonRefs.current[index] = el;
-              }}
-            />
-          )}
-
-          {step === 1 && (
             <WaitlistSocialStep
               socialPlatform={socialPlatform}
               primarySocialUrl={primarySocialUrl}
@@ -502,7 +414,7 @@ export default function WaitlistPage() {
             />
           )}
 
-          {step === 2 && (
+          {step === 1 && (
             <WaitlistAdditionalInfoStep
               spotifyUrl={spotifyUrl}
               heardAbout={heardAbout}
@@ -524,7 +436,7 @@ export default function WaitlistPage() {
             </div>
           )}
 
-          {step === 2 && (
+          {step === 1 && (
             <AuthButton
               type='submit'
               disabled={isSubmitting || !isReadyToSubmit}
@@ -534,7 +446,7 @@ export default function WaitlistPage() {
             </AuthButton>
           )}
 
-          {step === 1 && (
+          {step === 0 && (
             <AuthButton
               type='button'
               onClick={handleNext}

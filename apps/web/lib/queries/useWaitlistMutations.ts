@@ -30,7 +30,7 @@ export interface WaitlistMutationResponse {
 }
 
 export interface WaitlistSubmitInput {
-  primaryGoal: string;
+  primaryGoal: string | null;
   primarySocialUrl: string;
   spotifyUrl: string | null;
   spotifyArtistName: string | null;
