@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.28] - 2026-03-20
+## [26.4.29] - 2026-03-20
 
 ### Added
 
@@ -20,12 +20,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Refactored golden-path.spec.ts to import helpers from shared module instead of inlining them
 - `ensureDbUser()` now accepts optional `knownSpotifyArtistIds` parameter for caller-specific Spotify ID cleanup
 - `createFreshUser()` no longer calls `ensureDbUser()` internally — callers handle DB setup explicitly
-### Fixed
 
-- Waitlist re-submission no longer silently downgrades approved users — `upsertUserAsPending` is now guarded behind `existing.status === 'new'`, preventing approved users from being locked out if they re-hit the waitlist endpoint via stale bookmark or direct API call
-- Added regression test for waitlist status downgrade protection
-
-## [26.4.27] - 2026-03-20
+## [26.4.28] - 2026-03-20
 
 ### Fixed
 
