@@ -65,10 +65,12 @@ BEGIN
     updated_at = now()
   RETURNING id INTO v_user_id;
 
+  -- Only select claimed profiles to match backfill behavior.
+  -- Unclaimed (ingested) profiles should not become the active profile.
   SELECT id INTO v_profile_id
   FROM creator_profiles
-  WHERE user_id = v_user_id
-  ORDER BY is_claimed DESC, created_at ASC
+  WHERE user_id = v_user_id AND is_claimed = true
+  ORDER BY created_at ASC
   LIMIT 1;
 
   IF v_profile_id IS NOT NULL THEN
