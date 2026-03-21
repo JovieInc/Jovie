@@ -1,6 +1,7 @@
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { PageToolbar } from '@/components/organisms/table';
+import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 
 const AUDIENCE_LOADING_TAB_KEYS = ['all', 'identified', 'anonymous'] as const;
 const AUDIENCE_TABLE_HEADER_KEYS = Array.from(
@@ -97,7 +98,7 @@ export function AudienceTableLoadingShell() {
                     <li
                       key={rowKey}
                       className='grid grid-cols-7 items-center gap-4 border-b border-subtle px-4 last:border-b-0'
-                      style={{ height: '44px' }}
+                      style={{ height: `${TABLE_ROW_HEIGHTS.STANDARD + 4}px` }}
                       aria-hidden='true'
                     >
                       {AUDIENCE_TABLE_COL_KEYS.map(colKey => (
