@@ -43,6 +43,28 @@ describe('sanitizeRedirectUrl', () => {
       expect(sanitizeRedirectUrl('//evil.com/path')).toBeNull();
     });
 
+    it('should reject backslash-based bypass attempts', () => {
+      // Some browsers normalize \ to /, turning /\evil.com into //evil.com
+      expect(sanitizeRedirectUrl('/\\evil.com')).toBeNull();
+      expect(sanitizeRedirectUrl('/\\evil.com/path')).toBeNull();
+      expect(sanitizeRedirectUrl('/path\\to\\evil')).toBeNull();
+    });
+
+    it('should reject URL-encoded backslash bypass attempts', () => {
+      // %5C/%5c = encoded backslash (case-insensitive)
+      expect(sanitizeRedirectUrl('/%5Cevil.com')).toBeNull();
+      expect(sanitizeRedirectUrl('/%5cevil.com')).toBeNull();
+    });
+
+    it('should reject encoded protocol-relative URL bypass', () => {
+      // /%2F decodes to //, which is a protocol-relative redirect
+      expect(sanitizeRedirectUrl('/%2Fevil.com')).toBeNull();
+    });
+
+    it('should reject malformed percent-encoding', () => {
+      expect(sanitizeRedirectUrl('/%ZZbad')).toBeNull();
+    });
+
     it('should reject absolute URLs', () => {
       expect(sanitizeRedirectUrl('https://evil.com')).toBeNull();
       expect(sanitizeRedirectUrl('http://evil.com/path')).toBeNull();
@@ -92,6 +114,14 @@ describe('sanitizeRedirectUrl', () => {
   });
 
   describe('edge cases', () => {
+    it('should preserve URLs with encoded percent signs (%25)', () => {
+      // %25 = encoded %, common in query params with special characters
+      expect(sanitizeRedirectUrl('/search?q=100%25free')).toBe(
+        '/search?q=100%25free'
+      );
+      expect(sanitizeRedirectUrl('/promo/100%25')).toBe('/promo/100%25');
+    });
+
     it('should handle paths with special characters', () => {
       expect(sanitizeRedirectUrl('/user/@username')).toBe('/user/@username');
       expect(sanitizeRedirectUrl('/search?q=hello%20world')).toBe(
