@@ -325,123 +325,110 @@ async function fetchDashboardCoreWithSession(
 
         const selected = selectDashboardProfile(creatorData);
 
-        // Fetch settings, link counts, and tipping stats in parallel.
-        // These are independent reads within the same transaction — running
-        // them concurrently reduces wall-clock time by ~60% and avoids
-        // connection pool starvation under high-concurrency traffic.
-        const [settingsResult, linkCountsResult, tippingStatsResult] =
-          await Promise.allSettled([
-            dashboardQuery(
-              () =>
-                tx
-                  .select()
-                  .from(userSettings)
-                  .where(eq(userSettings.userId, userData.id))
-                  .limit(1),
-              'User settings query'
-            )
-              .then(
-                result =>
-                  result?.[0] as { sidebarCollapsed: boolean } | undefined
-              )
-              .catch((error: unknown) => {
-                const migrationResult = handleMigrationErrors(error, {
-                  userId: userData.id,
-                  operation: 'user_settings',
-                });
+        // Fetch settings, link counts, and tipping stats sequentially.
+        // These share a single transaction connection (pg serializes queries
+        // on one connection), so parallel dispatch would just queue them
+        // while starting all timeout timers simultaneously — making
+        // timeouts more likely, not less.
+        const settings = await dashboardQuery(
+          () =>
+            tx
+              .select()
+              .from(userSettings)
+              .where(eq(userSettings.userId, userData.id))
+              .limit(1),
+          'User settings query'
+        )
+          .then(
+            result => result?.[0] as { sidebarCollapsed: boolean } | undefined
+          )
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'user_settings',
+            });
 
-                if (!migrationResult.shouldRetry) {
-                  return migrationResult.fallbackData as
-                    | { sidebarCollapsed: boolean }
-                    | undefined;
-                }
+            if (!migrationResult.shouldRetry) {
+              return migrationResult.fallbackData as
+                | { sidebarCollapsed: boolean }
+                | undefined;
+            }
 
-                Sentry.captureException(error, {
-                  level: 'warning',
-                  tags: {
-                    query: 'user_settings',
-                    context: 'dashboard_data_settled',
-                  },
-                });
-                return undefined;
-              }),
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'user_settings',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return undefined;
+          });
 
-            // Optimized existence query for link booleans.
-            // Aggregate counts are scoped to the selected profile's active links.
-            dashboardQuery(
-              () =>
-                tx
-                  .select({
-                    hasLinks: drizzleSql<boolean>`
-                    exists (
-                      select 1
-                      from ${socialLinks}
-                      where ${and(
-                        eq(socialLinks.creatorProfileId, selected.id),
-                        eq(socialLinks.state, 'active'),
-                        eq(socialLinks.isActive, true)
-                      )}
+        // Optimized existence query for link booleans.
+        // Aggregate counts are scoped to the selected profile's active links.
+        const linkCounts = await dashboardQuery(
+          () =>
+            tx
+              .select({
+                hasLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true)
+                  )}
+                )
+              `,
+                hasMusicLinks: drizzleSql<boolean>`
+                exists (
+                  select 1
+                  from ${socialLinks}
+                  where ${and(
+                    eq(socialLinks.creatorProfileId, selected.id),
+                    eq(socialLinks.state, 'active'),
+                    eq(socialLinks.isActive, true),
+                    or(
+                      eq(socialLinks.platformType, 'dsp'),
+                      eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
                     )
-                  `,
-                    hasMusicLinks: drizzleSql<boolean>`
-                    exists (
-                      select 1
-                      from ${socialLinks}
-                      where ${and(
-                        eq(socialLinks.creatorProfileId, selected.id),
-                        eq(socialLinks.state, 'active'),
-                        eq(socialLinks.isActive, true),
-                        or(
-                          eq(socialLinks.platformType, 'dsp'),
-                          eq(socialLinks.platform, sqlAny(DSP_PLATFORMS))
-                        )
-                      )}
-                    )
-                  `,
-                  })
-                  .from(users)
-                  .where(eq(users.id, userData.id))
-                  .limit(1),
-              'Social links existence query'
-            )
-              .then(result => {
-                return mapSocialLinkExistence(result?.[0]);
+                  )}
+                )
+              `,
               })
-              .catch((error: unknown) => {
-                const migrationResult = handleMigrationErrors(error, {
-                  userId: userData.id,
-                  operation: 'social_links_existence',
-                });
+              .from(users)
+              .where(eq(users.id, userData.id))
+              .limit(1),
+          'Social links existence query'
+        )
+          .then(result => {
+            return mapSocialLinkExistence(result?.[0]);
+          })
+          .catch((error: unknown) => {
+            const migrationResult = handleMigrationErrors(error, {
+              userId: userData.id,
+              operation: 'social_links_existence',
+            });
 
-                if (!migrationResult.shouldRetry) {
-                  return { hasLinks: false, hasMusicLinks: false };
-                }
+            if (!migrationResult.shouldRetry) {
+              return { hasLinks: false, hasMusicLinks: false };
+            }
 
-                Sentry.captureException(error, {
-                  level: 'warning',
-                  tags: {
-                    query: 'social_links_existence',
-                    context: 'dashboard_data_settled',
-                  },
-                });
-                return { hasLinks: false, hasMusicLinks: false };
-              }),
+            Sentry.captureException(error, {
+              level: 'warning',
+              tags: {
+                query: 'social_links_existence',
+                context: 'dashboard_data_settled',
+              },
+            });
+            return { hasLinks: false, hasMusicLinks: false };
+          });
 
-            fetchTippingStatsWithSession(tx, selected.id),
-          ]);
-
-        const settings =
-          settingsResult.status === 'fulfilled'
-            ? settingsResult.value
-            : undefined;
-        const linkCounts =
-          linkCountsResult.status === 'fulfilled'
-            ? linkCountsResult.value
-            : { hasLinks: false, hasMusicLinks: false };
-        const tippingStats =
-          tippingStatsResult.status === 'fulfilled'
-            ? tippingStatsResult.value
-            : createEmptyTippingStats();
+        const tippingStats = await fetchTippingStatsWithSession(
+          tx,
+          selected.id
+        );
 
         const hasLinks = linkCounts.hasLinks;
         const hasMusicLinks = linkCounts.hasMusicLinks;
