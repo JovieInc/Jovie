@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockStripePaymentIntentsCreate = vi.hoisted(() => vi.fn());
 const mockAuth = vi.hoisted(() => vi.fn());
+const mockSelect = vi.hoisted(() => vi.fn());
 
 vi.mock('stripe', () => {
   const Stripe = vi.fn().mockImplementation(function (this: unknown) {
@@ -26,6 +27,27 @@ vi.mock('@/lib/rate-limit', () => ({
     limit: vi.fn().mockResolvedValue({ success: true }),
   },
   createRateLimitHeaders: vi.fn().mockReturnValue({}),
+}));
+
+// Mock database
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([{ id: 'profile-123', isPublic: true }]),
+        }),
+      }),
+    }),
+  },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: {
+    id: 'id',
+    usernameNormalized: 'username_normalized',
+    isPublic: 'is_public',
+  },
 }));
 
 // Mock stripe client module
@@ -121,5 +143,56 @@ describe('POST /api/create-tip-intent', () => {
     expect(response.status).toBe(200);
     expect(data.clientSecret).toBeDefined();
     expect(mockStripePaymentIntentsCreate).toHaveBeenCalledTimes(1);
+
+    // Verify profile_id (not plaintext handle) is stored in Stripe metadata
+    const metadata = mockStripePaymentIntentsCreate.mock.calls[0][0].metadata;
+    expect(metadata.profile_id).toBe('profile-123');
+    expect(metadata.handle).toBeUndefined();
+    expect(metadata.handle_hash).toBeDefined();
+  });
+
+  it('returns 404 when artist profile is not public', async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () =>
+            Promise.resolve([{ id: 'profile-123', isPublic: false }]),
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost/api/create-tip-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 500,
+        handle: 'hiddenartist',
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 404 when artist profile does not exist', async () => {
+    mockSelect.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve([]),
+        }),
+      }),
+    });
+
+    const request = new NextRequest('http://localhost/api/create-tip-intent', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        amount: 500,
+        handle: 'nonexistent',
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(404);
   });
 });
