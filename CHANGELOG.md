@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.30] - 2026-03-20
+
+### Changed
+
+- Upgraded Clerk SDK to v7 (Core 3): `@clerk/nextjs` 6.36.7→7.0.6, `@clerk/backend` ^2.32→^3.2, `@clerk/clerk-js` ^5.121→^6.3, `@clerk/testing` ^1.13→^2.0
+- Replaced removed `SignedIn`/`SignedOut` components with new `Show` component (`when="signed-in"` / `when="signed-out"`)
+- Migrated `useSignIn` and `useSignUp` hooks to `@clerk/nextjs/legacy` import path (v7 moved these to a signal-based API; legacy maintains the imperative `{ signIn, setActive, isLoaded }` shape)
+- Updated test mocks to match v7 exports
+
 ## [26.4.29] - 2026-03-20
 
 ### Added
