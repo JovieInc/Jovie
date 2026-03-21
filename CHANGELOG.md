@@ -16,11 +16,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Deterministic backfill query uses correlated subquery with `ORDER BY created_at ASC LIMIT 1` to handle multi-profile users
 - Stored function prefers claimed profiles over unclaimed ones when selecting existing profile
 - Fix migration journal timestamp ordering so new migration runs after existing ones on all environments
+- Waitlist re-submission no longer silently downgrades approved users — `upsertUserAsPending` is now guarded behind `existing.status === 'new'`, preventing approved users from being locked out if they re-hit the waitlist endpoint via stale bookmark or direct API call
+- Added regression test for waitlist status downgrade protection
 
 ## [26.4.27] - 2026-03-20
 
 ### Fixed
 
+- Hardened redirect URL sanitization against backslash and encoded bypass attacks (e.g., `%5C`, `%2F`)
+- Availability check on signup page now shows error message instead of silently disappearing on network failure
+- Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
+- Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments
+- Pixel settings API no longer fetches actual token values from database — uses SQL-level `IS NOT NULL` booleans instead
 - Google OAuth sign-up now shows a clear error message when the account already exists, instead of silently redirecting back to the sign-up page
 - OAuth callback handler uses imperative Clerk API for proper error classification (account exists, access denied, unknown)
 - Sign-up form displays specific error messages with "Sign in instead" link for existing account errors
