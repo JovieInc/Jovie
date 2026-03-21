@@ -81,6 +81,15 @@ export const LINKTREE_VERIFICATION_PATTERNS = [
 ];
 
 /**
+ * Known platform-owned pixel IDs (not creator-owned).
+ * Seeded manually, auto-refreshed by ingestion batch suppression query.
+ * These are filtered out at read-time, not during detection.
+ */
+export const SUPPRESSED_PIXEL_IDS = new Set<string>([
+  // TODO: Populate by checking view-source on a few Linktree profiles
+]);
+
+/**
  * Regex to extract href attributes from HTML.
  */
 export const HREF_REGEX = /href\s*=\s*["']([^"'#]+)["']/gi;

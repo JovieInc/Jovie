@@ -22,7 +22,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
   }
 
   return (
-    <div className='flex h-full min-h-0 flex-row'>
+    <div className='flex h-full min-h-0 flex-row bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'>
       {/* Main content */}
       <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
         <DspPresenceSummary
@@ -30,7 +30,7 @@ export function DspPresenceView({ data }: DspPresenceViewProps) {
           suggestedCount={data.suggestedCount}
         />
 
-        <div className='flex-1 min-h-0 overflow-y-auto px-2.5 py-2.5 lg:px-3 lg:py-3'>
+        <div className='flex-1 min-h-0 overflow-y-auto px-3.5 pb-3.5 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3'>
           <div className='grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3'>
             {data.items.map(item => (
               <DspPresenceCard

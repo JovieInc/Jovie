@@ -281,6 +281,12 @@ async function executeWithCircuitBreaker<T>(fn: () => Promise<T>): Promise<T> {
 export async function getSpotifyArtistProfile(
   artistId: string
 ): Promise<SpotifyArtistProfile | null> {
+  // Block enrichment for blacklisted artists (e.g., wrong Tim White profiles)
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  if (isBlacklistedSpotifyId(artistId)) {
+    return null;
+  }
+
   const spotifyUrl = `${SPOTIFY_API_BASE}/artists/${artistId}`;
   return Sentry.startSpan(
     {
@@ -339,7 +345,10 @@ export async function getSpotifyArtistProfile(
 export async function getSpotifyArtists(
   artistIds: string[]
 ): Promise<SpotifyArtistProfile[]> {
-  if (artistIds.length === 0) {
+  // Filter out blacklisted Spotify artist IDs before batch fetch
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  const filteredIds = artistIds.filter(id => !isBlacklistedSpotifyId(id));
+  if (filteredIds.length === 0) {
     return [];
   }
 
@@ -347,14 +356,14 @@ export async function getSpotifyArtists(
     {
       op: 'music.fetch',
       name: 'Spotify: batch get artists',
-      attributes: { 'artists.count': artistIds.length },
+      attributes: { 'artists.count': filteredIds.length },
     },
     async span => {
       Sentry.addBreadcrumb({
         category: 'music.fetch',
         message: `Fetching Spotify artists batch`,
         data: {
-          artistCount: artistIds.length,
+          artistCount: filteredIds.length,
           timestamp: new Date().toISOString(),
         },
         level: 'info',
@@ -362,8 +371,8 @@ export async function getSpotifyArtists(
 
       // Spotify allows max 50 artists per request
       const chunks: string[][] = [];
-      for (let i = 0; i < artistIds.length; i += 50) {
-        chunks.push(artistIds.slice(i, i + 50));
+      for (let i = 0; i < filteredIds.length; i += 50) {
+        chunks.push(filteredIds.slice(i, i + 50));
       }
 
       const allArtists: SpotifyArtistProfile[] = [];

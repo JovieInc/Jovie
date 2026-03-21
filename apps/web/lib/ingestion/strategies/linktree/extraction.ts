@@ -30,6 +30,7 @@ import {
   detectLinktreePaidTier,
   detectLinktreeVerification,
 } from './paid-tier';
+import { detectTrackingPixels } from './tracking-pixels';
 
 /**
  * Schemes that should be blocked for security and relevance.
@@ -183,6 +184,9 @@ export function extractLinktree(html: string): ExtractionResult {
   // Detect verification badge (stronger paid signal)
   const isLinktreeVerified = detectLinktreeVerification(html, nextData);
 
+  // Detect tracking pixels (Facebook, TikTok, Google)
+  const discoveredPixels = detectTrackingPixels(html);
+
   // Extract bio/description from Next.js data (using type assertions for optional fields)
   const pageProps = nextData?.props?.pageProps as
     | {
@@ -215,12 +219,13 @@ export function extractLinktree(html: string): ExtractionResult {
     hasPaidTier
   );
 
-  // Add bio, contact email, and verification to result
+  // Add bio, contact email, verification, and discovered pixels to result
   return {
     ...result,
     sourcePlatform: 'linktree',
     bio,
     contactEmail,
     isLinktreeVerified,
+    discoveredPixels,
   };
 }

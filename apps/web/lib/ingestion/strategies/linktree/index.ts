@@ -9,7 +9,7 @@
 export { ExtractionError } from '../base';
 
 // Re-export configuration
-export { LINKTREE_CONFIG, SKIP_HOSTS } from './config';
+export { LINKTREE_CONFIG, SKIP_HOSTS, SUPPRESSED_PIXEL_IDS } from './config';
 
 // Re-export extraction function
 export { extractLinktree } from './extraction';
@@ -22,6 +22,13 @@ export {
   detectLinktreePaidTier,
   detectLinktreeVerification,
 } from './paid-tier';
+
+// Re-export tracking pixel detection
+export {
+  detectTrackingPixels,
+  getCreatorOwnedPixels,
+  mergeDiscoveredPixels,
+} from './tracking-pixels';
 
 // Re-export validation functions
 export {
