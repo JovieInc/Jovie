@@ -8,6 +8,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.32] - 2026-03-21
 
+### Added
+
+- Knowledge-aware AI chat — keyword router selects relevant music industry topics and injects them into the system prompt for accurate, specific advice
+- `lib/chat/knowledge/topics.ts` — topic registry that loads distilled knowledge docs at cold start
+- `lib/chat/knowledge/router.ts` — keyword-based topic selection (top 2 matches per message, min score threshold)
+
 ### Changed
 
 - Upgraded Clerk SDK to v7 (Core 3): `@clerk/nextjs` 6.36.7→7.0.6, `@clerk/backend` ^2.32→^3.2, `@clerk/clerk-js` ^5.121→^6.3, `@clerk/testing` ^1.13→^2.0
