@@ -61,6 +61,29 @@ describe('buildContentSecurityPolicy', () => {
     expect(frameSrc).not.toContain('https://vercel.live');
   });
 
+  it('includes Sentry regional ingest wildcard in connect-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('https://*.ingest.sentry.io');
+    expect(connectSrc).toContain('https://*.ingest.us.sentry.io');
+  });
+
+  it('includes vercel analytics inline script hash in script-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const scriptSrc = findDirective(csp, 'script-src');
+
+    expect(scriptSrc).toContain(
+      "'sha256-k844ZRfHq5VBCg5bFxVtnBCvPUU7TVV7m1sDHs/cJXk='"
+    );
+  });
+
   it('does not include report directives in enforcing CSP', () => {
     const csp = buildContentSecurityPolicy({ nonce: 'test-nonce' });
 

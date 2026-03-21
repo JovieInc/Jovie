@@ -7,6 +7,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
 ## [26.4.30] - 2026-03-21
+## [26.4.30] - 2026-03-20
+
+### Fixed
+
+- CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
+- CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
+- Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
+
+### Added
+
+- Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
+- Unit test for Statsig warn-once behavior
+
+## [26.4.29] - 2026-03-20
 
 > The changelog is now customer-friendly — no more developer jargon on the public page, RSS feed, or emails.
 

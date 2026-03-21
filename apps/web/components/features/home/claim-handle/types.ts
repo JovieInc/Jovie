@@ -1,6 +1,6 @@
 export interface ClaimHandleFormProps {
   readonly onHandleChange?: (handle: string) => void;
-  readonly size?: 'default' | 'hero';
+  readonly size?: 'default' | 'hero' | 'display';
 }
 
 export interface HandleAvailabilityState {

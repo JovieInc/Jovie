@@ -1,15 +1,16 @@
 import type { Metadata } from 'next';
+import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { AiDemo } from '@/features/home/AiDemo';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
+import { PhoneProfileDemo } from '@/features/home/PhoneProfileDemo';
 import { PricingSection } from '@/features/home/PricingSection';
-import { RecentlyShippedSection } from '@/features/home/RecentlyShippedSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { SeeItInAction } from '@/features/home/SeeItInAction';
-import { TestimonialsSection } from '@/features/home/TestimonialsSection';
+import { ValuePropsSection } from '@/features/home/ValuePropsSection';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -23,7 +24,7 @@ export const revalidate = false;
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} | Release More Music.`;
   const description =
-    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.';
+    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.';
   const keywords = [
     'smart link in bio',
     'link in bio for musicians',
@@ -138,24 +139,56 @@ export async function generateMetadata(): Promise<Metadata> {
 const WEBSITE_SCHEMA = buildWebsiteSchema({
   alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
   description:
-    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.',
+    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Release More Music. Connect Spotify once — Jovie creates smart links, notifies fans, and builds your audience automatically.'
+  'Release more music with smart links, audience intelligence, paid release notifications, and AI support built for independent musicians.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Connect Spotify once. Jovie imports your discography, creates smart links for every release, and notifies your fans automatically — forever. No Linktree. No Mailchimp. No manual work.',
+    'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
 });
+
+function AiSupportSection() {
+  return (
+    <section className='section-spacing-linear relative overflow-hidden bg-page'>
+      <Container size='homepage'>
+        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
+          <div className='grid section-gap-linear lg:grid-cols-[0.9fr_1.1fr] lg:items-center'>
+            <div className='reveal-on-scroll'>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token'>
+                AI assistant
+              </span>
+              <h2 className='mt-5 max-w-[10ch] marketing-h2-linear text-primary-token'>
+                AI that knows your work.
+              </h2>
+              <p className='mt-4 max-w-xl marketing-lead-linear text-secondary-token'>
+                No gimmicks. Just an assistant grounded in your catalog, ready
+                to help with the business side of music when it is time to
+                write, plan, or launch.
+              </p>
+            </div>
+
+            <div className='reveal-on-scroll' data-delay='80'>
+              <div className='overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card'>
+                <AiDemo />
+              </div>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
 
 export default function HomePage() {
   return (
     <div
-      className='relative min-h-screen'
+      className='jovie-homepage-marketing relative min-h-screen'
       style={{
         backgroundColor: 'var(--linear-bg-footer)',
         color: 'var(--linear-text-primary)',
@@ -174,61 +207,17 @@ export default function HomePage() {
 
       <LogoBar />
 
+      <ReleasesSection />
+
+      <ValuePropsSection />
+
+      <PhoneProfileDemo />
+
+      <AiSupportSection />
+
       <AudienceCRMSection />
 
-      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
-        <hr
-          className='mx-auto max-w-lg border-0 h-px'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-          }}
-        />
-      )}
-
-      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
-        <ReleasesSection />
-      )}
-
-      {process.env.NEXT_PUBLIC_SHOW_RELEASES_SECTION === 'true' && (
-        <hr
-          className='mx-auto max-w-lg border-0 h-px'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-          }}
-        />
-      )}
-
       <PricingSection />
-
-      {process.env.NEXT_PUBLIC_SHOW_TESTIMONIALS === 'true' && (
-        <>
-          <hr
-            className='mx-auto max-w-lg border-0 h-px'
-            style={{
-              background:
-                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-            }}
-          />
-          <TestimonialsSection />
-        </>
-      )}
-
-      {process.env.NEXT_PUBLIC_SHOW_RECENTLY_SHIPPED === 'true' && (
-        <>
-          <hr
-            className='mx-auto max-w-lg border-0 h-px'
-            style={{
-              background:
-                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-            }}
-          />
-          <RecentlyShippedSection />
-        </>
-      )}
-
-      <SeeItInAction />
 
       <FinalCTASection />
     </div>
