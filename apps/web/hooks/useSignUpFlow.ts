@@ -5,7 +5,7 @@
  * Uses shared base logic from useAuthFlowBase.
  */
 
-import { useSignUp } from '@clerk/nextjs/legacy';
+import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';

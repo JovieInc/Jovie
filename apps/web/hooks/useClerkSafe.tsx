@@ -3,9 +3,9 @@
 import {
   useAuth as useAuthOriginal,
   useSession as useSessionOriginal,
+  useSignIn as useSignInOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
-import { useSignIn as useSignInOriginal } from '@clerk/nextjs/legacy';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 
 // Derive types from the actual hook return types
