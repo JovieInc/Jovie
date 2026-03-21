@@ -16,6 +16,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Deterministic backfill query uses correlated subquery with `ORDER BY created_at ASC LIMIT 1` to handle multi-profile users
 - Stored function prefers claimed profiles over unclaimed ones when selecting existing profile
 - Fix migration journal timestamp ordering so new migration runs after existing ones on all environments
+
 ## [26.4.27] - 2026-03-20
 
 ### Fixed
