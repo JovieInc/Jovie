@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.30] - 2026-03-21
+
+### Fixed
+
+- Set `active_profile_id` in all onboarding claim paths — `createProfileForExistingUser`, `updateExistingProfile`, and waitlist approval now update `users.active_profile_id`
+- Restrict stored function profile lookup to claimed profiles only (`is_claimed = true`), matching backfill behavior
+
 ## [26.4.29] - 2026-03-21
 
 ### Fixed
