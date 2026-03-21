@@ -1,21 +1,36 @@
 'use client';
 
 import { Button, type CommonDropdownItem } from '@jovie/ui';
-import { Copy, Download, ExternalLink, QrCode } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import {
+  Check,
+  Copy,
+  Download,
+  ExternalLink,
+  Loader2,
+  QrCode,
+} from 'lucide-react';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
   usePreviewPanelData,
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
-import { DrawerHeader } from '@/components/molecules/drawer';
+import {
+  DrawerButton,
+  DrawerEmptyState,
+  DrawerHeader,
+} from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { getQrCodeUrl } from '@/components/molecules/QRCode';
 import { RightDrawer } from '@/components/organisms/RightDrawer';
 import { BASE_URL } from '@/constants/domains';
+import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfilePreview } from '@/features/dashboard/molecules/ProfilePreview';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useQrCodeDownloadMutation } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 
 export const PREVIEW_PANEL_WIDTH = 360;
 
@@ -34,6 +49,18 @@ export function PreviewPanel() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData } = usePreviewPanelData();
   const qrCodeDownload = useQrCodeDownloadMutation();
+  const [isUrlCopied, setIsUrlCopied] = useState(false);
+  const copyResetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const profileUrl = useMemo(() => {
     if (!previewData) return '';
@@ -43,6 +70,14 @@ export function PreviewPanel() {
   const handleCopyUrl = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(profileUrl);
+      setIsUrlCopied(true);
+      if (copyResetTimeoutRef.current) {
+        clearTimeout(copyResetTimeoutRef.current);
+      }
+      copyResetTimeoutRef.current = setTimeout(
+        () => setIsUrlCopied(false),
+        2000
+      );
       toast.success('Profile URL copied');
     } catch {
       toast.error('Failed to copy');
@@ -110,25 +145,27 @@ export function PreviewPanel() {
   const primaryActions: DrawerHeaderAction[] = useMemo(
     () => [
       {
+        id: 'copy-url',
+        label: isUrlCopied ? 'Copied!' : 'Copy profile URL',
+        icon: Copy,
+        activeIcon: Check,
+        isActive: isUrlCopied,
+        onClick: () => {
+          void handleCopyUrl();
+        },
+      },
+      {
         id: 'open',
         label: 'Open profile in new tab',
         icon: ExternalLink,
         href: profileUrl,
       },
     ],
-    [profileUrl]
+    [handleCopyUrl, isUrlCopied, profileUrl]
   );
 
   const overflowActions: DrawerHeaderAction[] = useMemo(
     () => [
-      {
-        id: 'copy-url',
-        label: 'Copy Jovie Profile URL',
-        icon: Copy,
-        onClick: () => {
-          handleCopyUrl();
-        },
-      },
       {
         id: 'download-qr',
         label: 'Download QR Code',
@@ -144,15 +181,114 @@ export function PreviewPanel() {
         onClick: handleDownloadVcard,
       },
     ],
-    [handleCopyUrl, handleDownloadQr, handleDownloadVcard]
+    [handleDownloadQr, handleDownloadVcard]
   );
 
-  // Don't render anything until we have preview data
   if (!previewData) {
-    return null;
+    return (
+      <RightDrawer
+        isOpen={isOpen}
+        width={PREVIEW_PANEL_WIDTH}
+        ariaLabel='Live Preview'
+      >
+        <div className='flex h-full flex-col'>
+          <DrawerHeader
+            title='Live preview'
+            actions={
+              <DrawerHeaderActions
+                primaryActions={[]}
+                overflowActions={[]}
+                onClose={close}
+              />
+            }
+          />
+
+          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
+            <div className='space-y-3 pb-5'>
+              <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+                <div className='space-y-0.5'>
+                  <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                    Live preview
+                  </p>
+                  <p className='text-xs text-secondary-token'>
+                    This drawer will populate as soon as the profile preview
+                    state hydrates.
+                  </p>
+                </div>
+
+                <DrawerEmptyState message='Loading profile preview…' />
+
+                <div className='mx-auto w-full max-w-[320px]'>
+                  <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
+                    <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
+                      <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
+                        <div className='h-2.5 w-16 rounded skeleton' />
+                        <div className='h-5 w-20 rounded-full skeleton' />
+                      </div>
+                      <div className='relative aspect-[9/19.5] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40'>
+                        <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
+                          <div className='h-1.5 w-24 rounded-full bg-black/55' />
+                        </div>
+                        <div className='flex h-full flex-col items-center justify-center gap-3 px-6'>
+                          <div className='h-16 w-16 rounded-full skeleton' />
+                          <div className='h-3 w-28 rounded skeleton' />
+                          <div className='h-3 w-40 rounded skeleton' />
+                          <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
+                          <div className='h-9 w-full rounded-[16px] skeleton' />
+                          <div className='h-9 w-full rounded-[16px] skeleton' />
+                        </div>
+                        <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
+                          <div className='h-1.5 w-28 rounded-full bg-black/55' />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </RightDrawer>
+    );
   }
 
   const { username, displayName, avatarUrl, links } = previewData;
+  const visibleLinkCount = links.filter(link => link.isVisible).length;
+  const hiddenLinkCount = links.length - visibleLinkCount;
+  const connectedDspCount = [
+    previewData.dspConnections.spotify.connected,
+    previewData.dspConnections.appleMusic.connected,
+  ].filter(Boolean).length;
+  const hasBio = (previewData.bio?.trim().length ?? 0) > 0;
+  const snapshotTags = [
+    previewData.location,
+    previewData.hometown &&
+    previewData.hometown !== previewData.location &&
+    previewData.hometown.trim().length > 0
+      ? `From ${previewData.hometown}`
+      : null,
+    ...(previewData.genres?.slice(0, 2) ?? []),
+    previewData.activeSinceYear ? `Since ${previewData.activeSinceYear}` : null,
+    hasBio ? 'Bio live' : null,
+    connectedDspCount > 0 ? `${connectedDspCount} connected` : null,
+  ].filter((value): value is string => Boolean(value));
+  const headerTitle: ReactNode = (
+    <div className='min-w-0 space-y-0.5'>
+      <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+        Live preview
+      </p>
+      <div className='flex min-w-0 items-center gap-1.5'>
+        <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+          {displayName || username || 'Profile'}
+        </span>
+        {username && displayName !== username && (
+          <span className='truncate text-[11px] text-secondary-token'>
+            @{username}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <RightDrawer
@@ -162,9 +298,8 @@ export function PreviewPanel() {
       contextMenuItems={contextMenuItems}
     >
       <div className='flex h-full flex-col'>
-        {/* Header with action buttons */}
         <DrawerHeader
-          title='Live Preview'
+          title={headerTitle}
           actions={
             <DrawerHeaderActions
               primaryActions={primaryActions}
@@ -174,40 +309,216 @@ export function PreviewPanel() {
           }
         />
 
-        {/* Preview Content */}
-        <div className='flex-1 min-h-0 overflow-y-auto p-4'>
-          <div className='flex flex-col items-center gap-4 pb-8'>
-            <div className='w-full max-w-[360px] aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-2xl border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 dark:ring-white/5 shadow-sm shadow-black/10 dark:shadow-black/40'>
-              <ProfilePreview
-                username={username}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                links={links}
-                className='h-full w-full'
-              />
+        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
+          <div className='space-y-3 pb-5'>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+              <div className='flex items-center justify-between gap-3'>
+                <div>
+                  <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                    Public profile
+                  </p>
+                  <p className='text-xs text-secondary-token'>
+                    Preview the mobile profile before you publish changes.
+                  </p>
+                </div>
+                <div className='flex items-center gap-1.5'>
+                  <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                    Mobile
+                  </div>
+                  <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                    {visibleLinkCount} live
+                  </div>
+                  {hiddenLinkCount > 0 && (
+                    <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                      {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className='mx-auto w-full max-w-[320px]'>
+                <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
+                  <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                      <span>Preview</span>
+                      <span className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px]'>
+                        {username ? `@${username}` : 'Profile'}
+                      </span>
+                    </div>
+
+                    <div className='relative aspect-[9/19.5] max-h-[740px] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40 ring-1 ring-inset ring-white/3 shadow-sm shadow-black/10 dark:ring-white/5 dark:shadow-black/40'>
+                      <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
+                        <div className='h-1.5 w-24 rounded-full bg-black/55 shadow-[0_1px_2px_rgba(255,255,255,0.08)]' />
+                      </div>
+                      <ProfilePreview
+                        username={username}
+                        displayName={displayName}
+                        avatarUrl={avatarUrl}
+                        links={links}
+                        className='h-full w-full'
+                      />
+                      <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
+                        <div className='h-1.5 w-28 rounded-full bg-black/55 shadow-[0_1px_2px_rgba(255,255,255,0.08)]' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                asChild
+                variant='primary'
+                className='h-9 w-full rounded-full text-[11px] font-medium uppercase tracking-[0.12em]'
+              >
+                <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
+                  <ExternalLink
+                    className='mr-2 h-3.5 w-3.5'
+                    aria-hidden='true'
+                  />
+                  Open profile
+                </a>
+              </Button>
+
+              <div className='grid grid-cols-3 gap-2'>
+                <DrawerButton
+                  type='button'
+                  tone='secondary'
+                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  disabled={isUrlCopied}
+                  onClick={() => {
+                    void handleCopyUrl();
+                  }}
+                >
+                  {isUrlCopied ? (
+                    <Check className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+                  ) : (
+                    <Copy className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+                  )}
+                  {isUrlCopied ? 'Copied' : 'Copy'}
+                </DrawerButton>
+                <DrawerButton
+                  type='button'
+                  tone='secondary'
+                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  disabled={qrCodeDownload.isPending}
+                  onClick={handleDownloadQr}
+                >
+                  {qrCodeDownload.isPending ? (
+                    <Loader2
+                      className='mr-1.5 h-3.5 w-3.5 animate-spin'
+                      aria-hidden='true'
+                    />
+                  ) : (
+                    <QrCode className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+                  )}
+                  {qrCodeDownload.isPending ? 'Saving' : 'QR'}
+                </DrawerButton>
+                <DrawerButton
+                  type='button'
+                  tone='secondary'
+                  className='h-8 rounded-[12px] px-2 text-[11px]'
+                  onClick={handleDownloadVcard}
+                >
+                  <Download className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
+                  vCard
+                </DrawerButton>
+              </div>
             </div>
 
-            {/* Hero CTA - View Jovie Profile */}
-            <Button asChild variant='primary' className='w-full max-w-[360px]'>
-              <a href={profileUrl} target='_blank' rel='noopener noreferrer'>
-                <ExternalLink className='h-3.5 w-3.5 mr-2' aria-hidden='true' />
-                View Jovie Profile
-              </a>
-            </Button>
-          </div>
-        </div>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
+              <div className='space-y-0.5'>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  Share link
+                </p>
+                <p className='text-xs text-secondary-token'>
+                  Copy the public URL or open it in a new tab.
+                </p>
+              </div>
 
-        {/* Footer - URL Preview */}
-        <div className='shrink-0 border-t border-subtle p-4'>
-          <h3 className='text-[13px] font-medium text-primary-token mb-2'>
-            Your Profile URL
-          </h3>
-          <div className='rounded-lg border border-subtle bg-surface-1/40 px-3 py-2 text-[12px] text-primary-token font-sans truncate'>
-            {profileUrl || 'Loading...'}
+              <div className='flex items-center gap-1.5'>
+                <CopyLinkInput
+                  url={profileUrl}
+                  size='md'
+                  className='flex-1'
+                  inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                />
+                <button
+                  type='button'
+                  className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  onClick={() =>
+                    globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
+                  }
+                  aria-label='Open public profile'
+                >
+                  <ExternalLink className='h-3 w-3' aria-hidden='true' />
+                </button>
+              </div>
+
+              <p className='text-[11px] text-tertiary-token'>
+                Visitors will land on the published mobile profile shown above.
+              </p>
+            </div>
+
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
+              <div className='space-y-0.5'>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  Profile snapshot
+                </p>
+                <p className='text-xs text-secondary-token'>
+                  A quick read on what the public profile is currently showing.
+                </p>
+              </div>
+
+              <p className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
+                {visibleLinkCount} visible link
+                {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
+                profile
+                {hiddenLinkCount > 0
+                  ? `, with ${hiddenLinkCount} draft${
+                      hiddenLinkCount === 1 ? '' : 's'
+                    } still hidden from visitors.`
+                  : '.'}
+              </p>
+
+              <div className='grid grid-cols-3 gap-2'>
+                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                    Visible
+                  </p>
+                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                    {visibleLinkCount}
+                  </p>
+                </div>
+                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                    Hidden
+                  </p>
+                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                    {hiddenLinkCount}
+                  </p>
+                </div>
+                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                    DSPs
+                  </p>
+                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                    {connectedDspCount}
+                  </p>
+                </div>
+              </div>
+
+              <div className='flex flex-wrap gap-1.5'>
+                {snapshotTags.map(tag => (
+                  <span
+                    key={tag}
+                    className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
-          <p className='mt-2 text-xs text-secondary-token'>
-            Share this link with your audience
-          </p>
         </div>
       </div>
     </RightDrawer>

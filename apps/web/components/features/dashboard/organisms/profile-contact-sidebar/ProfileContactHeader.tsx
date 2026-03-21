@@ -119,7 +119,7 @@ export function ProfileContactHeader({
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
 
   return (
-    <div className='flex items-center gap-3.5'>
+    <div className='flex items-center gap-4'>
       <ProfileAvatar
         editable={editable}
         avatarUrl={avatarUrl}
@@ -128,8 +128,7 @@ export function ProfileContactHeader({
         onAvatarUpload={onAvatarUpload}
       />
 
-      {/* Name and username */}
-      <div className='min-w-0 flex-1 space-y-0.5'>
+      <div className='min-w-0 flex-1 space-y-1'>
         <EditableDisplayName
           editable={editable}
           isEditing={editingField === 'displayName'}
@@ -141,16 +140,18 @@ export function ProfileContactHeader({
           onStartEdit={() => setEditingField('displayName')}
         />
 
-        <EditableUsername
-          editable={editable && Boolean(onUsernameChange)}
-          isEditing={editingField === 'username'}
-          inputRef={usernameRef}
-          value={localUsername}
-          onChange={setLocalUsername}
-          onKeyDown={handleUsernameKeyDown}
-          onBlur={handleUsernameBlur}
-          onStartEdit={() => setEditingField('username')}
-        />
+        <div className='flex flex-wrap items-center gap-2'>
+          <EditableUsername
+            editable={editable && Boolean(onUsernameChange)}
+            isEditing={editingField === 'username'}
+            inputRef={usernameRef}
+            value={localUsername}
+            onChange={setLocalUsername}
+            onKeyDown={handleUsernameKeyDown}
+            onBlur={handleUsernameBlur}
+            onStartEdit={() => setEditingField('username')}
+          />
+        </div>
       </div>
     </div>
   );
@@ -227,7 +228,7 @@ function EditableDisplayName({
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-8 px-1.5 text-[14px] font-[560]'
+        className='h-8 rounded-[12px] border-subtle bg-surface-2/80 px-2.5 text-[14px] font-[560]'
       />
     );
   }
@@ -236,9 +237,9 @@ function EditableDisplayName({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-[14px] font-[560] tracking-[-0.012em] text-primary-token',
+        'block w-full truncate text-left text-[15px] font-[560] tracking-[-0.016em] text-primary-token',
         editable &&
-          'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
+          '-mx-1 rounded-[10px] px-1 py-0.5 transition-colors hover:bg-surface-2/80 cursor-text'
       )}
       onClick={editable ? onStartEdit : undefined}
       disabled={!editable}
@@ -283,7 +284,7 @@ function EditableUsername({
         }}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='mt-0.5 h-6 px-1.5 text-[12px]'
+        className='h-7 rounded-full border-subtle bg-surface-2/80 px-2.5 text-[11px]'
       />
     );
   }
@@ -292,9 +293,9 @@ function EditableUsername({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-[12px] text-tertiary-token',
+        'inline-flex max-w-full items-center truncate rounded-full border border-subtle bg-surface-2/70 px-2.5 py-1 text-[11px] font-medium text-secondary-token',
         editable &&
-          'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
+          'transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token cursor-text'
       )}
       onClick={editable ? onStartEdit : undefined}
       disabled={!editable}

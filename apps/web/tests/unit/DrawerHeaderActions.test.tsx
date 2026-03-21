@@ -56,7 +56,7 @@ describe('DrawerHeaderActions', () => {
     expect(tableActionMenuSpy).toHaveBeenCalledTimes(1);
     expect(tableActionMenuSpy).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'copy', label: 'Copy profile link' }),
-      expect.objectContaining({ id: 'separator' }),
+      expect.objectContaining({ id: 'separator-close' }),
       expect.objectContaining({ id: 'close-drawer', label: 'Close' }),
     ]);
   });
