@@ -9,6 +9,7 @@ import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { cn } from '@/lib/utils';
 import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerHeader } from './DrawerHeader';
+import { DrawerSurfaceCard } from './DrawerSurfaceCard';
 
 export interface EntitySidebarShellProps {
   /** Whether the sidebar drawer is open */
@@ -100,71 +101,66 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col'>
-        <div
-          className={cn(
-            LINEAR_SURFACE.stickyHeader,
-            'sticky top-0 z-20 shrink-0 border-b backdrop-blur-[12px]'
-          )}
-        >
-          {/* Header bar — close is in the overflow dropdown */}
-          <DrawerHeader
-            title={title}
-            actions={
-              headerActions ??
-              (onClose ? (
-                <DrawerHeaderActions
-                  primaryActions={[]}
-                  overflowActions={[]}
-                  onClose={onClose}
-                />
-              ) : undefined)
-            }
-          />
-
-          {/* Entity header — image + name area */}
-          {entityHeader && (
-            <div className='overflow-visible px-4 pt-3 pb-2.5'>
-              {entityHeader}
-            </div>
-          )}
-
-          {/* Tabs */}
-          {tabs && (
+      <div className='flex h-full min-h-0 flex-col gap-2 px-1.5 py-1.5'>
+        <div className='shrink-0'>
+          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
             <div
               className={cn(
-                'overflow-visible border-t border-(--linear-app-frame-seam) px-4 py-2 [&>*]:w-full',
-                tabsContainerClassName
+                LINEAR_SURFACE.stickyHeader,
+                'border-b border-transparent backdrop-blur-[12px]'
               )}
             >
-              {tabs}
+              <DrawerHeader
+                title={title}
+                actions={
+                  headerActions ??
+                  (onClose ? (
+                    <DrawerHeaderActions
+                      primaryActions={[]}
+                      overflowActions={[]}
+                      onClose={onClose}
+                    />
+                  ) : undefined)
+                }
+              />
+
+              {entityHeader ? (
+                <div className='overflow-visible px-3 pb-2.5 pt-2.5'>
+                  {entityHeader}
+                </div>
+              ) : null}
+
+              {tabs ? (
+                <div
+                  className={cn(
+                    'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2 [&>*]:w-full',
+                    tabsContainerClassName
+                  )}
+                >
+                  {tabs}
+                </div>
+              ) : null}
             </div>
-          )}
+          </DrawerSurfaceCard>
         </div>
 
         {isEmpty ? (
-          /* Empty state */
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
-            <DrawerEmptyState message={emptyMessage} />
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5'>
+            <DrawerSurfaceCard variant='card' className='p-4'>
+              <DrawerEmptyState message={emptyMessage} />
+            </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3'>
-              {children}
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5'>
+              <div className='space-y-3'>{children}</div>
             </div>
 
-            {/* Footer */}
-            {footer && (
-              <div
-                className={cn(
-                  LINEAR_SURFACE.toolbar,
-                  'shrink-0 border-t px-4 py-2'
-                )}
-              >
+            {footer ? (
+              <DrawerSurfaceCard variant='card' className='shrink-0 px-3 py-2'>
                 {footer}
-              </div>
-            )}
+              </DrawerSurfaceCard>
+            ) : null}
           </>
         )}
       </div>

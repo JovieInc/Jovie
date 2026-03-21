@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
@@ -28,38 +30,34 @@ export function SettingsSection({
   const descriptionId = description ? `${id}-description` : undefined;
 
   return (
-    <section
+    <ContentSurfaceCard
+      as='section'
+      surface='details'
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn(
-        'scroll-mt-4 rounded-lg bg-surface-0 px-3 py-2.5 sm:px-4 space-y-2',
-        className
-      )}
+      className={cn('scroll-mt-4 overflow-hidden', className)}
     >
-      <div className={cn('mb-2', headerClassName)}>
-        <h2
-          id={headingId}
-          className={cn(
-            'dashboard-heading text-[17px] font-[590] text-primary-token tracking-[-0.022em]',
-            titleClassName
-          )}
-        >
-          {title}
-        </h2>
-        {description ? (
-          <p
-            id={descriptionId}
-            className={cn(
-              'dashboard-body mt-1 text-[13px] text-secondary-token',
-              descriptionClassName
-            )}
-          >
-            {description}
-          </p>
-        ) : null}
-      </div>
-      {children}
-    </section>
+      <ContentSectionHeader
+        density='compact'
+        className={cn('min-h-0', headerClassName)}
+        bodyClassName='space-y-0.5'
+        title={<span id={headingId}>{title}</span>}
+        subtitle={
+          description ? (
+            <span id={descriptionId}>{description}</span>
+          ) : undefined
+        }
+        titleClassName={cn(
+          'dashboard-heading text-[15px] font-[590] text-primary-token tracking-[-0.02em]',
+          titleClassName
+        )}
+        subtitleClassName={cn(
+          'dashboard-body text-[12px] text-secondary-token',
+          descriptionClassName
+        )}
+      />
+      <div className='space-y-3 px-4 py-3'>{children}</div>
+    </ContentSurfaceCard>
   );
 }

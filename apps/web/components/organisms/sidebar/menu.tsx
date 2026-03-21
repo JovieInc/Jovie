@@ -36,7 +36,7 @@ SidebarMenuItem.displayName = 'SidebarMenuItem';
 const sidebarMenuButtonVariants = cva(
   [
     // Base layout — 13px / weight 500 / pill radius / -0.01em tracking matching Linear
-    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-[7px] border border-transparent px-2.25 text-left text-app leading-tight tracking-tight outline-none',
+    'peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent px-2.5 text-left text-[12px] leading-tight tracking-[-0.012em] outline-none',
     // Font weight 500 — Linear's --font-weight-medium for sidebar nav
     '[font-weight:var(--font-weight-nav)]',
     // Transitions — Linear: instant for background, colors
@@ -54,7 +54,7 @@ const sidebarMenuButtonVariants = cva(
     // Menu action spacing
     'group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 group-has-[[data-sidebar=menu-actions]]/menu-item:pr-14',
     // Collapsed icon mode
-    'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-8 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center',
+    'group-data-[collapsible=icon]:!w-(--sidebar-width-icon) group-data-[collapsible=icon]:!h-7 group-data-[collapsible=icon]:!px-0 group-data-[collapsible=icon]:justify-center',
     // Text truncation in collapsed mode
     '[&>span:last-child]:truncate [&>span:last-child]:transition-opacity [&>span:last-child]:duration-normal [&>span:last-child]:ease-interactive',
     'group-data-[collapsible=icon]:[&>span:last-child]:opacity-0 group-data-[collapsible=icon]:[&>span:not(.sr-only)]:hidden',

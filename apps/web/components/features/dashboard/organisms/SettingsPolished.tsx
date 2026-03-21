@@ -94,14 +94,14 @@ const SettingsSidebar = memo(
     useRouteLinks = false,
   }: SettingsSidebarProps) => (
     <aside className='h-fit'>
-      <div className='max-h-[calc(100vh-5rem)] overflow-y-auto rounded-[10px] border border-subtle/55 bg-surface-0/90 p-2 shadow-none backdrop-blur-sm'>
+      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
         {groups.map(group => (
-          <div key={group.id} className='mb-2.5 last:mb-0'>
-            <p className='mb-1.5 px-2 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+          <div key={group.id} className='mb-2 last:mb-0'>
+            <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
-              <ul className='space-y-0.5'>
+              <ul className='space-y-1'>
                 {group.sections.map(section => {
                   const isActive = section.id === activeSectionId;
                   const href = useRouteLinks
@@ -114,10 +114,10 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] transition-colors',
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
                             isActive
-                              ? 'bg-surface-1 text-primary-token'
-                              : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
                           )}
                         >
                           {section.title}
@@ -127,10 +127,10 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-8 items-center rounded-md px-2 py-1 text-[13px] transition-colors',
+                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
                             isActive
-                              ? 'bg-surface-1 text-primary-token'
-                              : 'text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
+                              : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
                           )}
                         >
                           {section.title}
@@ -163,7 +163,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-md bg-surface-0 px-3 py-3 text-left transition-colors hover:bg-surface-1 active:bg-surface-2 lg:hidden'
+      className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
         <p className='text-[14px] font-[510] text-primary-token'>
@@ -394,10 +394,10 @@ export function SettingsPolished({
 
     return (
       <div
-        className='mx-auto grid w-full max-w-5xl gap-7 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-10'
+        className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
         data-testid='settings-polished'
       >
-        <div className='lg:sticky lg:top-5 lg:self-start'>
+        <div className='lg:sticky lg:top-4 lg:self-start'>
           <SettingsSidebar
             groups={sectionGroups}
             activeSectionId={focusSection}
@@ -405,7 +405,7 @@ export function SettingsPolished({
           />
         </div>
 
-        <div className='space-y-8 pb-6 sm:pb-8'>
+        <div className='space-y-5 pb-5 sm:pb-6'>
           <SettingsSection
             id={section.id}
             title={section.title}
@@ -424,27 +424,27 @@ export function SettingsPolished({
   // Full settings view with Linear-style grouped navigation
   return (
     <div
-      className='mx-auto grid w-full max-w-5xl gap-7 pb-6 lg:grid-cols-[180px_minmax(0,760px)] lg:justify-center lg:gap-10'
+      className='mx-auto grid w-full max-w-[920px] gap-5 pb-6 lg:grid-cols-[172px_minmax(0,1fr)] lg:justify-center lg:gap-6'
       data-testid='settings-polished'
     >
-      <div className='lg:sticky lg:top-5 lg:self-start'>
+      <div className='lg:sticky lg:top-4 lg:self-start'>
         <SettingsSidebar
           groups={sectionGroups}
           activeSectionId={activeHashSectionId}
         />
       </div>
 
-      <div className='space-y-6'>
+      <div className='space-y-4'>
         {sectionGroups.map(group => (
           <section
             key={group.id}
             aria-label={`${group.label} settings group`}
-            className='px-1'
+            className='px-0.5'
           >
-            <h3 className='mb-2 px-1 text-[13px] font-[590] tracking-normal text-secondary-token'>
+            <h3 className='mb-2 px-1 text-[12px] font-[590] tracking-[-0.012em] text-secondary-token'>
               {group.label}
             </h3>
-            <div className='space-y-4'>
+            <div className='space-y-3'>
               {group.sections.map(section => (
                 <SettingsSection
                   key={section.id}

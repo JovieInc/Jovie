@@ -38,13 +38,13 @@ vi.mock('@/components/organisms/Sidebar', () => ({
 }));
 
 describe('Sidebar row alignment', () => {
-  it('uses px-2 for section labels', () => {
+  it('uses px-2.5 for section labels', () => {
     render(<SidebarGroupLabel>General</SidebarGroupLabel>);
 
-    expect(screen.getByText('General').className).toContain('px-2');
+    expect(screen.getByText('General').className).toContain('px-2.5');
   });
 
-  it('uses px-1.5 for collapsible section headers', () => {
+  it('uses px-2.5 for collapsible section headers', () => {
     render(
       <SidebarCollapsibleGroup label='General'>
         <div>Child</div>
@@ -53,6 +53,6 @@ describe('Sidebar row alignment', () => {
 
     expect(
       screen.getByRole('button', { name: /general/i }).className
-    ).toContain('px-1.5');
+    ).toContain('px-2.5');
   });
 });
