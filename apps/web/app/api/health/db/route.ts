@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
-import { checkDbHealth, getDbConfig } from '@/lib/db';
+import {
+  checkDbHealth,
+  dbCircuitBreaker,
+  getDbConfig,
+  getPoolMetrics,
+} from '@/lib/db';
 import { HEALTH_CHECK_CONFIG } from '@/lib/db/config';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
@@ -20,6 +25,8 @@ interface HealthDetails {
   latency?: number;
   error?: string;
   config?: ReturnType<typeof getDbConfig>;
+  circuitBreaker?: ReturnType<typeof dbCircuitBreaker.getStats>;
+  pool?: ReturnType<typeof getPoolMetrics>;
   validationError?: string;
   checks?: {
     connection: boolean;
@@ -86,6 +93,8 @@ export async function GET(request: Request) {
           : 'DATABASE_URL not configured',
         validationError: dbValidation.error,
         config,
+        circuitBreaker: dbCircuitBreaker.getStats(),
+        pool: getPoolMetrics(),
       },
     };
     logger.warn(
@@ -115,6 +124,8 @@ export async function GET(request: Request) {
       databaseUrlValid: dbValidation.valid,
       latency: healthResult.latency,
       checks: healthResult.details,
+      circuitBreaker: dbCircuitBreaker.getStats(),
+      pool: getPoolMetrics(),
       ...(healthResult.error ? { error: healthResult.error } : {}),
       config,
     },
