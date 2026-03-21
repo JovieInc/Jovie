@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.27] - 2026-03-20
+
+### Fixed
+
+- Hardened redirect URL sanitization against backslash and multi-encoded bypass attacks (e.g., `%5C`, `%255C`, `%2F`)
+- Handle availability check on signup page now shows error message instead of silently disappearing on network failure
+- Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
+- Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments
+- Pixel settings API no longer fetches actual token values from database — uses SQL-level `IS NOT NULL` booleans instead
+
 ## [26.4.26] - 2026-03-20
 
 ### Added
