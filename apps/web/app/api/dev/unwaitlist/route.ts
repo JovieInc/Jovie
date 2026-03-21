@@ -1,5 +1,7 @@
+import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { getWaitlistAccess } from '@/lib/auth/gate';
+import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import {
@@ -46,6 +48,11 @@ export async function POST() {
   );
 
   if (result.outcome === 'already_processed') {
+    // Still invalidate cache — previous approval may have cached stale state
+    const { userId } = await auth();
+    if (userId) {
+      await invalidateProxyUserStateCache(userId);
+    }
     return NextResponse.json(
       { success: true, message: 'Already approved', status: result.status },
       { status: 200, headers: NO_STORE_HEADERS }
