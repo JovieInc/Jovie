@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.30] - 2026-03-20
+## [26.4.32] - 2026-03-21
 
 ### Changed
 
