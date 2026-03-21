@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.28] - 2026-03-20
+
+### Added
+
+- Dev toolbar "Unwaitlist" button for self-approving waitlist entry during local testing
+- Dev-only API route `POST /api/dev/unwaitlist` reusing existing approval logic (blocked in production)
+
 ## [26.4.27] - 2026-03-20
 
 ### Fixed
