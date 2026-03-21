@@ -20,8 +20,13 @@ import {
 import type { DbOrTransaction } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
-import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
+import type {
+  DiscoveredPixels,
+  FitScoreBreakdown,
+} from '@/lib/db/schema/profiles';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { SUPPRESSED_PIXEL_IDS } from '@/lib/ingestion/strategies/linktree/config';
+import { getCreatorOwnedPixels } from '@/lib/ingestion/strategies/linktree/tracking-pixels';
 
 import {
   calculateFitScore,
@@ -29,6 +34,16 @@ import {
   type FitScoreInput,
   PAID_VERIFICATION_PLATFORMS,
 } from './calculator';
+
+/**
+ * Check if a profile has creator-owned tracking pixels after suppression filtering.
+ */
+function hasCreatorOwnedPixels(
+  discoveredPixels: DiscoveredPixels | null
+): boolean {
+  if (!discoveredPixels) return false;
+  return getCreatorOwnedPixels(discoveredPixels, SUPPRESSED_PIXEL_IDS) !== null;
+}
 
 /** Profile data with calculated score for batch updates */
 interface ScoredProfile {
@@ -211,7 +226,9 @@ export async function calculateAndStoreFitScore(
     hasSoundCloudId: !!profile.soundcloudId,
     dspPlatformCount,
     paidVerificationPlatforms,
-    hasTrackingPixels: !!profile.discoveredPixels,
+    hasTrackingPixels: hasCreatorOwnedPixels(
+      profile.discoveredPixels as DiscoveredPixels | null
+    ),
   };
 
   // Calculate score

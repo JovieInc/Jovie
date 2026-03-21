@@ -119,7 +119,20 @@ export async function processProfileExtraction(
   // Mark ingestion as idle or failed based on merge result
   await IngestionStatusManager.markIdleOrFailed(tx, profile.id, mergeError);
 
-  // Calculate fit score for the profile
+  // Store discovered tracking pixels with merge semantics (before fit score so scoring sees them)
+  if (extraction.discoveredPixels) {
+    try {
+      await storeDiscoveredPixels(tx, profile.id, extraction.discoveredPixels);
+    } catch (pixelError) {
+      logger.warn('Discovered pixels storage failed', {
+        profileId: profile.id,
+        error:
+          pixelError instanceof Error ? pixelError.message : 'Unknown error',
+      });
+    }
+  }
+
+  // Calculate fit score for the profile (after pixel storage so hasTrackingPixels is accurate)
   try {
     if (typeof extraction.hasPaidTier === 'boolean') {
       await updatePaidTierScore(tx, profile.id, extraction.hasPaidTier);
@@ -133,19 +146,6 @@ export async function processProfileExtraction(
           ? fitScoreError.message
           : 'Unknown error',
     });
-  }
-
-  // Store discovered tracking pixels with merge semantics
-  if (extraction.discoveredPixels) {
-    try {
-      await storeDiscoveredPixels(tx, profile.id, extraction.discoveredPixels);
-    } catch (pixelError) {
-      logger.warn('Discovered pixels storage failed', {
-        profileId: profile.id,
-        error:
-          pixelError instanceof Error ? pixelError.message : 'Unknown error',
-      });
-    }
   }
 
   // Store extracted contact email if found
