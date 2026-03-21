@@ -55,7 +55,7 @@ export function PricingSection() {
               <Badge variant='outline' size='xl' className='w-fit'>
                 Pricing
               </Badge>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Simple pricing.
               </h2>
             </div>

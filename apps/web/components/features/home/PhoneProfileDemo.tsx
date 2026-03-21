@@ -208,7 +208,7 @@ export function PhoneProfileDemo() {
           <div className='grid items-center gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:gap-8 xl:grid-cols-[0.74fr_1.26fr]'>
             <div className='reveal-on-scroll order-2 lg:order-1'>
               <p className='homepage-section-eyebrow'>Smart profile</p>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Profiles that convert.
               </h2>
               <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>

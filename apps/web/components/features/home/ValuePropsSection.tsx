@@ -23,7 +23,7 @@ export function ValuePropsSection() {
           <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
               <span className='homepage-section-eyebrow'>One platform</span>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 One Tool. Zero Setup.
               </h2>
             </div>

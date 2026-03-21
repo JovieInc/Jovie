@@ -161,7 +161,7 @@ function AiSupportSection() {
           <div className='homepage-section-intro-compact'>
             <div className='reveal-on-scroll'>
               <span className='homepage-section-eyebrow'>AI assistant</span>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 AI that knows your work.
               </h2>
               <p className='mt-4 max-w-xl marketing-lead-linear text-secondary-token'>

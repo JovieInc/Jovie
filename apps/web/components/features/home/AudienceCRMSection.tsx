@@ -114,7 +114,7 @@ export function AudienceCRMSection() {
               <span className='homepage-section-eyebrow'>
                 Audience intelligence
               </span>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Know every fan by name.
               </h2>
             </div>

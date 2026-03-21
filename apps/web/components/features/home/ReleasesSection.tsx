@@ -61,7 +61,7 @@ export function ReleasesSection() {
                 <Zap className='h-4 w-4' aria-hidden='true' />
                 Release automation
               </span>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Release day, automated.
               </h2>
             </div>
