@@ -10,7 +10,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Hardened redirect URL sanitization against backslash and multi-encoded bypass attacks (e.g., `%5C`, `%255C`, `%2F`)
+- Hardened redirect URL sanitization against backslash and encoded bypass attacks (e.g., `%5C`, `%2F`)
 - Handle availability check on signup page now shows error message instead of silently disappearing on network failure
 - Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
 - Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments

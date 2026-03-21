@@ -51,8 +51,9 @@ describe('sanitizeRedirectUrl', () => {
     });
 
     it('should reject URL-encoded backslash bypass attempts', () => {
-      // %5C = encoded backslash
+      // %5C/%5c = encoded backslash (case-insensitive)
       expect(sanitizeRedirectUrl('/%5Cevil.com')).toBeNull();
+      expect(sanitizeRedirectUrl('/%5cevil.com')).toBeNull();
     });
 
     it('should reject encoded protocol-relative URL bypass', () => {
