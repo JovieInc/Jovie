@@ -23,6 +23,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
 - Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
 - `demo:record` script in package.json for one-command demo video recording
+## [26.4.31] - 2026-03-21
+
+### Added
+
+- Music industry knowledge canon — scrape + distill pipeline that ingests 670+ pages from trusted music industry sources and synthesizes them into 8 authoritative topic guides
+- `scripts/knowledge/fetch.ts` — automated fetcher with resume support, exponential backoff, QA gate, and provenance manifest for internal auditing
+- `scripts/knowledge/distill.ts` — LLM-powered distillation that curates top articles per topic and synthesizes via Claude Sonnet into source-agnostic reference guides
+- 8 distilled knowledge docs: release strategy, playlist strategy, streaming metrics, profile optimization, marketing/promotion, distribution basics, monetization, music rights
+
 ## [26.4.30] - 2026-03-21
 
 ### Fixed
