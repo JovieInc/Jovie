@@ -37,6 +37,9 @@ on:
 
 permissions: {}
 
+env:
+  GH_REPO: ${{ github.repository }}
+
 concurrency:
   group: agent-pipeline-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number || github.run_id }}
   cancel-in-progress: true
