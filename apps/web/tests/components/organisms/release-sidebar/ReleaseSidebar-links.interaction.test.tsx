@@ -188,6 +188,20 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
 }));
 
+vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
+  ReleasePitchSection: () => (
+    <div data-testid='pitch-section'>Pitch Section</div>
+  ),
+}));
+
+vi.mock('@/components/features/dashboard/release-tasks', () => ({
+  ReleaseTaskChecklist: () => <div data-testid='task-checklist'>Tasks</div>,
+}));
+
+vi.mock('@/constants/routes', () => ({
+  APP_ROUTES: { DASHBOARD_RELEASES: '/dashboard/releases' },
+}));
+
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
   () => ({

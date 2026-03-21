@@ -119,6 +119,15 @@ export interface ReleaseViewModel {
   lyrics?: string;
   /** Preview audio URL (typically from the primary track) */
   previewUrl?: string | null;
+  /** AI-generated playlist pitches per platform */
+  generatedPitches?: {
+    spotify: string;
+    amazon: string;
+    appleMusic: string;
+    generic: string;
+    generatedAt: string;
+    modelUsed: string;
+  } | null;
 }
 
 /** Track view model for display in expandable release rows */

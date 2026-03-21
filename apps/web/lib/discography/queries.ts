@@ -256,6 +256,7 @@ export async function getLatestReleaseByUsername(
       spotifyPopularity: discogReleases.spotifyPopularity,
       sourceType: discogReleases.sourceType,
       metadata: discogReleases.metadata,
+      generatedPitches: discogReleases.generatedPitches,
       createdAt: discogReleases.createdAt,
       updatedAt: discogReleases.updatedAt,
     })
