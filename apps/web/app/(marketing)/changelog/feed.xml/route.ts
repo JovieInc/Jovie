@@ -1,46 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { parseChangelog } from '@/lib/changelog-parser';
 
 // Fully static
 export const revalidate = false;
-
-const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
-const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
-
-interface FeedEntry {
-  version: string;
-  date: string;
-  content: string[];
-}
-
-function parseForFeed(markdown: string): FeedEntry[] {
-  const lines = markdown.split('\n');
-  const entries: FeedEntry[] = [];
-  let current: FeedEntry | null = null;
-
-  for (const line of lines) {
-    const vMatch = line.match(VERSION_HEADING_RE);
-    if (vMatch) {
-      const [, version, date] = vMatch;
-      if (version.toLowerCase() === 'unreleased') {
-        current = null;
-        continue;
-      }
-      current = { version, date: date || '', content: [] };
-      entries.push(current);
-      continue;
-    }
-    if (!current) continue;
-    if (SECTION_HEADING_RE.test(line)) continue;
-
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ')) {
-      current.content.push(trimmed.slice(2));
-    }
-  }
-  return entries;
-}
 
 function escapeXml(s: string): string {
   return s
@@ -65,25 +29,33 @@ export async function GET() {
     }
   }
 
-  const entries = parseForFeed(markdown);
+  const releases = parseChangelog(markdown);
 
-  const atomEntries = entries
+  const atomEntries = releases
     .slice(0, 20)
-    .map(entry => {
-      const updated = entry.date
-        ? `${entry.date}T00:00:00Z`
+    .map(release => {
+      const updated = release.date
+        ? `${release.date}T00:00:00Z`
         : new Date().toISOString();
-      const contentHtml = entry.content
-        .map(c => `<li>${escapeXml(c)}</li>`)
-        .join('');
+      const summaryHtml = release.summary
+        ? `<p>${escapeXml(release.summary)}</p>`
+        : '';
+      const allEntries = [
+        ...release.sections.added,
+        ...release.sections.changed,
+        ...release.sections.fixed,
+        ...release.sections.removed,
+      ];
+      const listHtml = allEntries.map(c => `<li>${escapeXml(c)}</li>`).join('');
+      const contentHtml = summaryHtml + `<ul>${listHtml}</ul>`;
 
       return `
     <entry>
-      <title>${escapeXml(APP_NAME)} v${escapeXml(entry.version)}</title>
-      <id>${escapeXml(APP_URL)}/changelog#v${escapeXml(entry.version)}</id>
+      <title>${escapeXml(APP_NAME)} v${escapeXml(release.version)}</title>
+      <id>${escapeXml(APP_URL)}/changelog#v${escapeXml(release.version)}</id>
       <link href="${escapeXml(APP_URL)}/changelog" rel="alternate"/>
       <updated>${updated}</updated>
-      <content type="html">&lt;ul&gt;${escapeXml(contentHtml)}&lt;/ul&gt;</content>
+      <content type="html">${escapeXml(contentHtml)}</content>
     </entry>`;
     })
     .join('\n');

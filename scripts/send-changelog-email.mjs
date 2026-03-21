@@ -38,7 +38,21 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function entriesToHtml(sections) {
+const INTERNAL_PREFIX = '[internal]';
+
+function filterPublicEntries(entries) {
+  if (!entries || entries.length === 0) return [];
+  return entries.filter(e => !e.startsWith(INTERNAL_PREFIX));
+}
+
+/**
+ * Check if a summary is public (not tagged [internal]).
+ */
+function isPublicSummary(summary) {
+  return summary && !summary.startsWith(INTERNAL_PREFIX);
+}
+
+function entriesToHtml(sections, summary) {
   const sectionLabels = {
     added: 'New',
     changed: 'Improved',
@@ -47,9 +61,14 @@ function entriesToHtml(sections) {
   };
 
   let html = '';
+
+  if (isPublicSummary(summary)) {
+    html += `<p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: #333;">${escapeHtml(summary)}</p>`;
+  }
+
   for (const [key, label] of Object.entries(sectionLabels)) {
-    const entries = sections[key];
-    if (!entries || entries.length === 0) continue;
+    const entries = filterPublicEntries(sections[key]);
+    if (entries.length === 0) continue;
     html += `<p style="margin: 12px 0 4px; font-weight: 600; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #999;">${label}</p>`;
     html += '<ul style="margin: 0; padding: 0 0 0 20px;">';
     for (const entry of entries) {
@@ -60,7 +79,7 @@ function entriesToHtml(sections) {
   return html;
 }
 
-function entriesToText(sections) {
+function entriesToText(sections, summary) {
   const sectionLabels = {
     added: 'New',
     changed: 'Improved',
@@ -69,9 +88,14 @@ function entriesToText(sections) {
   };
 
   let text = '';
+
+  if (isPublicSummary(summary)) {
+    text += `${summary}\n`;
+  }
+
   for (const [key, label] of Object.entries(sectionLabels)) {
-    const entries = sections[key];
-    if (!entries || entries.length === 0) continue;
+    const entries = filterPublicEntries(sections[key]);
+    if (entries.length === 0) continue;
     text += `\n${label}:\n`;
     for (const entry of entries) {
       text += `  - ${entry}\n`;
@@ -101,8 +125,8 @@ async function main() {
     `📧 Preparing to send product update for v${latest.version} (${latest.date})\n`
   );
 
-  const entriesHtml = entriesToHtml(latest.sections);
-  const entriesText = entriesToText(latest.sections);
+  const entriesHtml = entriesToHtml(latest.sections, latest.summary);
+  const entriesText = entriesToText(latest.sections, latest.summary);
 
   if (!entriesText) {
     console.log('⚠️  Latest release has no entries. Nothing to send.');
