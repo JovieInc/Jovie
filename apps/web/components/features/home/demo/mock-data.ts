@@ -302,7 +302,7 @@ export const LINKS: DemoLink[] = [
     platform: 'Spotify',
     platformKey: 'spotify',
     type: 'music',
-    url: 'open.spotify.com/artist/timwhite',
+    url: `open.spotify.com/artist/${TIM_WHITE_PROFILE.spotifyArtistId}`,
     clicks: 1_126,
     active: true,
   },
@@ -514,3 +514,5 @@ export const SMARTLINK_KANBAN_COLUMNS = [
     ],
   },
 ] as const;
+
+import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';

@@ -28,7 +28,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
         aiCanUseTools: true,
         canCreateManualReleases: true,
         canAccessFutureReleases: false,
-        canSendNotifications: true,
+        canSendNotifications: false,
         canEditSmartLinks: true,
       });
     });
@@ -234,7 +234,7 @@ describe('Plan Configuration (Entitlement Registry)', () => {
       // Unlocked for free
       expect(booleans.aiCanUseTools).toBe(true);
       expect(booleans.canCreateManualReleases).toBe(true);
-      expect(booleans.canSendNotifications).toBe(true);
+      expect(booleans.canSendNotifications).toBe(false);
       expect(booleans.canEditSmartLinks).toBe(true);
     });
   });

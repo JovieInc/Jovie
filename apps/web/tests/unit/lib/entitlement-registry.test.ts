@@ -141,6 +141,17 @@ describe('Entitlement Registry Consistency', () => {
     );
   });
 
+  it('release notifications are paid-only in marketing and booleans', () => {
+    expect(ENTITLEMENT_REGISTRY.free.booleans.canSendNotifications).toBe(false);
+    expect(ENTITLEMENT_REGISTRY.free.marketing.features).not.toContain(
+      'Release notifications'
+    );
+    expect(ENTITLEMENT_REGISTRY.pro.booleans.canSendNotifications).toBe(true);
+    expect(ENTITLEMENT_REGISTRY.pro.marketing.features).toContain(
+      'Release notifications'
+    );
+  });
+
   it('paid plan marketing lists reference free features', () => {
     for (const planId of planIds) {
       if (planId === 'free') continue;

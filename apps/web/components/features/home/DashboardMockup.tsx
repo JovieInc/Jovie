@@ -10,23 +10,33 @@ export function DashboardMockup({
   rowRefs,
   urlRefs,
   footerRef,
+  variant = 'default',
 }: {
   readonly activeIndex: number;
   readonly rowRefs?: React.MutableRefObject<(HTMLDivElement | null)[]>;
   readonly urlRefs?: React.MutableRefObject<(HTMLSpanElement | null)[]>;
   readonly footerRef?: React.RefObject<HTMLDivElement | null>;
+  readonly variant?: 'default' | 'hero';
 }) {
+  const isHero = variant === 'hero';
+
   return (
     <div
-      className='relative overflow-hidden rounded-xl md:rounded-2xl'
+      className='relative overflow-hidden rounded-[0.95rem] md:rounded-[1rem]'
       style={{
         border: '1px solid var(--linear-border-subtle)',
         backgroundColor: 'var(--linear-bg-surface-0)',
-        boxShadow: [
-          '0 0 0 1px rgba(255,255,255,0.03)',
-          '0 8px 40px rgba(0,0,0,0.35)',
-          '0 24px 80px rgba(0,0,0,0.25)',
-        ].join(', '),
+        boxShadow: isHero
+          ? [
+              '0 0 0 1px rgba(255,255,255,0.03)',
+              '0 16px 48px rgba(0,0,0,0.28)',
+              '0 28px 80px rgba(0,0,0,0.16)',
+            ].join(', ')
+          : [
+              '0 0 0 1px rgba(255,255,255,0.03)',
+              '0 8px 28px rgba(0,0,0,0.28)',
+              '0 18px 48px rgba(0,0,0,0.18)',
+            ].join(', '),
       }}
     >
       {/* Shine edge */}
@@ -34,8 +44,9 @@ export function DashboardMockup({
         aria-hidden='true'
         className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px'
         style={{
-          background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
+          background: isHero
+            ? 'linear-gradient(90deg, transparent, rgba(255,255,255,0.12) 24%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.12) 76%, transparent)'
+            : 'linear-gradient(90deg, transparent, rgba(255,255,255,0.08) 30%, rgba(255,255,255,0.12) 50%, rgba(255,255,255,0.08) 70%, transparent)',
         }}
       />
 
@@ -47,7 +58,7 @@ export function DashboardMockup({
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
         </div>
         <div className='flex-1 text-center text-xs text-tertiary-token'>
-          Jovie - Releases
+          Jovie - Release Flow
         </div>
         <div className='w-[52px]' />
       </div>
@@ -208,14 +219,17 @@ export function DashboardMockup({
       })}
 
       {/* Footer punchline */}
-      <div
-        ref={footerRef}
-        className='flex items-center justify-center px-5 py-3'
-      >
-        <p className='text-xs text-quaternary-token'>
-          + every past and future release, automatically
-        </p>
-      </div>
+      {!isHero ? (
+        <div
+          ref={footerRef}
+          className='flex items-center justify-center px-5 py-3'
+        >
+          <p className='text-xs text-quaternary-token'>
+            + pre-save ready, matched across platforms, and shareable in one
+            link
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

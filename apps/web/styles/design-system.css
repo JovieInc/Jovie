@@ -1046,3 +1046,26 @@
   --color-bg-page: var(--linear-bg-page);
   --color-border-focus: var(--linear-border-focus);
 }
+
+.jovie-homepage-marketing {
+  --linear-content-max: 1104px;
+  --linear-section-pt-sm: 44px;
+  --linear-section-pb-sm: 52px;
+  --linear-section-pt-md: 64px;
+  --linear-section-pb-md: 72px;
+  --linear-section-pt-lg: 78px;
+  --linear-section-pb-lg: 86px;
+  --linear-content-gap-sm: 20px;
+  --linear-content-gap-md: 28px;
+  --linear-content-gap-lg: 34px;
+  --linear-shadow-card:
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.24) 0px 10px 24px -14px;
+  --linear-shadow-card-elevated:
+    rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.3) 0px 18px 44px -22px;
+  --linear-hero-backdrop: radial-gradient(
+    ellipse 78% 62% at 50% 0%,
+    oklch(17% 0.018 260 / 0.74) 0%,
+    oklch(10% 0.01 260 / 0.16) 50%,
+    transparent 76%
+  );
+}

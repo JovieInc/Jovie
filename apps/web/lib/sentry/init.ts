@@ -46,7 +46,10 @@
  */
 
 import type { FullSentryConfig } from './client-full';
-import type { LiteSentryConfig } from './client-lite';
+import {
+  initLiteSentry as initLiteSentrySyncImpl,
+  type LiteSentryConfig,
+} from './client-lite';
 import { getCurrentPathname, getSdkMode } from './route-detector';
 import {
   getSentryMode,
@@ -278,8 +281,7 @@ export function initSentrySync(
   }
 
   // For sync initialization, we always use lite SDK
-  const { initLiteSentry } = require('./client-lite');
-  const success = initLiteSentry(liteOptions);
+  const success = initLiteSentrySyncImpl(liteOptions);
 
   if (success) {
     setCurrentMode('lite');
