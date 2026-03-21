@@ -95,6 +95,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.accounts.dev',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
+    'https://*.sentry.io',
     'wss://*.clerk.com',
     'wss://clerk.jov.ie',
     'https://jov.ie',
