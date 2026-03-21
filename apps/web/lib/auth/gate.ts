@@ -1,7 +1,7 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -92,7 +92,7 @@ function determineUserStatus(
   if (!waitlistEntryId) {
     // When waitlist is disabled, skip waitlist states — treat as approved
     if (!waitlistGateEnabled) {
-      const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
+      const hasClaimedProfile = !!existingUserData?.profileId; // joined via claimed profile relation
       if (!hasClaimedProfile) {
         return 'waitlist_approved';
       }
@@ -103,7 +103,7 @@ function determineUserStatus(
     return 'waitlist_pending';
   }
 
-  const hasClaimedProfile = !!existingUserData?.profileId; // joined via activeProfileId = claimed
+  const hasClaimedProfile = !!existingUserData?.profileId; // joined via claimed profile relation
   if (!hasClaimedProfile) {
     return 'waitlist_approved';
   }
@@ -269,7 +269,10 @@ async function createUserWithRetry(
         .from(users)
         .leftJoin(
           creatorProfiles,
-          eq(creatorProfiles.id, users.activeProfileId)
+          and(
+            eq(creatorProfiles.userId, users.id),
+            eq(creatorProfiles.isClaimed, true)
+          )
         )
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
@@ -487,7 +490,13 @@ export async function resolveUserState(
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
@@ -556,7 +565,7 @@ export async function resolveUserState(
         avatarUrl: dbResult.profileAvatarUrl,
         isPublic: dbResult.profileIsPublic,
         onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
-        isClaimed: true, // joined via activeProfileId = claimed
+        isClaimed: true, // joined via claimed profile relation
       }
     : null;
 

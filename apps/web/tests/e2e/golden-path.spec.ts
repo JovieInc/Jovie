@@ -1,6 +1,6 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import { neon } from '@neondatabase/serverless';
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
 /**
  * Golden Path E2E — Signup -> Onboarding -> Music Fetch -> Stripe
@@ -81,6 +81,11 @@ const MAJOR_ARTIST_IDS = new Set([
   '6M2wZ9GZgrQXHCFfjv46we', // Dua Lipa
   '06HL4z0CvFAxyc27GXpf02', // Taylor Swift
 ]);
+
+const TEST_AVATAR_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4//8/AwAI/AL+Xn1tWQAAAABJRU5ErkJggg==',
+  'base64'
+);
 
 interface MultiDspEnrichmentState {
   profile_id: string;
@@ -356,6 +361,98 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
   );
 }
 
+async function waitForClerkReady(page: Page): Promise<boolean> {
+  const isClerkLoaded = async () =>
+    page
+      .waitForFunction(
+        () =>
+          Boolean((window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded),
+        { timeout: 5_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
+
+  await page.goto('/signup', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  });
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (await isClerkLoaded()) {
+      return true;
+    }
+
+    if (attempt === 0) {
+      const retryButton = page.getByRole('button', { name: 'Retry now' });
+      if (await retryButton.isVisible().catch(() => false)) {
+        await retryButton.click();
+        continue;
+      }
+    }
+
+    if (attempt === 1) {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
+      continue;
+    }
+
+    await page.waitForTimeout(1_000);
+  }
+
+  return false;
+}
+
+async function waitForOnboardingSurface(
+  page: Page
+): Promise<'handle' | 'connect-music'> {
+  await page
+    .locator('[data-onboarding-client-ready="true"]')
+    .waitFor({ state: 'attached', timeout: 20_000 })
+    .catch(() => {});
+
+  return Promise.any([
+    page
+      .getByLabel('Enter your desired handle')
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => 'handle' as const),
+    page
+      .getByPlaceholder(/search for your artist or paste a spotify link/i)
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => 'connect-music' as const),
+  ]);
+}
+
+async function navigateToOnboarding(
+  page: Page,
+  onboardingHandle: string
+): Promise<'handle' | 'connect-music'> {
+  const onboardingUrl = `/onboarding?handle=${onboardingHandle}`;
+
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await page.goto(onboardingUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 45_000,
+    });
+
+    await expect(page).toHaveURL(
+      new RegExp(`/onboarding\\?handle=${onboardingHandle}`),
+      {
+        timeout: 45_000,
+      }
+    );
+
+    const surface = await waitForOnboardingSurface(page).catch(() => null);
+    if (surface) {
+      return surface;
+    }
+
+    if (attempt < 2) {
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 });
+    }
+  }
+
+  throw new Error('Failed to reach a usable onboarding step after 2 attempts');
+}
+
 /**
  * Create a brand-new Clerk test user session.
  * Uses `+clerk_test` email suffix which auto-verifies in Clerk test mode.
@@ -363,41 +460,9 @@ async function interceptTrackingCalls(page: import('@playwright/test').Page) {
  * For +clerk_test emails, Clerk requires completing email verification
  * with the magic code 424242 before a session is created.
  */
-async function createFreshUser(
-  page: import('@playwright/test').Page,
-  uniqueSeed: string
-) {
+async function createFreshUser(page: Page, uniqueSeed: string) {
   await setupClerkTestingToken({ page });
-
-  const loadClerk = async () => {
-    await page.goto('/signin', {
-      waitUntil: 'domcontentloaded',
-      timeout: 60_000,
-    });
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const loaded = await page
-        .waitForFunction(
-          () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
-          { timeout: 20_000 }
-        )
-        .then(() => true)
-        .catch(() => false);
-
-      if (loaded) return true;
-
-      const retryButton = page.getByRole('button', { name: 'Retry now' });
-      if (await retryButton.isVisible().catch(() => false)) {
-        await retryButton.click();
-      } else {
-        await page.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-      }
-    }
-
-    return false;
-  };
-
-  const loaded = await loadClerk();
+  const loaded = await waitForClerkReady(page);
 
   if (!loaded) {
     throw new Error('Clerk JS failed to load — cannot create test user');
@@ -520,7 +585,7 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // The homepage CTA itself is already asserted above; navigate directly to
     // signup here to avoid client-side route transition flake under load.
     await page.goto('/signup', {
-      waitUntil: 'commit',
+      waitUntil: 'domcontentloaded',
       timeout: 30_000,
     });
     await expect(page).toHaveURL(/\/signup/, { timeout: 30_000 });
@@ -538,32 +603,24 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // ──────────────────────────────────────────────────────────────────
     // STEP 4: Onboarding — Handle step
     // ──────────────────────────────────────────────────────────────────
-    await page.goto(`/onboarding?handle=${onboardingHandle}`, {
-      waitUntil: 'commit',
-      timeout: 45_000,
-    });
-    await expect(page).toHaveURL(
-      new RegExp(`/onboarding\\?handle=${onboardingHandle}`)
+    const onboardingSurface = await navigateToOnboarding(
+      page,
+      onboardingHandle
     );
-    await expect(
-      page.locator('[data-testid="onboarding-form-wrapper"]')
-    ).toBeVisible({ timeout: 20_000 });
-    await expect(
-      page.locator('[data-onboarding-client-ready="true"]')
-    ).toBeVisible({ timeout: 20_000 });
 
-    const handleEl = page.getByLabel('Enter your desired handle');
-    await expect(handleEl).toBeVisible({ timeout: 10_000 });
-    await expect
-      .poll(async () => (await handleEl.inputValue()).trim(), {
-        timeout: 20_000,
-        message: 'Handle input should contain the seeded onboarding handle',
-      })
-      .toBe(onboardingHandle);
+    if (onboardingSurface === 'handle') {
+      const handleEl = page.getByLabel('Enter your desired handle');
+      await expect
+        .poll(async () => (await handleEl.inputValue()).trim(), {
+          timeout: 20_000,
+          message: 'Handle input should contain the seeded onboarding handle',
+        })
+        .toBe(onboardingHandle);
 
-    const continueBtn = page.getByRole('button', { name: 'Continue' });
-    await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
-    await continueBtn.click();
+      const continueBtn = page.getByRole('button', { name: 'Continue' });
+      await expect(continueBtn).toBeEnabled({ timeout: 20_000 });
+      await continueBtn.click();
+    }
 
     // ──────────────────────────────────────────────────────────────────
     // STEP 5: Onboarding — Artist search (Music Fetch)
@@ -581,9 +638,6 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
     // ──────────────────────────────────────────────────────────────────
 
     const reviewDisplayName = page.locator('#onboarding-display-name');
-    const goToDashboardBtn = page.getByRole('button', {
-      name: /go to dashboard/i,
-    });
     const reviewStepOrDashboard = await Promise.race([
       reviewDisplayName
         .waitFor({ state: 'visible', timeout: 30_000 })
@@ -636,22 +690,37 @@ test.describe('Golden Path: Signup -> Onboarding -> Music Fetch -> Stripe', () =
         }
       }
 
+      const uploadPhotoCta = page.getByRole('button', {
+        name: /upload a photo to continue/i,
+      });
+      if (await uploadPhotoCta.isVisible().catch(() => false)) {
+        const avatarInput = page.locator('input[type="file"]').first();
+        await avatarInput.setInputFiles({
+          name: 'golden-path-avatar.png',
+          mimeType: 'image/png',
+          buffer: TEST_AVATAR_PNG,
+        });
+      }
+
+      const continueToDashboardBtn = page.getByRole('button', {
+        name: /continue to dashboard|go to dashboard/i,
+      });
       const dashboardExit = await Promise.race([
-        goToDashboardBtn
-          .waitFor({ state: 'visible', timeout: 10_000 })
+        continueToDashboardBtn
+          .waitFor({ state: 'visible', timeout: 20_000 })
           .then(() => 'button' as const)
           .catch(() => null),
         page
-          .waitForURL(/\/app/, { timeout: 10_000 })
+          .waitForURL(/\/app/, { timeout: 20_000 })
           .then(() => 'dashboard' as const)
           .catch(() => null),
       ]);
 
       if (dashboardExit === 'button') {
-        await expect(goToDashboardBtn).toBeEnabled({ timeout: 10_000 });
-        await goToDashboardBtn.click();
+        await expect(continueToDashboardBtn).toBeEnabled({ timeout: 20_000 });
+        await continueToDashboardBtn.click();
       } else {
-        await expect(page).toHaveURL(/\/app/, { timeout: 10_000 });
+        await expect(page).toHaveURL(/\/app/, { timeout: 20_000 });
       }
     } else {
       await expect

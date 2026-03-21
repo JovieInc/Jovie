@@ -5,6 +5,12 @@ const { mockDbSelect } = vi.hoisted(() => ({
   mockDbSelect: vi.fn(),
 }));
 
+const { mockWithRetry } = vi.hoisted(() => ({
+  mockWithRetry: vi.fn(async (operation: () => Promise<unknown>) =>
+    operation()
+  ),
+}));
+
 // Mock database
 vi.mock('@/lib/db', () => ({
   db: {
@@ -58,7 +64,7 @@ vi.mock('@/lib/redis', () => ({
 
 // Mock retry to skip exponential backoff delays — just execute the operation once
 vi.mock('@/lib/db/client/retry', () => ({
-  withRetry: vi.fn(async (operation: () => Promise<unknown>) => operation()),
+  withRetry: mockWithRetry,
   isRetryableError: vi.fn().mockReturnValue(false),
 }));
 
@@ -76,6 +82,10 @@ import {
 describe('proxy-state.ts', () => {
   beforeEach(async () => {
     mockDbSelect.mockClear();
+    mockWithRetry.mockClear();
+    mockWithRetry.mockImplementation(
+      async (operation: () => Promise<unknown>) => operation()
+    );
     // Clear the module's in-memory cache to prevent cross-test contamination
     await invalidateProxyUserStateCache('clerk_123');
     await invalidateProxyUserStateCache('clerk_test_user');
@@ -178,6 +188,11 @@ describe('proxy-state.ts', () => {
         isActive: false,
         isBanned: false,
       });
+      expect(mockWithRetry).toHaveBeenCalledWith(
+        expect.any(Function),
+        'proxy_user_state_query',
+        2
+      );
     });
 
     it('returns needsOnboarding when profile exists but onboarding incomplete', async () => {

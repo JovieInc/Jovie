@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { captureWarning } from '@/lib/error-tracking';
 import { getFeaturedCreators } from '@/lib/featured-creators';
+import { withTimeout } from '@/lib/resilience/primitives';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+const HOMEPAGE_HEALTH_TIMEOUT_MS = 5000;
 
 /**
  * Health check endpoint for homepage dependencies.
@@ -38,16 +40,11 @@ export async function GET() {
   try {
     const dbStart = Date.now();
 
-    // Add 5s timeout to prevent hanging
-    const creators = await Promise.race([
-      getFeaturedCreators(),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Health check timeout after 5s')),
-          5000
-        )
-      ),
-    ]);
+    const creators = await withTimeout(getFeaturedCreators(), {
+      timeoutMs: HOMEPAGE_HEALTH_TIMEOUT_MS,
+      context: 'Homepage featured creators health check',
+      timeoutMessage: 'Health check timeout after 5s',
+    });
 
     health.checks.featuredCreators = {
       status: 'healthy',

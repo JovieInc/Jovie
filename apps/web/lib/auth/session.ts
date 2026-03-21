@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { logDbError, logDbInfo, withRetry } from '@/lib/db/client';
@@ -284,7 +284,13 @@ export async function getProfileByDbUserId(
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(users)
-    .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .innerJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
     .where(eq(users.id, dbUserId))
     .limit(1);
 
@@ -342,7 +348,13 @@ export async function getSessionContext(options?: {
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
     })
     .from(users)
-    .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
+    .leftJoin(
+      creatorProfiles,
+      and(
+        eq(creatorProfiles.userId, users.id),
+        eq(creatorProfiles.isClaimed, true)
+      )
+    )
     .where(eq(users.clerkId, clerkUserId))
     .limit(1);
 
@@ -379,7 +391,7 @@ export async function getSessionContext(options?: {
         displayName: result.profileDisplayName,
         avatarUrl: result.profileAvatarUrl,
         isPublic: result.profileIsPublic,
-        isClaimed: true, // joined via activeProfileId = claimed
+        isClaimed: true, // joined via claimed profile relation
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
       }
     : null;

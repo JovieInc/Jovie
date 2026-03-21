@@ -3,19 +3,17 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const revalidate = 3600; // Cache results for 1 hour
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const FEATURED_CREATORS_TIMEOUT_MS = 3000;
 
 async function getFeaturedCreators() {
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Database timeout')), 3000);
-  });
-
-  const data = await Promise.race([
+  const data = await withTimeout(
     db
       .select({
         id: creatorProfiles.id,
@@ -34,8 +32,12 @@ async function getFeaturedCreators() {
       )
       .orderBy(creatorProfiles.displayName)
       .limit(12),
-    timeoutPromise,
-  ]);
+    {
+      timeoutMs: FEATURED_CREATORS_TIMEOUT_MS,
+      context: 'Featured creators query',
+      timeoutMessage: 'Featured creators query timed out',
+    }
+  );
 
   return data.map(a => ({
     id: a.id,

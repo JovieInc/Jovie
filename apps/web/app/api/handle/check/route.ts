@@ -11,6 +11,7 @@ import {
   getCachedHandleAvailability,
 } from '@/lib/onboarding/handle-availability-cache';
 import { enforceHandleCheckRateLimit } from '@/lib/onboarding/rate-limit';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 
 const NO_STORE_HEADERS = {
@@ -36,6 +37,8 @@ const NO_STORE_HEADERS = {
 // Target response time in ms (with ±10ms jitter)
 const TARGET_RESPONSE_TIME_MS = 100;
 const RESPONSE_JITTER_MS = 10;
+const HANDLE_CHECK_TIMEOUT_MS = 3000;
+const HANDLE_CHECK_TIMEOUT_MESSAGE = 'Handle availability query timed out';
 
 /**
  * Generate cryptographically secure random jitter.
@@ -130,19 +133,18 @@ export async function GET(request: Request) {
       return respondWithConstantTime({ available: cachedAvailability });
     }
 
-    // Add timeout to prevent hanging on database issues
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Database timeout')), 3000); // 3 second timeout
-    });
-
-    const data = await Promise.race([
+    const data = await withTimeout(
       db
         .select({ username: creatorProfiles.username })
         .from(creatorProfiles)
         .where(eq(creatorProfiles.usernameNormalized, handleLower))
         .limit(1),
-      timeoutPromise,
-    ]);
+      {
+        timeoutMs: HANDLE_CHECK_TIMEOUT_MS,
+        context: 'Handle availability query',
+        timeoutMessage: HANDLE_CHECK_TIMEOUT_MESSAGE,
+      }
+    );
 
     const isAvailable = !data || data.length === 0;
     await cacheHandleAvailability(handleLower, isAvailable);
@@ -166,8 +168,8 @@ export async function GET(request: Request) {
 
     // Handle timeout - return error instead of mock data
     if (
-      (error as Error)?.message?.includes('timeout') ||
-      (error as Error)?.message?.includes('Database timeout')
+      (error as Error)?.message?.includes('timed out') ||
+      (error as Error)?.message?.includes(HANDLE_CHECK_TIMEOUT_MESSAGE)
     ) {
       return respondWithConstantTime(
         { available: false, error: 'Service temporarily unavailable' },

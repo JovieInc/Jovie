@@ -42,6 +42,7 @@ describe('GET /api/handle/check', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.useRealTimers();
     mockExtractClientIP.mockReturnValue('127.0.0.1');
     mockEnforceHandleCheckRateLimit.mockResolvedValue(undefined);
     mockGetCachedHandleAvailability.mockResolvedValue(null);
@@ -142,6 +143,31 @@ describe('GET /api/handle/check', () => {
     );
   });
 
+  it('clears timeout timers after a fast successful lookup', async () => {
+    vi.useFakeTimers();
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=fast-handle'
+    );
+
+    const responsePromise = GET(request);
+    await vi.advanceTimersByTimeAsync(500);
+    const response = await responsePromise;
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.available).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('returns available false when handle is taken', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
@@ -178,5 +204,30 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(429);
     expect(data.available).toBe(false);
+  });
+
+  it('returns 503 when the handle lookup times out', async () => {
+    vi.useFakeTimers();
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockReturnValue(new Promise(() => {})),
+        }),
+      }),
+    });
+
+    const { GET } = await import('@/app/api/handle/check/route');
+    const request = new Request(
+      'http://localhost/api/handle/check?handle=slow-handle'
+    );
+
+    const responsePromise = GET(request);
+    await vi.advanceTimersByTimeAsync(4000);
+    const response = await responsePromise;
+    const data = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(data.available).toBe(false);
+    expect(data.error).toBe('Service temporarily unavailable');
   });
 });

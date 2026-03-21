@@ -1,10 +1,10 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { isRetryableError, withRetry } from '@/lib/db/client/retry';
-import { QueryTimeoutError } from '@/lib/db/query-timeout';
+import { QueryTimeoutError, withTimeout } from '@/lib/db/query-timeout';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
@@ -28,9 +28,9 @@ const USER_STATE_CACHE_TTL_ACTIVE_SECONDS = 300; // 5 minutes - stable active us
 
 // Timeout for DB query to prevent proxy hanging on Neon cold starts.
 // Kept below the Neon p99 cold-start budget (~3 s) so that a single cache-miss
-// does not block authenticated navigations for more than ~3 s. Retries are
-// intentionally disabled for this query (maxRetries: 1) — retrying on timeout
-// compounds latency rather than reducing it.
+// does not block authenticated navigations for more than ~3 s. We still allow
+// one retry because transient Neon cold-start and transport errors were
+// observed to strand authenticated onboarding traffic in waitlist fallback.
 const DB_QUERY_TIMEOUT_MS = 3000; // 3 seconds
 
 // Timeout for Redis cache reads. Upstash REST calls are normally <50 ms but
@@ -297,7 +297,6 @@ const BANNED_STATE: ProxyUserState = {
 async function executeUserStateQuery(clerkUserId: string) {
   return withRetry(
     async () => {
-      let timeoutId: ReturnType<typeof setTimeout>;
       const queryPromise = db
         .select({
           dbUserId: users.id,
@@ -314,33 +313,22 @@ async function executeUserStateQuery(clerkUserId: string) {
         .from(users)
         .leftJoin(
           creatorProfiles,
-          eq(creatorProfiles.id, users.activeProfileId)
+          and(
+            eq(creatorProfiles.userId, users.id),
+            eq(creatorProfiles.isClaimed, true)
+          )
         )
         .where(eq(users.clerkId, clerkUserId))
         .limit(1);
 
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(
-          () =>
-            reject(
-              new QueryTimeoutError(
-                `[proxy-state] DB query timed out after ${DB_QUERY_TIMEOUT_MS}ms`
-              )
-            ),
-          DB_QUERY_TIMEOUT_MS
-        );
-      });
-
-      try {
-        return await Promise.race([queryPromise, timeoutPromise]);
-      } finally {
-        clearTimeout(timeoutId!);
-      }
-      // maxRetries: 1 disables retries for proxy state — retrying a timed-out DB
-      // query compounds latency. Failures fall through to DEFAULT_WAITLIST_STATE.
+      return await withTimeout(
+        queryPromise,
+        DB_QUERY_TIMEOUT_MS,
+        '[proxy-state] DB query'
+      );
     },
     'proxy_user_state_query',
-    1
+    2
   );
 }
 

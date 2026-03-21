@@ -583,6 +583,7 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const needsUserState =
       !pathname.startsWith('/api/') &&
       !pathInfo.isAuthCallbackPath &&
+      pathname !== '/onboarding' &&
       pathname !== '/app' &&
       !pathname.startsWith('/app/');
 

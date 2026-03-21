@@ -17,6 +17,7 @@ describe('GET /api/featured-creators', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.useRealTimers();
   });
 
   it('returns featured creators', async () => {
@@ -71,5 +72,27 @@ describe('GET /api/featured-creators', () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBeDefined();
+  });
+
+  it('returns 500 when the featured creators query times out', async () => {
+    vi.useFakeTimers();
+    mockDbSelect.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue(new Promise(() => {})),
+          }),
+        }),
+      }),
+    });
+
+    const { GET } = await import('@/app/api/featured-creators/route');
+    const responsePromise = GET();
+    await vi.advanceTimersByTimeAsync(4000);
+    const response = await responsePromise;
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('Failed to load featured creators');
   });
 });

@@ -46,6 +46,13 @@ export default async function OnboardingPage({
   if (authResult.state === UserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
   }
+  if (
+    authResult.state !== UserState.NEEDS_DB_USER &&
+    authResult.state !== UserState.NEEDS_ONBOARDING &&
+    authResult.state !== UserState.ACTIVE
+  ) {
+    redirect(authResult.redirectTo ?? APP_ROUTES.WAITLIST);
+  }
 
   // Defensive check: ensure we have a valid Clerk user ID
   // This can happen legitimately in certain scenarios:

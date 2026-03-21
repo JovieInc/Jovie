@@ -4,6 +4,12 @@ import { config } from 'dotenv';
 import path from 'path';
 import { APP_ROUTES } from '../constants/routes';
 import {
+  acquireE2ESetupLock,
+  createE2ESetupScope,
+  hasFreshSeedStamp,
+  writeSeedStamp,
+} from './helpers/e2e-setup-coordination';
+import {
   isExternalBaseUrl,
   isSafePreviewBaseUrl,
 } from './helpers/vercel-preview';
@@ -35,6 +41,9 @@ const warmupStampPath = path.join(warmupCacheDir, 'fast-warmup.json');
 const warmupStampMaxAgeMs = Number(
   process.env.E2E_WARMUP_MAX_AGE_MS ?? 60 * 60 * 1000
 );
+const e2eSeedStampMaxAgeMs = 30 * 60 * 1000;
+const e2eSetupLockStaleAfterMs = 10 * 60 * 1000;
+const e2eSetupLockWaitTimeoutMs = 90 * 1000;
 const WRAP_LINK_WARMUP_IP = '198.51.100.250';
 const CHALLENGE_TOKEN_PATTERNS = [
   /"challengeToken":"([^"]+)"/,
@@ -96,6 +105,11 @@ async function globalSetup() {
   const baseURL = process.env.BASE_URL;
   const hasExternalBaseUrl = isExternalBaseUrl(baseURL);
   const shouldSeedExternalPreview = isSafePreviewBaseUrl(baseURL);
+  const effectiveBaseURL = process.env.BASE_URL || 'http://localhost:3100';
+  const setupScope = createE2ESetupScope({
+    baseURL: effectiveBaseURL,
+    databaseUrl: process.env.DATABASE_URL,
+  });
   console.log('Starting E2E global setup...');
   if (isAuthRefreshOnly) {
     console.log('  Running auth-refresh-only setup');
@@ -167,199 +181,233 @@ async function globalSetup() {
       process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3100',
   });
 
-  if (shouldSkipSeeding) {
-    console.log('Skipping test data seeding for fast local iteration');
-  } else if (
-    process.env.DATABASE_URL &&
-    (!hasExternalBaseUrl || shouldSeedExternalPreview)
-  ) {
-    try {
-      console.log('Seeding test data...');
-      await seedTestData({ publicProfilesOnly: isPublicNoAuthOnly });
-      console.log('Test data seeded successfully');
-    } catch (error) {
-      console.warn('Failed to seed test data:', error);
-      console.log('  Tests may fail if required profiles are missing');
-      if (isCI && isSmokeOnly) {
-        console.error('Seeding is required for smoke tests in CI');
-        throw error;
+  const setupLock = await acquireE2ESetupLock({
+    cacheDir: warmupCacheDir,
+    scope: setupScope,
+    staleAfterMs: e2eSetupLockStaleAfterMs,
+    waitTimeoutMs: e2eSetupLockWaitTimeoutMs,
+  });
+
+  try {
+    if (shouldSkipSeeding) {
+      console.log('Skipping test data seeding for fast local iteration');
+    } else if (
+      process.env.DATABASE_URL &&
+      (!hasExternalBaseUrl || shouldSeedExternalPreview)
+    ) {
+      const hasFreshSeed = await hasFreshSeedStamp({
+        cacheDir: warmupCacheDir,
+        scope: setupScope,
+        maxAgeMs: e2eSeedStampMaxAgeMs,
+      });
+
+      if (hasFreshSeed) {
+        console.log(
+          'Skipping test data seeding because a fresh coordinated seed stamp exists'
+        );
+      } else {
+        try {
+          console.log('Seeding test data...');
+          await seedTestData({ publicProfilesOnly: isPublicNoAuthOnly });
+          await writeSeedStamp({
+            cacheDir: warmupCacheDir,
+            scope: setupScope,
+          });
+          console.log('Test data seeded successfully');
+        } catch (error) {
+          console.warn('Failed to seed test data:', error);
+          console.log('  Tests may fail if required profiles are missing');
+          if (isCI && isSmokeOnly) {
+            console.error('Seeding is required for smoke tests in CI');
+            throw error;
+          }
+        }
       }
+    } else {
+      console.log('DATABASE_URL not set, skipping test data seeding');
     }
-  } else {
-    console.log('DATABASE_URL not set, skipping test data seeding');
-  }
 
-  if (hasExternalBaseUrl) {
-    console.log(`External BASE_URL detected: ${baseURL}`);
-    console.log('  Skipping local env overrides and route warmup');
-    const elapsed = Date.now() - startTime;
-    console.log(`E2E global setup complete in ${elapsed}ms`);
-    return;
-  }
-
-  if (shouldSkipWarmup) {
-    console.log('Skipping route warmup for fast local iteration');
-  } else {
-    const localBaseURL = process.env.BASE_URL || 'http://localhost:3100';
-    const canReuseWarmup =
-      isFastIteration &&
-      !isPublicNoAuthOnly &&
-      hasFreshWarmupStamp(localBaseURL);
-
-    if (canReuseWarmup) {
-      console.log('Skipping route warmup because hot-server warmup is fresh');
+    if (hasExternalBaseUrl) {
+      console.log(`External BASE_URL detected: ${baseURL}`);
+      console.log('  Skipping local env overrides and route warmup');
       const elapsed = Date.now() - startTime;
       console.log(`E2E global setup complete in ${elapsed}ms`);
       return;
     }
 
-    console.log('Warming up Turbopack routes...');
-    const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
-    const warmupRoutes = isPublicNoAuthOnly
-      ? isFastIteration
-        ? ['/', `/${testProfile}`]
-        : [
-            '/',
-            '/api/stripe/pricing-options',
-            `/${testProfile}`,
-            `/${testProfile}?mode=listen`,
-            `/${testProfile}?mode=subscribe`,
-            '/testartist?mode=tip',
-            '/signin',
-            '/signup',
-            '/nonexistent-handle-xyz-123',
-          ]
-      : isFastIteration
-        ? useStoredAuth && hasStoredAuthState
-          ? [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
-          : ['/signin', APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
-        : [
-            '/',
-            '/api/stripe/pricing-options',
-            '/signin',
-            APP_ROUTES.DASHBOARD,
-            APP_ROUTES.CHAT,
-            APP_ROUTES.DASHBOARD_PROFILE,
-            `/${testProfile}`,
-            `/${testProfile}?mode=listen`,
-            `/${testProfile}?mode=subscribe`,
-            `/${testProfile}?mode=tip`,
-            '/testartist?mode=tip',
-            APP_ROUTES.ADMIN,
-            APP_ROUTES.ADMIN_CREATORS,
-            APP_ROUTES.ADMIN_USERS,
-          ];
+    if (shouldSkipWarmup) {
+      console.log('Skipping route warmup for fast local iteration');
+    } else {
+      const localBaseURL = process.env.BASE_URL || 'http://localhost:3100';
+      const canReuseWarmup =
+        isFastIteration &&
+        !isPublicNoAuthOnly &&
+        hasFreshWarmupStamp(localBaseURL);
 
-    for (const route of warmupRoutes) {
-      try {
-        const res = await fetch(`${localBaseURL}${route}`, {
-          signal: AbortSignal.timeout(120_000),
-          redirect: 'follow',
-        });
-        console.log(`  ${route} (${res.status}) warmed up`);
-      } catch {
-        console.log(
-          `  ${route} warmup failed (will compile on first test visit)`
-        );
+      if (canReuseWarmup) {
+        console.log('Skipping route warmup because hot-server warmup is fresh');
+        const elapsed = Date.now() - startTime;
+        console.log(`E2E global setup complete in ${elapsed}ms`);
+        return;
       }
-    }
 
-    if (isFastIteration && !isCuratedFastLane) {
-      try {
-        const wrapLinkResponse = await fetch(`${localBaseURL}/api/wrap-link`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-forwarded-for': WRAP_LINK_WARMUP_IP,
-          },
-          body: JSON.stringify({
-            url: 'https://spotify.com/track/e2e-warmup',
-            platform: 'spotify',
-          }),
-          signal: AbortSignal.timeout(120_000),
-        });
-        console.log(`  /api/wrap-link (${wrapLinkResponse.status}) warmed up`);
+      console.log('Warming up Turbopack routes...');
+      const testProfile = process.env.E2E_TEST_PROFILE || 'dualipa';
+      const warmupRoutes = isPublicNoAuthOnly
+        ? isFastIteration
+          ? ['/', `/${testProfile}`]
+          : [
+              '/',
+              '/api/stripe/pricing-options',
+              `/${testProfile}`,
+              `/${testProfile}?mode=listen`,
+              `/${testProfile}?mode=subscribe`,
+              '/testartist?mode=tip',
+              '/signin',
+              '/signup',
+              '/nonexistent-handle-xyz-123',
+            ]
+        : isFastIteration
+          ? useStoredAuth && hasStoredAuthState
+            ? [APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
+            : ['/signin', APP_ROUTES.AUDIENCE, APP_ROUTES.RELEASES]
+          : [
+              '/',
+              '/api/stripe/pricing-options',
+              '/signin',
+              APP_ROUTES.DASHBOARD,
+              APP_ROUTES.CHAT,
+              APP_ROUTES.DASHBOARD_PROFILE,
+              `/${testProfile}`,
+              `/${testProfile}?mode=listen`,
+              `/${testProfile}?mode=subscribe`,
+              `/${testProfile}?mode=tip`,
+              '/testartist?mode=tip',
+              APP_ROUTES.ADMIN,
+              APP_ROUTES.ADMIN_CREATORS,
+              APP_ROUTES.ADMIN_USERS,
+            ];
 
-        if (wrapLinkResponse.ok) {
-          const wrappedLink = (await wrapLinkResponse.json()) as {
-            shortId?: string;
-          };
+      for (const route of warmupRoutes) {
+        try {
+          const res = await fetch(`${localBaseURL}${route}`, {
+            signal: AbortSignal.timeout(120_000),
+            redirect: 'follow',
+          });
+          console.log(`  ${route} (${res.status}) warmed up`);
+        } catch {
+          console.log(
+            `  ${route} warmup failed (will compile on first test visit)`
+          );
+        }
+      }
 
-          if (wrappedLink.shortId) {
-            let challengeToken: string | null = null;
-
-            for (const route of [`/go/${wrappedLink.shortId}`]) {
-              try {
-                const res = await fetch(`${localBaseURL}${route}`, {
-                  signal: AbortSignal.timeout(120_000),
-                  redirect: 'manual',
-                });
-                console.log(`  ${route} (${res.status}) warmed up`);
-              } catch {
-                console.log(
-                  `  ${route} warmup failed (will compile on first test visit)`
-                );
-              }
+      if (isFastIteration && !isCuratedFastLane) {
+        try {
+          const wrapLinkResponse = await fetch(
+            `${localBaseURL}/api/wrap-link`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-forwarded-for': WRAP_LINK_WARMUP_IP,
+              },
+              body: JSON.stringify({
+                url: 'https://spotify.com/track/e2e-warmup',
+                platform: 'spotify',
+              }),
+              signal: AbortSignal.timeout(120_000),
             }
+          );
+          console.log(
+            `  /api/wrap-link (${wrapLinkResponse.status}) warmed up`
+          );
 
-            try {
-              const outResponse = await fetch(
-                `${localBaseURL}/out/${wrappedLink.shortId}`,
-                {
-                  signal: AbortSignal.timeout(120_000),
-                  redirect: 'manual',
-                }
-              );
-              console.log(
-                `  /out/${wrappedLink.shortId} (${outResponse.status}) warmed up`
-              );
-              challengeToken = extractChallengeToken(await outResponse.text());
-            } catch {
-              console.log(
-                `  /out/${wrappedLink.shortId} warmup failed (will compile on first test visit)`
-              );
-            }
+          if (wrapLinkResponse.ok) {
+            const wrappedLink = (await wrapLinkResponse.json()) as {
+              shortId?: string;
+            };
 
-            if (challengeToken) {
-              try {
-                const linkApiResponse = await fetch(
-                  `${localBaseURL}/api/link/${wrappedLink.shortId}`,
-                  {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'User-Agent':
-                        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                      'x-forwarded-for': WRAP_LINK_WARMUP_IP,
-                    },
-                    body: JSON.stringify({
-                      challengeToken,
-                      timestamp: Date.now(),
-                    }),
+            if (wrappedLink.shortId) {
+              let challengeToken: string | null = null;
+
+              for (const route of [`/go/${wrappedLink.shortId}`]) {
+                try {
+                  const res = await fetch(`${localBaseURL}${route}`, {
                     signal: AbortSignal.timeout(120_000),
+                    redirect: 'manual',
+                  });
+                  console.log(`  ${route} (${res.status}) warmed up`);
+                } catch {
+                  console.log(
+                    `  ${route} warmup failed (will compile on first test visit)`
+                  );
+                }
+              }
+
+              try {
+                const outResponse = await fetch(
+                  `${localBaseURL}/out/${wrappedLink.shortId}`,
+                  {
+                    signal: AbortSignal.timeout(120_000),
+                    redirect: 'manual',
                   }
                 );
                 console.log(
-                  `  /api/link/${wrappedLink.shortId} (${linkApiResponse.status}) warmed up`
+                  `  /out/${wrappedLink.shortId} (${outResponse.status}) warmed up`
+                );
+                challengeToken = extractChallengeToken(
+                  await outResponse.text()
                 );
               } catch {
                 console.log(
-                  `  /api/link/${wrappedLink.shortId} warmup failed (will compile on first test visit)`
+                  `  /out/${wrappedLink.shortId} warmup failed (will compile on first test visit)`
                 );
+              }
+
+              if (challengeToken) {
+                try {
+                  const linkApiResponse = await fetch(
+                    `${localBaseURL}/api/link/${wrappedLink.shortId}`,
+                    {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent':
+                          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                        'x-forwarded-for': WRAP_LINK_WARMUP_IP,
+                      },
+                      body: JSON.stringify({
+                        challengeToken,
+                        timestamp: Date.now(),
+                      }),
+                      signal: AbortSignal.timeout(120_000),
+                    }
+                  );
+                  console.log(
+                    `  /api/link/${wrappedLink.shortId} (${linkApiResponse.status}) warmed up`
+                  );
+                } catch {
+                  console.log(
+                    `  /api/link/${wrappedLink.shortId} warmup failed (will compile on first test visit)`
+                  );
+                }
               }
             }
           }
+        } catch {
+          console.log(
+            '  /api/wrap-link warmup failed (will compile on first anti-cloaking request)'
+          );
         }
-      } catch {
-        console.log(
-          '  /api/wrap-link warmup failed (will compile on first anti-cloaking request)'
-        );
+      }
+
+      if (isFastIteration && !isPublicNoAuthOnly) {
+        writeWarmupStamp(localBaseURL);
       }
     }
-
-    if (isFastIteration && !isPublicNoAuthOnly) {
-      writeWarmupStamp(localBaseURL);
-    }
+  } finally {
+    await setupLock.release();
   }
 
   const elapsed = Date.now() - startTime;
