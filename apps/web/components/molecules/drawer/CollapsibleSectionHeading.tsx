@@ -28,9 +28,9 @@ export function CollapsibleSectionHeading({
       aria-controls={ariaControls}
       className={cn(
         DRAWER_SECTION_HEADING_CLASSNAME,
-        'flex w-full items-center justify-between rounded-[8px] px-2 py-1.5 transition-[background-color,color,border-color] duration-150',
-        'hover:bg-(--linear-bg-surface-1)/75 hover:text-(--linear-text-secondary)',
-        'focus-visible:bg-(--linear-bg-surface-1)/75 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
+        'flex w-full items-center justify-between rounded-[10px] border border-transparent px-2.5 py-2 transition-[background-color,color,border-color] duration-150',
+        'hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-secondary-token',
+        'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)',
         className
       )}
     >

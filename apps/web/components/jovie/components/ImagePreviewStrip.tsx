@@ -20,40 +20,57 @@ export function ImagePreviewStrip({
   if (images.length === 0) return null;
 
   return (
-    <div className='flex gap-2 px-3 pt-2'>
-      <AnimatePresence mode='popLayout'>
-        {images.map(image => (
-          <motion.div
-            key={image.id}
-            className='group relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-subtle bg-surface-2'
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.8 }}
-            transition={{ duration: 0.15 }}
-          >
-            <Image
-              src={image.previewUrl}
-              alt={image.name}
-              fill
-              className='object-cover'
-              unoptimized
-            />
-            <button
-              type='button'
-              onClick={() => onRemove(image.id)}
-              className={cn(
-                'absolute right-1 top-1 flex h-5 w-5 items-center justify-center',
-                'rounded-full bg-surface-3/90 opacity-0 group-hover:opacity-100',
-                'text-primary-token transition-opacity',
-                'focus-visible:opacity-100'
-              )}
-              aria-label={`Remove ${image.name}`}
+    <div className='rounded-[20px] border border-subtle bg-surface-2/70 p-3'>
+      <div className='mb-3 flex items-center justify-between gap-3'>
+        <div>
+          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-token'>
+            Attachments
+          </p>
+          <p className='text-xs text-tertiary-token'>
+            {images.length} image{images.length === 1 ? '' : 's'} ready to send
+          </p>
+        </div>
+      </div>
+
+      <div className='flex gap-2 overflow-x-auto pb-0.5'>
+        <AnimatePresence mode='popLayout'>
+          {images.map(image => (
+            <motion.div
+              key={image.id}
+              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-subtle bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
             >
-              <X className='h-4 w-4' />
-            </button>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+              <Image
+                src={image.previewUrl}
+                alt={image.name}
+                fill
+                className='object-cover'
+                unoptimized
+              />
+              <div className='absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent px-2 pb-2 pt-5'>
+                <p className='truncate text-[11px] font-medium text-white'>
+                  {image.name}
+                </p>
+              </div>
+              <button
+                type='button'
+                onClick={() => onRemove(image.id)}
+                className={cn(
+                  'absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center',
+                  'rounded-full border border-white/15 bg-black/55 text-white opacity-0 transition-opacity',
+                  'group-hover:opacity-100 focus-visible:opacity-100'
+                )}
+                aria-label={`Remove ${image.name}`}
+              >
+                <X className='h-3.5 w-3.5' />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

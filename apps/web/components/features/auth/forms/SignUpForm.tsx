@@ -46,8 +46,25 @@ export function SignUpForm() {
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isClerkStalled = useLoadingStall(isLoaded);
 
+  // OAuth callback error from SSO callback redirect (e.g., ?oauth_error=account_exists)
+  const [oauthCallbackError, setOauthCallbackError] = useState<string | null>(
+    null
+  );
+
   // Shared auth page setup (hash cleanup, redirect URL storage)
   useAuthPageSetup();
+
+  // Handle OAuth callback errors passed via query param from SsoCallbackHandler
+  useEffect(() => {
+    const oauthError = searchParams.get('oauth_error');
+    if (oauthError) {
+      setOauthCallbackError(oauthError);
+      // Clean the URL param so it doesn't persist on refresh
+      const url = new URL(globalThis.location.href);
+      url.searchParams.delete('oauth_error');
+      router.replace(url.pathname + url.search);
+    }
+  }, [searchParams, router]);
 
   // Build sign-in URL with email and redirect preserved
   const buildSignInUrl = useCallback(
@@ -92,8 +109,29 @@ export function SignUpForm() {
 
   const handleEmailClick = () => {
     clearError();
+    setOauthCallbackError(null);
     setStep('email');
   };
+
+  // Map OAuth callback error type to user-facing message
+  const oauthCallbackMessage =
+    oauthCallbackError === 'account_exists'
+      ? 'An account with this email already exists. Try signing in instead.'
+      : oauthCallbackError === 'access_denied'
+        ? 'Required permissions were not granted. Please try again and accept all permissions.'
+        : oauthCallbackError
+          ? 'Something went wrong with Google sign-up. Please try again.'
+          : null;
+
+  // Show OAuth error from either: hook state (pre-redirect errors) or URL param (callback errors)
+  const showOAuthError =
+    (error && oauthFailureProvider) || oauthCallbackMessage;
+  const oauthErrorMessage = oauthCallbackMessage
+    ? oauthCallbackMessage
+    : error
+      ? getOAuthErrorMessage(error, 'Google')
+      : null;
+  const isAccountExistsOAuthError = oauthCallbackError === 'account_exists';
 
   return (
     <div className='w-full'>
@@ -106,16 +144,21 @@ export function SignUpForm() {
               onGoogleClick={startOAuth}
               loadingState={loadingState}
               mode='signup'
-              error={step === 'method' && oauthFailureProvider ? null : error}
+              error={
+                step === 'method' &&
+                (oauthFailureProvider || oauthCallbackError)
+                  ? null
+                  : error
+              }
             />
 
-            {error && oauthFailureProvider && (
+            {showOAuthError && (
               <div
                 className='rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-left space-y-3 animate-in fade-in-0 slide-in-from-top-2 duration-300'
                 role='alert'
               >
                 <p className='text-sm font-medium text-destructive'>
-                  {getOAuthErrorMessage(error, 'Google')}
+                  {oauthErrorMessage}
                 </p>
                 <p className='text-sm text-[#4c515a] dark:text-[#a8aaad]'>
                   Try another sign-up method to keep going right away.
@@ -135,10 +178,20 @@ export function SignUpForm() {
                   >
                     Continue with email
                   </button>
+                  {isAccountExistsOAuthError && (
+                    <Link
+                      href={buildSignInUrl('')}
+                      className='text-sm font-medium text-primary-token hover:underline focus-ring-themed rounded-md text-left'
+                    >
+                      Sign in instead
+                    </Link>
+                  )}
                 </div>
-                <p className='text-xs text-[#6b6f76] dark:text-[#969799]'>
-                  Details: {error}
-                </p>
+                {error && !oauthCallbackMessage && (
+                  <p className='text-xs text-[#6b6f76] dark:text-[#969799]'>
+                    Details: {error}
+                  </p>
+                )}
               </div>
             )}
           </>
