@@ -49,8 +49,8 @@ export function PricingSection() {
       className='section-spacing-linear relative overflow-hidden bg-page'
     >
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll grid items-end section-gap-linear md:grid-cols-[0.92fr_1.08fr]'>
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4'>
               <Badge variant='outline' size='xl' className='w-fit'>
                 Pricing
@@ -59,7 +59,7 @@ export function PricingSection() {
                 Simple pricing.
               </h2>
             </div>
-            <p className='max-w-xl marketing-lead-linear text-secondary-token md:justify-self-end'>
+            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
               Start free with smart links and your artist profile. Upgrade when
               you want release notifications, deeper audience intelligence, and
               branding control.
@@ -67,11 +67,11 @@ export function PricingSection() {
           </div>
 
           <div
-            className='reveal-on-scroll mx-auto mt-8 grid max-w-[58rem] grid-cols-1 gap-5 md:mt-8 md:grid-cols-2'
+            className='homepage-section-stack reveal-on-scroll mx-auto grid max-w-[58rem] grid-cols-1 gap-4 md:grid-cols-2 md:gap-5'
             data-delay='80'
           >
             <div
-              className='relative flex flex-col rounded-[0.95rem] p-7'
+              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
@@ -91,7 +91,7 @@ export function PricingSection() {
                 Smart links, your artist profile, and the core launch surface.
               </p>
 
-              <ul className='mt-7 flex flex-1 flex-col gap-2.5'>
+              <ul className='mt-6 flex flex-1 flex-col gap-2.5'>
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -103,7 +103,7 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-5 rounded-[0.85rem] border border-subtle bg-surface-1 p-4'>
+              <div className='mt-5 rounded-[0.9rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
@@ -116,16 +116,17 @@ export function PricingSection() {
                 asChild
                 variant='secondary'
                 size='xl'
-                className='mt-8 w-full'
+                className='mt-7 w-full'
               >
                 <Link href='/signup?plan=free'>Launch for Free</Link>
               </Button>
             </div>
 
             <div
-              className='relative flex flex-col overflow-hidden rounded-[0.95rem] p-7'
+              className='relative flex h-full flex-col overflow-hidden rounded-[1rem] p-6 md:p-7'
               style={{
-                backgroundColor: 'var(--linear-bg-surface-0)',
+                background:
+                  'linear-gradient(180deg, color-mix(in oklab, var(--linear-bg-surface-0) 78%, rgba(113,112,255,0.16)) 0%, var(--linear-bg-surface-0) 36%)',
                 border: '1px solid var(--linear-pricing-accent-border)',
                 boxShadow:
                   'var(--linear-shadow-card-elevated), 0 0 0 1px var(--linear-pricing-accent-shadow)',
@@ -158,7 +159,7 @@ export function PricingSection() {
                 and deeper fan ownership.
               </p>
 
-              <ul className='mt-7 flex flex-1 flex-col gap-2.5'>
+              <ul className='mt-6 flex flex-1 flex-col gap-2.5'>
                 {FOUNDING_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -170,7 +171,13 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-5 rounded-[0.85rem] border border-subtle bg-surface-1 p-4'>
+              <div
+                className='mt-5 rounded-[0.9rem] border border-subtle p-4'
+                style={{
+                  backgroundColor:
+                    'color-mix(in oklab, var(--linear-bg-surface-1) 95%, transparent)',
+                }}
+              >
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
@@ -183,7 +190,7 @@ export function PricingSection() {
                 asChild
                 variant='accent'
                 size='xl'
-                className='mt-8 w-full text-[rgb(8,9,10)] hover:text-[rgb(8,9,10)]'
+                className='mt-7 w-full text-[rgb(8,9,10)] hover:text-[rgb(8,9,10)]'
               >
                 <Link href='/signup?plan=founding'>Choose Founding Member</Link>
               </Button>

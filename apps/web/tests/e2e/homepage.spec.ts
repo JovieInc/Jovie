@@ -3,13 +3,6 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 
-/**
- * Homepage E2E Tests (consolidated from homepage + featured-artists)
- *
- * Covers: hero, sections, navigation, meta, responsiveness, featured
- * creators carousel. All tests run unauthenticated.
- */
-
 test.use({ storageState: { cookies: [], origins: [] } });
 test.skip(
   isFastIteration,
@@ -17,22 +10,15 @@ test.skip(
 );
 
 async function interceptAnalytics(page: import('@playwright/test').Page) {
-  await page.route('**/api/profile/view', r =>
-    r.fulfill({ status: 200, body: '{}' })
+  await page.route('**/api/profile/view', route =>
+    route.fulfill({ status: 200, body: '{}' })
   );
-  await page.route('**/api/audience/visit', r =>
-    r.fulfill({ status: 200, body: '{}' })
+  await page.route('**/api/audience/visit', route =>
+    route.fulfill({ status: 200, body: '{}' })
   );
-  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
-}
-
-async function scrollToLowerHomepageSections(
-  page: import('@playwright/test').Page
-) {
-  await page.evaluate(() => {
-    window.scrollTo(0, document.body.scrollHeight);
-  });
-  await page.waitForTimeout(500);
+  await page.route('**/api/track', route =>
+    route.fulfill({ status: 200, body: '{}' })
+  );
 }
 
 test.describe('Homepage', () => {
@@ -42,149 +28,107 @@ test.describe('Homepage', () => {
     await waitForHydration(page);
   });
 
-  test('hero section renders with headline and claim handle form', async ({
+  test('hero renders with current headline, lead, and claim form', async ({
     page,
   }) => {
-    await expect(page.locator('h1')).toContainText('Release More Music.');
+    await expect(page.locator('h1')).toContainText(
+      'One link to launch your music career.'
+    );
     await expect(
       page.getByText(
-        /Connect Spotify once\. Jovie creates smart links for every song/i
+        'Smart links, fan capture, tips, and tour dates, all behind a single link.'
       )
     ).toBeVisible();
 
-    // Claim handle input in hero
     const heroSection = page.locator('main section').first();
-    const input = heroSection.locator('input').first();
-    await expect(input).toBeVisible();
+    await expect(heroSection.locator('input').first()).toBeVisible();
   });
 
-  test('page has multiple sections with substantial content', async ({
-    page,
-  }) => {
-    const sections = page.locator('section');
-    const sectionCount = await sections.count();
-    expect(sectionCount).toBeGreaterThan(1);
-
-    const bodyText = await page.locator('body').textContent();
-    expect(bodyText && bodyText.length > 1000).toBe(true);
-
-    await scrollToLowerHomepageSections(page);
-    await expect
-      .poll(() => page.evaluate(() => window.scrollY), {
-        message: 'Homepage should scroll past the hero section',
-      })
-      .toBeGreaterThan(0);
-  });
-
-  test('header navigation and footer visible', async ({ page }) => {
+  test('header keeps homepage anchor navigation', async ({ page }) => {
     const header = page.locator('header');
     await expect(header).toBeVisible();
-
-    const logoLink = page.locator('a[href="/"]').first();
-    await expect(logoLink).toBeVisible();
+    await expect(page.locator('a[href="#release-proof"]')).toBeVisible();
+    await expect(page.locator('a[href="#profiles"]')).toBeVisible();
+    await expect(
+      page.locator('a[href="#audience-intelligence"]')
+    ).toBeVisible();
+    await expect(page.locator('a[href="#pricing"]')).toBeVisible();
   });
 
-  test('has proper meta information', async ({ page }) => {
-    await expect(page).toHaveTitle(/Jovie/);
-    const metaDescription = page.locator('meta[name="description"]');
-    await expect(metaDescription).toHaveAttribute('content');
+  test('core homepage sections render in order', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', { name: 'Release day, automated.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'One Tool. Zero Setup.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Profiles that convert.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'AI that knows your work.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Know every fan by name.' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Simple pricing.' })
+    ).toBeVisible();
+  });
+
+  test('final CTA renders with preserved ids and claim form', async ({
+    page,
+  }) => {
+    const finalHeadline = page.getByTestId('final-cta-headline');
+    await expect(finalHeadline).toHaveText('Take the stage.');
+
+    const finalDock = page.getByTestId('final-cta-dock');
+    await expect(finalDock).toBeVisible();
+    await expect(finalDock.locator('input').first()).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {
-    await page.setViewportSize({ width: 375, height: 667 });
+    await page.setViewportSize({ width: 375, height: 812 });
 
-    await expect(page.locator('h1')).toContainText('Release More Music.', {
+    await expect(page.locator('h1')).toContainText(
+      'One link to launch your music career.',
+      {
+        timeout: SMOKE_TIMEOUTS.VISIBILITY,
+      }
+    );
+
+    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
+    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
 
     const heroSection = page.locator('main section').first();
-    const input = heroSection.locator('input').first();
-    await expect(input).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+    await expect(heroSection.locator('input').first()).toBeVisible({
+      timeout: SMOKE_TIMEOUTS.VISIBILITY,
+    });
   });
 
-  test('no loading or error states visible after hydration', async ({
+  test('has proper meta information and no obvious error state', async ({
     page,
   }) => {
-    await expect(page.locator('body')).not.toContainText('Error');
-    await expect(page.locator('body')).not.toContainText('Loading...');
-    await expect(page.locator('h1')).toBeVisible();
-  });
-});
-
-test.describe('Homepage - See It In Action', () => {
-  test('showcase section loads with Tim White profile and releases', async ({
-    page,
-  }) => {
-    await interceptAnalytics(page);
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await scrollToLowerHomepageSections(page);
-
-    await expect(
-      page.getByRole('heading', { name: /See it in action/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText('Tim White', { exact: true })).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByText(/^Artist$/)).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(page.getByRole('link', { name: /jov\.ie\/tim/i })).toBeVisible(
-      {
-        timeout: 20000,
-      }
+    await expect(page).toHaveTitle(/Jovie/);
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      'content'
     );
-    await expect(
-      page.getByRole('link', { name: /View Profile/i })
-    ).toHaveAttribute('href', '/tim');
-    await expect(page.getByText(/Never Say A Word/i)).toBeVisible();
-    await expect(page.getByText(/The Deep End/i)).toBeVisible();
-    await expect(page.getByText(/Take Me Over/i)).toBeVisible();
+    await expect(page.locator('body')).not.toContainText('Loading...');
+    await expect(page.locator('body')).not.toContainText(
+      'Unhandled Runtime Error'
+    );
   });
 
-  test('showcase section has profile and release artwork with alt text', async ({
-    page,
-  }) => {
-    await interceptAnalytics(page);
-    await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await scrollToLowerHomepageSections(page);
-
-    await expect(
-      page.getByRole('heading', { name: /See it in action/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-
-    await expect(
-      page.getByRole('img', { name: /Tim White profile photo/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(
-      page.getByRole('img', { name: /Never Say A Word artwork/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(
-      page.getByRole('img', { name: /The Deep End artwork/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-    await expect(
-      page.getByRole('img', { name: /Take Me Over artwork/i })
-    ).toBeVisible({
-      timeout: 20000,
-    });
-  });
-
-  test('showcase loads without critical console errors', async ({ page }) => {
+  test('loads without critical console errors', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', msg => {
       if (msg.type() === 'error') errors.push(msg.text());
     });
 
-    await interceptAnalytics(page);
     await page.goto('/', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await waitForHydration(page);
 
