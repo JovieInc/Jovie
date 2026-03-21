@@ -6,11 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.27] - 2026-03-20
+## [26.4.28] - 2026-03-20
 
 ### Fixed
 
 - Add missing `active_profile_id` column to production database — migration was lost during migration squash, causing 6 Sentry errors across auth, session, and dashboard queries
+- Backfill `active_profile_id` for existing users with claimed profiles — prevents "no active profile" state after column is added
+- Update `create_profile_with_user()` stored function to set `active_profile_id` during onboarding
+- Deterministic backfill query uses correlated subquery with `ORDER BY created_at ASC LIMIT 1` to handle multi-profile users
+- Stored function prefers claimed profiles over unclaimed ones when selecting existing profile
 - Fix migration journal timestamp ordering so new migration runs after existing ones on all environments
 
 ## [26.4.26] - 2026-03-20
