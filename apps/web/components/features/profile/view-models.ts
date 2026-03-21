@@ -101,6 +101,7 @@ export function buildProfileIdentityFields(
     hideBranding: Boolean(artist.settings?.hide_branding),
     location: artist.location ?? '',
     hometown: artist.hometown ?? '',
+    pitchContext: artist.pitch_context ?? '',
     profilePath: `/${artist.handle}`,
   };
 }

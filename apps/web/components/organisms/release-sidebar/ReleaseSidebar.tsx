@@ -46,6 +46,7 @@ import { ReleaseDspLinks } from './ReleaseDspLinks';
 import { ReleaseFields } from './ReleaseFields';
 import { ReleaseLyricsSection } from './ReleaseLyricsSection';
 import { ReleaseMetadata } from './ReleaseMetadata';
+import { ReleasePitchSection } from './ReleasePitchSection';
 import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
 import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
@@ -538,12 +539,20 @@ export function ReleaseSidebar({
               )}
 
               {activeTab === 'details' && (
-                <ReleaseMetadata
-                  release={release}
-                  onCanvasStatusChange={
-                    canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                  }
-                />
+                <>
+                  <ReleaseMetadata
+                    release={release}
+                    onCanvasStatusChange={
+                      canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                    }
+                  />
+                  {!readOnly && (
+                    <ReleasePitchSection
+                      releaseId={release.id}
+                      existingPitches={release.generatedPitches}
+                    />
+                  )}
+                </>
               )}
 
               {activeTab === 'lyrics' && (

@@ -170,6 +170,7 @@ export interface Artist {
   hometown?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
+  pitch_context?: string | null;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;

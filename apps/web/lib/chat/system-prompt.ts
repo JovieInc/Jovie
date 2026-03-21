@@ -54,6 +54,7 @@ export function buildSystemPrompt(
     aiCanUseTools: boolean;
     aiDailyMessageLimit: number;
     insightsEnabled?: boolean;
+    knowledgeContext?: string;
   }
 ): string {
   const formatMoney = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -83,7 +84,7 @@ ${buildDiscographySection(releases)}
 - **Tips Received:** ${context.tippingStats.tipsSubmitted}
 - **Total Earned:** ${formatMoney(context.tippingStats.totalReceivedCents)}
 - **This Month:** ${formatMoney(context.tippingStats.monthReceivedCents)}
-
+${buildKnowledgeSection(options?.knowledgeContext)}
 ## Voice (CRITICAL)
 - Direct, concise: 1-3 sentences, max 150 words unless detail requested or generating a bio.
 - No emoji, no exclamation marks, no cheerleading, no filler, no repeating the user.
@@ -120,6 +121,17 @@ When asked to edit genres, explain that genres are automatically synced from the
 
 ## Feedback
 When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
+}
+
+function buildKnowledgeSection(knowledgeContext?: string): string {
+  if (!knowledgeContext) return '\n';
+  return `
+## Music Industry Knowledge
+The following reference material is relevant to this conversation. Use it to give accurate, specific advice. Present the information as established industry knowledge, but acknowledge uncertainty for anything highly time-sensitive (e.g. exact per-stream rates, feature availability, platform-specific deadlines).
+
+${knowledgeContext}
+
+`;
 }
 
 function buildPlanLimitationsSection(options?: {
