@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.26] - 2026-03-20
+
+### Added
+
+- Spotify artist blacklist for founder identity protection — blocks 24 wrong "Tim White" Spotify IDs from search results, DSP enrichment, and profile claiming
+- Safety assertion prevents accidental self-blacklisting of the correct Tim White Spotify ID
+- Observability logging when blacklisted artists are filtered from search results
+
+### Fixed
+
+- Homepage and featured creators display now shows the correct Tim White avatar (locked to static fallback image)
+- DSP enrichment pipeline can no longer overwrite Tim White's profile with wrong artist data
+
 ## [26.4.25] - 2026-03-20
 
 ### Changed
