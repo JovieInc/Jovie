@@ -242,3 +242,17 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M
 **Priority:** P2
 **Depends on:** Retargeting hardening PR (forwarding observability + conversion attribution).
+
+---
+
+## Connection pool monitoring
+
+**What:** Add lightweight connection pool utilization logging (active/idle/waiting counts) to dashboard data queries, emitted as Sentry breadcrumbs.
+
+**Why:** The social links timeout root cause was connection starvation, but we had no metrics to prove it. Pool monitoring would let you see `pool: 10/10 active, 3 waiting` in Sentry breadcrumbs when timeouts occur, making future diagnosis instant.
+
+**Context:** The pool is configured in `apps/web/lib/db/client/connection.ts` with max=10. Neon's `Pool` class exposes `pool.totalCount`, `pool.idleCount`, `pool.waitingCount`. Add breadcrumbs in the `dashboardQuery()` wrapper in `apps/web/lib/db/query-timeout.ts`.
+
+**Effort:** S (human ~30min / CC ~5min)
+**Priority:** P2
+**Depends on:** Nothing.
