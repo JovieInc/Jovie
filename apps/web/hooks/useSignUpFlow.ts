@@ -102,7 +102,8 @@ export interface UseSignUpFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
-  const { signUp, setActive, isLoaded } = useSignUp();
+  const { signUp, fetchStatus } = useSignUp();
+  const isLoaded = signUp !== null && fetchStatus === 'idle';
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup
@@ -138,14 +139,18 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
 
       try {
         // Create sign-up with email
-        await signUp.create({
+        const createResult = await signUp.create({
           emailAddress,
         });
+        if (createResult.error) {
+          throw createResult.error;
+        }
 
         // Prepare email verification - this sends the code
-        await signUp.prepareEmailAddressVerification({
-          strategy: 'email_code',
-        });
+        const verificationResult = await signUp.verifications.sendEmailCode();
+        if (verificationResult.error) {
+          throw verificationResult.error;
+        }
 
         base.setStep('verification');
         base.setLoadingState({ type: 'idle' });
@@ -187,13 +192,18 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       base.setCode(verificationCode);
 
       try {
-        const result = await signUp.attemptEmailAddressVerification({
+        const result = await signUp.verifications.verifyEmailCode({
           code: verificationCode,
         });
+        if (result.error) {
+          throw result.error;
+        }
 
-        if (result.status === 'complete') {
-          // Set the active session
-          await setActive({ session: result.createdSessionId });
+        if (signUp.status === 'complete') {
+          const finalizeResult = await signUp.finalize();
+          if (finalizeResult.error) {
+            throw finalizeResult.error;
+          }
 
           // CRITICAL: Wait for session to propagate before redirecting
           // This prevents race conditions where onboarding page loads before
@@ -226,10 +236,10 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         }
 
         // Handle other statuses
-        if (result.status === 'missing_requirements') {
+        if (signUp.status === 'missing_requirements') {
           // There may be additional verification needed
           base.setError('Additional verification required. Please try again.');
-        } else if (result.status === 'abandoned') {
+        } else if (signUp.status === 'abandoned') {
           base.setError('Sign-up was interrupted. Please start over.');
         } else {
           base.setError('Sign-up incomplete. Please try again.');
@@ -250,7 +260,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         return false;
       }
     },
-    [signUp, setActive, isLoaded, clearError, base]
+    [signUp, isLoaded, clearError, base]
   );
 
   /**
@@ -264,9 +274,10 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
     base.setCode('');
 
     try {
-      await signUp.prepareEmailAddressVerification({
-        strategy: 'email_code',
-      });
+      const result = await signUp.verifications.sendEmailCode();
+      if (result.error) {
+        throw result.error;
+      }
 
       base.setLoadingState({ type: 'idle' });
       return true;
@@ -297,11 +308,14 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
       // production all redirect correctly after the OAuth round-trip.
       const oauthBase = getOAuthBaseUrl();
       const storedRedirect = base.getRedirectUrl(); // falls back to /onboarding
-      await signUp.authenticateWithRedirect({
+      const oauthResult = await signUp.sso({
         strategy: `oauth_${provider}`,
         redirectUrl: `${oauthBase}/signup/sso-callback`,
-        redirectUrlComplete: `${oauthBase}${storedRedirect}`,
+        redirectCallbackUrl: `${oauthBase}${storedRedirect}`,
       });
+      if (oauthResult.error) {
+        throw oauthResult.error;
+      }
     } catch (err) {
       // If user already has a session, redirect to dashboard
       if (isSessionExists(err)) {

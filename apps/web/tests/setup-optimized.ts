@@ -199,15 +199,18 @@ vi.mock('@headlessui/react', async () => {
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
-  useSignIn: () => ({
-    isLoaded: true,
-    signIn: undefined,
+  useClerk: () => ({
     setActive: async () => {},
   }),
+  useSignIn: () => ({
+    fetchStatus: 'idle',
+    errors: [],
+    signIn: null,
+  }),
   useSignUp: () => ({
-    isLoaded: true,
-    signUp: undefined,
-    setActive: async () => {},
+    fetchStatus: 'idle',
+    errors: [],
+    signUp: null,
   }),
   SignedIn: ({ children }: { children: unknown }) => null,
   SignedOut: ({ children }: { children: unknown }) => children,

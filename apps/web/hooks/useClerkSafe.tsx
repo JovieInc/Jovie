@@ -2,8 +2,9 @@
 
 import {
   useAuth as useAuthOriginal,
+  useClerk as useClerkOriginal,
   useSession as useSessionOriginal,
-  useSignIn as useSignInOriginal,
+  useSignIn as useSignInSignalOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
@@ -12,7 +13,13 @@ import { createContext, type ReactNode, useContext, useMemo } from 'react';
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
 type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
 type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
-type UseSignInReturn = ReturnType<typeof useSignInOriginal>;
+type UseSignInSignalReturn = ReturnType<typeof useSignInSignalOriginal>;
+type UseClerkReturn = ReturnType<typeof useClerkOriginal>;
+type UseSignInReturn = {
+  isLoaded: boolean;
+  signIn: UseSignInSignalReturn['signIn'] | null;
+  setActive: UseClerkReturn['setActive'];
+};
 
 /**
  * Context to track whether Clerk is available in the current provider tree.
@@ -126,7 +133,16 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
-  const signIn = useSignInOriginal();
+  const clerk = useClerkOriginal();
+  const signInSignal = useSignInSignalOriginal();
+  const signIn = useMemo<UseSignInReturn>(
+    () => ({
+      isLoaded: signInSignal.signIn !== null,
+      signIn: signInSignal.signIn,
+      setActive: clerk.setActive,
+    }),
+    [clerk.setActive, signInSignal.signIn]
+  );
 
   const value = useMemo(
     () => ({ user, auth, session, signIn }),

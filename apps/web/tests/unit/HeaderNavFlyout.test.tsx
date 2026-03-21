@@ -7,10 +7,13 @@ vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useSession: () => ({ isLoaded: true, isSignedIn: false, session: null }),
-  useSignIn: () => ({
-    isLoaded: true,
-    signIn: undefined,
+  useClerk: () => ({
     setActive: async () => {},
+  }),
+  useSignIn: () => ({
+    fetchStatus: 'idle',
+    errors: [],
+    signIn: null,
   }),
   SignedIn: ({ children }: { children: React.ReactNode }) => null,
   SignedOut: ({ children }: { children: React.ReactNode }) => children,
