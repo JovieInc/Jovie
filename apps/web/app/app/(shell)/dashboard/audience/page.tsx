@@ -7,6 +7,8 @@ import { DashboardAudienceClient } from '@/features/dashboard/organisms/Dashboar
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -29,21 +31,41 @@ async function AudienceContent({
   searchParams: Promise<SearchParams>;
 }>) {
   try {
-    const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-    // Fetch dashboard data server-side (handles auth internally)
-    const dashboardData = await getDashboardData();
-
-    // Handle unauthenticated users
-    if (!dashboardData.user?.id) {
+    // Auth check via Clerk JWT (no DB dependency) — ensures unauthenticated
+    // users are redirected even during DB outages
+    const { userId } = await getCachedAuth();
+    if (!userId) {
       redirect(
         `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
       );
     }
 
-    // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect('/onboarding');
+    const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+
+    const dashboardData = await getDashboardData();
+
+    if (dashboardData.dashboardLoadError) {
+      void captureError(
+        'Dashboard data load failed on audience page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.DASHBOARD_AUDIENCE }
+      );
+      return (
+        <PageErrorState message='Failed to load audience data. Please refresh the page.' />
+      );
+    }
+
+    // Onboarding check first — during provisioning, user may be null but
+    // needsOnboarding is true. Checking user first would incorrectly redirect
+    // authenticated-but-not-yet-provisioned users to signin.
+    if (dashboardData.needsOnboarding) {
+      redirect(APP_ROUTES.ONBOARDING);
+    }
+
+    if (!dashboardData.user?.id) {
+      redirect(
+        `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
+      );
     }
 
     const artist = dashboardData.selectedProfile

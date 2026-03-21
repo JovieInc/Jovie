@@ -7,7 +7,7 @@ import { DrawerEmptyState } from './DrawerEmptyState';
 import { DrawerSectionHeading } from './DrawerSectionHeading';
 
 export const DRAWER_LINK_SECTION_ICON_BUTTON_CLASSNAME =
-  'min-h-[32px] min-w-[32px] flex items-center justify-center rounded-[8px] border border-transparent text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-surface-1 hover:border-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
+  'min-h-[32px] min-w-[32px] flex items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token transition-[background-color,border-color,color,box-shadow] duration-150 active:bg-surface-1 hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus) lg:min-h-0 lg:min-w-0 lg:p-1.5 lg:active:bg-transparent';
 
 export interface DrawerLinkSectionProps {
   /** Section heading text */
@@ -51,7 +51,7 @@ export function DrawerLinkSection({
   return (
     <div className={cn('space-y-1.5', className)}>
       {/* Section header: title + action buttons */}
-      <div className='flex min-h-[32px] items-center justify-between gap-2 lg:min-h-0'>
+      <div className='flex min-h-[32px] items-center justify-between gap-2 px-1 lg:min-h-0'>
         <DrawerSectionHeading as='h4' className='min-w-0 flex-1 truncate'>
           {title}
         </DrawerSectionHeading>
@@ -78,7 +78,7 @@ export function DrawerLinkSection({
           testId={emptyStateTestId}
         />
       ) : (
-        <div className='-mx-1'>{children}</div>
+        <div>{children}</div>
       )}
     </div>
   );

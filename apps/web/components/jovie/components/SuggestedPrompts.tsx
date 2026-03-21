@@ -53,20 +53,22 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex items-center gap-2 rounded-lg border border-subtle',
-        'bg-surface-1 px-3.5 py-2.5 text-left',
-        'hover:border-default hover:bg-surface-2',
+        'chat-pill flex items-start gap-2.5 rounded-[14px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'hover:bg-surface-0',
         'active:scale-[0.98]',
         'focus:outline-none',
-        'cursor-pointer transition-colors duration-fast'
+        'cursor-pointer transition-[background-color,border-color] duration-fast'
       )}
     >
-      {IconComponent && (
-        <IconComponent
-          className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
-        />
-      )}
-      <span className='text-[13px] leading-snug text-secondary-token'>
+      <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0'>
+        {IconComponent && (
+          <IconComponent
+            className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
+          />
+        )}
+      </span>
+      <span className='pt-0.5 text-[13px] leading-snug text-secondary-token'>
         {suggestion.label}
       </span>
     </button>
@@ -102,7 +104,7 @@ export function SuggestedPrompts({
     : fallbackSuggestions;
 
   return (
-    <div className='flex flex-col gap-2 w-full max-w-sm mx-auto'>
+    <div className='grid w-full max-w-[46rem] gap-2.5 sm:grid-cols-2'>
       {promptSuggestions.map(suggestion => (
         <SuggestionPill
           key={suggestion.label}

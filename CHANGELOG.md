@@ -6,6 +6,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.29] - 2026-03-20
+
+### Added
+
+- YC demo Playwright spec (`yc-demo.spec.ts`) that records the full onboarding flow at watchable pace with deliberate pauses for voiceover narration
+- Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
+- Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
+- `demo:record` script in package.json for one-command demo video recording
+
+### Changed
+
+- Refactored golden-path.spec.ts to import helpers from shared module instead of inlining them
+- `ensureDbUser()` now accepts optional `knownSpotifyArtistIds` parameter for caller-specific Spotify ID cleanup
+- `createFreshUser()` no longer calls `ensureDbUser()` internally — callers handle DB setup explicitly
+## [26.4.29] - 2026-03-21
+
+### Fixed
+
+- Stop capture-tip infinite Stripe retry loop — return 200 with fire-and-forget Sentry alert instead of 500 when creator profile not found
+- Store immutable profile_id in Stripe payment intent metadata so capture-tip webhook can resolve creators without relying on mutable handle lookups
+- Validate profile_id still exists before tip insert to prevent FK violation causing 500 retry loops
+- Check isPublic flag on creator profile in create-tip-intent to match checkout flow behavior
+- Add auth-first guards (getCachedAuth before getDashboardData) on dashboard pages to prevent unauthenticated access during DB outages
+- Escalate stripe-tips webhook from logger.warn to captureCriticalError with redacted email context
+- Dashboard pages (earnings, audience, releases, presence) show PageErrorState with consistent captureError telemetry instead of redirecting to signin on DB failure
+- Add error tracking to batchUpdateSequential with succeeded count and failed item context
+- Use APP_ROUTES.ONBOARDING constant instead of hardcoded paths
+
+## [26.4.28] - 2026-03-20
+
+### Added
+
+- Dev toolbar "Unwaitlist" button for self-approving waitlist entry during local testing
+- Dev-only API route `POST /api/dev/unwaitlist` reusing existing approval logic (blocked in production)
+### Fixed
+
+- Add missing `active_profile_id` column to production database — migration was lost during migration squash, causing 6 Sentry errors across auth, session, and dashboard queries
+- Backfill `active_profile_id` for existing users with claimed profiles — prevents "no active profile" state after column is added
+- Update `create_profile_with_user()` stored function to set `active_profile_id` during onboarding
+- Deterministic backfill query uses correlated subquery with `ORDER BY created_at ASC LIMIT 1` to handle multi-profile users
+- Stored function prefers claimed profiles over unclaimed ones when selecting existing profile
+- Fix migration journal timestamp ordering so new migration runs after existing ones on all environments
+- Waitlist re-submission no longer silently downgrades approved users — `upsertUserAsPending` is now guarded behind `existing.status === 'new'`, preventing approved users from being locked out if they re-hit the waitlist endpoint via stale bookmark or direct API call
+- Added regression test for waitlist status downgrade protection
+
+## [26.4.27] - 2026-03-20
+
+### Fixed
+
+- Hardened redirect URL sanitization against backslash and encoded bypass attacks (e.g., `%5C`, `%2F`)
+- Availability check on signup page now shows error message instead of silently disappearing on network failure
+- Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
+- Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments
+- Pixel settings API no longer fetches actual token values from database — uses SQL-level `IS NOT NULL` booleans instead
+- Google OAuth sign-up now shows a clear error message when the account already exists, instead of silently redirecting back to the sign-up page
+- OAuth callback handler uses imperative Clerk API for proper error classification (account exists, access denied, unknown)
+- Sign-up form displays specific error messages with "Sign in instead" link for existing account errors
+
+## [26.4.26] - 2026-03-20
+
+### Added
+
+- Spotify artist blacklist for founder identity protection — blocks 24 wrong "Tim White" Spotify IDs from search results, DSP enrichment, and profile claiming
+- Safety assertion prevents accidental self-blacklisting of the correct Tim White Spotify ID
+- Observability logging when blacklisted artists are filtered from search results
+
+### Fixed
+
+- Homepage and featured creators display now shows the correct Tim White avatar (locked to static fallback image)
+- DSP enrichment pipeline can no longer overwrite Tim White's profile with wrong artist data
+
 ## [26.4.25] - 2026-03-20
 
 ### Changed

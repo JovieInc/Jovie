@@ -16,7 +16,7 @@ const realRoot = (() => {
 
 // Load environment variables from .env.test if it exists to keep parity with the
 // standard configuration while using the optimized defaults locally.
-dotenv.config({ path: '.env.test' });
+dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 
 // Detect CI environment
 const isCI = process.env.CI === 'true';
@@ -46,6 +46,7 @@ const changedSuiteStabilityConfig = isChangedRun
  * Uses optimized setup file and aggressive performance settings.
  */
 export default defineConfig({
+  root: realRoot,
   plugins: [react()],
   // Allow Vite's @fs handler to serve files from the real path (handles
   // Windows short-name paths like TIMWHI~1 that contain spaces when expanded).

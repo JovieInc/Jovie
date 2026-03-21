@@ -10,6 +10,31 @@ import { getChangelogVerifyEmail } from '@/lib/email/templates/changelog-verify'
 const rateLimitMap = new Map<string, number>();
 const RATE_LIMIT_MS = 10_000; // 10 seconds between requests per IP
 
+function isValidEmail(email: string): boolean {
+  if (email.length > 254) return false;
+
+  const atIndex = email.indexOf('@');
+  if (atIndex <= 0 || atIndex !== email.lastIndexOf('@')) return false;
+
+  const local = email.slice(0, atIndex);
+  const domain = email.slice(atIndex + 1);
+
+  if (local.length > 64 || domain.length === 0) return false;
+  if (!domain.includes('.') || domain.startsWith('.') || domain.endsWith('.')) {
+    return false;
+  }
+
+  for (const char of domain) {
+    const isAlphaNumeric =
+      (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9');
+    if (!(isAlphaNumeric || char === '.' || char === '-')) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const last = rateLimitMap.get(ip);
@@ -76,7 +101,7 @@ export async function POST(request: NextRequest) {
   }
 
   const email = body.email?.trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !isValidEmail(email)) {
     return NextResponse.json(
       { error: 'Valid email required' },
       { status: 400 }

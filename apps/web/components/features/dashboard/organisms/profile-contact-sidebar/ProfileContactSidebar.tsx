@@ -16,11 +16,13 @@ import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyR
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useAvatarMutation,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
+import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
 import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
@@ -58,6 +60,13 @@ const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
   'dsp',
   'earnings',
 ]);
+
+let tempLinkIdCounter = 0;
+
+function createTempLinkId(): string {
+  tempLinkIdCounter += 1;
+  return `temp-${Date.now()}-${tempLinkIdCounter}`;
+}
 
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
@@ -261,7 +270,7 @@ export function ProfileContactSidebar() {
 
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
-        id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: createTempLinkId(),
         title: link.suggestedTitle ?? link.platform.name,
         url: link.normalizedUrl,
         platform: link.platform.id,
@@ -425,26 +434,39 @@ export function ProfileContactSidebar() {
         title={<div className='h-4 w-24 rounded skeleton' />}
         onClose={close}
         entityHeader={
-          <div className='flex items-center gap-3'>
-            <div className='h-10 w-10 rounded-full skeleton' />
-            <div className='space-y-1.5'>
-              <div className='h-4 w-24 rounded skeleton' />
-              <div className='h-3 w-16 rounded skeleton' />
+          <div className='space-y-3'>
+            <div
+              className={cn(
+                LINEAR_SURFACE.sidebarCard,
+                'flex items-center gap-3 px-3.5 py-3'
+              )}
+            >
+              <div className='h-10 w-10 rounded-full skeleton' />
+              <div className='space-y-1.5'>
+                <div className='h-4 w-24 rounded skeleton' />
+                <div className='h-3 w-16 rounded skeleton' />
+              </div>
+            </div>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
+              <div className='h-16 rounded-[10px] skeleton' />
+              <div className='h-10 rounded-[10px] skeleton' />
             </div>
           </div>
         }
         tabs={
-          <div className='flex gap-2'>
-            <div className='h-7 w-16 rounded-md skeleton' />
-            <div className='h-7 w-16 rounded-md skeleton' />
-            <div className='h-7 w-14 rounded-md skeleton' />
+          <div className='flex items-center gap-1'>
+            <div className='h-9 flex-1 rounded-[10px] skeleton' />
+            <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
           </div>
         }
       >
-        <div className='space-y-3'>
+        <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-2')}>
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className='flex items-center gap-3'>
-              <div className='h-8 w-8 rounded-md skeleton shrink-0' />
+            <div
+              key={i}
+              className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+            >
+              <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
               <div className='flex-1 h-4 rounded skeleton' />
             </div>
           ))}
@@ -497,8 +519,13 @@ export function ProfileContactSidebar() {
       title={headerTitle}
       headerActions={headerActions}
       entityHeader={
-        <div className='space-y-1.5'>
-          <div className='pt-0.5'>
+        <div className='space-y-3'>
+          <div
+            className={cn(
+              LINEAR_SURFACE.sidebarCard,
+              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+            )}
+          >
             <ProfileContactHeader
               displayName={displayName}
               username={username}
@@ -509,48 +536,60 @@ export function ProfileContactSidebar() {
             />
           </div>
 
-          {/* Analytics summary */}
-          <ProfileAnalyticsSummary />
+          <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
+            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
+              <ProfileAnalyticsSummary />
+            </div>
 
-          <DrawerPropertyRow
-            label='Profile link'
-            value={
-              <div className='flex items-center gap-1.5'>
-                <CopyLinkInput
-                  url={profileUrl}
-                  size='md'
-                  className='flex-1'
-                  inputClassName='h-7 rounded-md border-subtle bg-surface-0 px-2 py-1 text-[11px]'
-                />
-                <button
-                  type='button'
-                  className='shrink-0 rounded-md border border-transparent p-1 text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
-                  onClick={() =>
-                    globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
-                  }
-                  aria-label='Open public profile'
-                >
-                  <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                </button>
-                <CommonDropdown
-                  variant='dropdown'
-                  size='compact'
-                  align='end'
-                  side='bottom'
-                  items={profileShareItems}
-                  trigger={
+            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
+              <DrawerPropertyRow
+                label='Profile link'
+                value={
+                  <div className='flex items-center gap-1.5'>
+                    <CopyLinkInput
+                      url={profileUrl}
+                      size='md'
+                      className='flex-1'
+                      inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                    />
                     <button
                       type='button'
-                      className='shrink-0 rounded-md border border-transparent p-1 text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-secondary-token'
-                      aria-label='Open profile share options'
+                      className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                      onClick={() =>
+                        globalThis.open(
+                          profileUrl,
+                          '_blank',
+                          'noopener,noreferrer'
+                        )
+                      }
+                      aria-label='Open public profile'
                     >
-                      <MoreHorizontal className='h-3 w-3' aria-hidden='true' />
+                      <ExternalLink className='h-3 w-3' aria-hidden='true' />
                     </button>
-                  }
-                />
-              </div>
-            }
-          />
+                    <CommonDropdown
+                      variant='dropdown'
+                      size='compact'
+                      align='end'
+                      side='bottom'
+                      items={profileShareItems}
+                      trigger={
+                        <button
+                          type='button'
+                          className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                          aria-label='Open profile share options'
+                        >
+                          <MoreHorizontal
+                            className='h-3 w-3'
+                            aria-hidden='true'
+                          />
+                        </button>
+                      }
+                    />
+                  </div>
+                }
+              />
+            </div>
+          </div>
         </div>
       }
       tabs={
@@ -569,7 +608,7 @@ export function ProfileContactSidebar() {
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-[26px] w-[26px] rounded-md border-subtle bg-surface-0 text-tertiary-token hover:bg-surface-1 hover:text-primary-token'
+                className='h-[26px] w-[26px] rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
                 ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-3.5 w-3.5' />

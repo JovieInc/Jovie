@@ -325,8 +325,11 @@ async function fetchDashboardCoreWithSession(
 
         const selected = selectDashboardProfile(creatorData);
 
-        // Fetch settings, link counts, and tipping stats sequentially to
-        // avoid exhausting the connection pool during high-concurrency requests.
+        // Fetch settings, link counts, and tipping stats sequentially.
+        // These share a single transaction connection (pg serializes queries
+        // on one connection), so parallel dispatch would just queue them
+        // while starting all timeout timers simultaneously — making
+        // timeouts more likely, not less.
         const settings = await dashboardQuery(
           () =>
             tx

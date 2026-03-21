@@ -142,10 +142,25 @@ export async function batchUpdateSequential<T>(
 ): Promise<number> {
   if (updates.length === 0) return 0;
 
+  let succeeded = 0;
   for (const update of updates) {
-    await updateFn(db, update.id, update.data);
+    try {
+      await updateFn(db, update.id, update.data);
+      succeeded++;
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { context: 'batch_update_sequential' },
+        extra: {
+          failedId: update.id,
+          succeeded,
+          total: updates.length,
+          remaining: updates.length - succeeded - 1,
+        },
+      });
+      throw error;
+    }
   }
-  return updates.length;
+  return succeeded;
 }
 
 /**
