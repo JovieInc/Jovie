@@ -80,6 +80,9 @@ export default function WaitlistPage() {
   // Load all persisted form state on mount
   useEffect(() => {
     try {
+      // Evict defunct key from removed primary goal step
+      globalThis.sessionStorage.removeItem('waitlist_primary_goal');
+
       const storedSubmitted = globalThis.sessionStorage.getItem(
         WAITLIST_STORAGE_KEYS.submitted
       );

@@ -266,7 +266,7 @@ async function submitWaitlistEntry(
  *
  * submitWaitlist(
  *   {
- *     primaryGoal: 'streams',
+ *     primaryGoal: null,
  *     primarySocialUrl: 'https://instagram.com/artist',
  *     spotifyUrl: null,
  *     heardAbout: null,
