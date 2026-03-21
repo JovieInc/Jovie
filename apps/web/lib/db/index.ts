@@ -28,12 +28,13 @@ export {
   checkDbPerformance,
   // Connection
   db,
+  // Retry logic
+  dbCircuitBreaker,
   doesTableExist,
   getDb,
   getDbConfig,
   getPoolMetrics,
   initializeDb,
-  // Retry logic
   isRetryableError,
   // Session helpers
   setSessionUser,

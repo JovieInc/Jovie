@@ -10,11 +10,16 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  APP_CONTROL_BUTTON_CLASS,
+  AppIconButton,
+} from '@/components/atoms/AppIconButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { BatchIngestModal } from '@/features/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
+import { cn } from '@/lib/utils';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
 
@@ -23,7 +28,10 @@ function BatchIngestButton({ onClick }: { readonly onClick: () => void }) {
     <button
       type='button'
       onClick={onClick}
-      className='inline-flex h-7 items-center gap-1.5 rounded-md border border-transparent px-2 text-[12px] font-medium text-secondary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
+      className={cn(
+        APP_CONTROL_BUTTON_CLASS,
+        'h-7 rounded-full px-3 text-[11.5px]'
+      )}
     >
       <ListPlus className='h-3.5 w-3.5' />
       Batch Ingest
@@ -114,27 +122,27 @@ export function AdminCreatorsPageWrapper(
                   handleSearchClose();
                 }
               }}
-              className='h-7 w-[210px] border-subtle bg-surface-0 text-[12px]'
+              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3 text-[12px]'
               aria-label='Search creators by handle'
             />
-            <button
+            <AppIconButton
               type='button'
               onClick={handleSearchClose}
-              className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-tertiary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
-              aria-label='Close search'
+              className='h-7 w-7 border-transparent bg-transparent text-tertiary-token'
+              ariaLabel='Close search'
             >
               <X className='h-3.5 w-3.5' aria-hidden='true' />
-            </button>
+            </AppIconButton>
           </form>
         ) : (
-          <button
+          <AppIconButton
             type='button'
             onClick={handleSearchToggle}
-            className='inline-flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-secondary-token transition-colors hover:border-subtle hover:bg-surface-0 hover:text-primary-token'
-            aria-label='Open search'
+            className='h-7 w-7 border-transparent bg-transparent text-secondary-token'
+            ariaLabel='Open search'
           >
             <Search className='h-3.5 w-3.5' aria-hidden='true' />
-          </button>
+          </AppIconButton>
         )}
         <BatchIngestButton onClick={handleOpenBatchModal} />
         <IngestProfileDropdown onIngestPending={handleIngestPending} />

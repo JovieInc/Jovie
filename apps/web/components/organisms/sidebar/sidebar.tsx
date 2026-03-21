@@ -72,7 +72,7 @@ export const Sidebar = React.forwardRef<
         {!isMobile && (
           <div
             ref={ref}
-            className='group peer hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:block data-[variant=sidebar]:lg:m-2.5 data-[variant=sidebar]:lg:mr-0'
+            className='group peer hidden shrink-0 overflow-visible text-sidebar-foreground lg:sticky lg:top-0 lg:block data-[variant=sidebar]:lg:m-1.5 data-[variant=sidebar]:lg:mr-0'
             data-state={state}
             data-collapsible={state === 'closed' ? collapsible : ''}
             data-variant={variant}
@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='pointer-events-auto flex h-full w-full flex-col overflow-hidden border border-transparent bg-sidebar transition-[transform,border-color,box-shadow,background-color] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[14px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-(--linear-app-frame-seam) group-data-[variant=sidebar]:bg-[color-mix(in_oklab,var(--linear-bg-page)_82%,var(--linear-bg-surface-1))] group-data-[variant=sidebar]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='pointer-events-auto flex h-full w-full flex-col overflow-hidden border border-transparent bg-sidebar transition-[transform,border-color,box-shadow,background-color] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[16px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-(--linear-app-frame-seam) group-data-[variant=sidebar]:bg-[color-mix(in_oklab,var(--linear-bg-page)_84%,var(--linear-bg-surface-1))] group-data-[variant=sidebar]:shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>

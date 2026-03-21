@@ -15,8 +15,9 @@ describe('DrawerSurfaceCard', () => {
 
     expect(className).toContain('custom-class');
     expect(className).not.toContain('rounded-xl');
-    expect(className).not.toContain('border');
-    expect(className).not.toContain('bg-(--linear-bg-surface-0)');
+    expect(className).toContain('border-0');
+    expect(className).toContain('bg-transparent');
+    expect(className).toContain('shadow-none');
   });
 
   it('applies the card styling when variant is card', () => {
@@ -29,7 +30,7 @@ describe('DrawerSurfaceCard', () => {
     const className =
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
-    expect(className).toContain('rounded-[12px]');
+    expect(className).toContain('rounded-[14px]');
     expect(className).toContain('bg-[color-mix');
   });
 });
