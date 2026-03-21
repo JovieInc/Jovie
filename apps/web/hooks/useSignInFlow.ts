@@ -29,6 +29,9 @@ export type { AuthMethod, LoadingState } from '@/lib/auth/types';
 
 export type SignInStep = AuthFlowStep;
 
+/** Why the verification step is being shown */
+export type VerificationReason = 'code' | 'mfa' | 'device_trust';
+
 export interface UseSignInFlowReturn {
   // Clerk loaded state
   isLoaded: boolean;
@@ -50,6 +53,10 @@ export interface UseSignInFlowReturn {
 
   // Suggestions based on errors
   shouldSuggestSignUp: boolean;
+
+  // Verification context — lets the UI show different copy for
+  // normal OTP vs MFA vs device trust challenges.
+  verificationReason: VerificationReason;
 
   // Actions
   startEmailFlow: (email: string) => Promise<boolean>;
@@ -74,6 +81,9 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
   // Sign-in specific state
   const [shouldSuggestSignUp, setShouldSuggestSignUp] = useState(false);
+  const [isSecondFactor, setIsSecondFactor] = useState(false);
+  const [verificationReason, setVerificationReason] =
+    useState<VerificationReason>('code');
 
   const clearError = useCallback(() => {
     base.clearError();
@@ -88,6 +98,8 @@ export function useSignInFlow(): UseSignInFlowReturn {
       if (!signIn || !isLoaded) return false;
 
       clearError();
+      setIsSecondFactor(false);
+      setVerificationReason('code');
       base.setLoadingState({ type: 'submitting' });
       base.setEmail(emailAddress);
       base.persistAuthMethod('email');
@@ -139,7 +151,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
   );
 
   /**
-   * Verify the OTP code and complete sign-in
+   * Verify the OTP code and complete sign-in.
+   *
+   * Handles both first-factor (normal OTP) and second-factor (MFA /
+   * client trust) verification in a single function. When the first
+   * factor returns needs_second_factor or needs_client_trust, we
+   * prepare the second factor and loop back to the verification step.
+   * On the next call, isSecondFactor is true so we call
+   * attemptSecondFactor instead.
    */
   const verifyCode = useCallback(
     async (verificationCode: string): Promise<boolean> => {
@@ -155,6 +174,26 @@ export function useSignInFlow(): UseSignInFlowReturn {
       base.setCode(verificationCode);
 
       try {
+        // If we're in a second-factor state, verify via attemptSecondFactor
+        if (isSecondFactor) {
+          const result = await signIn.attemptSecondFactor({
+            strategy: 'email_code',
+            code: verificationCode,
+          });
+
+          if (result.status === 'complete') {
+            await setActive({ session: result.createdSessionId });
+            const redirectUrl = base.getRedirectUrl();
+            base.router.push(redirectUrl);
+            return true;
+          }
+
+          base.setError('Verification incomplete. Please try again.');
+          base.setLoadingState({ type: 'idle' });
+          return false;
+        }
+
+        // Normal first-factor verification
         const result = await signIn.attemptFirstFactor({
           strategy: 'email_code',
           code: verificationCode,
@@ -171,7 +210,56 @@ export function useSignInFlow(): UseSignInFlowReturn {
           return true;
         }
 
-        // Handle other statuses (shouldn't happen for email_code)
+        // MFA / Client Trust: user needs a second factor challenge.
+        // Our flow is passwordless so this shouldn't normally trigger,
+        // but handles the case where a user has MFA enabled on their
+        // Clerk account, or Clerk introduces client trust challenges.
+        // TODO: Remove `as string` cast when @clerk/shared types include 'needs_client_trust'
+        if (
+          result.status === 'needs_second_factor' ||
+          (result.status as string) === 'needs_client_trust'
+        ) {
+          const secondFactor = signIn.supportedSecondFactors?.find(
+            (f: { strategy: string }) =>
+              f.strategy === 'email_code' || f.strategy === 'phone_code'
+          );
+
+          if (secondFactor) {
+            await signIn.prepareSecondFactor({
+              strategy: secondFactor.strategy as 'email_code' | 'phone_code',
+            });
+            setIsSecondFactor(true);
+            setVerificationReason(
+              (result.status as string) === 'needs_client_trust'
+                ? 'device_trust'
+                : 'mfa'
+            );
+            base.setStep('verification');
+            base.setCode('');
+            base.setLoadingState({ type: 'idle' });
+            return false;
+          }
+
+          // No email/phone second factor available — can't proceed
+          base.setError(
+            'Additional verification is required. Please contact support.'
+          );
+          base.setLoadingState({ type: 'idle' });
+          return false;
+        }
+
+        // Statuses that shouldn't occur after attemptFirstFactor in our
+        // passwordless flow, but handle defensively with clear messages.
+        if (result.status === 'needs_new_password') {
+          base.setError(
+            'Password setup is not supported. Please sign in with email or Google.'
+          );
+          base.setLoadingState({ type: 'idle' });
+          return false;
+        }
+
+        // Catch-all for needs_first_factor, needs_identifier, or any
+        // future unknown statuses.
         base.setError('Verification incomplete. Please try again.');
         base.setLoadingState({ type: 'idle' });
         return false;
@@ -189,7 +277,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
         return false;
       }
     },
-    [signIn, setActive, isLoaded, clearError, base]
+    [signIn, setActive, isLoaded, isSecondFactor, clearError, base]
   );
 
   /**
@@ -272,6 +360,8 @@ export function useSignInFlow(): UseSignInFlowReturn {
    */
   const goBack = useCallback(() => {
     clearError();
+    setIsSecondFactor(false);
+    setVerificationReason('code');
     base.goBack();
   }, [clearError, base]);
 
@@ -287,6 +377,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
     error: base.error,
     clearError,
     shouldSuggestSignUp,
+    verificationReason,
     startEmailFlow,
     verifyCode,
     resendCode,
