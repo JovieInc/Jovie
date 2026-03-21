@@ -1055,26 +1055,26 @@
 }
 
 .jovie-homepage-marketing {
-  --linear-section-pt-sm: 52px;
-  --linear-section-pb-sm: 58px;
-  --linear-section-pt-md: 72px;
-  --linear-section-pb-md: 80px;
-  --linear-section-pt-lg: 88px;
-  --linear-section-pb-lg: 96px;
-  --linear-content-gap-sm: 18px;
-  --linear-content-gap-md: 26px;
-  --linear-content-gap-lg: 32px;
-  --linear-intro-gap-sm: 16px;
-  --linear-intro-gap-md: 18px;
-  --linear-intro-gap-lg: 20px;
-  --linear-section-stack-gap-sm: 26px;
-  --linear-section-stack-gap-md: 34px;
-  --linear-section-stack-gap-lg: 42px;
+  --linear-section-pt-sm: 48px;
+  --linear-section-pb-sm: 54px;
+  --linear-section-pt-md: 66px;
+  --linear-section-pb-md: 74px;
+  --linear-section-pt-lg: 80px;
+  --linear-section-pb-lg: 88px;
+  --linear-content-gap-sm: 16px;
+  --linear-content-gap-md: 22px;
+  --linear-content-gap-lg: 28px;
+  --linear-intro-gap-sm: 14px;
+  --linear-intro-gap-md: 16px;
+  --linear-intro-gap-lg: 18px;
+  --linear-section-stack-gap-sm: 22px;
+  --linear-section-stack-gap-md: 28px;
+  --linear-section-stack-gap-lg: 36px;
   --linear-hero-shell-max: 1120px;
-  --linear-hero-copy-max: 40rem;
-  --linear-hero-scene-offset-sm: -2.75rem;
-  --linear-hero-scene-offset-md: -5.5rem;
-  --linear-hero-scene-offset-lg: -6.5rem;
+  --linear-hero-copy-max: 43rem;
+  --linear-hero-scene-offset-sm: -3.25rem;
+  --linear-hero-scene-offset-md: -6.75rem;
+  --linear-hero-scene-offset-lg: -8rem;
   --linear-shadow-card:
     rgba(0, 0, 0, 0.2) 0px 0px 0px 1px, rgba(0, 0, 0, 0.24) 0px 10px 24px -14px;
   --linear-shadow-card-elevated:

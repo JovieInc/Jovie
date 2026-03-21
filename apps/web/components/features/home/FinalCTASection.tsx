@@ -9,26 +9,26 @@ export function FinalCTASection() {
       className='relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
-        paddingTop: 'calc(var(--linear-cta-section-pt) - 1.5rem)',
-        paddingBottom: 'calc(var(--linear-cta-section-pb) - 2rem)',
+        paddingTop: 'calc(var(--linear-cta-section-pt) - 2rem)',
+        paddingBottom: 'calc(var(--linear-cta-section-pb) - 2.5rem)',
       }}
     >
       <Container size='homepage'>
-        <div className='reveal-on-scroll relative mx-auto flex max-w-[38rem] flex-col items-center text-center'>
+        <div className='reveal-on-scroll relative mx-auto flex max-w-[42rem] flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear max-w-[8.5ch] text-primary-token'
+            className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-none'
           >
             Take the stage.
           </h2>
 
-          <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>
+          <p className='mt-3.5 max-w-[32rem] marketing-lead-linear text-secondary-token'>
             Claim your handle and get the release system ready before the next
             song drops.
           </p>
 
           {/* Form */}
-          <div className='mt-6 w-full max-w-[34rem] md:mt-7'>
+          <div className='mt-5 w-full max-w-[32rem] md:mt-6'>
             <div
               id='final-cta-dock'
               data-testid='final-cta-dock'
@@ -42,7 +42,7 @@ export function FinalCTASection() {
           </div>
 
           {/* Trust signals */}
-          <div className='mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2'>
+          <div className='mt-4 flex flex-col items-center justify-center gap-2 text-center sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-2'>
             <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
               <span
                 aria-hidden='true'
@@ -50,7 +50,10 @@ export function FinalCTASection() {
               />{' '}
               Live in minutes
             </p>
-            <span aria-hidden='true' className='text-quaternary-token'>
+            <span
+              aria-hidden='true'
+              className='hidden text-quaternary-token sm:inline'
+            >
               ·
             </span>
             <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>

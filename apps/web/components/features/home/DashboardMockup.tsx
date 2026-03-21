@@ -51,7 +51,7 @@ export function DashboardMockup({
       />
 
       {/* Mac window chrome */}
-      <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-5'>
+      <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-5'>
         <div className='flex gap-2' aria-hidden='true'>
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
@@ -65,7 +65,7 @@ export function DashboardMockup({
 
       {/* Column headers */}
       <div
-        className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5 max-md:hidden'
+        className='grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2 max-md:hidden'
         style={{ borderBottom: '1px solid var(--linear-border-subtle)' }}
       >
         <span className='text-[10px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
@@ -98,7 +98,7 @@ export function DashboardMockup({
             }}
           >
             {/* Desktop row layout */}
-            <div className='hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-3'>
+            <div className='hidden md:grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-2.5'>
               <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2'>
                 <Image
                   src={release.artwork}
@@ -166,7 +166,7 @@ export function DashboardMockup({
             </div>
 
             {/* Mobile row layout — stacked */}
-            <div className='md:hidden px-5 py-3'>
+            <div className='md:hidden px-5 py-2.5'>
               <div className='flex items-center gap-3'>
                 <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-surface-2'>
                   <Image
@@ -222,7 +222,7 @@ export function DashboardMockup({
       {!isHero ? (
         <div
           ref={footerRef}
-          className='flex items-center justify-center px-5 py-3'
+          className='flex items-center justify-center px-5 py-2.5'
         >
           <p className='text-xs text-quaternary-token'>
             + pre-save ready, matched across platforms, and shareable in one

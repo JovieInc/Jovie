@@ -205,10 +205,10 @@ export function PhoneProfileDemo() {
     >
       <Container size='homepage'>
         <div className='homepage-section-shell'>
-          <div className='grid items-center gap-8 lg:grid-cols-[0.86fr_1.14fr] lg:gap-10'>
+          <div className='grid items-center gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:gap-8 xl:grid-cols-[0.74fr_1.26fr]'>
             <div className='reveal-on-scroll order-2 lg:order-1'>
               <p className='homepage-section-eyebrow'>Smart profile</p>
-              <h2 className='mt-4 max-w-[9ch] marketing-h2-linear text-primary-token'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
                 Profiles that convert.
               </h2>
               <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>
@@ -216,8 +216,8 @@ export function PhoneProfileDemo() {
                 capture in one place. It looks polished, updates fast, and gives
                 every release a home.
               </p>
-              <div className='mt-5 grid gap-3 sm:grid-cols-3 lg:max-w-[24rem] lg:grid-cols-1'>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.5'>
+              <div className='mt-4 grid gap-2.5 sm:grid-cols-3 lg:max-w-[25rem] lg:grid-cols-1'>
+                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
                   <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                     Streaming
                   </p>
@@ -225,7 +225,7 @@ export function PhoneProfileDemo() {
                     One clean page for every link out.
                   </p>
                 </div>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.5'>
+                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
                   <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                     Fan capture
                   </p>
@@ -233,7 +233,7 @@ export function PhoneProfileDemo() {
                     Collect emails without extra tooling.
                   </p>
                 </div>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.5'>
+                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
                   <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                     Monetization
                   </p>
@@ -253,7 +253,7 @@ export function PhoneProfileDemo() {
                   'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
               }}
             >
-              <div className='scale-[0.97] sm:scale-100 lg:translate-x-2'>
+              <div className='scale-[1.02] sm:scale-[1.06] lg:translate-x-4 lg:scale-[1.1] xl:scale-[1.14]'>
                 <PhoneFrame>
                   {/* Profile header */}
                   <div className='flex flex-col items-center px-5 pb-4 pt-10'>

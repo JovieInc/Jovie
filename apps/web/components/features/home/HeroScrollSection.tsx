@@ -6,7 +6,7 @@ import { HeroDashboardScene } from './HeroDashboardScene';
 
 export function HeroScrollSection() {
   return (
-    <section className='relative overflow-hidden px-5 pb-0 pt-[6.35rem] sm:px-6 md:pt-[7rem] lg:pt-[7.8rem] xl:pt-[8.4rem]'>
+    <section className='relative overflow-hidden pb-0 pt-[6rem] md:pt-[6.65rem] lg:pt-[7.35rem] xl:pt-[7.9rem]'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -25,21 +25,25 @@ export function HeroScrollSection() {
         <div className='homepage-section-shell max-w-[var(--linear-hero-shell-max)]'>
           <div className='hero-stagger reveal-on-scroll'>
             <div className='max-w-[var(--linear-hero-copy-max)] text-left'>
-              <h1 className='marketing-h1-linear max-w-[10.5ch] text-primary-token sm:max-w-[11ch]'>
-                <span className='block'>One link to launch</span>
-                <span className='block'>your music career.</span>
+              <h1 className='marketing-h1-linear max-w-[10.75ch] text-primary-token sm:max-w-[11.2ch] md:max-w-none'>
+                <span className='md:block md:whitespace-nowrap'>
+                  One link to launch
+                </span>
+                <span className='md:block md:whitespace-nowrap'>
+                  your music career.
+                </span>
               </h1>
 
-              <p className='marketing-lead-linear mt-4 max-w-[31rem] text-secondary-token md:mt-5'>
+              <p className='marketing-lead-linear mt-3.5 max-w-[34rem] text-secondary-token md:mt-4.5'>
                 Smart links, fan capture, tips, and tour dates, all behind a
                 single link.
               </p>
 
-              <div className='mt-6 w-full max-w-[35rem] md:mt-7'>
+              <div className='mt-5 w-full max-w-[35rem] md:mt-6'>
                 <ClaimHandleForm size='display' />
               </div>
 
-              <p className='mt-3.5 text-[length:var(--linear-label-size)] tracking-[0.01em] text-tertiary-token md:mt-4'>
+              <p className='mt-3 text-[length:var(--linear-label-size)] tracking-[0.01em] text-tertiary-token md:mt-3.5'>
                 <span
                   aria-hidden='true'
                   className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
@@ -48,8 +52,8 @@ export function HeroScrollSection() {
               </p>
             </div>
 
-            <div className='relative mt-10 w-full sm:mt-12 md:mt-14'>
-              <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
+            <div className='relative mt-8 w-full sm:mt-10 md:mt-12'>
+              <div className='homepage-surface-card relative max-h-[29rem] overflow-hidden rounded-[1rem] sm:max-h-[34rem] md:max-h-[41rem] md:rounded-[1.1rem] lg:max-h-[49rem] xl:max-h-[51rem]'>
                 <div className='relative -mb-[var(--linear-hero-scene-offset-sm)] md:-mb-[var(--linear-hero-scene-offset-md)] xl:-mb-[var(--linear-hero-scene-offset-lg)]'>
                   <HeroDashboardScene />
                 </div>

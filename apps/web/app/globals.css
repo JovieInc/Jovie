@@ -724,10 +724,11 @@ body {
     gap: var(--linear-intro-gap-sm);
     @media (min-width: 768px) {
       gap: var(--linear-intro-gap-md);
-      grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+      grid-template-columns: minmax(0, 0.96fr) minmax(0, 1.04fr);
     }
     @media (min-width: 1024px) {
       gap: var(--linear-intro-gap-lg);
+      grid-template-columns: minmax(0, 0.98fr) minmax(0, 1.02fr);
     }
   }
 
@@ -736,13 +737,13 @@ body {
     gap: var(--linear-intro-gap-sm);
     @media (min-width: 1024px) {
       gap: var(--linear-intro-gap-md);
-      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
       align-items: center;
     }
   }
 
   .homepage-section-copy {
-    max-width: 34rem;
+    max-width: 36rem;
     @media (min-width: 768px) {
       justify-self: end;
     }
@@ -790,32 +791,32 @@ body {
   }
 
   .jovie-homepage-marketing .marketing-h1-linear {
-    font-size: clamp(3.4rem, 12vw, 4.75rem);
+    font-size: clamp(3.5rem, 11.2vw, 4.85rem);
     font-weight: var(--linear-font-weight-medium);
     letter-spacing: -0.034em;
-    line-height: 0.92;
+    line-height: 0.9;
     text-wrap: balance;
   }
   @media (min-width: 768px) {
     .jovie-homepage-marketing .marketing-h1-linear {
-      font-size: clamp(4.5rem, 7.6vw, 5.35rem);
+      font-size: clamp(4.7rem, 7vw, 5.45rem);
     }
   }
   @media (min-width: 1280px) {
     .jovie-homepage-marketing .marketing-h1-linear {
-      font-size: 5.6rem;
+      font-size: 5.8rem;
     }
   }
   .jovie-homepage-marketing .marketing-h2-linear {
-    font-size: clamp(2rem, 6.5vw, 3.4rem);
+    font-size: clamp(2.15rem, 6vw, 3.5rem);
     font-weight: var(--linear-font-weight-medium);
     letter-spacing: -0.03em;
-    line-height: 0.98;
+    line-height: 0.96;
     text-wrap: balance;
   }
   .jovie-homepage-marketing .marketing-lead-linear {
     font-size: clamp(1rem, 2.9vw, 1.125rem);
-    line-height: 1.62;
+    line-height: 1.56;
     letter-spacing: -0.016em;
     text-wrap: pretty;
   }

@@ -21,9 +21,9 @@ export function ValuePropsSection() {
       <Container size='homepage'>
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
-            <div className='flex max-w-[22rem] flex-col gap-4'>
+            <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
               <span className='homepage-section-eyebrow'>One platform</span>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
                 One Tool. Zero Setup.
               </h2>
             </div>
@@ -40,7 +40,7 @@ export function ValuePropsSection() {
             {VALUE_PROPS.map(prop => (
               <article
                 key={prop.title}
-                className='homepage-surface-card rounded-[1rem] p-5 md:p-6'
+                className='homepage-surface-card rounded-[1rem] p-5 md:p-[1.35rem]'
               >
                 <p className='text-lg font-medium tracking-tight text-primary-token'>
                   {prop.title}

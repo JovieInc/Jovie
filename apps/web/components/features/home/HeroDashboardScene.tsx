@@ -121,7 +121,7 @@ export function HeroDashboardScene() {
         }}
       />
 
-      <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
+      <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
         <div className='flex gap-2' aria-hidden='true'>
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
           <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
@@ -133,8 +133,8 @@ export function HeroDashboardScene() {
         <div className='w-[52px]' />
       </div>
 
-      <div className='grid lg:grid-cols-[216px_minmax(0,1fr)_312px] xl:grid-cols-[224px_minmax(0,1fr)_320px]'>
-        <aside className='hidden border-r border-subtle bg-surface-1/75 px-4 py-4 lg:flex lg:flex-col'>
+      <div className='grid lg:grid-cols-[204px_minmax(0,1fr)_292px] xl:grid-cols-[212px_minmax(0,1fr)_304px]'>
+        <aside className='hidden border-r border-subtle bg-surface-1/75 px-3.5 py-3.5 lg:flex lg:flex-col'>
           <div className='flex items-center justify-between rounded-[0.85rem] border border-subtle bg-surface-0 px-3 py-2.5'>
             <div className='min-w-0'>
               <p className='truncate text-sm font-medium text-primary-token'>
@@ -145,12 +145,12 @@ export function HeroDashboardScene() {
             <ChevronDown className='h-4 w-4 text-tertiary-token' />
           </div>
 
-          <div className='mt-5 space-y-1.5'>
+          <div className='mt-4 space-y-1'>
             {SIDEBAR_PRIMARY.map(item => (
               // Some items are plain nav rows; only the active one carries the flag.
               <div
                 key={item.label}
-                className='flex items-center gap-3 rounded-[0.8rem] px-3 py-2.5'
+                className='flex items-center gap-3 rounded-[0.8rem] px-3 py-2.25'
                 style={{
                   backgroundColor:
                     'active' in item && item.active
@@ -178,11 +178,11 @@ export function HeroDashboardScene() {
             ))}
           </div>
 
-          <div className='mt-6 border-t border-subtle pt-4'>
+          <div className='mt-5 border-t border-subtle pt-3.5'>
             {SIDEBAR_SECONDARY.map(item => (
               <div
                 key={item.label}
-                className='flex items-center gap-3 rounded-[0.8rem] px-3 py-2.5'
+                className='flex items-center gap-3 rounded-[0.8rem] px-3 py-2.25'
               >
                 <item.icon className='h-4 w-4 text-tertiary-token' />
                 <span className='text-sm text-secondary-token'>
@@ -192,7 +192,7 @@ export function HeroDashboardScene() {
             ))}
           </div>
 
-          <div className='mt-auto rounded-[0.9rem] border border-subtle bg-surface-0 p-3.5'>
+          <div className='mt-auto rounded-[0.9rem] border border-subtle bg-surface-0 p-3'>
             <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
               Active workspace
             </p>
@@ -203,7 +203,7 @@ export function HeroDashboardScene() {
         </aside>
 
         <div className='min-w-0 border-b border-subtle lg:border-b-0 lg:border-r lg:border-subtle'>
-          <div className='flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-4 py-4 sm:px-5'>
+          <div className='flex flex-wrap items-center justify-between gap-3 border-b border-subtle px-4 py-3.5 sm:px-5'>
             <div>
               <p className='text-lg font-semibold tracking-tight text-primary-token'>
                 Releases
@@ -225,11 +225,11 @@ export function HeroDashboardScene() {
             </div>
           </div>
 
-          <div className='grid gap-3 border-b border-subtle px-4 py-4 sm:grid-cols-3 sm:px-5'>
+          <div className='grid gap-2.5 border-b border-subtle px-4 py-3.5 sm:grid-cols-3 sm:px-5'>
             {HERO_STATS.map(stat => (
               <div
                 key={stat.label}
-                className='rounded-[0.85rem] border border-subtle bg-surface-1 px-3.5 py-3'
+                className='rounded-[0.85rem] border border-subtle bg-surface-1 px-3.5 py-2.5'
               >
                 <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                   {stat.label}
@@ -241,7 +241,7 @@ export function HeroDashboardScene() {
             ))}
           </div>
 
-          <div className='px-4 py-3 sm:px-5'>
+          <div className='px-4 py-2.5 sm:px-5'>
             <div className='grid grid-cols-[minmax(0,1.1fr)_auto_auto_auto_auto] items-center gap-3 border-b border-subtle px-3 py-2 text-[11px] font-medium uppercase tracking-[0.08em] text-quaternary-token'>
               <span>Release</span>
               <span className='hidden sm:block'>Status</span>
@@ -250,7 +250,7 @@ export function HeroDashboardScene() {
               <span className='hidden md:block'>Updated</span>
             </div>
 
-            <div className='space-y-1.5 pt-2'>
+            <div className='space-y-1 pt-2'>
               {HERO_RELEASES.map((release, index) => {
                 const isActive = index === activeIndex;
                 return (
@@ -260,7 +260,7 @@ export function HeroDashboardScene() {
                     onMouseEnter={() => setActiveIndex(index)}
                     onFocus={() => setActiveIndex(index)}
                     onClick={() => setActiveIndex(index)}
-                    className='grid w-full grid-cols-[minmax(0,1.1fr)_auto_auto_auto_auto] items-center gap-3 rounded-[0.9rem] px-3 py-3 text-left transition-colors'
+                    className='grid w-full grid-cols-[minmax(0,1.1fr)_auto_auto_auto_auto] items-center gap-3 rounded-[0.9rem] px-3 py-2.5 text-left transition-colors'
                     style={{
                       backgroundColor: isActive
                         ? 'rgba(255,255,255,0.055)'

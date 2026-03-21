@@ -114,7 +114,7 @@ export function AudienceCRMSection() {
               <span className='homepage-section-eyebrow'>
                 Audience intelligence
               </span>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none lg:whitespace-nowrap'>
                 Know every fan by name.
               </h2>
             </div>
@@ -131,13 +131,13 @@ export function AudienceCRMSection() {
           </div>
 
           <div
-            className='homepage-section-stack grid gap-2.5 sm:grid-cols-3 reveal-on-scroll'
+            className='homepage-section-stack grid gap-2 sm:grid-cols-3 reveal-on-scroll'
             data-delay='120'
           >
             {BENEFITS.map(benefit => (
               <div
                 key={benefit}
-                className='rounded-[0.95rem] border border-subtle bg-surface-0 px-3.5 py-2.5 text-sm font-medium text-secondary-token'
+                className='rounded-[0.95rem] border border-subtle bg-surface-0 px-3.5 py-2.25 text-sm font-medium text-secondary-token'
               >
                 {benefit}
               </div>
@@ -146,7 +146,7 @@ export function AudienceCRMSection() {
 
           {/* Product demo */}
           <div
-            className='relative mx-auto mt-6 w-full reveal-on-scroll md:mt-8'
+            className='relative mx-auto mt-5 w-full reveal-on-scroll md:mt-6'
             data-delay='160'
           >
             {/* Dashboard window */}
@@ -163,7 +163,7 @@ export function AudienceCRMSection() {
                 className='pointer-events-none absolute inset-0 z-10 rounded-t-[1rem] rounded-b-none md:rounded-t-[1.05rem]'
               />
               {/* Mac window chrome */}
-              <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
+              <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
                 <div className='flex gap-2'>
                   <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                   <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
@@ -176,13 +176,13 @@ export function AudienceCRMSection() {
               </div>
 
               {/* Stat cards */}
-              <div className='grid grid-cols-2 gap-px bg-[var(--linear-border-subtle)] md:grid-cols-4'>
+              <div className='grid grid-cols-2 gap-px bg-subtle md:grid-cols-4'>
                 {STATS.map(stat => (
                   <div
                     key={stat.label}
-                    className='flex items-center gap-3 bg-surface-0 px-4 py-3.5 sm:px-5 sm:py-4'
+                    className='flex items-center gap-2.5 bg-surface-0 px-4 py-3 sm:px-5 sm:py-3.5'
                   >
-                    <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
+                    <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                       <stat.icon
                         className='h-4 w-4 text-secondary-token'
                         aria-hidden='true'
@@ -203,7 +203,7 @@ export function AudienceCRMSection() {
                 Snapshot from a Jovie audience dashboard
               </p>
 
-              <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-4 py-3 text-xs text-tertiary-token sm:px-5'>
+              <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-4 py-2.5 text-xs text-tertiary-token sm:px-5'>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
                   Source tracked
                 </span>
@@ -216,7 +216,7 @@ export function AudienceCRMSection() {
               </div>
 
               {/* Real audience table (lazy-loaded, clipped to ~5 visible rows) */}
-              <div className='relative max-h-[360px] overflow-hidden'>
+              <div className='relative max-h-[320px] overflow-hidden md:max-h-[336px]'>
                 <Suspense fallback={<TableSkeleton />}>
                   <DemoAudienceSection />
                 </Suspense>
