@@ -6,8 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.29] - 2026-03-20
+
+### Added
+
+- YC demo Playwright spec (`yc-demo.spec.ts`) that records the full onboarding flow at watchable pace with deliberate pauses for voiceover narration
+- Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
+- Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
+- `demo:record` script in package.json for one-command demo video recording
+
+### Changed
+
+- Refactored golden-path.spec.ts to import helpers from shared module instead of inlining them
+- `ensureDbUser()` now accepts optional `knownSpotifyArtistIds` parameter for caller-specific Spotify ID cleanup
+- `createFreshUser()` no longer calls `ensureDbUser()` internally — callers handle DB setup explicitly
+## [26.4.29] - 2026-03-21
+
+### Fixed
+
+- Stop capture-tip infinite Stripe retry loop — return 200 with fire-and-forget Sentry alert instead of 500 when creator profile not found
+- Store immutable profile_id in Stripe payment intent metadata so capture-tip webhook can resolve creators without relying on mutable handle lookups
+- Validate profile_id still exists before tip insert to prevent FK violation causing 500 retry loops
+- Check isPublic flag on creator profile in create-tip-intent to match checkout flow behavior
+- Add auth-first guards (getCachedAuth before getDashboardData) on dashboard pages to prevent unauthenticated access during DB outages
+- Escalate stripe-tips webhook from logger.warn to captureCriticalError with redacted email context
+- Dashboard pages (earnings, audience, releases, presence) show PageErrorState with consistent captureError telemetry instead of redirecting to signin on DB failure
+- Add error tracking to batchUpdateSequential with succeeded count and failed item context
+- Use APP_ROUTES.ONBOARDING constant instead of hardcoded paths
+
 ## [26.4.28] - 2026-03-20
 
+### Added
+
+- Dev toolbar "Unwaitlist" button for self-approving waitlist entry during local testing
+- Dev-only API route `POST /api/dev/unwaitlist` reusing existing approval logic (blocked in production)
 ### Fixed
 
 - Add missing `active_profile_id` column to production database — migration was lost during migration squash, causing 6 Sentry errors across auth, session, and dashboard queries
