@@ -244,10 +244,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-full border bg-surface-1 transition-colors duration-fast',
+            'rounded-[24px] border transition-colors duration-fast',
+            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
+            'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-subtle focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
+              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -259,7 +261,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
-          <div className='flex items-end gap-2 px-2 py-1.5'>
+          <div className='flex items-end gap-2 px-2.5 py-2'>
             {/* Left: Circular plus button with attachment dropdown */}
             {hasAttachButton && onImageAttach && (
               <AttachDropdown
