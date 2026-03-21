@@ -17,6 +17,8 @@ import {
 } from './shared';
 
 let statsigInitialized = false;
+// Suppresses the "no secret" warning after the first call within a process lifetime.
+// Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
 let statsigWarnedNoSecret = false;
 const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 

@@ -44,9 +44,10 @@ const INLINE_SCRIPT_HASHES = {
   nextThemes: "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
 
   /**
-   * @vercel/analytics inline script hash (v1.6.x)
+   * @vercel/analytics inline script hash (locked at v1.6.1)
    * The Analytics component injects an inline script via document.head at runtime.
    * Hash may need updating when @vercel/analytics version changes.
+   * package.json range is ^1.5.0 — verify hash after any lockfile update.
    */
   vercelAnalytics: "'sha256-k844ZRfHq5VBCg5bFxVtnBCvPUU7TVV7m1sDHs/cJXk='",
 };
