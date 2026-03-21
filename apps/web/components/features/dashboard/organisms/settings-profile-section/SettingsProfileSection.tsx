@@ -41,7 +41,12 @@ export function SettingsProfileSection({
 
   /** Handle field changes with debounced save */
   const handleFieldChange = (
-    field: 'username' | 'displayName' | 'location' | 'hometown',
+    field:
+      | 'username'
+      | 'displayName'
+      | 'location'
+      | 'hometown'
+      | 'pitchContext',
     value: string
   ) => {
     setFormData(prev => {
@@ -52,6 +57,7 @@ export function SettingsProfileSection({
         username: next.username,
         location: next.location,
         hometown: next.hometown,
+        pitchContext: next.pitchContext,
       });
       return next;
     });
@@ -182,6 +188,38 @@ export function SettingsProfileSection({
             placeholder='Nashville, TN'
             className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
+        </div>
+
+        <div className='flex flex-col gap-2 py-2'>
+          <div className='shrink-0'>
+            <label
+              htmlFor='pitchContext'
+              className='text-[13px] text-primary-token'
+            >
+              Pitch context
+            </label>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
+              Tell us about your streaming milestones, press coverage, radio
+              play, playlist history, and your artist story. This helps generate
+              better playlist pitches for your releases.
+            </p>
+          </div>
+          <div className='relative'>
+            <textarea
+              name='pitchContext'
+              id='pitchContext'
+              value={formData.pitchContext}
+              onChange={e => handleFieldChange('pitchContext', e.target.value)}
+              onBlur={() => flushSave()}
+              placeholder='e.g. 500K+ monthly listeners on Spotify, featured on New Music Friday twice, recent radio play on KCRW...'
+              rows={4}
+              maxLength={2000}
+              className={`w-full resize-y ${PROFILE_INPUT_CLASS}`}
+            />
+            <span className='absolute bottom-2 right-3 text-[11px] text-tertiary-token'>
+              {formData.pitchContext.length}/2000
+            </span>
+          </div>
         </div>
       </div>
     </div>
