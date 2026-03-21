@@ -1,12 +1,16 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Knowledge topic registry.
  *
- * Each topic maps to a distilled markdown file in scripts/knowledge/topics/.
+ * Each topic maps to a distilled markdown file co-located in ./topics/.
  * Content is loaded once at module scope (cold start) and cached for the
  * lifetime of the serverless function instance.
+ *
+ * Files live inside apps/web so Next.js file tracing includes them in
+ * the Vercel standalone bundle automatically.
  */
 
 interface KnowledgeTopic {
@@ -15,12 +19,16 @@ interface KnowledgeTopic {
   readonly content: string;
 }
 
-const TOPICS_DIR = join(process.cwd(), 'scripts/knowledge/topics');
+const TOPICS_DIR = join(dirname(fileURLToPath(import.meta.url)), 'topics');
 
 function loadTopic(filename: string): string {
   try {
     return readFileSync(join(TOPICS_DIR, filename), 'utf-8');
-  } catch {
+  } catch (err) {
+    console.error(
+      `[knowledge] Failed to load topic "${filename}" from ${TOPICS_DIR}:`,
+      err instanceof Error ? err.message : err
+    );
     return '';
   }
 }
@@ -34,20 +42,17 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'pre-save',
       'countdown',
       'launch',
-      'drop',
       'schedule',
       'timeline',
       'lead time',
       'release date',
       'friday',
       'new music',
-      'release radar',
       'pre-release',
       'album release',
       'single release',
       'when should i release',
       'how to release',
-      'dropping',
     ],
     content: loadTopic('release-strategy.md'),
   },
@@ -57,7 +62,6 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'playlist',
       'editorial',
       'algorithmic',
-      'pitch',
       'pitching',
       'discover weekly',
       'release radar',
@@ -72,11 +76,8 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
   {
     id: 'streaming-metrics',
     keywords: [
-      'stream',
       'streams',
-      'listener',
       'listeners',
-      'follower',
       'followers',
       'popularity',
       'monthly listeners',
@@ -121,13 +122,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'instagram',
       'tiktok',
       'advertising',
-      'ad',
       'campaign',
       'discovery mode',
-      'press',
       'influencer',
       'viral',
-      'growth',
       'how to promote',
       'how to market',
       'grow my audience',
@@ -144,15 +142,10 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
       'isrc',
       'upc',
       'upload',
-      'deliver',
       'delivery',
       'digital distribution',
       'encoding',
-      'wav',
-      'flac',
-      'mp3',
       'audio quality',
-      'specs',
       'how to distribute',
     ],
     content: loadTopic('distribution-basics.md'),
@@ -160,15 +153,13 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
   {
     id: 'monetization',
     keywords: [
-      'royalty',
       'royalties',
       'revenue',
       'income',
       'payment',
       'payout',
       'per stream',
-      'sync',
-      'licensing',
+      'sync licensing',
       'merch',
       'merchandise',
       'touring',
@@ -187,22 +178,19 @@ export const KNOWLEDGE_TOPICS: readonly KnowledgeTopic[] = [
     keywords: [
       'copyright',
       'publishing',
-      'master',
+      'master recording',
       'composition',
-      'split',
       'splits',
       'songwriter',
       'rights',
-      'license',
-      'mechanical',
-      'performance',
-      'pro',
+      'mechanical royalties',
+      'performance royalties',
       'ascap',
       'bmi',
       'sesac',
       'ownership',
-      'sample',
-      'cover',
+      'sample clearance',
+      'cover song',
       'interpolation',
       'who owns',
     ],

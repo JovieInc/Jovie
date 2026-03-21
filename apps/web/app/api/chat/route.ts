@@ -1408,17 +1408,22 @@ export async function POST(req: Request) {
   const resolvedConversationId = toNullableString(conversationId);
   const releases = await fetchOptionalReleases(resolvedProfileId);
 
-  // Select relevant music industry knowledge based on the user's message
-  const lastUserMsg = [...uiMessages].reverse().find(m => m.role === 'user');
-  const lastUserText =
-    lastUserMsg?.parts
-      ?.filter(
-        (p): p is { type: 'text'; text: string } =>
-          p.type === 'text' && typeof p.text === 'string'
-      )
-      .map(p => p.text)
-      .join('') ?? '';
-  const knowledgeContext = selectKnowledgeContext(lastUserText);
+  // Select relevant music industry knowledge based on recent user messages.
+  // Uses last 3 turns so follow-up questions retain context from earlier turns.
+  const recentUserText = [...uiMessages]
+    .reverse()
+    .filter(m => m.role === 'user')
+    .slice(0, 3)
+    .flatMap(m =>
+      (m.parts ?? [])
+        .filter(
+          (p): p is { type: 'text'; text: string } =>
+            p.type === 'text' && typeof p.text === 'string'
+        )
+        .map(p => p.text)
+    )
+    .join(' ');
+  const knowledgeContext = selectKnowledgeContext(recentUserText);
 
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,

@@ -14,6 +14,18 @@ const MAX_TOPICS = 2;
 const MIN_SCORE = 2;
 
 /**
+ * Check if a keyword matches in the message text.
+ * Multi-word keywords use substring matching.
+ * Single-word keywords use word-boundary matching to prevent
+ * false positives (e.g., "ad" matching "had").
+ */
+function keywordMatches(text: string, keyword: string): boolean {
+  if (keyword.includes(' ')) return text.includes(keyword);
+  const boundary = new RegExp(`(?<![a-z])${keyword}(?![a-z])`, 'i');
+  return boundary.test(text);
+}
+
+/**
  * Select relevant knowledge topics based on the user's message.
  *
  * Returns the concatenated content of the top matching topics,
@@ -24,25 +36,22 @@ export function selectKnowledgeContext(message: string): string {
 
   const lower = message.toLowerCase();
 
-  const scored = KNOWLEDGE_TOPICS.map(topic => {
-    let score = 0;
-    for (const keyword of topic.keywords) {
-      if (lower.includes(keyword.toLowerCase())) {
-        score++;
-        // Bonus for multi-word keyword matches (more specific)
-        if (keyword.includes(' ')) score++;
+  const scored = KNOWLEDGE_TOPICS.filter(topic => topic.content.length > 0)
+    .map(topic => {
+      let score = 0;
+      for (const keyword of topic.keywords) {
+        if (keywordMatches(lower, keyword.toLowerCase())) {
+          score++;
+          if (keyword.includes(' ')) score++;
+        }
       }
-    }
-    return { topic, score };
-  })
+      return { topic, score };
+    })
     .filter(s => s.score >= MIN_SCORE)
     .sort((a, b) => b.score - a.score)
     .slice(0, MAX_TOPICS);
 
   if (scored.length === 0) return '';
 
-  return scored
-    .map(s => s.topic.content)
-    .filter(Boolean)
-    .join('\n\n---\n\n');
+  return scored.map(s => s.topic.content).join('\n\n---\n\n');
 }
