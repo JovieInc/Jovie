@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { withDbSessionTx } from '@/lib/auth/session';
@@ -77,20 +77,33 @@ export async function GET() {
           facebookEnabled: creatorPixels.facebookEnabled,
           googleEnabled: creatorPixels.googleEnabled,
           tiktokEnabled: creatorPixels.tiktokEnabled,
-          // Token presence check (for hasTokens response)
-          facebookAccessToken: creatorPixels.facebookAccessToken,
-          googleApiSecret: creatorPixels.googleApiSecret,
-          tiktokAccessToken: creatorPixels.tiktokAccessToken,
+          // Token presence as booleans (never fetch actual secret values)
+          hasFacebookToken:
+            drizzleSql<boolean>`${creatorPixels.facebookAccessToken} IS NOT NULL`.as(
+              'has_facebook_token'
+            ),
+          hasGoogleToken:
+            drizzleSql<boolean>`${creatorPixels.googleApiSecret} IS NOT NULL`.as(
+              'has_google_token'
+            ),
+          hasTiktokToken:
+            drizzleSql<boolean>`${creatorPixels.tiktokAccessToken} IS NOT NULL`.as(
+              'has_tiktok_token'
+            ),
         })
         .from(creatorPixels)
         .where(eq(creatorPixels.profileId, userProfile.profileId))
         .limit(1);
 
-      // Extract token presence (don't return actual token values)
+      // Token presence from SQL-level booleans (secrets never loaded into memory)
+      // Neon/Drizzle may return 't'/'f' strings for SQL boolean expressions,
+      // so we must parse explicitly rather than using !! (which treats 'f' as truthy)
+      const parseBool = (v: unknown) =>
+        v === true || v === 1 || v === '1' || v === 't';
       const hasTokens = {
-        facebook: !!pixelConfig?.facebookAccessToken,
-        google: !!pixelConfig?.googleApiSecret,
-        tiktok: !!pixelConfig?.tiktokAccessToken,
+        facebook: parseBool(pixelConfig?.hasFacebookToken),
+        google: parseBool(pixelConfig?.hasGoogleToken),
+        tiktok: parseBool(pixelConfig?.hasTiktokToken),
       };
 
       // Build response without exposing token values
