@@ -743,7 +743,7 @@ async function seedDemoProfile(userId: string): Promise<string> {
     usernameNormalized: DEMO_USERNAME.toLowerCase(),
     displayName: DEMO_DISPLAY_NAME,
     bio: FALLBACK_PROFILE.bio,
-    avatarUrl,
+    avatarUrl: '/images/avatars/tim-white.jpg', // Use static fallback — prevents wrong Spotify image
     spotifyId,
     spotifyUrl,
     genres: profileGenres,
@@ -753,6 +753,7 @@ async function seedDemoProfile(userId: string): Promise<string> {
     isVerified: true,
     isFeatured: true,
     isClaimed: true,
+    avatarLockedByUser: true, // Lock avatar to prevent enrichment overwriting with wrong Tim White
     ingestionStatus: 'idle' as const,
     stripeAccountId: 'acct_demo_timwhite',
     stripeOnboardingComplete: true,
