@@ -7,17 +7,29 @@
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
+const INTERNAL_PREFIX = '[internal]';
 
 /**
  * Parse a full CHANGELOG.md into structured data.
  *
+ * Supports two public-facing conventions:
+ * - **Summary blockquote**: A `> ...` line immediately after the version heading
+ *   is captured as `summary` (plain text, blockquote marker stripped).
+ * - **`[internal]` entries**: Bullet entries starting with `[internal]` are
+ *   separated into `internalSections` and excluded from `sections`.
+ *
  * @param {string} markdown - Raw CHANGELOG.md content
- * @returns {{ unreleased: { raw: string, sections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, sections: Record<string, string[]> }> }}
+ * @returns {{ unreleased: { raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }, releases: Array<{ version: string, date: string, raw: string, summary: string, sections: Record<string, string[]>, internalSections: Record<string, string[]> }> }}
  */
 export function parseChangelog(markdown) {
   const lines = markdown.split('\n');
   const releases = [];
-  const unreleased = { raw: '', sections: {} };
+  const unreleased = {
+    raw: '',
+    summary: '',
+    sections: {},
+    internalSections: {},
+  };
   let currentBlock = null; // null | 'unreleased' | index into releases
   let currentSection = null;
 
@@ -32,33 +44,56 @@ export function parseChangelog(markdown) {
         currentBlock = 'unreleased';
       } else {
         currentBlock = releases.length;
-        releases.push({ version, date: date || '', raw: '', sections: {} });
+        releases.push({
+          version,
+          date: date || '',
+          raw: '',
+          summary: '',
+          sections: {},
+          internalSections: {},
+        });
       }
       continue;
     }
 
     if (currentBlock === null) continue;
 
+    const target =
+      currentBlock === 'unreleased' ? unreleased : releases[currentBlock];
+
+    // Capture summary blockquote (first `> ` line before any section heading)
+    if (!currentSection && line.startsWith('> ') && !target.summary) {
+      target.summary = line.slice(2).trim();
+      target.raw += line + '\n';
+      continue;
+    }
+
     const sectionMatch = line.match(SECTION_HEADING_RE);
     if (sectionMatch) {
       currentSection = sectionMatch[1].toLowerCase();
-      const target =
-        currentBlock === 'unreleased' ? unreleased : releases[currentBlock];
       if (!target.sections[currentSection]) {
         target.sections[currentSection] = [];
+      }
+      if (!target.internalSections[currentSection]) {
+        target.internalSections[currentSection] = [];
       }
       continue;
     }
 
     // Collect raw content
-    const target =
-      currentBlock === 'unreleased' ? unreleased : releases[currentBlock];
     target.raw += line + '\n';
 
-    // Collect bullet entries
+    // Collect bullet entries, separating internal from public
     const trimmed = line.trim();
     if (trimmed.startsWith('- ') && currentSection) {
-      target.sections[currentSection].push(trimmed.slice(2));
+      const entry = trimmed.slice(2);
+      if (entry.startsWith(INTERNAL_PREFIX)) {
+        target.internalSections[currentSection].push(
+          entry.slice(INTERNAL_PREFIX.length).trim()
+        );
+      } else {
+        target.sections[currentSection].push(entry);
+      }
     }
   }
 

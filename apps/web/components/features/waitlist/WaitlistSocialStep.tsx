@@ -78,7 +78,7 @@ export function WaitlistSocialStep({
             return (
               <label
                 key={option.value}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors border focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base ${
+                className={`rounded-full px-3 py-1.5 text-(--linear-caption-size) font-(--linear-caption-weight) transition-colors border focus-within:ring-2 focus-within:ring-(--linear-border-focus)/40 focus-within:ring-offset-2 ${
                   isSelected
                     ? 'bg-surface-3 text-primary-token border-subtle'
                     : 'bg-transparent text-tertiary-token border-subtle hover:bg-surface-2'
@@ -133,7 +133,7 @@ export function WaitlistSocialStep({
             />
           </>
         ) : (
-          <div className='w-full flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base'>
+          <div className='w-full flex items-center gap-2 rounded-full border border-subtle bg-surface-0 px-4 py-3 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/40 focus-within:ring-offset-2 transition-colors duration-150'>
             <span className='text-sm text-secondary-token whitespace-nowrap'>
               {getSocialPlatformPrefix(socialPlatform).display}
             </span>
