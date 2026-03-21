@@ -395,6 +395,57 @@ describe('clerk-errors.ts', () => {
     });
   });
 
+  describe('isAccountExistsError', () => {
+    it('returns true for form_identifier_exists', async () => {
+      const clerkError = { errors: [{ code: 'form_identifier_exists' }] };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+      const { isAccountExistsError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccountExistsError(clerkError)).toBe(true);
+    });
+
+    it('returns true for external_account_exists', async () => {
+      const clerkError = { errors: [{ code: 'external_account_exists' }] };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+      const { isAccountExistsError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccountExistsError(clerkError)).toBe(true);
+    });
+
+    it('returns false for other error codes', async () => {
+      const clerkError = { errors: [{ code: 'oauth_access_denied' }] };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+      const { isAccountExistsError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccountExistsError(clerkError)).toBe(false);
+    });
+
+    it('returns false for non-Clerk errors', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+      const { isAccountExistsError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccountExistsError(new Error('test'))).toBe(false);
+    });
+  });
+
+  describe('isAccessDeniedError', () => {
+    it('returns true for oauth_access_denied', async () => {
+      const clerkError = { errors: [{ code: 'oauth_access_denied' }] };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+      const { isAccessDeniedError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccessDeniedError(clerkError)).toBe(true);
+    });
+
+    it('returns false for other error codes', async () => {
+      const clerkError = { errors: [{ code: 'external_account_exists' }] };
+      mockIsClerkAPIResponseError.mockReturnValue(true);
+      const { isAccessDeniedError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccessDeniedError(clerkError)).toBe(false);
+    });
+
+    it('returns false for non-Clerk errors', async () => {
+      mockIsClerkAPIResponseError.mockReturnValue(false);
+      const { isAccessDeniedError } = await import('@/lib/auth/clerk-errors');
+      expect(isAccessDeniedError(new Error('test'))).toBe(false);
+    });
+  });
+
   describe('isSessionExists', () => {
     it('returns true for session_exists', async () => {
       const clerkError = {
