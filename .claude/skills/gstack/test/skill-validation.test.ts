@@ -99,6 +99,20 @@ describe('SKILL.md command validation', () => {
     const result = validateSkill(skill);
     expect(result.snapshotFlagErrors).toHaveLength(0);
   });
+
+  test('all $B commands in perf/SKILL.md are valid browse commands', () => {
+    const skill = path.join(ROOT, 'perf', 'SKILL.md');
+    if (!fs.existsSync(skill)) return;
+    const result = validateSkill(skill);
+    expect(result.invalid).toHaveLength(0);
+  });
+
+  test('all snapshot flags in perf/SKILL.md are valid', () => {
+    const skill = path.join(ROOT, 'perf', 'SKILL.md');
+    if (!fs.existsSync(skill)) return;
+    const result = validateSkill(skill);
+    expect(result.snapshotFlagErrors).toHaveLength(0);
+  });
 });
 
 describe('Command registry consistency', () => {
@@ -222,6 +236,7 @@ describe('Update check preamble', () => {
     'plan-design-review/SKILL.md',
     'design-review/SKILL.md',
     'design-consultation/SKILL.md',
+    'perf/SKILL.md',
     'document-release/SKILL.md',
   ];
 
@@ -447,6 +462,7 @@ describe('No hardcoded branch names in SKILL templates', () => {
     'document-release/SKILL.md.tmpl',
     'plan-eng-review/SKILL.md.tmpl',
     'plan-design-review/SKILL.md.tmpl',
+    'perf/SKILL.md.tmpl',
   ];
 
   // Patterns that indicate hardcoded 'main' in git commands
@@ -533,6 +549,7 @@ describe('v0.4.1 preamble features', () => {
     'plan-design-review/SKILL.md',
     'design-review/SKILL.md',
     'design-consultation/SKILL.md',
+    'perf/SKILL.md',
     'document-release/SKILL.md',
   ];
 
@@ -666,6 +683,7 @@ describe('Contributor mode preamble structure', () => {
     'plan-design-review/SKILL.md',
     'design-review/SKILL.md',
     'design-consultation/SKILL.md',
+    'perf/SKILL.md',
     'document-release/SKILL.md',
   ];
 
@@ -754,6 +772,7 @@ describe('Completeness Principle in generated SKILL.md files', () => {
     'plan-design-review/SKILL.md',
     'design-review/SKILL.md',
     'design-consultation/SKILL.md',
+    'perf/SKILL.md',
     'document-release/SKILL.md',
   ];
 
