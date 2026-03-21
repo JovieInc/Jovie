@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.30] - 2026-03-20
+
+### Changed
+
+- Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
+- Adopted Linear in-app design system (`rounded-full`) for all auth buttons and inputs globally
+- Unified waitlist form focus rings to use `--linear-border-focus` token instead of ad-hoc accent colors
+- Normalized platform pill typography to Linear caption tokens
+- Made `primaryGoal` optional in API validation (DB column was already nullable)
+
+### Removed
+
+- `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
+
 ## [26.4.29] - 2026-03-20
 
 ### Added
