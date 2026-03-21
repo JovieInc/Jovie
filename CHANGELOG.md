@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.27] - 2026-03-20
+
+### Fixed
+
+- Google OAuth sign-up now shows a clear error message when the account already exists, instead of silently redirecting back to the sign-up page
+- OAuth callback handler uses imperative Clerk API for proper error classification (account exists, access denied, unknown)
+- Sign-up form displays specific error messages with "Sign in instead" link for existing account errors
+
 ## [26.4.26] - 2026-03-20
 
 ### Added
