@@ -8,6 +8,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.28] - 2026-03-20
 
+### Added
+
+- Dev toolbar "Unwaitlist" button for self-approving waitlist entry during local testing
+- Dev-only API route `POST /api/dev/unwaitlist` reusing existing approval logic (blocked in production)
 ### Fixed
 
 - Add missing `active_profile_id` column to production database — migration was lost during migration squash, causing 6 Sentry errors across auth, session, and dashboard queries

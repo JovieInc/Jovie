@@ -7,11 +7,13 @@ import {
   ChevronUp,
   Copy,
   ExternalLink,
+  Loader2,
   Monitor,
   Moon,
   Route,
   Search,
   Sun,
+  UserCheck,
   Wrench,
   X,
 } from 'lucide-react';
@@ -74,6 +76,9 @@ export function DevToolbar({
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const [unwaitlistState, setUnwaitlistState] = useState<
+    'idle' | 'loading' | 'done' | 'error'
+  >('idle');
   const { theme, setTheme } = useTheme();
   const overridesCtx = useFeatureFlagOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -178,6 +183,24 @@ export function DevToolbar({
       setTimeout(() => setCopiedField(null), 1500);
     } catch {
       // Clipboard not available — fail silently
+    }
+  }
+
+  async function handleUnwaitlist() {
+    setUnwaitlistState('loading');
+    try {
+      const res = await fetch('/api/dev/unwaitlist', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        setUnwaitlistState('done');
+        setTimeout(() => window.location.reload(), 500);
+      } else {
+        setUnwaitlistState('error');
+        setTimeout(() => setUnwaitlistState('idle'), 3000);
+      }
+    } catch {
+      setUnwaitlistState('error');
+      setTimeout(() => setUnwaitlistState('idle'), 3000);
     }
   }
 
@@ -420,6 +443,36 @@ export function DevToolbar({
             <ExternalLink size={11} />
             <span className='hidden sm:inline text-[10px]'>Admin</span>
           </Link>
+
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={handleUnwaitlist}
+              disabled={
+                unwaitlistState === 'loading' || unwaitlistState === 'done'
+              }
+              title='Approve your own waitlist entry (dev only)'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              aria-label='Unwaitlist'
+            >
+              {unwaitlistState === 'loading' ? (
+                <Loader2 size={11} className='animate-spin' />
+              ) : unwaitlistState === 'done' ? (
+                <Check size={11} className='text-[var(--color-accent)]' />
+              ) : (
+                <UserCheck size={11} />
+              )}
+              <span className='hidden sm:inline text-[10px]'>
+                {unwaitlistState === 'loading'
+                  ? 'Working...'
+                  : unwaitlistState === 'done'
+                    ? 'Done!'
+                    : unwaitlistState === 'error'
+                      ? 'Failed'
+                      : 'Unwaitlist'}
+              </span>
+            </button>
+          )}
 
           <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
 
