@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.34] - 2026-03-21
+
+### Fixed
+
+- Block blacklisted Spotify artist IDs from polluting profiles during MusicFetch enrichment — prevents wrong artist photos, discography imports, and spotifyId overwrites
+- Allow re-enrichment recovery when a profile's stored spotifyId is blacklisted but the enrichment URL points to the correct artist
+
 ## [26.4.33] - 2026-03-21
 
 ### Fixed
