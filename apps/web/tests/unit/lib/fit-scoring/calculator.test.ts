@@ -50,6 +50,7 @@ describe('Fit Score Calculator', () => {
           multiDspPresence: 0,
           hasContactEmail: 0,
           paidVerification: 0,
+          hasTrackingPixels: 0,
           meta: {
             calculatedAt: expect.any(String),
             version: FIT_SCORE_VERSION,
@@ -586,6 +587,30 @@ describe('Fit Score Calculator', () => {
       });
     });
 
+    describe('tracking pixels scoring (+5 points)', () => {
+      it('should award 5 points when hasTrackingPixels is true', () => {
+        const result = calculateFitScore({
+          hasTrackingPixels: true,
+        });
+        expect(result.breakdown.hasTrackingPixels).toBe(
+          SCORE_WEIGHTS.HAS_TRACKING_PIXELS
+        );
+        expect(result.score).toBe(5);
+      });
+
+      it('should not award points when hasTrackingPixels is false or undefined', () => {
+        const resultFalse = calculateFitScore({
+          hasTrackingPixels: false,
+        });
+        expect(resultFalse.breakdown.hasTrackingPixels).toBe(0);
+
+        const resultUndefined = calculateFitScore({
+          hasTrackingPixels: undefined,
+        });
+        expect(resultUndefined.breakdown.hasTrackingPixels).toBe(0);
+      });
+    });
+
     describe('maximum score calculation', () => {
       it('should calculate maximum score of 90 with all criteria met', () => {
         const input: FitScoreInput = {
@@ -636,7 +661,8 @@ describe('Fit Score Calculator', () => {
           (result.breakdown.hasAlternativeDsp ?? 0) +
           (result.breakdown.multiDspPresence ?? 0) +
           (result.breakdown.hasContactEmail ?? 0) +
-          (result.breakdown.paidVerification ?? 0);
+          (result.breakdown.paidVerification ?? 0) +
+          (result.breakdown.hasTrackingPixels ?? 0);
 
         expect(result.score).toBe(breakdownSum);
       });
@@ -717,10 +743,11 @@ describe('Fit Score Calculator', () => {
       expect(SCORE_WEIGHTS.MULTI_DSP_PRESENCE).toBe(5);
       expect(SCORE_WEIGHTS.HAS_CONTACT_EMAIL).toBe(5);
       expect(SCORE_WEIGHTS.PAID_VERIFICATION).toBe(10);
+      expect(SCORE_WEIGHTS.HAS_TRACKING_PIXELS).toBe(5);
     });
 
     it('should have correct version', () => {
-      expect(FIT_SCORE_VERSION).toBe(3);
+      expect(FIT_SCORE_VERSION).toBe(4);
     });
 
     it('should have expected link-in-bio platforms', () => {
@@ -743,7 +770,7 @@ describe('Fit Score Calculator', () => {
       expect(TARGET_GENRES.size).toBeGreaterThan(20);
     });
 
-    it('should have total max score of 120', () => {
+    it('should have total max score of 125', () => {
       const maxScore =
         SCORE_WEIGHTS.USES_LINK_IN_BIO +
         SCORE_WEIGHTS.PAID_TIER +
@@ -755,8 +782,9 @@ describe('Fit Score Calculator', () => {
         SCORE_WEIGHTS.HAS_ALTERNATIVE_DSP +
         SCORE_WEIGHTS.MULTI_DSP_PRESENCE +
         SCORE_WEIGHTS.HAS_CONTACT_EMAIL +
-        SCORE_WEIGHTS.PAID_VERIFICATION;
-      expect(maxScore).toBe(120);
+        SCORE_WEIGHTS.PAID_VERIFICATION +
+        SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
+      expect(maxScore).toBe(125);
     });
 
     it('should have expected paid verification platforms', () => {

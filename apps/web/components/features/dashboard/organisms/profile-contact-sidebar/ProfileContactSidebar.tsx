@@ -59,6 +59,13 @@ const LINK_ACTION_CATEGORIES: ReadonlySet<CategoryOption> = new Set([
   'earnings',
 ]);
 
+let tempLinkIdCounter = 0;
+
+function createTempLinkId(): string {
+  tempLinkIdCounter += 1;
+  return `temp-${Date.now()}-${tempLinkIdCounter}`;
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -261,7 +268,7 @@ export function ProfileContactSidebar() {
 
       // Optimistically add to sidebar
       const optimisticLink: PreviewPanelLink = {
-        id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: createTempLinkId(),
         title: link.suggestedTitle ?? link.platform.name,
         url: link.normalizedUrl,
         platform: link.platform.id,
