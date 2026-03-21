@@ -427,76 +427,25 @@ async function distillTopic(
     `  Distilling ${topic.id}: ${articles.length} articles, ~${approxTokens.toLocaleString()} tokens input`
   );
 
-  // Use Vercel AI Gateway (key from Doppler)
-  const gatewayApiKey = process.env.AI_GATEWAY_API_KEY;
-  if (gatewayApiKey) {
-    return callViaGateway(prompt);
+  const apiKey =
+    process.env.ANTHROPIC_API_KEY ?? process.env.AI_GATEWAY_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'Missing API credentials. Set ANTHROPIC_API_KEY or AI_GATEWAY_API_KEY via Doppler.'
+    );
   }
 
-  // Fallback: direct Anthropic API
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    return callAnthropicDirect(anthropicKey, prompt);
-  }
-
-  throw new Error(
-    'Missing API credentials. Set AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY via Doppler.'
-  );
-}
-
-async function callViaGateway(prompt: string): Promise<string> {
-  // Resolve the repo root and use absolute paths to apps/web node_modules
-  const repoRoot = join(__dirname, '..', '..');
-  const gatewayPath = join(
-    repoRoot,
-    'apps/web/node_modules/@ai-sdk/gateway/dist/index.mjs'
-  );
-  const aiPath = join(repoRoot, 'apps/web/node_modules/ai/dist/index.mjs');
-
-  const { gateway } = await import(gatewayPath);
-  const { generateText } = await import(aiPath);
-
-  const model = gateway('anthropic/claude-sonnet-4-20250514');
-
-  const result = await generateText({
-    model,
-    prompt,
-    maxTokens: 16384,
+  const { default: Anthropic } = await import('@anthropic-ai/sdk');
+  const client = new Anthropic({ apiKey });
+  const response = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 16384,
     temperature: 0.3,
+    messages: [{ role: 'user', content: prompt }],
   });
 
-  return result.text;
-}
-
-async function callAnthropicDirect(
-  apiKey: string,
-  prompt: string
-): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 16384,
-      temperature: 0.3,
-      messages: [{ role: 'user', content: prompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Anthropic API error ${res.status}: ${text}`);
-  }
-
-  const data = (await res.json()) as {
-    content: { type: string; text: string }[];
-  };
-  const textBlock = data.content.find(b => b.type === 'text');
-  return textBlock?.text ?? '';
+  const block = response.content.find(b => b.type === 'text');
+  return block && 'text' in block ? block.text : '';
 }
 
 // ---------------------------------------------------------------------------
