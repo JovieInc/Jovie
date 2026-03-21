@@ -9,6 +9,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ## [26.4.30] - 2026-03-21
 ## [26.4.30] - 2026-03-20
 
+### Added
+
+- Defensive handling for all Clerk sign-in statuses (`needs_second_factor`, `needs_client_trust`, `needs_new_password`, `needs_first_factor`) with clear user-facing error messages
+- Second-factor verification support in sign-in flow — when MFA or client trust is triggered, the flow prepares and verifies a second factor automatically
+- `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
+- `abandoned` status handling in sign-up flow with specific "interrupted" message
+- Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
 ### Changed
 
 - Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
