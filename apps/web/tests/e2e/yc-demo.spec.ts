@@ -5,7 +5,7 @@
  * recording video via Playwright's built-in capture. Tim narrates
  * over the resulting .webm separately.
  *
- * Run: doppler run -- pnpm --filter web exec playwright test --config playwright.config.demo.ts
+ * Run: pnpm --filter web demo:record
  *
  * Uses Dua Lipa as the demo artist for guaranteed multi-DSP enrichment.
  */
@@ -14,7 +14,6 @@ import { expect, test } from '@playwright/test';
 
 import {
   buildValidOnboardingHandle,
-  clearOnboardingRateLimits,
   countPopulatedDspFields,
   createFreshUser,
   ensureDbUser,
@@ -55,14 +54,11 @@ test.describe('YC Demo Recording', () => {
     await interceptTrackingCalls(page);
   });
 
-  test('full onboarding demo — signup to public profile', async ({
-    page,
-  }, testInfo) => {
+  test('full onboarding demo — signup to public profile', async ({ page }) => {
     test.setTimeout(300_000);
 
     // Cleanup before demo
     await purgeStaleClerkTestUsers();
-    await clearOnboardingRateLimits();
 
     // ──────────────────────────────────────────────────────────────────
     // SCENE 1: Landing page
@@ -318,6 +314,9 @@ test.describe('YC Demo Recording', () => {
 
     const finalDspState = dspState as MultiDspEnrichmentState | null;
     const dspCount = finalDspState ? countPopulatedDspFields(finalDspState) : 0;
+
+    // Reload so SSR includes enriched DSP data
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30_000 });
 
     // Verify DSP buttons render on the page
     const body = await page.evaluate(() =>
