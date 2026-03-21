@@ -45,6 +45,17 @@ export interface NotificationPreferences {
   newReleaseDetected?: boolean;
 }
 
+export interface DiscoveredPixelPlatform {
+  detected: true;
+  pixelIds: string[];
+}
+
+export interface DiscoveredPixels {
+  facebook?: DiscoveredPixelPlatform;
+  tiktok?: DiscoveredPixelPlatform;
+  google?: DiscoveredPixelPlatform;
+}
+
 /**
  * Fit score breakdown for GTM prioritization.
  * Each field stores the points awarded for that criterion.
@@ -72,6 +83,8 @@ export interface FitScoreBreakdown {
   hasContactEmail?: number;
   /** Has paid verification on social platforms (Twitter/X, Instagram, Facebook, Threads) - max 10 points */
   paidVerification?: number;
+  /** Has tracking pixels on link-in-bio (Facebook, TikTok, Google) - max 5 points */
+  hasTrackingPixels?: number;
   /** Metadata about the scoring */
   meta?: {
     calculatedAt: string;
@@ -163,6 +176,9 @@ export const creatorProfiles = pgTable(
     fitScore: integer('fit_score'),
     fitScoreBreakdown: jsonb('fit_score_breakdown').$type<FitScoreBreakdown>(),
     fitScoreUpdatedAt: timestamp('fit_score_updated_at'),
+    // Tracking pixel detection from link-in-bio pages
+    discoveredPixels: jsonb('discovered_pixels').$type<DiscoveredPixels>(),
+    discoveredPixelsAt: timestamp('discovered_pixels_at'),
     // Spotify enrichment data
     genres: text('genres').array(),
     location: text('location'),

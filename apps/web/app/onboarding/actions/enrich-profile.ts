@@ -282,6 +282,18 @@ export async function enrichProfileFromDsp(
   spotifyArtistId: string,
   spotifyUrl: string
 ): Promise<EnrichedProfileData> {
+  // Block enrichment for blacklisted Spotify artist IDs
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  if (isBlacklistedSpotifyId(spotifyArtistId)) {
+    return {
+      name: null,
+      imageUrl: null,
+      bio: null,
+      genres: [],
+      followers: null,
+    };
+  }
+
   const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');
