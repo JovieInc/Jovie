@@ -373,28 +373,20 @@ describe('Public Profile Page Logic', () => {
   describe('Metadata generation logic', () => {
     // Test the metadata construction logic from generateMetadata
 
-    it('builds SEO title with genre context', () => {
+    it('uses a clean share title for the public profile', () => {
       const artistName = 'Test Artist';
-      const genres = ['rock', 'indie'];
-      const genreContext =
-        genres && genres.length > 0
-          ? ` | ${genres.slice(0, 2).join(', ')} Artist`
-          : '';
-      const title = `${artistName}${genreContext} - Music & Links`;
+      const title = `${artistName} | Jovie`;
 
-      expect(title).toBe('Test Artist | rock, indie Artist - Music & Links');
+      expect(title).toBe('Test Artist | Jovie');
     });
 
-    it('builds title without genre when none available', () => {
+    it('keeps the same share title even when genres are available', () => {
       const artistName = 'Test Artist';
-      const genres: string[] = [];
-      const genreContext =
-        genres && genres.length > 0
-          ? ` | ${genres.slice(0, 2).join(', ')} Artist`
-          : '';
-      const title = `${artistName}${genreContext} - Music & Links`;
+      const genres = ['rock', 'indie'];
+      const title = `${artistName} | Jovie`;
 
-      expect(title).toBe('Test Artist - Music & Links');
+      expect(genres).toEqual(['rock', 'indie']);
+      expect(title).toBe('Test Artist | Jovie');
     });
 
     it('truncates bio to 155 chars in description', () => {

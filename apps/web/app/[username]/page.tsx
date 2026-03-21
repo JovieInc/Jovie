@@ -753,7 +753,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
   const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
 
   return {
-    title: `Listen to ${artistName}`,
+    title: `${artistName} | Jovie`,
     description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
     metadataBase: new URL(BASE_URL),
     alternates: {
@@ -761,7 +761,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
     },
     openGraph: {
       type: 'profile',
-      title: `Listen to ${artistName}`,
+      title: `${artistName} | Jovie`,
       description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
       url: profileUrl,
       siteName: 'Jovie',
@@ -777,7 +777,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
     },
     twitter: {
       card: 'summary_large_image',
-      title: `Listen to ${artistName}`,
+      title: `${artistName} | Jovie`,
       description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
       creator: '@jovieapp',
       site: '@jovieapp',
@@ -789,14 +789,6 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
       ],
     },
   };
-}
-
-function buildGenreContext(genres: string[] | null): string {
-  if (!genres || genres.length === 0) {
-    return '';
-  }
-
-  return ` | ${genres.slice(0, 2).join(', ')} Artist`;
 }
 
 function buildProfileDescription(
@@ -821,7 +813,7 @@ function buildProfileMetadata(
 ): Metadata {
   const artistName = profile.display_name || profile.username;
   const profileUrl = `${BASE_URL}/${profile.username}`;
-  const title = `${artistName}${buildGenreContext(genres)} - Music & Links`;
+  const title = `${artistName} | Jovie`;
   const description = buildProfileDescription(profile, artistName, genres);
 
   const baseKeywords = [
@@ -860,7 +852,7 @@ function buildProfileMetadata(
     },
     openGraph: {
       type: 'profile',
-      title: `${artistName} - Artist Profile`,
+      title,
       description,
       url: profileUrl,
       siteName: 'Jovie',
@@ -876,7 +868,7 @@ function buildProfileMetadata(
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${artistName} - Artist Profile`,
+      title,
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
