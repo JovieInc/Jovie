@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.27] - 2026-03-21
+
+### Fixed
+
+- Stop capture-tip infinite Stripe retry loop — return 200 with Sentry alert instead of 500 when creator profile not found
+- Fix handle metadata mismatch in create-tip-intent — include plaintext handle alongside handle_hash so capture-tip webhook can resolve creators
+- Escalate stripe-tips webhook from logger.warn to captureCriticalError when tip checkout has no creator identifier
+- Dashboard pages (earnings, audience, releases, presence) now show error state instead of incorrectly redirecting to signin when database fails
+- Add error tracking to batchUpdateSequential with succeeded count and failed item context
+- Add error logging to contacts API catch block
+
 ## [26.4.26] - 2026-03-20
 
 ### Added
