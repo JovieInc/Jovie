@@ -82,6 +82,8 @@ const DEFAULT_DEMO_PROFILE: CreatorProfile = {
   stripeAccountId: null,
   stripeOnboardingComplete: false,
   stripePayoutsEnabled: false,
+  discoveredPixels: null,
+  discoveredPixelsAt: null,
   createdAt: now,
   updatedAt: now,
 };

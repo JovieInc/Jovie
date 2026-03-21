@@ -20,8 +20,13 @@ import {
 import type { DbOrTransaction } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
 import { socialAccounts, socialLinks } from '@/lib/db/schema/links';
-import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
+import type {
+  DiscoveredPixels,
+  FitScoreBreakdown,
+} from '@/lib/db/schema/profiles';
 import { creatorContacts, creatorProfiles } from '@/lib/db/schema/profiles';
+import { SUPPRESSED_PIXEL_IDS } from '@/lib/ingestion/strategies/linktree/config';
+import { getCreatorOwnedPixels } from '@/lib/ingestion/strategies/linktree/tracking-pixels';
 
 import {
   calculateFitScore,
@@ -29,6 +34,16 @@ import {
   type FitScoreInput,
   PAID_VERIFICATION_PLATFORMS,
 } from './calculator';
+
+/**
+ * Check if a profile has creator-owned tracking pixels after suppression filtering.
+ */
+function hasCreatorOwnedPixels(
+  discoveredPixels: DiscoveredPixels | null
+): boolean {
+  if (!discoveredPixels) return false;
+  return getCreatorOwnedPixels(discoveredPixels, SUPPRESSED_PIXEL_IDS) !== null;
+}
 
 /** Profile data with calculated score for batch updates */
 interface ScoredProfile {
@@ -52,6 +67,7 @@ interface RecalculateProfileRow {
   latestReleaseDate: Date | null;
   hasContactEmail: boolean | null;
   paidVerificationPlatforms: string[] | null;
+  hasTrackingPixels: boolean | null;
 }
 
 /**
@@ -119,6 +135,7 @@ export async function calculateAndStoreFitScore(
       deezerId: creatorProfiles.deezerId,
       tidalId: creatorProfiles.tidalId,
       youtubeMusicId: creatorProfiles.youtubeMusicId,
+      discoveredPixels: creatorProfiles.discoveredPixels,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
@@ -209,6 +226,9 @@ export async function calculateAndStoreFitScore(
     hasSoundCloudId: !!profile.soundcloudId,
     dspPlatformCount,
     paidVerificationPlatforms,
+    hasTrackingPixels: hasCreatorOwnedPixels(
+      profile.discoveredPixels as DiscoveredPixels | null
+    ),
   };
 
   // Calculate score
@@ -246,6 +266,7 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+      hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
       socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
@@ -306,6 +327,7 @@ export async function calculateMissingFitScores(
       paidVerificationPlatforms: (
         profile.paidVerificationPlatforms ?? []
       ).filter((p): p is string => !!p),
+      hasTrackingPixels: !!profile.hasTrackingPixels,
     };
 
     const { score, breakdown } = calculateFitScore(input);
@@ -385,6 +407,7 @@ export async function recalculateAllFitScores(
             '{}'
           ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
         `,
+        hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
       })
       .from(creatorProfiles)
       .leftJoin(
@@ -437,6 +460,7 @@ export async function recalculateAllFitScores(
         paidVerificationPlatforms: (
           profile.paidVerificationPlatforms ?? []
         ).filter((p): p is string => !!p),
+        hasTrackingPixels: !!profile.hasTrackingPixels,
       };
 
       const { score, breakdown } = calculateFitScore(input);
