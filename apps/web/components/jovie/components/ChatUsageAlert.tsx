@@ -26,7 +26,11 @@ export function ChatUsageAlert() {
 
   if (data.isExhausted) {
     return (
-      <InfoBox title="You're out of messages for today" variant='error'>
+      <InfoBox
+        title="You're out of messages for today"
+        variant='error'
+        className='rounded-[16px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]'
+      >
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <p>
             You&apos;ve used all {data.dailyLimit} AI messages included in your
@@ -50,7 +54,11 @@ export function ChatUsageAlert() {
   }
 
   return (
-    <InfoBox title="You're almost out of messages" variant='warning'>
+    <InfoBox
+      title="You're almost out of messages"
+      variant='warning'
+      className='rounded-[16px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]'
+    >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <p>
           You&apos;ve sent {data.used} of {data.dailyLimit} daily messages.

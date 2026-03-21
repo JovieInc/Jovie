@@ -9,6 +9,7 @@ import type {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import {
   DrawerLinkSection,
   SidebarLinkRow,
@@ -17,6 +18,7 @@ import { PLATFORM_METADATA_MAP } from '@/constants/platforms';
 import { PROVIDER_LABELS } from '@/features/dashboard/atoms/DspProviderIcon';
 import type { LinkSection } from '@/features/dashboard/organisms/links/utils/link-categorization';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
+import { cn } from '@/lib/utils';
 import { extractHandleFromUrl } from '@/lib/utils/social-platform';
 
 export type CategoryOption = LinkSection | 'all';
@@ -214,14 +216,16 @@ export function ProfileLinkList({
 
       if (!hasDspContent) {
         return (
-          <p className='text-xs text-tertiary-token py-2'>
-            No music links yet. Click + to add one.
-          </p>
+          <div className={cn(LINEAR_SURFACE.drawerCard, 'px-3 py-3')}>
+            <p className='py-1 text-xs text-tertiary-token'>
+              No music links yet. Click + to add one.
+            </p>
+          </div>
         );
       }
 
       return (
-        <div className='space-y-0.5 -mx-3 lg:mx-0'>
+        <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-1 p-2')}>
           <ConnectedDspRows
             dspConnections={dspConnections}
             onDisconnect={onDisconnectDsp}
@@ -235,15 +239,17 @@ export function ProfileLinkList({
 
     if (filteredLinks.length === 0) {
       return (
-        <p className='text-xs text-tertiary-token py-2'>
-          No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click +
-          to add one.
-        </p>
+        <div className={cn(LINEAR_SURFACE.drawerCard, 'px-3 py-3')}>
+          <p className='py-1 text-xs text-tertiary-token'>
+            No {SECTION_LABELS[selectedCategory].toLowerCase()} links yet. Click
+            + to add one.
+          </p>
+        </div>
       );
     }
 
     return (
-      <div className='space-y-0.5 -mx-3 lg:mx-0'>
+      <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-1 p-2')}>
         {filteredLinks.map(link => (
           <LinkItem key={link.id} link={link} onRemove={onRemoveLink} />
         ))}

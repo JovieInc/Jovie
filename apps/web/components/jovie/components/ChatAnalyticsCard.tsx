@@ -2,7 +2,9 @@
 
 import { Sparkles } from 'lucide-react';
 import { InsightCategoryIcon } from '@/components/features/dashboard/insights/InsightCategoryIcon';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { cn } from '@/lib/utils';
 import type { ChatInsightsToolResult } from '../types';
 
 interface ChatAnalyticsCardProps {
@@ -16,12 +18,12 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
 
   return (
     <ContentSurfaceCard
-      className='w-full max-w-xl p-4'
+      className='w-full max-w-xl rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
       data-testid='chat-analytics-card'
     >
       <div className='flex items-center justify-between gap-3'>
         <div className='flex items-center gap-2'>
-          <div className='flex h-7 w-7 items-center justify-center rounded-lg border border-subtle bg-surface-0'>
+          <div className='flex h-7 w-7 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
             <Sparkles className='h-3.5 w-3.5 text-secondary-token' />
           </div>
           <div>
@@ -38,8 +40,16 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
 
       <ul className='mt-3 space-y-2.5'>
         {result.insights.map(insight => (
-          <li key={insight.id} className='flex items-start gap-2.5'>
-            <InsightCategoryIcon category={insight.category} size='sm' />
+          <li
+            key={insight.id}
+            className={cn(
+              LINEAR_SURFACE.drawerCardSm,
+              'flex items-start gap-2.5 p-3'
+            )}
+          >
+            <span className='mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0'>
+              <InsightCategoryIcon category={insight.category} size='sm' />
+            </span>
             <div className='min-w-0'>
               <p className='text-[13px] font-[510] leading-snug text-primary-token'>
                 {insight.title}

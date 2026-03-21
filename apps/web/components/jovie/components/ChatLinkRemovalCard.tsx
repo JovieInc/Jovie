@@ -4,6 +4,7 @@ import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatRemoveLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,37 @@ interface ChatLinkRemovalCardProps {
 }
 
 type CardState = 'pending' | 'removing' | 'removed' | 'dismissed';
+
+const VALID_SOCIAL_PLATFORMS = new Set([
+  'spotify',
+  'applemusic',
+  'soundcloud',
+  'bandcamp',
+  'instagram',
+  'twitter',
+  'x',
+  'tiktok',
+  'youtube',
+  'youtubemusic',
+  'facebook',
+  'discord',
+  'reddit',
+  'github',
+  'patreon',
+  'twitch',
+  'linkedin',
+  'snapchat',
+  'pinterest',
+  'threads',
+  'mastodon',
+  'bluesky',
+  'link',
+]);
+
+function normalizeSocialPlatform(platform: string): string {
+  const lower = platform.toLowerCase();
+  return VALID_SOCIAL_PLATFORMS.has(lower) ? lower : 'link';
+}
 
 export function ChatLinkRemovalCard({
   profileId,
@@ -60,34 +92,36 @@ export function ChatLinkRemovalCard({
 
   if (state === 'removed') {
     return (
-      <div className='rounded-xl border border-success/30 bg-success-subtle p-4'>
+      <ContentSurfaceCard className='rounded-[18px] border-success/30 bg-success-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>{platform} link removed</span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   if (state === 'dismissed') {
     return (
-      <div className='rounded-xl border border-subtle bg-surface-1 p-4 opacity-60'>
+      <ContentSurfaceCard className='rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 opacity-60 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
           <span className='text-sm'>Removal cancelled</span>
         </div>
-      </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='rounded-xl border border-error/20 bg-error-subtle p-4'>
+    <ContentSurfaceCard className='rounded-[18px] border-error/20 bg-error-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'>
       <div className='flex items-center gap-3'>
-        <SocialIcon
-          platform={platform.toLowerCase()}
-          className='h-5 w-5 shrink-0'
-          aria-hidden
-        />
+        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-error/20 bg-white/50'>
+          <SocialIcon
+            platform={normalizeSocialPlatform(platform)}
+            className='h-5 w-5 shrink-0'
+            aria-hidden
+          />
+        </span>
         <div className='min-w-0 flex-1'>
           <p className='text-sm font-medium text-primary-token'>
             Remove {platform}
@@ -99,13 +133,13 @@ export function ChatLinkRemovalCard({
             </output>
           )}
         </div>
-        <div className='flex items-center gap-1.5 shrink-0'>
+        <div className='shrink-0 flex items-center gap-1.5'>
           <button
             type='button'
             onClick={handleRemove}
             disabled={state === 'removing'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium',
+              'inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-xs font-medium',
               'bg-error text-error-foreground hover:bg-error/90',
               'disabled:opacity-50 transition-colors'
             )}
@@ -122,8 +156,8 @@ export function ChatLinkRemovalCard({
             onClick={handleDismiss}
             disabled={state === 'removing'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-md p-1.5 text-xs',
-              'text-secondary-token hover:bg-surface-2 hover:text-primary-token',
+              'inline-flex items-center gap-1 rounded-[10px] border border-transparent p-1.5 text-xs',
+              'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}
             aria-label='Cancel removal'
@@ -132,6 +166,6 @@ export function ChatLinkRemovalCard({
           </button>
         </div>
       </div>
-    </div>
+    </ContentSurfaceCard>
   );
 }

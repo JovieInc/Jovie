@@ -305,8 +305,12 @@ async function handleExistingEntry(params: {
       .where(eq(waitlistEntries.id, existing.id));
   }
 
-  // Upsert users.userStatus to 'waitlist_pending' so auth gate recognizes submission
-  await upsertUserAsPending(userId, emailRaw);
+  // Only set waitlist_pending for entries that haven't been processed yet.
+  // If the entry is already 'invited' or 'claimed', the user was approved —
+  // overwriting their status would silently lock them out of the app.
+  if (existing.status === 'new') {
+    await upsertUserAsPending(userId, emailRaw);
+  }
 
   return successResponse({ status: existing.status });
 }

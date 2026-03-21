@@ -46,51 +46,63 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-4'
+      className='rounded-[20px] border border-subtle bg-surface-1/95 p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.9)]'
     >
-      <ErrorIcon className='mt-0.5 h-5 w-5 shrink-0 text-error' />
-      <div className='flex-1 space-y-2'>
-        <div>
-          <p className='text-sm font-medium text-primary-token'>
-            {chatError.message}
-          </p>
-          <p className='mt-1 text-xs text-secondary-token'>
-            {getNextStepMessage(chatError.type)}
-          </p>
+      <div className='flex items-start gap-3'>
+        <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-error/20 bg-error-subtle text-error'>
+          <ErrorIcon className='h-4.5 w-4.5' />
         </div>
+        <div className='min-w-0 flex-1 space-y-3'>
+          <div className='space-y-1'>
+            <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-error'>
+              Chat interrupted
+            </p>
+            <p className='text-sm font-medium text-primary-token'>
+              {chatError.message}
+            </p>
+            <p className='text-xs text-secondary-token'>
+              {getNextStepMessage(chatError.type)}
+            </p>
+          </div>
 
-        {supportCode && (
-          <div className='flex items-center gap-2 text-xs text-tertiary-token'>
-            <span className='font-mono'>Ref: {supportCode}</span>
+          {supportCode && (
+            <div className='flex flex-wrap items-center gap-2 rounded-2xl border border-subtle bg-surface-2/70 px-3 py-2 text-xs text-tertiary-token'>
+              <span className='text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+                Reference
+              </span>
+              <span className='font-mono text-primary-token'>
+                {supportCode}
+              </span>
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={() => {
+                  void handleCopySupportCode();
+                }}
+                className='ml-auto h-7 gap-1 rounded-full px-2.5 text-[11px] font-medium uppercase tracking-[0.12em]'
+                aria-label='Copy support reference'
+              >
+                <Copy className='h-3 w-3' />
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+          )}
+
+          {chatError.failedMessage && !chatError.retryAfter && (
             <Button
               type='button'
-              variant='ghost'
+              variant='secondary'
               size='sm'
-              onClick={() => {
-                void handleCopySupportCode();
-              }}
-              className='h-7 gap-1 px-2 text-xs'
-              aria-label='Copy support reference'
+              onClick={onRetry}
+              disabled={isLoading || isSubmitting}
+              className='h-9 gap-2 rounded-full px-4 text-[11px] font-medium uppercase tracking-[0.12em]'
             >
-              <Copy className='h-3 w-3' />
-              {copied ? 'Copied' : 'Copy'}
+              <RefreshCw className='h-3.5 w-3.5' />
+              Retry message
             </Button>
-          </div>
-        )}
-
-        {chatError.failedMessage && !chatError.retryAfter && (
-          <Button
-            type='button'
-            variant='secondary'
-            size='sm'
-            onClick={onRetry}
-            disabled={isLoading || isSubmitting}
-            className='h-8 gap-2'
-          >
-            <RefreshCw className='h-3.5 w-3.5' />
-            Try again
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

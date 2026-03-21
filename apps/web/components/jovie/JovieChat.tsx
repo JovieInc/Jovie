@@ -326,7 +326,10 @@ export function JovieChat({
   } as const;
 
   return (
-    <div ref={dropZoneRef} className='relative flex h-full flex-col'>
+    <div
+      ref={dropZoneRef}
+      className='relative flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_18%)]'
+    >
       {/* Hidden file input for image attachments */}
       <input
         ref={imageFileInputRef}
@@ -362,7 +365,7 @@ export function JovieChat({
           {/* Messages area */}
           <div
             ref={messagesContainerRef}
-            className='relative flex-1 overflow-y-auto px-4 py-6'
+            className='relative flex-1 overflow-y-auto px-4 py-6 sm:px-5'
             onScroll={handleScroll}
           >
             <div
@@ -466,7 +469,7 @@ export function JovieChat({
           )}
 
           {/* Input at bottom */}
-          <div className='px-4 py-4'>
+          <div className='border-t border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 py-4 sm:px-5'>
             <div className='mx-auto max-w-2xl space-y-2'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
@@ -486,8 +489,8 @@ export function JovieChat({
         // Empty state - centered content with input pinned at bottom
         <div className='flex flex-1 flex-col'>
           {/* Centered content area */}
-          <div className='flex flex-1 flex-col items-center justify-center px-4'>
-            <div className='chat-stagger w-full max-w-2xl space-y-4'>
+          <div className='flex flex-1 flex-col items-center justify-center px-4 sm:px-5'>
+            <div className='chat-stagger w-full max-w-[46rem] space-y-5'>
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
               {showSuggestedProfiles && (
                 <SuggestedProfilesCarousel
@@ -517,29 +520,34 @@ export function JovieChat({
               {!hasCarouselItems &&
                 (profileCompletion?.percentage ?? 0) >= 100 && (
                   <>
-                    {isFirstSession ? (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        Welcome, {displayName ?? 'there'}. Your profile is live
-                        at{' '}
-                        <a
-                          href={
-                            username
-                              ? `https://jov.ie/${username}`
-                              : 'https://jov.ie'
-                          }
-                          target='_blank'
-                          rel='noreferrer'
-                          className='font-medium text-primary-token underline-offset-2 hover:underline'
-                        >
-                          {username ? `jov.ie/${username}` : 'jov.ie'}
-                        </a>
-                        .
+                    <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+                      <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+                        {isFirstSession ? 'Workspace ready' : 'Ask Jovie'}
                       </p>
-                    ) : (
-                      <p className='text-center text-[15px] text-secondary-token'>
-                        What can I help you with?
-                      </p>
-                    )}
+                      {isFirstSession ? (
+                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
+                          Welcome, {displayName ?? 'there'}. Your profile is
+                          live at{' '}
+                          <a
+                            href={
+                              username
+                                ? `https://jov.ie/${username}`
+                                : 'https://jov.ie'
+                            }
+                            target='_blank'
+                            rel='noreferrer'
+                            className='font-medium text-primary-token underline-offset-2 hover:underline'
+                          >
+                            {username ? `jov.ie/${username}` : 'jov.ie'}
+                          </a>
+                          .
+                        </p>
+                      ) : (
+                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
+                          What can I help you with today?
+                        </p>
+                      )}
+                    </div>
 
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}
@@ -553,7 +561,7 @@ export function JovieChat({
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='px-4 pb-4 sm:pb-8'>
+          <div className='border-t border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
