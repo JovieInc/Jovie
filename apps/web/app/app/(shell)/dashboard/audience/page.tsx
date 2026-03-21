@@ -7,6 +7,7 @@ import { DashboardAudienceClient } from '@/features/dashboard/organisms/Dashboar
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -29,12 +30,19 @@ async function AudienceContent({
   searchParams: Promise<SearchParams>;
 }>) {
   try {
+    // Auth check via Clerk JWT (no DB dependency) — ensures unauthenticated
+    // users are redirected even during DB outages
+    const { userId } = await getCachedAuth();
+    if (!userId) {
+      redirect(
+        `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
+      );
+    }
+
     const isE2E = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-    // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
 
-    // If data load failed, show error state (don't redirect — user IS authenticated)
     if (dashboardData.dashboardLoadError) {
       logger.error('[AudiencePage] Dashboard data load failed', {
         error: dashboardData.dashboardLoadError,
@@ -44,16 +52,15 @@ async function AudienceContent({
       );
     }
 
-    // Handle unauthenticated users
+    // Fallback: if dashboard data has no user despite Clerk auth, redirect
     if (!dashboardData.user?.id) {
       redirect(
         `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
       );
     }
 
-    // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
-      redirect('/onboarding');
+      redirect(APP_ROUTES.ONBOARDING);
     }
 
     const artist = dashboardData.selectedProfile

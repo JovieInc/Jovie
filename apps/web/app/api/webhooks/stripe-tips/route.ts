@@ -88,17 +88,18 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     // Log as critical error (not just warn) so the team can investigate and
     // manually reconcile. Still return (200) to stop Stripe retries since
     // retrying won't produce a handle that was never set.
-    await captureCriticalError(
+    // Fire-and-forget — don't let telemetry failure bubble into a 500
+    const rawEmail = session.customer_details?.email ?? session.customer_email;
+    void captureCriticalError(
       'Tip checkout completed without handle or profile_id metadata',
       new Error('Missing creator metadata on tip checkout session'),
       {
         route: '/api/webhooks/stripe-tips',
         session_id: session.id,
         amount: session.amount_total,
-        customer_email:
-          session.customer_details?.email ?? session.customer_email,
+        customer_email_domain: rawEmail?.split('@')[1] ?? null,
       }
-    );
+    ).catch(() => {});
     return;
   }
 

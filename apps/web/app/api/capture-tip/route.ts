@@ -55,12 +55,18 @@ export async function POST(req: NextRequest) {
         pi as Stripe.PaymentIntent & { charges?: { data: Stripe.Charge[] } }
       ).charges?.data?.[0];
 
+      // Resolve creator profile: prefer immutable profile_id from metadata,
+      // fall back to handle lookup for backward compatibility with older intents
+      const metadataProfileId =
+        typeof pi.metadata?.profile_id === 'string'
+          ? pi.metadata.profile_id
+          : null;
       const handle =
         typeof pi.metadata?.handle === 'string' ? pi.metadata.handle : null;
 
-      let creatorProfileId: string | null = null;
+      let creatorProfileId: string | null = metadataProfileId;
 
-      if (handle) {
+      if (!creatorProfileId && handle) {
         const [profile] = await db
           .select({ id: creatorProfiles.id })
           .from(creatorProfiles)

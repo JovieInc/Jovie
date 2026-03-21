@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { auth } from '@clerk/nextjs/server';
+import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/db';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
@@ -105,18 +108,32 @@ export async function POST(req: NextRequest) {
     // Convert to cents with overflow protection
     const amountInCents = amountToCents(amount);
 
-    // Hash handle to prevent PII exposure in third-party metadata
-    // The original handle can be correlated via internal logs if needed
+    // Look up the creator profile to store an immutable profile_id in metadata.
+    // This avoids issues with handle renames and keeps PII out of Stripe metadata.
+    const [profile] = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
+      .limit(1);
+
+    if (!profile) {
+      return NextResponse.json(
+        { error: 'Artist not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Hash handle for audit trail (non-reversible correlation key)
     const handleHash = hashHandleForMetadata(handle);
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: 'usd',
       automatic_payment_methods: { enabled: true },
-      // Store hashed handle instead of plaintext to prevent PII exposure
-      // Stripe metadata values must be strings
+      // Store immutable profile_id for webhook lookup and handle_hash for audit.
+      // Avoid storing plaintext handles/emails in third-party metadata.
       metadata: {
-        handle: handle.toLowerCase(),
+        profile_id: profile.id,
         handle_hash: handleHash,
         amount_cents: String(amountInCents),
       },

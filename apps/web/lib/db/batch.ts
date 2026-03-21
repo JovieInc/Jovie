@@ -154,7 +154,7 @@ export async function batchUpdateSequential<T>(
           failedId: update.id,
           succeeded,
           total: updates.length,
-          remaining: updates.length - succeeded,
+          remaining: updates.length - succeeded - 1,
         },
       });
       throw error;

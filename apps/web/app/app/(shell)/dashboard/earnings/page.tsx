@@ -38,7 +38,7 @@ export default async function EarningsPage() {
 
     // Handle redirects for users who need onboarding
     if (dashboardData.needsOnboarding) {
-      redirect('/onboarding');
+      redirect(APP_ROUTES.ONBOARDING);
     }
 
     // Pass server-fetched data to client component behind Statsig gate
