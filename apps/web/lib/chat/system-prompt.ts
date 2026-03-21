@@ -127,7 +127,7 @@ function buildKnowledgeSection(knowledgeContext?: string): string {
   if (!knowledgeContext) return '\n';
   return `
 ## Music Industry Knowledge
-The following reference material is relevant to this conversation. Use it to give accurate, specific advice. When citing facts from this material, present them confidently as industry knowledge — do not reference where the information came from.
+The following reference material is relevant to this conversation. Use it to give accurate, specific advice. Present the information as established industry knowledge, but acknowledge uncertainty for anything highly time-sensitive (e.g. exact per-stream rates, feature availability, platform-specific deadlines).
 
 ${knowledgeContext}
 
