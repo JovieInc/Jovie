@@ -40,12 +40,21 @@ export function MarketingHeader({
   });
   const resolvedHideNav = hideNav ?? pathname === '/investors';
 
-  // Anchor nav links for the /launch landing page
+  // Anchor nav links for marketing landing pages
   const launchNavLinks =
     pathname === APP_ROUTES.LAUNCH
       ? [
           { href: '#how-it-works', label: 'How it works' },
           { href: '#features', label: 'Features' },
+        ]
+      : undefined;
+  const homeNavLinks =
+    pathname === '/'
+      ? [
+          { href: '#release-proof', label: 'Releases' },
+          { href: '#profiles', label: 'Profile' },
+          { href: '#audience-intelligence', label: 'Audience' },
+          { href: '#pricing', label: 'Pricing' },
         ]
       : undefined;
 
@@ -57,7 +66,7 @@ export function MarketingHeader({
       hideNav={resolvedHideNav}
       containerSize='homepage'
       className='border-b'
-      navLinks={launchNavLinks}
+      navLinks={launchNavLinks ?? homeNavLinks}
       style={{
         backgroundColor: 'var(--linear-bg-header)',
         borderBottomColor: 'var(--linear-border-default)',

@@ -13,6 +13,33 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Set `active_profile_id` in all onboarding claim paths — `createProfileForExistingUser`, `updateExistingProfile`, and waitlist approval now update `users.active_profile_id`
 - Restrict stored function profile lookup to claimed profiles only (`is_claimed = true`), matching backfill behavior
 
+## [26.4.30] - 2026-03-20
+
+### Fixed
+
+- CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
+- CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
+- Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
+
+### Added
+
+- Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
+- Unit test for Statsig warn-once behavior
+
+## [26.4.29] - 2026-03-20
+
+### Added
+
+- YC demo Playwright spec (`yc-demo.spec.ts`) that records the full onboarding flow at watchable pace with deliberate pauses for voiceover narration
+- Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
+- Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
+- `demo:record` script in package.json for one-command demo video recording
+
+### Changed
+
+- Refactored golden-path.spec.ts to import helpers from shared module instead of inlining them
+- `ensureDbUser()` now accepts optional `knownSpotifyArtistIds` parameter for caller-specific Spotify ID cleanup
+- `createFreshUser()` no longer calls `ensureDbUser()` internally — callers handle DB setup explicitly
 ## [26.4.29] - 2026-03-21
 
 ### Fixed
