@@ -14,6 +14,7 @@ Detailed guides for every gstack skill — philosophy, workflow, and examples.
 | [`/qa`](#qa) | **QA Lead** | Test your app, find bugs, fix them with atomic commits, re-verify. Auto-generates regression tests for every fix. |
 | [`/qa-only`](#qa) | **QA Reporter** | Same methodology as /qa but report only. Use when you want a pure bug report without code changes. |
 | [`/design-review`](#design-review) | **Designer Who Codes** | Live-site visual audit + fix loop. 80-item audit, then fixes what it finds. Atomic commits, before/after screenshots. |
+| [`/perf`](#perf) | **Performance Engineer** | Production-only golden-path perf loop. Measures budgets, diagnoses the worst misses, fixes, rebuilds, and re-measures. |
 | [`/setup-browser-cookies`](#setup-browser-cookies) | **Session Manager** | Import cookies from your real browser (Chrome, Arc, Brave, Edge) into the headless session. Test authenticated pages. |
 | [`/retro`](#retro) | **Eng Manager** | Team-aware weekly retro. Per-person breakdowns, shipping streaks, test health trends, growth opportunities. |
 | [`/office-hours`](#office-hours) | **YC Office Hours** | Two modes. Startup: six forcing questions on demand, users, and product. Builder: brainstorming for side projects, hackathons, and learning. Writes a design doc with personal observations about how you think. |
@@ -517,6 +518,24 @@ Claude: [Explores 12 pages, fills 3 forms, tests 2 flows]
 ```
 
 **Testing authenticated pages:** Use `/setup-browser-cookies` first to import your real browser sessions, then `/qa` can test pages behind login.
+
+---
+
+## `/perf`
+
+This is my **performance engineer mode**.
+
+`/perf` is the golden-path optimization loop for production performance. It builds the app, runs the real performance budget guard, sorts pages by worst budget miss, diagnoses the largest bottleneck, applies one minimal fix, rebuilds, and measures again.
+
+The workflow is intentionally page-by-page because shared bundles and layouts move multiple pages at once. After each batch of fixes, `/perf` reruns all configured budgets and reprioritizes from fresh data instead of following a stale plan.
+
+Use it when:
+
+- the homepage, profile, or dashboard golden path is failing a budget
+- you want bundle-size and render-timing work grounded in actual measurements
+- you want an agent to keep grinding through safe perf wins until the path passes or clearly plateaus
+
+Typical diagnostics include bundle analyzer output for oversized scripts, `/browse perf` plus network inspection for timing problems, and route/source inspection to find heavy client boundaries or expensive imports.
 
 ---
 

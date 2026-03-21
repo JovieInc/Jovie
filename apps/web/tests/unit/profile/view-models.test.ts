@@ -56,6 +56,7 @@ describe('profile view models', () => {
       hideBranding: true,
       location: 'Austin, TX',
       hometown: 'Tulsa, OK',
+      pitchContext: '',
       profilePath: '/testartist',
     });
   });

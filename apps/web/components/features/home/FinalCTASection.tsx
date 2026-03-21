@@ -9,33 +9,32 @@ export function FinalCTASection() {
       className='relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
-        paddingTop: 'var(--linear-cta-section-pt)',
-        paddingBottom: 'var(--linear-cta-section-pb)',
+        paddingTop: 'calc(var(--linear-cta-section-pt) - 1.5rem)',
+        paddingBottom: 'calc(var(--linear-cta-section-pb) - 2rem)',
       }}
     >
       <Container size='homepage'>
-        <div className='reveal-on-scroll relative mx-auto flex max-w-[40rem] flex-col items-center text-center'>
+        <div className='reveal-on-scroll relative mx-auto flex max-w-[38rem] flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear max-w-[9ch] text-primary-token'
+            className='marketing-h2-linear max-w-[8.5ch] text-primary-token'
           >
             Take the stage.
           </h2>
 
-          <p className='mt-5 max-w-md marketing-lead-linear text-secondary-token'>
+          <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>
             Claim your handle and get the release system ready before the next
             song drops.
           </p>
 
           {/* Form */}
-          <div className='mt-7 w-full'>
+          <div className='mt-6 w-full max-w-[34rem] md:mt-7'>
             <div
               id='final-cta-dock'
               data-testid='final-cta-dock'
-              className='relative w-full overflow-hidden rounded-[0.95rem] p-2'
+              className='homepage-surface-card relative w-full overflow-hidden rounded-[1rem] p-2'
               style={{
-                border: '1px solid var(--linear-border-default)',
-                boxShadow: 'var(--linear-shadow-card)',
+                borderColor: 'var(--linear-border-default)',
               }}
             >
               <ClaimHandleForm />
@@ -43,7 +42,7 @@ export function FinalCTASection() {
           </div>
 
           {/* Trust signals */}
-          <div className='mt-4 flex items-center justify-center gap-4'>
+          <div className='mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2'>
             <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
               <span
                 aria-hidden='true'

@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { buildArtistBioDraft } from '@/lib/ai/artist-bio-writer';
 import { createProfileEditTool } from '@/lib/ai/tools/profile-edit';
+import { selectKnowledgeContext } from '@/lib/chat/knowledge/router';
 import { buildSystemPrompt } from '@/lib/chat/system-prompt';
 import { CHAT_MODEL, CHAT_MODEL_LIGHT } from '@/lib/constants/ai-models';
 import { db } from '@/lib/db';
@@ -1407,10 +1408,28 @@ export async function POST(req: Request) {
   const resolvedConversationId = toNullableString(conversationId);
   const releases = await fetchOptionalReleases(resolvedProfileId);
 
+  // Select relevant music industry knowledge based on recent user messages.
+  // Uses last 3 turns so follow-up questions retain context from earlier turns.
+  const recentUserText = [...uiMessages]
+    .reverse()
+    .filter(m => m.role === 'user')
+    .slice(0, 3)
+    .flatMap(m =>
+      (m.parts ?? [])
+        .filter(
+          (p): p is { type: 'text'; text: string } =>
+            p.type === 'text' && typeof p.text === 'string'
+        )
+        .map(p => p.text)
+    )
+    .join(' ');
+  const knowledgeContext = selectKnowledgeContext(recentUserText);
+
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
     aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
     insightsEnabled,
+    knowledgeContext: knowledgeContext || undefined,
   });
 
   try {

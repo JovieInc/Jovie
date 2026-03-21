@@ -27,7 +27,6 @@ const __dirname = dirname(__filename);
 const CACHE_DIR = join(__dirname, '.cache');
 const MANIFEST_PATH = join(CACHE_DIR, 'manifest.json');
 const QA_MIN_LENGTH = 100;
-const QA_MAX_TAG_RATIO = 0.8;
 const REQUEST_TIMEOUT_MS = 10_000;
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 500;
@@ -78,10 +77,9 @@ async function fetchWithRetry(
   retries = MAX_RETRIES
 ): Promise<Response | null> {
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
       const res = await fetch(url, {
         signal: controller.signal,
         headers: {
@@ -117,6 +115,7 @@ async function fetchWithRetry(
 
       return res;
     } catch (err) {
+      clearTimeout(timeout);
       if (attempt < retries) {
         const delay = BASE_DELAY_MS * 2 ** attempt;
         console.log(
@@ -431,7 +430,15 @@ async function fetchSourceCPages(manifest: Manifest): Promise<number> {
     return 0;
   }
 
-  const browser = await playwright.chromium.launch({ headless: true });
+  let browser: Awaited<ReturnType<typeof playwright.chromium.launch>>;
+  try {
+    browser = await playwright.chromium.launch({ headless: true });
+  } catch (err) {
+    console.error(
+      `[Source C] Playwright browsers not installed. Run: npx playwright install chromium\n  ${(err as Error).message}`
+    );
+    return 0;
+  }
   const context = await browser.newContext({
     userAgent:
       'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -616,14 +623,11 @@ function runQaGate(manifest: Manifest): QaSummary {
       continue;
     }
 
-    // Check for high HTML tag ratio (junk content)
-    const tagMatches = content.match(/<[^>]+>/g);
-    const tagChars = tagMatches
-      ? tagMatches.reduce((sum, tag) => sum + tag.length, 0)
-      : 0;
-    if (tagChars / content.length > QA_MAX_TAG_RATIO) {
+    // Check for low word count (nav-only or template placeholder pages)
+    const wordCount = content.split(/\s+/).filter(Boolean).length;
+    if (wordCount < 30) {
       entry.qaStatus = 'dropped';
-      entry.qaReason = `high tag ratio (${((tagChars / content.length) * 100).toFixed(0)}%)`;
+      entry.qaReason = `too few words (${wordCount})`;
       summary.droppedJunk++;
       continue;
     }
