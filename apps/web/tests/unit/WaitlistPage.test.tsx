@@ -39,10 +39,6 @@ vi.mock('@/features/auth', () => ({
   AuthBackButton: () => <button type='button'>Back</button>,
 }));
 
-vi.mock('@/features/waitlist/WaitlistPrimaryGoalStep', () => ({
-  WaitlistPrimaryGoalStep: () => <div />,
-}));
-
 vi.mock('@/features/waitlist/WaitlistSocialStep', () => ({
   WaitlistSocialStep: () => <div />,
 }));

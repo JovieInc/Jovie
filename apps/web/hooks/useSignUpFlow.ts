@@ -229,6 +229,8 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
         if (result.status === 'missing_requirements') {
           // There may be additional verification needed
           base.setError('Additional verification required. Please try again.');
+        } else if (result.status === 'abandoned') {
+          base.setError('Sign-up was interrupted. Please start over.');
         } else {
           base.setError('Sign-up incomplete. Please try again.');
         }

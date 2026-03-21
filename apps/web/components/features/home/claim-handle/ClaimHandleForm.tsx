@@ -19,11 +19,16 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
-function getInputRowStyle(isHero: boolean, isAvailable: boolean) {
+function getInputRowStyle(
+  size: 'default' | 'hero' | 'display',
+  isAvailable: boolean
+) {
+  const isHeroLike = size !== 'default';
+  const isDisplay = size === 'display';
   let borderColor: string;
   if (isAvailable) {
     borderColor = 'rgba(74,222,128,0.25)';
-  } else if (isHero) {
+  } else if (isHeroLike) {
     borderColor = 'rgba(255,255,255,0.1)';
   } else {
     borderColor = 'rgba(255,255,255,0.06)';
@@ -45,26 +50,43 @@ function getInputRowStyle(isHero: boolean, isAvailable: boolean) {
   ].join(', ');
 
   return {
-    minHeight: isHero ? 68 : 52,
-    background: isHero
+    minHeight: isDisplay ? 88 : isHeroLike ? 68 : 52,
+    background: isHeroLike
       ? 'linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.032) 100%)'
       : 'rgba(255,255,255,0.03)',
-    border: `1px solid ${borderColor}`,
-    boxShadow: isHero ? heroShadow : defaultShadow,
+    border: `${isDisplay ? 1.5 : 1}px solid ${borderColor}`,
+    boxShadow: isHeroLike ? heroShadow : defaultShadow,
   };
 }
 
-function getInputStyle(isHero: boolean, isAvailable: boolean) {
+function getInputStyle(
+  size: 'default' | 'hero' | 'display',
+  isAvailable: boolean
+) {
+  const isHero = size === 'hero';
+  const isDisplay = size === 'display';
   const color = isAvailable ? 'rgb(74,222,128)' : 'var(--linear-text-primary)';
-  return isHero
-    ? { fontSize: '19px', fontWeight: 510, letterSpacing: '-0.03em', color }
-    : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
+  return isDisplay
+    ? {
+        fontSize: '28px',
+        fontWeight: 510,
+        letterSpacing: '-0.04em',
+        color,
+      }
+    : isHero
+      ? { fontSize: '19px', fontWeight: 510, letterSpacing: '-0.03em', color }
+      : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
 }
 
-function getButtonStyle(isHero: boolean, isDisabled: boolean) {
+function getButtonStyle(
+  size: 'default' | 'hero' | 'display',
+  isDisabled: boolean
+) {
+  const isHero = size === 'hero';
+  const isDisplay = size === 'display';
   return {
-    height: isHero ? 50 : 36,
-    fontSize: isHero ? '14px' : '13px',
+    height: isDisplay ? 64 : isHero ? 50 : 36,
+    fontSize: isDisplay ? '16px' : isHero ? '14px' : '13px',
     fontWeight: 510,
     letterSpacing: '-0.01em',
     background: isDisabled
@@ -85,6 +107,8 @@ export function ClaimHandleForm({
   size = 'default',
 }: Readonly<ClaimHandleFormProps>) {
   const isHero = size === 'hero';
+  const isDisplay = size === 'display';
+  const isHeroLike = size !== 'default';
   const router = useRouter();
   const { isSignedIn } = useAuthSafe();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -184,9 +208,9 @@ export function ClaimHandleForm({
   const hasClientError = !!handleError;
   const isDisabled = navigating || hasClientError;
 
-  const inputRowStyle = getInputRowStyle(isHero, isAvailable);
-  const inputStyle = getInputStyle(isHero, isAvailable);
-  const buttonStyle = getButtonStyle(isHero, isDisabled);
+  const inputRowStyle = getInputRowStyle(size, isAvailable);
+  const inputStyle = getInputStyle(size, isAvailable);
+  const buttonStyle = getButtonStyle(size, isDisabled);
 
   return (
     <form onSubmit={onSubmit} className='w-full' noValidate>
@@ -195,12 +219,16 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isHero ? 'rounded-2xl p-1 sm:p-1.5' : 'rounded-xl p-1',
+          isDisplay
+            ? 'rounded-[1.4rem] p-1.5 sm:p-2'
+            : isHero
+              ? 'rounded-2xl p-1 sm:p-1.5'
+              : 'rounded-xl p-1',
           isAvailable && 'claim-input-row--available'
         )}
         style={inputRowStyle}
       >
-        {isHero && (
+        {isHeroLike && (
           <div
             aria-hidden='true'
             className='pointer-events-none absolute inset-x-2 top-0 h-px rounded-full'
@@ -216,21 +244,29 @@ export function ClaimHandleForm({
           <span
             className='shrink-0 select-none'
             style={
-              isHero
+              isDisplay
                 ? {
-                    fontSize: '19px',
+                    fontSize: '28px',
                     fontWeight: 510,
-                    letterSpacing: '-0.03em',
+                    letterSpacing: '-0.04em',
                     color: 'var(--linear-text-quaternary)',
                     fontFamily: 'inherit',
                   }
-                : {
-                    fontSize: '13px',
-                    fontWeight: 400,
-                    color: 'var(--linear-text-tertiary)',
-                    letterSpacing: '-0.02em',
-                    fontFamily: 'monospace',
-                  }
+                : isHero
+                  ? {
+                      fontSize: '19px',
+                      fontWeight: 510,
+                      letterSpacing: '-0.03em',
+                      color: 'var(--linear-text-quaternary)',
+                      fontFamily: 'inherit',
+                    }
+                  : {
+                      fontSize: '13px',
+                      fontWeight: 400,
+                      color: 'var(--linear-text-tertiary)',
+                      letterSpacing: '-0.02em',
+                      fontFamily: 'monospace',
+                    }
             }
           >
             {displayDomain}/
@@ -249,7 +285,7 @@ export function ClaimHandleForm({
             autoComplete='off'
             aria-label='Choose your handle'
             aria-describedby={helperState.text ? 'handle-hint' : undefined}
-            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHero ? 'placeholder:text-quaternary-token' : 'placeholder:text-tertiary-token'}`}
+            className={`min-w-0 flex-1 bg-transparent focus-visible:outline-none ${isHeroLike ? 'placeholder:text-quaternary-token' : 'placeholder:text-tertiary-token'}`}
             style={inputStyle}
           />
 
@@ -267,7 +303,11 @@ export function ClaimHandleForm({
           disabled={isDisabled}
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
-            isHero ? 'rounded-xl px-5' : 'rounded-lg px-3.5 sm:px-4',
+            isDisplay
+              ? 'rounded-[1rem] px-6 sm:px-7'
+              : isHero
+                ? 'rounded-xl px-5'
+                : 'rounded-lg px-3.5 sm:px-4',
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'

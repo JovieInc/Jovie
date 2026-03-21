@@ -6,69 +6,12 @@ import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import {
+  type ChangelogRelease,
+  type ChangelogSection,
+  parseChangelog,
+} from '@/lib/changelog-parser';
 import { ChangelogEmailSignup } from './ChangelogEmailSignup';
-
-// ---------------------------------------------------------------------------
-// Changelog parsing (mirrors scripts/lib/changelog-parser.mjs for server use)
-// ---------------------------------------------------------------------------
-
-interface ChangelogSection {
-  added: string[];
-  changed: string[];
-  fixed: string[];
-  removed: string[];
-}
-
-interface ChangelogRelease {
-  version: string;
-  date: string;
-  sections: ChangelogSection;
-}
-
-const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
-const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
-
-function parseChangelogFile(markdown: string): ChangelogRelease[] {
-  const lines = markdown.split('\n');
-  const releases: ChangelogRelease[] = [];
-  let current: ChangelogRelease | null = null;
-  let currentSection: keyof ChangelogSection | null = null;
-
-  for (const line of lines) {
-    const vMatch = line.match(VERSION_HEADING_RE);
-    if (vMatch) {
-      const [, version, date] = vMatch;
-      if (version.toLowerCase() === 'unreleased') {
-        current = null;
-        currentSection = null;
-        continue;
-      }
-      current = {
-        version,
-        date: date || '',
-        sections: { added: [], changed: [], fixed: [], removed: [] },
-      };
-      releases.push(current);
-      currentSection = null;
-      continue;
-    }
-
-    if (!current) continue;
-
-    const sMatch = line.match(SECTION_HEADING_RE);
-    if (sMatch) {
-      currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
-      continue;
-    }
-
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ') && currentSection) {
-      current.sections[currentSection].push(trimmed.slice(2));
-    }
-  }
-
-  return releases;
-}
 
 // ---------------------------------------------------------------------------
 // File resolution & caching
@@ -94,7 +37,7 @@ const getReleases = unstable_cache(
     if (!changelogPath) return [];
     try {
       const md = fs.readFileSync(changelogPath, 'utf8');
-      return parseChangelogFile(md);
+      return parseChangelog(md);
     } catch {
       return [];
     }
@@ -238,6 +181,13 @@ export default async function ChangelogPage() {
                       </span>
                     )}
                   </div>
+
+                  {/* Summary */}
+                  {release.summary && (
+                    <p className='text-sm leading-relaxed opacity-60 mb-4'>
+                      {release.summary}
+                    </p>
+                  )}
 
                   {/* Sections */}
                   <div className='space-y-4'>

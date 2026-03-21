@@ -111,7 +111,7 @@ export async function approveWaitlistEntryInTx(
 
   await tx
     .update(users)
-    .set({ userStatus: 'active', updatedAt: now })
+    .set({ userStatus: 'active', activeProfileId: profile.id, updatedAt: now })
     .where(eq(users.id, user.id));
 
   return {

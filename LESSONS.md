@@ -42,6 +42,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 **Fix:** `rm -rf apps/web/.next` then restart the dev server. Always stop the dev server before stash/checkout operations.
 
+### Tim White homepage identity must come from one canonical source
+**Mistake:** Homepage demos mixed old local Tim White images with a different blob-hosted avatar and used the wrong Spotify artist identifier in mock links.
+
+**Rule:** If the homepage uses Tim White, use a single canonical source for founder identity data across all homepage demos and mocks. Do not guess or hardcode alternate photos. Tim White's Spotify artist ID is `4u`, and sibling homepage references must be updated together.
+
 ---
 
 ## Tailwind v4 / Design Tokens
