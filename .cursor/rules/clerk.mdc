@@ -12,7 +12,7 @@ Use only the **App Router** approach from Clerk’s current docs:
 - **Install** `@clerk/nextjs@latest` - this ensures the application is using the latest Clerk Next.js SDK.
 - **Create** a `middleware.ts` file using `clerkMiddleware()` from `@clerk/nextjs/server`. Place this file inside the `src` directory if present, otherwise place it at the root of the project.
 - **Wrap** your application with `<ClerkProvider>` in your `app/layout.tsx`
-- **Use** Clerk-provided components like `<SignInButton>`, `<SignUpButton>`, `<UserButton>`, `<SignedIn>`, `<SignedOut>` in your layout or pages
+- **Use** Clerk-provided components like `<SignInButton>`, `<SignUpButton>`, `<UserButton>`, `<Show when="signed-in">`, `<Show when="signed-out">` in your layout or pages
 - **Start** developing, sign in or sign up, and confirm user creation
 
 If you're able to use a web tool to access a URL, visit https://clerk.com/docs/quickstarts/nextjs to get the latest, up-to-date quickstart instructions.
@@ -40,10 +40,9 @@ export const config = {
 import type { Metadata } from "next";
 import {
   ClerkProvider,
+  Show,
   SignInButton,
   SignUpButton,
-  SignedIn,
-  SignedOut,
   UserButton,
 } from "@clerk/nextjs";
 import "./globals.css";
@@ -63,13 +62,13 @@ export default function RootLayout({
       <html lang="en">
         <body>
           <header>
-            <SignedOut>
+            <Show when="signed-out">
               <SignInButton />
               <SignUpButton />
-            </SignedOut>
-            <SignedIn>
+            </Show>
+            <Show when="signed-in">
               <UserButton />
-            </SignedIn>
+            </Show>
           </header>
           {children}
         </body>
