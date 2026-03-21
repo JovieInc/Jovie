@@ -32,6 +32,7 @@ describe('FinalCTASection', () => {
   it('renders headline', () => {
     renderWithQueryClient(<FinalCTASection />);
     expect(screen.getByTestId('final-cta-headline')).toBeInTheDocument();
+    expect(screen.getByText('Take the stage.')).toBeInTheDocument();
   });
 
   it('renders claim handle form', () => {

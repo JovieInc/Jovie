@@ -19,6 +19,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
+### Fixed
+
+- CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
+- CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
+- Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
+
+### Added
+
+- Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
+- Unit test for Statsig warn-once behavior
 
 ## [26.4.29] - 2026-03-20
 
