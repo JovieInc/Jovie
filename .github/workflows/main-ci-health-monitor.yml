@@ -64,6 +64,7 @@ jobs:
               const ageMinutes = (now - Date.parse(startedAt)) / (1000 * 60);
               return ageMinutes > thresholdMinutes;
             });
+            const activeRun = runs.find((run) => run.status === 'queued' || run.status === 'in_progress');
 
             const latestSuccess = runs.find((run) => run.status === 'completed' && run.conclusion === 'success');
             const latestFailure = runs.find((run) =>
@@ -129,6 +130,10 @@ jobs:
             }
 
             const noSuccessForTooLong = (() => {
+              if (activeRun && !staleRun) {
+                return false;
+              }
+
               if (!successCutoff) {
                 return mergedCount > 0;
               }
