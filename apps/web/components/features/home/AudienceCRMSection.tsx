@@ -1,6 +1,6 @@
 'use client';
 
-import { DollarSign, Mail, MapPin, Users } from 'lucide-react';
+import { Mail, MapPin, Users } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import { Container } from '@/components/site/Container';
 
@@ -13,15 +13,15 @@ const DemoAudienceSection = lazy(
 /* ------------------------------------------------------------------ */
 
 const STATS = [
-  { label: 'Total fans', value: '2,847', icon: Users },
-  { label: 'Email subscribers', value: '2,341', icon: Mail },
-  { label: 'Cities reached', value: '189', icon: MapPin },
-  { label: 'Tips earned', value: '$1,204', icon: DollarSign },
+  { label: 'Total fans', value: '42,891', icon: Users },
+  { label: 'Captured contacts', value: '12,318', icon: Mail },
+  { label: 'Top city', value: 'Los Angeles', icon: MapPin },
+  { label: 'Fan value', value: 'High intent', icon: Users },
 ];
 const BENEFITS = [
-  'Capture fans automatically',
-  'Know where they came from',
-  'Reach them on every release',
+  'Spot your super-fans',
+  'Track what actually drives clicks',
+  'Build campaign-ready audiences',
 ] as const;
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +91,10 @@ function TableSkeleton() {
 
 export function AudienceCRMSection() {
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
+    <section
+      id='audience-intelligence'
+      className='section-spacing-linear relative overflow-hidden bg-page'
+    >
       {/* Ambient glow behind the mockup */}
       <div
         aria-hidden='true'
@@ -108,31 +111,34 @@ export function AudienceCRMSection() {
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
           {/* Header */}
           <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
-            <h2 className='max-w-md marketing-h2-linear text-primary-token reveal-on-scroll'>
-              You&apos;re losing fans every day.
-            </h2>
-            <div className='max-w-lg reveal-on-scroll' data-delay='80'>
-              <p className='marketing-lead-linear text-secondary-token'>
-                Those 10 people from your show last night? Gone forever. The
-                fans who tapped your Linktree but didn&apos;t know which link to
-                click? Lost. Jovie captures every fan across every touchpoint —
-                profile visits, smart links, QR codes — into one list you
-                actually own.
-              </p>
-              <span className='mt-6 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token border border-subtle'>
-                Built-in fan CRM
+            <div className='reveal-on-scroll'>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+                Audience intelligence
               </span>
+              <h2 className='mt-5 max-w-[10ch] marketing-h2-linear text-primary-token'>
+                Know every fan by name.
+              </h2>
+            </div>
+            <div
+              className='max-w-lg reveal-on-scroll md:justify-self-end'
+              data-delay='80'
+            >
+              <p className='marketing-lead-linear text-secondary-token'>
+                See which fans keep showing up, where they came from, and which
+                platforms are actually driving growth before you spend money on
+                the next push.
+              </p>
             </div>
           </div>
 
           <div
-            className='mt-8 grid gap-3 sm:grid-cols-3 reveal-on-scroll'
+            className='mt-7 grid gap-3 sm:grid-cols-3 reveal-on-scroll'
             data-delay='120'
           >
             {BENEFITS.map(benefit => (
               <div
                 key={benefit}
-                className='rounded-2xl border border-subtle bg-surface-0 px-4 py-3 text-sm font-medium text-secondary-token'
+                className='rounded-[0.95rem] border border-subtle bg-surface-0 px-4 py-3 text-sm font-medium text-secondary-token'
               >
                 {benefit}
               </div>
@@ -141,12 +147,12 @@ export function AudienceCRMSection() {
 
           {/* Product demo */}
           <div
-            className='relative mt-16 md:mt-20 mx-auto w-full reveal-on-scroll'
+            className='relative mx-auto mt-9 w-full reveal-on-scroll md:mt-10'
             data-delay='160'
           >
             {/* Dashboard window */}
             <div
-              className='relative overflow-hidden rounded-t-xl md:rounded-t-2xl rounded-b-none'
+              className='relative overflow-hidden rounded-t-[1rem] rounded-b-none md:rounded-t-[1.05rem]'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 boxShadow: 'var(--linear-panel-ring) 0px 0px 0px 1px inset',
@@ -155,7 +161,7 @@ export function AudienceCRMSection() {
               {/* Shine border overlay */}
               <div
                 aria-hidden='true'
-                className='pointer-events-none absolute inset-0 rounded-t-xl md:rounded-t-2xl rounded-b-none z-10'
+                className='pointer-events-none absolute inset-0 z-10 rounded-t-[1rem] rounded-b-none md:rounded-t-[1.05rem]'
               />
               {/* Mac window chrome */}
               <div className='flex items-center px-5 h-12 border-b border-subtle bg-surface-1'>
@@ -194,19 +200,19 @@ export function AudienceCRMSection() {
                   </div>
                 ))}
               </div>
-              <p className='text-xs text-quaternary-token mt-2 text-center'>
-                Real data from a Jovie artist profile
+              <p className='mt-2 text-center text-xs text-quaternary-token'>
+                Snapshot from a Jovie audience dashboard
               </p>
 
               <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-5 py-3 text-xs text-tertiary-token'>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
-                  From profile
-                </span>
-                <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
                   Source tracked
                 </span>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
-                  High-intent fan scoring
+                  Super-fan segments
+                </span>
+                <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
+                  Campaign-ready audiences
                 </span>
               </div>
 
