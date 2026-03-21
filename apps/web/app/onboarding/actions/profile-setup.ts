@@ -89,6 +89,14 @@ export async function createProfileForExistingUser(
       });
     console.timeEnd(createProfileTimer);
 
+    // Set active_profile_id on the user so auth/session joins resolve correctly
+    if (profile?.id) {
+      await tx
+        .update(users)
+        .set({ activeProfileId: profile.id, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    }
+
     return {
       username: profile?.usernameNormalized || normalizedUsername,
       status: 'created',
@@ -135,6 +143,14 @@ export async function updateExistingProfile(
         usernameNormalized: creatorProfiles.usernameNormalized,
       });
     console.timeEnd(updateProfileTimer);
+
+    // Set active_profile_id on the user so auth/session joins resolve correctly
+    if (profile.userId) {
+      await tx
+        .update(users)
+        .set({ activeProfileId: profile.id, updatedAt: new Date() })
+        .where(eq(users.id, profile.userId));
+    }
 
     return {
       username: updated?.usernameNormalized || normalizedUsername,
