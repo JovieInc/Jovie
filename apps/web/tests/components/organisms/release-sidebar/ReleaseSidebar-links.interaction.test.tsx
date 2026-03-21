@@ -188,6 +188,12 @@ vi.mock('@/components/organisms/release-sidebar/ReleaseDspLinks', () => ({
   ReleaseDspLinks: () => <div data-testid='dsp-links'>DSP Links Content</div>,
 }));
 
+vi.mock('@/components/organisms/release-sidebar/ReleasePitchSection', () => ({
+  ReleasePitchSection: () => (
+    <div data-testid='pitch-section'>Pitch Section</div>
+  ),
+}));
+
 vi.mock(
   '@/components/organisms/release-sidebar/ReleaseSmartLinkSection',
   () => ({
