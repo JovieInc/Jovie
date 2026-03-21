@@ -286,6 +286,15 @@ grep -rn "PATTERN_YOU_FIXED" apps/web --include="*.tsx"
 
 **Why:** A bug in one file often indicates a systemic issue. Patching one instance while leaving others creates inconsistency and delays future debugging.
 
+### 6a. Founder / Featured Creator Identity Must Be Canonical
+
+- **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used
+- For Tim White specifically, agents must use the canonical homepage identity source instead of hardcoded fallback assets or guessed values
+- If Tim White appears in homepage mocks, use the correct founder photo and the correct Spotify artist ID: `4u`
+- When fixing one wrong Tim White reference, search for sibling homepage/demo references and fix all of them in the same pass
+
+**Why:** Using the wrong founder photo or wrong Spotify identity undermines trust in the product and makes the AI experience look careless.
+
 ### 7. Public/Webhook Coordination Must Be Durable
 
 - **NEVER** rely on in-memory rate-limit, dedupe, or coordination state for public endpoints, webhooks, or automation triggers
@@ -1231,6 +1240,14 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 **Do not manually edit `CHANGELOG.md` during development.** The `/ship` workflow generates changelog entries automatically from the diff and commit history.
 
 `CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+
+**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions:
+- **Summary blockquote:** Add `> plain-language summary` (max 3 sentences) right after the version heading. Written for non-technical users (artists, fans, investors).
+- **`[internal]` prefix:** Tag developer-facing entries with `- [internal] ...`. These are hidden from the public page, RSS feed, and emails but preserved for developer reference.
+- **Plain language:** Public entries should avoid jargon. Write what changed for the user, not how it was implemented. Example: "Tips now process correctly" not "Stop capture-tip infinite Stripe retry loop".
+- **Hidden releases:** Releases where ALL entries are `[internal]` are completely hidden from public surfaces.
+
+**Shared parser:** `apps/web/lib/changelog-parser.ts` is the single source of truth for changelog parsing in the Next.js app (page + RSS feed). `scripts/lib/changelog-parser.mjs` is the Node ESM version used by the email send script.
 
 **Post-merge emails:** After a PR merges to main, run `pnpm changelog:send` to email all verified changelog subscribers (requires `RESEND_API_KEY`, `DATABASE_URL`).
 

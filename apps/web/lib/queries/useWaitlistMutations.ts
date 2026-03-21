@@ -30,7 +30,7 @@ export interface WaitlistMutationResponse {
 }
 
 export interface WaitlistSubmitInput {
-  primaryGoal: string;
+  primaryGoal: string | null;
   primarySocialUrl: string;
   spotifyUrl: string | null;
   spotifyArtistName: string | null;
@@ -266,7 +266,7 @@ async function submitWaitlistEntry(
  *
  * submitWaitlist(
  *   {
- *     primaryGoal: 'streams',
+ *     primaryGoal: null,
  *     primarySocialUrl: 'https://instagram.com/artist',
  *     spotifyUrl: null,
  *     heardAbout: null,

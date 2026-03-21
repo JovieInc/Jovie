@@ -6,47 +6,76 @@ import { Container } from '@/components/site/Container';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 const FREE_OUTCOMES = [
-  'Get live fast with a smart artist profile',
-  'Fans get notified when you release',
-  'Start building your fanbase',
+  'Launch unlimited smart links',
+  'Build a release-ready artist profile',
+  'See core audience and click activity',
 ] as const;
 
 const FOUNDING_OUTCOMES = [
-  'Own and export your full fan list',
-  'See richer analytics and export contacts',
-  'Support bigger release campaigns without extra tools',
+  'Send paid release notifications to fans',
+  'Unlock deeper audience intelligence',
+  'Run every release from one branded home',
+] as const;
+
+const FREE_FEATURE_PREVIEW = [
+  'Unlimited smart links',
+  'Public artist profile page',
+  'Basic analytics (30 days)',
+] as const;
+
+const FOUNDING_FEATURE_PREVIEW = [
+  'Release notifications',
+  'Advanced analytics & geographic insights',
+  'Remove Jovie branding',
 ] as const;
 
 export function PricingSection() {
   const freePlan = ENTITLEMENT_REGISTRY.free.marketing;
   const foundingPlan = ENTITLEMENT_REGISTRY.founding.marketing;
+  const freeIncludes = freePlan.features.filter(feature =>
+    FREE_FEATURE_PREVIEW.includes(
+      feature as (typeof FREE_FEATURE_PREVIEW)[number]
+    )
+  );
+  const foundingIncludes = foundingPlan.features.filter(feature =>
+    FOUNDING_FEATURE_PREVIEW.includes(
+      feature as (typeof FOUNDING_FEATURE_PREVIEW)[number]
+    )
+  );
 
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
+    <section
+      id='pricing'
+      className='section-spacing-linear relative overflow-hidden bg-page'
+    >
       <Container size='homepage'>
         <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
-            <Badge variant='outline' size='xl'>
-              Pricing
-            </Badge>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              Get live for free. Grow when you&apos;re ready.
-            </h2>
-            <p className='max-w-md marketing-lead-linear text-secondary-token'>
-              Smart links, fan notifications, and your profile — all free.
-              Upgrade to own your full fan list and remove branding.
+          <div className='reveal-on-scroll grid items-end section-gap-linear md:grid-cols-[0.92fr_1.08fr]'>
+            <div className='flex max-w-[22rem] flex-col gap-4'>
+              <Badge variant='outline' size='xl' className='w-fit'>
+                Pricing
+              </Badge>
+              <h2 className='marketing-h2-linear max-w-[9ch] text-primary-token'>
+                Simple pricing.
+              </h2>
+            </div>
+            <p className='max-w-xl marketing-lead-linear text-secondary-token md:justify-self-end'>
+              Start free with smart links and your artist profile. Upgrade when
+              you want release notifications, deeper audience intelligence, and
+              branding control.
             </p>
           </div>
 
           <div
-            className='reveal-on-scroll mx-auto grid max-w-3xl grid-cols-1 gap-6 md:grid-cols-2'
+            className='reveal-on-scroll mx-auto mt-8 grid max-w-[58rem] grid-cols-1 gap-5 md:mt-8 md:grid-cols-2'
             data-delay='80'
           >
             <div
-              className='relative flex flex-col rounded-xl p-8'
+              className='relative flex flex-col rounded-[0.95rem] p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
+                boxShadow: 'var(--linear-shadow-card)',
               }}
             >
               <p className='text-sm font-medium tracking-[-0.01em] text-tertiary-token'>
@@ -59,11 +88,10 @@ export function PricingSection() {
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Get live, start notifying fans, and prove it works — then
-                decide.
+                Smart links, your artist profile, and the core launch surface.
               </p>
 
-              <ul className='mt-8 flex flex-1 flex-col gap-3'>
+              <ul className='mt-7 flex flex-1 flex-col gap-2.5'>
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -75,12 +103,12 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+              <div className='mt-5 rounded-[0.85rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  {freePlan.features.slice(0, 4).join(' • ')}
+                  {freeIncludes.join(' • ')}
                 </p>
               </div>
 
@@ -95,7 +123,7 @@ export function PricingSection() {
             </div>
 
             <div
-              className='relative flex flex-col overflow-hidden rounded-xl p-8'
+              className='relative flex flex-col overflow-hidden rounded-[0.95rem] p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-pricing-accent-border)',
@@ -126,11 +154,11 @@ export function PricingSection() {
                 <span className='text-[14px] text-tertiary-token'>/mo</span>
               </div>
               <p className='mt-3 text-[14px] leading-relaxed text-secondary-token'>
-                Unlock deeper analytics, remove branding, and scale once your
-                profile is working.
+                Release notifications, audience intelligence, branding control,
+                and deeper fan ownership.
               </p>
 
-              <ul className='mt-8 flex flex-1 flex-col gap-3'>
+              <ul className='mt-7 flex flex-1 flex-col gap-2.5'>
                 {FOUNDING_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -142,15 +170,12 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-6 rounded-xl border border-subtle bg-surface-1 p-4'>
+              <div className='mt-5 rounded-[0.85rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
-                  {foundingPlan.features
-                    .filter(feature => !feature.endsWith('+'))
-                    .slice(0, 4)
-                    .join(' • ')}
+                  {foundingIncludes.join(' • ')}
                 </p>
               </div>
 

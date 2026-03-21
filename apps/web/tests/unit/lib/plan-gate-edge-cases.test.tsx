@@ -241,7 +241,7 @@ describe('usePlanGate – feature consistency', () => {
     // Free-tier unlocked features
     expect(result.current.aiCanUseTools).toBe(true);
     expect(result.current.canCreateManualReleases).toBe(true);
-    expect(result.current.canSendNotifications).toBe(true);
+    expect(result.current.canSendNotifications).toBe(false);
     expect(result.current.canEditSmartLinks).toBe(true);
   });
 

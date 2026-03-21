@@ -91,6 +91,7 @@ const PRO_LIMITS: PlanEntitlements['limits'] = {
 const PRO_FEATURES: readonly string[] = [
   'All Free features +',
   'Pre-release & countdown pages',
+  'Release notifications',
   'Remove Jovie branding',
   'Extended analytics (90 days)',
   'Advanced analytics & geographic insights',
@@ -123,7 +124,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
       aiCanUseTools: true,
       canCreateManualReleases: true,
       canAccessFutureReleases: false,
-      canSendNotifications: true,
+      canSendNotifications: false,
       canEditSmartLinks: true,
       canAccessInbox: false,
     },
@@ -152,7 +153,6 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Contact page',
         'About page',
         'Tour dates (Bandsintown)',
-        'Release notifications',
         'Click & visit tracking',
         'Basic analytics (30 days)',
         'Audience intelligence',
@@ -370,7 +370,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
       },
       {
         name: 'Release notifications (email to fans)',
-        free: true,
+        free: false,
         pro: true,
         growth: true,
       },

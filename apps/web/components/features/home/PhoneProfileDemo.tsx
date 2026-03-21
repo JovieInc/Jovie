@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Container } from '@/components/site/Container';
 import { PhoneFrame } from './PhoneFrame';
+import { TIM_WHITE_PROFILE } from './tim-white';
 
 /* ------------------------------------------------------------------ */
 /*  Types & constants                                                  */
@@ -20,9 +21,10 @@ const TABS: ReadonlyArray<{ id: ProfileTab; label: string }> = [
 ];
 
 const PROFILE = {
-  name: 'Mara Vale',
-  handle: '@maravale',
-  tagline: 'New single out now. Tour announced.',
+  name: TIM_WHITE_PROFILE.name,
+  handle: '@timwhite',
+  tagline: 'Never Say A Word out now. Tour announced.',
+  avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
 } as const;
 
 /* ------------------------------------------------------------------ */
@@ -42,17 +44,17 @@ function ListenContent() {
         return (
           <div
             key={dsp.name}
-            className='flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
+            className='flex items-center justify-between rounded-[0.9rem] border border-white/[0.06] bg-white/[0.04] p-2.5'
           >
             <div className='flex items-center gap-2.5'>
-              <div className='w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.06]'>
+              <div className='flex h-7 w-7 items-center justify-center rounded-[0.7rem] bg-white/[0.06]'>
                 <Icon className='w-3.5 h-3.5' style={{ color: dsp.color }} />
               </div>
               <span className='text-[13px] font-medium text-white/90'>
                 {dsp.name}
               </span>
             </div>
-            <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
+            <span className='rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black'>
               Play
             </span>
           </div>
@@ -72,7 +74,7 @@ function TipContent() {
         {['$3', '$5', '$10'].map(amt => (
           <div
             key={amt}
-            className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-0.5 ${
+            className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-[0.9rem] ${
               amt === '$5'
                 ? 'bg-primary-token text-page border border-transparent'
                 : 'bg-white/[0.04] text-primary-token border border-white/[0.06]'
@@ -91,7 +93,7 @@ function TipContent() {
           </div>
         ))}
       </div>
-      <div className='flex items-center justify-center rounded-xl px-4 py-2.5 text-[13px] font-medium bg-white text-black mt-1'>
+      <div className='mt-1 flex items-center justify-center rounded-[0.9rem] bg-white px-4 py-2.5 text-[13px] font-medium text-black'>
         Continue with Venmo
       </div>
     </div>
@@ -109,7 +111,7 @@ function TourContent() {
       {shows.map(show => (
         <div
           key={show.city}
-          className='flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
+          className='flex items-center justify-between rounded-[0.9rem] border border-white/[0.06] bg-white/[0.04] p-2.5'
         >
           <div className='flex flex-col gap-0.5'>
             <span className='text-[13px] font-medium text-white/90'>
@@ -119,7 +121,7 @@ function TourContent() {
               {show.date} · {show.venue}
             </span>
           </div>
-          <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
+          <span className='rounded-full bg-white px-3 py-1 text-[11px] font-medium text-black'>
             Tickets
           </span>
         </div>
@@ -141,9 +143,9 @@ function ContactContent() {
         return (
           <div
             key={c.role}
-            className='flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.04] border border-white/[0.06]'
+            className='flex items-center gap-2.5 rounded-[0.9rem] border border-white/[0.06] bg-white/[0.04] p-2.5'
           >
-            <div className='w-7 h-7 rounded-lg flex items-center justify-center bg-white/[0.06]'>
+            <div className='flex h-7 w-7 items-center justify-center rounded-[0.7rem] bg-white/[0.06]'>
               <Icon className='w-3.5 h-3.5 text-white/50' />
             </div>
             <div className='flex flex-col'>
@@ -196,104 +198,130 @@ export function PhoneProfileDemo() {
 
   return (
     <section
+      id='profiles'
       ref={sectionRef}
       className='section-spacing-linear overflow-hidden'
       style={{ backgroundColor: 'var(--linear-bg-page)' }}
     >
       <Container size='homepage'>
         <div className='mx-auto max-w-[var(--linear-content-max)]'>
-          {/* Phone mockup — above text */}
-          <div
-            className='flex justify-center mb-10 lg:mb-12'
-            style={{
-              transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
-              opacity: isVisible ? 1 : 0,
-              transition:
-                'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
-            }}
-          >
-            <PhoneFrame>
-              {/* Profile header */}
-              <div className='flex flex-col items-center pt-10 pb-4 px-5'>
-                <div className='w-14 h-14 rounded-full overflow-hidden border border-white/10'>
-                  <Image
-                    src='/images/avatars/nova-lane.jpg'
-                    alt='Mara Vale'
-                    width={112}
-                    height={112}
-                    className='w-full h-full object-cover'
-                    priority={false}
-                  />
+          <div className='grid items-center gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12'>
+            <div className='reveal-on-scroll order-2 lg:order-1'>
+              <p className='inline-flex w-fit items-center rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-secondary-token backdrop-blur'>
+                Smart profile
+              </p>
+              <h2 className='mt-4 max-w-[9ch] marketing-h2-linear text-primary-token'>
+                Profiles that convert.
+              </h2>
+              <p className='mt-4 max-w-[30rem] marketing-lead-linear text-secondary-token'>
+                Your artist page handles streaming, tips, tour dates, and fan
+                capture in one place. It looks polished, updates fast, and gives
+                every release a home.
+              </p>
+              <div className='mt-6 grid gap-3 sm:grid-cols-3 lg:max-w-[24rem] lg:grid-cols-1'>
+                <div className='rounded-[0.95rem] border border-subtle bg-surface-0 px-4 py-4'>
+                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                    Streaming
+                  </p>
+                  <p className='mt-1 text-sm font-medium text-primary-token'>
+                    One clean page for every link out.
+                  </p>
                 </div>
-                <p className='mt-2.5 text-[15px] font-semibold text-white'>
-                  {PROFILE.name}
-                </p>
-                <p className='mt-0.5 text-[11px] text-white/40'>
-                  {PROFILE.tagline}
-                </p>
+                <div className='rounded-[0.95rem] border border-subtle bg-surface-0 px-4 py-4'>
+                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                    Fan capture
+                  </p>
+                  <p className='mt-1 text-sm font-medium text-primary-token'>
+                    Collect emails without extra tooling.
+                  </p>
+                </div>
+                <div className='rounded-[0.95rem] border border-subtle bg-surface-0 px-4 py-4'>
+                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
+                    Monetization
+                  </p>
+                  <p className='mt-1 text-sm font-medium text-primary-token'>
+                    Tips, tickets, and launch traffic in one flow.
+                  </p>
+                </div>
               </div>
+            </div>
 
-              {/* Tab bar */}
-              <div className='relative flex mx-4 rounded-xl overflow-hidden bg-white/[0.04]'>
-                {/* Sliding indicator */}
-                <span
-                  aria-hidden='true'
-                  className='absolute inset-y-0 left-0 rounded-xl bg-white/[0.08]'
-                  style={{
-                    width: `${100 / TABS.length}%`,
-                    transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
-                    transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                  }}
-                />
-                {TABS.map(tab => (
-                  <button
-                    key={tab.id}
-                    type='button'
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`relative z-10 flex-1 py-2 text-[11px] font-medium text-center transition-colors ${
-                      tab.id === activeTab
-                        ? 'text-primary-token'
-                        : 'text-white/40'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab content */}
-              <div
-                className='px-5 pt-4 pb-6 overflow-y-auto'
-                style={{ flex: 1 }}
-              >
-                {TABS.map(tab => (
-                  <div
-                    key={tab.id}
-                    style={{
-                      display: tab.id === activeTab ? 'block' : 'none',
-                    }}
-                  >
-                    {TAB_CONTENT[tab.id]}
+            <div
+              className='order-1 flex justify-center lg:order-2 lg:justify-end'
+              style={{
+                transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
+                opacity: isVisible ? 1 : 0,
+                transition:
+                  'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
+              }}
+            >
+              <div className='lg:translate-x-2'>
+                <PhoneFrame>
+                  {/* Profile header */}
+                  <div className='flex flex-col items-center px-5 pb-4 pt-10'>
+                    <div className='h-14 w-14 overflow-hidden rounded-full border border-white/10'>
+                      <Image
+                        src={PROFILE.avatarSrc}
+                        alt='Tim White'
+                        width={112}
+                        height={112}
+                        className='h-full w-full object-cover'
+                        priority={false}
+                      />
+                    </div>
+                    <p className='mt-2.5 text-[15px] font-semibold text-white'>
+                      {PROFILE.name}
+                    </p>
+                    <p className='mt-0.5 text-[11px] text-white/40'>
+                      {PROFILE.tagline}
+                    </p>
                   </div>
-                ))}
-              </div>
-            </PhoneFrame>
-          </div>
 
-          {/* Section heading — below phone */}
-          <div className='text-center heading-gap-linear'>
-            <p className='inline-flex w-fit items-center rounded-full border border-subtle bg-surface-1 px-2.5 py-1 text-[10px] font-medium tracking-wide uppercase text-secondary-token backdrop-blur mx-auto'>
-              Link in bio
-            </p>
-            <h2 className='mt-4 marketing-h2-linear text-primary-token'>
-              One profile. Adapts to every fan.
-            </h2>
-            <p className='mx-auto mt-4 max-w-[460px] marketing-lead-linear text-secondary-token'>
-              Opinionated by design. Your link instantly adapts to a fan&apos;s
-              location, preferred music app, and notification status. Jovie
-              handles the optimization and retargeting so you can focus on the
-              music.
-            </p>
+                  <div className='relative mx-4 flex overflow-hidden rounded-[0.85rem] border border-white/[0.05] bg-white/[0.04]'>
+                    <span
+                      aria-hidden='true'
+                      className='absolute inset-y-0 left-0 rounded-[0.75rem] bg-white/[0.08]'
+                      style={{
+                        width: `${100 / TABS.length}%`,
+                        transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
+                        transition:
+                          'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                      }}
+                    />
+                    {TABS.map(tab => (
+                      <button
+                        key={tab.id}
+                        type='button'
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`relative z-10 flex-1 py-2 text-center text-[11px] font-medium transition-colors ${
+                          tab.id === activeTab
+                            ? 'text-primary-token'
+                            : 'text-white/40'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div
+                    className='overflow-y-auto px-5 pb-6 pt-4'
+                    style={{ flex: 1 }}
+                  >
+                    {TABS.map(tab => (
+                      <div
+                        key={tab.id}
+                        style={{
+                          display: tab.id === activeTab ? 'block' : 'none',
+                        }}
+                      >
+                        {TAB_CONTENT[tab.id]}
+                      </div>
+                    ))}
+                  </div>
+                </PhoneFrame>
+              </div>
+            </div>
           </div>
         </div>
       </Container>
