@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
+import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
@@ -20,21 +22,33 @@ export const runtime = 'nodejs';
 /**
  * Releases page — streams instantly after auth gate.
  *
- * Auth check (getDashboardData) blocks navigation because we need to redirect
- * unauthenticated/onboarding users. Everything else loads inside a Suspense
- * boundary so the skeleton renders immediately while data fetches in parallel.
+ * Auth check via getCachedAuth (Clerk JWT, no DB) runs first to redirect
+ * unauthenticated users even during DB outages. Dashboard data loads next,
+ * with error state shown if the DB fails.
  */
 export default async function ReleasesPage() {
-  const dashboardData = await getDashboardData();
-
-  if (!dashboardData.user?.id) {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
     redirect(
       `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
     );
   }
 
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
+  const dashboardData = await getDashboardData();
+
+  if (dashboardData.dashboardLoadError) {
+    void captureError(
+      'Dashboard data load failed on releases page',
+      dashboardData.dashboardLoadError,
+      { route: APP_ROUTES.DASHBOARD_RELEASES }
+    );
+    return (
+      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
+    );
+  }
+
+  if (dashboardData.needsOnboarding) {
+    redirect(APP_ROUTES.ONBOARDING);
   }
 
   return (
