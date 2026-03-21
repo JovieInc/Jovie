@@ -43,11 +43,11 @@ export function SidebarCollapsibleGroup({
             className={cn(
               'justify-between',
               'text-sidebar-item-icon hover:bg-transparent hover:text-sidebar-item-icon',
-              'h-6 px-1.5'
+              'h-6 px-2.5'
             )}
             aria-expanded={open}
           >
-            <span className='truncate group-data-[collapsible=icon]:hidden text-app font-[450] tracking-tight'>
+            <span className='truncate group-data-[collapsible=icon]:hidden text-[11px] font-[510] tracking-[-0.01em]'>
               {label}
             </span>
             {GroupIcon ? (

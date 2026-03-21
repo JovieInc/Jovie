@@ -199,27 +199,27 @@
   /* App UI tokens (distinct from marketing page tokens) */
   --linear-app-radius-item: 8px;
   --linear-app-radius-menu: 8px;
-  --linear-app-shell-gap: 8px;
-  --linear-app-shell-radius: 12px;
-  --linear-app-shell-border: rgba(0, 0, 0, 0.09);
-  --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.06);
+  --linear-app-shell-gap: 6px;
+  --linear-app-shell-radius: 14px;
+  --linear-app-shell-border: rgba(0, 0, 0, 0.08);
+  --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
   --linear-app-frame-seam: rgba(0, 0, 0, 0.07);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.05), 0 18px 40px rgba(0, 0, 0, 0.06);
-  --linear-app-header-height: 36px;
-  --linear-app-header-padding-x: 14px;
-  --linear-app-content-padding-x: 16px;
-  --linear-app-content-padding-y: 10px;
+    0 0 0 1px rgba(0, 0, 0, 0.045), 0 18px 42px rgba(0, 0, 0, 0.055);
+  --linear-app-header-height: 40px;
+  --linear-app-header-padding-x: 12px;
+  --linear-app-content-padding-x: 12px;
+  --linear-app-content-padding-y: 8px;
   --linear-app-control-height-sm: 28px;
-  --linear-app-control-padding-x: 10px;
-  --linear-app-control-radius: 7px;
-  --linear-app-toolbar-gap: 3px;
+  --linear-app-control-padding-x: 11px;
+  --linear-app-control-radius: 9999px;
+  --linear-app-toolbar-gap: 4px;
   --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.06);
+    0 0 0 1px rgba(0, 0, 0, 0.035), 0 12px 28px rgba(0, 0, 0, 0.045);
   --linear-row-hover: oklch(96.9% 0.002 260);
   --linear-row-selected: oklch(95.4% 0.004 260);
-  --linear-app-sidebar-width: 232px;
+  --linear-app-sidebar-width: 244px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
   --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
@@ -379,9 +379,9 @@
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.06);
   --linear-app-frame-seam: rgba(255, 255, 255, 0.05);
   --linear-app-shell-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.05), 0 20px 48px rgba(0, 0, 0, 0.3);
+    0 0 0 1px rgba(255, 255, 255, 0.045), 0 18px 42px rgba(0, 0, 0, 0.28);
   --linear-app-drawer-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.04), -12px 0 28px rgba(0, 0, 0, 0.24);
+    0 0 0 1px rgba(255, 255, 255, 0.035), -12px 0 24px rgba(0, 0, 0, 0.2);
   --linear-row-hover: rgba(255, 255, 255, 0.028);
   --linear-row-selected: rgba(255, 255, 255, 0.038);
   --linear-app-sidebar-background-rgb: 15 16 17;

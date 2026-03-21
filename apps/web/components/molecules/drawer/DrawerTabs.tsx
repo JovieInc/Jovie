@@ -29,11 +29,11 @@ export function DrawerTabs<T extends string>({
       surface='ghost'
       aria-label={ariaLabel}
       className={cn(
-        'w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'w-full rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         className
       )}
       triggerClassName={cn(
-        'h-[26px] rounded-[7px] px-2.5 text-[11px] font-[510] tracking-[-0.008em] text-tertiary-token data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token',
+        'h-[27px] rounded-full px-3 text-[11px] font-[510] tracking-[-0.008em] text-tertiary-token data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token',
         triggerClassName
       )}
     />
