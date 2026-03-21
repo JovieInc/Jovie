@@ -8,6 +8,7 @@ import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashbo
 import type { AudienceSegment } from '@/features/dashboard/organisms/dashboard-audience-table/types';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
@@ -44,9 +45,11 @@ async function AudienceContent({
     const dashboardData = await getDashboardData();
 
     if (dashboardData.dashboardLoadError) {
-      logger.error('[AudiencePage] Dashboard data load failed', {
-        error: dashboardData.dashboardLoadError,
-      });
+      void captureError(
+        'Dashboard data load failed on audience page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.DASHBOARD_AUDIENCE }
+      );
       return (
         <PageErrorState message='Failed to load audience data. Please refresh the page.' />
       );

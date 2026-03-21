@@ -64,8 +64,20 @@ export async function POST(req: NextRequest) {
       const handle =
         typeof pi.metadata?.handle === 'string' ? pi.metadata.handle : null;
 
-      let creatorProfileId: string | null = metadataProfileId;
+      let creatorProfileId: string | null = null;
 
+      // Validate profile_id from metadata still exists (creator may have been deleted)
+      if (metadataProfileId) {
+        const [profile] = await db
+          .select({ id: creatorProfiles.id })
+          .from(creatorProfiles)
+          .where(eq(creatorProfiles.id, metadataProfileId))
+          .limit(1);
+
+        creatorProfileId = profile?.id ?? null;
+      }
+
+      // Fallback: try handle lookup for backward compatibility with older intents
       if (!creatorProfileId && handle) {
         const [profile] = await db
           .select({ id: creatorProfiles.id })
@@ -80,17 +92,18 @@ export async function POST(req: NextRequest) {
         // Creator profile not found for this tip. Return 200 to acknowledge receipt
         // and stop Stripe retries — returning 500 here would cause infinite retry
         // loops if the creator profile was deleted or the handle is permanently invalid.
-        // The critical error alert ensures the team can manually reconcile.
-        await captureCriticalError(
+        // Fire-and-forget so telemetry failure can't cause 500 → retry loop.
+        void captureCriticalError(
           'Tip payment succeeded but no creator profile found',
           new Error('Creator profile not found for tip'),
           {
             route: '/api/capture-tip',
             handle,
+            metadata_profile_id: metadataProfileId,
             payment_intent: pi.id,
             amount_cents: pi.amount_received,
           }
-        );
+        ).catch(() => {});
         return NextResponse.json(
           {
             received: true,

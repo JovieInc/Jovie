@@ -4,6 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { DashboardTippingGate } from '@/features/dashboard/DashboardTippingGate';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
@@ -27,10 +28,11 @@ export default async function EarningsPage() {
 
     // If data load failed, show error state (don't redirect — user IS authenticated)
     if (dashboardData.dashboardLoadError) {
-      Sentry.captureMessage('Dashboard data load failed on earnings page', {
-        level: 'error',
-        extra: { error: dashboardData.dashboardLoadError },
-      });
+      void captureError(
+        'Dashboard data load failed on earnings page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.DASHBOARD_EARNINGS }
+      );
       return (
         <PageErrorState message='Failed to load earnings data. Please refresh the page.' />
       );

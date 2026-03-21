@@ -110,13 +110,18 @@ export async function POST(req: NextRequest) {
 
     // Look up the creator profile to store an immutable profile_id in metadata.
     // This avoids issues with handle renames and keeps PII out of Stripe metadata.
+    // Note: This adds a DB dependency to the payment path. If the DB is down,
+    // tip creation will fail with 500 — an accepted trade-off for data integrity.
     const [profile] = await db
-      .select({ id: creatorProfiles.id })
+      .select({
+        id: creatorProfiles.id,
+        isPublic: creatorProfiles.isPublic,
+      })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
       .limit(1);
 
-    if (!profile) {
+    if (!profile?.isPublic) {
       return NextResponse.json(
         { error: 'Artist not found' },
         { status: 404, headers: NO_STORE_HEADERS }
