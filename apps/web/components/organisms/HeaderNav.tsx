@@ -34,6 +34,11 @@ export function HeaderNav({
   navLinks,
 }: HeaderNavProps = {}) {
   const navLinkClass = 'nav-link-linear focus-ring-themed';
+  const hasNavLinks = !hideNav && !!navLinks?.length;
+  const containerClass =
+    _containerSize === 'homepage'
+      ? 'mx-auto flex h-[var(--linear-header-height)] w-full max-w-[var(--linear-content-max)] items-center gap-6'
+      : 'flex h-[var(--linear-header-height)] w-full items-center gap-6';
   return (
     <header
       data-testid='header-nav'
@@ -57,55 +62,63 @@ export function HeaderNav({
     >
       {/* Linear-style full-width content container */}
       <nav
-        className='flex items-center h-[var(--linear-header-height)] w-full px-5 sm:px-6 lg:px-[77px]'
+        className='mx-auto w-full max-w-[calc(var(--linear-content-max)+3rem)] px-5 sm:px-6'
         aria-label='Primary navigation'
       >
-        {/* Logo section - left aligned with Linear padding */}
-        <div className='flex items-center'>
-          <LogoLink
-            logoSize={logoSize}
-            variant={logoVariant}
-            className='px-2 rounded-full'
-          />
-        </div>
-
-        {/* Spacer pushes nav + auth to the right */}
-        <div className='flex-1' aria-hidden='true' />
-
-        {/* Nav links - desktop only, right-aligned */}
-        {!hideNav && (
-          <div className='hidden md:flex items-center gap-2'>
-            {navLinks?.map(link =>
-              link.href.startsWith('/') && !link.href.startsWith('#') ? (
-                <Link key={link.href} href={link.href} className={navLinkClass}>
-                  {link.label}
-                </Link>
-              ) : (
-                <a key={link.href} href={link.href} className={navLinkClass}>
-                  {link.label}
-                </a>
-              )
-            )}
+        <div className={containerClass}>
+          {/* Logo section - left aligned with Linear padding */}
+          <div className='flex items-center'>
+            <LogoLink
+              logoSize={logoSize}
+              variant={logoVariant}
+              className='rounded-md'
+            />
           </div>
-        )}
 
-        {/* Divider between nav and auth - desktop only */}
-        <div
-          className='hidden md:block mx-3 h-4 w-px bg-(--linear-border-subtle)'
-          aria-hidden='true'
-        />
+          {/* Spacer pushes nav + auth to the right */}
+          <div className='flex-1' aria-hidden='true' />
 
-        {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
-        <div className='flex items-center gap-1'>
-          <AuthActions />
-        </div>
+          {/* Nav links - desktop only, right-aligned */}
+          {hasNavLinks && (
+            <div className='hidden items-center gap-1.5 md:flex'>
+              {navLinks?.map(link =>
+                link.href.startsWith('/') && !link.href.startsWith('#') ? (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={navLinkClass}
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a key={link.href} href={link.href} className={navLinkClass}>
+                    {link.label}
+                  </a>
+                )
+              )}
+            </div>
+          )}
 
-        {/* Mobile hamburger menu - shown on small screens only */}
-        {!hideNav && (
-          <div className='flex md:hidden items-center'>
-            <MobileNav navLinks={navLinks} />
+          {/* Divider between nav and auth - desktop only */}
+          {hasNavLinks ? (
+            <div
+              className='mx-2 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
+              aria-hidden='true'
+            />
+          ) : null}
+
+          {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
+          <div className='flex items-center gap-1'>
+            <AuthActions />
           </div>
-        )}
+
+          {/* Mobile hamburger menu - shown on small screens only */}
+          {hasNavLinks && (
+            <div className='flex md:hidden items-center'>
+              <MobileNav navLinks={navLinks} />
+            </div>
+          )}
+        </div>
       </nav>
     </header>
   );

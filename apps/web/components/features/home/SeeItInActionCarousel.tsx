@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
 import { Container } from '@/components/site/Container';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
+import { TIM_WHITE_PROFILE } from './tim-white';
 
 const BLUR_DATA_URL =
   'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+';
@@ -14,10 +15,10 @@ const BLUR_DATA_URL =
 const HOVER_MEDIA_QUERY = '(hover: hover) and (pointer: fine)';
 
 const PROFILE = {
-  name: 'Tim White',
+  name: TIM_WHITE_PROFILE.name,
   role: 'Artist',
   handle: 'tim',
-  avatarSrc: '/images/avatars/tim-white.jpg',
+  avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
   profilePath: '/tim',
 } as const;
 

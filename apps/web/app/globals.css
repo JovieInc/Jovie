@@ -713,6 +713,33 @@ body {
   .text-destructive {
     color: var(--color-error);
   }
+
+  .jovie-homepage-marketing .marketing-h1-linear {
+    letter-spacing: -0.034em;
+    line-height: 0.96;
+  }
+  @media (min-width: 768px) {
+    .jovie-homepage-marketing .marketing-h1-linear {
+      font-size: 68px;
+    }
+  }
+  @media (min-width: 1280px) {
+    .jovie-homepage-marketing .marketing-h1-linear {
+      font-size: 88px;
+    }
+  }
+  .jovie-homepage-marketing .marketing-h2-linear {
+    letter-spacing: -0.03em;
+  }
+  .jovie-homepage-marketing .marketing-lead-linear {
+    font-size: 15px;
+    line-height: 1.58;
+  }
+  @media (min-width: 768px) {
+    .jovie-homepage-marketing .marketing-lead-linear {
+      font-size: 16px;
+    }
+  }
 }
 
 /* text-quaternary-token now available via theme.extend.colors */
