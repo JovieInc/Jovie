@@ -316,6 +316,64 @@ describe('Waitlist API', () => {
       expect(data.status).toBe('new');
     });
 
+    it('does not downgrade user status when re-submitting with a claimed entry', async () => {
+      mockAuth.mockResolvedValue({ userId: 'user_claimed' });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: 'claimed@example.com' }],
+        fullName: 'Claimed User',
+      });
+      mockDbExecute.mockResolvedValue({ rows: [{ table_exists: true }] });
+
+      // Existing entry with status 'claimed' (already approved)
+      mockDbSelect.mockReturnValue({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi
+              .fn()
+              .mockResolvedValue([{ id: 'entry_claimed', status: 'claimed' }]),
+          }),
+        }),
+      });
+
+      // Track insert calls to verify upsertUserAsPending is NOT called
+      const insertValuesCalls: unknown[] = [];
+      mockDbInsert.mockReturnValue({
+        values: vi.fn((arg: unknown) => {
+          insertValuesCalls.push(arg);
+          return {
+            onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
+          };
+        }),
+      });
+
+      const { POST } = await import('@/app/api/waitlist/route');
+      const request = new Request('http://localhost/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          primaryGoal: 'streams',
+          primarySocialUrl: 'https://instagram.com/claimeduser',
+        }),
+      });
+
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.status).toBe('claimed');
+
+      // upsertUserAsPending should NOT have been called — no insert with waitlist_pending
+      const pendingUpsert = insertValuesCalls.find(
+        (call: unknown) =>
+          typeof call === 'object' &&
+          call !== null &&
+          'userStatus' in call &&
+          (call as Record<string, unknown>).userStatus === 'waitlist_pending'
+      );
+      expect(pendingUpsert).toBeUndefined();
+    });
+
     it('does not send welcome email when auto-approval succeeds (user bypassed waitlist)', async () => {
       mockAuth.mockResolvedValue({ userId: 'user_auto' });
       mockCurrentUser.mockResolvedValue({

@@ -4,7 +4,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import {
   getWrappedLink,
   incrementClickCount,
@@ -40,10 +40,9 @@ export async function GET(
       return NextResponse.redirect(interstitialUrl, { status: 302 });
     }
 
-    // Increment click count asynchronously (don't wait)
-    incrementClickCount(shortId).catch(error => {
-      Sentry.captureException(error);
-    });
+    // Increment click count after response is sent (survives serverless teardown)
+    // incrementClickCount handles errors internally via captureError
+    after(() => incrementClickCount(shortId));
 
     // Create redirect response with anti-cloaking headers
     const response = NextResponse.redirect(wrappedLink.originalUrl, {
