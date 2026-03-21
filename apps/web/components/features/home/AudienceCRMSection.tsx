@@ -108,19 +108,18 @@ export function AudienceCRMSection() {
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          {/* Header */}
-          <div className='grid md:grid-cols-2 md:items-start section-gap-linear'>
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro'>
             <div className='reveal-on-scroll'>
-              <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
+              <span className='homepage-section-eyebrow'>
                 Audience intelligence
               </span>
-              <h2 className='mt-5 max-w-[10ch] marketing-h2-linear text-primary-token'>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token'>
                 Know every fan by name.
               </h2>
             </div>
             <div
-              className='max-w-lg reveal-on-scroll md:justify-self-end'
+              className='homepage-section-copy reveal-on-scroll'
               data-delay='80'
             >
               <p className='marketing-lead-linear text-secondary-token'>
@@ -132,13 +131,13 @@ export function AudienceCRMSection() {
           </div>
 
           <div
-            className='mt-7 grid gap-3 sm:grid-cols-3 reveal-on-scroll'
+            className='homepage-section-stack grid gap-2.5 sm:grid-cols-3 reveal-on-scroll'
             data-delay='120'
           >
             {BENEFITS.map(benefit => (
               <div
                 key={benefit}
-                className='rounded-[0.95rem] border border-subtle bg-surface-0 px-4 py-3 text-sm font-medium text-secondary-token'
+                className='rounded-[0.95rem] border border-subtle bg-surface-0 px-3.5 py-2.5 text-sm font-medium text-secondary-token'
               >
                 {benefit}
               </div>
@@ -147,7 +146,7 @@ export function AudienceCRMSection() {
 
           {/* Product demo */}
           <div
-            className='relative mx-auto mt-9 w-full reveal-on-scroll md:mt-10'
+            className='relative mx-auto mt-6 w-full reveal-on-scroll md:mt-8'
             data-delay='160'
           >
             {/* Dashboard window */}
@@ -164,7 +163,7 @@ export function AudienceCRMSection() {
                 className='pointer-events-none absolute inset-0 z-10 rounded-t-[1rem] rounded-b-none md:rounded-t-[1.05rem]'
               />
               {/* Mac window chrome */}
-              <div className='flex items-center px-5 h-12 border-b border-subtle bg-surface-1'>
+              <div className='flex h-11 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
                 <div className='flex gap-2'>
                   <div className='w-3 h-3 rounded-full bg-[#ED6A5E] border border-black/10' />
                   <div className='w-3 h-3 rounded-full bg-[#F4BF4F] border border-black/10' />
@@ -177,11 +176,11 @@ export function AudienceCRMSection() {
               </div>
 
               {/* Stat cards */}
-              <div className='grid grid-cols-2 md:grid-cols-4 gap-px bg-[var(--linear-border-subtle)]'>
+              <div className='grid grid-cols-2 gap-px bg-[var(--linear-border-subtle)] md:grid-cols-4'>
                 {STATS.map(stat => (
                   <div
                     key={stat.label}
-                    className='flex items-center gap-3 px-5 py-4 bg-surface-0'
+                    className='flex items-center gap-3 bg-surface-0 px-4 py-3.5 sm:px-5 sm:py-4'
                   >
                     <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                       <stat.icon
@@ -204,7 +203,7 @@ export function AudienceCRMSection() {
                 Snapshot from a Jovie audience dashboard
               </p>
 
-              <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-5 py-3 text-xs text-tertiary-token'>
+              <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-4 py-3 text-xs text-tertiary-token sm:px-5'>
                 <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
                   Source tracked
                 </span>

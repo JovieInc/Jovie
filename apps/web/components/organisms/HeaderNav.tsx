@@ -37,7 +37,7 @@ export function HeaderNav({
   const hasNavLinks = !hideNav && !!navLinks?.length;
   const containerClass =
     _containerSize === 'homepage'
-      ? 'mx-auto flex h-[var(--linear-header-height)] w-full max-w-[var(--linear-content-max)] items-center gap-6'
+      ? 'flex h-[var(--linear-header-height)] w-full items-center gap-3 sm:gap-4 md:gap-6'
       : 'flex h-[var(--linear-header-height)] w-full items-center gap-6';
   return (
     <header
@@ -62,7 +62,12 @@ export function HeaderNav({
     >
       {/* Linear-style full-width content container */}
       <nav
-        className='mx-auto w-full max-w-[calc(var(--linear-content-max)+3rem)] px-5 sm:px-6'
+        className={cn(
+          'mx-auto w-full px-5 sm:px-6',
+          _containerSize === 'homepage'
+            ? 'max-w-[var(--linear-content-max)] lg:px-0'
+            : 'max-w-[calc(var(--linear-content-max)+3rem)]'
+        )}
         aria-label='Primary navigation'
       >
         <div className={containerClass}>
@@ -80,7 +85,7 @@ export function HeaderNav({
 
           {/* Nav links - desktop only, right-aligned */}
           {hasNavLinks && (
-            <div className='hidden items-center gap-1.5 md:flex'>
+            <div className='hidden items-center gap-1 md:flex lg:gap-1.5'>
               {navLinks?.map(link =>
                 link.href.startsWith('/') && !link.href.startsWith('#') ? (
                   <Link
@@ -102,7 +107,7 @@ export function HeaderNav({
           {/* Divider between nav and auth - desktop only */}
           {hasNavLinks ? (
             <div
-              className='mx-2 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
+              className='mx-1.5 hidden h-4 w-px bg-(--linear-border-subtle) md:block'
               aria-hidden='true'
             />
           ) : null}
