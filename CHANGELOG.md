@@ -16,6 +16,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Dashboard pages (earnings, audience, releases, presence) now show error state instead of incorrectly redirecting to signin when database fails
 - Add error tracking to batchUpdateSequential with succeeded count and failed item context
 - Add error logging to contacts API catch block
+## [26.4.27] - 2026-03-20
+
+### Fixed
+
+- Google OAuth sign-up now shows a clear error message when the account already exists, instead of silently redirecting back to the sign-up page
+- OAuth callback handler uses imperative Clerk API for proper error classification (account exists, access denied, unknown)
+- Sign-up form displays specific error messages with "Sign in instead" link for existing account errors
 
 ## [26.4.26] - 2026-03-20
 

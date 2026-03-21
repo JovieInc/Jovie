@@ -28,9 +28,12 @@ export function DrawerTabs<T extends string>({
       options={options}
       surface='ghost'
       aria-label={ariaLabel}
-      className={cn('w-full', className)}
+      className={cn(
+        'w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        className
+      )}
       triggerClassName={cn(
-        'h-[26px] rounded-[7px] px-2.5 text-[11px] font-[510] tracking-[-0.008em] data-[state=active]:bg-surface-1',
+        'h-[26px] rounded-[7px] px-2.5 text-[11px] font-[510] tracking-[-0.008em] text-tertiary-token data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token',
         triggerClassName
       )}
     />

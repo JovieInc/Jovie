@@ -1,10 +1,15 @@
 'use client';
 
-import { AuthenticateWithRedirectCallback } from '@clerk/nextjs';
+import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import {
+  isAccessDeniedError,
+  isAccountExistsError,
+} from '@/lib/auth/clerk-errors';
+import { logger } from '@/lib/utils/logger';
 
 /** Seconds before showing stall message */
 const STALL_TIMEOUT_SECONDS = 10;
@@ -52,20 +57,37 @@ function SsoLoadingState({ isStalled }: { readonly isStalled: boolean }) {
 }
 
 /**
- * Wrapper around Clerk's AuthenticateWithRedirectCallback that handles
- * unexpected hash fragments from Clerk's internal routing.
+ * Classify an OAuth callback error into a query param value for the signup page.
+ * Uses Clerk error codes to provide specific error messages downstream.
+ */
+function classifyOAuthError(error: unknown): string {
+  if (isAccountExistsError(error)) return 'account_exists';
+  if (isAccessDeniedError(error)) return 'access_denied';
+  return 'unknown';
+}
+
+/**
+ * Handles OAuth SSO callbacks using Clerk's imperative API.
  *
- * Clerk may add hash fragments like #reset-password when it detects certain
- * account states (e.g., password auth enabled in dashboard). Since Jovie uses
- * passwordless auth only, we intercept and redirect these cases appropriately.
+ * Processes the OAuth redirect, handling:
+ * - Successful sign-up (new account) → navigates to signUpFallbackRedirectUrl
+ * - Successful transfer (existing account) → auto-signs in, navigates to signInFallbackRedirectUrl
+ * - Account exists error → redirects to /signup with specific error param
+ * - Access denied error → redirects to /signup with specific error param
+ * - Other errors → redirects to /signup with generic error param
+ *
+ * Also handles unexpected hash fragments from Clerk's internal routing
+ * (e.g., #reset-password) since Jovie uses passwordless auth only.
  */
 export function SsoCallbackHandler({
   signInFallbackRedirectUrl,
   signUpFallbackRedirectUrl,
 }: Readonly<SsoCallbackHandlerProps>) {
+  const clerk = useClerk();
   const router = useRouter();
   const [isHandlingHash, setIsHandlingHash] = useState(false);
   const [isStalled, setIsStalled] = useState(false);
+  const callbackInitiated = useRef(false);
 
   useEffect(() => {
     // Check for unexpected hash fragments that Clerk might add
@@ -95,6 +117,45 @@ export function SsoCallbackHandler({
     }
   }, [router, signInFallbackRedirectUrl]);
 
+  // Process the OAuth callback imperatively
+  useEffect(() => {
+    // Guard against double-invocation in React strict mode
+    if (callbackInitiated.current) return;
+    // Skip if we're handling a hash redirect instead
+    if (isHandlingHash) return;
+
+    callbackInitiated.current = true;
+
+    clerk
+      .handleRedirectCallback({
+        signInFallbackRedirectUrl,
+        signUpFallbackRedirectUrl,
+        transferable: true,
+      })
+      .catch((err: unknown) => {
+        const errorType = classifyOAuthError(err);
+
+        logger.warn(
+          'OAuth callback failed',
+          {
+            errorType,
+            error: err instanceof Error ? err.message : String(err),
+          },
+          'SsoCallbackHandler'
+        );
+
+        // Redirect to signup page with error classification so it can
+        // show the appropriate error message using existing OAuth error UI
+        router.replace(`/signup?oauth_error=${errorType}`);
+      });
+  }, [
+    clerk,
+    router,
+    isHandlingHash,
+    signInFallbackRedirectUrl,
+    signUpFallbackRedirectUrl,
+  ]);
+
   // Stall detection: if the callback hasn't resolved after a timeout, show help
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -104,23 +165,5 @@ export function SsoCallbackHandler({
     return () => clearTimeout(timer);
   }, []);
 
-  // If we're handling a hash redirect, show a loading state
-  if (isHandlingHash) {
-    return <SsoLoadingState isStalled={isStalled} />;
-  }
-
-  // Clerk's callback handler processes the OAuth redirect via JS.
-  // We render our loading state visually and keep Clerk's component mounted
-  // (visually hidden but not display:none, so it can still process).
-  return (
-    <>
-      <SsoLoadingState isStalled={isStalled} />
-      <div className='sr-only'>
-        <AuthenticateWithRedirectCallback
-          signInFallbackRedirectUrl={signInFallbackRedirectUrl}
-          signUpFallbackRedirectUrl={signUpFallbackRedirectUrl}
-        />
-      </div>
-    </>
-  );
+  return <SsoLoadingState isStalled={isStalled} />;
 }

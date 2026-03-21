@@ -107,7 +107,8 @@ function ProfileReadyCard({
   return (
     <div
       className={cn(
-        'chat-card rounded-xl border border-subtle bg-surface-1 overflow-hidden',
+        'chat-card overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -125,7 +126,7 @@ function ProfileReadyCard({
         </button>
 
         {/* Header */}
-        <div className='flex items-center gap-2 mb-4'>
+        <div className='mb-4 flex items-center gap-2'>
           <CheckCircle2 className='h-4 w-4 text-success' />
           <p className='text-sm font-medium text-primary-token'>
             Your profile is live
@@ -170,7 +171,7 @@ function ProfileReadyCard({
           target='_blank'
           rel='noopener noreferrer'
           className={cn(
-            'flex w-full items-center justify-center gap-1.5 rounded-lg',
+            'flex w-full items-center justify-center gap-1.5 rounded-[12px]',
             'bg-accent px-3 py-2.5 text-[13px] font-medium text-accent-foreground',
             'transition-colors hover:bg-accent/90',
             'focus:outline-none'
@@ -204,7 +205,8 @@ function SuggestionCard({
   return (
     <div
       className={cn(
-        'chat-card rounded-xl border border-subtle bg-surface-1 overflow-hidden',
+        'chat-card overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -213,7 +215,7 @@ function SuggestionCard({
       <div className='p-4'>
         {/* Header with platform icon */}
         <div className='flex items-center gap-2.5 mb-3'>
-          <div className='flex h-8 w-8 items-center justify-center rounded-lg border border-subtle bg-surface-2'>
+          <div className='flex h-8 w-8 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
             {isAvatar ? (
               <Camera className='h-4 w-4 text-secondary-token' />
             ) : (
@@ -285,7 +287,7 @@ function SuggestionCard({
             onClick={onReject}
             disabled={isActioning}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
+              'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
               'border border-subtle px-3 py-3 text-[13px] font-medium sm:py-2',
               'text-secondary-token transition-colors',
               'hover:bg-surface-2 hover:text-primary-token',
@@ -305,7 +307,7 @@ function SuggestionCard({
             onClick={onConfirm}
             disabled={isActioning}
             className={cn(
-              'flex flex-1 items-center justify-center gap-1.5 rounded-lg',
+              'flex flex-1 items-center justify-center gap-1.5 rounded-[12px]',
               'bg-accent px-3 py-3 text-[13px] font-medium text-accent-foreground sm:py-2',
               'transition-colors hover:bg-accent/90',
               'focus:outline-none focus:ring-2 focus:ring-accent/20',
@@ -412,10 +414,17 @@ export function SuggestedProfilesCarousel({
   }
 
   return (
-    <div className='space-y-2'>
+    <div className='space-y-3'>
       {/* Header */}
-      <div className='flex items-center justify-between'>
-        <p className='text-xs font-medium text-secondary-token'>{heading}</p>
+      <div className='flex items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+        <div>
+          <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+            Suggested identity
+          </p>
+          <p className='mt-0.5 text-[13px] font-medium text-secondary-token'>
+            {heading}
+          </p>
+        </div>
         <div className='flex items-center gap-1'>
           {total > 1 && (
             <span className='text-xs tabular-nums text-tertiary-token'>
@@ -431,7 +440,7 @@ export function SuggestedProfilesCarousel({
                 className={cn(
                   'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
                   'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                  'hover:bg-surface-2 hover:text-secondary-token',
+                  'hover:bg-surface-0 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Previous suggestion'
@@ -445,7 +454,7 @@ export function SuggestedProfilesCarousel({
                 className={cn(
                   'flex items-center justify-center rounded-lg text-tertiary-token transition-colors',
                   'h-11 w-11 sm:h-auto sm:w-auto sm:rounded-md sm:p-1',
-                  'hover:bg-surface-2 hover:text-secondary-token',
+                  'hover:bg-surface-0 hover:text-secondary-token',
                   'disabled:opacity-30 disabled:cursor-not-allowed'
                 )}
                 aria-label='Next suggestion'
