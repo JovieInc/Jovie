@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.30] - 2026-03-20
+
+### Added
+
+- Defensive handling for all Clerk sign-in statuses (`needs_second_factor`, `needs_client_trust`, `needs_new_password`, `needs_first_factor`) with clear user-facing error messages
+- Second-factor verification support in sign-in flow — when MFA or client trust is triggered, the flow prepares and verifies a second factor automatically
+- `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
+- `abandoned` status handling in sign-up flow with specific "interrupted" message
+- Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
+
 ## [26.4.29] - 2026-03-20
 
 ### Added
