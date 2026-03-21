@@ -34,6 +34,16 @@ async function AudienceContent({
     // Fetch dashboard data server-side (handles auth internally)
     const dashboardData = await getDashboardData();
 
+    // If data load failed, show error state (don't redirect — user IS authenticated)
+    if (dashboardData.dashboardLoadError) {
+      logger.error('[AudiencePage] Dashboard data load failed', {
+        error: dashboardData.dashboardLoadError,
+      });
+      return (
+        <PageErrorState message='Failed to load audience data. Please refresh the page.' />
+      );
+    }
+
     // Handle unauthenticated users
     if (!dashboardData.user?.id) {
       redirect(
@@ -42,7 +52,7 @@ async function AudienceContent({
     }
 
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+    if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
     }
 

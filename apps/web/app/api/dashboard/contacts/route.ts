@@ -90,7 +90,8 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(contacts, { headers: NO_STORE_HEADERS });
-  } catch {
+  } catch (error) {
+    console.error('[contacts] Failed to load contacts:', error);
     return NextResponse.json(
       { error: 'Failed to load contacts' },
       { status: 500, headers: NO_STORE_HEADERS }

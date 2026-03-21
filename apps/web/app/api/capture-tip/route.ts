@@ -71,8 +71,10 @@ export async function POST(req: NextRequest) {
       }
 
       if (!creatorProfileId) {
-        // CRITICAL: If no profile found, we MUST return 500 to trigger Stripe retry
-        // Otherwise customer payment succeeds but tip is lost
+        // Creator profile not found for this tip. Return 200 to acknowledge receipt
+        // and stop Stripe retries — returning 500 here would cause infinite retry
+        // loops if the creator profile was deleted or the handle is permanently invalid.
+        // The critical error alert ensures the team can manually reconcile.
         await captureCriticalError(
           'Tip payment succeeded but no creator profile found',
           new Error('Creator profile not found for tip'),
@@ -84,8 +86,12 @@ export async function POST(req: NextRequest) {
           }
         );
         return NextResponse.json(
-          { error: 'Creator profile not found', payment_intent: pi.id },
-          { status: 500, headers: NO_STORE_HEADERS }
+          {
+            received: true,
+            warning: 'Creator profile not found',
+            payment_intent: pi.id,
+          },
+          { status: 200, headers: NO_STORE_HEADERS }
         );
       }
 

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { ReleasesExperience } from '@/features/dashboard/organisms/release-provider-matrix';
+import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
@@ -27,13 +28,20 @@ export const runtime = 'nodejs';
 export default async function ReleasesPage() {
   const dashboardData = await getDashboardData();
 
+  // If data load failed, show error state (don't redirect — user IS authenticated)
+  if (dashboardData.dashboardLoadError) {
+    return (
+      <PageErrorState message='Failed to load releases data. Please refresh the page.' />
+    );
+  }
+
   if (!dashboardData.user?.id) {
     redirect(
       `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_RELEASES}`
     );
   }
 
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+  if (dashboardData.needsOnboarding) {
     redirect('/onboarding');
   }
 

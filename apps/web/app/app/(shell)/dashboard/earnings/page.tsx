@@ -25,8 +25,19 @@ export default async function EarningsPage() {
     // Fetch dashboard data server-side
     const dashboardData = await getDashboardData();
 
+    // If data load failed, show error state (don't redirect — user IS authenticated)
+    if (dashboardData.dashboardLoadError) {
+      Sentry.captureMessage('Dashboard data load failed on earnings page', {
+        level: 'error',
+        extra: { error: dashboardData.dashboardLoadError },
+      });
+      return (
+        <PageErrorState message='Failed to load earnings data. Please refresh the page.' />
+      );
+    }
+
     // Handle redirects for users who need onboarding
-    if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
+    if (dashboardData.needsOnboarding) {
       redirect('/onboarding');
     }
 

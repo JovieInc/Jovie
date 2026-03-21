@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       // Store hashed handle instead of plaintext to prevent PII exposure
       // Stripe metadata values must be strings
       metadata: {
+        handle: handle.toLowerCase(),
         handle_hash: handleHash,
         amount_cents: String(amountInCents),
       },
