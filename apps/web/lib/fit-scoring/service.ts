@@ -52,6 +52,7 @@ interface RecalculateProfileRow {
   latestReleaseDate: Date | null;
   hasContactEmail: boolean | null;
   paidVerificationPlatforms: string[] | null;
+  hasTrackingPixels: boolean | null;
 }
 
 /**
@@ -119,6 +120,7 @@ export async function calculateAndStoreFitScore(
       deezerId: creatorProfiles.deezerId,
       tidalId: creatorProfiles.tidalId,
       youtubeMusicId: creatorProfiles.youtubeMusicId,
+      discoveredPixels: creatorProfiles.discoveredPixels,
     })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.id, creatorProfileId))
@@ -209,6 +211,7 @@ export async function calculateAndStoreFitScore(
     hasSoundCloudId: !!profile.soundcloudId,
     dspPlatformCount,
     paidVerificationPlatforms,
+    hasTrackingPixels: !!profile.discoveredPixels,
   };
 
   // Calculate score
@@ -246,6 +249,7 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
+      hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
       socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
@@ -306,6 +310,7 @@ export async function calculateMissingFitScores(
       paidVerificationPlatforms: (
         profile.paidVerificationPlatforms ?? []
       ).filter((p): p is string => !!p),
+      hasTrackingPixels: !!profile.hasTrackingPixels,
     };
 
     const { score, breakdown } = calculateFitScore(input);
@@ -385,6 +390,7 @@ export async function recalculateAllFitScores(
             '{}'
           ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
         `,
+        hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
       })
       .from(creatorProfiles)
       .leftJoin(
@@ -437,6 +443,7 @@ export async function recalculateAllFitScores(
         paidVerificationPlatforms: (
           profile.paidVerificationPlatforms ?? []
         ).filter((p): p is string => !!p),
+        hasTrackingPixels: !!profile.hasTrackingPixels,
       };
 
       const { score, breakdown } = calculateFitScore(input);

@@ -242,3 +242,17 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M
 **Priority:** P2
 **Depends on:** Retargeting hardening PR (forwarding observability + conversion attribution).
+
+---
+
+## Post-upgrade pixel pre-fill from Linktree detection
+
+**What:** When a creator upgrades to Pro, check if `discoveredPixels` has data (from Linktree ingestion). If so, surface their detected pixel IDs in the post-checkout celebration flow or first Settings > Audience visit: "We found your Facebook Pixel 123456 — enable it?" Pre-fill the `creatorPixels` row with the discovered ID on confirm.
+
+**Why:** Removes the manual pixel setup step for ad-savvy creators upgrading to Pro. The magic moment — Jovie already knows your pixel ID from your Linktree. Partial auto-populate: pixel IDs are public (in page source), but access tokens are NOT in HTML. Creator still needs to add their token for server-side forwarding.
+
+**Context:** PR `itstimwhite/linktree-pixel-detect` stores discovered pixel IDs on `creator_profiles.discoveredPixels` (jsonb). The `creatorPixels` table and `/api/dashboard/pixels` route handle pixel config (Pro-gated). Post-checkout page is at `apps/web/app/billing/success/page.tsx`. Settings > Audience is the pixel settings page. The `getCreatorOwnedPixels()` helper filters raw detected data against the auto-maintained suppression list. Codex flagged: the pixel settings API auto-computes enabled flags from full credentials, so pre-fill should only set the ID field, not the enabled flag.
+
+**Effort:** M (human: ~3 days / CC: ~20 min)
+**Priority:** P2
+**Depends on:** Linktree pixel detection PR (stores the data this feature surfaces).
