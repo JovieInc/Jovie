@@ -15,6 +15,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
 - `abandoned` status handling in sign-up flow with specific "interrupted" message
 - Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
+### Changed
+
+- Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
+- Adopted Linear in-app design system (`rounded-full`) for all auth buttons and inputs globally
+- Unified waitlist form focus rings to use `--linear-border-focus` token instead of ad-hoc accent colors
+- Normalized platform pill typography to Linear caption tokens
+- Made `primaryGoal` optional in API validation (DB column was already nullable)
+
+### Removed
+
+- `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
+### Fixed
+
+- CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
+- CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
+- Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
+
+### Added
+
+- Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
+- Unit test for Statsig warn-once behavior
 
 ## [26.4.29] - 2026-03-20
 

@@ -17,6 +17,9 @@ import {
 } from './shared';
 
 let statsigInitialized = false;
+// Suppresses the "no secret" warning after the first call within a process lifetime.
+// Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
+let statsigWarnedNoSecret = false;
 const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
 /**
@@ -28,9 +31,12 @@ async function initializeStatsig(): Promise<void> {
 
   const serverSecret = env.STATSIG_SERVER_SECRET;
   if (!serverSecret) {
-    console.warn(
-      '[Statsig] Server secret not configured - feature flags will use defaults'
-    );
+    if (!statsigWarnedNoSecret) {
+      console.warn(
+        '[Statsig] Server secret not configured - feature flags will use defaults'
+      );
+      statsigWarnedNoSecret = true;
+    }
     return;
   }
 

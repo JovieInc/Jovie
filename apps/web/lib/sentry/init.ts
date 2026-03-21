@@ -277,7 +277,10 @@ export function initSentrySync(
     };
   }
 
-  // For sync initialization, we always use lite SDK
+  // For sync initialization, we always use lite SDK.
+  // Uses require() to keep client-lite lazily loaded — static ESM import would
+  // eagerly bundle the lite SDK for every consumer of this module (e.g., error
+  // boundaries on public routes that only read getSentryMode()).
   const { initLiteSentry } = require('./client-lite');
   const success = initLiteSentry(liteOptions);
 

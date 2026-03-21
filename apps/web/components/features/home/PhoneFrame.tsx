@@ -6,17 +6,19 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
   return (
     <div
       className='relative mx-auto flex flex-col items-center'
-      style={{ width: 280, height: 580 }}
+      style={{ width: 282, height: 592 }}
     >
       {/* Outer bezel */}
       <div
-        className='relative h-full w-full overflow-hidden rounded-full p-px'
+        className='relative h-full w-full overflow-hidden rounded-[2rem] p-px'
         style={{
-          backgroundColor: 'var(--linear-bg-surface-1)',
+          backgroundColor:
+            'color-mix(in oklab, var(--linear-bg-surface-1) 92%, var(--linear-bg-page))',
           boxShadow: [
             '0 0 0 1px var(--linear-border-default)',
-            '0 8px 40px rgba(0,0,0,0.45)',
-            '0 24px 80px rgba(0,0,0,0.35)',
+            '0 0 0 3px rgba(255,255,255,0.015)',
+            '0 12px 34px rgba(0,0,0,0.34)',
+            '0 24px 56px rgba(0,0,0,0.2)',
           ].join(', '),
         }}
       >
@@ -34,7 +36,7 @@ export function PhoneFrame({ children }: PhoneFrameProps) {
 
         {/* Inner screen */}
         <div
-          className='relative h-full w-full overflow-hidden rounded-4xl'
+          className='relative h-full w-full overflow-hidden rounded-[1.9rem]'
           style={{ backgroundColor: 'var(--linear-bg-page)' }}
         >
           {children}
