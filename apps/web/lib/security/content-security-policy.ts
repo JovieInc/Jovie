@@ -42,6 +42,13 @@ const INLINE_SCRIPT_HASHES = {
    * Config: attribute='class', storageKey='jovie-theme', enableSystem=true
    */
   nextThemes: "'sha256-72V5U2XTMga8oD2MGpcgPdSLXnks+/+SSDhnTJpROjA='",
+
+  /**
+   * @vercel/analytics inline script hash (v1.6.x)
+   * The Analytics component injects an inline script via document.head at runtime.
+   * Hash may need updating when @vercel/analytics version changes.
+   */
+  vercelAnalytics: "'sha256-k844ZRfHq5VBCg5bFxVtnBCvPUU7TVV7m1sDHs/cJXk='",
 };
 
 /**
@@ -68,6 +75,7 @@ const STATIC_CSP_PARTS = {
   scriptSrcSuffix: [
     INLINE_SCRIPT_HASHES.clerk,
     INLINE_SCRIPT_HASHES.nextThemes,
+    INLINE_SCRIPT_HASHES.vercelAnalytics,
     'https://va.vercel-scripts.com',
     'https://vitals.vercel-insights.com',
     'https://vercel.live',
@@ -95,6 +103,7 @@ const STATIC_CSP_PARTS = {
     'https://*.clerk.accounts.dev',
     'https://api.stripe.com',
     'https://*.ingest.sentry.io',
+    'https://*.ingest.us.sentry.io',
     'https://*.sentry.io',
     'wss://*.clerk.com',
     'wss://clerk.jov.ie',
