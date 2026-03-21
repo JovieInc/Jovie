@@ -157,13 +157,11 @@ function AiSupportSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='grid section-gap-linear lg:grid-cols-[0.9fr_1.1fr] lg:items-center'>
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro-compact'>
             <div className='reveal-on-scroll'>
-              <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                AI assistant
-              </span>
-              <h2 className='mt-5 max-w-[10ch] marketing-h2-linear text-primary-token'>
+              <span className='homepage-section-eyebrow'>AI assistant</span>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token'>
                 AI that knows your work.
               </h2>
               <p className='mt-4 max-w-xl marketing-lead-linear text-secondary-token'>
@@ -174,7 +172,7 @@ function AiSupportSection() {
             </div>
 
             <div className='reveal-on-scroll' data-delay='80'>
-              <div className='overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card'>
+              <div className='homepage-surface-card overflow-hidden rounded-[1rem]'>
                 <AiDemo />
               </div>
             </div>

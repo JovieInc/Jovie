@@ -46,6 +46,8 @@ export interface ProfileUpdateInput {
     youtubeUrl?: string | null;
     // Genre tags
     genres?: string[];
+    // Pitch context for AI-generated playlist pitches
+    pitchContext?: string;
     // Settings object for feature flags
     settings?: ProfileSettingsUpdate;
   };

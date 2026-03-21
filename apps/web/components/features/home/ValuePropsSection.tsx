@@ -19,35 +19,33 @@ export function ValuePropsSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll grid items-end section-gap-linear md:grid-cols-[0.92fr_1.08fr]'>
-            <div className='flex max-w-[22rem] flex-col gap-5'>
-              <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-[12px] font-medium tracking-[-0.01em] text-tertiary-token'>
-                One platform
-              </span>
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro reveal-on-scroll'>
+            <div className='flex max-w-[22rem] flex-col gap-4'>
+              <span className='homepage-section-eyebrow'>One platform</span>
               <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token'>
                 One Tool. Zero Setup.
               </h2>
             </div>
-            <p className='max-w-xl marketing-lead-linear text-secondary-token md:justify-self-end'>
+            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
               Jovie replaces the release work artists usually skip when they are
               trying to move fast.
             </p>
           </div>
 
           <div
-            className='reveal-on-scroll mt-8 grid gap-4 md:mt-8 md:grid-cols-3'
+            className='homepage-section-stack reveal-on-scroll grid gap-3.5 md:grid-cols-3'
             data-delay='80'
           >
             {VALUE_PROPS.map(prop => (
               <article
                 key={prop.title}
-                className='rounded-[0.95rem] border border-subtle bg-surface-0 p-6'
+                className='homepage-surface-card rounded-[1rem] p-5 md:p-6'
               >
                 <p className='text-lg font-medium tracking-tight text-primary-token'>
                   {prop.title}
                 </p>
-                <p className='mt-4 text-sm leading-6 text-secondary-token'>
+                <p className='mt-3 text-sm leading-6 text-secondary-token'>
                   {prop.body}
                 </p>
               </article>

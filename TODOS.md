@@ -272,3 +272,31 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M (human: ~3 days / CC: ~20 min)
 **Priority:** P2
 **Depends on:** Linktree pixel detection PR (stores the data this feature surfaces).
+
+---
+
+## Email pitch submission to DSPs
+
+**What:** Send AI-generated playlist pitches via email to platforms that accept editorial pitches through dedicated email addresses.
+
+**Why:** Eliminates the final copy-paste step for platforms with email intake. The auto-generated pitch text is already formatted per platform — email submission makes the pitch flow feel automated even without APIs.
+
+**Context:** The pitch generator PR (`itstimwhite/auto-pitch-generator`) stores per-platform pitches on `discogReleases.generatedPitches`. Resend is already integrated for transactional email. Need to research which DSPs accept email pitches, their required formats, and submission email addresses. Some platforms (e.g., Amazon Music for Artists) have known intake forms or email addresses.
+
+**Effort:** S (human: ~1 day / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Auto pitch generator PR.
+
+---
+
+## Pitch generation as automated release task
+
+**What:** Make pitch generation an automated release task (`assigneeType: 'ai_workflow'`) that auto-triggers when a release is created, with status tracked in the release task checklist.
+
+**Why:** Artists forget to pitch. An auto-generated pitch appearing in their task list with a "Review & Copy" action makes it part of their release workflow rather than a separate tool they have to remember to use.
+
+**Context:** The release task system already supports `ai_workflow` assignee types with "Automatic with Pro" badges. The `generatePitches()` service from `lib/services/pitch/` can be called from the task instantiation flow. Need to decide on trigger timing: on release creation, or X days before release date (editorial teams need 2-4 weeks lead time). Also need to handle the case where `pitchContext` is empty — still generate but note in the task that adding context will improve quality.
+
+**Effort:** S (human: ~1 day / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Auto pitch generator PR.

@@ -54,40 +54,43 @@ export function ReleasesSection() {
       />
 
       <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll flex flex-col gap-4'>
-            <span className='inline-flex w-fit items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-[-0.01em] text-tertiary-token'>
-              <Zap className='h-3 w-3' aria-hidden='true' />
-              Release automation
-            </span>
-
-            <div className='grid gap-4 md:grid-cols-2 md:items-start md:gap-8'>
-              <h2 className='marketing-h2-linear max-w-[12ch] text-primary-token'>
+        <div className='homepage-section-shell'>
+          <div className='homepage-section-intro reveal-on-scroll'>
+            <div>
+              <span className='homepage-section-eyebrow'>
+                <Zap className='h-3 w-3' aria-hidden='true' />
+                Release automation
+              </span>
+              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token'>
                 Release day, automated.
               </h2>
-              <p className='max-w-md marketing-lead-linear text-secondary-token'>
-                The moment a song drops, Jovie spins up the release page,
-                matches every major platform, and starts the launch for you.
-              </p>
+            </div>
+            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
+              The moment a song drops, Jovie spins up the release page, matches
+              every major platform, and starts the launch for you.
+            </p>
+          </div>
+
+          <div
+            className='homepage-section-stack reveal-on-scroll'
+            data-delay='40'
+          >
+            <div className='-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0'>
+              <div className='flex min-w-max gap-2 sm:min-w-0 sm:flex-wrap'>
+                {RELEASE_PROOF_POINTS.map(point => (
+                  <span
+                    key={point}
+                    className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-secondary-token'
+                  >
+                    {point}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           <div
-            className='mt-4 flex flex-wrap gap-2 reveal-on-scroll'
-            data-delay='40'
-          >
-            {RELEASE_PROOF_POINTS.map(point => (
-              <span
-                key={point}
-                className='rounded-full border border-subtle bg-surface-0 px-3 py-1.5 text-xs font-medium text-secondary-token'
-              >
-                {point}
-              </span>
-            ))}
-          </div>
-
-          <div
-            className='mt-5 flex flex-wrap items-center gap-2 reveal-on-scroll'
+            className='mt-4 flex flex-wrap items-center gap-2 reveal-on-scroll sm:mt-5'
             data-delay='60'
           >
             {RELEASES.map((release, index) => (
@@ -95,7 +98,7 @@ export function ReleasesSection() {
                 key={release.id}
                 type='button'
                 onClick={() => setActiveIndex(index)}
-                className='flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all duration-300'
+                className='flex items-center gap-2 rounded-full px-3.5 py-[0.44rem] text-[13px] font-medium transition-all duration-300 sm:px-4 sm:py-2 sm:text-sm'
                 style={{
                   backgroundColor:
                     index === activeIndex
@@ -113,7 +116,7 @@ export function ReleasesSection() {
                 )}
                 {release.title}
                 <span
-                  className='text-xs'
+                  className='text-[11px] sm:text-xs'
                   style={{
                     color:
                       index === activeIndex
@@ -128,9 +131,8 @@ export function ReleasesSection() {
           </div>
 
           <div
-            className='reveal-on-scroll relative mt-5 overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 p-4 sm:p-5'
+            className='homepage-surface-card reveal-on-scroll relative mt-5 overflow-hidden rounded-[1rem] p-3.5 sm:mt-6 sm:p-4 md:p-5'
             data-delay='120'
-            style={{ boxShadow: 'var(--linear-shadow-card)' }}
           >
             <div
               aria-hidden='true'
@@ -141,7 +143,7 @@ export function ReleasesSection() {
               }}
             />
 
-            <div className='flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-4 py-3'>
+            <div className='flex flex-wrap items-center justify-between gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-3.5 py-3 sm:px-4'>
               <div>
                 <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                   Release event
@@ -157,7 +159,7 @@ export function ReleasesSection() {
               </div>
             </div>
 
-            <div className='mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start'>
+            <div className='mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start'>
               <div className='space-y-3'>
                 <div className='max-w-[42rem]'>
                   <DashboardMockup activeIndex={activeIndex} />
@@ -185,7 +187,7 @@ export function ReleasesSection() {
                 </div>
               </div>
 
-              <div className='grid gap-3'>
+              <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-1'>
                 <div className='rounded-[0.9rem] border border-subtle bg-surface-1 p-4'>
                   <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
                     Paid release notifications
