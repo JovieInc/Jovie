@@ -23,7 +23,9 @@ export function DrawerSurfaceCard({
     <Component
       data-testid={testId}
       className={cn(
-        variant === 'card' && DRAWER_SURFACE_CARD_CLASSNAME,
+        variant === 'card'
+          ? DRAWER_SURFACE_CARD_CLASSNAME
+          : 'border-0 bg-transparent shadow-none',
         className
       )}
     >
