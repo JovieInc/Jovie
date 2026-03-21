@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.32] - 2026-03-21
+
+### Added
+
+- Knowledge-aware AI chat — keyword router selects relevant music industry topics and injects them into the system prompt for accurate, specific advice
+- `lib/chat/knowledge/topics.ts` — topic registry that loads distilled knowledge docs at cold start
+- `lib/chat/knowledge/router.ts` — keyword-based topic selection (top 2 matches per message, min score threshold)
+
 ## [26.4.31] - 2026-03-21
 
 ### Added
