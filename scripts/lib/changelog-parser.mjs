@@ -24,7 +24,12 @@ const INTERNAL_PREFIX = '[internal]';
 export function parseChangelog(markdown) {
   const lines = markdown.split('\n');
   const releases = [];
-  const unreleased = { raw: '', summary: '', sections: {}, internalSections: {} };
+  const unreleased = {
+    raw: '',
+    summary: '',
+    sections: {},
+    internalSections: {},
+  };
   let currentBlock = null; // null | 'unreleased' | index into releases
   let currentSection = null;
 
@@ -39,7 +44,14 @@ export function parseChangelog(markdown) {
         currentBlock = 'unreleased';
       } else {
         currentBlock = releases.length;
-        releases.push({ version, date: date || '', raw: '', summary: '', sections: {}, internalSections: {} });
+        releases.push({
+          version,
+          date: date || '',
+          raw: '',
+          summary: '',
+          sections: {},
+          internalSections: {},
+        });
       }
       continue;
     }
@@ -76,7 +88,9 @@ export function parseChangelog(markdown) {
     if (trimmed.startsWith('- ') && currentSection) {
       const entry = trimmed.slice(2);
       if (entry.startsWith(INTERNAL_PREFIX)) {
-        target.internalSections[currentSection].push(entry.slice(INTERNAL_PREFIX.length).trim());
+        target.internalSections[currentSection].push(
+          entry.slice(INTERNAL_PREFIX.length).trim()
+        );
       } else {
         target.sections[currentSection].push(entry);
       }
