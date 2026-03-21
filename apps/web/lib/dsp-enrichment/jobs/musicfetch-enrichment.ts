@@ -23,6 +23,7 @@ import {
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
+import { isBlacklistedSpotifyId } from '@/lib/spotify/blacklist';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
@@ -86,6 +87,16 @@ async function applyDspUpdates(
     profile,
     spotifyUrl
   );
+
+  // Block blacklisted Spotify artist IDs from polluting profiles
+  if (dspUpdates.spotifyId && isBlacklistedSpotifyId(dspUpdates.spotifyId)) {
+    logger.warn('MusicFetch enrichment: blocked blacklisted Spotify ID', {
+      creatorProfileId,
+      blockedSpotifyId: dspUpdates.spotifyId,
+    });
+    delete dspUpdates.spotifyId;
+    delete dspUpdates.avatarUrl;
+  }
 
   let enrichedDisplayName: string | undefined;
   const hasPlaceholderName =
@@ -174,8 +185,22 @@ async function importDiscography(
   creatorProfileId: string,
   result: MusicFetchEnrichmentResult
 ): Promise<void> {
-  const spotifyId = extractSpotifyArtistId(spotifyUrl, existingSpotifyId);
+  // Prefer URL-derived ID over a blacklisted stored ID so re-enrichment
+  // with a corrected URL can recover the discography.
+  const candidateId = extractSpotifyArtistId(spotifyUrl, existingSpotifyId);
+  const spotifyId =
+    candidateId && isBlacklistedSpotifyId(candidateId)
+      ? extractSpotifyArtistId(spotifyUrl, null)
+      : candidateId;
   if (!spotifyId) return;
+
+  if (isBlacklistedSpotifyId(spotifyId)) {
+    logger.warn(
+      'MusicFetch enrichment: blocked discography import for blacklisted ID',
+      { creatorProfileId, blockedSpotifyId: spotifyId }
+    );
+    return;
+  }
 
   try {
     const importResult = await importReleasesFromSpotify(
@@ -234,6 +259,21 @@ export async function processMusicFetchEnrichmentJob(
     releasesFailed: 0,
     errors: [],
   };
+
+  // Block enrichment for blacklisted Spotify artist URLs
+  const urlArtistId = extractSpotifyArtistId(spotifyUrl, null);
+  if (urlArtistId && isBlacklistedSpotifyId(urlArtistId)) {
+    logger.warn('MusicFetch enrichment: blocked blacklisted Spotify URL', {
+      creatorProfileId,
+      blockedSpotifyId: urlArtistId,
+      spotifyUrl,
+    });
+    result.errors.push(
+      `Spotify artist ${urlArtistId} is blacklisted — skipping enrichment`
+    );
+    await setEnrichmentJobStatus(tx, creatorProfileId, 'musicfetch', 'failed');
+    return result;
+  }
 
   // Check availability — throw so the job fails and retries
   if (!isMusicFetchAvailable()) {

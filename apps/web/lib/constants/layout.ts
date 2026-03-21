@@ -6,21 +6,21 @@
  */
 
 /**
- * Standard sidebar width across all tables
- * Used by: Audience, Creators, Releases, Contact sidebars
+ * Standard desktop details-lane width across most entity panels.
+ * Release detail uses a slightly wider override for artwork and metadata density.
  */
-export const SIDEBAR_WIDTH = 340; // px
+export const SIDEBAR_WIDTH = 360; // px
 
 /**
  * Standard table row heights
  *
- * All tables now use COMPACT (40px) as the standard for visual consistency, matching Linear design.
- * - COMPACT/STANDARD: 40px - unified row height for all tables
+ * All tables now use a denser 36px baseline to better match the authenticated shell density.
+ * - COMPACT/STANDARD: 36px - unified row height for all tables
  * - TALL: 56px - deprecated, kept for backwards compatibility
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 40, // Unified standard row height
-  STANDARD: 40, // Same as COMPACT - all tables use 40px
+  COMPACT: 36, // Unified standard row height
+  STANDARD: 36, // Same as COMPACT - all tables use 36px
   TALL: 56, // Deprecated - remove after full migration
 } as const;
 

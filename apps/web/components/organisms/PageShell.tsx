@@ -46,7 +46,7 @@ export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] text-primary-token',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-primary-token',
         className
       )}
     >
@@ -115,6 +115,7 @@ export function PageHeader({
         ) : undefined
       }
       actions={action}
+      density='compact'
       actionsClassName='flex shrink-0 items-center gap-(--linear-app-toolbar-gap)'
       className={className}
       bodyClassName='min-w-0'

@@ -119,9 +119,7 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'border-l border-(--linear-app-frame-seam)',
-        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
-        'shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,-14px_0_36px_rgba(0,0,0,0.06)]',
+        'bg-transparent shadow-none',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
@@ -132,8 +130,8 @@ export function RightDrawer({
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
       <div
-        className="relative flex h-full min-h-0 flex-col before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-16 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent)] before:content-['']"
-        style={{ minWidth: width }}
+        className='relative flex h-full min-h-0 flex-col'
+        style={{ minWidth: '100%' }}
       >
         {content}
       </div>
