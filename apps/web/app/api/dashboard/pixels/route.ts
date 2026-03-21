@@ -96,10 +96,14 @@ export async function GET() {
         .limit(1);
 
       // Token presence from SQL-level booleans (secrets never loaded into memory)
+      // Neon/Drizzle may return 't'/'f' strings for SQL boolean expressions,
+      // so we must parse explicitly rather than using !! (which treats 'f' as truthy)
+      const parseBool = (v: unknown) =>
+        v === true || v === 1 || v === '1' || v === 't';
       const hasTokens = {
-        facebook: !!pixelConfig?.hasFacebookToken,
-        google: !!pixelConfig?.hasGoogleToken,
-        tiktok: !!pixelConfig?.hasTiktokToken,
+        facebook: parseBool(pixelConfig?.hasFacebookToken),
+        google: parseBool(pixelConfig?.hasGoogleToken),
+        tiktok: parseBool(pixelConfig?.hasTiktokToken),
       };
 
       // Build response without exposing token values

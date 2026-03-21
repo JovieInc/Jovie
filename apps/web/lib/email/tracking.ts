@@ -169,10 +169,18 @@ export function inferDeviceType(
 ): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
   if (!userAgent) return 'unknown';
   const ua = userAgent.toLowerCase();
-  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
+  if (
+    ua.includes('ipad') ||
+    ua.includes('tablet') ||
+    (ua.includes('android') && !ua.includes('mobile'))
+  )
+    return 'tablet';
+  if (
+    ua.includes('mobi') ||
+    ua.includes('iphone') ||
+    (ua.includes('android') && ua.includes('mobile'))
+  )
     return 'mobile';
-  }
   return 'desktop';
 }
 
@@ -181,8 +189,13 @@ export function inferDeviceType(
  * Returns truncated SHA-256 hex, or undefined if no IP.
  */
 export function hashIP(ipAddress: string | null): string | undefined {
-  if (!ipAddress) return undefined;
-  return createHash('sha256').update(ipAddress).digest('hex').slice(0, 16);
+  const normalized = ipAddress?.trim();
+  const secret = getTrackingSecret();
+  if (!normalized || !secret) return undefined;
+  return createHmac('sha256', `${secret}:ip`)
+    .update(normalized)
+    .digest('hex')
+    .slice(0, 16);
 }
 
 /**

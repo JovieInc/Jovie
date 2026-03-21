@@ -11,7 +11,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Hardened redirect URL sanitization against backslash and encoded bypass attacks (e.g., `%5C`, `%2F`)
-- Handle availability check on signup page now shows error message instead of silently disappearing on network failure
+- Availability check on signup page now shows error message instead of silently disappearing on network failure
 - Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
 - Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments
 - Pixel settings API no longer fetches actual token values from database — uses SQL-level `IS NOT NULL` booleans instead

@@ -79,11 +79,10 @@ export async function GET(request: NextRequest) {
       },
     };
     after(async () => {
-      try {
-        await recordEngagement(engagementData);
-      } catch (error) {
+      const result = await recordEngagement(engagementData);
+      if (!result.success) {
         logger.error('[Email Open Track] Failed to record engagement', {
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: result.error ?? 'Unknown error',
           emailType: payload.emailType,
           referenceId: payload.referenceId,
         });
