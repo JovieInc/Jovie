@@ -4,7 +4,7 @@ Understanding streaming metrics is essential for independent artists to build su
 
 ## Audience Segmentation and Listener Types
 
-Your streaming audience consists of distinct segments that represent different levels of engagement and fan development potential.
+The following taxonomy reflects Spotify's audience model. Other platforms use different segmentation, but Spotify's is the most detailed and widely referenced. Your streaming audience consists of distinct segments that represent different levels of engagement and fan development potential.
 
 **Monthly Active Listeners** are your most valuable audience segment, representing listeners who intentionally streamed your music in the past 28 days from active sources like your artist profile, album pages, or their personal playlists and libraries. These listeners typically comprise 33% of your total audience but drive 60% of your streams and 80% of merchandise purchases. Within this segment, three sub-categories exist:
 
@@ -16,7 +16,7 @@ Your streaming audience consists of distinct segments that represent different l
 
 **Previously Active Listeners** were once part of your monthly active audience but haven't intentionally streamed your music in the past 28 days. These listeners have demonstrated past interest and are often easier to re-engage than completely new audiences.
 
-**Programmed Listeners** have only streamed your music from algorithmic sources like editorial playlists, Discovery Weekly, Radio, Autoplay, or playlists created by other users. They haven't actively sought out your music in at least two years but may be primed to explore your catalog deeper and transition to active listening.
+**Programmed Listeners** have only streamed your music from algorithmic sources like editorial playlists, Discover Weekly, Radio, Autoplay, or playlists created by other users. They haven't actively sought out your music in at least two years but may be primed to explore your catalog deeper and transition to active listening.
 
 ## Engagement vs. Lean-Back Streaming
 

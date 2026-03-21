@@ -16,7 +16,7 @@ The **ISWC** (International Standard Musical Work Code) identifies the musical c
 
 ## Royalty Types and Collection
 
-**Performance royalties** flow to songwriters, composers, and publishers when their compositions are performed or broadcast publicly—including streaming, downloads, radio airplay, TV broadcasts, live concerts, and music played in public spaces. These royalties are collected and distributed through Performance Rights Organizations (PROs).
+**Performance royalties** flow to songwriters, composers, and publishers when their compositions are performed or broadcast publicly—including streaming, radio airplay, TV broadcasts, live concerts, and music played in public spaces. These royalties are collected and distributed through Performance Rights Organizations (PROs).
 
 **Mechanical royalties** are paid whenever a composition is reproduced, whether through physical sales (vinyl, CDs), digital downloads, or streaming. The term originates from early mechanical reproduction methods but now applies to all forms of reproduction.
 

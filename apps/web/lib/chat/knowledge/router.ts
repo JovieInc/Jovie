@@ -9,9 +9,10 @@ const MAX_TOPICS = 2;
 
 /**
  * Minimum keyword score to consider a topic relevant.
- * Prevents injecting marginally-related content.
+ * Score 1 = one exact keyword match (sufficient for high-signal terms).
+ * Multi-word matches get a +1 bonus, so a single phrase scores 2.
  */
-const MIN_SCORE = 2;
+const MIN_SCORE = 1;
 
 /**
  * Check if a keyword matches in the message text.

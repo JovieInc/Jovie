@@ -52,7 +52,7 @@ Five key codes form essential metadata: IPI identifies the songwriter/composer, 
 
 ## Metadata Best Practices
 
-Accurate metadata prevents revenue loss and ensures proper attribution. Common mistakes include using special characters in artist names (dollar signs, hyphens, non-Latin characters) that systems may not handle properly, potentially costing thousands in lost royalties.
+Accurate metadata prevents revenue loss and ensures proper attribution. Common mistakes include using unsupported special characters in artist names (dollar signs, certain punctuation marks, or control characters) that some distribution systems may not handle properly, potentially costing thousands in lost royalties.
 
 **Split sheets** document who contributed what during songwriting and each party's royalty percentage entitlement. Establishing these before release prevents future disputes and ensures proper payment distribution.
 
