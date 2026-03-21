@@ -6,16 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.27] - 2026-03-21
+## [26.4.29] - 2026-03-21
 
 ### Fixed
 
-- Stop capture-tip infinite Stripe retry loop — return 200 with Sentry alert instead of 500 when creator profile not found
-- Fix handle metadata mismatch in create-tip-intent — include plaintext handle alongside handle_hash so capture-tip webhook can resolve creators
-- Escalate stripe-tips webhook from logger.warn to captureCriticalError when tip checkout has no creator identifier
-- Dashboard pages (earnings, audience, releases, presence) now show error state instead of incorrectly redirecting to signin when database fails
+- Stop capture-tip infinite Stripe retry loop — return 200 with fire-and-forget Sentry alert instead of 500 when creator profile not found
+- Store immutable profile_id in Stripe payment intent metadata so capture-tip webhook can resolve creators without relying on mutable handle lookups
+- Validate profile_id still exists before tip insert to prevent FK violation causing 500 retry loops
+- Check isPublic flag on creator profile in create-tip-intent to match checkout flow behavior
+- Add auth-first guards (getCachedAuth before getDashboardData) on dashboard pages to prevent unauthenticated access during DB outages
+- Escalate stripe-tips webhook from logger.warn to captureCriticalError with redacted email context
+- Dashboard pages (earnings, audience, releases, presence) show PageErrorState with consistent captureError telemetry instead of redirecting to signin on DB failure
 - Add error tracking to batchUpdateSequential with succeeded count and failed item context
-- Add error logging to contacts API catch block
+- Use APP_ROUTES.ONBOARDING constant instead of hardcoded paths
+
 ## [26.4.28] - 2026-03-20
 
 ### Fixed

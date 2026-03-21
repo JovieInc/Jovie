@@ -55,15 +55,17 @@ async function AudienceContent({
       );
     }
 
-    // Fallback: if dashboard data has no user despite Clerk auth, redirect
+    // Onboarding check first — during provisioning, user may be null but
+    // needsOnboarding is true. Checking user first would incorrectly redirect
+    // authenticated-but-not-yet-provisioned users to signin.
+    if (dashboardData.needsOnboarding) {
+      redirect(APP_ROUTES.ONBOARDING);
+    }
+
     if (!dashboardData.user?.id) {
       redirect(
         `${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD_AUDIENCE}`
       );
-    }
-
-    if (dashboardData.needsOnboarding) {
-      redirect(APP_ROUTES.ONBOARDING);
     }
 
     const artist = dashboardData.selectedProfile
