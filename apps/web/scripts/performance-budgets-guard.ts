@@ -6,8 +6,11 @@
  * Runs against BASE_URL (defaults to http://localhost:3000).
  *
  * For authenticated routes (auth: true in config), reads Clerk session cookies
- * from CLERK_SESSION_COOKIE env var or falls back to browser context stored at
- * apps/web/.auth/session.json (created by `doppler run -- pnpm perf:auth`).
+ * from CLERK_SESSION_COOKIE env var or falls back to apps/web/.auth/session.json.
+ *
+ * Flags:
+ *   --json         Emit machine-readable JSON to stdout
+ *   --path <path>  Restrict to one or more configured budget paths
  */
 
 import { chromium } from '@playwright/test';
@@ -17,19 +20,23 @@ import { resolve } from 'path';
 
 const require = createRequire(import.meta.url);
 
+type TimingMetricName =
+  | 'first-contentful-paint'
+  | 'largest-contentful-paint'
+  | 'cumulative-layout-shift'
+  | 'first-input-delay'
+  | 'time-to-first-byte'
+  | 'skeleton-to-content';
+
+type ResourceMetricName = 'script' | 'image' | 'font' | 'stylesheet' | 'total';
+
 type TimingBudget = {
-  metric:
-    | 'first-contentful-paint'
-    | 'largest-contentful-paint'
-    | 'cumulative-layout-shift'
-    | 'first-input-delay'
-    | 'time-to-first-byte'
-    | 'skeleton-to-content';
+  metric: TimingMetricName;
   budget: number;
 };
 
 type ResourceBudget = {
-  resourceType: 'script' | 'image' | 'font' | 'stylesheet' | 'total';
+  resourceType: ResourceMetricName;
   budget: number;
 };
 
@@ -45,21 +52,44 @@ type BudgetConfig = {
 };
 
 type PageMetrics = {
-  timings: {
-    'first-contentful-paint': number;
-    'largest-contentful-paint': number;
-    'cumulative-layout-shift': number;
-    'first-input-delay': number;
-    'time-to-first-byte': number;
-    'skeleton-to-content': number;
-  };
-  resourceSizes: {
-    script: number;
-    image: number;
-    font: number;
-    stylesheet: number;
-    total: number;
-  };
+  timings: Record<TimingMetricName, number>;
+  resourceSizes: Record<ResourceMetricName, number>;
+};
+
+type CliOptions = {
+  json: boolean;
+  paths: string[];
+};
+
+type MetricResult = {
+  name: string;
+  measured: number;
+  budget: number;
+  unit: '' | 'ms' | 'KB';
+  passed: boolean;
+  overshootPct: number;
+};
+
+type ViolationResult = MetricResult & {
+  kind: 'timing' | 'resource';
+};
+
+type PageResult = {
+  configuredPath: string;
+  resolvedPath: string;
+  url: string;
+  auth: boolean;
+  timings: MetricResult[];
+  resourceSizes: MetricResult[];
+  violations: ViolationResult[];
+};
+
+type GuardSummary = {
+  baseUrl: string;
+  status: 'pass' | 'fail';
+  checkedAt: string;
+  violationCount: number;
+  pages: PageResult[];
 };
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
@@ -74,7 +104,57 @@ const AUTH_STORAGE_PATH = resolve(
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
+const parseCliArgs = (args: string[]): CliOptions => {
+  const options: CliOptions = { json: false, paths: [] };
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === '--') {
+      continue;
+    }
+
+    if (arg === '--json') {
+      options.json = true;
+      continue;
+    }
+
+    if (arg === '--path') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --path');
+      }
+      options.paths.push(value);
+      index += 1;
+      continue;
+    }
+
+    throw new TypeError(`Unknown argument: ${arg}`);
+  }
+
+  return options;
+};
+
+const CLI_OPTIONS = parseCliArgs(process.argv.slice(2));
+
 const toKilobytes = (bytes: number) => bytes / 1024;
+
+const writeStderr = (message: string) => {
+  process.stderr.write(`${message}\n`);
+};
+
+const logInfo = (message: string) => {
+  if (!CLI_OPTIONS.json) {
+    console.log(message);
+  }
+};
+
+const logWarning = (message: string) => {
+  if (CLI_OPTIONS.json) {
+    writeStderr(message);
+    return;
+  }
+  console.warn(message);
+};
 
 const resolvePath = (path: string) =>
   path.replaceAll(/\[([^\]]+)\]/g, (_match, key: string) => {
@@ -92,9 +172,49 @@ const resolvePath = (path: string) =>
 const formatMetric = (value: number, unit: string) =>
   `${value.toFixed(1)}${unit}`;
 
+const calculateOvershootPct = (measured: number, budget: number) => {
+  if (measured <= budget || budget === 0) {
+    return 0;
+  }
+  return Number((((measured - budget) / budget) * 100).toFixed(2));
+};
+
+const formatMetricResult = (
+  name: string,
+  measured: number,
+  budget: number,
+  unit: '' | 'ms' | 'KB'
+): MetricResult => ({
+  name,
+  measured,
+  budget,
+  unit,
+  passed: measured <= budget,
+  overshootPct: calculateOvershootPct(measured, budget),
+});
+
+const selectBudgetEntries = (
+  budgets: BudgetEntry[],
+  paths: string[]
+): BudgetEntry[] => {
+  if (paths.length === 0) {
+    return budgets;
+  }
+
+  const selected = budgets.filter(entry => paths.includes(entry.path));
+  if (selected.length === 0) {
+    throw new TypeError(
+      `No budget entries matched --path. Available paths: ${budgets
+        .map(entry => entry.path)
+        .join(', ')}`
+    );
+  }
+  return selected;
+};
+
 /**
  * Load Clerk session cookies for authenticated routes.
- * Priority: CLERK_SESSION_COOKIE env → .auth/session.json file.
+ * Priority: CLERK_SESSION_COOKIE env -> .auth/session.json file.
  */
 const loadAuthCookies = (
   baseUrl: string
@@ -120,7 +240,7 @@ const loadAuthCookies = (
         return data.cookies;
       }
     } catch {
-      console.warn('  ⚠ Could not parse auth session file, skipping auth');
+      logWarning('  ⚠ Could not parse auth session file, skipping auth');
     }
   }
 
@@ -139,14 +259,12 @@ const measureSkeletonToContent = async (
   const start = Date.now();
 
   try {
-    // Wait for skeleton to disappear (it has data-testid="releases-loading")
     await page.waitForSelector('[data-testid="releases-loading"]', {
       state: 'detached',
       timeout: 10000,
     });
     return Date.now() - start;
   } catch {
-    // If skeleton was never present or didn't disappear, check if content loaded directly
     try {
       await page.waitForSelector(
         'table tbody tr, [data-testid="releases-content"]',
@@ -172,23 +290,19 @@ const collectMetrics = async (
   try {
     const context = await browser.newContext();
 
-    // Inject auth cookies for authenticated routes
     if (needsAuth) {
       const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
         throw new Error(
-          'No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or run: doppler run -- pnpm perf:auth'
+          'No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide apps/web/.auth/session.json.'
         );
       }
       await context.addCookies(cookies);
-      console.log(`  🔐 Injected ${cookies.length} auth cookies`);
+      logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
     }
 
     page = await context.newPage();
 
-    // Warm up the browser + server connection — first navigation includes
-    // browser launch overhead + TCP/TLS setup which inflates TTFB/FCP by ~5-8s.
-    // Hit the actual server first so the real measurement reflects app performance.
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
     await page.addInitScript(() => {
@@ -218,7 +332,6 @@ const collectMetrics = async (
 
       new PerformanceObserver(list => {
         for (const entry of list.getEntries() as LayoutShiftEntry[]) {
-          // Only count layout shifts without recent input.
           if (!entry.hadRecentInput) {
             metrics.cls += entry.value ?? 0;
           }
@@ -240,14 +353,10 @@ const collectMetrics = async (
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // Start skeleton-to-content measurement from DOMContentLoaded (not navigation start —
-    // measures only the time the skeleton is visible while data streams in).
     const skeletonToContentPromise = measureSkeletonToContent(page);
 
-    // Best-effort networkidle wait; fall back gracefully for dynamic pages
-    // where third-party scripts or long-polling prevent idle state.
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
-      console.warn(
+      logWarning(
         `  ⚠ networkidle timeout for ${url}, continuing with load state`
       );
     });
@@ -353,75 +462,137 @@ const collectMetrics = async (
   }
 };
 
-const runBudgetGuard = async () => {
-  const violations: string[] = [];
-  console.log('📊 Running performance budget guard...');
-  console.log(`Base URL: ${BASE_URL}`);
+const buildPageResult = (
+  budgetEntry: BudgetEntry,
+  resolvedPath: string,
+  url: string,
+  metrics: PageMetrics
+): PageResult => {
+  const timingResults = budgetEntry.timings.map(timing =>
+    formatMetricResult(
+      timing.metric,
+      metrics.timings[timing.metric],
+      timing.budget,
+      timing.metric === 'cumulative-layout-shift' ? '' : 'ms'
+    )
+  );
 
-  for (const budgetEntry of config.budgets) {
-    const resolvedPath = resolvePath(budgetEntry.path);
-    const url = `${BASE_URL.replace(/\/$/, '')}${resolvedPath}`;
-    const needsAuth = budgetEntry.auth === true;
+  const resourceResults = budgetEntry.resourceSizes.map(resource =>
+    formatMetricResult(
+      resource.resourceType,
+      metrics.resourceSizes[resource.resourceType],
+      resource.budget,
+      'KB'
+    )
+  );
 
-    console.log(
-      `\n🔎 Checking ${budgetEntry.path} (${url})${needsAuth ? ' [auth]' : ''}`
-    );
-
-    let metrics!: PageMetrics;
-    const MAX_RETRIES = 2;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        metrics = await collectMetrics(url, needsAuth);
-        break;
-      } catch (error) {
-        if (attempt === MAX_RETRIES) throw error;
-        console.warn(`  ⚠ Attempt ${attempt} failed for ${url}, retrying...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-    }
-
-    for (const timing of budgetEntry.timings) {
-      const measured = metrics.timings[timing.metric];
-      const maxAllowed = timing.budget;
-      const unit = timing.metric === 'cumulative-layout-shift' ? '' : 'ms';
-      const status = measured <= maxAllowed ? '✅' : '❌';
-      console.log(
-        ` ${status} ${timing.metric}: ${formatMetric(measured, unit)} (budget ${formatMetric(maxAllowed, unit)})`
-      );
-      if (measured > maxAllowed) {
-        violations.push(
-          `${budgetEntry.path} ${timing.metric} ${measured.toFixed(1)}${unit} exceeds ${maxAllowed}${unit}`
-        );
-      }
-    }
-
-    for (const resource of budgetEntry.resourceSizes) {
-      const measured = metrics.resourceSizes[resource.resourceType];
-      const maxAllowed = resource.budget;
-      const status = measured <= maxAllowed ? '✅' : '❌';
-      console.log(
-        ` ${status} ${resource.resourceType}: ${formatMetric(measured, 'KB')} (budget ${formatMetric(maxAllowed, 'KB')})`
-      );
-      if (measured > maxAllowed) {
-        violations.push(
-          `${budgetEntry.path} ${resource.resourceType} ${measured.toFixed(1)}KB exceeds ${maxAllowed}KB`
-        );
-      }
-    }
-  }
-
-  if (violations.length > 0) {
-    console.error('\n🚨 Performance budget violations detected:');
-    for (const violation of violations) {
-      console.error(` - ${violation}`);
-    }
-    process.exit(1);
-  }
-
-  console.log('\n✅ All performance budgets are within limits.');
+  return {
+    configuredPath: budgetEntry.path,
+    resolvedPath,
+    url,
+    auth: budgetEntry.auth === true,
+    timings: timingResults,
+    resourceSizes: resourceResults,
+    violations: [
+      ...timingResults
+        .filter(result => !result.passed)
+        .map(result => ({ ...result, kind: 'timing' as const })),
+      ...resourceResults
+        .filter(result => !result.passed)
+        .map(result => ({ ...result, kind: 'resource' as const })),
+    ],
+  };
 };
 
-runBudgetGuard().catch(error => {
-  console.error('❌ Performance budget guard failed:', error);
-  process.exit(1);
-});
+const renderHumanReadablePage = (page: PageResult) => {
+  logInfo(
+    `\n🔎 Checking ${page.configuredPath} (${page.url})${page.auth ? ' [auth]' : ''}`
+  );
+
+  for (const result of page.timings) {
+    const status = result.passed ? '✅' : '❌';
+    logInfo(
+      ` ${status} ${result.name}: ${formatMetric(result.measured, result.unit)} (budget ${formatMetric(result.budget, result.unit)})`
+    );
+  }
+
+  for (const result of page.resourceSizes) {
+    const status = result.passed ? '✅' : '❌';
+    logInfo(
+      ` ${status} ${result.name}: ${formatMetric(result.measured, result.unit)} (budget ${formatMetric(result.budget, result.unit)})`
+    );
+  }
+};
+
+const emitJson = (summary: GuardSummary) => {
+  process.stdout.write(`${JSON.stringify(summary, null, 2)}\n`);
+};
+
+const runBudgetGuard = async (): Promise<GuardSummary> => {
+  const pages: PageResult[] = [];
+  const budgetEntries = selectBudgetEntries(config.budgets, CLI_OPTIONS.paths);
+
+  logInfo('📊 Running performance budget guard...');
+  logInfo(`Base URL: ${BASE_URL}`);
+
+  for (const budgetEntry of budgetEntries) {
+    const resolvedPath = resolvePath(budgetEntry.path);
+    const url = `${BASE_URL.replace(/\/$/, '')}${resolvedPath}`;
+
+    let metrics!: PageMetrics;
+    const maxRetries = 2;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        metrics = await collectMetrics(url, budgetEntry.auth === true);
+        break;
+      } catch (error) {
+        if (attempt === maxRetries) {
+          throw error;
+        }
+        logWarning(`  ⚠ Attempt ${attempt} failed for ${url}, retrying...`);
+        await new Promise(resolvePromise => setTimeout(resolvePromise, 2000));
+      }
+    }
+
+    const pageResult = buildPageResult(budgetEntry, resolvedPath, url, metrics);
+    pages.push(pageResult);
+    renderHumanReadablePage(pageResult);
+  }
+
+  const violationCount = pages.reduce(
+    (total, page) => total + page.violations.length,
+    0
+  );
+
+  return {
+    baseUrl: BASE_URL,
+    status: violationCount > 0 ? 'fail' : 'pass',
+    checkedAt: new Date().toISOString(),
+    violationCount,
+    pages,
+  };
+};
+
+runBudgetGuard()
+  .then(summary => {
+    if (CLI_OPTIONS.json) {
+      emitJson(summary);
+    } else if (summary.violationCount > 0) {
+      console.error('\n🚨 Performance budget violations detected:');
+      for (const page of summary.pages) {
+        for (const violation of page.violations) {
+          console.error(
+            ` - ${page.configuredPath} ${violation.name} ${violation.measured.toFixed(1)}${violation.unit} exceeds ${violation.budget}${violation.unit}`
+          );
+        }
+      }
+    } else {
+      console.log('\n✅ All performance budgets are within limits.');
+    }
+
+    process.exit(summary.violationCount > 0 ? 1 : 0);
+  })
+  .catch(error => {
+    console.error('❌ Performance budget guard failed:', error);
+    process.exit(1);
+  });

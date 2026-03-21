@@ -54,6 +54,7 @@ gstack/
 ├── qa-only/         # /qa-only skill (report-only QA, no fixes)
 ├── plan-design-review/  # /plan-design-review skill (report-only design audit)
 ├── design-review/    # /design-review skill (design audit + fix loop)
+├── perf/            # /perf skill (golden-path performance optimization)
 ├── ship/            # Ship workflow skill
 ├── review/          # PR review skill
 ├── plan-ceo-review/ # /plan-ceo-review skill
