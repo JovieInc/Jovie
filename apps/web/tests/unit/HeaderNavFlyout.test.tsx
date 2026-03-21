@@ -7,11 +7,8 @@ vi.mock('@clerk/nextjs', () => ({
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useSession: () => ({ isLoaded: true, isSignedIn: false, session: null }),
-  Show: ({ when, children }: { when: string; children: React.ReactNode }) =>
-    when === 'signed-out' ? children : null,
-}));
-
-vi.mock('@clerk/nextjs/legacy', () => ({
+  SignedIn: ({ children }: { children: React.ReactNode }) => null,
+  SignedOut: ({ children }: { children: React.ReactNode }) => children,
   useSignIn: () => ({
     isLoaded: true,
     signIn: undefined,

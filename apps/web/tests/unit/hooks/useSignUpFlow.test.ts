@@ -15,7 +15,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-vi.mock('@clerk/nextjs/legacy', () => ({
+vi.mock('@clerk/nextjs', () => ({
   useSignUp: () => ({
     signUp: {
       create: createMock,

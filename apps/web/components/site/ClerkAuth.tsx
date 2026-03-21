@@ -1,6 +1,6 @@
 'use client';
 
-import { Show, SignInButton, SignUpButton } from '@clerk/nextjs';
+import { SignedIn, SignedOut, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { UserButton } from '@/components/organisms/user-button';
 
 /**
@@ -9,13 +9,13 @@ import { UserButton } from '@/components/organisms/user-button';
 export default function ClerkAuth() {
   return (
     <>
-      <Show when='signed-out'>
+      <SignedOut>
         <SignInButton mode='redirect'>Sign In</SignInButton>
         <SignUpButton mode='redirect'>Sign Up</SignUpButton>
-      </Show>
-      <Show when='signed-in'>
+      </SignedOut>
+      <SignedIn>
         <UserButton />
-      </Show>
+      </SignedIn>
     </>
   );
 }
