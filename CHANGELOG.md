@@ -11,8 +11,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Dev toolbar "Unwaitlist" button now invalidates proxy user state cache on repeat clicks, fixing stale waitlist redirects after approval
+### Added
+
+- AI-powered playlist pitch generator: auto-generates per-platform pitches (Spotify, Apple Music, Amazon, Generic) from artist and release data
+- New "Pitch context" field in Settings > Artist Profile for artists to provide streaming milestones, press coverage, radio play, and other context the AI can't auto-detect
+- Pitch generation service using Claude via Vercel AI SDK with structured output and Zod validation
+- Per-platform character limit enforcement (Spotify 500, Apple Music 300, Amazon 500, Generic 1000) with smart truncation fallback
+- Release sidebar "Playlist Pitches" section in the Details tab with generate, regenerate, and copy-to-clipboard per platform
+- Rate limiting: 10 pitch generations per hour per user
+- 28 new tests covering prompt builders, Zod schema validation, truncation logic, and profile validation
 
 ## [26.4.32] - 2026-03-21
+
+### Added
+
+- Knowledge-aware AI chat — keyword router selects relevant music industry topics and injects them into the system prompt for accurate, specific advice
+- `lib/chat/knowledge/topics.ts` — topic registry that loads distilled knowledge docs at cold start
+- `lib/chat/knowledge/router.ts` — keyword-based topic selection (top 2 matches per message, min score threshold)
 
 ### Changed
 
