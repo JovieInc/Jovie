@@ -148,7 +148,11 @@ export function useProfileHeaderParts({
     },
   ];
 
-  const title: ReactNode = 'Profile';
+  const title: ReactNode = username
+    ? displayName && displayName !== username
+      ? `${displayName} · @${username}`
+      : `@${username}`
+    : 'Profile';
 
   const actions = (
     <DrawerHeaderActions

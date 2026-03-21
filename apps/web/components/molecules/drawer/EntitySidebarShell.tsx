@@ -104,7 +104,7 @@ export function EntitySidebarShell({
         <div
           className={cn(
             LINEAR_SURFACE.stickyHeader,
-            'sticky top-0 z-20 shrink-0 border-b backdrop-blur-[10px]'
+            'sticky top-0 z-20 shrink-0 border-b backdrop-blur-[12px]'
           )}
         >
           {/* Header bar — close is in the overflow dropdown */}
@@ -124,7 +124,7 @@ export function EntitySidebarShell({
 
           {/* Entity header — image + name area */}
           {entityHeader && (
-            <div className='overflow-visible px-4 pt-2 pb-1.5'>
+            <div className='overflow-visible px-4 pt-3 pb-2.5'>
               {entityHeader}
             </div>
           )}
@@ -133,7 +133,7 @@ export function EntitySidebarShell({
           {tabs && (
             <div
               className={cn(
-                'overflow-visible border-t border-(--linear-app-frame-seam) px-4 py-1.5 [&>*]:w-full',
+                'overflow-visible border-t border-(--linear-app-frame-seam) px-4 py-2 [&>*]:w-full',
                 tabsContainerClassName
               )}
             >
@@ -144,13 +144,13 @@ export function EntitySidebarShell({
 
         {isEmpty ? (
           /* Empty state */
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-3.5 py-4'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-4'>
             <DrawerEmptyState message={emptyMessage} />
           </div>
         ) : (
           <>
             {/* Scrollable content */}
-            <div className='flex-1 min-h-0 space-y-3 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-2.5'>
+            <div className='flex-1 min-h-0 space-y-4 overflow-y-auto overflow-x-hidden overscroll-contain px-4 py-3'>
               {children}
             </div>
 

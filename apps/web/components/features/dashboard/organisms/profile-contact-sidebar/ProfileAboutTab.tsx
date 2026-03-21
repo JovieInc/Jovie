@@ -4,12 +4,14 @@ import { Badge } from '@jovie/ui';
 import { Calendar, Home, type LucideIcon, MapPin, Plus, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import {
   DrawerAsyncToggle,
   DrawerSection,
 } from '@/components/molecules/drawer';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { LocationPicker } from '@/components/molecules/LocationPicker';
+import { cn } from '@/lib/utils';
 
 interface ProfileAboutTabProps {
   readonly bio: string | null;
@@ -70,7 +72,7 @@ function EditableBio({
           setDraft(value ?? '');
           setEditing(true);
         }}
-        className='w-full text-left cursor-text'
+        className='w-full cursor-text rounded-[10px] px-1 py-0.5 text-left transition-colors hover:bg-surface-0'
       >
         {value ? (
           <p className='text-[13px] leading-relaxed text-secondary-token whitespace-pre-wrap'>
@@ -94,7 +96,7 @@ function EditableBio({
       onKeyDown={handleKeyDown}
       maxLength={512}
       rows={4}
-      className='w-full resize-none rounded-md border border-subtle bg-surface-0 px-2.5 py-2 text-[12.5px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
+      className='w-full resize-none rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-[12.5px] leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
       placeholder='Write your bio...'
     />
   );
@@ -124,7 +126,7 @@ function LocationField({
           trigger={
             <button
               type='button'
-              className='flex items-center gap-2 text-[12px] text-secondary-token transition-colors hover:text-primary-token'
+              className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-[12px] text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token'
             >
               <Icon
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -153,7 +155,7 @@ function LocationField({
         trigger={
           <button
             type='button'
-            className='flex items-center gap-2 text-[12px] text-tertiary-token transition-colors hover:text-secondary-token'
+            className='flex items-center gap-2 rounded-[10px] px-1.5 py-1 text-[12px] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
           >
             <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
             <span>Add your {addLabel.toLowerCase()}</span>
@@ -185,7 +187,11 @@ export function ProfileAboutTab({
 
   return (
     <div className='space-y-4'>
-      <DrawerSection title='Bio' collapsible={false} className='space-y-1.5'>
+      <DrawerSection
+        title='Bio'
+        collapsible={false}
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+      >
         {onBioChange && <EditableBio value={bio} onChange={onBioChange} />}
         {!onBioChange && bio && (
           <p className='whitespace-pre-wrap text-[12.5px] leading-relaxed text-secondary-token'>
@@ -203,7 +209,7 @@ export function ProfileAboutTab({
         <DrawerSection
           title='Location'
           collapsible={false}
-          className='space-y-1.5'
+          className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
         >
           <div className='space-y-1.5'>
             <LocationField
@@ -231,7 +237,11 @@ export function ProfileAboutTab({
         </DrawerSection>
       )}
 
-      <DrawerSection title='Genres' collapsible={false} className='space-y-1.5'>
+      <DrawerSection
+        title='Genres'
+        collapsible={false}
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
+      >
         {hasGenres && (
           <div className='flex flex-wrap gap-1.5'>
             {genres.map(genre => (
@@ -297,7 +307,7 @@ export function ProfileAboutTab({
       <DrawerSection
         title='Settings'
         collapsible={false}
-        className='space-y-1.5'
+        className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2 p-3')}
       >
         <DrawerAsyncToggle
           label='Photo downloads'

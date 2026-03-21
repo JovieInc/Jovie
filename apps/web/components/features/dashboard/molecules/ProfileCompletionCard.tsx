@@ -74,10 +74,10 @@ export const ProfileCompletionCard = memo(
       : 'Complete these essentials so fans can find you.';
 
     return (
-      <ContentSurfaceCard className='mb-2 p-3 sm:mb-3 sm:p-3.5'>
+      <ContentSurfaceCard className='mb-2 rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:mb-3 sm:p-4.5'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-2 text-[13px] font-[500] text-secondary-token'>
+            <div className='flex items-center gap-2 text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
               {profileIsLive ? (
                 <Sparkles className='h-3 w-3' aria-hidden='true' />
               ) : (
@@ -86,7 +86,7 @@ export const ProfileCompletionCard = memo(
               {sectionLabel}
             </div>
             <div className='space-y-0.5'>
-              <p className='text-[14px] font-[590] text-primary-token'>
+              <p className='text-[15px] font-[590] text-primary-token'>
                 {heading}
               </p>
               <p className='text-[13px] text-secondary-token'>{subtext}</p>
@@ -106,7 +106,7 @@ export const ProfileCompletionCard = memo(
                 <li key={step.id}>
                   <Link
                     href={step.href}
-                    className='group flex items-center justify-between gap-3 rounded-md px-2.5 py-1.5 transition-[background-color] duration-150 hover:bg-surface-1'
+                    className='group flex items-center justify-between gap-3 rounded-[12px] border border-transparent px-3 py-2 transition-[background-color,border-color] duration-150 hover:border-(--linear-app-frame-seam) hover:bg-surface-0'
                   >
                     <div className='min-w-0'>
                       <p className='text-[13px] font-[510] text-primary-token'>
