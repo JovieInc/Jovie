@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { AlertCircle, Copy, RefreshCw, WifiOff } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatError } from '../types';
 import { getNextStepMessage } from '../utils';
@@ -22,6 +22,13 @@ export function ErrorDisplay({
 }: ErrorDisplayProps) {
   const ErrorIcon = chatError.type === 'network' ? WifiOff : AlertCircle;
   const [copied, setCopied] = useState(false);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   const supportCode = useMemo(() => {
     if (!chatError.requestId && !chatError.errorCode) return null;
@@ -35,7 +42,8 @@ export function ErrorDisplay({
     try {
       await navigator.clipboard.writeText(supportCode);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 1500);
     } catch {
       // Clipboard write can fail (permissions denied, non-secure context)
     }
@@ -77,9 +85,7 @@ export function ErrorDisplay({
                 type='button'
                 variant='ghost'
                 size='sm'
-                onClick={() => {
-                  void handleCopySupportCode();
-                }}
+                onClick={handleCopySupportCode}
                 className='ml-auto h-7 gap-1 rounded-full px-2.5 text-[11px] font-medium uppercase tracking-[0.12em]'
                 aria-label='Copy support reference'
               >

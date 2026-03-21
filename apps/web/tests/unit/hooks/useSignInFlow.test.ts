@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 
 // --- Mocks ---
@@ -123,9 +123,6 @@ describe('useSignInFlow – status handling', () => {
     expect(result.current.error).toBe(
       'Additional verification is required. Please contact support.'
     );
-
-    // Restore for other tests
-    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
   });
 
   it('handles needs_client_trust (string cast) like needs_second_factor', async () => {
@@ -240,41 +237,45 @@ describe('useSignInFlow – status handling', () => {
     expect(result.current.verificationReason).toBe('code');
   });
 
-  it('uses phone_code strategy when that is the supported second factor', async () => {
-    // Override to only support phone_code as second factor
-    signInMock.supportedSecondFactors = [{ strategy: 'phone_code' }];
-
-    const { result } = renderHook(() => useSignInFlow());
-    await setupVerificationStep(result);
-
-    verifyFirstFactorCodeMock.mockImplementation(async () => {
-      signInMock.status = 'needs_second_factor';
-      return { error: null };
-    });
-    sendSecondFactorPhoneCodeMock.mockResolvedValue({ error: null });
-
-    await act(async () => {
-      await result.current.verifyCode('123456');
+  describe('with phone_code second factor', () => {
+    beforeEach(() => {
+      signInMock.supportedSecondFactors = [{ strategy: 'phone_code' }];
     });
 
-    expect(sendSecondFactorPhoneCodeMock).toHaveBeenCalled();
-
-    // Second verification should use phone_code strategy
-    verifySecondFactorPhoneCodeMock.mockImplementation(async () => {
-      signInMock.status = 'complete';
-      return { error: null };
+    afterEach(() => {
+      signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
     });
 
-    await act(async () => {
-      await result.current.verifyCode('789012');
-    });
+    it('uses phone_code strategy when that is the supported second factor', async () => {
+      const { result } = renderHook(() => useSignInFlow());
+      await setupVerificationStep(result);
 
-    expect(verifySecondFactorPhoneCodeMock).toHaveBeenCalledWith({
-      code: '789012',
-    });
+      verifyFirstFactorCodeMock.mockImplementation(async () => {
+        signInMock.status = 'needs_second_factor';
+        return { error: null };
+      });
+      sendSecondFactorPhoneCodeMock.mockResolvedValue({ error: null });
 
-    // Restore for other tests
-    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
+      await act(async () => {
+        await result.current.verifyCode('123456');
+      });
+
+      expect(sendSecondFactorPhoneCodeMock).toHaveBeenCalled();
+
+      // Second verification should use phone_code strategy
+      verifySecondFactorPhoneCodeMock.mockImplementation(async () => {
+        signInMock.status = 'complete';
+        return { error: null };
+      });
+
+      await act(async () => {
+        await result.current.verifyCode('789012');
+      });
+
+      expect(verifySecondFactorPhoneCodeMock).toHaveBeenCalledWith({
+        code: '789012',
+      });
+    });
   });
 
   it('resends second-factor challenge instead of first-factor when in second-factor state', async () => {

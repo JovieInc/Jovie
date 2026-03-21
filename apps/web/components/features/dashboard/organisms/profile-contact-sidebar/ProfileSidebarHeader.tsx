@@ -123,7 +123,7 @@ export function useProfileHeaderParts({
       icon: Copy,
       activeIcon: Check,
       isActive: isCopied,
-      onClick: () => void handleCopyUrl(),
+      onClick: handleCopyUrl,
     },
   ];
 
@@ -144,7 +144,7 @@ export function useProfileHeaderParts({
       id: 'qr',
       label: 'Download QR code',
       icon: QrCode,
-      onClick: () => void handleDownloadQRCode(),
+      onClick: handleDownloadQRCode,
     },
   ];
 

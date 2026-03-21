@@ -150,9 +150,7 @@ export function PreviewPanel() {
         icon: Copy,
         activeIcon: Check,
         isActive: isUrlCopied,
-        onClick: () => {
-          void handleCopyUrl();
-        },
+        onClick: handleCopyUrl,
       },
       {
         id: 'open',
@@ -385,9 +383,7 @@ export function PreviewPanel() {
                   tone='secondary'
                   className='h-8 rounded-[12px] px-2 text-[11px]'
                   disabled={isUrlCopied}
-                  onClick={() => {
-                    void handleCopyUrl();
-                  }}
+                  onClick={handleCopyUrl}
                 >
                   {isUrlCopied ? (
                     <Check className='mr-1.5 h-3.5 w-3.5' aria-hidden='true' />
