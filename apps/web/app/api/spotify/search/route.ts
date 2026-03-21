@@ -18,6 +18,7 @@ import {
   spotifyClient,
 } from '@/lib/spotify';
 import { getAlphabetResults } from '@/lib/spotify/alphabet-cache';
+import { filterBlacklistedResults } from '@/lib/spotify/blacklist';
 import { CircuitOpenError } from '@/lib/spotify/circuit-breaker';
 import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
@@ -129,7 +130,8 @@ export async function GET(request: NextRequest) {
   if (q.length === 1 && /^[a-zA-Z]$/.test(q)) {
     const alphabetResults = await getAlphabetResults(q.toLowerCase());
     if (alphabetResults && alphabetResults.length > 0) {
-      const annotated = await annotateClaimedStatus(alphabetResults);
+      const filtered = filterBlacklistedResults(alphabetResults);
+      const annotated = await annotateClaimedStatus(filtered);
       return NextResponse.json(annotated, { headers: rateLimitHeaders });
     }
     // No cached results — return empty rather than hitting Spotify with a 1-char query
@@ -160,8 +162,9 @@ export async function GET(request: NextRequest) {
       { ttlSeconds: SEARCH_CACHE_TTL_SECONDS, useRedis: true }
     );
 
-    // Post-cache pipeline: annotate claimed → boost claimed → VIP boost (VIP always wins)
-    const annotated = await annotateClaimedStatus(cachedResults);
+    // Post-cache pipeline: blacklist filter → annotate claimed → boost claimed → VIP boost (VIP always wins)
+    const safeResults = filterBlacklistedResults(cachedResults);
+    const annotated = await annotateClaimedStatus(safeResults);
     const claimedBoosted = boostClaimedArtists(annotated);
     const results = await applyVipBoost(claimedBoosted, q, limit);
 

@@ -4,6 +4,7 @@ import { Disc, Music, Youtube } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { PhoneFrame } from './PhoneFrame';
+import { TIM_WHITE_PROFILE } from './tim-white';
 
 type ProfileTab = 'listen' | 'tip' | 'tour';
 
@@ -14,8 +15,9 @@ const TABS: ReadonlyArray<{ id: ProfileTab; label: string }> = [
 ];
 
 const PROFILE = {
-  name: 'Tim White',
+  name: TIM_WHITE_PROFILE.name,
   tagline: 'Indie / Alternative · Los Angeles',
+  avatarSrc: TIM_WHITE_PROFILE.avatarSrc,
 } as const;
 
 function ListenContent() {
@@ -150,7 +152,7 @@ export function PhoneHeroDemo() {
       <div className='flex flex-col items-center pt-10 pb-4 px-5'>
         <div className='w-14 h-14 rounded-full overflow-hidden border border-white/10'>
           <Image
-            src='/images/avatars/tim-white.jpg'
+            src={PROFILE.avatarSrc}
             alt='Tim White'
             width={112}
             height={112}

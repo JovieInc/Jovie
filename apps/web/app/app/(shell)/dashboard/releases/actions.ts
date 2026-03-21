@@ -1147,6 +1147,20 @@ export async function connectSpotifyArtist(params: {
   artistName: string;
 }> {
   noStore();
+
+  // Block claiming of blacklisted Spotify artist IDs
+  const { isBlacklistedSpotifyId } = await import('@/lib/spotify/blacklist');
+  if (isBlacklistedSpotifyId(params.spotifyArtistId)) {
+    return {
+      success: false,
+      importing: false,
+      message: 'This artist profile is not available for claiming.',
+      imported: 0,
+      releases: [],
+      artistName: params.artistName,
+    };
+  }
+
   const { userId } = await getCachedAuth();
   if (!userId) {
     throw new Error('Unauthorized');

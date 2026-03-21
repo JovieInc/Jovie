@@ -16,6 +16,7 @@
  * - Multi-DSP presence: +5 points
  * - Has contact email: +5 points
  * - Paid verification (Twitter/X, Instagram, Facebook, Threads): +10 points
+ * - Has tracking pixels on link-in-bio: +5 points
  *
  * Max score: 100 points (capped)
  */
@@ -23,7 +24,7 @@
 import type { FitScoreBreakdown } from '@/lib/db/schema/profiles';
 
 /** Current version of the scoring algorithm */
-export const FIT_SCORE_VERSION = 3;
+export const FIT_SCORE_VERSION = 4;
 
 /** Point values for each scoring criterion */
 export const SCORE_WEIGHTS = {
@@ -40,6 +41,7 @@ export const SCORE_WEIGHTS = {
   MULTI_DSP_PRESENCE: 5, // Present on 3+ streaming platforms
   HAS_CONTACT_EMAIL: 5, // Contact email available (easier outreach)
   PAID_VERIFICATION: 10, // Verified on a paid-verification platform (Twitter/X, Instagram, Facebook, Threads)
+  HAS_TRACKING_PIXELS: 5,
 } as const;
 
 const SPOTIFY_POPULARITY_THRESHOLDS = [
@@ -160,6 +162,8 @@ export interface FitScoreInput {
   dspPlatformCount?: number;
   /** Platforms where the creator has paid verification (e.g., ['twitter', 'instagram']) */
   paidVerificationPlatforms?: string[];
+  /** Whether the profile has tracking pixels detected on their link-in-bio */
+  hasTrackingPixels?: boolean;
 }
 
 /**
@@ -185,6 +189,7 @@ function createInitialBreakdown(now: Date): FitScoreBreakdown {
     multiDspPresence: 0,
     hasContactEmail: 0,
     paidVerification: 0,
+    hasTrackingPixels: 0,
     meta: {
       calculatedAt: now.toISOString(),
       version: FIT_SCORE_VERSION,
@@ -253,7 +258,8 @@ function getFitScoreTotal(breakdown: FitScoreBreakdown) {
     (breakdown.hasAlternativeDsp ?? 0) +
     (breakdown.multiDspPresence ?? 0) +
     (breakdown.hasContactEmail ?? 0) +
-    (breakdown.paidVerification ?? 0)
+    (breakdown.paidVerification ?? 0) +
+    (breakdown.hasTrackingPixels ?? 0)
   );
 }
 
@@ -344,6 +350,11 @@ export function calculateFitScore(input: FitScoreInput): FitScoreResult {
   ) {
     breakdown.paidVerification = SCORE_WEIGHTS.PAID_VERIFICATION;
     breakdown.meta!.paidVerificationPlatforms = input.paidVerificationPlatforms;
+  }
+
+  // 12. Has tracking pixels on link-in-bio (+5) - signals active ad spend
+  if (input.hasTrackingPixels) {
+    breakdown.hasTrackingPixels = SCORE_WEIGHTS.HAS_TRACKING_PIXELS;
   }
 
   // Calculate total score (capped at 100)

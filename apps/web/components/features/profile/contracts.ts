@@ -66,6 +66,7 @@ export interface ProfileIdentityFields {
   readonly hideBranding: boolean;
   readonly location: string;
   readonly hometown: string;
+  readonly pitchContext: string;
   readonly profilePath: string;
 }
 

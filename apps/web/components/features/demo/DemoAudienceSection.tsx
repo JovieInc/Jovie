@@ -19,7 +19,7 @@ import { DEMO_AUDIENCE_MEMBERS } from './mock-release-data';
 
 export default function DemoAudienceSection() {
   const [selectedIds] = useState(() => new Set<string>());
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(true);
 
   const toggleSelect = useCallback(() => {}, []);
   const noop = useCallback(() => {}, []);

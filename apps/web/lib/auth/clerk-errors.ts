@@ -139,6 +139,30 @@ export function isCodeExpired(error: unknown): boolean {
 }
 
 /**
+ * Check if an error indicates the account already exists (OAuth callback failure)
+ */
+export function isAccountExistsError(error: unknown): boolean {
+  if (isClerkAPIResponseError(error)) {
+    const code = error.errors[0]?.code;
+    return (
+      code === 'form_identifier_exists' || code === 'external_account_exists'
+    );
+  }
+  return false;
+}
+
+/**
+ * Check if an error indicates OAuth access was denied by the user
+ */
+export function isAccessDeniedError(error: unknown): boolean {
+  if (isClerkAPIResponseError(error)) {
+    const code = error.errors[0]?.code;
+    return code === 'oauth_access_denied';
+  }
+  return false;
+}
+
+/**
  * Check if a session already exists (user is already signed in)
  */
 export function isSessionExists(error: unknown): boolean {

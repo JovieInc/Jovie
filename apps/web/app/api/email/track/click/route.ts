@@ -6,9 +6,14 @@
  */
 
 import { headers } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 
-import { recordEngagement, verifyTrackingToken } from '@/lib/email/tracking';
+import {
+  hashIP,
+  inferDeviceType,
+  recordEngagement,
+  verifyTrackingToken,
+} from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
@@ -17,18 +22,6 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-function inferDeviceType(
-  userAgent: string | null
-): 'mobile' | 'desktop' | 'tablet' | 'unknown' {
-  if (!userAgent) return 'unknown';
-  const ua = userAgent.toLowerCase();
-  if (ua.includes('ipad') || ua.includes('tablet')) return 'tablet';
-  if (ua.includes('mobi') || ua.includes('iphone') || ua.includes('android')) {
-    return 'mobile';
-  }
-  return 'desktop';
-}
 
 /**
  * Validate that a URL is safe to redirect to.
@@ -95,10 +88,10 @@ export async function GET(request: NextRequest) {
     const country = headersList.get('x-vercel-ip-country') ?? undefined;
     const city = headersList.get('x-vercel-ip-city') ?? undefined;
 
-    // Record the click event (fire and forget for performance)
-    recordEngagement({
+    // Record the click event after response is sent (survives serverless teardown)
+    const engagementData = {
       emailType: payload.emailType,
-      eventType: 'click',
+      eventType: 'click' as const,
       referenceId: payload.referenceId,
       recipientEmail: payload.email,
       providerMessageId: payload.messageId,
@@ -106,23 +99,21 @@ export async function GET(request: NextRequest) {
         clickUrl: targetUrl,
         linkId,
         userAgent: userAgent ?? undefined,
-        ipHash: ipAddress
-          ? (await import('node:crypto'))
-              .createHash('sha256')
-              .update(ipAddress)
-              .digest('hex')
-              .slice(0, 16)
-          : undefined,
+        ipHash: hashIP(ipAddress),
         deviceType: inferDeviceType(userAgent),
         country,
         city,
       },
-    }).catch(error => {
-      logger.error('[Email Click Track] Failed to record engagement', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        emailType: payload.emailType,
-        referenceId: payload.referenceId,
-      });
+    };
+    after(async () => {
+      const result = await recordEngagement(engagementData);
+      if (!result.success) {
+        logger.error('[Email Click Track] Failed to record engagement', {
+          error: result.error ?? 'Unknown error',
+          emailType: payload.emailType,
+          referenceId: payload.referenceId,
+        });
+      }
     });
 
     // Redirect to the target URL

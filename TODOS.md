@@ -22,6 +22,8 @@
 
 **Context:** `aggregateIsrcMatches()` in `lib/dsp-enrichment/matching/isrc-aggregator.ts` already returns sorted candidates. `storeMatch()` in `dsp-artist-discovery.ts` just needs to be called for the top-2 instead of top-1. The unique constraint change is backwards-compatible (relaxing, not tightening). The `onConflictDoUpdate` target in `storeMatch()` needs updating to match the new 3-column constraint. The presence page (`DspPresenceView.tsx`) already supports multiple items per provider visually — it just filters by status. Secondary candidates would appear as `status: 'suggested'` cards.
 
+**Tactical mitigation:** Founder identity blacklist shipped in `lib/spotify/blacklist.ts` — blocks all wrong "Tim White" Spotify IDs from search, enrichment, and claiming. This is a hardcoded stopgap; the multi-candidate matching system above is the proper solution.
+
 **Depends on:** PR that expanded `targetProviders` to `['apple_music', 'deezer', 'musicbrainz']` must land first so Deezer/MusicBrainz matches exist to surface.
 
 ---
@@ -242,3 +244,59 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 **Effort:** M
 **Priority:** P2
 **Depends on:** Retargeting hardening PR (forwarding observability + conversion attribution).
+
+---
+
+## Connection pool monitoring
+
+**What:** Add lightweight connection pool utilization logging (active/idle/waiting counts) to dashboard data queries, emitted as Sentry breadcrumbs.
+
+**Why:** The social links timeout root cause was connection starvation, but we had no metrics to prove it. Pool monitoring would let you see `pool: 10/10 active, 3 waiting` in Sentry breadcrumbs when timeouts occur, making future diagnosis instant.
+
+**Context:** The pool is configured in `apps/web/lib/db/client/connection.ts` with max=10. Neon's `Pool` class exposes `pool.totalCount`, `pool.idleCount`, `pool.waitingCount`. Add breadcrumbs in the `dashboardQuery()` wrapper in `apps/web/lib/db/query-timeout.ts`.
+
+**Effort:** S (human ~30min / CC ~5min)
+**Priority:** P2
+**Depends on:** Nothing.
+
+---
+
+## Post-upgrade pixel pre-fill from Linktree detection
+
+**What:** When a creator upgrades to Pro, check if `discoveredPixels` has data (from Linktree ingestion). If so, surface their detected pixel IDs in the post-checkout celebration flow or first Settings > Audience visit: "We found your Facebook Pixel 123456 — enable it?" Pre-fill the `creatorPixels` row with the discovered ID on confirm.
+
+**Why:** Removes the manual pixel setup step for ad-savvy creators upgrading to Pro. The magic moment — Jovie already knows your pixel ID from your Linktree. Partial auto-populate: pixel IDs are public (in page source), but access tokens are NOT in HTML. Creator still needs to add their token for server-side forwarding.
+
+**Context:** PR `itstimwhite/linktree-pixel-detect` stores discovered pixel IDs on `creator_profiles.discoveredPixels` (jsonb). The `creatorPixels` table and `/api/dashboard/pixels` route handle pixel config (Pro-gated). Post-checkout page is at `apps/web/app/billing/success/page.tsx`. Settings > Audience is the pixel settings page. The `getCreatorOwnedPixels()` helper filters raw detected data against the auto-maintained suppression list. Codex flagged: the pixel settings API auto-computes enabled flags from full credentials, so pre-fill should only set the ID field, not the enabled flag.
+
+**Effort:** M (human: ~3 days / CC: ~20 min)
+**Priority:** P2
+**Depends on:** Linktree pixel detection PR (stores the data this feature surfaces).
+
+---
+
+## Email pitch submission to DSPs
+
+**What:** Send AI-generated playlist pitches via email to platforms that accept editorial pitches through dedicated email addresses.
+
+**Why:** Eliminates the final copy-paste step for platforms with email intake. The auto-generated pitch text is already formatted per platform — email submission makes the pitch flow feel automated even without APIs.
+
+**Context:** The pitch generator PR (`itstimwhite/auto-pitch-generator`) stores per-platform pitches on `discogReleases.generatedPitches`. Resend is already integrated for transactional email. Need to research which DSPs accept email pitches, their required formats, and submission email addresses. Some platforms (e.g., Amazon Music for Artists) have known intake forms or email addresses.
+
+**Effort:** S (human: ~1 day / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Auto pitch generator PR.
+
+---
+
+## Pitch generation as automated release task
+
+**What:** Make pitch generation an automated release task (`assigneeType: 'ai_workflow'`) that auto-triggers when a release is created, with status tracked in the release task checklist.
+
+**Why:** Artists forget to pitch. An auto-generated pitch appearing in their task list with a "Review & Copy" action makes it part of their release workflow rather than a separate tool they have to remember to use.
+
+**Context:** The release task system already supports `ai_workflow` assignee types with "Automatic with Pro" badges. The `generatePitches()` service from `lib/services/pitch/` can be called from the task instantiation flow. Need to decide on trigger timing: on release creation, or X days before release date (editorial teams need 2-4 weeks lead time). Also need to handle the case where `pitchContext` is empty — still generate but note in the task that adding context will improve quality.
+
+**Effort:** S (human: ~1 day / CC: ~15 min)
+**Priority:** P2
+**Depends on:** Auto pitch generator PR.

@@ -176,22 +176,32 @@ function SidebarHeaderNav({
   return (
     <div className='flex w-full items-center'>
       {isInSettings ? (
-        <Link
-          href={APP_ROUTES.DASHBOARD}
-          aria-label='Back to dashboard'
-          className={cn(
-            'inline-flex h-6 w-full items-center gap-1.5 rounded-md px-1.5 text-app tracking-tight text-sidebar-item-foreground/75 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
-            'group-data-[collapsible=icon]:justify-center'
-          )}
-        >
-          <ArrowLeft
-            className='size-3 text-sidebar-item-icon/70'
-            aria-hidden='true'
-          />
-          <span className='truncate text-app tracking-tight text-sidebar-item-foreground/80 group-data-[collapsible=icon]:hidden'>
-            Back to app
-          </span>
-        </Link>
+        <div className='flex w-full items-center gap-2'>
+          <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
+            <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
+              Workspace
+            </p>
+            <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
+              Settings
+            </p>
+          </div>
+          <Link
+            href={APP_ROUTES.DASHBOARD}
+            aria-label='Exit settings and return to app'
+            className={cn(
+              'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+              'group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+            )}
+          >
+            <ArrowLeft
+              className='size-3 text-sidebar-item-icon/70'
+              aria-hidden='true'
+            />
+            <span className='truncate group-data-[collapsible=icon]:hidden'>
+              Exit
+            </span>
+          </Link>
+        </div>
       ) : (
         <UserButton
           profileHref={profileHref}
@@ -261,7 +271,12 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         'transition-[width,transform] duration-normal ease-interactive'
       )}
     >
-      <SidebarHeader className='relative h-9 justify-center gap-0 px-2 py-0'>
+      <SidebarHeader
+        className={cn(
+          'relative justify-center gap-0 px-2',
+          isInSettings ? 'min-h-12 py-2' : 'h-9 py-0'
+        )}
+      >
         <SidebarHeaderNav
           isInSettings={isInSettings}
           isAdmin={isAdmin}

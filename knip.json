@@ -14,7 +14,9 @@
     "unresolved"
   ],
   "workspaces": {
-    ".": {},
+    ".": {
+      "entry": ["scripts/knowledge/fetch.ts"]
+    },
     "apps/web": {
       "entry": [
         "instrumentation.{ts,js}",
