@@ -199,9 +199,21 @@ vi.mock('@headlessui/react', async () => {
 vi.mock('@clerk/nextjs', () => ({
   useUser: () => ({ isLoaded: true, isSignedIn: false, user: null }),
   useAuth: () => ({ isLoaded: true, isSignedIn: false, userId: null }),
-  SignedIn: ({ children }: { children: unknown }) => children,
-  SignedOut: ({ children }: { children: unknown }) => children,
+  Show: ({ children }: { children: unknown }) => children,
   ClerkProvider: ({ children }: { children: unknown }) => children,
+}));
+
+vi.mock('@clerk/nextjs/legacy', () => ({
+  useSignIn: () => ({
+    isLoaded: true,
+    signIn: undefined,
+    setActive: async () => {},
+  }),
+  useSignUp: () => ({
+    isLoaded: true,
+    signUp: undefined,
+    setActive: async () => {},
+  }),
 }));
 
 // Ensure the DOM is cleaned up between tests to avoid cross-test interference
