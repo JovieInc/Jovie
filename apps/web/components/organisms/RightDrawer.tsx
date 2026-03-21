@@ -95,7 +95,9 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'bg-surface-2 overflow-hidden',
+          'overflow-hidden border-l border-(--linear-app-frame-seam)',
+          'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
+          'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
           isOpen ? 'translate-x-0' : 'translate-x-full pointer-events-none',
@@ -117,7 +119,9 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-surface-0 border-l border-(--linear-app-frame-seam)',
+        'border-l border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
+        'shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,-14px_0_36px_rgba(0,0,0,0.06)]',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
@@ -127,7 +131,10 @@ export function RightDrawer({
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}
     >
-      <div className='flex flex-col h-full' style={{ minWidth: width }}>
+      <div
+        className="relative flex h-full min-h-0 flex-col before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-16 before:bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent)] before:content-['']"
+        style={{ minWidth: width }}
+      >
         {content}
       </div>
     </aside>

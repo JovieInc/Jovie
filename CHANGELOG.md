@@ -15,6 +15,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
 - Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments
 - Pixel settings API no longer fetches actual token values from database — uses SQL-level `IS NOT NULL` booleans instead
+- Google OAuth sign-up now shows a clear error message when the account already exists, instead of silently redirecting back to the sign-up page
+- OAuth callback handler uses imperative Clerk API for proper error classification (account exists, access denied, unknown)
+- Sign-up form displays specific error messages with "Sign in instead" link for existing account errors
 
 ## [26.4.26] - 2026-03-20
 

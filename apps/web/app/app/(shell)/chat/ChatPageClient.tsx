@@ -11,6 +11,7 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
+import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -40,8 +41,13 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='block max-w-[240px] truncate font-[510] text-primary-token'>
-      {title}
+    <span className='flex min-w-0 items-center gap-2 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-2.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+      <span className='shrink-0 text-[10px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+        Thread
+      </span>
+      <span className='block max-w-[220px] truncate font-[510] text-primary-token'>
+        {title}
+      </span>
     </span>
   );
 }
@@ -162,7 +168,7 @@ export function ChatPageClient({
 
   const headerActions = useMemo(
     () => (
-      <>
+      <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'>
         {conversationId && (
           <SimpleTooltip
             content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}
@@ -183,7 +189,7 @@ export function ChatPageClient({
           </SimpleTooltip>
         )}
         {enablePreviewPanel ? <PreviewToggleButton /> : null}
-      </>
+      </div>
     ),
     [
       conversationId,
@@ -333,68 +339,74 @@ export function ChatPageClient({
       : 'We hit a problem loading your profile. Please retry in a moment.';
 
     return (
-      <div className='flex h-full items-center justify-center'>
-        <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-          {isProfileSetupRace ? (
-            <LoadingSpinner size='lg' tone='muted' />
-          ) : (
-            <AlertCircle className='h-8 w-8 text-tertiary-token' />
-          )}
-          <p className='text-sm text-secondary-token'>{profileMessage}</p>
-          {isProfileSetupRace && canAutoRetry && (
-            <p className='text-xs text-tertiary-token'>
-              Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
-            </p>
-          )}
-          {!isProfileSetupRace && (
-            <Button
-              onClick={() => router.refresh()}
-              variant='secondary'
-              size='sm'
-              className='gap-2'
-            >
-              <RefreshCw className='h-4 w-4' />
-              Retry
-            </Button>
-          )}
-        </ContentSurfaceCard>
-      </div>
+      <ChatWorkspaceSurface>
+        <div className='flex h-full items-center justify-center p-6'>
+          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+            {isProfileSetupRace ? (
+              <LoadingSpinner size='lg' tone='muted' />
+            ) : (
+              <AlertCircle className='h-8 w-8 text-tertiary-token' />
+            )}
+            <p className='text-sm text-secondary-token'>{profileMessage}</p>
+            {isProfileSetupRace && canAutoRetry && (
+              <p className='text-xs text-tertiary-token'>
+                Retrying automatically in 3 seconds ({autoRetryCount + 1}/3)…
+              </p>
+            )}
+            {!isProfileSetupRace && (
+              <Button
+                onClick={() => router.refresh()}
+                variant='secondary'
+                size='sm'
+                className='gap-2'
+              >
+                <RefreshCw className='h-4 w-4' />
+                Retry
+              </Button>
+            )}
+          </ContentSurfaceCard>
+        </div>
+      </ChatWorkspaceSurface>
     );
   }
 
   return (
     <ErrorBoundary
       fallback={
-        <div className='flex h-full items-center justify-center'>
-          <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
-            <AlertCircle className='h-8 w-8 text-tertiary-token' />
-            <p className='text-sm text-secondary-token'>
-              Something went wrong loading chat. Please try again.
-            </p>
-            <Button
-              onClick={() => router.refresh()}
-              variant='secondary'
-              size='sm'
-              className='gap-2'
-            >
-              <RefreshCw className='h-4 w-4' />
-              Retry
-            </Button>
-          </ContentSurfaceCard>
-        </div>
+        <ChatWorkspaceSurface>
+          <div className='flex h-full items-center justify-center p-6'>
+            <ContentSurfaceCard className='flex max-w-sm flex-col items-center gap-3 px-6 py-8 text-center'>
+              <AlertCircle className='h-8 w-8 text-tertiary-token' />
+              <p className='text-sm text-secondary-token'>
+                Something went wrong loading chat. Please try again.
+              </p>
+              <Button
+                onClick={() => router.refresh()}
+                variant='secondary'
+                size='sm'
+                className='gap-2'
+              >
+                <RefreshCw className='h-4 w-4' />
+                Retry
+              </Button>
+            </ContentSurfaceCard>
+          </div>
+        </ChatWorkspaceSurface>
       }
     >
-      <JovieChat
-        profileId={activeProfile.id}
-        conversationId={conversationId}
-        onConversationCreate={handleConversationCreate}
-        onTitleChange={handleTitleChange}
-        initialQuery={initialQuery ?? undefined}
-        displayName={activeProfile.displayName ?? undefined}
-        avatarUrl={activeProfile.avatarUrl}
-        username={activeProfile.username ?? undefined}
-        isFirstSession={isFirstSession}
-      />
+      <ChatWorkspaceSurface>
+        <JovieChat
+          profileId={activeProfile.id}
+          conversationId={conversationId}
+          onConversationCreate={handleConversationCreate}
+          onTitleChange={handleTitleChange}
+          initialQuery={initialQuery ?? undefined}
+          displayName={activeProfile.displayName ?? undefined}
+          avatarUrl={activeProfile.avatarUrl}
+          username={activeProfile.username ?? undefined}
+          isFirstSession={isFirstSession}
+        />
+      </ChatWorkspaceSurface>
     </ErrorBoundary>
   );
 }
