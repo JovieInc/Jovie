@@ -119,7 +119,7 @@ export function ProfileContactHeader({
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
 
   return (
-    <div className='flex items-center gap-3'>
+    <div className='flex items-center gap-3.5'>
       <ProfileAvatar
         editable={editable}
         avatarUrl={avatarUrl}
@@ -129,7 +129,7 @@ export function ProfileContactHeader({
       />
 
       {/* Name and username */}
-      <div className='min-w-0 flex-1'>
+      <div className='min-w-0 flex-1 space-y-0.5'>
         <EditableDisplayName
           editable={editable}
           isEditing={editingField === 'displayName'}
@@ -227,7 +227,7 @@ function EditableDisplayName({
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-7 text-[13px] font-[510] px-1'
+        className='h-8 px-1.5 text-[14px] font-[560]'
       />
     );
   }
@@ -236,7 +236,7 @@ function EditableDisplayName({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-[13px] font-[510] text-primary-token',
+        'block w-full truncate text-left text-[14px] font-[560] tracking-[-0.012em] text-primary-token',
         editable &&
           'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
       )}
@@ -283,7 +283,7 @@ function EditableUsername({
         }}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-6 text-xs px-1 mt-0.5'
+        className='mt-0.5 h-6 px-1.5 text-[12px]'
       />
     );
   }
@@ -292,7 +292,7 @@ function EditableUsername({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-xs text-sidebar-muted',
+        'block w-full truncate text-left text-[12px] text-tertiary-token',
         editable &&
           'rounded px-1 -mx-1 transition-colors hover:bg-surface-2 cursor-text'
       )}

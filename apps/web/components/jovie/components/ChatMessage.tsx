@@ -99,7 +99,15 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='px-5 py-4 text-primary-token'>
+            <div className='rounded-[20px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='mb-3 flex items-center gap-2'>
+                <span className='rounded-full border border-subtle bg-surface-2/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+                  Jovie
+                </span>
+                <span className='text-[11px] text-tertiary-token'>
+                  {isStreaming ? 'Writing reply…' : 'Reply'}
+                </span>
+              </div>
               <ChatMarkdown
                 content={messageText}
                 isStreaming={Boolean(isStreaming)}
@@ -196,12 +204,15 @@ export function ChatMessage({
           })}
 
           {!isStreaming && messageText && (
-            <div className='mt-1.5 flex items-center gap-0.5 pl-1.5'>
+            <div className='mt-2 flex items-center gap-2 pl-1.5'>
+              <span className='text-[10px] font-medium uppercase tracking-[0.14em] text-tertiary-token'>
+                Response
+              </span>
               <SimpleTooltip content={isSuccess ? 'Copied!' : 'Copy'}>
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-8 w-8 items-center justify-center rounded-md border border-transparent bg-transparent text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-3 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
@@ -211,6 +222,9 @@ export function ChatMessage({
                   ) : (
                     <Copy className='h-3.5 w-3.5' />
                   )}
+                  <span className='text-[11px] font-medium uppercase tracking-[0.12em]'>
+                    {isSuccess ? 'Copied' : 'Copy'}
+                  </span>
                 </button>
               </SimpleTooltip>
             </div>
