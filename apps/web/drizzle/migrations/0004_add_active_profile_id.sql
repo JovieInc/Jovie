@@ -5,11 +5,21 @@ CREATE INDEX IF NOT EXISTS "idx_users_active_profile_id" ON "users" USING btree 
 -- Links each user to their claimed creator_profile via the deprecated user_id FK.
 -- Safe: only updates rows where active_profile_id is still NULL.
 UPDATE "users" u
-SET "active_profile_id" = cp."id"
-FROM "creator_profiles" cp
-WHERE cp."user_id" = u."id"
-  AND cp."is_claimed" = true
-  AND u."active_profile_id" IS NULL;
+SET "active_profile_id" = (
+  SELECT cp."id"
+  FROM "creator_profiles" cp
+  WHERE cp."user_id" = u."id"
+    AND cp."is_claimed" = true
+  ORDER BY cp."created_at" ASC
+  LIMIT 1
+)
+WHERE u."active_profile_id" IS NULL
+  AND EXISTS (
+    SELECT 1
+    FROM "creator_profiles" cp
+    WHERE cp."user_id" = u."id"
+      AND cp."is_claimed" = true
+  );
 
 -- Update create_profile_with_user() to set active_profile_id on the user
 -- when a new profile is created during onboarding.
