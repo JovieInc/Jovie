@@ -48,6 +48,7 @@ export function WaitlistAdditionalInfoStep({
         value={heardAbout}
         onChange={e => onHeardAboutChange(e.target.value)}
         maxLength={280}
+        inputSize='lg'
         placeholder='How did you hear about us? (optional)'
         disabled={isSubmitting}
       />

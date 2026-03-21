@@ -205,7 +205,7 @@ export function WaitlistSpotifySearch({
     return (
       <div className='space-y-2'>
         {selectedArtistName ? (
-          <div className='w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3'>
+          <div className='w-full flex items-center gap-3 rounded-full border border-subtle bg-surface-0 px-4 py-3'>
             <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15'>
               <SocialIcon
                 platform='spotify'
@@ -281,8 +281,9 @@ export function WaitlistSpotifySearch({
       </label>
       <div
         className={cn(
-          'w-full flex items-center gap-3 rounded-lg border border-subtle bg-surface-0 px-4 py-3',
-          'focus-within:ring-2 focus-within:ring-accent/40 focus-within:ring-offset-2 focus-within:ring-offset-base'
+          'w-full flex items-center gap-3 rounded-full border border-subtle bg-surface-0 px-4 py-3',
+          'focus-within:ring-2 focus-within:ring-(--linear-border-focus)/40 focus-within:ring-offset-2',
+          'transition-colors duration-150'
         )}
       >
         <div className='flex items-center justify-center w-6 h-6 rounded-full bg-brand-spotify/15 shrink-0'>
