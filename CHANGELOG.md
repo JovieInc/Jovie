@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.33] - 2026-03-21
+
+### Added
+
+- AI-powered playlist pitch generator: auto-generates per-platform pitches (Spotify, Apple Music, Amazon, Generic) from artist and release data
+- New "Pitch context" field in Settings > Artist Profile for artists to provide streaming milestones, press coverage, radio play, and other context the AI can't auto-detect
+- Pitch generation service using Claude via Vercel AI SDK with structured output and Zod validation
+- Per-platform character limit enforcement (Spotify 500, Apple Music 300, Amazon 500, Generic 1000) with smart truncation fallback
+- Release sidebar "Playlist Pitches" section in the Details tab with generate, regenerate, and copy-to-clipboard per platform
+- Rate limiting: 10 pitch generations per hour per user
+- 28 new tests covering prompt builders, Zod schema validation, truncation logic, and profile validation
+
 ## [26.4.32] - 2026-03-21
 
 ### Changed
