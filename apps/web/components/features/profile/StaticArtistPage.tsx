@@ -16,6 +16,7 @@ import { StaticListenInterface } from '@/features/profile/StaticListenInterface'
 import { SubscriptionConfirmedBanner } from '@/features/profile/SubscriptionConfirmedBanner';
 import { TourModePanel } from '@/features/profile/TourModePanel';
 import { PublicProfileTemplate } from '@/features/profile/templates/PublicProfileTemplate';
+import { PublicProfileTemplateV2 } from '@/features/profile/templates/PublicProfileTemplateV2';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import { buildProfilePublicViewModel } from '@/features/profile/view-models';
@@ -54,6 +55,7 @@ export interface StaticArtistPageProps {
   readonly visitTrackingToken?: string;
   readonly showSubscriptionConfirmedBanner?: boolean;
   readonly showShopButton?: boolean;
+  readonly profileV2Enabled?: boolean;
 }
 
 /**
@@ -188,6 +190,7 @@ export function StaticArtistPage({
   visitTrackingToken,
   showSubscriptionConfirmedBanner = true,
   showShopButton = false,
+  profileV2Enabled = false,
 }: StaticArtistPageProps) {
   const mergedDSPs = getMergedDSPs(artist, socialLinks);
   const viewModel = buildProfilePublicViewModel({
@@ -212,6 +215,25 @@ export function StaticArtistPage({
     showSubscriptionConfirmedBanner,
     showShopButton,
   });
+
+  if (profileV2Enabled) {
+    return (
+      <PublicProfileTemplateV2
+        mode={mode}
+        artist={artist}
+        socialLinks={socialLinks}
+        contacts={contacts}
+        latestRelease={latestRelease}
+        enableDynamicEngagement={enableDynamicEngagement}
+        subscribeTwoStep={subscribeTwoStep}
+        genres={genres}
+        tourDates={tourDates}
+        visitTrackingToken={visitTrackingToken}
+        photoDownloadSizes={photoDownloadSizes}
+        allowPhotoDownloads={allowPhotoDownloads}
+      />
+    );
+  }
 
   return (
     <PublicProfileTemplate viewModel={viewModel}>

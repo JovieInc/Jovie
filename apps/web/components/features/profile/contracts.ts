@@ -16,6 +16,16 @@ export const PROFILE_MODE_KEYS = [
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
 
+export const SWIPEABLE_MODES = [
+  'profile',
+  'listen',
+  'tour',
+  'about',
+  'tip',
+] as const;
+
+export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
+
 export interface ProfileModeShellConfig {
   readonly showBackButton: boolean;
   readonly showSocialBar: boolean;

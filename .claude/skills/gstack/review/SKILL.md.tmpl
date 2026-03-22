@@ -5,6 +5,7 @@ description: |
   Pre-landing PR review. Analyzes diff against the base branch for SQL safety, LLM trust
   boundary violations, conditional side effects, and other structural issues. Use when
   asked to "review this PR", "code review", "pre-landing review", or "check my diff".
+  Proactively suggest when the user is about to merge or land code changes.
 allowed-tools:
   - Bash
   - Read
@@ -12,7 +13,9 @@ allowed-tools:
   - Write
   - Grep
   - Glob
+  - Agent
   - AskUserQuestion
+  - WebSearch
 ---
 
 {{PREAMBLE}}
@@ -97,31 +100,21 @@ Run `git diff origin/<base>` to get the full diff. This includes both committed 
 
 ---
 
-## Step 3.5: Simplify pass
-
-Before the main review, do a narrow simplify pass on the changed code:
-
-1. Read the touched hunks with enough surrounding context to understand them.
-2. Apply low-risk clarity cleanups that do **not** change behavior or scope:
-   - remove dead imports / dead branches introduced in this branch
-   - collapse obvious duplication
-   - flatten mechanical conditionals
-   - tighten naming or comments when they add noise
-3. Do **not** turn this into a speculative refactor or architecture rewrite.
-4. If you simplify anything, report it in Step 5 using the same `[AUTO-FIXED]` format as other automatic fixes.
-
-Then review the updated working tree diff against `origin/<base>`.
-
----
-
 ## Step 4: Two-pass review
 
 Apply the checklist against the diff in two passes:
 
 1. **Pass 1 (CRITICAL):** SQL & Data Safety, Race Conditions & Concurrency, LLM Output Trust Boundary, Enum & Value Completeness
-2. **Pass 2 (INFORMATIONAL):** Conditional Side Effects, Magic Numbers & String Coupling, Dead Code & Consistency, LLM Prompt Issues, Test Gaps, View/Frontend
+2. **Pass 2 (INFORMATIONAL):** Conditional Side Effects, Magic Numbers & String Coupling, Dead Code & Consistency, LLM Prompt Issues, Test Gaps, View/Frontend, Performance & Bundle Impact
 
 **Enum & Value Completeness requires reading code OUTSIDE the diff.** When the diff introduces a new enum value, status, tier, or type constant, use Grep to find all files that reference sibling values, then Read those files to check if the new value is handled. This is the one category where within-diff review is insufficient.
+
+**Search-before-recommending:** When recommending a fix pattern (especially for concurrency, caching, auth, or framework-specific behavior):
+- Verify the pattern is current best practice for the framework version in use
+- Check if a built-in solution exists in newer versions before recommending a workaround
+- Verify API signatures against current docs (APIs change between versions)
+
+Takes seconds, prevents recommending outdated patterns. If WebSearch is unavailable, note it and proceed with in-distribution knowledge.
 
 Follow the output format specified in the checklist. Respect the suppressions — do NOT flag items listed in the "DO NOT flag" section.
 
@@ -246,6 +239,8 @@ This is informational only — never critical. The fix action is `/document-rele
 If no documentation files exist, skip this step silently.
 
 ---
+
+{{ADVERSARIAL_STEP}}
 
 ## Important Rules
 

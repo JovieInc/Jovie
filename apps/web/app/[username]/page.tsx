@@ -380,6 +380,16 @@ const getCachedLatestReleaseGate = unstable_cache(
   }
 );
 
+const getCachedProfileV2Gate = unstable_cache(
+  async () => {
+    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, false);
+  },
+  ['public-profile-v2-gate'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
 const getCachedSubscribeCTAVariant = unstable_cache(
   async (profileId: string) => {
     return getSubscribeCTAVariant(profileId);
@@ -586,11 +596,12 @@ export default async function ArtistPage({
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
+  const profileV2Enabled = await getCachedProfileV2Gate();
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
-  if (mode === 'listen') {
+  if (mode === 'listen' && !profileV2Enabled) {
     const { schemas, body } = await renderListenMode(
       username,
       isPublicNoAuthSmoke
@@ -658,7 +669,7 @@ export default async function ArtistPage({
     [
       getCachedLatestReleaseGate(),
       getCachedSubscribeCTAVariant(profile.id),
-      mode === 'tour'
+      profileV2Enabled || mode === 'tour'
         ? loadUpcomingTourDates(profile.id)
         : Promise.resolve(
             [] as Awaited<ReturnType<typeof loadUpcomingTourDates>>
@@ -735,6 +746,7 @@ export default async function ArtistPage({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        profileV2Enabled={profileV2Enabled}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
@@ -906,8 +918,9 @@ export async function generateMetadata({
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
+  const profileV2Enabled = await getCachedProfileV2Gate();
 
-  if (mode === 'listen') {
+  if (mode === 'listen' && !profileV2Enabled) {
     const lightweightProfile = await getLightweightProfile(username);
     return lightweightProfile
       ? buildListenModeMetadata(lightweightProfile.profile)
