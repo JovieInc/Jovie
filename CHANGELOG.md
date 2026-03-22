@@ -8,6 +8,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.35] - 2026-03-21
 
+### Added
+
+- Preview panel with live mobile profile preview, profile snapshot metrics, and share actions
+- Profile sidebar header with copy URL, download QR code, and download vCard actions
+
+### Changed
+
+- Dashboard drawer headers support ReactNode titles with multi-line metadata
+- Auth hooks (`useSignInFlow`, `useSignUpFlow`) refactored to use Clerk Core API via shared `useAuthFlowBase`
+- `useClerkSafe` hooks provide context-based safe access to Clerk state outside `ClerkProvider`
+
+### Fixed
+
+- Remove `void` operator anti-pattern from async onClick handlers (SonarCloud)
+- Fix timeout stacking in error display copy button with ref-based cleanup
+- Fix image remove button invisible on touch devices via `@media(hover:hover)` pattern
+- Fix test state mutation in `useSignInFlow` tests with proper `beforeEach`/`afterEach` scoping
 ### Fixed
 
 - Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production

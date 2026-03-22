@@ -2,17 +2,24 @@
 
 import {
   useAuth as useAuthOriginal,
+  useClerk as useClerkOriginal,
   useSession as useSessionOriginal,
+  useSignIn as useSignInSignalOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
-import { useSignIn as useSignInOriginal } from '@clerk/nextjs/legacy';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
 
 // Derive types from the actual hook return types
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
 type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
 type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
-type UseSignInReturn = ReturnType<typeof useSignInOriginal>;
+type UseSignInSignalReturn = ReturnType<typeof useSignInSignalOriginal>;
+type UseClerkReturn = ReturnType<typeof useClerkOriginal>;
+type UseSignInReturn = {
+  isLoaded: boolean;
+  signIn: UseSignInSignalReturn['signIn'] | null;
+  setActive: UseClerkReturn['setActive'];
+};
 
 /**
  * Context to track whether Clerk is available in the current provider tree.
@@ -126,7 +133,19 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
-  const signIn = useSignInOriginal();
+  const clerk = useClerkOriginal();
+  const signInSignal = useSignInSignalOriginal();
+  // Core 3 Signal API has no isLoaded — derive from fetchStatus instead.
+  // signIn is always a SignInFutureResource inside ClerkProvider; we coerce
+  // to null for the safe-hook contract when Clerk is bypassed.
+  const signIn = useMemo<UseSignInReturn>(
+    () => ({
+      isLoaded: signInSignal.fetchStatus === 'idle',
+      signIn: signInSignal.signIn ?? null,
+      setActive: clerk.setActive,
+    }),
+    [clerk.setActive, signInSignal.fetchStatus, signInSignal.signIn]
+  );
 
   const value = useMemo(
     () => ({ user, auth, session, signIn }),

@@ -60,8 +60,8 @@ export function ImagePreviewStrip({
                 onClick={() => onRemove(image.id)}
                 className={cn(
                   'absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center',
-                  'rounded-full border border-white/15 bg-black/55 text-white opacity-0 transition-opacity',
-                  'group-hover:opacity-100 focus-visible:opacity-100'
+                  'rounded-full border border-white/15 bg-black/55 text-white transition-opacity',
+                  'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100'
                 )}
                 aria-label={`Remove ${image.name}`}
               >
