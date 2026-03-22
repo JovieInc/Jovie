@@ -1,4 +1,7 @@
+'use client';
+
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 
 interface ProductScreenshotProps {
   /** Path to the screenshot image in /public */
@@ -30,6 +33,29 @@ export function ProductScreenshot({
   priority = false,
   className,
 }: ProductScreenshotProps) {
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetch(src, { method: 'HEAD' })
+      .then(response => {
+        if (isActive) {
+          const contentType = response.headers.get('content-type') ?? '';
+          setIsAvailable(response.ok && contentType.startsWith('image/'));
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setIsAvailable(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [src]);
+
   return (
     <figure
       aria-label={alt}
@@ -68,15 +94,33 @@ export function ProductScreenshot({
       </div>
 
       {/* Screenshot image */}
-      <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        priority={priority}
-        className='w-full'
-        sizes='(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 1440px'
-      />
+      {isAvailable === false ? (
+        <div className='grid aspect-[16/10] w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'>
+          <div className='max-w-[22rem]'>
+            <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
+              Product preview
+            </div>
+            <p className='text-lg font-medium tracking-tight text-primary-token'>
+              Screenshot unavailable in this worktree
+            </p>
+            <p className='mt-2 text-sm leading-6 text-secondary-token'>
+              The marketing surface still renders and stays reviewable while the
+              generated product screenshot assets are absent.
+            </p>
+          </div>
+        </div>
+      ) : isAvailable === true ? (
+        <Image
+          src={src}
+          alt={alt}
+          width={width}
+          height={height}
+          priority={priority}
+          className='w-full'
+        />
+      ) : (
+        <div className='aspect-[16/10] w-full animate-pulse bg-surface-1' />
+      )}
     </figure>
   );
 }
