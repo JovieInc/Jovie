@@ -14,7 +14,7 @@ export function resolveAuthor(
   profile?: ProfileData | null
 ): ResolvedAuthor {
   return {
-    name: profile?.displayName ?? post.author,
+    name: profile?.displayName || post.author,
     title: post.authorTitle,
     avatarUrl: profile?.avatarUrl ?? null,
     profileUrl: profile ? `/${profile.username}` : post.authorProfile,
