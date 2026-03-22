@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME } from '@/constants/app';
+import { BASE_URL } from '@/constants/domains';
 
 const title = `Sign up | ${APP_NAME}`;
 const description =
   'Create your Jovie account to launch your artist profile, share smarter music links, and turn every release into momentum.';
-const imageUrl = `${APP_URL}/og/default.png`;
+const imageUrl = `${BASE_URL}/og/default.png`;
 
 export const metadata: Metadata = {
   title,
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    url: `${APP_URL}/signup`,
+    url: `${BASE_URL}/signup`,
     title,
     description,
     siteName: APP_NAME,

@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.38] - 2026-03-21
+
+### Fixed
+
+- Use the canonical `BASE_URL` for signup metadata so `/signup` Open Graph URLs and images resolve to `jov.ie` instead of the deprecated app domain
+
 ## [26.4.37] - 2026-03-21
 
 ### Changed
