@@ -30,21 +30,21 @@ export default async function BlogIndexPage() {
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
-      <MarketingHero variant='centered'>
+      <MarketingHero variant='centered' className='items-start text-left'>
         <p
-          className='text-sm font-medium tracking-widest uppercase mb-4'
+          className='marketing-kicker mb-0'
           style={{ color: 'var(--linear-text-tertiary)' }}
         >
           Updates
         </p>
         <h1
-          className='marketing-h1-linear mb-6'
+          className='marketing-h1-linear mb-6 mt-6 max-w-[8ch]'
           style={{ color: 'var(--linear-text-primary)' }}
         >
-          Now
+          Blog
         </h1>
         <p
-          className='marketing-lead-linear max-w-2xl mx-auto'
+          className='marketing-lead-linear max-w-[34rem]'
           style={{ color: 'var(--linear-text-secondary)' }}
         >
           Thoughts on product, strategy, and the craft of building tools for
@@ -54,7 +54,8 @@ export default async function BlogIndexPage() {
 
       {/* Posts Timeline */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
-        <div className='mx-auto max-w-3xl'>
+        <div className='marketing-divider mb-10' />
+        <div className='max-w-3xl'>
           <div className='space-y-0'>
             {posts.map((post, index) => (
               <article key={post.slug} className='group relative'>
@@ -68,7 +69,7 @@ export default async function BlogIndexPage() {
 
                 <Link
                   href={`/blog/${post.slug}`}
-                  className='block py-8 -mx-4 px-4 sm:-mx-6 sm:px-6 rounded-xl transition-all duration-200'
+                  className='block rounded-xl px-4 py-8 transition-all duration-200 sm:-mx-6 sm:px-6'
                 >
                   <div className='flex gap-6 sm:gap-8'>
                     {/* Timeline dot */}

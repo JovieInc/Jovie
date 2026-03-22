@@ -1,9 +1,9 @@
 import { cn } from '@/lib/utils';
 
 const widthClasses = {
-  landing: 'max-w-[1344px]',
-  page: 'max-w-[1024px]',
-  prose: 'max-w-[624px]',
+  landing: 'max-w-[1280px]',
+  page: 'max-w-[1120px]',
+  prose: 'max-w-[680px]',
 } as const;
 
 export interface MarketingContainerProps {
@@ -24,7 +24,7 @@ export function MarketingContainer({
   return (
     <div
       className={cn(
-        'mx-auto w-full px-5 sm:px-6 lg:px-8',
+        'mx-auto w-full px-6 sm:px-8 lg:px-10',
         widthClasses[width],
         className
       )}

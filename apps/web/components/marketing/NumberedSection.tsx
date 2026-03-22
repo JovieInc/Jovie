@@ -38,29 +38,41 @@ export function NumberedSection({
   return (
     <section id={id} className={cn('section-spacing-linear', className)}>
       <MarketingContainer width='landing'>
-        <div className='reveal-on-scroll'>
-          <div className='mb-6 flex items-center gap-3'>
-            <span className='section-number-label'>{sectionNumber}</span>
-            <span className='section-title-link'>{sectionTitle} →</span>
+        <div className='homepage-section-shell'>
+          <div className='reveal-on-scroll'>
+            <div className='mb-7 flex items-center gap-3'>
+              <span className='section-number-label'>{sectionNumber}</span>
+              <span className='section-title-link'>{sectionTitle} →</span>
+            </div>
           </div>
 
-          <h2 className='marketing-h2-linear max-w-[20ch] text-primary-token'>
-            {heading}
-          </h2>
-          <p className='mt-4 max-w-xl marketing-lead-linear text-secondary-token'>
-            {description}
-          </p>
-        </div>
+          <div className='homepage-section-intro reveal-on-scroll'>
+            <div>
+              <h2 className='marketing-h2-linear max-w-[12ch] text-primary-token'>
+                {heading}
+              </h2>
+            </div>
 
-        <div className='reveal-on-scroll mt-10 lg:mt-14' data-delay='80'>
-          {children}
-        </div>
-
-        {subItems && subItems.length > 0 && (
-          <div className='reveal-on-scroll mt-8 lg:mt-10' data-delay='160'>
-            <FeatureAccordion items={subItems} />
+            <div className='homepage-section-copy'>
+              <p className='marketing-lead-linear text-secondary-token'>
+                {description}
+              </p>
+            </div>
           </div>
-        )}
+
+          <div
+            className='homepage-section-stack reveal-on-scroll'
+            data-delay='80'
+          >
+            {children}
+          </div>
+
+          {subItems && subItems.length > 0 && (
+            <div className='reveal-on-scroll mt-8 lg:mt-10' data-delay='160'>
+              <FeatureAccordion items={subItems} />
+            </div>
+          )}
+        </div>
       </MarketingContainer>
     </section>
   );

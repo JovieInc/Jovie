@@ -14,8 +14,9 @@ export const metadata: Metadata = {
 
 export default function SupportPage() {
   return (
-    <MarketingHero variant='centered'>
-      <h1 className='marketing-h1-linear text-primary-token'>
+    <MarketingHero variant='centered' className='items-start text-left'>
+      <p className='marketing-kicker'>Support</p>
+      <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
         We&apos;re here to help.
       </h1>
       <SupportContent />

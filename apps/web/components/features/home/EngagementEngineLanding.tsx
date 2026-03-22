@@ -7,43 +7,26 @@ export function EngagementEngineLanding() {
   return (
     <div className='relative min-h-screen bg-base text-primary-token'>
       <section className='relative overflow-hidden'>
-        <div className='absolute inset-0 -z-10'>
-          <div className='absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.15),transparent)] dark:bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(120,119,198,0.25),transparent)]' />
-          <div className='absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-size-[56px_56px]' />
-          <div className='absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.03)_100%)] dark:bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.4)_100%)]' />
-        </div>
+        <div className='hero-glow pointer-events-none absolute inset-0 -z-10' />
 
-        <MarketingHero variant='centered'>
-          <div className='mb-6 inline-flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium rounded-full bg-surface-1 text-secondary-token border border-subtle'>
-            <span className='relative flex h-1.5 w-1.5'>
-              <span className='animate-ping motion-reduce:animate-none absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75' />
-              <span className='relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500' />
-            </span>{' '}
+        <MarketingHero variant='centered' className='items-start text-left'>
+          <p className='marketing-kicker'>
             Built for DJs, indie artists, and AI-first creators
-          </div>
-
-          <h1 className='text-4xl font-bold tracking-tight text-primary-token sm:text-6xl lg:text-7xl leading-[1.05]'>
-            Attention is the bottleneck.
-            <br />
-            <span className='text-transparent bg-linear-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text'>
-              Keep it.
-            </span>
-          </h1>
-
-          <p className='mt-6 text-lg leading-relaxed text-secondary-token sm:text-xl max-w-2xl mx-auto'>
-            Making music is easy now. Getting the right people to care, come
-            back, and buy is the hard part.
-            <br />
-            Jovie helps you collect a warm list and re-engage automatically.
           </p>
 
-          <div className='mt-10 flex flex-col items-center gap-3'>
-            <Button
-              asChild
-              variant='primary'
-              size='hero'
-              className='group hover:scale-[1.02] hover:shadow-lg'
-            >
+          <h1 className='marketing-h1-linear mt-6 max-w-[11ch] text-primary-token'>
+            Attention is the bottleneck.
+            <span className='text-secondary-token'> Keep it.</span>
+          </h1>
+
+          <p className='marketing-lead-linear mt-6 max-w-[34rem] text-secondary-token'>
+            Making music is easy now. Getting the right people to care, come
+            back, and buy is the hard part. Jovie helps you collect a warm list
+            and re-engage automatically.
+          </p>
+
+          <div className='mt-10 flex flex-col items-start gap-3 sm:flex-row sm:flex-wrap'>
+            <Button asChild variant='primary' size='hero' className='group'>
               <Link href='/signup'>
                 Get started free
                 <ArrowRight className='h-4 w-4 transition-transform group-hover:translate-x-0.5' />
@@ -51,13 +34,13 @@ export function EngagementEngineLanding() {
             </Button>
             <Link
               href='#system'
-              className='text-xs text-secondary-token hover:text-primary-token transition-colors'
+              className='inline-flex h-11 items-center rounded-md border border-subtle px-4 text-sm text-secondary-token transition-colors hover:border-default hover:text-primary-token'
             >
-              See the system ↓
+              See the system
             </Link>
           </div>
 
-          <div className='mt-8 flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-tertiary-token'>
+          <div className='mt-8 flex flex-wrap gap-x-6 gap-y-2 text-xs text-tertiary-token'>
             <span className='inline-flex items-center gap-2'>
               <Target className='h-4 w-4' />
               Personalized per fan

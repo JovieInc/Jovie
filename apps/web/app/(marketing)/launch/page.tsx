@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
@@ -8,40 +7,16 @@ import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
+import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { captureWarning } from '@/lib/error-tracking';
-import { getProfileByUsername } from '@/lib/services/profile';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
-
-/** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
-const getTimProfile = unstable_cache(
-  async () => {
-    try {
-      const profile = await getProfileByUsername('tim');
-      if (!profile) return null;
-      return {
-        name: profile.displayName ?? null,
-        tagline: profile.bio ?? null,
-        handle: profile.username,
-        avatarUrl: profile.avatarUrl ?? null,
-      };
-    } catch (error) {
-      void captureWarning('[launch] Failed to fetch /tim profile for mockup', {
-        error,
-      });
-      return null;
-    }
-  },
-  ['launch-tim-profile'],
-  { revalidate: 3600, tags: ['profile:tim'] }
-);
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Your Entire Music Career. One Intelligent Link.`;
@@ -199,9 +174,7 @@ function Divider() {
   return <hr className='border-t border-subtle' />;
 }
 
-export default async function LaunchPage() {
-  const timProfile = await getTimProfile();
-
+export default function LaunchPage() {
   return (
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
@@ -223,14 +196,18 @@ export default async function LaunchPage() {
 
         <MarketingHero
           variant='centered'
-          className='relative pt-40 md:pt-48 lg:pt-52'
+          className='relative items-start pt-40 text-left md:pt-48 lg:pt-52'
         >
-          <h1 id='hero-heading' className='marketing-h1-linear max-w-[780px]'>
+          <p className='marketing-kicker'>Launch</p>
+          <h1
+            id='hero-heading'
+            className='marketing-h1-linear mt-6 max-w-[11ch]'
+          >
             Your entire music career.{' '}
             <span className='text-secondary-token'>One intelligent link.</span>
           </h1>
 
-          <p className='marketing-lead-linear mt-6 max-w-[520px] text-secondary-token'>
+          <p className='marketing-lead-linear mt-6 max-w-[34rem] text-secondary-token'>
             Import your Spotify, get smart links for every release, and a
             link-in-bio that converts listeners into fans.
           </p>
@@ -400,10 +377,9 @@ export default async function LaunchPage() {
       {/* ═══ 6. PROFILE MOCKUP ═══ */}
       <div className={`${WRAP} pb-16`}>
         <ProfileMockup
-          name={timProfile?.name}
-          tagline={timProfile?.tagline}
-          handle={timProfile?.handle}
-          avatarUrl={timProfile?.avatarUrl}
+          name={TIM_WHITE_PROFILE.name}
+          handle='tim'
+          avatarUrl={TIM_WHITE_PROFILE.avatarSrc}
         />
       </div>
 

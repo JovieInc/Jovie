@@ -114,23 +114,20 @@ export default async function ChangelogPage() {
   ).length;
 
   return (
-    <section
-      className='min-h-screen'
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        color: 'var(--linear-text-primary)',
-      }}
-    >
+    <section className='min-h-screen bg-page text-primary-token'>
       {/* Header */}
-      <MarketingHero variant='centered'>
-        <h1 className='marketing-h1-linear mb-4'>What&apos;s New</h1>
+      <MarketingHero variant='centered' className='items-start text-left'>
+        <p className='marketing-kicker'>Changelog</p>
+        <h1 className='marketing-h1-linear mb-4 mt-6 max-w-[10ch]'>
+          What&apos;s new
+        </h1>
         <p
-          className='marketing-lead-linear max-w-2xl mx-auto mb-4'
+          className='marketing-lead-linear mb-4 max-w-[34rem]'
           style={{ color: 'var(--linear-text-secondary)' }}
         >
           Follow our journey building the future of music.
         </p>
-        <div className='flex flex-wrap items-center justify-center gap-3'>
+        <div className='flex flex-wrap items-center gap-3'>
           {thisMonthCount > 0 && (
             <Badge variant='outline' className='text-xs'>
               {thisMonthCount} update{thisMonthCount !== 1 ? 's' : ''} this
@@ -148,6 +145,7 @@ export default async function ChangelogPage() {
 
       {/* Releases timeline */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
+        <div className='marketing-divider mb-10' />
         <div className='max-w-3xl'>
           {releases.length === 0 ? (
             <p className='opacity-40'>No updates yet. Check back soon!</p>

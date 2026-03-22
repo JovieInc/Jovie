@@ -12,7 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { MarketingContainer } from '@/components/marketing';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
@@ -21,40 +21,27 @@ import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 function TipsHero() {
   return (
-    <section className='relative flex flex-col items-center overflow-hidden px-5 sm:px-6 pt-(--linear-section-pt-lg) pb-(--linear-section-pb-md)'>
-      {/* Ambient glow */}
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0'
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 40% at 50% 0%, rgba(120,119,198,0.12), transparent)',
-        }}
-      />
-
-      <div className='relative z-10 flex w-full max-w-(--linear-content-max) flex-col items-center text-center heading-gap-linear'>
-        <h1 className='marketing-h1-linear max-w-(--linear-hero-h1-width) text-primary-token'>
+    <section className='relative overflow-hidden'>
+      <div className='hero-glow pointer-events-none absolute inset-0' />
+      <MarketingHero variant='centered' className='items-start text-left'>
+        <p className='marketing-kicker'>Tips</p>
+        <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
           Turn every tip into a fan.
         </h1>
 
-        <p className='marketing-lead-linear mx-auto mt-6 max-w-xl text-secondary-token'>
-          Scan. Tip. Stream. One QR code turns a stranger{' '}
-          <br className='hidden sm:block' />
-          into a superfan.
+        <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
+          Scan. Tip. Stream. One QR code turns a stranger into a superfan and
+          keeps the relationship going after the show ends.
         </p>
 
-        <div className='mt-8 w-full max-w-[480px] text-left'>
+        <div className='mt-8 w-full max-w-[29rem] text-left'>
           <ClaimHandleForm />
         </div>
 
-        <p className='mt-3 flex items-center justify-center gap-2 text-(--linear-label-size) font-(--linear-font-weight-medium) tracking-(--linear-tracking-wide) text-tertiary-token'>
-          <span
-            aria-hidden='true'
-            className='inline-block h-1.5 w-1.5 rounded-full bg-success'
-          />{' '}
-          Free forever. No credit card.
+        <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
+          Free forever. No credit card required.
         </p>
-      </div>
+      </MarketingHero>
     </section>
   );
 }
@@ -95,29 +82,33 @@ function HowItWorksSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-(--linear-content-max)'>
-          <div className='text-center'>
-            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
-              How it works
-            </p>
-            <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-              Three steps to your first fan.
-            </h2>
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='homepage-section-intro'>
+            <div>
+              <p className='marketing-kicker'>How it works</p>
+              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
+                Three steps to your first fan.
+              </h2>
+            </div>
+            <div className='homepage-section-copy'>
+              <p className='marketing-lead-linear text-secondary-token'>
+                Put a QR code where people already tip, capture their contact
+                info, and send them directly into your music without another
+                tool in the loop.
+              </p>
+            </div>
           </div>
 
-          <div className='mt-14 grid grid-cols-1 gap-8 md:grid-cols-3'>
+          <div className='homepage-section-stack mt-0 grid grid-cols-1 gap-6 md:grid-cols-3'>
             {STEPS.map((step, i) => (
               <div
                 key={step.title}
-                className='relative flex flex-col items-center rounded-xl border border-subtle p-8 text-center'
-                style={{
-                  backgroundColor: 'var(--linear-bg-surface-0)',
-                }}
+                className='homepage-surface-card relative flex flex-col rounded-[1rem] p-7 text-left'
               >
-                <div className='flex h-12 w-12 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
+                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <step.icon className='h-6 w-6 text-secondary-token' />
                 </div>
-                <span className='mt-5 text-(--linear-label-size) font-(--linear-font-weight-medium) text-tertiary-token'>
+                <span className='mt-5 text-[length:var(--linear-label-size)] text-tertiary-token'>
                   Step {i + 1}
                 </span>
                 <h3 className='mt-2 text-lg font-medium tracking-tight text-primary-token'>
@@ -171,40 +162,31 @@ function BenefitsSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-(--linear-content-max)'>
-          {/* Gradient separator */}
-          <div
-            aria-hidden='true'
-            className='mb-14 h-px max-w-(--linear-container-max) mx-auto'
-            style={{
-              background:
-                'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-            }}
-          />
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='marketing-divider mb-14' />
 
-          <div className='text-center'>
-            <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
-              Why it matters
-            </p>
-            <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-              Tips are just the beginning.
-            </h2>
-            <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-secondary-token'>
-              Every dollar someone drops in your jar is a signal. Jovie helps
-              you act on it.
-            </p>
+          <div className='homepage-section-intro'>
+            <div>
+              <p className='marketing-kicker'>Why it matters</p>
+              <h2 className='marketing-h2-linear mt-6 max-w-[11ch] text-primary-token'>
+                Tips are just the beginning.
+              </h2>
+            </div>
+            <div className='homepage-section-copy'>
+              <p className='marketing-lead-linear text-secondary-token'>
+                Every dollar someone drops in your jar is a signal. Jovie helps
+                you act on it while the moment is still warm.
+              </p>
+            </div>
           </div>
 
-          <div className='mt-14 grid grid-cols-1 gap-6 md:grid-cols-3'>
+          <div className='homepage-section-stack mt-0 grid grid-cols-1 gap-6 md:grid-cols-3'>
             {BENEFITS.map(benefit => (
               <div
                 key={benefit.title}
-                className='flex flex-col rounded-xl border border-subtle p-8'
-                style={{
-                  backgroundColor: 'var(--linear-bg-surface-0)',
-                }}
+                className='homepage-surface-card flex flex-col rounded-[1rem] p-7'
               >
-                <div className='flex h-10 w-10 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
+                <div className='flex h-10 w-10 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <benefit.icon className='h-5 w-5 text-secondary-token' />
                 </div>
                 <h3 className='mt-5 text-base font-medium tracking-tight text-primary-token'>
@@ -244,26 +226,29 @@ function SocialProofSection() {
       }}
     >
       <MarketingContainer width='landing'>
-        <div className='mx-auto max-w-3xl text-center'>
-          <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
-            Built for real-world artists
-          </p>
-          <h2 className='marketing-h2-linear mt-4 text-primary-token'>
-            Perfect for every stage.
-          </h2>
-          <p className='marketing-lead-linear mx-auto mt-4 max-w-xl text-secondary-token'>
-            Whether you are playing a subway platform or a sold-out basement
-            show, Jovie turns your audience into a reachable fan base.
-          </p>
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='homepage-section-intro'>
+            <div>
+              <p className='marketing-kicker'>Built for real-world artists</p>
+              <h2 className='marketing-h2-linear mt-6 max-w-[10ch] text-primary-token'>
+                Perfect for every stage.
+              </h2>
+            </div>
+            <div className='homepage-section-copy'>
+              <p className='marketing-lead-linear text-secondary-token'>
+                Whether you are playing a subway platform or a sold-out basement
+                show, Jovie turns your audience into a reachable fan base.
+              </p>
+            </div>
+          </div>
 
-          <div className='mt-12 grid grid-cols-2 gap-4 sm:grid-cols-4'>
+          <div className='homepage-section-stack mt-0 grid grid-cols-2 gap-4 sm:grid-cols-4'>
             {USE_CASES.map(uc => (
               <div
                 key={uc.label}
-                className='flex flex-col items-center gap-3 rounded-xl border border-subtle p-6'
-                style={{ backgroundColor: 'var(--linear-bg-surface-0)' }}
+                className='homepage-surface-card flex flex-col items-center gap-3 rounded-[1rem] p-6'
               >
-                <div className='flex h-11 w-11 items-center justify-center rounded-lg bg-[rgba(255,255,255,0.05)]'>
+                <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <uc.icon className='h-5 w-5 text-secondary-token' />
                 </div>
                 <span className='text-sm font-medium text-primary-token'>
@@ -293,40 +278,34 @@ function TipsFinalCTA() {
       }}
     >
       <MarketingContainer width='landing'>
-        {/* Gradient separator */}
-        <div
-          aria-hidden='true'
-          className='mb-12 h-px max-w-(--linear-container-max) mx-auto'
-          style={{
-            background:
-              'linear-gradient(to right, transparent, var(--linear-separator-via), transparent)',
-          }}
-        />
+        <div className='marketing-divider mb-12' />
 
-        <div className='mx-auto flex max-w-2xl flex-col items-center text-center'>
-          <h2 className='marketing-h2-linear text-primary-token'>
-            Claim your handle. <br className='hidden sm:block' />
-            Start turning tips into fans.
-          </h2>
-          <p className='mt-4 marketing-lead-linear text-secondary-token'>
-            Free forever. No credit card required.
-          </p>
-
-          <div className='mt-8 w-full max-w-[480px] text-left'>
-            <ClaimHandleForm />
+        <div className='grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start'>
+          <div className='max-w-[31rem]'>
+            <p className='marketing-kicker'>Claim your handle</p>
+            <h2 className='marketing-h2-linear mt-6 text-primary-token'>
+              Start turning tips into fans.
+            </h2>
+            <p className='mt-4 marketing-lead-linear text-secondary-token'>
+              Keep the QR code simple, the follow-up automatic, and the listener
+              path clean.
+            </p>
+            <div className='mt-6'>
+              <Button
+                size='lg'
+                className='btn-linear-signup h-(--linear-button-height-md) px-6'
+                asChild
+              >
+                <Link href='/signup'>
+                  Claim Your Handle
+                  <ArrowRight className='ml-2 h-4 w-4' />
+                </Link>
+              </Button>
+            </div>
           </div>
 
-          <div className='mt-6'>
-            <Button
-              size='lg'
-              className='btn-linear-signup h-(--linear-button-height-md) px-6'
-              asChild
-            >
-              <Link href='/signup'>
-                Claim Your Handle
-                <ArrowRight className='ml-2 h-4 w-4' />
-              </Link>
-            </Button>
+          <div className='homepage-surface-card rounded-[1rem] p-2'>
+            <ClaimHandleForm />
           </div>
         </div>
       </MarketingContainer>

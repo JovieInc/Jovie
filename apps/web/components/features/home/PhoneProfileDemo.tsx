@@ -35,6 +35,9 @@ const SUB_ITEMS = [
 export function PhoneProfileDemo() {
   const phoneRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isImageAvailable, setIsImageAvailable] = useState<boolean | null>(
+    null
+  );
 
   useEffect(() => {
     const section = phoneRef.current;
@@ -52,6 +55,26 @@ export function PhoneProfileDemo() {
 
     observer.observe(section);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    fetch('/product-screenshots/profile-phone.png', { method: 'HEAD' })
+      .then(response => {
+        if (isActive) {
+          setIsImageAvailable(response.ok);
+        }
+      })
+      .catch(() => {
+        if (isActive) {
+          setIsImageAvailable(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   return (
@@ -80,14 +103,28 @@ export function PhoneProfileDemo() {
           }}
         >
           <PhoneFrame>
-            <Image
-              src='/product-screenshots/profile-phone.png'
-              alt='Artist profile page showing streaming links, tips, and tour dates'
-              width={780}
-              height={1688}
-              className='h-full w-full object-cover object-top'
-              sizes='282px'
-            />
+            {isImageAvailable === false ? (
+              <div className='grid h-full w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.15),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))] px-6 text-center'>
+                <div>
+                  <p className='text-sm font-medium text-primary-token'>
+                    Profile preview
+                  </p>
+                  <p className='mt-2 text-xs leading-5 text-secondary-token'>
+                    Generated phone screenshot unavailable in this worktree.
+                  </p>
+                </div>
+              </div>
+            ) : isImageAvailable === true ? (
+              <Image
+                src='/product-screenshots/profile-phone.png'
+                alt='Artist profile page showing streaming links, tips, and tour dates'
+                width={780}
+                height={1688}
+                className='h-full w-full object-cover object-top'
+              />
+            ) : (
+              <div className='h-full w-full animate-pulse bg-surface-1' />
+            )}
           </PhoneFrame>
         </div>
       </div>

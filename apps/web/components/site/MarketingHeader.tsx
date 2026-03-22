@@ -7,16 +7,13 @@
  * useThrottledScroll hook from TanStack Pacer.
  *
  * Supports three variants:
- * - `landing` (default): full nav with anchor links
+ * - `landing` (default): logo + auth actions
  * - `content`: simplified nav with Logo + Sign in/up only
  * - `minimal`: logo only, no navigation (e.g. investors page)
  *
  * @see https://tanstack.com/pacer
  */
-
-import { usePathname } from 'next/navigation';
 import { Header } from '@/components/site/Header';
-import { APP_ROUTES } from '@/constants/routes';
 import { PACER_TIMING, useThrottledScroll } from '@/lib/pacer/hooks';
 
 export type MarketingHeaderVariant = 'landing' | 'content' | 'minimal';
@@ -37,8 +34,6 @@ export function MarketingHeader({
   scrollThresholdPx = 0,
   variant = 'landing',
 }: MarketingHeaderProps) {
-  const pathname = usePathname();
-
   // Use the shared throttled scroll hook
   // Note: _isScrolled available for future scroll-aware styling
   const { isScrolled: _isScrolled } = useThrottledScroll({
@@ -48,29 +43,6 @@ export function MarketingHeader({
 
   const hideNav = variant === 'minimal';
 
-  // Anchor nav links only for the landing variant
-  const navLinks = (() => {
-    if (variant !== 'landing') return undefined;
-
-    if (pathname === APP_ROUTES.LAUNCH) {
-      return [
-        { href: '#how-it-works', label: 'How it works' },
-        { href: '#features', label: 'Features' },
-      ];
-    }
-    if (pathname === '/') {
-      return [
-        { href: '#release', label: 'Releases' },
-        { href: '#profile', label: 'Profile' },
-        { href: '#audience', label: 'Audience' },
-        { href: '/pricing', label: 'Pricing' },
-        { href: '/blog', label: 'Blog' },
-        { href: '/investors', label: 'Investors' },
-      ];
-    }
-    return undefined;
-  })();
-
   return (
     <Header
       sticky={false}
@@ -79,7 +51,6 @@ export function MarketingHeader({
       hideNav={hideNav}
       containerSize='homepage'
       className='border-b'
-      navLinks={navLinks}
       style={{
         backgroundColor: 'var(--linear-bg-header)',
         borderBottomColor: 'var(--linear-border-default)',

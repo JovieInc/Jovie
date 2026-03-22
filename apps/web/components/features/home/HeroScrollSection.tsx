@@ -4,7 +4,7 @@ import { ProductScreenshot } from './ProductScreenshot';
 
 export function HeroScrollSection() {
   return (
-    <section className='relative overflow-hidden pb-0 pt-[6.25rem] md:pt-[7rem] lg:pt-[7.5rem] xl:pt-[8rem]'>
+    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:pt-[6.6rem] xl:pt-[6.9rem]'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -15,32 +15,31 @@ export function HeroScrollSection() {
       <Container size='homepage'>
         <div className='mx-auto max-w-[var(--linear-hero-shell-max)]'>
           <div className='hero-stagger'>
-            <div className='max-w-[48rem] text-center lg:text-left'>
-              <p className='marketing-kicker justify-center lg:justify-start'>
-                Release more music. Do less release work.
+            <div className='max-w-[44rem] text-center lg:text-left'>
+              <p className='homepage-section-eyebrow'>
+                Built for independent artists
               </p>
 
-              <h1 className='marketing-h1-linear mt-6 max-w-[11ch] text-primary-token lg:text-left'>
-                The link your music deserves.
+              <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left'>
+                Own the link behind every release.
               </h1>
 
-              <p className='marketing-lead-linear mx-auto mt-5 max-w-[36rem] text-secondary-token md:mt-6 lg:mx-0'>
-                Smart links, release automation, and fan intelligence for
-                independent artists. One system to launch, convert, and follow
-                up without stitching tools together.
+              <p className='marketing-lead-linear mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
+                Smart links, release automation, and fan intelligence in one
+                system that helps you launch faster and keep more fans moving.
               </p>
 
-              <div className='mx-auto mt-7 w-full max-w-[29rem] md:mt-8 lg:mx-0'>
-                <ClaimHandleForm size='display' />
+              <div className='mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
+                <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-4 text-[length:var(--linear-label-size)] tracking-[0.01em] text-tertiary-token md:mt-4.5 lg:text-left'>
-                Start free with smart links, your artist profile, and release
-                workflows ready for the next drop.
+              <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+                Start free with your artist link, profile, and next release
+                workflow.
               </p>
             </div>
 
-            <div className='relative mt-12 w-full md:mt-16 lg:mt-18'>
+            <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
               <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
                 <ProductScreenshot
                   src='/product-screenshots/releases-dashboard-sidebar.png'

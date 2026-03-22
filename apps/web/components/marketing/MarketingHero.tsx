@@ -23,11 +23,11 @@ export function MarketingHero({
     <section
       className={cn(
         'relative w-full',
-        'pt-16 pb-20 sm:pt-20 sm:pb-24 lg:pt-24 lg:pb-32',
+        'pt-20 pb-18 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-30',
         variant === 'centered' &&
-          'mx-auto flex max-w-[1024px] flex-col items-center px-5 text-center sm:px-6 lg:px-8',
+          'mx-auto flex max-w-[1120px] flex-col items-center px-6 text-center sm:px-8 lg:px-10',
         variant === 'split' &&
-          'mx-auto grid max-w-[1344px] grid-cols-1 items-center gap-10 px-5 sm:px-6 md:grid-cols-2 md:gap-16 lg:px-8',
+          'mx-auto grid max-w-[1280px] grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
         className
       )}
     >
