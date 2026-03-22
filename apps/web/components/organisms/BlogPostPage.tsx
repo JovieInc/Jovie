@@ -3,9 +3,11 @@ import { Avatar } from '@/components/molecules/Avatar';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import { Container } from '@/components/site/Container';
 import type { BlogPost } from '@/lib/blog/getBlogPosts';
+import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
 
 export interface BlogPostPageProps {
   readonly post: BlogPost;
+  readonly author: ResolvedAuthor;
 }
 
 function formatDate(dateString: string): string {
@@ -17,7 +19,7 @@ function formatDate(dateString: string): string {
   });
 }
 
-export function BlogPostPage({ post }: BlogPostPageProps) {
+export function BlogPostPage({ post, author }: BlogPostPageProps) {
   return (
     <div className='min-h-screen'>
       {/* Header Section */}
@@ -79,23 +81,25 @@ export function BlogPostPage({ post }: BlogPostPageProps) {
           {/* Author section */}
           <div className='flex items-center gap-4 pb-10 border-b border-border-subtle'>
             <Avatar
-              name={post.author}
-              alt={`${post.author} avatar`}
+              src={author.avatarUrl}
+              name={author.name}
+              alt={`${author.name} avatar`}
               size='md'
+              verified={author.isVerified}
             />
             <div className='flex flex-col'>
               <span className='font-semibold text-primary-token'>
-                {post.author}
+                {author.name}
               </span>
-              {post.authorTitle && (
+              {author.title && (
                 <span className='text-sm text-tertiary-token'>
-                  {post.authorTitle}
+                  {author.title}
                 </span>
               )}
             </div>
-            {post.authorProfile && (
+            {author.profileUrl && (
               <Link
-                href={post.authorProfile}
+                href={author.profileUrl}
                 className='ml-auto text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200'
               >
                 View profile →

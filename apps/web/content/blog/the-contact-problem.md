@@ -2,8 +2,8 @@
 title: The Contact Problem
 date: 2026-03-18
 author: Tim White
+authorUsername: tim
 authorTitle: Founder at Jovie
-authorProfile: https://jov.ie/tim
 category: Artist Management
 ---
 

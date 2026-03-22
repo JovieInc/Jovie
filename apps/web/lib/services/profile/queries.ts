@@ -5,7 +5,7 @@
  * This is the single source of truth for profile queries.
  */
 
-import { and, eq, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, ne, or } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -527,6 +527,31 @@ export async function getProfileSummary(
     .limit(1);
 
   return profile ?? null;
+}
+
+/**
+ * Get multiple profiles by username in a single query.
+ * Used for batch-resolving blog authors.
+ *
+ * @param usernames - Array of usernames to look up
+ * @returns Map from normalized username to ProfileData
+ */
+export async function getProfilesByUsernames(
+  usernames: string[]
+): Promise<Map<string, ProfileData>> {
+  const normalized = Array.from(
+    new Set(
+      usernames
+        .map(u => u?.trim().toLowerCase())
+        .filter((u): u is string => Boolean(u))
+    )
+  );
+  if (normalized.length === 0) return new Map();
+  const profiles = await db
+    .select(profileSelectColumns)
+    .from(creatorProfiles)
+    .where(inArray(creatorProfiles.usernameNormalized, normalized));
+  return new Map(profiles.map(p => [p.usernameNormalized, p]));
 }
 
 /**
