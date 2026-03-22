@@ -19,6 +19,38 @@ import type { LoadingState } from '@/lib/auth/types';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 import { useSignInSafe } from './useClerkSafe';
 
+/**
+ * At runtime, the signIn object returned by Clerk's useSignIn() implements the
+ * "future" Signal API (create returns {error}, plus .emailCode, .mfa, .sso,
+ * .finalize methods). However, the published TypeScript types still expose the
+ * legacy SignInResource interface. We define a minimal type overlay here so our
+ * code type-checks without changing any runtime behavior.
+ */
+type SignInFuture = {
+  status: string | null;
+  supportedFirstFactors?: Array<{ strategy: string; [k: string]: unknown }>;
+  supportedSecondFactors?: Array<{ strategy: string; [k: string]: unknown }>;
+  create: (params: { identifier: string }) => Promise<{ error: unknown }>;
+  emailCode: {
+    sendCode: (params: {
+      emailAddressId: string;
+    }) => Promise<{ error: unknown }>;
+    verifyCode: (params: { code: string }) => Promise<{ error: unknown }>;
+  };
+  mfa: {
+    sendPhoneCode: () => Promise<{ error: unknown }>;
+    sendEmailCode: () => Promise<{ error: unknown }>;
+    verifyPhoneCode: (params: { code: string }) => Promise<{ error: unknown }>;
+    verifyEmailCode: (params: { code: string }) => Promise<{ error: unknown }>;
+  };
+  sso: (params: {
+    strategy: string;
+    redirectUrl: string;
+    redirectCallbackUrl: string;
+  }) => Promise<{ error: unknown }>;
+  finalize: () => Promise<{ error: unknown }>;
+};
+
 /** Use current origin for OAuth callbacks so localhost works correctly */
 const getOAuthBaseUrl = () =>
   typeof window !== 'undefined' ? window.location.origin : APP_URL;
@@ -71,7 +103,9 @@ export interface UseSignInFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignInFlow(): UseSignInFlowReturn {
-  const { signIn, isLoaded } = useSignInSafe();
+  const { signIn: signInRaw, isLoaded } = useSignInSafe();
+  // Cast to the future Signal API shape used at runtime (see SignInFuture above).
+  const signIn = signInRaw as unknown as SignInFuture | null;
 
   // Use shared auth flow base
   const base = useAuthFlowBase({

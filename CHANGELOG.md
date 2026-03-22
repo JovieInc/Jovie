@@ -12,6 +12,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
 - Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+### Added
+
+- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
+  - Auto-creates test user via Clerk API if not found
+  - Uses `+clerk_test` email suffix with magic OTP code `424242`
+  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
+  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
+
+### Fixed
+
+- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
+- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
 
 ## [26.4.39] - 2026-03-21
 
