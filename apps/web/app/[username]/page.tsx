@@ -764,7 +764,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
   const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
 
   return {
-    title: `${artistName} | Jovie`,
+    title: artistName,
     description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
     metadataBase: new URL(BASE_URL),
     alternates: {
@@ -824,7 +824,8 @@ function buildProfileMetadata(
 ): Metadata {
   const artistName = profile.display_name || profile.username;
   const profileUrl = `${BASE_URL}/${profile.username}`;
-  const title = `${artistName} | Jovie`;
+  const title = artistName;
+  const socialTitle = `${artistName} | Jovie`;
   const description = buildProfileDescription(profile, artistName, genres);
 
   const baseKeywords = [
@@ -863,7 +864,7 @@ function buildProfileMetadata(
     },
     openGraph: {
       type: 'profile',
-      title,
+      title: socialTitle,
       description,
       url: profileUrl,
       siteName: 'Jovie',
@@ -879,7 +880,7 @@ function buildProfileMetadata(
     },
     twitter: {
       card: 'summary_large_image',
-      title,
+      title: socialTitle,
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
