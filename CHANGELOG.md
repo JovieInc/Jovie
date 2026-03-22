@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.41] - 2026-03-22
+
+### Fixed
+
+- Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
+- Extract shared `FF_OVERRIDES_KEY` constant to prevent key drift between toolbar and provider
+
 ## [26.4.40] - 2026-03-22
 
 ### Fixed

@@ -8,22 +8,14 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: mockSetTheme }),
 }));
 
-const mockSetOverride = vi.fn();
-const mockRemoveOverride = vi.fn();
-const mockClearOverrides = vi.fn();
-let mockOverrides: Record<string, boolean> = {};
+const FF_OVERRIDES_KEY = '__ff_overrides';
 
-// Mock feature flag overrides
-vi.mock('@/lib/feature-flags/client', () => ({
-  useFeatureFlagOverrides: () => ({
-    overrides: mockOverrides,
-    setOverride: mockSetOverride,
-    removeOverride: mockRemoveOverride,
-    clearOverrides: mockClearOverrides,
-  }),
-}));
+function setLocalOverrides(overrides: Record<string, boolean>) {
+  localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(overrides));
+}
 
 vi.mock('@/lib/feature-flags/shared', () => ({
+  FF_OVERRIDES_KEY: '__ff_overrides',
   FEATURE_FLAG_KEYS: {
     CLAIM_HANDLE: 'feature_claim_handle',
     HERO_SPOTIFY: 'feature_hero_spotify',
@@ -60,10 +52,6 @@ describe('DevToolbar', () => {
   beforeEach(() => {
     localStorage.clear();
     document.body.style.paddingBottom = '';
-    mockOverrides = {};
-    mockSetOverride.mockClear();
-    mockRemoveOverride.mockClear();
-    mockClearOverrides.mockClear();
     mockSetTheme.mockClear();
 
     // Mock clipboard API
@@ -360,7 +348,7 @@ describe('DevToolbar', () => {
 
   describe('override sorting', () => {
     it('shows overrides group when flags are overridden', () => {
-      mockOverrides = { feature_claim_handle: true };
+      setLocalOverrides({ feature_claim_handle: true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -375,7 +363,7 @@ describe('DevToolbar', () => {
     });
 
     it('shows server default for overridden flags', () => {
-      mockOverrides = { feature_claim_handle: true };
+      setLocalOverrides({ feature_claim_handle: true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -383,27 +371,27 @@ describe('DevToolbar', () => {
     });
 
     it('shows clear all button in overrides group', () => {
-      mockOverrides = { feature_claim_handle: true };
+      setLocalOverrides({ feature_claim_handle: true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
       expect(screen.getByText('clear all')).toBeInTheDocument();
     });
 
-    it('calls clearOverrides when clear all is clicked', () => {
-      mockOverrides = { feature_claim_handle: true };
+    it('clears all overrides when clear all is clicked', () => {
+      setLocalOverrides({ feature_claim_handle: true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
       fireEvent.click(screen.getByText('clear all'));
-      expect(mockClearOverrides).toHaveBeenCalledOnce();
+      expect(localStorage.getItem(FF_OVERRIDES_KEY)).toBeNull();
     });
 
     it('shows correct override count for multiple overrides', () => {
-      mockOverrides = {
+      setLocalOverrides({
         feature_claim_handle: true,
         'code:THREADS_ENABLED': true,
-      };
+      });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
@@ -451,10 +439,12 @@ describe('DevToolbar', () => {
   // ─── Toggle Flash Feedback ─────────────────────────────────
 
   describe('toggle flash feedback', () => {
-    it('applies flash class when flag is toggled', () => {
+    it('applies flash class when an already-overridden flag is toggled', () => {
+      setLocalOverrides({ feature_claim_handle: true });
       localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
       renderToolbar();
 
+      // Find the switch in the overrides section (already overridden flag)
       const switches = screen.getAllByRole('switch');
       fireEvent.click(switches[0]);
 
@@ -468,17 +458,17 @@ describe('DevToolbar', () => {
 
   describe('override badge', () => {
     it('shows override count in collapsed bar when overrides exist', () => {
-      mockOverrides = { feature_claim_handle: true };
+      setLocalOverrides({ feature_claim_handle: true });
       renderToolbar();
 
       expect(screen.getByText('1 override')).toBeInTheDocument();
     });
 
     it('uses plural for multiple overrides', () => {
-      mockOverrides = {
+      setLocalOverrides({
         feature_claim_handle: true,
         'code:THREADS_ENABLED': true,
-      };
+      });
       renderToolbar();
 
       expect(screen.getByText('2 overrides')).toBeInTheDocument();
@@ -491,7 +481,7 @@ describe('DevToolbar', () => {
     });
 
     it('opens panel when badge is clicked and panel is collapsed', () => {
-      mockOverrides = { feature_claim_handle: true };
+      setLocalOverrides({ feature_claim_handle: true });
       renderToolbar();
 
       // Panel should be collapsed
