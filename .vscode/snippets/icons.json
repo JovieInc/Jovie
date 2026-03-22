@@ -1,22 +1,20 @@
 {
-  "Heroicon Import": {
-    "prefix": "heroicon",
-    "body": [
-      "import { ${1:ChevronRightIcon} } from '@heroicons/react/24/${2|outline,solid|}';"
-    ],
-    "description": "Import a Heroicon component"
+  "Lucide Icon Import": {
+    "prefix": "lucide",
+    "body": ["import { ${1:ChevronRight} } from 'lucide-react';"],
+    "description": "Import a Lucide React icon"
   },
-  "Multiple Heroicons Import": {
-    "prefix": "heroicons",
+  "Multiple Lucide Icons Import": {
+    "prefix": "lucide-multi",
     "body": [
-      "import { ${1:ChevronRightIcon}, ${2:XMarkIcon}, ${3:CheckIcon} } from '@heroicons/react/24/${4|outline,solid|}';"
+      "import { ${1:ChevronRight}, ${2:X}, ${3:Check} } from 'lucide-react';"
     ],
-    "description": "Import multiple Heroicon components"
+    "description": "Import multiple Lucide React icons"
   },
-  "Heroicon Usage": {
-    "prefix": "heroicon-use",
-    "body": ["<${1:ChevronRightIcon} className=\"${2:h-5 w-5}\" />"],
-    "description": "Use a Heroicon component"
+  "Lucide Icon Usage": {
+    "prefix": "lucide-use",
+    "body": ["<${1:ChevronRight} className=\"${2:h-5 w-5}\" />"],
+    "description": "Use a Lucide React icon"
   },
   "SocialIcon Component": {
     "prefix": "socialicon",
@@ -33,7 +31,7 @@
   "Icon Component": {
     "prefix": "icon",
     "body": [
-      "<Icon name=\"${1|chevron-right,chevron-left,x-mark,check,plus,search,settings,user,home,menu|}\" size=\"${2|sm,md,lg,xl|}\" />"
+      "<Icon name=\"${1|ChevronRight,X,Check,Plus,Search,Settings,User,Home,Menu,Trash2|}\" className=\"${2:h-5 w-5}\" />"
     ],
     "description": "Use the unified Icon component"
   },
@@ -42,32 +40,32 @@
     "body": ["import { Icon } from '@/components/atoms/Icon';"],
     "description": "Import the unified Icon component"
   },
-  "IconButton with Heroicon": {
+  "IconButton with Lucide": {
     "prefix": "iconbutton",
     "body": [
       "<IconButton ariaLabel=\"${1:Button description}\">",
-      "  <${2:ChevronRightIcon} className=\"${3:h-4 w-4}\" />",
+      "  <${2:Settings} className=\"${3:h-4 w-4}\" />",
       "</IconButton>"
     ],
-    "description": "IconButton component with Heroicon"
+    "description": "IconButton component with Lucide React icon"
   },
-  "IconBadge with Heroicon": {
+  "IconBadge with Lucide": {
     "prefix": "iconbadge",
     "body": [
-      "<IconBadge Icon={${1:BoltIcon}} colorVar=\"${2:--color-yellow-500}\" />"
+      "<IconBadge Icon={${1:Bolt}} colorVar=\"${2:--color-yellow-500}\" />"
     ],
-    "description": "IconBadge component with Heroicon"
+    "description": "IconBadge component with Lucide React icon"
   },
   "Icon with Accessibility": {
     "prefix": "icon-a11y",
     "body": [
-      "<${1:ChevronRightIcon} ",
+      "<${1:ChevronRight} ",
       "  className=\"${2:h-5 w-5}\" ",
       "  aria-label=\"${3:Icon description}\"",
       "  aria-hidden={${4|false,true|}}",
       "/>"
     ],
-    "description": "Icon with accessibility attributes"
+    "description": "Lucide icon with accessibility attributes"
   },
   "Social Icon with Accessibility": {
     "prefix": "socialicon-a11y",
@@ -91,13 +89,13 @@
     "body": [
       "// Navigation icons",
       "import { ",
-      "  ChevronRightIcon,",
-      "  ChevronLeftIcon,",
-      "  ArrowRightIcon,",
-      "  ArrowLeftIcon,",
-      "  HomeIcon,",
-      "  Bars3Icon,",
-      "} from '@heroicons/react/24/outline';"
+      "  ChevronRight,",
+      "  ChevronLeft,",
+      "  ArrowRight,",
+      "  ArrowLeft,",
+      "  Home,",
+      "  Menu,",
+      "} from 'lucide-react';"
     ],
     "description": "Common navigation icons import"
   },
@@ -106,14 +104,14 @@
     "body": [
       "// Action icons",
       "import { ",
-      "  PlusIcon,",
-      "  XMarkIcon,",
-      "  PencilIcon,",
-      "  TrashIcon,",
-      "  ShareIcon,",
-      "  MagnifyingGlassIcon,",
-      "  CogIcon,",
-      "} from '@heroicons/react/24/outline';"
+      "  Plus,",
+      "  X,",
+      "  Pencil,",
+      "  Trash2,",
+      "  Share,",
+      "  Search,",
+      "  Settings,",
+      "} from 'lucide-react';"
     ],
     "description": "Common action icons import"
   },
@@ -122,12 +120,12 @@
     "body": [
       "// State icons",
       "import { ",
-      "  CheckIcon,",
-      "  CheckCircleIcon,",
-      "  XCircleIcon,",
-      "  ExclamationTriangleIcon,",
-      "  InformationCircleIcon,",
-      "} from '@heroicons/react/24/outline';"
+      "  Check,",
+      "  CheckCircle,",
+      "  XCircle,",
+      "  AlertTriangle,",
+      "  Info,",
+      "} from 'lucide-react';"
     ],
     "description": "Common state icons import"
   }

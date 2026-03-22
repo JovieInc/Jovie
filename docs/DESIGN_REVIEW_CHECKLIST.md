@@ -6,7 +6,7 @@ When reviewing PRs or design implementations, ensure the following icon standard
 
 ### 1. Icon Library Usage
 
-- [ ] **General UI icons use Heroicons v2**
+- [ ] **General UI icons use Lucide React**
   - Navigation icons (chevrons, arrows, home, menu)
   - Action icons (plus, edit, delete, share, search, settings)
   - State icons (check, error, warning, info)
@@ -30,7 +30,7 @@ When reviewing PRs or design implementations, ensure the following icon standard
   import CustomIcon from './icon.svg';
   
   // ✅ Use instead
-  import { ChevronRightIcon } from '@heroicons/react/24/outline';
+  import { ChevronRight } from 'lucide-react';
   ```
 
 - [ ] **No inline SVG elements** (except in approved components)
@@ -125,10 +125,10 @@ import CustomChevron from './chevron.svg';
 <CustomChevron className="h-5 w-5" />
 ```
 
-### ✅ Use Heroicons
+### ✅ Use Lucide React
 ```tsx
-import { ChevronRightIcon } from '@heroicons/react/24/outline';
-<ChevronRightIcon className="h-5 w-5" />
+import { ChevronRight } from 'lucide-react';
+<ChevronRight className="h-5 w-5" />
 ```
 
 ---
@@ -164,7 +164,7 @@ import { ChevronRightIcon } from '@heroicons/react/24/outline';
 ## Resources
 
 - **Icon Standards Documentation**: [docs/ICON_STANDARDS.md](./ICON_STANDARDS.md)
-- **Heroicons Browser**: [heroicons.com](https://heroicons.com)
+- **Lucide React Browser**: [lucide.dev](https://lucide.dev)
 - **SimpleIcons Browser**: [simpleicons.org](https://simpleicons.org)
 - **SocialIcon Component**: [components/atoms/SocialIcon.tsx](../components/atoms/SocialIcon.tsx)
 - **Icon Audit Script**: `pnpm audit:icons`

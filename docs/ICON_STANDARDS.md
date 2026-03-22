@@ -117,8 +117,6 @@ The following ESLint rule enforces these standards:
 - Provides helpful error messages guiding to correct icon libraries
 - Maintains allowlist for approved custom SVGs
 
-**Note:** The ESLint rule currently references Heroicons but should be updated to reference Lucide React to match current implementation.
-
 ### Pre-commit Hooks
 
 Icon usage validation runs automatically on:
@@ -137,7 +135,7 @@ Current approved custom SVGs:
 
 ### Requesting New Custom SVGs
 
-1. Check if equivalent exists in Heroicons or SimpleIcons
+1. Check if equivalent exists in Lucide React or SimpleIcons
 2. Create GitHub issue with `icon-request` label
 3. Include:
    - Use case and context
