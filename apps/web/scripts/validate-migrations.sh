@@ -178,6 +178,22 @@ for tag in "${JOURNAL_TAGS[@]}"; do
   fi
 done
 
+# Check journal timestamps are monotonically non-decreasing
+# Drizzle's migrator uses `when` timestamps (not idx) to decide which migrations
+# have been applied. If a later migration has an earlier timestamp than a previous
+# one, Drizzle will silently skip it, causing schema drift.
+PREV_WHEN=0
+PREV_TAG=""
+NON_MONOTONIC=()
+while IFS=$'\t' read -r tag when_val; do
+  if [ "$when_val" -lt "$PREV_WHEN" ]; then
+    NON_MONOTONIC+=("$tag (when=$when_val) comes after $PREV_TAG (when=$PREV_WHEN) but has an earlier timestamp")
+    EXIT_CODE=1
+  fi
+  PREV_WHEN="$when_val"
+  PREV_TAG="$tag"
+done < <(jq -r '.entries[] | [.tag, .when] | @tsv' "$JOURNAL_FILE" 2>/dev/null | tr -d '\r')
+
 # Report results
 if [ $EXIT_CODE -eq 0 ]; then
   echo -e "${GREEN}✅ All migrations are properly registered and idempotent${NC}"
@@ -210,6 +226,22 @@ if [ ${#ORPHANED_ENTRIES[@]} -gt 0 ]; then
   echo ""
   echo "These journal entries have no corresponding .sql file."
   echo "This usually happens after deleting/renaming migration files."
+fi
+
+if [ ${#NON_MONOTONIC[@]} -gt 0 ]; then
+  echo -e "\n${RED}❌ Non-Monotonic Journal Timestamps Detected${NC}"
+  echo -e "${RED}Found ${#NON_MONOTONIC[@]} out-of-order timestamp(s) in _journal.json:${NC}"
+  for entry in "${NON_MONOTONIC[@]}"; do
+    echo -e "  ${RED}- ${entry}${NC}"
+  done
+  echo ""
+  echo -e "${YELLOW}⚠️  Drizzle uses 'when' timestamps (not idx) to decide which migrations to run!${NC}"
+  echo "A migration with a lower timestamp than an already-applied migration will be"
+  echo "silently skipped, causing schema drift and deploy failures."
+  echo ""
+  echo "To fix:"
+  echo "  Update the 'when' field in _journal.json so all entries are in non-decreasing order."
+  echo "  Set the out-of-order entry's 'when' to a value greater than the previous entry's."
 fi
 
 if [ ${#CONCURRENT_FILES[@]} -gt 0 ]; then

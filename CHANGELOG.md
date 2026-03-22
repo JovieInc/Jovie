@@ -6,32 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
-## [26.4.38] - 2026-03-21
+## [26.4.40] - 2026-03-22
 
+### Fixed
+
+- Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
+- Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
 ### Added
 
-- Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
-- Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
+- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
+  - Auto-creates test user via Clerk API if not found
+  - Uses `+clerk_test` email suffix with magic OTP code `424242`
+  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
+  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
+
+### Fixed
+
+- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
+- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
+
+## [26.4.39] - 2026-03-21
+
+> [internal] Audit changelog for customer and investor safety.
+
+### Changed
+
+- [internal] Hide sensitive entries (old pricing, scraping pipeline, YC demo tooling, admin features, vendor names, conversion funnel tactics) behind `[internal]` prefix
+- [internal] Rewrite technical entries into customer-friendly language
+- [internal] Remove blog post references from public changelog
+
+## [26.4.38] - 2026-03-21
+
+### Fixed
+
+- Use the canonical `BASE_URL` for signup metadata so `/signup` Open Graph URLs and images resolve to `jov.ie` instead of the deprecated app domain
+### Added
+
+- [internal] Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
+- [internal] Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
 
 ## [26.4.37] - 2026-03-21
 
 ### Changed
 
-- Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
-- Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
-- Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)
+- [internal] Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
+- [internal] Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
+- [internal] Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)
 
 ### Removed
 
-- Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
+- [internal] Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
 
 ## [26.4.36] - 2026-03-21
 
 ### Fixed
 
-- Consolidate 5 independent profile completeness checks into one canonical `isProfileComplete()` function, eliminating the redirect loop bug class between `/app` and `/onboarding`
-- Add ACTIVE user guard on onboarding page to break redirect loops from stale proxy cache or direct navigation
-- Add circuit breaker in proxy.ts that detects and breaks redirect loops after 3 redirects in 30 seconds
+- Fixed a rare issue where some users could get stuck in a redirect loop after signing up
+- [internal] Consolidate 5 independent profile completeness checks into one canonical `isProfileComplete()` function, eliminating the redirect loop bug class between `/app` and `/onboarding`
+- [internal] Add ACTIVE user guard on onboarding page to break redirect loops from stale proxy cache or direct navigation
+- [internal] Add circuit breaker in proxy.ts that detects and breaks redirect loops after 3 redirects in 30 seconds
 
 ## [26.4.35] - 2026-03-21
 
@@ -42,113 +75,115 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Dashboard drawer headers support ReactNode titles with multi-line metadata
-- Auth hooks (`useSignInFlow`, `useSignUpFlow`) refactored to use Clerk Core API via shared `useAuthFlowBase`
-- `useClerkSafe` hooks provide context-based safe access to Clerk state outside `ClerkProvider`
+- [internal] Dashboard drawer headers support ReactNode titles with multi-line metadata
+- [internal] Auth hooks (`useSignInFlow`, `useSignUpFlow`) refactored to use Clerk Core API via shared `useAuthFlowBase`
+- [internal] `useClerkSafe` hooks provide context-based safe access to Clerk state outside `ClerkProvider`
 
 ### Fixed
 
-- Remove `void` operator anti-pattern from async onClick handlers (SonarCloud)
-- Fix timeout stacking in error display copy button with ref-based cleanup
-- Fix image remove button invisible on touch devices via `@media(hover:hover)` pattern
-- Fix test state mutation in `useSignInFlow` tests with proper `beforeEach`/`afterEach` scoping
+- [internal] Remove `void` operator anti-pattern from async onClick handlers (SonarCloud)
+- [internal] Fix timeout stacking in error display copy button with ref-based cleanup
+- Fix image remove button not visible on touch devices
+- [internal] Fix test state mutation in `useSignInFlow` tests with proper `beforeEach`/`afterEach` scoping
 ### Fixed
 
-- Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production
-- Add repair migration for `discovered_pixels`, `discovered_pixels_at`, `pitch_context`, and `generated_pitches` columns that were tracked as applied but never executed
-- Fix referral settings page passing Clerk user ID to a UUID column — now converts to internal UUID first, redirects to onboarding if user record missing
+- [internal] Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production
+- [internal] Add repair migration for `discovered_pixels`, `discovered_pixels_at`, `pitch_context`, and `generated_pitches` columns that were tracked as applied but never executed
+- [internal] Fix referral settings page passing Clerk user ID to a UUID column — now converts to internal UUID first, redirects to onboarding if user record missing
 
 ## [26.4.34] - 2026-03-21
 
 ### Fixed
 
-- Block blacklisted Spotify artist IDs from polluting profiles during MusicFetch enrichment — prevents wrong artist photos, discography imports, and spotifyId overwrites
-- Allow re-enrichment recovery when a profile's stored spotifyId is blacklisted but the enrichment URL points to the correct artist
+- Fixed incorrect artist photos appearing on some profiles
+- [internal] Block blacklisted Spotify artist IDs from polluting profiles during MusicFetch enrichment — prevents wrong artist photos, discography imports, and spotifyId overwrites
+- [internal] Allow re-enrichment recovery when a profile's stored spotifyId is blacklisted but the enrichment URL points to the correct artist
 
 ## [26.4.33] - 2026-03-21
 
 ### Fixed
 
-- Dev toolbar "Unwaitlist" button now invalidates proxy user state cache on repeat clicks, fixing stale waitlist redirects after approval
+- [internal] Dev toolbar "Unwaitlist" button now invalidates proxy user state cache on repeat clicks, fixing stale waitlist redirects after approval
 ### Added
 
 - AI-powered playlist pitch generator: auto-generates per-platform pitches (Spotify, Apple Music, Amazon, Generic) from artist and release data
 - New "Pitch context" field in Settings > Artist Profile for artists to provide streaming milestones, press coverage, radio play, and other context the AI can't auto-detect
-- Pitch generation service using Claude via Vercel AI SDK with structured output and Zod validation
-- Per-platform character limit enforcement (Spotify 500, Apple Music 300, Amazon 500, Generic 1000) with smart truncation fallback
+- [internal] Pitch generation service using Claude via Vercel AI SDK with structured output and Zod validation
+- [internal] Per-platform character limit enforcement (Spotify 500, Apple Music 300, Amazon 500, Generic 1000) with smart truncation fallback
 - Release sidebar "Playlist Pitches" section in the Details tab with generate, regenerate, and copy-to-clipboard per platform
-- Rate limiting: 10 pitch generations per hour per user
-- 28 new tests covering prompt builders, Zod schema validation, truncation logic, and profile validation
+- [internal] Rate limiting: 10 pitch generations per hour per user
+- [internal] 28 new tests covering prompt builders, Zod schema validation, truncation logic, and profile validation
 
 ## [26.4.32] - 2026-03-21
 
 ### Added
 
-- Knowledge-aware AI chat — keyword router selects relevant music industry topics and injects them into the system prompt for accurate, specific advice
-- `lib/chat/knowledge/topics.ts` — topic registry that loads distilled knowledge docs at cold start
-- `lib/chat/knowledge/router.ts` — keyword-based topic selection (top 2 matches per message, min score threshold)
+- AI chat now gives more accurate, specific advice based on deep music industry knowledge
+- [internal] Knowledge-aware AI chat — keyword router selects relevant music industry topics and injects them into the system prompt for accurate, specific advice
+- [internal] `lib/chat/knowledge/topics.ts` — topic registry that loads distilled knowledge docs at cold start
+- [internal] `lib/chat/knowledge/router.ts` — keyword-based topic selection (top 2 matches per message, min score threshold)
 
 ### Changed
 
-- Upgraded Clerk SDK to v7 (Core 3): `@clerk/nextjs` 6.36.7→7.0.6, `@clerk/backend` ^2.32→^3.2, `@clerk/clerk-js` ^5.121→^6.3, `@clerk/testing` ^1.13→^2.0
-- Replaced removed `SignedIn`/`SignedOut` components with new `Show` component (`when="signed-in"` / `when="signed-out"`)
-- Migrated `useSignIn` and `useSignUp` hooks to `@clerk/nextjs/legacy` import path (v7 moved these to a signal-based API; legacy maintains the imperative `{ signIn, setActive, isLoaded }` shape)
-- Updated test mocks to match v7 exports
+- [internal] Upgraded Clerk SDK to v7 (Core 3): `@clerk/nextjs` 6.36.7→7.0.6, `@clerk/backend` ^2.32→^3.2, `@clerk/clerk-js` ^5.121→^6.3, `@clerk/testing` ^1.13→^2.0
+- [internal] Replaced removed `SignedIn`/`SignedOut` components with new `Show` component (`when="signed-in"` / `when="signed-out"`)
+- [internal] Migrated `useSignIn` and `useSignUp` hooks to `@clerk/nextjs/legacy` import path (v7 moved these to a signal-based API; legacy maintains the imperative `{ signIn, setActive, isLoaded }` shape)
+- [internal] Updated test mocks to match v7 exports
 
 ## [26.4.29] - 2026-03-20
 
 ### Added
 
-- YC demo Playwright spec (`yc-demo.spec.ts`) that records the full onboarding flow at watchable pace with deliberate pauses for voiceover narration
-- Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
-- Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
-- `demo:record` script in package.json for one-command demo video recording
+- [internal] YC demo Playwright spec (`yc-demo.spec.ts`) that records the full onboarding flow at watchable pace with deliberate pauses for voiceover narration
+- [internal] Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
+- [internal] Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
+- [internal] `demo:record` script in package.json for one-command demo video recording
 ## [26.4.31] - 2026-03-21
 
 ### Added
 
-- Music industry knowledge canon — scrape + distill pipeline that ingests 670+ pages from trusted music industry sources and synthesizes them into 8 authoritative topic guides
-- `scripts/knowledge/fetch.ts` — automated fetcher with resume support, exponential backoff, QA gate, and provenance manifest for internal auditing
-- `scripts/knowledge/distill.ts` — LLM-powered distillation that curates top articles per topic and synthesizes via Claude Sonnet into source-agnostic reference guides
-- 8 distilled knowledge docs: release strategy, playlist strategy, streaming metrics, profile optimization, marketing/promotion, distribution basics, monetization, music rights
+- [internal] Music industry knowledge canon — scrape + distill pipeline that ingests 670+ pages from trusted music industry sources and synthesizes them into 8 authoritative topic guides
+- [internal] `scripts/knowledge/fetch.ts` — automated fetcher with resume support, exponential backoff, QA gate, and provenance manifest for internal auditing
+- [internal] `scripts/knowledge/distill.ts` — LLM-powered distillation that curates top articles per topic and synthesizes via Claude Sonnet into source-agnostic reference guides
+- [internal] 8 distilled knowledge docs: release strategy, playlist strategy, streaming metrics, profile optimization, marketing/promotion, distribution basics, monetization, music rights
 
 ## [26.4.30] - 2026-03-21
 
 ### Fixed
 
-- Set `active_profile_id` in all onboarding claim paths — `createProfileForExistingUser`, `updateExistingProfile`, and waitlist approval now update `users.active_profile_id`
-- Restrict stored function profile lookup to claimed profiles only (`is_claimed = true`), matching backfill behavior
+- [internal] Set `active_profile_id` in all onboarding claim paths — `createProfileForExistingUser`, `updateExistingProfile`, and waitlist approval now update `users.active_profile_id`
+- [internal] Restrict stored function profile lookup to claimed profiles only (`is_claimed = true`), matching backfill behavior
 
 ## [26.4.30] - 2026-03-20
 
 ### Added
 
-- Defensive handling for all Clerk sign-in statuses (`needs_second_factor`, `needs_client_trust`, `needs_new_password`, `needs_first_factor`) with clear user-facing error messages
-- Second-factor verification support in sign-in flow — when MFA or client trust is triggered, the flow prepares and verifies a second factor automatically
-- `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
-- `abandoned` status handling in sign-up flow with specific "interrupted" message
-- Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
+- [internal] Defensive handling for all Clerk sign-in statuses (`needs_second_factor`, `needs_client_trust`, `needs_new_password`, `needs_first_factor`) with clear user-facing error messages
+- Two-factor authentication now works seamlessly during sign-in
+- [internal] `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
+- [internal] `abandoned` status handling in sign-up flow with specific "interrupted" message
+- [internal] Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
 ### Changed
 
-- Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
-- Adopted Linear in-app design system (`rounded-full`) for all auth buttons and inputs globally
-- Unified waitlist form focus rings to use `--linear-border-focus` token instead of ad-hoc accent colors
-- Normalized platform pill typography to Linear caption tokens
-- Made `primaryGoal` optional in API validation (DB column was already nullable)
+- [internal] Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
+- [internal] Adopted Linear in-app design system (`rounded-full`) for all auth buttons and inputs globally
+- [internal] Unified waitlist form focus rings to use `--linear-border-focus` token instead of ad-hoc accent colors
+- [internal] Normalized platform pill typography to Linear caption tokens
+- [internal] Made `primaryGoal` optional in API validation (DB column was already nullable)
 
 ### Removed
 
-- `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
+- [internal] `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
 ### Fixed
 
-- CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
-- CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
-- Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
+- [internal] CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
+- [internal] CSP `script-src` includes `@vercel/analytics` inline script hash — eliminates console CSP violation
+- [internal] Statsig "Server secret not configured" warning now logs once instead of 48+ times per page load
 
 ### Added
 
-- Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
-- Unit test for Statsig warn-once behavior
+- [internal] Unit tests for new CSP entries (Sentry regional wildcard, Vercel analytics hash)
+- [internal] Unit test for Statsig warn-once behavior
 
 ## [26.4.29] - 2026-03-20
 
@@ -158,11 +193,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Public changelog page, RSS feed, and subscriber emails now show plain-language summaries and hide developer-facing details
 - Each release has a short summary at the top describing what changed in simple terms
-- Consolidated changelog parsing into a shared module used by the page and RSS feed
+- [internal] Consolidated changelog parsing into a shared module used by the page and RSS feed
 
 ### Added
 
-- Shared changelog parser (`apps/web/lib/changelog-parser.ts`) used by both the page and RSS feed
+- [internal] Shared changelog parser (`apps/web/lib/changelog-parser.ts`) used by both the page and RSS feed
 - 12 unit tests for the shared changelog parser
 
 ## [26.4.29] - 2026-03-20
@@ -357,7 +392,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- "Delete account" moved from the dropdown menu to Settings for safety — it was too easy to click accidentally
+- [internal] "Delete account" moved from the dropdown menu to Settings for safety — it was too easy to click accidentally
 - [internal] Extended useTrackAudioPlayer hook with track metadata (title, release, artist, artwork) for any UI surface to render current track
 - [internal] All 5 toggleTrack callers now pass release metadata (ReleaseCell, ReleaseTrackList, TrackRow, ReleaseSidebar, NowPlayingCard)
 
@@ -417,7 +452,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Release artwork self-hosted from `/img/releases/` instead of Spotify CDN
 - [internal] Added persistent "Claim your handle" ghost button during dashboard animation
 - [internal] Mobile dashboard uses stacked row layout for full smart link URL visibility
-- Smart checkout step after onboarding recommends a plan based on your audience size
+- [internal] Smart checkout step after onboarding recommends a plan based on your audience size
 - [internal] Onboarding checkout intercept: all users completing onboarding now see an upgrade page (gated by `ONBOARDING_CHECKOUT_STEP` feature flag)
 - [internal] Smart plan recommendation: Spotify followers determine suggested tier (Pro for <10K, Growth for 10K+)
 - [internal] Personalized checkout hint for organic users with their jov.ie handle
@@ -506,7 +541,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - "Delete account" is now easy to find — Settings shows all sections, plus there's a direct link in your profile menu
-- Changelog pages now show a friendly error page instead of crashing on temporary issues
+- [internal] Changelog pages now show a friendly error page instead of crashing on temporary issues
 - [internal] Account deletion now discoverable: settings page shows all sections (Data & Privacy was hidden by focusSection='account')
 - [internal] Added "Delete account" link to user profile menu with destructive styling
 - [internal] Added direct `/app/settings/delete-account` route for deep-linking
@@ -540,7 +575,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Spotify import progress bar now shows real progress ("5 of 30 imported") instead of a bouncing animation
 - Import progress no longer flashes in and out during active imports
-- "No matching Apple Music artist" banner no longer shows while Spotify import is still running
+- [internal] "No matching Apple Music artist" banner no longer shows while Spotify import is still running
 - Progress bar holds at 100% briefly before disappearing for a polished finish
 - [internal] Move Next.js dev indicator to top-right corner so it no longer overlaps the DevToolbar at the bottom of the screen
 - [internal] Added 1-second completion hold at 100% before banner fadeout for a polished finish
@@ -566,7 +601,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Waitlist can now be toggled on/off from the admin panel without restarting the server
+- [internal] Waitlist can now be toggled on/off from the admin panel without restarting the server
 - [internal] Waitlist gating: replaced `WAITLIST_ENABLED` env var with DB-only `gateEnabled` toggle — admin panel now controls waitlist without server restarts
 - [internal] Default waitlist state for fresh environments changed to OFF (gateEnabled: false), matching previous env-var-unset behavior
 
@@ -598,8 +633,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- New blog post: "The Contact Problem"
-- Pause all outreach emails with a single toggle in the admin panel
+- [internal] Pause all outreach emails with a single toggle in the admin panel
 - [internal] Multi-DSP golden path assertions: poll for Apple Music, Deezer, Tidal, YouTube Music, SoundCloud IDs after Spotify connect with tiered thresholds by artist size
 - [internal] Profile page DSP round-trip test: navigate to public profile page and verify multiple DSP links render
 - [internal] Seed multi-DSP data for dualipa test profile (6 DSP IDs + 4 social links) for reliable E2E assertions
@@ -621,7 +655,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Homepage headline updated to "One link to launch your music career"
+- [internal] Homepage headline updated to "One link to launch your music career"
 - [internal] Conductor workspace archive script to clean up build artifacts and node_modules when archiving
 - [internal] Meta descriptions and SEO schema updated across all pages to new positioning
 - [internal] llms.txt brand description updated to match new messaging
@@ -641,7 +675,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Bulk actions for managing creators, users, and waitlist entries from the admin panel
+- [internal] Bulk actions for managing creators, users, and waitlist entries from the admin panel
 - [internal] Non-interactive cleanup mode (`--force`, `--dry-run`) for E2E test account script, enabling agents and CI to clean up without human prompts
 - [internal] Paginated Clerk user discovery and database record cleanup (FK CASCADE) in cleanup script
 - [internal] Rate-limited batch deletion with exponential backoff for Clerk API calls
@@ -830,8 +864,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - New help pages: Tour Dates, Verified Badge, AI Insights, Ad Pixels, Fan CRM, Retargeting Ads, Plans & Pricing
 - New guides: Share Your First Smart Link, Set Up Tipping, Set Up Ad Pixels, Connect Bandsintown
-- After onboarding, you'll see a personalized upgrade page with a plan recommendation based on your audience size
-- Upgrade prompts now appear when you're close to reaching plan limits
+- [internal] After onboarding, you'll see a personalized upgrade page with a plan recommendation based on your audience size
+- [internal] Upgrade prompts now appear when you're close to reaching plan limits
 - [internal] `docs/PRODUCT_CAPABILITIES.md` — canonical rich feature catalog for AI agents with 37+ features, consistent schema
 - [internal] "Use This Sound" feature documented in FEATURE_REGISTRY
 - [internal] Signup-to-paid conversion funnel: capture `?plan=` intent at signup, persist through onboarding, present personalized checkout step before dashboard
@@ -860,7 +894,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - DSP Presence page — see all your matched streaming platform profiles (Spotify, Apple Music, Deezer, etc.) with match confidence and confirm/reject actions
-- Centralized admin settings page for campaign targeting, developer tools, and waitlist controls
+- [internal] Centralized admin settings page for campaign targeting, developer tools, and waitlist controls
 - [internal] Admin settings section in Settings sidebar with dedicated `/app/settings/admin` route
 - [internal] `CampaignSettingsPanel` — campaign targeting (fit score, batch size) and throttling controls moved from inline campaign manager to centralized settings
 - [internal] Dev toolbar on/off toggle under Admin > Developer tools
@@ -900,7 +934,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Reordered homepage sections for a better flow
+- [internal] Reordered homepage sections for a better flow
 - [internal] Move phone carousel (DeeplinksGrid) above CRM section (AudienceCRMSection) on homepage
 
 ### Fixed
@@ -919,15 +953,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Added
 
 - "On Jovie" badge on search results for artists already on the platform
-- 5-second profile review pause during onboarding so you can see your enriched profile before continuing
+- [internal] 5-second profile review pause during onboarding so you can see your enriched profile before continuing
 - Right-click context menus on all data tables for quick actions
 
 ### Fixed
 
 - Your claimed artist now appears first in search results so you can easily find yourself among duplicates
 - Dashboard now loads completely after onboarding — sidebar, streaming links, and social links all appear immediately
-- Profile review button is disabled while your data is still loading (with a 10-second safety timeout)
-- Tour Dates table shows the full menu (Edit, Open tickets, Delete) on both the menu button and right-click
+- [internal] Profile review button is disabled while your data is still loading (with a 10-second safety timeout)
+- [internal] Tour Dates table shows the full menu (Edit, Open tickets, Delete) on both the menu button and right-click
 - [internal] Dashboard redirect now waits for `connectSpotifyArtist` DB writes to complete — fixes empty sidebar, missing DSPs, and missing social links after onboarding
 - [internal] Profile review CTA disabled while enrichment or Spotify connection is still in progress (with 10s timeout fallback)
 
@@ -937,7 +971,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Demo sidebar tabs (Audience, Earnings) no longer redirect to sign-in — shows a toast notification instead
+- [internal] Demo sidebar tabs (Audience, Earnings) no longer redirect to sign-in — shows a toast notification instead
 - Error messages now display when something goes wrong (like "Handle already taken") instead of silently reverting
 - [internal] `isAppleMusicConfigured()` now reads env vars at call time instead of module load, fixing false positives when Doppler injects credentials
 - [internal] Google CSE tests now correctly stub SerpAPI key to exercise the Google CSE code path
@@ -953,7 +987,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Wider content layout for a more spacious feel
 - Dark mode now works on sign-in, sign-up, waitlist, and onboarding pages
 - Updated messaging across the homepage
-- SSO loading screens now match the app's dark theme
+- [internal] SSO loading screens now match the app's dark theme
 - [internal] Migrated all marketing homepage components from hardcoded rgba/hex to CSS design tokens (`var(--linear-*)`)
 - [internal] Replaced fluid `clamp()` typography with discrete breakpoints matching Linear.app's exact values at 375/768/1280/1440px
 - [internal] Widened homepage content max-width from 984px to 1250px to match Linear.app layout
@@ -966,7 +1000,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Badge component now uses pill shape (`rounded-full`) and 12px font size
 - [internal] Button component uses hardcoded `rounded-[4px]` instead of `--radius-default` variable
 - [internal] Replaced hardcoded `#5e6ad2` accent in PricingSection with `var(--color-accent)` token
-- Pricing buttons now link directly to the plan you choose
+- [internal] Pricing buttons now link directly to the plan you choose
 
 ### Fixed
 
@@ -974,9 +1008,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Social link delete no longer fails on temporary items
 - Social links show proper platform names instead of raw URLs
 - Mobile settings page now shows all tabs (Links, Music, Earn, About) — they were hidden on small screens
-- Analytics section reserves space during loading to prevent layout shift
+- [internal] Analytics section reserves space during loading to prevent layout shift
 - Homepage claim button now validates your handle before submitting
-- CRM audience demo table now shows visible labels for all columns
+- [internal] CRM audience demo table now shows visible labels for all columns
 - Social links on artist profiles now open in new tabs
 - "Log in" link is now visible on mobile homepage
 - [internal] Social link optimistic rollback now properly reverts UI on server error (was using stale closure instead of snapshot)
@@ -993,7 +1027,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- "Already claimed" indicator on Spotify search results for artists linked to another account
+- Spotify search shows when an artist is already claimed by another account
 - [internal] Canonical CDN domain registry (`constants/platforms/cdn-domains.ts`) as single source of truth for all platform image domains
 - [internal] Comprehensive CDN coverage for all supported platforms
 - [internal] Sync test to verify `next.config.js` remotePatterns stays in sync with the CDN registry
@@ -1046,9 +1080,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Pro subscription ($5/month) with branding removal, advanced features, and Stripe checkout
+- Pro subscription with branding removal and advanced features
 - Pricing page with Free and Pro plan comparison
-- Billing success page with upgrade confirmation
+- [internal] Billing success page with upgrade confirmation
 - Pro users can remove "Made with Jovie" branding from their profile
 - [internal] Initial design token map and tailwind v4 config
 - [internal] Canonical shadcn Button atom

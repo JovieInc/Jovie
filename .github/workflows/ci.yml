@@ -610,6 +610,10 @@ jobs:
         if: steps.download.outcome == 'success'
         run: |
           cd apps/web
+          if [ ! -f tests/e2e/layout-overlap-guard.spec.ts ]; then
+            echo "⚠ layout-overlap-guard.spec.ts not found — skipping"
+            exit 0
+          fi
           mkdir -p tests/.auth
           echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
           PORT=3100 pnpm --filter=@jovie/web exec next start &
