@@ -13,6 +13,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Blog author sections now pull display name, avatar, and verified badge from the author's Jovie profile instead of hardcoded frontmatter
 - Batch profile query `getProfilesByUsernames` for efficient blog index rendering
 - `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
+### Fixed
+
+- Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
+- Extract shared `FF_OVERRIDES_KEY` constant to prevent key drift between toolbar and provider
 
 ## [26.4.40] - 2026-03-22
 
