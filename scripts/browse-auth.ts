@@ -197,7 +197,9 @@ async function main() {
   // Click "Continue with email"
   console.log('Clicking "Continue with email"...');
   await page.getByRole('button', { name: 'Continue with email' }).click();
-  await page.waitForTimeout(500);
+  await page
+    .getByLabel('Email Address')
+    .waitFor({ state: 'visible', timeout: 5000 });
 
   // Fill email and submit
   console.log(`Entering email: ${TEST_EMAIL}`);
