@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.38] - 2026-03-21
+
+### Added
+
+- Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
+- Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
+
 ## [26.4.37] - 2026-03-21
 
 ### Changed
