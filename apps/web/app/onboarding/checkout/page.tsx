@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
-import { resolveUserState, UserState } from '@/lib/auth/gate';
+import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import type { PlanIntentTier } from '@/lib/auth/plan-intent';
 import {
   DEFAULT_UPSELL_PLAN,
@@ -71,7 +71,7 @@ export default async function OnboardingCheckoutPage({
   const authResult = await resolveUserState();
   if (
     !authResult.clerkUserId ||
-    authResult.state === UserState.UNAUTHENTICATED
+    authResult.state === CanonicalUserState.UNAUTHENTICATED
   ) {
     redirect(APP_ROUTES.SIGNIN);
   }
