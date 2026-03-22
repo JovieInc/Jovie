@@ -236,8 +236,8 @@ These rules are enforced by `.claude/hooks/` and will **block your changes** if 
 
 ### 1. Migration Files Are Immutable
 
-- **NEVER** edit files in `drizzle/migrations/`
-- **NEVER** delete or rename migration files
+- **NEVER** edit, delete, or rename migration SQL or snapshot files that already exist in `drizzle/migrations/` on the base branch
+- **ALLOW** generated append-only migration artifacts for a new migration: one new `*.sql`, one new `meta/*_snapshot.json`, and the corresponding append to `meta/_journal.json`
 - To fix a migration issue: create a NEW migration
 
 ### 2. No Direct middleware.ts Creation
