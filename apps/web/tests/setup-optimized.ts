@@ -203,6 +203,7 @@ vi.mock('@clerk/nextjs', () => ({
     setActive: async () => {},
   }),
   useSignIn: () => ({
+    isLoaded: true,
     fetchStatus: 'idle',
     errors: [],
     signIn: null,

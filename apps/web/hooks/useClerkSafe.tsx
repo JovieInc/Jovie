@@ -135,13 +135,16 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const session = useSessionOriginal();
   const clerk = useClerkOriginal();
   const signInSignal = useSignInSignalOriginal();
+  // Core 3 Signal API has no isLoaded — derive from fetchStatus instead.
+  // signIn is always a SignInFutureResource inside ClerkProvider; we coerce
+  // to null for the safe-hook contract when Clerk is bypassed.
   const signIn = useMemo<UseSignInReturn>(
     () => ({
-      isLoaded: signInSignal.signIn !== null,
-      signIn: signInSignal.signIn,
+      isLoaded: signInSignal.fetchStatus === 'idle',
+      signIn: signInSignal.signIn ?? null,
       setActive: clerk.setActive,
     }),
-    [clerk.setActive, signInSignal.signIn]
+    [clerk.setActive, signInSignal.fetchStatus, signInSignal.signIn]
   );
 
   const value = useMemo(

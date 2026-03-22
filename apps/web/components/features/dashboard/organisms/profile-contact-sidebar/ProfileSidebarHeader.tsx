@@ -90,12 +90,7 @@ export function useProfileHeaderParts({
     const blob = new Blob([generateVCard(displayName, username, profileUrl)], {
       type: 'text/vcard',
     });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${username}.vcf`;
-    link.click();
-    URL.revokeObjectURL(blobUrl);
+    downloadBlob(blob, `${username}.vcf`);
     toast.success('vCard downloaded');
   };
 
@@ -148,12 +143,12 @@ export function useProfileHeaderParts({
     },
   ];
 
-  const primaryLabel =
-    displayName && displayName !== username
-      ? displayName
-      : username
-        ? `@${username}`
-        : 'Profile';
+  let primaryLabel = 'Profile';
+  if (displayName && displayName !== username) {
+    primaryLabel = displayName;
+  } else if (username) {
+    primaryLabel = `@${username}`;
+  }
 
   const secondaryLabel =
     username && displayName && displayName !== username ? `@${username}` : null;

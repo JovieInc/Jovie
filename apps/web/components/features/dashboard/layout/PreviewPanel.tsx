@@ -269,7 +269,10 @@ export function PreviewPanel() {
     previewData.activeSinceYear ? `Since ${previewData.activeSinceYear}` : null,
     hasBio ? 'Bio live' : null,
     connectedDspCount > 0 ? `${connectedDspCount} connected` : null,
-  ].filter((value): value is string => Boolean(value));
+  ].filter(
+    (value, i, arr): value is string =>
+      Boolean(value) && arr.indexOf(value) === i
+  );
   const headerTitle: ReactNode = (
     <div className='min-w-0 space-y-0.5'>
       <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
@@ -320,14 +323,14 @@ export function PreviewPanel() {
                   </p>
                 </div>
                 <div className='flex items-center gap-1.5'>
-                  <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                  <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
                     Mobile
                   </div>
-                  <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                  <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
                     {visibleLinkCount} live
                   </div>
                   {hiddenLinkCount > 0 && (
-                    <div className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
+                    <div className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
                       {hiddenLinkCount} draft{hiddenLinkCount === 1 ? '' : 's'}
                     </div>
                   )}
@@ -339,7 +342,7 @@ export function PreviewPanel() {
                   <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
                     <div className='mb-2 flex items-center justify-between px-2.5 pt-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'>
                       <span>Preview</span>
-                      <span className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0.5 text-[9px]'>
+                      <span className='rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-[9px]'>
                         {username ? `@${username}` : 'Profile'}
                       </span>
                     </div>
@@ -436,11 +439,11 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-[10px] border-subtle bg-surface-0 px-2.5 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  className='shrink-0 rounded-[10px] border border-subtle bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -465,19 +468,17 @@ export function PreviewPanel() {
                 </p>
               </div>
 
-              <p className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
+              <p className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
                 {visibleLinkCount} visible link
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile
                 {hiddenLinkCount > 0
-                  ? `, with ${hiddenLinkCount} draft${
-                      hiddenLinkCount === 1 ? '' : 's'
-                    } still hidden from visitors.`
+                  ? `, with ${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'} still hidden from visitors.`
                   : '.'}
               </p>
 
               <div className='grid grid-cols-3 gap-2'>
-                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
                   <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
                     Visible
                   </p>
@@ -485,7 +486,7 @@ export function PreviewPanel() {
                     {visibleLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
                   <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
                     Hidden
                   </p>
@@ -493,7 +494,7 @@ export function PreviewPanel() {
                     {hiddenLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+                <div className='rounded-[12px] border border-subtle bg-surface-0 px-2.5 py-2'>
                   <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
                     DSPs
                   </p>
@@ -507,7 +508,7 @@ export function PreviewPanel() {
                 {snapshotTags.map(tag => (
                   <span
                     key={tag}
-                    className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'
+                    className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-secondary-token'
                   >
                     {tag}
                   </span>
