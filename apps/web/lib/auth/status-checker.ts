@@ -4,8 +4,7 @@
  * Handles user status validation for auth gating.
  */
 
-// eslint-disable-next-line import/no-cycle -- mutual dependency with gate.ts for auth state
-import { UserState } from './gate';
+import { CanonicalUserState } from './canonical-user-state';
 
 /**
  * Result of user status check.
@@ -14,7 +13,7 @@ export interface UserStatusCheckResult {
   /** Whether user is blocked (banned, suspended, or deleted) */
   isBlocked: boolean;
   /** User state if blocked */
-  blockedState: UserState | null;
+  blockedState: CanonicalUserState | null;
   /** Redirect path if blocked */
   redirectTo: string | null;
 }
@@ -34,7 +33,7 @@ export function checkUserStatus(
   if (deletedAt) {
     return {
       isBlocked: true,
-      blockedState: UserState.BANNED,
+      blockedState: CanonicalUserState.BANNED,
       redirectTo: '/banned',
     };
   }
@@ -43,7 +42,7 @@ export function checkUserStatus(
   if (userStatus === 'banned' || userStatus === 'suspended') {
     return {
       isBlocked: true,
-      blockedState: UserState.BANNED,
+      blockedState: CanonicalUserState.BANNED,
       redirectTo: '/banned',
     };
   }

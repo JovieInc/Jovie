@@ -57,6 +57,13 @@
       "when": 1774339000000,
       "tag": "0007_repair_missing_claim_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1774149000000,
+      "tag": "0008_repair_missing_claim_tables_retry",
+      "breakpoints": true
     }
   ]
 }

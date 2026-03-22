@@ -39,6 +39,86 @@ interface DbColumn {
   column_name: string;
 }
 
+interface ExpectedColumn {
+  table: string;
+  column: string;
+}
+
+const MAX_VERIFY_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 2_000;
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function groupByTable(mismatches: ExpectedColumn[]): Map<string, string[]> {
+  const byTable = new Map<string, string[]>();
+  for (const mismatch of mismatches) {
+    if (!byTable.has(mismatch.table)) byTable.set(mismatch.table, []);
+    byTable.get(mismatch.table)!.push(mismatch.column);
+  }
+  return byTable;
+}
+
+async function loadDbColumns(pool: Pool): Promise<Map<string, Set<string>>> {
+  const dbResult = await pool.query<DbColumn>(`
+    SELECT table_name, column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+    ORDER BY table_name, ordinal_position
+  `);
+
+  const dbColumns = new Map<string, Set<string>>();
+  for (const row of dbResult.rows) {
+    if (!dbColumns.has(row.table_name)) {
+      dbColumns.set(row.table_name, new Set());
+    }
+    dbColumns.get(row.table_name)!.add(row.column_name);
+  }
+
+  return dbColumns;
+}
+
+function loadExpectedColumns(): {
+  expectedColumns: ExpectedColumn[];
+  tablesChecked: number;
+  columnsChecked: number;
+} {
+  const expectedColumns: ExpectedColumn[] = [];
+  let tablesChecked = 0;
+  let columnsChecked = 0;
+
+  for (const [_exportName, exported] of Object.entries(schema)) {
+    if (!is(exported, PgTable)) continue;
+
+    const tableName = getTableName(exported);
+    const columns = getTableColumns(exported);
+    tablesChecked++;
+
+    for (const [_key, col] of Object.entries(columns)) {
+      const dbColName = (col as unknown as { name: string }).name;
+      expectedColumns.push({ table: tableName, column: dbColName });
+      columnsChecked++;
+    }
+  }
+
+  return { expectedColumns, tablesChecked, columnsChecked };
+}
+
+function findMismatches(
+  expectedColumns: ExpectedColumn[],
+  dbColumns: Map<string, Set<string>>
+): ExpectedColumn[] {
+  const mismatches: ExpectedColumn[] = [];
+
+  for (const expected of expectedColumns) {
+    const actualColumns = dbColumns.get(expected.table);
+    if (!actualColumns || !actualColumns.has(expected.column)) {
+      mismatches.push(expected);
+    }
+  }
+
+  return mismatches;
+}
+
 async function main() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -49,56 +129,26 @@ async function main() {
   const pool = new Pool({ connectionString: databaseUrl });
 
   try {
-    // 1. Get all columns from the actual database
-    const dbResult = await pool.query<DbColumn>(`
-      SELECT table_name, column_name
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-      ORDER BY table_name, ordinal_position
-    `);
+    const { expectedColumns, tablesChecked, columnsChecked } =
+      loadExpectedColumns();
+    let mismatches: ExpectedColumn[] = [];
 
-    const dbColumns = new Map<string, Set<string>>();
-    for (const row of dbResult.rows) {
-      if (!dbColumns.has(row.table_name)) {
-        dbColumns.set(row.table_name, new Set());
-      }
-      dbColumns.get(row.table_name)!.add(row.column_name);
-    }
+    for (let attempt = 1; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
+      const dbColumns = await loadDbColumns(pool);
+      mismatches = findMismatches(expectedColumns, dbColumns);
 
-    // 2. Extract expected columns from Drizzle schema
-    const mismatches: Array<{ table: string; column: string }> = [];
-    let tablesChecked = 0;
-    let columnsChecked = 0;
-
-    for (const [_exportName, exported] of Object.entries(schema)) {
-      if (!is(exported, PgTable)) continue;
-
-      const tableName = getTableName(exported);
-      const columns = getTableColumns(exported);
-      tablesChecked++;
-
-      const actualColumns = dbColumns.get(tableName);
-      if (!actualColumns) {
-        // Entire table missing — report all columns
-        for (const [_key, col] of Object.entries(columns)) {
-          const dbColName = (col as unknown as { name: string }).name;
-          mismatches.push({ table: tableName, column: dbColName });
-          columnsChecked++;
-        }
-        continue;
+      if (mismatches.length === 0) {
+        break;
       }
 
-      for (const [_key, col] of Object.entries(columns)) {
-        const dbColName = (col as unknown as { name: string }).name;
-        columnsChecked++;
-
-        if (!actualColumns.has(dbColName)) {
-          mismatches.push({ table: tableName, column: dbColName });
-        }
+      if (attempt < MAX_VERIFY_ATTEMPTS) {
+        console.warn(
+          `${colors.yellow}⚠${colors.reset} Schema mismatch on attempt ${attempt}/${MAX_VERIFY_ATTEMPTS} (${mismatches.length} missing columns). Retrying in ${RETRY_DELAY_MS / 1000}s...`
+        );
+        await sleep(RETRY_DELAY_MS);
       }
     }
 
-    // 3. Report results
     if (mismatches.length === 0) {
       console.log(
         `${colors.green}✓${colors.reset} Schema verification passed — ${columnsChecked} columns across ${tablesChecked} tables match the database`
@@ -107,11 +157,7 @@ async function main() {
     }
 
     // Group mismatches by table for readable output
-    const byTable = new Map<string, string[]>();
-    for (const m of mismatches) {
-      if (!byTable.has(m.table)) byTable.set(m.table, []);
-      byTable.get(m.table)!.push(m.column);
-    }
+    const byTable = groupByTable(mismatches);
 
     console.error(
       `\n${colors.red}${colors.bright}✗ Schema verification FAILED${colors.reset}`
