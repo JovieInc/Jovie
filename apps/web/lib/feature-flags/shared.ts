@@ -57,6 +57,8 @@ export const FEATURE_FLAGS = {
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
 
+export const FF_OVERRIDES_KEY = '__ff_overrides';
+
 export const CODE_FLAG_KEYS = {
   THREADS_ENABLED: 'code:THREADS_ENABLED',
   SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
