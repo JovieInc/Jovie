@@ -795,52 +795,36 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             }
           : {};
 
-      const profileValues = {
-        username: profile.username,
-        usernameNormalized: profile.username.toLowerCase(),
-        displayName: profile.displayName,
-        bio: profile.bio,
-        spotifyUrl: profile.spotifyUrl || null,
-        avatarUrl: profile.avatarUrl || null,
-        creatorType: 'artist' as const,
-        isPublic: true,
-        isVerified: false,
-        isClaimed: false,
-        ingestionStatus: 'idle' as const,
-        ...dspFields,
-      };
+      // Delete any existing profile with this username first (also cascades social links).
+      // We delete unconditionally by usernameNormalized — no existence check needed.
+      // The Neon CI branches may inherit data from the parent branch.
+      await db
+        .delete(creatorProfiles)
+        .where(
+          eq(creatorProfiles.usernameNormalized, profile.username.toLowerCase())
+        );
 
-      // Use upsert (ON CONFLICT DO UPDATE) to atomically handle existing profiles.
-      // The Neon HTTP driver sends each query as a separate HTTP request, so
-      // delete-then-insert is not transactional and can fail with duplicate key
-      // if the branch already has data from the parent.
       const [createdProfile] = await db
         .insert(creatorProfiles)
-        .values(profileValues)
-        .onConflictDoUpdate({
-          target: creatorProfiles.usernameNormalized,
-          set: {
-            displayName: profileValues.displayName,
-            bio: profileValues.bio,
-            spotifyUrl: profileValues.spotifyUrl,
-            avatarUrl: profileValues.avatarUrl,
-            isPublic: profileValues.isPublic,
-            isVerified: profileValues.isVerified,
-            isClaimed: profileValues.isClaimed,
-            ingestionStatus: profileValues.ingestionStatus,
-            ...dspFields,
-          },
+        .values({
+          username: profile.username,
+          usernameNormalized: profile.username.toLowerCase(),
+          displayName: profile.displayName,
+          bio: profile.bio,
+          spotifyUrl: profile.spotifyUrl || null,
+          avatarUrl: profile.avatarUrl || null,
+          creatorType: 'artist' as const,
+          isPublic: true,
+          isVerified: false,
+          isClaimed: false,
+          ingestionStatus: 'idle' as const,
+          ...dspFields,
         })
         .returning({ id: creatorProfiles.id });
 
       console.log(
-        `    ✓ Upserted profile ${profile.username} (ID: ${createdProfile.id})`
+        `    ✓ Created profile ${profile.username} (ID: ${createdProfile.id})`
       );
-
-      // Clean up existing social links before re-seeding (upsert doesn't cascade-delete)
-      await db
-        .delete(socialLinks)
-        .where(eq(socialLinks.creatorProfileId, createdProfile.id));
 
       // Add a sample social link
       if (profile.spotifyUrl) {
