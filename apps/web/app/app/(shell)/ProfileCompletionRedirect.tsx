@@ -3,20 +3,18 @@
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
-
-function isBlank(value: string | null | undefined): boolean {
-  return !value?.trim();
-}
+import { isProfileComplete } from '@/lib/auth/profile-completeness';
 
 /**
  * Client-side safety net for onboarding redirects.
  *
  * If server-side onboarding checks fail due to network/cache timing,
  * this guard ensures authenticated users without a usable profile
- * (missing handle, display name, or avatar) are sent to onboarding.
+ * are sent to onboarding.
  *
- * Avatar is required — onboarding enforces photo upload at the profile
- * review step, and step-resume routes existing users back to complete it.
+ * Uses the canonical isProfileComplete() check, plus an additional
+ * avatar check — avatar is enforced client-side only because it uploads
+ * asynchronously during onboarding steps 1-2.
  */
 export function ProfileCompletionRedirect() {
   const { selectedProfile, dashboardLoadError } = useDashboardData();
@@ -35,10 +33,11 @@ export function ProfileCompletionRedirect() {
       return;
     }
 
+    // Canonical completeness check (username, displayName, isPublic, onboarding)
+    // plus avatar which is only enforced client-side.
     if (
-      isBlank(selectedProfile.username) ||
-      isBlank(selectedProfile.displayName) ||
-      isBlank(selectedProfile.avatarUrl)
+      !isProfileComplete(selectedProfile) ||
+      !selectedProfile.avatarUrl?.trim()
     ) {
       router.replace('/onboarding');
     }

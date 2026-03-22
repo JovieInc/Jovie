@@ -10,6 +10,7 @@ import {
   formatCommissionRate,
 } from '@/lib/referrals/config';
 import {
+  getInternalUserId,
   getOrCreateReferralCode,
   getReferralStats,
 } from '@/lib/referrals/service';
@@ -28,9 +29,14 @@ export default async function SettingsReferralPage() {
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/referral`);
   }
 
+  const internalUserId = await getInternalUserId(userId);
+  if (!internalUserId) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
   const [referralResult, stats] = await Promise.all([
-    getOrCreateReferralCode(userId),
-    getReferralStats(userId),
+    getOrCreateReferralCode(internalUserId),
+    getReferralStats(internalUserId),
   ]);
 
   const commissionRate = formatCommissionRate(DEFAULT_COMMISSION_RATE_BPS);

@@ -3,7 +3,10 @@ import {
   applyPublicProfileLinkCaps,
   capProfileLinkInputs,
 } from '@/lib/profile/social-link-limits';
-import { getContextAwareLinks } from '@/lib/utils/context-aware-links';
+import {
+  getContextAwareLinks,
+  getHeaderSocialLinks,
+} from '@/lib/utils/context-aware-links';
 import type { LegacySocialLink } from '@/types/db';
 
 const createLink = (
@@ -90,5 +93,18 @@ describe('context-aware link ordering', () => {
       'twitter',
       'youtube',
     ]);
+  });
+
+  it('caps header social links to two high-priority platforms and excludes the source platform', () => {
+    const links = [
+      createLink('1', 'twitter', 'https://x.com/artist'),
+      createLink('2', 'instagram', 'https://instagram.com/artist'),
+      createLink('3', 'youtube', 'https://youtube.com/@artist'),
+      createLink('4', 'tiktok', 'https://tiktok.com/@artist'),
+    ];
+
+    const result = getHeaderSocialLinks(links, 'instagram');
+
+    expect(result.map(link => link.platform)).toEqual(['tiktok', 'youtube']);
   });
 });

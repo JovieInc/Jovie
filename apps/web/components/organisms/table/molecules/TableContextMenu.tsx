@@ -108,7 +108,7 @@ export function convertContextMenuItems(
   return items.map((item, index) => {
     if (isSeparator(item)) {
       return {
-        id: 'separator', // Must be exactly 'separator' for TableActionMenu to recognize it
+        id: `separator-${index}`,
         label: '', // Empty label, will be rendered as separator component
         onClick: () => {}, // Required by type, but unused for separators
       };

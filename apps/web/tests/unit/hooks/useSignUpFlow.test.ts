@@ -10,20 +10,27 @@ const setActiveMock = vi.fn();
 const createMock = vi.fn();
 const prepareEmailVerificationMock = vi.fn();
 const attemptEmailVerificationMock = vi.fn();
+const authenticateWithRedirectMock = vi.fn();
+const signUpResource = {
+  create: createMock,
+  verifications: {
+    sendEmailCode: prepareEmailVerificationMock,
+    verifyEmailCode: attemptEmailVerificationMock,
+  },
+  finalize: setActiveMock,
+  authenticateWithRedirect: authenticateWithRedirectMock,
+  status: null as string | null,
+};
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-vi.mock('@clerk/nextjs/legacy', () => ({
+vi.mock('@clerk/nextjs', () => ({
   useSignUp: () => ({
-    signUp: {
-      create: createMock,
-      prepareEmailAddressVerification: prepareEmailVerificationMock,
-      attemptEmailAddressVerification: attemptEmailVerificationMock,
-    },
-    setActive: setActiveMock,
-    isLoaded: true,
+    fetchStatus: 'idle',
+    errors: [],
+    signUp: signUpResource,
   }),
 }));
 
@@ -40,8 +47,9 @@ vi.mock('@/constants/domains', () => ({
 async function setupVerificationStep(result: {
   current: ReturnType<typeof useSignUpFlow>;
 }) {
-  createMock.mockResolvedValue(undefined);
-  prepareEmailVerificationMock.mockResolvedValue(undefined);
+  signUpResource.status = null;
+  createMock.mockResolvedValue({ error: null });
+  prepareEmailVerificationMock.mockResolvedValue({ error: null });
 
   await act(async () => {
     await result.current.startEmailFlow('test@example.com');
@@ -55,15 +63,17 @@ async function setupVerificationStep(result: {
 describe('useSignUpFlow – status handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setActiveMock.mockResolvedValue(undefined);
+    signUpResource.status = null;
+    setActiveMock.mockResolvedValue({ error: null });
   });
 
   it('shows specific message for abandoned status', async () => {
     const { result } = renderHook(() => useSignUpFlow());
     await setupVerificationStep(result);
 
-    attemptEmailVerificationMock.mockResolvedValue({
-      status: 'abandoned',
+    attemptEmailVerificationMock.mockImplementation(async () => {
+      signUpResource.status = 'abandoned';
+      return { error: null };
     });
 
     await act(async () => {
@@ -79,8 +89,9 @@ describe('useSignUpFlow – status handling', () => {
     const { result } = renderHook(() => useSignUpFlow());
     await setupVerificationStep(result);
 
-    attemptEmailVerificationMock.mockResolvedValue({
-      status: 'some_future_status',
+    attemptEmailVerificationMock.mockImplementation(async () => {
+      signUpResource.status = 'some_future_status';
+      return { error: null };
     });
 
     await act(async () => {

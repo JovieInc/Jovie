@@ -90,12 +90,7 @@ export function useProfileHeaderParts({
     const blob = new Blob([generateVCard(displayName, username, profileUrl)], {
       type: 'text/vcard',
     });
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = `${username}.vcf`;
-    link.click();
-    URL.revokeObjectURL(blobUrl);
+    downloadBlob(blob, `${username}.vcf`);
     toast.success('vCard downloaded');
   };
 
@@ -123,7 +118,7 @@ export function useProfileHeaderParts({
       icon: Copy,
       activeIcon: Check,
       isActive: isCopied,
-      onClick: () => void handleCopyUrl(),
+      onClick: handleCopyUrl,
     },
   ];
 
@@ -144,15 +139,37 @@ export function useProfileHeaderParts({
       id: 'qr',
       label: 'Download QR code',
       icon: QrCode,
-      onClick: () => void handleDownloadQRCode(),
+      onClick: handleDownloadQRCode,
     },
   ];
 
-  const title: ReactNode = username
-    ? displayName && displayName !== username
-      ? `${displayName} · @${username}`
-      : `@${username}`
-    : 'Profile';
+  let primaryLabel = 'Profile';
+  if (displayName && displayName !== username) {
+    primaryLabel = displayName;
+  } else if (username) {
+    primaryLabel = `@${username}`;
+  }
+
+  const secondaryLabel =
+    username && displayName && displayName !== username ? `@${username}` : null;
+
+  const title: ReactNode = (
+    <div className='min-w-0 space-y-0.5'>
+      <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+        Profile workspace
+      </p>
+      <div className='flex min-w-0 items-center gap-1.5'>
+        <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+          {primaryLabel}
+        </span>
+        {secondaryLabel && (
+          <span className='truncate text-[11px] text-secondary-token'>
+            {secondaryLabel}
+          </span>
+        )}
+      </div>
+    </div>
+  );
 
   const actions = (
     <DrawerHeaderActions
