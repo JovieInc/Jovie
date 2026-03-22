@@ -1,23 +1,6 @@
-'use client';
-
-import { Mail, MapPin, Users } from 'lucide-react';
-import { lazy, Suspense } from 'react';
 import { NumberedSection } from '@/components/marketing';
+import { ProductScreenshot } from './ProductScreenshot';
 
-const DemoAudienceSection = lazy(
-  () => import('@/features/demo/DemoAudienceSection')
-);
-
-/* ------------------------------------------------------------------ */
-/*  Stat cards shown above the table                                    */
-/* ------------------------------------------------------------------ */
-
-const STATS = [
-  { label: 'Total fans', value: '42,891', icon: Users },
-  { label: 'Captured contacts', value: '12,318', icon: Mail },
-  { label: 'Top city', value: 'Los Angeles', icon: MapPin },
-  { label: 'Fan value', value: 'High intent', icon: Users },
-];
 const SUB_ITEMS = [
   {
     number: '3.1',
@@ -39,71 +22,6 @@ const SUB_ITEMS = [
   },
 ];
 
-/* ------------------------------------------------------------------ */
-/*  Loading skeleton (matches old FansTable layout)                     */
-/* ------------------------------------------------------------------ */
-
-function TableSkeleton() {
-  return (
-    <div className='animate-pulse bg-surface-0'>
-      {/* Table header skeleton */}
-      <div className='flex items-center justify-between border-b border-subtle px-5 py-3'>
-        <div className='flex items-center gap-2'>
-          <div className='h-4 w-24 rounded bg-surface-2' />
-          <div className='h-4 w-8 rounded-full bg-surface-2' />
-        </div>
-        <div className='h-4 w-16 rounded bg-surface-2' />
-      </div>
-
-      {/* Column headers skeleton */}
-      <div className='flex items-center gap-4 border-b border-subtle px-5 py-2'>
-        {[
-          { key: 'col-name', width: 'w-16' },
-          { key: 'col-city', width: 'w-12' },
-          { key: 'col-source', width: 'w-16' },
-          { key: 'col-date', width: 'w-14' },
-          { key: 'col-status', width: 'w-20' },
-          { key: 'col-tips', width: 'w-10' },
-        ].map(({ key, width }) => (
-          <div key={key} className={`h-3 ${width} rounded bg-surface-2`} />
-        ))}
-      </div>
-
-      {/* Row skeletons */}
-      {[
-        'skeleton-row-1',
-        'skeleton-row-2',
-        'skeleton-row-3',
-        'skeleton-row-4',
-        'skeleton-row-5',
-      ].map((rowKey, i) => (
-        <div
-          key={rowKey}
-          className='flex items-center gap-4 px-5 py-3'
-          style={{
-            borderBottom:
-              i < 4 ? '1px solid var(--linear-border-subtle)' : undefined,
-          }}
-        >
-          <div className='flex-1 space-y-1.5'>
-            <div className='h-3.5 w-28 rounded bg-surface-2' />
-            <div className='h-3 w-40 rounded bg-surface-2 opacity-50' />
-          </div>
-          <div className='h-3 w-14 rounded bg-surface-2' />
-          <div className='h-3 w-10 rounded bg-surface-2' />
-          <div className='h-5 w-16 rounded-full bg-surface-2' />
-          <div className='h-3 w-24 rounded bg-surface-2' />
-          <div className='h-5 w-12 rounded-full bg-surface-2' />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  AudienceCRMSection                                                  */
-/* ------------------------------------------------------------------ */
-
 export function AudienceCRMSection() {
   return (
     <NumberedSection
@@ -115,71 +33,14 @@ export function AudienceCRMSection() {
       subItems={SUB_ITEMS}
       className='relative overflow-hidden bg-page'
     >
-      {/* Product demo */}
-      <div
-        className='relative overflow-hidden rounded-t-[1rem] rounded-b-none md:rounded-t-[1.05rem]'
-        style={{
-          backgroundColor: 'var(--linear-bg-surface-0)',
-          boxShadow: 'var(--linear-panel-ring) 0px 0px 0px 1px inset',
-        }}
-      >
-        {/* Mac window chrome */}
-        <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
-          <div className='flex gap-2'>
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-            <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
-          </div>
-          <div className='flex-1 text-center text-[var(--linear-caption-size)] text-tertiary-token'>
-            Audience
-          </div>
-          <div className='w-[52px]' />
-        </div>
-
-        {/* Stat cards */}
-        <div className='grid grid-cols-2 gap-px bg-subtle md:grid-cols-4'>
-          {STATS.map(stat => (
-            <div
-              key={stat.label}
-              className='flex items-center gap-2.5 bg-surface-0 px-4 py-3 sm:px-5 sm:py-3.5'
-            >
-              <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                <stat.icon
-                  className='h-4 w-4 text-secondary-token'
-                  aria-hidden='true'
-                />
-              </div>
-              <div className='min-w-0'>
-                <p className='text-[var(--linear-label-size)] text-tertiary-token'>
-                  {stat.label}
-                </p>
-                <p className='text-[var(--linear-caption-size)] font-[var(--linear-font-weight-medium)] text-primary-token'>
-                  {stat.value}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className='flex flex-wrap items-center gap-2 border-t border-subtle px-4 py-2.5 text-xs text-tertiary-token sm:px-5'>
-          <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1 font-medium text-secondary-token'>
-            Source tracked
-          </span>
-          <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
-            Super-fan segments
-          </span>
-          <span className='rounded-full border border-subtle bg-surface-1 px-2.5 py-1'>
-            Campaign-ready audiences
-          </span>
-        </div>
-
-        {/* Real audience table (lazy-loaded, clipped) */}
-        <div className='relative max-h-[320px] overflow-hidden md:max-h-[336px]'>
-          <Suspense fallback={<TableSkeleton />}>
-            <DemoAudienceSection />
-          </Suspense>
-        </div>
-
+      <div className='relative'>
+        <ProductScreenshot
+          src='/product-screenshots/audience-crm.png'
+          alt='Audience CRM showing fan table with source tracking and segments'
+          width={2880}
+          height={1800}
+          title='Audience'
+        />
         {/* Bottom gradient fade */}
         <div className='pointer-events-none absolute inset-x-0 bottom-0 z-20 h-40 bg-linear-to-t from-[var(--linear-bg-surface-0)] to-transparent' />
       </div>

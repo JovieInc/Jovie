@@ -1,284 +1,187 @@
-# Design System: Marketing vs Product Split
+# Jovie Design System Boundaries
 
-Jovie uses **two intentionally different but related design systems**, both Linear-inspired. Mixing them is a bug unless explicitly documented in the [Grey Areas](#grey-areas) section below.
+> Canonical filename: `DESIGN.md`. On this macOS worktree, `design.md` resolves to the same file path because the filesystem is case-insensitive.
 
-| System | Inspiration | Governs |
-|--------|-------------|---------|
-| **Marketing / homepage** | `linear.app` homepage | Acquisition, storytelling, launch pages |
-| **Product / app** | `linear.app/demo` (product UI) | Dashboard, auth, onboarding, waitlist, settings, public product surfaces |
+## Purpose
 
----
+Jovie intentionally uses two related but different Linear-inspired design systems:
 
-## Decision Tree
+- **Marketing / homepage system**: inspired by the `linear.app` homepage
+- **Product / demo-inspired system**: inspired by `linear.app/demo` and Linear's app UI
 
-Use this first. If your new page doesn't clearly fit, check [Grey Areas](#grey-areas).
+The split is based on **surface purpose**, not route privacy. A public page is not automatically a marketing page. Mixing these systems casually creates inconsistent UX and should be treated as a bug unless the reason is documented in code review or PR notes.
 
-```
-Is this page selling, explaining, or launching the product?
-  YES → Marketing system (use MarketingLayout)
-  NO ↓
+## Canonical Surface Split
 
-Is this page helping a user sign in, set up, join waitlist, or operate the product?
-  YES → Product system (use AuthLayout or app shell)
-  NO ↓
+| Surface | Routes / entrypoints | Layout / shell | Design system | Notes |
+| --- | --- | --- | --- | --- |
+| Homepage storytelling marketing | `apps/web/app/(marketing)/page.tsx`, `apps/web/components/features/home/*` | `apps/web/app/(marketing)/layout.tsx` with `MarketingHeader` and `MarketingFooter` | Marketing / homepage | Acquisition-first, cinematic, proof-led |
+| Secondary marketing pages | `apps/web/app/(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `apps/web/app/(marketing)/layout.tsx` plus page-specific nested layouts | Marketing / homepage family | Same shell and token family, but denser and calmer than the homepage |
+| Legal / public informational pages | `apps/web/app/(dynamic)/legal/*` | legal layout under `app/(dynamic)/legal` | Marketing / public informational | Public informational surfaces, not product shell |
+| Product app shell | `apps/web/app/app/(shell)/*` | authenticated app shell | Product / demo-inspired | Dashboard, settings, admin, sidebars, tables, drawers, operational UI |
+| Auth funnel | `apps/web/app/(auth)/*` | `AuthLayout` rendered inside `apps/web/app/(auth)/layout.tsx` | Product / demo-inspired | Sign in and sign up are funnel pages, not marketing |
+| Onboarding funnel | `apps/web/app/onboarding/*` | `AuthLayout` with onboarding provider shell | Product / demo-inspired | Pre-dashboard but still product |
+| Waitlist funnel | `apps/web/app/waitlist/*` | page renders through `AuthLayout` | Product / demo-inspired | Public route, but canonically part of the auth/product funnel |
+| Public product surfaces | `apps/web/app/[username]/*` including `claim`, `contact`, `listen`, `tip`, `tour`, `shop`, `subscribe`, `notifications`, release pages under `[slug]` | username public layouts and page-specific shells | Public product surface | Public-facing product artifacts, not marketing storytelling pages |
 
-Is this a public creator artifact or utility surface (profile, release, tip jar)?
-  YES → Product system (product semantic tokens, no marketing layout)
-  NO ↓
+## System A: Marketing / Homepage Design Language
 
-Default → Product system. Only use marketing if it's clearly acquisition-oriented.
-```
+The marketing system is the acquisition and storytelling layer. It is inspired by the `linear.app` homepage rather than the app UI.
 
----
+- Visual intent: cinematic, editorial, launch-oriented, proof-led
+- Typography: oversized marketing headlines, looser narrative spacing, long-view reading rhythm
+- Layout rhythm: section intros, hero framing, controlled screenshot/mockup presentation, large vertical spacing
+- Typical usage: homepage, feature launches, pricing marketing, investor-facing and content-marketing pages using the marketing shell
 
-## Surface Map
-
-| Route group | System | Shell / Layout |
-|-------------|--------|----------------|
-| `app/(marketing)/*` | Marketing | `MarketingLayout` + `MarketingHeader` + `MarketingFooter` |
-| `app/(marketing)/blog/*` | Marketing (content variant) | `MarketingLayout`, own post components |
-| `app/(marketing)/changelog/*` | Marketing (content variant) | `MarketingLayout`, own changelog components |
-| `app/(marketing)/tips/*` | Marketing (content variant) | `MarketingLayout`, own components |
-| `app/(marketing)/support/*` | Marketing (content variant) | `MarketingLayout`, own components |
-| `app/(marketing)/pricing/*` | Marketing | `MarketingLayout` + nested `pricing/layout.tsx` |
-| `app/(marketing)/investors/*` | Marketing | `MarketingLayout` + nested `investors/layout.tsx` |
-| `app/app/(shell)/*` | Product | Authenticated app shell (sidebar, dashboard chrome) |
-| `app/(auth)/*` | Product | `AuthLayout` |
-| `app/onboarding/*` | Product | `AuthLayout` (own provider shell in `onboarding/layout.tsx`) |
-| `app/onboarding/checkout/*` | Product | `AuthLayout` |
-| `app/waitlist/*` | Product | `AuthLayout` |
-| `app/[username]` | Product (public) | Profile display — product tokens, no marketing layout |
-| `app/[username]/claim/*` | Product (funnel) | Profile claiming flow |
-| `app/[username]/tip/*`, `shop/*`, `subscribe/*` | Product (interactive) | Fan interaction utilities |
-| `app/[username]/[slug]/*` | Product (content) | Release / smartlink pages |
+### Common primitives
 
-**Note:** Blog, changelog, tips, and support live under `(marketing)` and use `MarketingLayout`, but they are **content pages** with their own component families — they do not use homepage section primitives like `homepage-section-shell` or `marketing-h1-linear`.
+- `homepage-section-shell`
+- `homepage-section-intro`
+- `homepage-section-intro-compact`
+- `homepage-section-copy`
+- `homepage-section-stack`
+- `homepage-section-eyebrow`
+- `homepage-surface-card`
+- `marketing-h1-linear`
+- `marketing-h2-linear`
+- `marketing-lead-linear`
 
----
+### Token / style ownership
 
-## Source-of-Truth Files
+- `apps/web/styles/linear-tokens.css`
+- marketing-oriented composition in `apps/web/app/globals.css`
+- marketing shell in `apps/web/app/(marketing)/layout.tsx`
+- homepage implementation layer in `apps/web/components/features/home/*`
 
-### CSS Architecture
+### Marketing has two tiers
 
-One CSS graph, two composition layers:
+#### Homepage storytelling pages
 
-```
-globals.css
-  └── imports design-system.css    ← base tokens for ALL surfaces
-        └── imports linear-tokens.css  ← Linear-extracted tokens
-```
+Examples:
 
-All tokens are always loaded everywhere. The split is **compositional**, gated by the `.linear-marketing` class applied on the marketing layout root. You never need to "choose which CSS to import."
+- homepage
+- launch-style hero pages
+- acquisition-first product storytelling
 
-### File Ownership
+Rules:
 
-| File | Owns | System |
-|------|------|--------|
-| `apps/web/styles/design-system.css` | Base token system (OKLCH surfaces, text, borders, buttons, sidebar, shadows, animations) | Product (shared base) |
-| `apps/web/styles/linear-tokens.css` | 254 Linear-extracted tokens (spacing, typography, colors, layout) | Marketing-specific tokens |
-| `apps/web/app/globals.css` | Tailwind registration, semantic utilities, homepage section classes | Both (composition layer) |
-| `apps/web/app/(marketing)/layout.tsx` | Marketing shell — applies `.linear-marketing` class | Marketing |
-| `apps/web/components/site/MarketingHeader.tsx` | Scroll-aware marketing nav | Marketing |
-| `apps/web/components/site/MarketingFooter.tsx` | Minimal marketing footer | Marketing |
-| `apps/web/components/features/home/*` | 80+ homepage section components | Marketing |
-| `apps/web/components/features/auth/AuthLayout.tsx` | Shared auth/funnel shell (`bg-page`, `text-primary-token`) | Product |
-| `apps/web/app/waitlist/page.tsx` | Waitlist — renders inside `AuthLayout` (product system, not marketing) | Product |
+- strongest editorial rhythm
+- largest headline scale
+- most cinematic screenshot/mockup framing
+- use homepage section primitives directly
 
-For token-level details (import order, OKLCH format, naming conventions, migration notes), see [`docs/DESIGN_TOKENS.md`](docs/DESIGN_TOKENS.md).
+#### Secondary marketing pages
 
----
+Examples:
 
-## Marketing / Homepage System
+- blog
+- changelog
+- support
+- pricing marketing pages
+- informational pages under the marketing shell
 
-### Dark-only mode
+Rules:
 
-The marketing site forces `dark` class on the layout wrapper. No light/dark toggle. This matches Linear.app's approach for their marketing pages.
+- use the marketing shell and marketing token family
+- do **not** automatically inherit homepage-scale hero composition
+- use denser, calmer, more content-oriented layouts than the homepage
 
-### Page structure (Linear-style numbered sections)
+## System B: Product / Demo-Inspired Design Language
 
-The homepage follows Linear's numbered section pattern:
-1. **Hero** — full-width product mockup with claim handle form
-2. **LogoBar** — trust indicators
-3. **ValuePropsSection** — "A new kind of release platform" with FIG-labeled cards (FIG 0.1, 0.2, 0.3)
-4. **Section 1.0 Release** — "Release day, automated." with accordion sub-items (1.1-1.4)
-5. **Section 2.0 Profile** — "Profiles that convert." with phone mockup and sub-items (2.1-2.4)
-6. **Section 3.0 Audience** — "Know every fan by name." with CRM mockup and sub-items (3.1-3.3)
-7. **Section 4.0 AI** — "AI that knows your work." with AI demo and sub-items (4.1-4.3)
-8. **Section 5.0 Analytics** — "Understand your reach." with analytics mockup and sub-items (5.1-5.3)
-9. **ChangelogPreview** — 3 recent entries
-10. **TestimonialsSection** — quote cards
-11. **FinalCTASection** — "Take the stage." with buttons
-12. **Footer** — 5-column (Product, Features, Company, Resources, Connect)
+The product system is the operational UI layer. It is inspired by the Linear app and `linear.app/demo`, not the homepage.
 
-### Concrete primitives
+- Visual intent: compact, operational, systemized, tool-like
+- Layout: denser spacing, higher information density, faster scanability
+- Emphasis: surfaces, controls, panels, sidebars, tables, drawers, cards, settings chrome
+- Typical usage: dashboard, settings, admin, product operations, auth funnel, onboarding, waitlist, public product utilities
 
-These classes define the marketing composition layer. They are only meaningful inside `.linear-marketing` scope:
+### Common primitives and token families
 
-**Layout classes:**
-- `homepage-section-shell` — section container, `max-width: 1250px`, centered
-- `homepage-section-intro` — grid layout for section intros
-- `homepage-section-intro-compact` — compact grid variant
-- `homepage-section-copy` — constrained copy block, `max-width: 36rem`
-- `homepage-section-stack` — vertical stack with section spacing
-- `homepage-section-eyebrow` — inline-flex pill labels
+- `bg-surface-*`
+- `text-*-token`
+- `border-subtle`, `border-default`, `border-strong`
+- button variants
+- app shadows
+- sidebar, table, drawer, and panel conventions
 
-**Numbered section classes:**
-- `section-number-label` — 12px tabular-nums label (e.g., "1.0")
-- `section-title-link` — 14px section category label (e.g., "Release →")
-- `accordion-trigger` / `accordion-content` — expandable sub-items (e.g., "+1.1 Smart Links")
-- `fig-label` — 11px uppercase label for value prop cards (e.g., "FIG 0.1")
+### Token / style ownership
 
-**Typography classes:**
-- `marketing-h1-linear` — responsive hero headline: 38px → 56px → 76px, weight 510, line-height 1.1 → 1.0, tracking -0.022em
-- `marketing-h2-linear` — responsive section headline: 24px → 36px → 48px, weight 510, line-height 1.33 → 1.0, tracking -0.022em
-- `marketing-lead-linear` — lead paragraph
-- `marketing-body` — body text
-- `marketing-cta` — call-to-action text
+- `apps/web/styles/design-system.css`
+- `apps/web/app/globals.css`
+- `apps/web/tailwind.config.js`
 
-**Surface classes:**
-- `homepage-surface-card` — elevated card for marketing sections
+## Auth / Onboarding / Waitlist Classification
 
-**Components:**
-- `NumberedSection` — core structural pattern, wraps content with section number, title, heading, description, and accordion sub-items
-- `FeatureAccordion` — expandable sub-item list (client component)
-- `FigCard` — "FIG 0.X" labeled value prop card
-- `MarketingSectionFrame` — legacy section frame (still used by some pages)
-- `MarketingContainer` — responsive centered container
+Auth, onboarding, and waitlist are part of the **product funnel**. They belong to the **product / demo-inspired system**, not the homepage marketing system.
 
-### Spacing rhythm
+This is a canonical rule, not a temporary exception:
 
-Section spacing: consistent `120px` top and bottom on all numbered sections (via `section-spacing-linear`).
+- auth pages render through `AuthLayout`
+- onboarding pages currently render through `AuthLayout`
+- waitlist currently renders through `AuthLayout` even though the route is public
 
-Content gaps: `16px` → `22px` → `28px` across breakpoints.
+These pages should:
 
-### Character
+- use `AuthLayout`-style funnel framing
+- use product semantic tokens
+- avoid homepage storytelling composition
+- avoid marketing hero, homepage section, and marketing header/footer patterns
 
-Linear.app-inspired, dark-only, product-mockup-driven. Numbered sections give each product area a clear address. Expandable sub-items for information density without clutter. Built for acquisition and storytelling.
+## Public Profiles Classification
 
-### Used for
+Public profiles are **not** marketing pages.
 
-- Homepage (`/`)
-- Launch pages (`/launch`)
-- Feature marketing (`/ai`, `/engagement-engine`)
-- Pricing (`/pricing`)
-- Investor portal (`/investors`)
-- Content pages that use the marketing shell: blog, changelog, tips, support (these use `MarketingLayout` but have their own component families)
+They are public-facing product artifacts:
 
----
+- expressive enough to represent a creator publicly
+- still part of the product surface family
+- not default candidates for homepage storytelling composition
 
-## Product / Demo-Inspired System
+If public profiles need a visual redesign, that should be treated as a **public-product** design problem, not a homepage marketing problem.
 
-### Concrete primitives
+## Source-of-Truth File Map
 
-These tokens and classes are the default everywhere — no gating class needed:
+| File | Responsibility |
+| --- | --- |
+| `apps/web/styles/design-system.css` | Canonical app/product token source |
+| `apps/web/styles/linear-tokens.css` | Homepage/marketing-specific Linear-extracted tokens |
+| `apps/web/app/globals.css` | Tailwind registration plus shared semantic utilities and marketing utility classes |
+| `apps/web/app/(marketing)/layout.tsx` | Canonical marketing shell |
+| `apps/web/components/site/MarketingHeader.tsx` | Marketing header/navigation behavior |
+| `apps/web/components/site/MarketingFooter.tsx` | Marketing footer behavior |
+| `apps/web/components/features/auth/AuthLayout.tsx` | Product-funnel shell for auth, onboarding, and waitlist |
+| `apps/web/components/features/home/*` | Homepage marketing implementation layer |
 
-**Surface tokens:**
-- `bg-base`, `bg-surface-0`, `bg-surface-1`, `bg-surface-2`, `bg-surface-3` — elevation hierarchy
-- `bg-page`, `bg-hover`, `bg-elevated`, `bg-input`, `bg-active`, `bg-button`
-
-**Text tokens:**
-- `text-primary-token` — headings, body
-- `text-secondary-token` — secondary text
-- `text-tertiary-token` — muted text
-- `text-quaternary-token` — placeholders, disabled
-
-**Border tokens:**
-- `border-subtle` (6% opacity) / `border-default` (10%) / `border-strong` (18%) / `border-focus` (#7170ff)
-
-**Utility classes:**
-- `dashboard-heading` — bold heading with letter-spacing
-- `dashboard-label` — 11px uppercase label
-- `dashboard-body` — body text with font features
-- `btn-primary`, `btn-secondary` — button styles
-- `focus-ring` — focus ring utilities
-
-**Shadows:**
-- `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`
-- `shadow-card`, `shadow-card-elevated` — card depth
-- `shadow-divider` — inset divider
-- `shadow-button-inset` — button depth
-
-### Spacing rhythm
-
-Product spacing scale (rem-based):
-- `--space-1` through `--space-24`: `0.25rem` (4px) to `6rem` (96px)
-
-Animation durations: `50ms` (instant) → `100ms` (fast) → `160ms` (normal) → `250ms` (slow) → `350ms` (slower)
-
-### Character
-
-Compact, operational, tool-like. Dense spacing, high information density. Sidebars, tables, panels, cards, drawers. Built for getting work done.
-
-### Used for
-
-- Dashboard, settings, admin (`app/app/(shell)/*`)
-- Auth flows — sign in, sign up (`app/(auth)/*`)
-- Onboarding (`app/onboarding/*`)
-- Waitlist (`app/waitlist/*`)
-- Public creator profiles (`app/[username]/*`)
-- Release/smartlink pages (`app/[username]/[slug]/*`)
-
----
-
-## Auth / Onboarding / Waitlist
-
-These surfaces are **product system**, not marketing — even though they are public or semi-public entry flows.
-
-| Surface | Shell | Layout |
-|---------|-------|--------|
-| Sign in / Sign up | `AuthLayout` | `(auth)/layout.tsx` (Clerk + feature flags) |
-| Onboarding | `AuthLayout` | `onboarding/layout.tsx` (own Clerk + feature flags provider) |
-| Checkout | `AuthLayout` | Under `onboarding/checkout/` |
-| Waitlist | `AuthLayout` | `waitlist/layout.tsx` |
-
-`AuthLayout` renders a centered, responsive form with `bg-page` and `text-primary-token` — product tokens throughout. No marketing hero patterns, no marketing header/footer.
-
----
+`docs/DESIGN_TOKENS.md` remains the token-level reference. `DESIGN.md` is the boundary document for choosing the correct surface system.
 
 ## Hard Rules
 
-1. **Do not** use homepage section primitives (`homepage-section-*`, `marketing-h*-linear`, `homepage-surface-card`) on auth, onboarding, waitlist, or app pages.
-2. **Do not** use dashboard/table/sidebar primitives on marketing sections unless the page intentionally embeds a product demo.
-3. Auth, onboarding, and waitlist **must** use `AuthLayout` and product semantic tokens — not marketing hero/header/footer patterns.
-4. `app/(marketing)` pages **must** use `MarketingLayout` — not app-shell chrome.
-5. Public profile routes (`app/[username]/*`) are **not** marketing pages — do not adopt homepage storytelling layout language.
-6. New public acquisition pages → marketing system, unless clearly part of the product funnel.
-7. New funnel steps continuing sign-in/account setup → product system, unless explicitly framed as marketing.
-8. **Both systems must meet WCAG AA**: minimum 4.5:1 contrast for text, 44px minimum touch targets, full keyboard navigation, screen reader support.
+### Do
 
----
+- Use the marketing/homepage system for acquisition, storytelling, launch, and public informational pages.
+- Use the product/demo-inspired system for sign-in, account setup, waitlist, dashboard, settings, admin, and product operation surfaces.
+- Treat public creator pages as public product surfaces unless there is an explicit, documented reason not to.
+- Document any intentional cross-system borrowing in code review or PR notes.
 
-## Grey Areas
+### Don't
 
-Ambiguous cases where the system boundary isn't obvious:
+- Do not use homepage section primitives on auth, onboarding, waitlist, dashboard, settings, admin, or other product flows.
+- Do not use dashboard/sidebar/table/drawer composition as the base language for marketing pages.
+- Do not treat all public pages as marketing pages.
+- Do not assume that pages under the marketing shell should look like the homepage hero.
 
-| Scenario | Guidance |
-|----------|----------|
-| Marketing page embedding a live product demo or dashboard preview | Use marketing shell. Product data components render inside but **do not** adopt marketing typography or section spacing. |
-| Product flow with celebration language (e.g., checkout success) | Stays in product system. Celebration is UX polish, not a system switch. |
-| New public page that doesn't clearly fit either system | Default to product system unless it's acquisition/storytelling-oriented. |
-| Marketing CTA in a product flow (e.g., upgrade prompts in dashboard) | Stays in product system. Use product button styles, not marketing hero patterns. |
-| Blog post with embedded interactive product widget | Marketing shell for the page. Widget uses product component but inherits marketing container width. |
+## Decision Tree For New Pages
 
----
+1. Is the page selling, explaining, or launching the product?
+   Use the marketing / homepage system.
+2. Is the page helping a user sign in, join, wait, set up, or operate the product?
+   Use the product / demo-inspired system.
+3. Is the page a creator-facing public artifact?
+   Treat it as a public product surface, not a marketing page by default.
 
-## Known Exceptions
+## Known Current Exceptions / Notes
 
-- **Waitlist** is public-facing but functionally part of the auth/onboarding funnel — it uses `AuthLayout`, making it product system.
-- **Onboarding** is pre-dashboard but uses `AuthLayout` with its own provider shell — product system, not marketing.
-- Auth and onboarding share `AuthLayout` as a unified shell but have separate `layout.tsx` providers.
-- Marketing pages are intentionally static with their own header/footer shell.
-- The two systems **share underlying tokens** (all loaded via one CSS graph), but the **composition rules** are different — which classes you use, not which tokens are available.
-
----
-
-## Maintaining This Document
-
-Update `DESIGN.md` when:
-- Adding a new route group or top-level route
-- Moving or renaming layout files
-- Creating a new public surface category
-- Adding new CSS composition classes to either system
-- Changing the classification of an existing surface
-
-Stale paths are bugs. If a file path in this document no longer exists, fix the document.
+- Waitlist is public, but belongs to the product funnel.
+- Onboarding is pre-dashboard, but still part of the product system.
+- Secondary marketing pages share the marketing shell without inheriting homepage hero composition by default.
+- Public profiles are public, but separate from marketing.

@@ -2,9 +2,8 @@
 
 import { BellRing, CheckCheck, Mail } from 'lucide-react';
 import Image from 'next/image';
-import { useState } from 'react';
 import { NumberedSection } from '@/components/marketing';
-import { DashboardMockup } from './DashboardMockup';
+import { ProductScreenshot } from './ProductScreenshot';
 import { RELEASES } from './releases-data';
 
 const SUB_ITEMS = [
@@ -35,8 +34,7 @@ const SUB_ITEMS = [
 ];
 
 export function ReleasesSection() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeRelease = RELEASES[activeIndex];
+  const activeRelease = RELEASES[0];
 
   return (
     <NumberedSection
@@ -48,44 +46,6 @@ export function ReleasesSection() {
       subItems={SUB_ITEMS}
       className='relative overflow-hidden bg-page'
     >
-      <div className='flex flex-wrap items-center gap-2'>
-        {RELEASES.map((release, index) => (
-          <button
-            key={release.id}
-            type='button'
-            onClick={() => setActiveIndex(index)}
-            className='flex items-center gap-2 rounded-full px-3.5 py-[0.44rem] text-[13px] font-medium transition-all duration-300 sm:px-4 sm:py-2 sm:text-sm'
-            style={{
-              backgroundColor:
-                index === activeIndex
-                  ? 'rgba(255,255,255,0.08)'
-                  : 'transparent',
-              border: `1px solid ${index === activeIndex ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)'}`,
-              color:
-                index === activeIndex
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-text-tertiary)',
-            }}
-          >
-            {release.isNew && (
-              <span className='inline-block h-1.5 w-1.5 rounded-full bg-amber-400' />
-            )}
-            {release.title}
-            <span
-              className='text-[11px] sm:text-xs'
-              style={{
-                color:
-                  index === activeIndex
-                    ? 'var(--linear-text-tertiary)'
-                    : 'var(--linear-text-quaternary)',
-              }}
-            >
-              {release.year}
-            </span>
-          </button>
-        ))}
-      </div>
-
       <div className='homepage-surface-card relative mt-4 overflow-hidden rounded-[1rem] p-3.5 sm:mt-5 sm:p-4 md:p-[1.15rem] lg:p-5'>
         <div
           aria-hidden='true'
@@ -115,7 +75,13 @@ export function ReleasesSection() {
         <div className='mt-3.5 grid gap-3.5 lg:grid-cols-[minmax(0,1.08fr)_15.5rem] lg:items-start xl:grid-cols-[minmax(0,1.06fr)_16.25rem]'>
           <div className='space-y-3'>
             <div className='max-w-[42rem]'>
-              <DashboardMockup activeIndex={activeIndex} />
+              <ProductScreenshot
+                src='/product-screenshots/releases-dashboard-full.png'
+                alt='Jovie releases dashboard showing catalog with smart links'
+                width={2880}
+                height={1800}
+                title='Jovie - Release Flow'
+              />
             </div>
 
             <div className='flex items-center gap-3 rounded-[0.9rem] border border-subtle bg-surface-1 px-4 py-3 lg:hidden'>
