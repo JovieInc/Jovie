@@ -781,26 +781,6 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     for (const profile of TEST_PROFILES) {
       console.log(`  Creating profile: ${profile.username}`);
 
-      // Check if profile already exists and delete it to ensure clean state
-      const [existing] = await db
-        .select({ id: creatorProfiles.id })
-        .from(creatorProfiles)
-        .where(
-          eq(creatorProfiles.usernameNormalized, profile.username.toLowerCase())
-        )
-        .limit(1);
-
-      if (existing) {
-        console.log(
-          `    → Profile ${profile.username} exists, recreating with correct values...`
-        );
-        // Delete existing profile (social links will cascade delete)
-        await db
-          .delete(creatorProfiles)
-          .where(eq(creatorProfiles.id, existing.id));
-      }
-
-      // Create the creator profile using Drizzle ORM insert to ensure proper boolean handling
       // For dualipa, include real multi-DSP IDs so E2E tests can verify multi-DSP rendering
       const dspFields =
         profile.username === 'dualipa'
@@ -815,27 +795,52 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             }
           : {};
 
+      const profileValues = {
+        username: profile.username,
+        usernameNormalized: profile.username.toLowerCase(),
+        displayName: profile.displayName,
+        bio: profile.bio,
+        spotifyUrl: profile.spotifyUrl || null,
+        avatarUrl: profile.avatarUrl || null,
+        creatorType: 'artist' as const,
+        isPublic: true,
+        isVerified: false,
+        isClaimed: false,
+        ingestionStatus: 'idle' as const,
+        ...dspFields,
+      };
+
+      // Use upsert (ON CONFLICT DO UPDATE) to atomically handle existing profiles.
+      // The Neon HTTP driver sends each query as a separate HTTP request, so
+      // delete-then-insert is not transactional and can fail with duplicate key
+      // if the branch already has data from the parent.
       const [createdProfile] = await db
         .insert(creatorProfiles)
-        .values({
-          username: profile.username,
-          usernameNormalized: profile.username.toLowerCase(),
-          displayName: profile.displayName,
-          bio: profile.bio,
-          spotifyUrl: profile.spotifyUrl || null,
-          avatarUrl: profile.avatarUrl || null,
-          creatorType: 'artist',
-          isPublic: true,
-          isVerified: false,
-          isClaimed: false,
-          ingestionStatus: 'idle',
-          ...dspFields,
+        .values(profileValues)
+        .onConflictDoUpdate({
+          target: creatorProfiles.usernameNormalized,
+          set: {
+            displayName: profileValues.displayName,
+            bio: profileValues.bio,
+            spotifyUrl: profileValues.spotifyUrl,
+            avatarUrl: profileValues.avatarUrl,
+            isPublic: profileValues.isPublic,
+            isVerified: profileValues.isVerified,
+            isClaimed: profileValues.isClaimed,
+            ingestionStatus: profileValues.ingestionStatus,
+            ...dspFields,
+          },
         })
         .returning({ id: creatorProfiles.id });
 
       console.log(
-        `    ✓ Created profile ${profile.username} (ID: ${createdProfile.id})`
+        `    ✓ Upserted profile ${profile.username} (ID: ${createdProfile.id})`
       );
+
+      // Clean up existing social links before re-seeding (upsert doesn't cascade-delete)
+      await db
+        .delete(socialLinks)
+        .where(eq(socialLinks.creatorProfileId, createdProfile.id));
 
       // Add a sample social link
       if (profile.spotifyUrl) {
