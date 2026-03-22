@@ -33,8 +33,24 @@ describe('isRetryableError', () => {
     ).toBe(true);
   });
 
+  it('returns true when a Failed query wrapper contains a transient nested cause', () => {
+    const error = new Error('Failed query: select * from creator_profiles', {
+      cause: new Error('Connection terminated unexpectedly'),
+    });
+
+    expect(isRetryableError(error)).toBe(true);
+  });
+
   it('returns false for non-retryable errors', () => {
     expect(isRetryableError(new Error('syntax error in SQL'))).toBe(false);
+  });
+
+  it('returns false for a Failed query wrapper around a permanent SQL error', () => {
+    const error = new Error('Failed query: select * from creator_profiles', {
+      cause: new Error('column \"foo\" does not exist'),
+    });
+
+    expect(isRetryableError(error)).toBe(false);
   });
 
   it('returns false for non-Error values', () => {
@@ -112,7 +128,11 @@ describe('withRetry', () => {
     let attempt = 0;
     const operation = vi.fn(async () => {
       attempt++;
-      if (attempt < 3) throw new Error('Failed query: SELECT 1');
+      if (attempt < 3) {
+        throw new Error('Failed query: SELECT 1', {
+          cause: new Error('Connection terminated unexpectedly'),
+        });
+      }
       return 'ok';
     });
 

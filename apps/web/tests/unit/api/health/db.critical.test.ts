@@ -16,6 +16,10 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/db', () => ({
   checkDbHealth: mockCheckDbHealth,
   getDbConfig: vi.fn().mockReturnValue({ maxConnections: 10 }),
+  dbCircuitBreaker: {
+    getStats: vi.fn().mockReturnValue({ state: 'closed', failures: 0 }),
+  },
+  getPoolMetrics: vi.fn().mockReturnValue({}),
 }));
 
 vi.mock('@/lib/db/config', () => ({

@@ -22,11 +22,18 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const stickyRail = container.querySelector('.sticky.top-0');
-    expect(stickyRail).toBeInTheDocument();
-    expect(stickyRail).toContainElement(screen.getByText('Release details'));
-    expect(stickyRail).toContainElement(screen.getByText('Header content'));
-    expect(stickyRail).toContainElement(screen.getByText('Tab controls'));
+    const stickyRailCard = container.querySelector(
+      '[class*="overflow-hidden"]'
+    );
+    expect(stickyRailCard).toBeInTheDocument();
+    expect(stickyRailCard).toContainElement(
+      screen.getByText('Release details')
+    );
+    expect(stickyRailCard).toContainElement(screen.getByText('Header content'));
+    expect(stickyRailCard).toContainElement(screen.getByText('Tab controls'));
+    expect(stickyRailCard).not.toContainElement(
+      screen.getByText('Body content')
+    );
     expect(screen.getByText('Body content')).toBeInTheDocument();
   });
 });

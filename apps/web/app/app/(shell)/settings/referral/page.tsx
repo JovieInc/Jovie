@@ -10,6 +10,7 @@ import {
   formatCommissionRate,
 } from '@/lib/referrals/config';
 import {
+  getInternalUserId,
   getOrCreateReferralCode,
   getReferralStats,
 } from '@/lib/referrals/service';
@@ -28,9 +29,14 @@ export default async function SettingsReferralPage() {
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/referral`);
   }
 
+  const internalUserId = await getInternalUserId(userId);
+  if (!internalUserId) {
+    redirect(APP_ROUTES.ONBOARDING);
+  }
+
   const [referralResult, stats] = await Promise.all([
-    getOrCreateReferralCode(userId),
-    getReferralStats(userId),
+    getOrCreateReferralCode(internalUserId),
+    getReferralStats(internalUserId),
   ]);
 
   const commissionRate = formatCommissionRate(DEFAULT_COMMISSION_RATE_BPS);
@@ -40,15 +46,16 @@ export default async function SettingsReferralPage() {
     <PageShell>
       <PageContent>
         <div className='space-y-6'>
-          <ContentSurfaceCard>
+          <ContentSurfaceCard surface='details'>
             <ContentSectionHeader
+              density='compact'
               title='Referral Program'
               subtitle={`Earn ${commissionRate} commission for ${DEFAULT_COMMISSION_DURATION_MONTHS} months on every artist you refer.`}
             />
 
-            <div className='space-y-4 p-3 pt-0 sm:p-4 sm:pt-0'>
+            <div className='space-y-3 p-3 pt-0 sm:p-4 sm:pt-0'>
               {/* Referral code + copy */}
-              <div className='rounded-lg border border-subtle bg-surface-1 p-4'>
+              <ContentSurfaceCard surface='nested' className='p-4'>
                 <p className='mb-2 text-xs font-medium uppercase tracking-wider text-tertiary-token'>
                   Your referral link
                 </p>
@@ -56,10 +63,10 @@ export default async function SettingsReferralPage() {
                   shareUrl={shareUrl}
                   code={referralResult.code}
                 />
-              </div>
+              </ContentSurfaceCard>
 
               {/* Terms */}
-              <div className='rounded-lg border border-subtle p-4'>
+              <ContentSurfaceCard surface='nested' className='p-4'>
                 <p className='text-[13px] font-[510] text-primary-token'>
                   How it works
                 </p>
@@ -78,40 +85,43 @@ export default async function SettingsReferralPage() {
                     subscribed
                   </li>
                 </ul>
-              </div>
+              </ContentSurfaceCard>
             </div>
           </ContentSurfaceCard>
 
           {/* Stats */}
-          <ContentSurfaceCard>
-            <ContentSectionHeader title='Your referral stats' />
-            <div className='grid grid-cols-3 gap-4 p-3 pt-0 sm:p-4 sm:pt-0'>
-              <div className='rounded-lg border border-subtle p-4 text-center'>
+          <ContentSurfaceCard surface='details'>
+            <ContentSectionHeader
+              density='compact'
+              title='Your referral stats'
+            />
+            <div className='grid grid-cols-3 gap-3 p-3 pt-0 sm:p-4 sm:pt-0'>
+              <ContentSurfaceCard surface='nested' className='p-4 text-center'>
                 <p className='text-2xl font-semibold text-primary-token'>
                   {stats.activeReferrals}
                 </p>
                 <p className='mt-1 text-xs text-tertiary-token'>
                   Active referrals
                 </p>
-              </div>
-              <div className='rounded-lg border border-subtle p-4 text-center'>
+              </ContentSurfaceCard>
+              <ContentSurfaceCard surface='nested' className='p-4 text-center'>
                 <p className='text-2xl font-semibold text-primary-token'>
                   {formatCents(stats.totalEarningsCents)}
                 </p>
                 <p className='mt-1 text-xs text-tertiary-token'>Total earned</p>
-              </div>
-              <div className='rounded-lg border border-subtle p-4 text-center'>
+              </ContentSurfaceCard>
+              <ContentSurfaceCard surface='nested' className='p-4 text-center'>
                 <p className='text-2xl font-semibold text-primary-token'>
                   {formatCents(stats.pendingEarningsCents)}
                 </p>
                 <p className='mt-1 text-xs text-tertiary-token'>Pending</p>
-              </div>
+              </ContentSurfaceCard>
             </div>
           </ContentSurfaceCard>
 
           {/* Empty state for referral history */}
           {stats.totalReferrals === 0 ? (
-            <ContentSurfaceCard>
+            <ContentSurfaceCard surface='details'>
               <div className='p-8 text-center'>
                 <p className='text-sm text-secondary-token'>
                   No referrals yet. Share your link to start earning!

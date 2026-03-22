@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.35] - 2026-03-21
+
+### Fixed
+
+- Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production
+- Add repair migration for `discovered_pixels`, `discovered_pixels_at`, `pitch_context`, and `generated_pitches` columns that were tracked as applied but never executed
+- Fix referral settings page passing Clerk user ID to a UUID column — now converts to internal UUID first, redirects to onboarding if user record missing
+
+## [26.4.34] - 2026-03-21
+
+### Fixed
+
+- Block blacklisted Spotify artist IDs from polluting profiles during MusicFetch enrichment — prevents wrong artist photos, discography imports, and spotifyId overwrites
+- Allow re-enrichment recovery when a profile's stored spotifyId is blacklisted but the enrichment URL points to the correct artist
+
 ## [26.4.33] - 2026-03-21
 
 ### Fixed

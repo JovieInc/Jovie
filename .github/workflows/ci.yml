@@ -2362,16 +2362,11 @@ jobs:
         run: pnpm --filter=@jovie/web run drizzle:verify:ci
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # Schema drift should warn, not block deploys. A mismatch between
-        # Drizzle definitions and the live DB (e.g. schema added without
-        # migration) must be fixed, but should never block shipping code.
-        # Safety net: canary health gate + Sentry error gate catch runtime
-        # failures from missing columns and trigger auto-rollback.
-        continue-on-error: true
-      - name: Warn on schema drift
-        if: ${{ steps.verify.outcome == 'failure' }}
-        run: |
-          echo "::warning::Schema drift detected — Drizzle schema does not match the database. Deploy continues but this must be fixed."
+        # Blocks deploy by default — missing columns = broken production.
+        # To bypass in emergencies, include [skip-schema-verify] in the
+        # merge commit message. The Slack drift notification in deploy-notify
+        # fires when verify fails but deploy proceeds (bypass alert).
+        continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env

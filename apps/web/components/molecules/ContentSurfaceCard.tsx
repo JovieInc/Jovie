@@ -3,13 +3,19 @@ import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
-  'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]',
+  'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
   {
     variants: {
       surface: {
         default: 'rounded-[14px]',
+        details:
+          'rounded-[14px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
         marketing: 'rounded-xl',
+        nested:
+          'rounded-[12px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]',
         settings: 'rounded-[14px] px-4 py-3 sm:px-5',
+        table:
+          'rounded-[14px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
       },
     },
     defaultVariants: {
