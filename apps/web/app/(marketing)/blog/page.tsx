@@ -3,6 +3,7 @@ import { Container } from '@/components/site/Container';
 import { APP_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
+import type { ProfileData } from '@/lib/services/profile';
 import { getProfilesByUsernames } from '@/lib/services/profile';
 
 // Fully static - blog posts are read from filesystem at build time
@@ -33,7 +34,12 @@ export default async function BlogIndexPage() {
       posts.map(p => p.authorUsername).filter((u): u is string => u != null)
     ),
   ];
-  const profileMap = await getProfilesByUsernames(usernames);
+  let profileMap: Map<string, ProfileData> = new Map();
+  try {
+    profileMap = await getProfilesByUsernames(usernames);
+  } catch {
+    // Fallback to frontmatter-only author data if profile fetch fails
+  }
 
   return (
     <div className='min-h-screen'>

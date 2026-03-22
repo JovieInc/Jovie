@@ -55,9 +55,14 @@ export default async function BlogPostRoute({
 
   try {
     const post = await getBlogPost(slug);
-    const profile = post.authorUsername
-      ? await getProfileByUsername(post.authorUsername)
-      : null;
+    let profile = null;
+    if (post.authorUsername) {
+      try {
+        profile = await getProfileByUsername(post.authorUsername);
+      } catch {
+        profile = null;
+      }
+    }
     const author = resolveAuthor(post, profile);
     return <BlogPostPage post={post} author={author} />;
   } catch {

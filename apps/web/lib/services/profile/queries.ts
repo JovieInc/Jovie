@@ -539,8 +539,14 @@ export async function getProfileSummary(
 export async function getProfilesByUsernames(
   usernames: string[]
 ): Promise<Map<string, ProfileData>> {
-  if (usernames.length === 0) return new Map();
-  const normalized = usernames.map(u => u.toLowerCase());
+  const normalized = Array.from(
+    new Set(
+      usernames
+        .map(u => u?.trim().toLowerCase())
+        .filter((u): u is string => Boolean(u))
+    )
+  );
+  if (normalized.length === 0) return new Map();
   const profiles = await db
     .select(profileSelectColumns)
     .from(creatorProfiles)
