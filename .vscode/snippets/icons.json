@@ -59,10 +59,9 @@
   "Icon with Accessibility": {
     "prefix": "icon-a11y",
     "body": [
-      "<${1:ChevronRight} ",
-      "  className=\"${2:h-5 w-5}\" ",
+      "<${1:ChevronRight}",
+      "  className=\"${2:h-5 w-5}\"",
       "  aria-label=\"${3:Icon description}\"",
-      "  aria-hidden={${4|false,true|}}",
       "/>"
     ],
     "description": "Lucide icon with accessibility attributes"

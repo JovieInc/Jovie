@@ -126,6 +126,7 @@ import CustomChevron from './chevron.svg';
 ```
 
 ### ✅ Use Lucide React
+
 ```tsx
 import { ChevronRight } from 'lucide-react';
 <ChevronRight className="h-5 w-5" />
