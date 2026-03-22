@@ -381,17 +381,8 @@ describe('resolveProfileState', () => {
       );
     });
 
-    it('returns true when missing avatarUrl (avatar optional)', () => {
-      expect(isProfileComplete({ ...completeProfile, avatarUrl: null })).toBe(
-        true
-      );
-    });
-
-    it('returns true when avatarUrl is whitespace-only (avatar optional)', () => {
-      expect(isProfileComplete({ ...completeProfile, avatarUrl: '  ' })).toBe(
-        true
-      );
-    });
+    // avatarUrl is NOT checked by isProfileComplete() — it's enforced
+    // client-side only by ProfileCompletionRedirect. See profile-completeness.ts.
   });
 });
 
