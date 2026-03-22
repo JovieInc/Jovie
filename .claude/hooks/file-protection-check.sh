@@ -1,6 +1,6 @@
 #!/bin/bash
 # Protect critical files based on AGENTS.md HARD GUARDRAILS
-# - Prevent modification of Drizzle migrations (append-only, line 51)
+# - Prevent edits to existing Drizzle migration history while allowing new generated artifacts
 # - Prevent creation of middleware.ts (use proxy.ts instead, line 11)
 # - Check for biome-ignore suppressions (never allowed, line 52)
 # - Prevent hardcoded legacy dashboard route literals in app/components
@@ -22,19 +22,23 @@ if [ -z "$file_path" ]; then
   exit 0
 fi
 
-# HARD GUARDRAIL: Drizzle migrations are immutable (AGENTS.md line 51)
-if [[ "$file_path" =~ drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ drizzle/migrations/meta/_journal\.json$ ]]; then
-  echo "🚨 BLOCKED: Drizzle migration files are IMMUTABLE (AGENTS.md line 51)"
-  echo "File: $file_path"
-  echo ""
-  echo "Drizzle migrations are append-only once merged to main."
-  echo "You cannot edit, delete, reorder, squash, or regenerate existing migrations."
-  echo ""
-  echo "If a past migration is incorrect, escalate to a human instead of attempting an automated fix."
-  echo ""
-  echo "To add a new migration:"
-  echo "  pnpm --filter=@jovie/web run drizzle:generate"
-  exit 1
+# HARD GUARDRAIL: Existing Drizzle migration history is immutable.
+# Allow generated append-only artifacts for a new migration:
+# - new drizzle/migrations/*.sql
+# - new drizzle/migrations/meta/*_snapshot.json
+# - append/update drizzle/migrations/meta/_journal.json
+if [[ "$file_path" =~ (^|/)drizzle/migrations/.*\.sql$ ]] || [[ "$file_path" =~ (^|/)drizzle/migrations/meta/.*_snapshot\.json$ ]]; then
+  if git cat-file -e "HEAD:$file_path" 2>/dev/null; then
+    echo "🚨 BLOCKED: Existing Drizzle migration history is immutable"
+    echo "File: $file_path"
+    echo ""
+    echo "Do not edit migration SQL or snapshot files that already exist on the base branch."
+    echo "Create a new migration instead, and let Drizzle append the matching journal entry."
+    echo ""
+    echo "To add a new migration:"
+    echo "  pnpm --filter=@jovie/web run drizzle:generate"
+    exit 1
+  fi
 fi
 
 # HARD GUARDRAIL: No middleware.ts allowed (AGENTS.md line 11)

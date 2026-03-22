@@ -25,6 +25,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fix timeout stacking in error display copy button with ref-based cleanup
 - Fix image remove button invisible on touch devices via `@media(hover:hover)` pattern
 - Fix test state mutation in `useSignInFlow` tests with proper `beforeEach`/`afterEach` scoping
+### Fixed
+
+- Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production
+- Add repair migration for `discovered_pixels`, `discovered_pixels_at`, `pitch_context`, and `generated_pitches` columns that were tracked as applied but never executed
+- Fix referral settings page passing Clerk user ID to a UUID column — now converts to internal UUID first, redirects to onboarding if user record missing
 
 ## [26.4.34] - 2026-03-21
 

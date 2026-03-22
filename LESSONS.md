@@ -69,6 +69,11 @@ See `AGENTS.md` guardrail #10 for the self-improvement loop process.
 
 ## CI / Build
 
+### New generated Drizzle migrations must be allowed to update `_journal.json`
+**Mistake:** The root migration rule and file-protection hook treated any `_journal.json` edit as forbidden, even though the repo's migration scripts require a new migration to append the journal and add a snapshot.
+
+**Rule:** Existing migration SQL and snapshot files are immutable once they exist on the base branch. New generated migration artifacts are allowed to add one new SQL file, one new snapshot, and the corresponding `_journal.json` entry.
+
 ### `pnpm vitest --run --changed` exits 0 with no test files
 **Situation:** When no changed test files exist, `vitest --run --changed` exits with code 0 and prints "No test files found." This is not a failure — it means all affected tests are implicitly passing (no files changed to test).
 
