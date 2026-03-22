@@ -6,16 +6,16 @@ This guide helps you migrate existing code to follow the new icon standardizatio
 
 | Old Pattern | New Pattern | Library |
 |-------------|-------------|---------|
-| Custom SVG imports | Heroicons import | `@heroicons/react` |
-| Inline SVG elements | Heroicons component | `@heroicons/react` |
+| Custom SVG imports | Lucide React import | `lucide-react` |
+| Inline SVG elements | Lucide React component | `lucide-react` |
 | Direct SimpleIcons | SocialIcon component | `components/atoms/SocialIcon` |
 | Inconsistent sizing | Standard size classes | `h-4 w-4`, `h-5 w-5`, etc. |
 
 ## Migration Patterns
 
-### 1. Replace Custom SVG Imports with Heroicons
+### 1. Replace Custom SVG Imports with Lucide React
 
-#### ❌ Before
+#### Before
 ```tsx
 import ChevronIcon from './icons/chevron.svg';
 import CloseIcon from './icons/close.svg';
@@ -32,28 +32,24 @@ function MyComponent() {
 }
 ```
 
-#### ✅ After
+#### After
 ```tsx
-import { 
-  ChevronRightIcon, 
-  XMarkIcon, 
-  MagnifyingGlassIcon 
-} from '@heroicons/react/24/outline';
+import { ChevronRight, X, Search } from 'lucide-react';
 
 function MyComponent() {
   return (
     <div>
-      <ChevronRightIcon className="h-5 w-5" />
-      <XMarkIcon className="h-4 w-4" />
-      <MagnifyingGlassIcon className="h-5 w-5" />
+      <ChevronRight className="h-5 w-5" />
+      <X className="h-4 w-4" />
+      <Search className="h-5 w-5" />
     </div>
   );
 }
 ```
 
-### 2. Replace Inline SVG with Heroicons
+### 2. Replace Inline SVG with Lucide React
 
-#### ❌ Before
+#### Before
 ```tsx
 function MyComponent() {
   return (
@@ -67,14 +63,14 @@ function MyComponent() {
 }
 ```
 
-#### ✅ After
+#### After
 ```tsx
-import { XMarkIcon } from '@heroicons/react/24/outline';
+import { X } from 'lucide-react';
 
 function MyComponent() {
   return (
     <button>
-      <XMarkIcon className="h-5 w-5" />
+      <X className="h-5 w-5" />
       Close
     </button>
   );
@@ -83,7 +79,7 @@ function MyComponent() {
 
 ### 3. Replace Direct SimpleIcons with SocialIcon Component
 
-#### ❌ Before
+#### Before
 ```tsx
 import { siSpotify, siInstagram, siTwitter } from 'simple-icons';
 
@@ -104,7 +100,7 @@ function SocialLinks() {
 }
 ```
 
-#### ✅ After
+#### After
 ```tsx
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 
@@ -121,29 +117,29 @@ function SocialLinks() {
 
 ### 4. Standardize Icon Sizing
 
-#### ❌ Before
+#### Before
 ```tsx
 function MyComponent() {
   return (
     <div>
-      <ChevronRightIcon className="h-3 w-3" />
-      <UserIcon className="h-7 w-7" />
-      <SearchIcon className="w-5 h-4" />
-      <CloseIcon style={{ width: 18, height: 18 }} />
+      <ChevronRight className="h-3 w-3" />
+      <User className="h-7 w-7" />
+      <Search className="w-5 h-4" />
+      <X style={{ width: 18, height: 18 }} />
     </div>
   );
 }
 ```
 
-#### ✅ After
+#### After
 ```tsx
 function MyComponent() {
   return (
     <div>
-      <ChevronRightIcon className="h-4 w-4" />  {/* Small */}
-      <UserIcon className="h-6 w-6" />          {/* Large */}
-      <SearchIcon className="h-5 w-5" />        {/* Medium (default) */}
-      <XMarkIcon className="h-4 w-4" />         {/* Small */}
+      <ChevronRight className="h-4 w-4" />  {/* Small */}
+      <User className="h-6 w-6" />           {/* Large */}
+      <Search className="h-5 w-5" />         {/* Medium (default) */}
+      <X className="h-4 w-4" />              {/* Small */}
     </div>
   );
 }
@@ -151,25 +147,25 @@ function MyComponent() {
 
 ### 5. Add Proper Accessibility Attributes
 
-#### ❌ Before
+#### Before
 ```tsx
 function MyComponent() {
   return (
     <button>
-      <ChevronRightIcon className="h-5 w-5" />
+      <ChevronRight className="h-5 w-5" />
     </button>
   );
 }
 ```
 
-#### ✅ After
+#### After
 ```tsx
 function MyComponent() {
   return (
     <button>
-      <ChevronRightIcon 
-        className="h-5 w-5" 
-        aria-hidden="true" 
+      <ChevronRight
+        className="h-5 w-5"
+        aria-hidden="true"
       />
       <span className="sr-only">Next page</span>
     </button>
@@ -179,14 +175,14 @@ function MyComponent() {
 // Or for meaningful icons:
 function StatusIcon({ status }: { status: 'success' | 'error' }) {
   return status === 'success' ? (
-    <CheckCircleIcon 
-      className="h-5 w-5 text-green-500" 
+    <CheckCircle
+      className="h-5 w-5 text-green-500"
       aria-label="Success"
       aria-hidden="false"
     />
   ) : (
-    <XCircleIcon 
-      className="h-5 w-5 text-red-500" 
+    <XCircle
+      className="h-5 w-5 text-red-500"
       aria-label="Error"
       aria-hidden="false"
     />
@@ -198,58 +194,58 @@ function StatusIcon({ status }: { status: 'success' | 'error' }) {
 
 #### IconButton Component
 ```tsx
-// ❌ Before
+// Before
 <button className="p-2 rounded-md border">
   <CustomCloseIcon className="h-4 w-4" />
 </button>
 
-// ✅ After
-import { XMarkIcon } from '@heroicons/react/24/outline';
+// After
+import { X } from 'lucide-react';
 import { IconButton } from '@/components/atoms/IconButton';
 
 <IconButton ariaLabel="Close dialog">
-  <XMarkIcon className="h-4 w-4" />
+  <X className="h-4 w-4" />
 </IconButton>
 ```
 
 #### IconBadge Component
 ```tsx
-// ❌ Before
+// Before
 <div className="rounded-full bg-yellow-100 p-2">
   <CustomBoltIcon className="h-4 w-4 text-yellow-600" />
 </div>
 
-// ✅ After
-import { BoltIcon } from '@heroicons/react/24/outline';
+// After
+import { Bolt } from 'lucide-react';
 import { IconBadge } from '@/components/atoms/IconBadge';
 
-<IconBadge Icon={BoltIcon} colorVar="--color-yellow-500" />
+<IconBadge Icon={Bolt} colorVar="--color-yellow-500" />
 ```
 
 ## Common Icon Mappings
 
-Use this table to find the correct Heroicon for common use cases:
+Use this table to find the correct Lucide React icon for common use cases:
 
-| Use Case | Old Name/Description | Heroicon | Import |
-|----------|---------------------|----------|---------|
-| Close/Cancel | `close`, `x`, `cancel` | `XMarkIcon` | `@heroicons/react/24/outline` |
-| Next/Forward | `next`, `forward`, `right` | `ChevronRightIcon` | `@heroicons/react/24/outline` |
-| Back/Previous | `back`, `previous`, `left` | `ChevronLeftIcon` | `@heroicons/react/24/outline` |
-| Add/Create | `add`, `create`, `new` | `PlusIcon` | `@heroicons/react/24/outline` |
-| Delete/Remove | `delete`, `remove`, `trash` | `TrashIcon` | `@heroicons/react/24/outline` |
-| Edit/Modify | `edit`, `modify`, `pencil` | `PencilIcon` | `@heroicons/react/24/outline` |
-| Search/Find | `search`, `find`, `magnify` | `MagnifyingGlassIcon` | `@heroicons/react/24/outline` |
-| Settings/Config | `settings`, `config`, `gear` | `CogIcon` | `@heroicons/react/24/outline` |
-| Success/Check | `success`, `check`, `done` | `CheckIcon` | `@heroicons/react/24/outline` |
-| Error/Failed | `error`, `failed`, `wrong` | `XCircleIcon` | `@heroicons/react/24/outline` |
-| Warning/Alert | `warning`, `alert`, `caution` | `ExclamationTriangleIcon` | `@heroicons/react/24/outline` |
-| Info/Help | `info`, `help`, `question` | `InformationCircleIcon` | `@heroicons/react/24/outline` |
-| User/Profile | `user`, `profile`, `account` | `UserIcon` | `@heroicons/react/24/outline` |
-| Home/Dashboard | `home`, `dashboard`, `house` | `HomeIcon` | `@heroicons/react/24/outline` |
-| Menu/Navigation | `menu`, `hamburger`, `bars` | `Bars3Icon` | `@heroicons/react/24/outline` |
-| Share/Export | `share`, `export`, `send` | `ShareIcon` | `@heroicons/react/24/outline` |
-| Download/Save | `download`, `save`, `arrow-down` | `ArrowDownTrayIcon` | `@heroicons/react/24/outline` |
-| Upload/Import | `upload`, `import`, `arrow-up` | `ArrowUpTrayIcon` | `@heroicons/react/24/outline` |
+| Use Case | Old Name/Description | Lucide Icon | Import |
+|----------|---------------------|-------------|---------|
+| Close/Cancel | `close`, `x`, `cancel` | `X` | `lucide-react` |
+| Next/Forward | `next`, `forward`, `right` | `ChevronRight` | `lucide-react` |
+| Back/Previous | `back`, `previous`, `left` | `ChevronLeft` | `lucide-react` |
+| Add/Create | `add`, `create`, `new` | `Plus` | `lucide-react` |
+| Delete/Remove | `delete`, `remove`, `trash` | `Trash2` | `lucide-react` |
+| Edit/Modify | `edit`, `modify`, `pencil` | `Pencil` | `lucide-react` |
+| Search/Find | `search`, `find`, `magnify` | `Search` | `lucide-react` |
+| Settings/Config | `settings`, `config`, `gear` | `Settings` | `lucide-react` |
+| Success/Check | `success`, `check`, `done` | `Check` | `lucide-react` |
+| Error/Failed | `error`, `failed`, `wrong` | `XCircle` | `lucide-react` |
+| Warning/Alert | `warning`, `alert`, `caution` | `AlertTriangle` | `lucide-react` |
+| Info/Help | `info`, `help`, `question` | `Info` | `lucide-react` |
+| User/Profile | `user`, `profile`, `account` | `User` | `lucide-react` |
+| Home/Dashboard | `home`, `dashboard`, `house` | `Home` | `lucide-react` |
+| Menu/Navigation | `menu`, `hamburger`, `bars` | `Menu` | `lucide-react` |
+| Share/Export | `share`, `export`, `send` | `Share` | `lucide-react` |
+| Download/Save | `download`, `save`, `arrow-down` | `Download` | `lucide-react` |
+| Upload/Import | `upload`, `import`, `arrow-up` | `Upload` | `lucide-react` |
 
 ## Social Platform Mappings
 
@@ -317,14 +313,14 @@ pnpm lint
 ```
 
 ### 3. Update Imports
-Replace custom SVG imports with Heroicons:
-- Check the [Heroicons website](https://heroicons.com) for available icons
+Replace custom SVG imports with Lucide React:
+- Browse [lucide.dev](https://lucide.dev) for available icons
 - Use the mapping table above for common patterns
-- Import from `@heroicons/react/24/outline` or `@heroicons/react/24/solid`
+- Import from `lucide-react`
 
 ### 4. Replace Inline SVGs
 - Identify the purpose of each inline SVG
-- Find the equivalent Heroicon
+- Find the equivalent Lucide React icon
 - Replace with the appropriate import and component
 
 ### 5. Update Social Icons
@@ -349,8 +345,8 @@ pnpm audit:icons
 
 ## Troubleshooting
 
-### Icon Not Found in Heroicons
-1. Check the [Heroicons website](https://heroicons.com) for alternatives
+### Icon Not Found in Lucide React
+1. Browse [lucide.dev](https://lucide.dev) for alternatives
 2. Search the icon registry: `searchIcons('keyword')`
 3. Consider if it should be a social icon using `SocialIcon`
 4. If truly unique, follow the custom SVG approval process
@@ -377,11 +373,10 @@ The new system is optimized for performance:
 
 - **Documentation**: [docs/ICON_STANDARDS.md](./ICON_STANDARDS.md)
 - **Design Review**: [docs/DESIGN_REVIEW_CHECKLIST.md](./DESIGN_REVIEW_CHECKLIST.md)
-- **Heroicons**: [heroicons.com](https://heroicons.com)
+- **Lucide React**: [lucide.dev](https://lucide.dev)
 - **SimpleIcons**: [simpleicons.org](https://simpleicons.org)
 - **Issues**: Create a GitHub issue with the `icon-request` label
 
 ---
 
 *This migration guide ensures a smooth transition to the standardized icon system while maintaining code quality and accessibility standards.*
-

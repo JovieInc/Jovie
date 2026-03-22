@@ -12,9 +12,8 @@ import {
   type CodeFlagName,
   FEATURE_FLAGS,
   type FeatureFlagsBootstrap,
+  FF_OVERRIDES_KEY,
 } from './shared';
-
-const FF_OVERRIDES_KEY = '__ff_overrides';
 
 function readOverrides(): Record<string, boolean> {
   if (globalThis.window === undefined) return {};

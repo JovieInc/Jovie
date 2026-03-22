@@ -20,13 +20,51 @@ import {
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
-import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
 import {
   CODE_FLAG_KEYS,
   FEATURE_FLAG_KEYS,
   FEATURE_FLAGS,
+  FF_OVERRIDES_KEY,
 } from '@/lib/feature-flags/shared';
+
+function useLocalOverrides() {
+  const [overrides, setOverridesState] = useState<Record<string, boolean>>(
+    () => {
+      if (typeof window === 'undefined') return {};
+      try {
+        return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
+      } catch {
+        return {};
+      }
+    }
+  );
+
+  const setOverride = useCallback((key: string, value: boolean) => {
+    setOverridesState(prev => {
+      const next = { ...prev, [key]: value };
+      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const removeOverride = useCallback((key: string) => {
+    setOverridesState(prev => {
+      const next = { ...prev };
+      delete next[key];
+      localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const clearOverrides = useCallback(() => {
+    setOverridesState({});
+    localStorage.removeItem(FF_OVERRIDES_KEY);
+  }, []);
+
+  return { overrides, setOverride, removeOverride, clearOverrides };
+}
 
 type FlagEntry = {
   name: string;
@@ -54,6 +92,29 @@ const ALL_FLAGS: FlagEntry[] = [
   ),
 ];
 
+const BREAKPOINTS = [
+  { name: '2xl', min: 1536 },
+  { name: 'xl', min: 1280 },
+  { name: 'lg', min: 1024 },
+  { name: 'md', min: 768 },
+  { name: 'sm', min: 640 },
+] as const;
+
+function useBreakpoint() {
+  const [bp, setBp] = useState('xs');
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      const match = BREAKPOINTS.find(b => w >= b.min);
+      setBp(match?.name ?? 'xs');
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return bp;
+}
+
 const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 
@@ -80,9 +141,10 @@ export function DevToolbar({
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
   const { theme, setTheme } = useTheme();
-  const overridesCtx = useFeatureFlagOverrides();
+  const overridesCtx = useLocalOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const breakpoint = useBreakpoint();
 
   // Restore state from localStorage and mark as mounted
   useEffect(() => {
@@ -154,8 +216,8 @@ export function DevToolbar({
   }, []);
 
   const overrides = useMemo(
-    () => overridesCtx?.overrides ?? {},
-    [overridesCtx?.overrides]
+    () => overridesCtx.overrides,
+    [overridesCtx.overrides]
   );
   const overrideCount = Object.keys(overrides).length;
 
@@ -239,110 +301,110 @@ export function DevToolbar({
       >
         <div className='flex flex-col'>
           {/* Search bar */}
-          {overridesCtx && (
-            <div className='flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border-subtle)]'>
-              <Search
-                size={12}
-                className='shrink-0 text-[var(--color-text-quaternary-token)]'
-              />
-              <input
-                ref={searchRef}
-                type='text'
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder='Search flags...'
-                className='flex-1 bg-transparent text-[var(--color-text-primary)] placeholder:text-[var(--color-text-quaternary-token)] outline-none text-xs'
-                aria-label='Search flags'
-              />
-              {search && (
-                <button
-                  type='button'
-                  onClick={() => setSearch('')}
-                  className='shrink-0 text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] transition-colors'
-                  aria-label='Clear search'
-                >
-                  <X size={11} />
-                </button>
-              )}
-              <span className='shrink-0 text-[10px] text-[var(--color-text-quaternary-token)]'>
-                {matchCount} of {filteredFlags.total}
-              </span>
-            </div>
-          )}
+          <div className='flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border-subtle)]'>
+            <Search
+              size={12}
+              className='shrink-0 text-[var(--color-text-quaternary-token)]'
+            />
+            <input
+              ref={searchRef}
+              type='text'
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder='Search flags...'
+              className='flex-1 bg-transparent text-[var(--color-text-primary)] placeholder:text-[var(--color-text-quaternary-token)] outline-none text-xs'
+              aria-label='Search flags'
+            />
+            {search && (
+              <button
+                type='button'
+                onClick={() => setSearch('')}
+                className='shrink-0 text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] transition-colors'
+                aria-label='Clear search'
+              >
+                <X size={11} />
+              </button>
+            )}
+            <span className='shrink-0 text-[10px] text-[var(--color-text-quaternary-token)]'>
+              {matchCount} of {filteredFlags.total}
+            </span>
+          </div>
 
           {/* Flags list */}
-          {overridesCtx && (
-            <div className='px-4 py-2 max-h-48 overflow-y-auto'>
-              {/* Overridden flags group */}
-              {filteredFlags.overridden.length > 0 && (
-                <div className='mb-2 border-l-2 border-[var(--color-accent)] pl-3'>
-                  <div className='flex items-center justify-between mb-1'>
-                    <span className='text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]'>
-                      Overrides ({filteredFlags.overridden.length})
-                    </span>
-                    <button
-                      type='button'
-                      onClick={overridesCtx.clearOverrides}
-                      className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
-                    >
-                      clear all
-                    </button>
-                  </div>
-                  <div className='flex flex-col gap-0.5'>
-                    {filteredFlags.overridden.map(flag => (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        isOverridden
-                        checked={overrides[flag.key]}
-                        serverDefault={flag.serverDefault}
-                        onCheckedChange={v =>
-                          overridesCtx.setOverride(flag.key, v)
-                        }
-                        onClear={() => overridesCtx.removeOverride(flag.key)}
-                        source={flag.source}
-                      />
-                    ))}
-                  </div>
+          <div className='px-4 py-2 max-h-48 overflow-y-auto'>
+            {/* Overridden flags group */}
+            {filteredFlags.overridden.length > 0 && (
+              <div className='mb-2 border-l-2 border-[var(--color-accent)] pl-3'>
+                <div className='flex items-center justify-between mb-1'>
+                  <span className='text-[10px] font-semibold uppercase tracking-wide text-[var(--color-accent)]'>
+                    Overrides ({filteredFlags.overridden.length})
+                  </span>
+                  <button
+                    type='button'
+                    onClick={overridesCtx.clearOverrides}
+                    className='text-[10px] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] underline transition-colors'
+                  >
+                    clear all
+                  </button>
                 </div>
-              )}
-
-              {/* Non-overridden flags */}
-              {filteredFlags.nonOverridden.length > 0 && (
                 <div className='flex flex-col gap-0.5'>
-                  {filteredFlags.nonOverridden.map(flag => {
-                    const checked =
-                      flag.source === 'code' ? flag.serverDefault : false;
-                    return (
-                      <FlagRow
-                        key={flag.key}
-                        label={flag.name.toLowerCase().replaceAll('_', ' ')}
-                        isOverridden={false}
-                        checked={checked}
-                        onCheckedChange={v =>
-                          overridesCtx.setOverride(flag.key, v)
-                        }
-                        onClear={() => overridesCtx.removeOverride(flag.key)}
-                        source={flag.source}
-                      />
-                    );
-                  })}
+                  {filteredFlags.overridden.map(flag => (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      isOverridden
+                      checked={overrides[flag.key]}
+                      serverDefault={flag.serverDefault}
+                      onCheckedChange={v =>
+                        overridesCtx.setOverride(flag.key, v)
+                      }
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
+            )}
 
-              {/* Empty search state */}
-              {matchCount === 0 && search && (
-                <div className='py-3 text-center text-[var(--color-text-quaternary-token)]'>
-                  No flags match &lsquo;{search}&rsquo;
-                </div>
-              )}
-            </div>
-          )}
+            {/* Non-overridden flags */}
+            {filteredFlags.nonOverridden.length > 0 && (
+              <div className='flex flex-col gap-0.5'>
+                {filteredFlags.nonOverridden.map(flag => {
+                  const checked =
+                    flag.source === 'code' ? flag.serverDefault : false;
+                  return (
+                    <FlagRow
+                      key={flag.key}
+                      label={flag.name.toLowerCase().replaceAll('_', ' ')}
+                      isOverridden={false}
+                      checked={checked}
+                      onCheckedChange={v =>
+                        overridesCtx.setOverride(flag.key, v)
+                      }
+                      onClear={() => overridesCtx.removeOverride(flag.key)}
+                      source={flag.source}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Empty search state */}
+            {matchCount === 0 && search && (
+              <div className='py-3 text-center text-[var(--color-text-quaternary-token)]'>
+                No flags match &lsquo;{search}&rsquo;
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Bottom bar (always visible) */}
-      <div className='flex items-center h-9 px-4 gap-2 border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+      <div className='relative flex items-center h-9 px-4 gap-2 border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+        {/* Center: brand logo */}
+        <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
+          <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
+        </div>
         {/* Left: env + version */}
         <span
           className={`px-2 py-0.5 rounded border text-[10px] font-semibold shrink-0 ${envColor}`}
@@ -373,6 +435,10 @@ export function DevToolbar({
             {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'}
           </button>
         )}
+
+        <span className='hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
+          {breakpoint}
+        </span>
 
         <div className='flex-1' />
 

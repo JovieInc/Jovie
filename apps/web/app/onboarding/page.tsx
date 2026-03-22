@@ -8,7 +8,7 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
-import { resolveUserState, UserState } from '@/lib/auth/gate';
+import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
@@ -40,16 +40,16 @@ export default async function OnboardingPage({
 
   // Gate blocked states — proxy normally prevents these from reaching here,
   // but the page must not render for banned/failed users regardless.
-  if (authResult.state === UserState.BANNED) {
+  if (authResult.state === CanonicalUserState.BANNED) {
     redirect('/banned');
   }
-  if (authResult.state === UserState.USER_CREATION_FAILED) {
+  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
   }
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. If the user is already active, send them to /app.
-  if (authResult.state === UserState.ACTIVE) {
+  if (authResult.state === CanonicalUserState.ACTIVE) {
     redirect('/app');
   }
 

@@ -10,37 +10,24 @@ import { captureCriticalError, captureError } from '@/lib/error-tracking';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { getCachedAuth, getCachedCurrentUser } from './cached';
+import { CanonicalUserState } from './canonical-user-state';
 import { syncEmailFromClerk } from './clerk-sync';
-// eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { resolveProfileState } from './profile-state-resolver';
-// eslint-disable-next-line import/no-cycle -- intentional auth module structure
 import { checkUserStatus } from './status-checker';
 
-/**
- * Centralized user state enum for auth gating decisions.
- *
- * This replaces scattered auth checks throughout the codebase with a single
- * source of truth for user state resolution. Each state has a clear redirect
- * destination and guards users from accessing features they shouldn't.
- */
-export enum UserState {
-  /** No authenticated session */
-  UNAUTHENTICATED = 'UNAUTHENTICATED',
-  /** Clerk user exists but no DB user row yet */
-  NEEDS_DB_USER = 'NEEDS_DB_USER',
-  /** User needs to submit waitlist application */
-  NEEDS_WAITLIST_SUBMISSION = 'NEEDS_WAITLIST_SUBMISSION',
-  /** Waitlist application submitted but not yet approved */
-  WAITLIST_PENDING = 'WAITLIST_PENDING',
-  /** User has access but needs to complete onboarding */
-  NEEDS_ONBOARDING = 'NEEDS_ONBOARDING',
-  /** Fully active user with complete profile */
-  ACTIVE = 'ACTIVE',
-  /** User has been banned */
-  BANNED = 'BANNED',
-  /** User creation failed after retries - prevents redirect loops */
-  USER_CREATION_FAILED = 'USER_CREATION_FAILED',
-}
+export type { UserStateInput } from './canonical-user-state';
+// Re-export canonical state enum and utilities so consumers can import from gate.ts
+// (preserves existing import paths) or directly from canonical-user-state.ts.
+export {
+  CanonicalUserState,
+  // Temporary alias — tests reference UserState extensively via dynamic imports.
+  // TODO: Migrate test files to CanonicalUserState, then remove this alias.
+  CanonicalUserState as UserState,
+  canAccessApp,
+  canAccessOnboarding,
+  getRedirectForState,
+  requiresRedirect,
+} from './canonical-user-state';
 
 /**
  * Result of resolving user state. Contains all information needed
@@ -48,7 +35,7 @@ export enum UserState {
  */
 export interface AuthGateResult {
   /** The resolved user state */
-  state: UserState;
+  state: CanonicalUserState;
   /** Clerk user ID if authenticated */
   clerkUserId: string | null;
   /** Database user ID if exists */
@@ -342,7 +329,7 @@ async function handleMissingDbUser(
   // Don't create user - return NEEDS_DB_USER state
   if (!createDbUserIfMissing) {
     return {
-      state: UserState.NEEDS_DB_USER,
+      state: CanonicalUserState.NEEDS_DB_USER,
       clerkUserId,
       dbUserId: null,
       profileId: null,
@@ -369,7 +356,7 @@ async function handleMissingDbUser(
 
     if (waitlistResult.status === 'new' || !waitlistResult.status) {
       return {
-        state: UserState.NEEDS_WAITLIST_SUBMISSION,
+        state: CanonicalUserState.NEEDS_WAITLIST_SUBMISSION,
         clerkUserId,
         dbUserId: null,
         profileId: null,
@@ -402,7 +389,7 @@ async function handleMissingDbUser(
     );
 
     return {
-      state: UserState.USER_CREATION_FAILED,
+      state: CanonicalUserState.USER_CREATION_FAILED,
       clerkUserId,
       dbUserId: null,
       profileId: null,
@@ -435,7 +422,7 @@ export async function resolveUserState(
 
   // Default empty result
   const emptyResult: AuthGateResult = {
-    state: UserState.UNAUTHENTICATED,
+    state: CanonicalUserState.UNAUTHENTICATED,
     clerkUserId: null,
     dbUserId: null,
     profileId: null,
@@ -653,49 +640,6 @@ async function checkWaitlistAccessInternal(email: string): Promise<{
   };
 }
 
-// =============================================================================
-// State Utilities
-// =============================================================================
-
-/**
- * Lookup map for user state redirects.
- */
-const STATE_REDIRECT_MAP: Record<UserState, string | null> = {
-  [UserState.UNAUTHENTICATED]: '/signin',
-  [UserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
-  [UserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
-  [UserState.WAITLIST_PENDING]: '/waitlist',
-  [UserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
-  [UserState.BANNED]: '/banned',
-  [UserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
-  [UserState.ACTIVE]: null,
-};
-
-/**
- * Returns redirect paths for each user state.
- * Used by routes to determine where to redirect users based on their state.
- */
-export function getRedirectForState(state: UserState): string | null {
-  return STATE_REDIRECT_MAP[state] ?? null;
-}
-
-/**
- * Utility to check if a state allows access to the main app.
- */
-export function canAccessApp(state: UserState): boolean {
-  return state === UserState.ACTIVE;
-}
-
-/**
- * Utility to check if a state allows access to onboarding.
- */
-export function canAccessOnboarding(state: UserState): boolean {
-  return state === UserState.NEEDS_ONBOARDING || state === UserState.ACTIVE;
-}
-
-/**
- * Utility to check if a state requires redirect away from protected routes.
- */
-export function requiresRedirect(state: UserState): boolean {
-  return state !== UserState.ACTIVE;
-}
+// State utilities (getRedirectForState, canAccessApp, canAccessOnboarding,
+// requiresRedirect) are re-exported from canonical-user-state.ts at the top
+// of this file. No local definitions needed.

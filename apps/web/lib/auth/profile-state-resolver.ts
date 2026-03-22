@@ -5,8 +5,7 @@
  * Uses the canonical isProfileComplete() from profile-completeness.ts.
  */
 
-// eslint-disable-next-line import/no-cycle -- mutual dependency with gate.ts for auth state
-import { UserState } from './gate';
+import { CanonicalUserState } from './canonical-user-state';
 import { isProfileComplete } from './profile-completeness';
 
 /**
@@ -26,7 +25,7 @@ export interface ProfileData {
  * Result of profile state resolution.
  */
 export interface ProfileStateResult {
-  state: UserState;
+  state: CanonicalUserState;
   profileId: string | null;
   redirectTo: string | null;
 }
@@ -46,7 +45,7 @@ export function resolveProfileState(
   // No profile exists
   if (!profile) {
     return {
-      state: UserState.NEEDS_ONBOARDING,
+      state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
       redirectTo: '/onboarding?fresh_signup=true',
     };
@@ -55,7 +54,7 @@ export function resolveProfileState(
   // Profile exists but is incomplete
   if (!isProfileComplete(profile)) {
     return {
-      state: UserState.NEEDS_ONBOARDING,
+      state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: profile.id,
       redirectTo: '/onboarding?fresh_signup=true',
     };
@@ -63,7 +62,7 @@ export function resolveProfileState(
 
   // Profile is complete - user is active
   return {
-    state: UserState.ACTIVE,
+    state: CanonicalUserState.ACTIVE,
     profileId: profile.id,
     redirectTo: null,
   };

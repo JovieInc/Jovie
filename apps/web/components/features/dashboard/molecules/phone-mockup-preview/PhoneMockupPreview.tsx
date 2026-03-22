@@ -1,11 +1,13 @@
 'use client';
 
+import { ChevronRight, Link2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import Image from 'next/image';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { cn } from '@/lib/utils';
 import type { PhoneMockupPreviewProps } from './types';
 import { usePhoneMockupPreview } from './usePhoneMockupPreview';
-import { getPlatformIcon, getPlatformName } from './utils';
+import { getPlatformName } from './utils';
 
 // Animation constants
 const LINK_ANIMATION_BASE_DELAY = 0.1;
@@ -166,10 +168,10 @@ export function PhoneMockupPreview({
                           'transition-all duration-200'
                         )}
                       >
-                        <span
+                        <SocialIcon
+                          platform={link.platform}
                           className={cn(
                             'w-5 h-5',
-                            getPlatformIcon(link.platform),
                             link.platform === 'tiktok' &&
                               'text-black dark:text-white'
                           )}
@@ -188,20 +190,7 @@ export function PhoneMockupPreview({
                       </div>
 
                       <div className='shrink-0 text-tertiary-token'>
-                        <svg
-                          className='w-4 h-4'
-                          fill='none'
-                          viewBox='0 0 24 24'
-                          stroke='currentColor'
-                          aria-hidden='true'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            strokeWidth={2}
-                            d='M9 5l7 7-7 7'
-                          />
-                        </svg>
+                        <ChevronRight className='w-4 h-4' aria-hidden='true' />
                       </div>
                     </div>
 
@@ -220,20 +209,10 @@ export function PhoneMockupPreview({
               ) : (
                 <div className='h-full flex flex-col items-center justify-center text-center p-6'>
                   <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2'>
-                    <svg
+                    <Link2
                       className='w-6 h-6 text-tertiary-token'
-                      fill='none'
-                      viewBox='0 0 24 24'
-                      stroke='currentColor'
                       aria-hidden='true'
-                    >
-                      <path
-                        strokeLinecap='round'
-                        strokeLinejoin='round'
-                        strokeWidth={1.5}
-                        d='M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1'
-                      />
-                    </svg>
+                    />
                   </div>
                   <h3 className='mb-1 text-[13px] font-[510] text-primary-token'>
                     No links yet

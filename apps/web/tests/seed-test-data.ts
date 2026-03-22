@@ -781,26 +781,6 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     for (const profile of TEST_PROFILES) {
       console.log(`  Creating profile: ${profile.username}`);
 
-      // Check if profile already exists and delete it to ensure clean state
-      const [existing] = await db
-        .select({ id: creatorProfiles.id })
-        .from(creatorProfiles)
-        .where(
-          eq(creatorProfiles.usernameNormalized, profile.username.toLowerCase())
-        )
-        .limit(1);
-
-      if (existing) {
-        console.log(
-          `    → Profile ${profile.username} exists, recreating with correct values...`
-        );
-        // Delete existing profile (social links will cascade delete)
-        await db
-          .delete(creatorProfiles)
-          .where(eq(creatorProfiles.id, existing.id));
-      }
-
-      // Create the creator profile using Drizzle ORM insert to ensure proper boolean handling
       // For dualipa, include real multi-DSP IDs so E2E tests can verify multi-DSP rendering
       const dspFields =
         profile.username === 'dualipa'
@@ -815,6 +795,15 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             }
           : {};
 
+      // Delete any existing profile with this username first (also cascades social links).
+      // We delete unconditionally by usernameNormalized — no existence check needed.
+      // The Neon CI branches may inherit data from the parent branch.
+      await db
+        .delete(creatorProfiles)
+        .where(
+          eq(creatorProfiles.usernameNormalized, profile.username.toLowerCase())
+        );
+
       const [createdProfile] = await db
         .insert(creatorProfiles)
         .values({
@@ -824,11 +813,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           bio: profile.bio,
           spotifyUrl: profile.spotifyUrl || null,
           avatarUrl: profile.avatarUrl || null,
-          creatorType: 'artist',
+          creatorType: 'artist' as const,
           isPublic: true,
           isVerified: false,
           isClaimed: false,
-          ingestionStatus: 'idle',
+          ingestionStatus: 'idle' as const,
           ...dspFields,
         })
         .returning({ id: creatorProfiles.id });
