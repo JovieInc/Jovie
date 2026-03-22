@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.39] - 2026-03-21
+
+> [internal] Audit changelog for customer and investor safety.
+
+### Changed
+
+- [internal] Hide sensitive entries (old pricing, scraping pipeline, YC demo tooling, admin features, vendor names, conversion funnel tactics) behind `[internal]` prefix
+- [internal] Rewrite technical entries into customer-friendly language
+- [internal] Remove blog post references from public changelog
+
 ## [26.4.38] - 2026-03-21
 
 ### Added
