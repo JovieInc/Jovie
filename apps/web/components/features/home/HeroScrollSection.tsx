@@ -25,7 +25,8 @@ export function HeroScrollSection() {
               </h1>
 
               <p className='marketing-lead-linear mx-auto mt-4 max-w-[34rem] text-secondary-token md:mt-5'>
-                Share every release. Reach every fan. Automatically.
+                Smart links, release automation, and fan intelligence for
+                independent artists. One tool to reach every listener.
               </p>
 
               <div className='mx-auto mt-5 w-full max-w-[28rem] md:mt-6'>

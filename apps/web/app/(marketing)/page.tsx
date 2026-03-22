@@ -5,11 +5,11 @@ import { AiDemo } from '@/features/home/AiDemo';
 import { AnalyticsSection } from '@/features/home/AnalyticsSection';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { ChangelogPreview } from '@/features/home/ChangelogPreview';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PhoneProfileDemo } from '@/features/home/PhoneProfileDemo';
+import { PricingSection } from '@/features/home/PricingSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import { ValuePropsSection } from '@/features/home/ValuePropsSection';
@@ -235,8 +235,8 @@ export default function HomePage() {
       {/* 5.0 Analytics */}
       <AnalyticsSection />
 
-      {/* Changelog preview */}
-      <ChangelogPreview />
+      {/* Pricing — must show before CTA for conversion */}
+      <PricingSection />
 
       {/* Testimonials */}
       <TestimonialsSection />
