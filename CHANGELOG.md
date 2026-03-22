@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Use the canonical `BASE_URL` for signup metadata so `/signup` Open Graph URLs and images resolve to `jov.ie` instead of the deprecated app domain
+### Added
+
+- Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
+- Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
 
 ## [26.4.37] - 2026-03-21
 
