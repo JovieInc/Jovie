@@ -7,6 +7,29 @@
 
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
+
+/**
+ * At runtime, the signUp object returned by Clerk's useSignUp() implements the
+ * "future" Signal API (create returns {error}, plus .verifications.sendEmailCode,
+ * .verifications.verifyEmailCode, .sso, .finalize methods). However, the published
+ * TypeScript types still expose the legacy SignUpResource interface. We define a
+ * minimal type overlay here so our code type-checks without changing runtime behavior.
+ */
+type SignUpFuture = {
+  status: string | null;
+  create: (params: { emailAddress: string }) => Promise<{ error: unknown }>;
+  verifications: {
+    sendEmailCode: () => Promise<{ error: unknown }>;
+    verifyEmailCode: (params: { code: string }) => Promise<{ error: unknown }>;
+  };
+  sso: (params: {
+    strategy: string;
+    redirectUrl: string;
+    redirectCallbackUrl: string;
+  }) => Promise<{ error: unknown }>;
+  finalize: () => Promise<{ error: unknown }>;
+};
+
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -102,8 +125,10 @@ export interface UseSignUpFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
-  const { signUp, fetchStatus } = useSignUp();
-  const isLoaded = signUp !== null && fetchStatus === 'idle';
+  const { signUp: signUpRaw, isLoaded: isClerkLoaded } = useSignUp();
+  // Cast to the future Signal API shape used at runtime (see SignUpFuture above).
+  const signUp = signUpRaw as unknown as SignUpFuture | undefined;
+  const isLoaded = isClerkLoaded;
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup
