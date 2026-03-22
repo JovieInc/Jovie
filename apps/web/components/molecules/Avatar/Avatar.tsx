@@ -37,6 +37,8 @@ export interface AvatarProps {
   readonly priority?: boolean;
   /** Image quality */
   readonly quality?: number;
+  /** Responsive browser size hints for Next.js image selection */
+  readonly sizes?: string;
   /** Custom className */
   readonly className?: string;
   /** Custom styling */
@@ -156,7 +158,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
     verified = false,
     priority = false,
     quality = 85,
-
+    sizes,
     className,
     style,
   },
@@ -240,7 +242,7 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
           quality={quality}
           placeholder='blur'
           blurDataURL={blurDataURL}
-          sizes={`${width}px`}
+          sizes={sizes ?? `${width}px`}
           unoptimized={unoptimized}
           className={cn(
             'object-cover object-center transition-opacity duration-300 ease-out',
