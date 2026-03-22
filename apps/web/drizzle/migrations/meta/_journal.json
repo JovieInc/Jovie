@@ -50,6 +50,13 @@
       "when": 1774338000000,
       "tag": "0006_repair_missing_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1774145587000,
+      "tag": "0007_repair_profile_claim_schema_drift",
+      "breakpoints": true
     }
   ]
 }
