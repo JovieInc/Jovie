@@ -12,6 +12,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
 - Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+### Added
+
+- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
+  - Auto-creates test user via Clerk API if not found
+  - Uses `+clerk_test` email suffix with magic OTP code `424242`
+  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
+  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
+
+### Fixed
+
+- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
+- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
 
 ## [26.4.39] - 2026-03-21
 
@@ -44,41 +56,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
-## [26.4.37] - 2026-03-22
-## [26.4.38] - 2026-03-22
-## [26.4.39] - 2026-03-22
-
-### Added
-
-- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
-  - Auto-creates test user via Clerk API if not found
-  - Uses `+clerk_test` email suffix with magic OTP code `424242`
-  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
-  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
-
-### Fixed
-
-- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
-- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
-
-## [26.4.38] - 2026-03-21
-
-### Added
-
-- Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
-- Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
-
-## [26.4.37] - 2026-03-21
-
-### Changed
-
-- Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
-- Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
-- Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)
-
-### Removed
-
-- Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
 
 ## [26.4.36] - 2026-03-21
 
