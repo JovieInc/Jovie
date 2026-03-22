@@ -10,6 +10,9 @@
  * These are pure logic tests that don't render React components.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   getProfileModeSubtitle,
@@ -19,6 +22,12 @@ import {
 // --- Mock data used across tests ---
 
 const BASE_URL = 'https://jov.ie';
+const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const WEB_ROOT = path.resolve(TEST_FILE_DIR, '../../..');
+const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
+  path.join(WEB_ROOT, 'app/[username]/page.tsx'),
+  'utf8'
+);
 
 const mockProfile = {
   id: 'profile-123',
@@ -80,6 +89,18 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  describe('public tour data loading', () => {
+    it('uses the public-safe upcoming tour query helper', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'getUpcomingTourDatesForProfile'
+      );
+    });
+
+    it('does not import the dashboard noStore loader into the public page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('loadUpcomingTourDates');
+    });
+  });
+
   describe('generateProfileStructuredData', () => {
     // We test the structured data generation logic directly
     // Since it's a private function, we replicate the logic here for testing

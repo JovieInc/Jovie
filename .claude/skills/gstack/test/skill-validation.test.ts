@@ -208,6 +208,26 @@ describe('Generated SKILL.md freshness', () => {
   });
 });
 
+describe('Top-level skill alias integrity', () => {
+  test('all .claude/skills symlinks resolve to existing skill directories with SKILL.md', () => {
+    const skillsRoot = path.resolve(ROOT, '..');
+    const entries = fs.readdirSync(skillsRoot, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(skillsRoot, entry.name);
+      if (!entry.isSymbolicLink()) continue;
+
+      const resolvedPath = path.resolve(
+        skillsRoot,
+        fs.readlinkSync(fullPath)
+      );
+
+      expect(fs.existsSync(resolvedPath)).toBe(true);
+      expect(fs.existsSync(path.join(resolvedPath, 'SKILL.md'))).toBe(true);
+    }
+  });
+});
+
 // --- Update check preamble validation ---
 
 describe('Update check preamble', () => {

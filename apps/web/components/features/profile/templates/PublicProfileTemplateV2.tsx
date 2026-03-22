@@ -85,12 +85,13 @@ export function PublicProfileTemplateV2({
     () => getCanonicalProfileDSPs(artist, socialLinks),
     [artist, socialLinks]
   );
-  const { notificationsContextValue } = useProfileShell({
-    artist,
-    socialLinks,
-    contacts,
-    visitTrackingToken,
-  });
+  const initialSource = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    return new URLSearchParams(globalThis.location.search).get('source');
+  }, []);
 
   const {
     activeIndex,
@@ -105,6 +106,23 @@ export function PublicProfileTemplateV2({
   });
 
   const activeMode = SWIPEABLE_MODES[activeIndex] ?? 'profile';
+  const { notificationsContextValue } = useProfileShell({
+    artist,
+    socialLinks,
+    contacts,
+    visitTrackingToken,
+    modeOverride: activeMode,
+    sourceOverride: initialSource,
+  });
+
+  useEffect(() => {
+    const nextMode = normalizeInitialMode(mode);
+    const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
+
+    if (nextIndex !== activeIndex) {
+      setActiveIndex(nextIndex);
+    }
+  }, [activeIndex, mode, setActiveIndex]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

@@ -26,6 +26,10 @@ export const SWIPEABLE_MODES = [
 
 export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
 
+export function supportsProfileV2Mode(mode: ProfileMode): boolean {
+  return mode !== 'contact';
+}
+
 export interface ProfileModeShellConfig {
   readonly showBackButton: boolean;
   readonly showSocialBar: boolean;

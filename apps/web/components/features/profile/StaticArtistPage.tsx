@@ -10,6 +10,7 @@ import type {
   ProfileMode,
   ProfilePublicViewModel,
 } from '@/features/profile/contracts';
+import { supportsProfileV2Mode } from '@/features/profile/contracts';
 import { LatestReleaseCard } from '@/features/profile/LatestReleaseCard';
 import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
@@ -216,7 +217,7 @@ export function StaticArtistPage({
     showShopButton,
   });
 
-  if (profileV2Enabled) {
+  if (profileV2Enabled && supportsProfileV2Mode(mode)) {
     return (
       <PublicProfileTemplateV2
         mode={mode}

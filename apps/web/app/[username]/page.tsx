@@ -2,7 +2,7 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
@@ -37,6 +37,7 @@ import {
 } from '@/lib/services/profile';
 import { getProfileSocialLinks } from '@/lib/services/profile/queries';
 import { isDspPlatform } from '@/lib/services/social-links/types';
+import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -670,10 +671,8 @@ export default async function ArtistPage({
       getCachedLatestReleaseGate(),
       getCachedSubscribeCTAVariant(profile.id),
       profileV2Enabled || mode === 'tour'
-        ? loadUpcomingTourDates(profile.id)
-        : Promise.resolve(
-            [] as Awaited<ReturnType<typeof loadUpcomingTourDates>>
-          ),
+        ? getUpcomingTourDatesForProfile(profile.id)
+        : Promise.resolve([] as TourDateViewModel[]),
     ]
   );
 

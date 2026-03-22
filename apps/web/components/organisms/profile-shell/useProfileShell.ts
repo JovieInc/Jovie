@@ -8,6 +8,7 @@ import {
   useProfileVisitTracking,
   useTipPageTracking,
 } from '@/components/organisms/hooks/useProfileTracking';
+import type { ProfileMode } from '@/features/profile/contracts';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { applyPublicProfileLinkCaps } from '@/lib/profile/social-link-limits';
 import {
@@ -71,10 +72,15 @@ export function useProfileShell({
   socialLinks,
   contacts = [],
   visitTrackingToken,
+  modeOverride,
+  sourceOverride,
 }: Pick<
   ProfileShellProps,
   'artist' | 'socialLinks' | 'contacts' | 'visitTrackingToken'
->): UseProfileShellReturn {
+> & {
+  modeOverride?: ProfileMode;
+  sourceOverride?: string | null;
+}): UseProfileShellReturn {
   const [isTipNavigating, setIsTipNavigating] = useState(false);
   const { success: showSuccess, error: showError } = useNotifications();
   const searchParams = useSearchParams();
@@ -85,10 +91,13 @@ export function useProfileShell({
   // when unrelated URL parameters change
   const { mode, source } = useMemo(
     () => ({
-      mode: searchParams?.get('mode') ?? 'profile',
-      source: searchParams?.get('source') ?? null,
+      mode:
+        modeOverride ??
+        (searchParams?.get('mode') as ProfileMode | null) ??
+        'profile',
+      source: sourceOverride ?? searchParams?.get('source') ?? null,
     }),
-    [searchParams]
+    [modeOverride, searchParams, sourceOverride]
   );
 
   // Notifications CTA is always enabled (previously gated by preview=1 param)
