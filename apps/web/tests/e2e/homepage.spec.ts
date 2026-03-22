@@ -32,12 +32,10 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.'
+      'The link your music deserves.'
     );
     await expect(
-      page.getByText(
-        'Smart links, fan capture, tips, and tour dates, all behind a single link.'
-      )
+      page.getByText('Share every release. Reach every fan. Automatically.')
     ).toBeVisible();
 
     const heroSection = page.locator('main section').first();
@@ -91,7 +89,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.',
+      'The link your music deserves.',
       {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       }

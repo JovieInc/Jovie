@@ -13,7 +13,7 @@ describe('HeroScrollSection', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'One link to launch your music career.',
+        name: 'The link your music deserves.',
       })
     ).toBeInTheDocument();
     expect(

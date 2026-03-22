@@ -27,16 +27,13 @@ export function HeroScrollSection() {
             <div className='max-w-[var(--linear-hero-copy-max)] text-left'>
               <h1 className='marketing-h1-linear max-w-[10.75ch] text-primary-token sm:max-w-[11.2ch] md:max-w-none'>
                 <span className='md:block md:whitespace-nowrap'>
-                  One link to launch
+                  The link your music
                 </span>
-                <span className='md:block md:whitespace-nowrap'>
-                  your music career.
-                </span>
+                <span className='md:block md:whitespace-nowrap'>deserves.</span>
               </h1>
 
               <p className='marketing-lead-linear mt-3.5 max-w-[34rem] text-secondary-token md:mt-4.5'>
-                Smart links, fan capture, tips, and tour dates, all behind a
-                single link.
+                Share every release. Reach every fan. Automatically.
               </p>
 
               <div className='mt-5 w-full max-w-[35rem] md:mt-6'>
