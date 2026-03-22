@@ -1,8 +1,8 @@
 'use client';
 
-import ErrorBoundary from '@/components/organisms/ErrorBoundary';
+import { PublicPageErrorFallback } from '@/components/providers/PublicPageErrorFallback';
 import type { ErrorProps } from '@/types/common';
 
-export default function AuthError({ error, reset }: ErrorProps) {
-  return <ErrorBoundary error={error} reset={reset} context='Auth' />;
+export default function AuthError({ error }: ErrorProps) {
+  return <PublicPageErrorFallback error={error} context='Auth' />;
 }
