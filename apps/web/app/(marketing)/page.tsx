@@ -1,15 +1,17 @@
 import type { Metadata } from 'next';
-import { Container } from '@/components/site/Container';
+import { NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AiDemo } from '@/features/home/AiDemo';
+import { AnalyticsSection } from '@/features/home/AnalyticsSection';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { ChangelogPreview } from '@/features/home/ChangelogPreview';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroScrollSection } from '@/features/home/HeroScrollSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { PhoneProfileDemo } from '@/features/home/PhoneProfileDemo';
-import { PricingSection } from '@/features/home/PricingSection';
 import { ReleasesSection } from '@/features/home/ReleasesSection';
+import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import { ValuePropsSection } from '@/features/home/ValuePropsSection';
 import {
   buildOrganizationSchema,
@@ -153,45 +155,54 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
 });
 
-function AiSupportSection() {
-  return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
-      <Container size='homepage'>
-        <div className='homepage-section-shell'>
-          <div className='homepage-section-intro-compact'>
-            <div className='reveal-on-scroll'>
-              <span className='homepage-section-eyebrow'>AI assistant</span>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
-                AI that knows your work.
-              </h2>
-              <p className='mt-4 max-w-xl marketing-lead-linear text-secondary-token'>
-                No gimmicks. Just an assistant grounded in your catalog, ready
-                to help with the business side of music when it is time to
-                write, plan, or launch.
-              </p>
-            </div>
+const AI_SUB_ITEMS = [
+  {
+    number: '4.1',
+    title: 'Press Releases',
+    description:
+      'A press release that says you dropped "Never Say A Word" with The Orchard on March 3rd, it hit 42K streams in the first week, and you\'ve toured 12 cities this year. ChatGPT can\'t write that.',
+  },
+  {
+    number: '4.2',
+    title: 'Career Context',
+    description:
+      "Every release date, every stream count, every collab, every city you've played. The AI has your full history loaded — not a blank prompt.",
+  },
+  {
+    number: '4.3',
+    title: 'Release Strategy',
+    description:
+      'Rollout plans built on your actual numbers — which platforms drive your streams, when your fans are most active, what worked last time.',
+  },
+];
 
-            <div className='reveal-on-scroll' data-delay='80'>
-              <div className='homepage-surface-card overflow-hidden rounded-[1rem]'>
-                <AiDemo />
-              </div>
-            </div>
-          </div>
-        </div>
-      </Container>
-    </section>
+function AiSection() {
+  return (
+    <NumberedSection
+      id='ai'
+      sectionNumber='4.0'
+      sectionTitle='AI'
+      heading='AI that knows every song.'
+      description='Your releases, your stream counts, your tour history, your collabs — all loaded. Ask it to write a press release and it cites real numbers. Ask it to plan a rollout and it pulls from what actually worked.'
+      subItems={AI_SUB_ITEMS}
+      className='relative overflow-hidden bg-page'
+    >
+      <div
+        className='homepage-surface-card overflow-hidden rounded-[1rem]'
+        style={{
+          boxShadow:
+            '0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.25)',
+        }}
+      >
+        <AiDemo />
+      </div>
+    </NumberedSection>
   );
 }
 
 export default function HomePage() {
   return (
-    <div
-      className='jovie-homepage-marketing relative min-h-screen'
-      style={{
-        backgroundColor: 'var(--linear-bg-footer)',
-        color: 'var(--linear-text-primary)',
-      }}
-    >
+    <div className='relative min-h-screen'>
       {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
       <AuthRedirectHandler />
 
@@ -200,23 +211,37 @@ export default function HomePage() {
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* Hero with scroll-hijacking phone animation into mode carousel */}
+      {/* 1. Hero */}
       <HeroScrollSection />
 
+      {/* Logo trust bar */}
       <LogoBar />
 
-      <ReleasesSection />
-
+      {/* Value proposition — FIG cards */}
       <ValuePropsSection />
 
+      {/* 1.0 Release */}
+      <ReleasesSection />
+
+      {/* 2.0 Profile */}
       <PhoneProfileDemo />
 
-      <AiSupportSection />
-
+      {/* 3.0 Audience */}
       <AudienceCRMSection />
 
-      <PricingSection />
+      {/* 4.0 AI */}
+      <AiSection />
 
+      {/* 5.0 Analytics */}
+      <AnalyticsSection />
+
+      {/* Changelog preview */}
+      <ChangelogPreview />
+
+      {/* Testimonials */}
+      <TestimonialsSection />
+
+      {/* Final CTA */}
       <FinalCTASection />
     </div>
   );

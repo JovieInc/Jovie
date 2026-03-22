@@ -12,7 +12,7 @@ import {
   Users,
 } from 'lucide-react';
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
@@ -94,7 +94,7 @@ function HowItWorksSection() {
         backgroundColor: 'var(--linear-bg-page)',
       }}
     >
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         <div className='mx-auto max-w-(--linear-content-max)'>
           <div className='text-center'>
             <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
@@ -130,7 +130,7 @@ function HowItWorksSection() {
             ))}
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }
@@ -170,7 +170,7 @@ function BenefitsSection() {
         backgroundColor: 'var(--linear-bg-footer)',
       }}
     >
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         <div className='mx-auto max-w-(--linear-content-max)'>
           {/* Gradient separator */}
           <div
@@ -217,7 +217,7 @@ function BenefitsSection() {
             ))}
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }
@@ -243,7 +243,7 @@ function SocialProofSection() {
         backgroundColor: 'var(--linear-bg-page)',
       }}
     >
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         <div className='mx-auto max-w-3xl text-center'>
           <p className='text-(--linear-label-size) font-(--linear-font-weight-medium) uppercase tracking-[0.08em] text-tertiary-token'>
             Built for real-world artists
@@ -273,7 +273,7 @@ function SocialProofSection() {
             ))}
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }
@@ -292,7 +292,7 @@ function TipsFinalCTA() {
         backgroundColor: 'var(--linear-bg-page)',
       }}
     >
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         {/* Gradient separator */}
         <div
           aria-hidden='true'
@@ -329,7 +329,7 @@ function TipsFinalCTA() {
             </Button>
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

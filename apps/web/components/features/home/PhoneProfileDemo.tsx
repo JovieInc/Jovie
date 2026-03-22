@@ -3,9 +3,36 @@
 import { Calendar, Disc, FileText, Mail, Music, Youtube } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import { Container } from '@/components/site/Container';
+import { NumberedSection } from '@/components/marketing';
 import { PhoneFrame } from './PhoneFrame';
 import { TIM_WHITE_PROFILE } from './tim-white';
+
+const SUB_ITEMS = [
+  {
+    number: '2.1',
+    title: 'Streaming Links',
+    description:
+      'One clean page for every link out — Spotify, Apple Music, YouTube Music, and more.',
+  },
+  {
+    number: '2.2',
+    title: 'Fan Capture',
+    description:
+      'Collect emails without extra tooling. Every profile visit is a conversion opportunity.',
+  },
+  {
+    number: '2.3',
+    title: 'Monetization',
+    description:
+      'Tips, tickets, and launch traffic in one flow. Fans support you directly.',
+  },
+  {
+    number: '2.4',
+    title: 'Tour Dates',
+    description:
+      'Auto-synced show listings that update across your profile and smart links.',
+  },
+];
 
 /* ------------------------------------------------------------------ */
 /*  Types & constants                                                  */
@@ -174,12 +201,11 @@ const TAB_CONTENT: Record<ProfileTab, React.ReactNode> = {
 
 export function PhoneProfileDemo() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('listen');
-  const sectionRef = useRef<HTMLElement>(null);
+  const phoneRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
 
-  // Intersection Observer for entrance animation
   useEffect(() => {
-    const section = sectionRef.current;
+    const section = phoneRef.current;
     if (!section) return;
 
     const observer = new IntersectionObserver(
@@ -197,132 +223,94 @@ export function PhoneProfileDemo() {
   }, []);
 
   return (
-    <section
-      id='profiles'
-      ref={sectionRef}
-      className='section-spacing-linear overflow-hidden'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
+    <NumberedSection
+      id='profile'
+      sectionNumber='2.0'
+      sectionTitle='Profile'
+      heading='Profiles that convert.'
+      description='Your artist page handles streaming, tips, tour dates, and fan capture in one place. It looks polished, updates fast, and gives every release a home.'
+      subItems={SUB_ITEMS}
     >
-      <Container size='homepage'>
-        <div className='homepage-section-shell'>
-          <div className='grid items-center gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:gap-8 xl:grid-cols-[0.74fr_1.26fr]'>
-            <div className='reveal-on-scroll order-2 lg:order-1'>
-              <p className='homepage-section-eyebrow'>Smart profile</p>
-              <h2 className='mt-4 max-w-[10ch] marketing-h2-linear text-primary-token md:max-w-[12ch] lg:max-w-none'>
-                Profiles that convert.
-              </h2>
-              <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>
-                Your artist page handles streaming, tips, tour dates, and fan
-                capture in one place. It looks polished, updates fast, and gives
-                every release a home.
+      <div
+        ref={phoneRef}
+        className='flex justify-center'
+        style={{
+          transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
+          opacity: isVisible ? 1 : 0,
+          transition:
+            'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
+        }}
+      >
+        <div
+          className='scale-[1.06] sm:scale-[1.1] lg:scale-[1.14] xl:scale-[1.18]'
+          style={{
+            filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
+          }}
+        >
+          <PhoneFrame>
+            <div className='flex flex-col items-center px-5 pb-4 pt-10'>
+              <div
+                className='h-14 w-14 overflow-hidden rounded-full border border-white/10'
+                style={{ boxShadow: '0 0 0 1px rgba(255,255,255,0.06)' }}
+              >
+                <Image
+                  src={PROFILE.avatarSrc}
+                  alt='Tim White'
+                  width={112}
+                  height={112}
+                  className='h-full w-full object-cover'
+                  priority={false}
+                />
+              </div>
+              <p className='mt-2.5 text-[15px] font-semibold text-white'>
+                {PROFILE.name}
               </p>
-              <div className='mt-4 grid gap-2.5 sm:grid-cols-3 lg:max-w-[25rem] lg:grid-cols-1'>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
-                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
-                    Streaming
-                  </p>
-                  <p className='mt-1 text-sm font-medium text-primary-token'>
-                    One clean page for every link out.
-                  </p>
-                </div>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
-                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
-                    Fan capture
-                  </p>
-                  <p className='mt-1 text-sm font-medium text-primary-token'>
-                    Collect emails without extra tooling.
-                  </p>
-                </div>
-                <div className='homepage-surface-card rounded-[1rem] px-4 py-3.25'>
-                  <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
-                    Monetization
-                  </p>
-                  <p className='mt-1 text-sm font-medium text-primary-token'>
-                    Tips, tickets, and launch traffic in one flow.
-                  </p>
-                </div>
-              </div>
+              <p className='mt-0.5 text-[11px] text-white/40'>
+                {PROFILE.tagline}
+              </p>
             </div>
 
-            <div
-              className='order-1 flex justify-center lg:order-2 lg:justify-end'
-              style={{
-                transform: isVisible ? 'translateY(0)' : 'translateY(40px)',
-                opacity: isVisible ? 1 : 0,
-                transition:
-                  'transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.7s ease-out',
-              }}
-            >
-              <div className='scale-[1.02] sm:scale-[1.06] lg:translate-x-4 lg:scale-[1.1] xl:scale-[1.14]'>
-                <PhoneFrame>
-                  {/* Profile header */}
-                  <div className='flex flex-col items-center px-5 pb-4 pt-10'>
-                    <div className='h-14 w-14 overflow-hidden rounded-full border border-white/10'>
-                      <Image
-                        src={PROFILE.avatarSrc}
-                        alt='Tim White'
-                        width={112}
-                        height={112}
-                        className='h-full w-full object-cover'
-                        priority={false}
-                      />
-                    </div>
-                    <p className='mt-2.5 text-[15px] font-semibold text-white'>
-                      {PROFILE.name}
-                    </p>
-                    <p className='mt-0.5 text-[11px] text-white/40'>
-                      {PROFILE.tagline}
-                    </p>
-                  </div>
-
-                  <div className='relative mx-4 flex overflow-hidden rounded-[0.85rem] border border-white/[0.05] bg-white/[0.04]'>
-                    <span
-                      aria-hidden='true'
-                      className='absolute inset-y-0 left-0 rounded-[0.75rem] bg-white/[0.08]'
-                      style={{
-                        width: `${100 / TABS.length}%`,
-                        transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
-                        transition:
-                          'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                      }}
-                    />
-                    {TABS.map(tab => (
-                      <button
-                        key={tab.id}
-                        type='button'
-                        onClick={() => setActiveTab(tab.id)}
-                        className={`relative z-10 flex-1 py-2 text-center text-[11px] font-medium transition-colors ${
-                          tab.id === activeTab
-                            ? 'text-primary-token'
-                            : 'text-white/40'
-                        }`}
-                      >
-                        {tab.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div
-                    className='overflow-y-auto px-5 pb-6 pt-4'
-                    style={{ flex: 1 }}
-                  >
-                    {TABS.map(tab => (
-                      <div
-                        key={tab.id}
-                        style={{
-                          display: tab.id === activeTab ? 'block' : 'none',
-                        }}
-                      >
-                        {TAB_CONTENT[tab.id]}
-                      </div>
-                    ))}
-                  </div>
-                </PhoneFrame>
-              </div>
+            <div className='relative mx-4 flex overflow-hidden rounded-[0.85rem] border border-white/[0.05] bg-white/[0.04]'>
+              <span
+                aria-hidden='true'
+                className='absolute inset-y-0 left-0 rounded-[0.75rem] bg-white/[0.08]'
+                style={{
+                  width: `${100 / TABS.length}%`,
+                  transform: `translateX(${TABS.findIndex(t => t.id === activeTab) * 100}%)`,
+                  transition: 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              />
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  type='button'
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`relative z-10 flex-1 py-2 text-center text-[11px] font-medium transition-colors ${
+                    tab.id === activeTab
+                      ? 'text-primary-token'
+                      : 'text-white/40'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
             </div>
-          </div>
+
+            <div className='overflow-y-auto px-5 pb-6 pt-4' style={{ flex: 1 }}>
+              {TABS.map(tab => (
+                <div
+                  key={tab.id}
+                  style={{
+                    display: tab.id === activeTab ? 'block' : 'none',
+                  }}
+                >
+                  {TAB_CONTENT[tab.id]}
+                </div>
+              ))}
+            </div>
+          </PhoneFrame>
         </div>
-      </Container>
-    </section>
+      </div>
+    </NumberedSection>
   );
 }

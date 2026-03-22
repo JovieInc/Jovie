@@ -90,6 +90,26 @@ For token-level details (import order, OKLCH format, naming conventions, migrati
 
 ## Marketing / Homepage System
 
+### Dark-only mode
+
+The marketing site forces `dark` class on the layout wrapper. No light/dark toggle. This matches Linear.app's approach for their marketing pages.
+
+### Page structure (Linear-style numbered sections)
+
+The homepage follows Linear's numbered section pattern:
+1. **Hero** — full-width product mockup with claim handle form
+2. **LogoBar** — trust indicators
+3. **ValuePropsSection** — "A new kind of release platform" with FIG-labeled cards (FIG 0.1, 0.2, 0.3)
+4. **Section 1.0 Release** — "Release day, automated." with accordion sub-items (1.1-1.4)
+5. **Section 2.0 Profile** — "Profiles that convert." with phone mockup and sub-items (2.1-2.4)
+6. **Section 3.0 Audience** — "Know every fan by name." with CRM mockup and sub-items (3.1-3.3)
+7. **Section 4.0 AI** — "AI that knows your work." with AI demo and sub-items (4.1-4.3)
+8. **Section 5.0 Analytics** — "Understand your reach." with analytics mockup and sub-items (5.1-5.3)
+9. **ChangelogPreview** — 3 recent entries
+10. **TestimonialsSection** — quote cards
+11. **FinalCTASection** — "Take the stage." with buttons
+12. **Footer** — 5-column (Product, Features, Company, Resources, Connect)
+
 ### Concrete primitives
 
 These classes define the marketing composition layer. They are only meaningful inside `.linear-marketing` scope:
@@ -102,9 +122,15 @@ These classes define the marketing composition layer. They are only meaningful i
 - `homepage-section-stack` — vertical stack with section spacing
 - `homepage-section-eyebrow` — inline-flex pill labels
 
+**Numbered section classes:**
+- `section-number-label` — 12px tabular-nums label (e.g., "1.0")
+- `section-title-link` — 14px section category label (e.g., "Release →")
+- `accordion-trigger` / `accordion-content` — expandable sub-items (e.g., "+1.1 Smart Links")
+- `fig-label` — 11px uppercase label for value prop cards (e.g., "FIG 0.1")
+
 **Typography classes:**
-- `marketing-h1-linear` — responsive hero headline: `clamp(3.5rem, 11.2vw, 4.85rem)` → `5.8rem` at 1280px+, weight medium, line-height 0.9, tracking -0.034em
-- `marketing-h2-linear` — responsive section headline: `clamp(2.15rem, 6vw, 3.5rem)`, weight medium, line-height 0.96, tracking -0.03em
+- `marketing-h1-linear` — responsive hero headline: 38px → 56px → 76px, weight 510, line-height 1.1 → 1.0, tracking -0.022em
+- `marketing-h2-linear` — responsive section headline: 24px → 36px → 48px, weight 510, line-height 1.33 → 1.0, tracking -0.022em
 - `marketing-lead-linear` — lead paragraph
 - `marketing-body` — body text
 - `marketing-cta` — call-to-action text
@@ -112,18 +138,22 @@ These classes define the marketing composition layer. They are only meaningful i
 **Surface classes:**
 - `homepage-surface-card` — elevated card for marketing sections
 
+**Components:**
+- `NumberedSection` — core structural pattern, wraps content with section number, title, heading, description, and accordion sub-items
+- `FeatureAccordion` — expandable sub-item list (client component)
+- `FigCard` — "FIG 0.X" labeled value prop card
+- `MarketingSectionFrame` — legacy section frame (still used by some pages)
+- `MarketingContainer` — responsive centered container
+
 ### Spacing rhythm
 
-Section padding in `.jovie-homepage-marketing`:
-- Mobile: `48px` top / `54px` bottom
-- Tablet (768px+): `66px` top / `74px` bottom
-- Desktop (1024px+): `80px` top / `88px` bottom
+Section spacing: consistent `120px` top and bottom on all numbered sections (via `section-spacing-linear`).
 
 Content gaps: `16px` → `22px` → `28px` across breakpoints.
 
 ### Character
 
-Cinematic, editorial, launch-oriented. Large headline scale, wide section spacing, proof-driven hero/product framing. Built for acquisition and storytelling.
+Linear.app-inspired, dark-only, product-mockup-driven. Numbered sections give each product area a clear address. Expandable sub-items for information density without clutter. Built for acquisition and storytelling.
 
 ### Used for
 

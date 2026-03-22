@@ -67,11 +67,11 @@ export function PricingSection() {
           </div>
 
           <div
-            className='homepage-section-stack reveal-on-scroll mx-auto grid max-w-[60rem] grid-cols-1 gap-4 md:grid-cols-2 md:gap-5'
+            className='homepage-section-stack reveal-on-scroll mx-auto grid max-w-[58rem] grid-cols-1 gap-4 md:grid-cols-2 md:gap-5'
             data-delay='80'
           >
             <div
-              className='relative flex h-full flex-col rounded-[1rem] p-5 md:p-6'
+              className='relative flex h-full flex-col rounded-[1rem] p-6 md:p-7'
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
@@ -103,7 +103,7 @@ export function PricingSection() {
                 ))}
               </ul>
 
-              <div className='mt-5 rounded-[0.9rem] border border-subtle bg-surface-1 p-3.5'>
+              <div className='mt-5 rounded-[0.9rem] border border-subtle bg-surface-1 p-4'>
                 <p className='text-xs font-semibold uppercase tracking-[0.08em] text-tertiary-token'>
                   Includes
                 </p>
@@ -123,7 +123,7 @@ export function PricingSection() {
             </div>
 
             <div
-              className='relative flex h-full flex-col overflow-hidden rounded-[1rem] p-5 md:p-6'
+              className='relative flex h-full flex-col overflow-hidden rounded-[1rem] p-6 md:p-7'
               style={{
                 background:
                   'linear-gradient(180deg, color-mix(in oklab, var(--linear-bg-surface-0) 78%, rgba(113,112,255,0.16)) 0%, var(--linear-bg-surface-0) 36%)',
@@ -172,7 +172,7 @@ export function PricingSection() {
               </ul>
 
               <div
-                className='mt-5 rounded-[0.9rem] border border-subtle p-3.5'
+                className='mt-5 rounded-[0.9rem] border border-subtle p-4'
                 style={{
                   backgroundColor:
                     'color-mix(in oklab, var(--linear-bg-surface-1) 95%, transparent)',

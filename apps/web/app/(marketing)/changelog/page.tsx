@@ -4,7 +4,7 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
   type ChangelogRelease,
@@ -115,38 +115,39 @@ export default async function ChangelogPage() {
 
   return (
     <section
-      className='py-16 md:py-24 min-h-screen'
+      className='min-h-screen'
       style={{
         backgroundColor: 'var(--linear-bg-footer)',
         color: 'var(--linear-text-primary)',
       }}
     >
-      <Container>
-        {/* Header */}
-        <header className='mb-12 md:mb-16 max-w-2xl'>
-          <h1 className='text-3xl md:text-4xl font-semibold tracking-tight mb-3'>
-            What&apos;s New
-          </h1>
-          <p className='text-base md:text-lg opacity-60 mb-4'>
-            Follow our journey building the future of music.
-          </p>
-          <div className='flex flex-wrap items-center gap-3'>
-            {thisMonthCount > 0 && (
-              <Badge variant='outline' className='text-xs'>
-                {thisMonthCount} update{thisMonthCount !== 1 ? 's' : ''} this
-                month
-              </Badge>
-            )}
-            <Link
-              href='/changelog/feed.xml'
-              className='text-xs opacity-40 hover:opacity-70 transition-opacity'
-            >
-              RSS Feed
-            </Link>
-          </div>
-        </header>
+      {/* Header */}
+      <MarketingHero variant='centered'>
+        <h1 className='marketing-h1-linear mb-4'>What&apos;s New</h1>
+        <p
+          className='marketing-lead-linear max-w-2xl mx-auto mb-4'
+          style={{ color: 'var(--linear-text-secondary)' }}
+        >
+          Follow our journey building the future of music.
+        </p>
+        <div className='flex flex-wrap items-center justify-center gap-3'>
+          {thisMonthCount > 0 && (
+            <Badge variant='outline' className='text-xs'>
+              {thisMonthCount} update{thisMonthCount !== 1 ? 's' : ''} this
+              month
+            </Badge>
+          )}
+          <Link
+            href='/changelog/feed.xml'
+            className='text-xs opacity-40 hover:opacity-70 transition-opacity'
+          >
+            RSS Feed
+          </Link>
+        </div>
+      </MarketingHero>
 
-        {/* Releases timeline */}
+      {/* Releases timeline */}
+      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='max-w-3xl'>
           {releases.length === 0 ? (
             <p className='opacity-40'>No updates yet. Check back soon!</p>
@@ -230,7 +231,7 @@ export default async function ChangelogPage() {
         <div className='mt-16 max-w-xl'>
           <ChangelogEmailSignup />
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

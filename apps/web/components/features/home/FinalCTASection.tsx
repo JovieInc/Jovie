@@ -1,6 +1,7 @@
 'use client';
 
-import { Container } from '@/components/site/Container';
+import Link from 'next/link';
+import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
@@ -9,22 +10,21 @@ export function FinalCTASection() {
       className='relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
-        paddingTop: 'calc(var(--linear-cta-section-pt) - 2rem)',
-        paddingBottom: 'calc(var(--linear-cta-section-pb) - 2.5rem)',
+        paddingTop: 'var(--linear-cta-section-pt)',
+        paddingBottom: 'var(--linear-cta-section-pb)',
       }}
     >
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         <div className='reveal-on-scroll relative mx-auto flex max-w-[42rem] flex-col items-center text-center'>
           <h2
             data-testid='final-cta-headline'
-            className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-none'
+            className='marketing-h2-linear text-primary-token'
           >
             Take the stage.
           </h2>
 
           <p className='mt-3.5 max-w-[32rem] marketing-lead-linear text-secondary-token'>
-            Claim your handle and get the release system ready before the next
-            song drops.
+            Claim your handle and start releasing.
           </p>
 
           {/* Form */}
@@ -41,27 +41,31 @@ export function FinalCTASection() {
             </div>
           </div>
 
-          {/* Trust signals */}
-          <div className='mt-4 flex flex-col items-center justify-center gap-2 text-center sm:flex-row sm:flex-wrap sm:gap-x-4 sm:gap-y-2'>
-            <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              <span
-                aria-hidden='true'
-                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
-              />{' '}
-              Live in minutes
-            </p>
-            <span
-              aria-hidden='true'
-              className='hidden text-quaternary-token sm:inline'
+          {/* Buttons */}
+          <div className='mt-5 flex items-center gap-3'>
+            <Link
+              href='/pricing'
+              className='rounded-[4px] px-4 py-2 text-[13px] font-[510] transition-colors'
+              style={{
+                backgroundColor: '#e6e6e6',
+                color: '#08090a',
+              }}
             >
-              ·
-            </span>
-            <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              No credit card required
-            </p>
+              Get started
+            </Link>
+            <Link
+              href='/support'
+              className='rounded-[4px] border px-4 py-2 text-[13px] font-[510] transition-colors'
+              style={{
+                borderColor: 'var(--linear-border-default)',
+                color: 'var(--linear-text-secondary)',
+              }}
+            >
+              Contact us
+            </Link>
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

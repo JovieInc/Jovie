@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
@@ -259,34 +259,33 @@ export default function PricingPage() {
       {/* Structured Data for SEO */}
       <script type='application/ld+json'>{PRICING_SCHEMA}</script>
 
-      <Container size='lg'>
-        <div className='section-spacing-linear'>
-          {/* Header */}
-          <div className='text-center heading-gap-linear'>
-            <h1
-              className='text-3xl md:text-5xl lg:text-6xl'
-              style={{
-                fontWeight: 'var(--linear-font-weight-medium)',
-                lineHeight: 1.1,
-                letterSpacing: '-0.02em',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
-              Simple pricing. No Surprises.
-            </h1>
-            <p
-              className='mt-4 mx-auto max-w-lg'
-              style={{
-                fontSize: 'var(--linear-body-lg-size)',
-                lineHeight: 'var(--linear-body-lg-leading)',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              Start free with unlimited smartlinks. Upgrade when you&apos;re
-              ready to grow.
-            </p>
-          </div>
+      <MarketingHero variant='centered'>
+        <h1
+          className='text-3xl md:text-5xl lg:text-6xl'
+          style={{
+            fontWeight: 'var(--linear-font-weight-medium)',
+            lineHeight: 1.1,
+            letterSpacing: '-0.02em',
+            color: 'var(--linear-text-primary)',
+          }}
+        >
+          Simple pricing. No Surprises.
+        </h1>
+        <p
+          className='mt-4 mx-auto max-w-lg'
+          style={{
+            fontSize: 'var(--linear-body-lg-size)',
+            lineHeight: 'var(--linear-body-lg-leading)',
+            color: 'var(--linear-text-secondary)',
+          }}
+        >
+          Start free with unlimited smartlinks. Upgrade when you&apos;re ready
+          to grow.
+        </p>
+      </MarketingHero>
 
+      <MarketingContainer width='page'>
+        <div className='section-spacing-linear'>
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
             {/* Desktop: 2-3 columns, Mobile: stacked cards */}
@@ -356,7 +355,7 @@ export default function PricingPage() {
             <PricingComparisonChart />
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
 
       {/* CTA Section */}
       <FinalCTASection />

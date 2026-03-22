@@ -1,65 +1,53 @@
-import { Badge } from '@jovie/ui/atoms/badge';
-import { Container } from '@/components/site/Container';
-import { TestimonialCard } from './TestimonialCard';
+import Link from 'next/link';
+import { MarketingContainer } from '@/components/marketing';
 
 const TESTIMONIALS = [
   {
-    initials: 'TW',
-    name: 'Tim White',
-    title: 'Founder & Artist',
     quote:
-      'I built Jovie because I was tired of juggling five different tools just to share my music. Now every release, every link, every fan notification lives in one place.',
-  },
-  {
-    initials: 'DL',
-    name: 'DJ Luna',
-    title: 'Electronic / NYC',
-    quote:
-      'I imported my whole catalog in 60 seconds. My fans actually know when I drop now.',
-  },
-  {
-    initials: 'MC',
+      'I dropped my single and the smart link was already live. Jovie handled the rest — notifications, emails, everything.',
     name: 'Maya Cole',
-    title: 'Producer / LA',
+    role: 'Producer / LA',
+  },
+  {
     quote:
       'Switched from Linktree and my click-through rate doubled overnight. The smart links just work.',
+    name: 'DJ Luna',
+    role: 'Electronic / NYC',
   },
-] as const;
+];
 
 export function TestimonialsSection() {
   return (
-    <section className='section-spacing-linear relative overflow-hidden bg-page'>
-      <Container size='homepage'>
-        <div className='relative mx-auto max-w-[var(--linear-content-max)]'>
-          <div className='reveal-on-scroll mb-16 flex flex-col items-center gap-5 text-center'>
-            <Badge variant='outline' size='xl'>
-              Testimonials
-            </Badge>
-            <h2 className='marketing-h2-linear text-primary-token'>
-              What creators are saying
-            </h2>
-            <p className='max-w-md marketing-lead-linear text-secondary-token'>
-              Artists are simplifying their careers and growing their fanbases
-              with Jovie.
-            </p>
-          </div>
-
-          <div
-            className='reveal-on-scroll mx-auto grid max-w-4xl grid-cols-1 gap-6 sm:grid-cols-3'
-            data-delay='80'
-          >
-            {TESTIMONIALS.map(testimonial => (
-              <TestimonialCard
-                key={testimonial.name}
-                initials={testimonial.initials}
-                name={testimonial.name}
-                title={testimonial.title}
-                quote={testimonial.quote}
-              />
-            ))}
-          </div>
+    <section className='section-spacing-linear'>
+      <MarketingContainer width='landing'>
+        <div className='grid gap-6 md:grid-cols-2'>
+          {TESTIMONIALS.map(testimonial => (
+            <Link
+              key={testimonial.name}
+              href='/'
+              className='group block rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 transition-colors hover:border-[rgba(255,255,255,0.1)] md:p-8'
+            >
+              <p className='text-[17px] leading-relaxed text-primary-token'>
+                {testimonial.quote}
+              </p>
+              <p className='mt-4 text-sm text-tertiary-token'>
+                {testimonial.name}{' '}
+                <span className='text-quaternary-token'>
+                  {testimonial.role}
+                </span>
+              </p>
+            </Link>
+          ))}
         </div>
-      </Container>
+
+        <div className='reveal-on-scroll mt-12 text-center'>
+          <p className='text-[17px] leading-relaxed text-secondary-token'>
+            Jovie is built for{' '}
+            <strong className='text-primary-token'>independent artists</strong>.
+            From first releases to world tours.
+          </p>
+        </div>
+      </MarketingContainer>
     </section>
   );
 }

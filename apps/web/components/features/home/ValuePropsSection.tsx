@@ -1,58 +1,41 @@
-import { Container } from '@/components/site/Container';
-
-const VALUE_PROPS = [
-  {
-    title: 'Skip the setup',
-    body: 'Connect Spotify once. Your catalog, artwork, and release-ready smart links stay in sync without rebuilding the launch every time.',
-  },
-  {
-    title: 'Release smarter',
-    body: 'Keep the launch surface free, then turn on paid release notifications and automation when you want more than a basic smart link.',
-  },
-  {
-    title: 'Retarget every touchpoint',
-    body: 'Your smart links, profile, and fan capture flows stay instrumented so every release builds a warmer audience before you open an ads manager.',
-  },
-] as const;
+import { Music, Rocket, Users } from 'lucide-react';
+import { FigCard, MarketingContainer } from '@/components/marketing';
 
 export function ValuePropsSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
-      <Container size='homepage'>
-        <div className='homepage-section-shell'>
-          <div className='homepage-section-intro reveal-on-scroll'>
-            <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
-              <span className='homepage-section-eyebrow'>One platform</span>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
-                One Tool. Zero Setup.
-              </h2>
-            </div>
-            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Jovie replaces the release work artists usually skip when they are
-              trying to move fast.
-            </p>
-          </div>
-
-          <div
-            className='homepage-section-stack reveal-on-scroll grid gap-3.5 md:grid-cols-3'
-            data-delay='80'
-          >
-            {VALUE_PROPS.map(prop => (
-              <article
-                key={prop.title}
-                className='homepage-surface-card rounded-[1rem] p-5 md:p-[1.35rem]'
-              >
-                <p className='text-lg font-medium tracking-tight text-primary-token'>
-                  {prop.title}
-                </p>
-                <p className='mt-3 text-sm leading-6 text-secondary-token'>
-                  {prop.body}
-                </p>
-              </article>
-            ))}
-          </div>
+      <MarketingContainer width='landing'>
+        <div className='reveal-on-scroll mx-auto max-w-3xl text-center'>
+          <h2 className='marketing-h2-linear text-primary-token'>
+            <strong>A new kind of release tool.</strong>{' '}
+            <span className='text-secondary-token'>
+              Purpose-built for independent artists. Designed so every release
+              reaches every fan, automatically.
+            </span>
+          </h2>
         </div>
-      </Container>
+
+        <div
+          className='reveal-on-scroll mt-12 grid gap-3.5 md:grid-cols-3 lg:mt-16'
+          data-delay='80'
+        >
+          <FigCard
+            title='Built for artists'
+            description='Shaped by the practices of independent musicians who release fast and want their work to reach everyone.'
+            icon={<Music className='h-5 w-5' />}
+          />
+          <FigCard
+            title='Automated releases'
+            description='Smart links, fan notifications, and email outreach run the moment a release drops. No manual work.'
+            icon={<Rocket className='h-5 w-5' />}
+          />
+          <FigCard
+            title='Fan intelligence'
+            description='Understand your audience at the individual level. Know who shows up, where they came from, and what converts.'
+            icon={<Users className='h-5 w-5' />}
+          />
+        </div>
+      </MarketingContainer>
     </section>
   );
 }

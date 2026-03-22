@@ -395,8 +395,8 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
-       375px: 38px/1.1  |  768px: 56px/1.1  |  1280px: 64px/1.0 */
+    /* Discrete breakpoints matching Linear.app (measured 2026-03-21):
+       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px: 76px/1.0 */
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
@@ -423,7 +423,7 @@ body {
        375px: 24px/1.33  |  768px: 32px/1.125  |  1280px: 40px/1.1  |  1440px: 48px/1.0 */
     font-size: var(--linear-h2-size-sm);
     font-weight: 510;
-    letter-spacing: -0.022em;
+    letter-spacing: -0.025em;
     line-height: 1.33;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
@@ -462,13 +462,13 @@ body {
   }
   .marketing-lead-linear {
     /* Exact Linear.app: 15px, 400wt, -0.165px tracking, 24px line-height */
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 400;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     letter-spacing: -0.011em;
     /* -0.165px at 15px = -0.011em */
-    line-height: 1.6;
+    line-height: 1.65;
   }
   .marketing-body {
     font-feature-settings:
@@ -490,6 +490,83 @@ body {
   }
 
   /* Hero stagger entrance — children fade up in sequence */
+  /* Numbered section label — Linear's "1.0 Intake →" pattern */
+  .section-number-label {
+    font-size: var(--linear-label-size, 12px);
+    font-weight: var(--linear-font-weight-medium, 510);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: var(--linear-text-tertiary);
+    font-feature-settings: var(--linear-font-features);
+  }
+  .section-title-link {
+    font-size: var(--linear-body-sm-size, 14px);
+    font-weight: var(--linear-font-weight-medium, 510);
+    letter-spacing: -0.013em;
+    color: var(--linear-text-secondary);
+    transition: color var(--linear-duration-fast) var(--linear-ease);
+  }
+  .section-title-link:hover {
+    color: var(--linear-text-primary);
+  }
+
+  /* Accordion expand/collapse — Linear sub-item pattern */
+  .accordion-content {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .accordion-content[data-open="true"] {
+    grid-template-rows: 1fr;
+  }
+  .accordion-content > div {
+    overflow: hidden;
+  }
+  .accordion-trigger {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: var(--linear-body-sm-size, 14px);
+    font-weight: var(--linear-font-weight-medium, 510);
+    color: var(--linear-text-secondary);
+    background: transparent;
+    border: 1px solid var(--linear-border-subtle);
+    border-radius: var(--linear-radius-sm, 8px);
+    cursor: pointer;
+    transition: all var(--linear-duration-fast) var(--linear-ease);
+    letter-spacing: -0.011em;
+  }
+  .accordion-trigger:hover {
+    color: var(--linear-text-primary);
+    border-color: var(--linear-border-default);
+    background: rgba(255, 255, 255, 0.02);
+  }
+  .accordion-trigger[data-open="true"] {
+    color: var(--linear-text-primary);
+    border-color: var(--linear-border-default);
+  }
+  .accordion-trigger .accordion-icon {
+    margin-left: auto;
+    transition: transform 0.2s var(--linear-ease);
+    font-size: 13px;
+    color: var(--linear-text-quaternary);
+  }
+  .accordion-trigger[data-open="true"] .accordion-icon {
+    transform: rotate(45deg);
+  }
+
+  /* FIG card label — Linear's "FIG 0.1" pattern */
+  .fig-label {
+    font-size: 11px;
+    font-weight: var(--linear-font-weight-medium, 510);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--linear-text-quaternary);
+  }
+
   .hero-stagger {
     animation: hero-fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
@@ -788,47 +865,6 @@ body {
       var(--linear-bg-page)
     );
     box-shadow: var(--linear-shadow-card);
-  }
-
-  .jovie-homepage-marketing .marketing-h1-linear {
-    font-size: clamp(3.5rem, 11.2vw, 4.85rem);
-    font-weight: var(--linear-font-weight-medium);
-    letter-spacing: -0.034em;
-    line-height: 0.9;
-    text-wrap: balance;
-  }
-  @media (min-width: 768px) {
-    .jovie-homepage-marketing .marketing-h1-linear {
-      font-size: clamp(4.7rem, 7vw, 5.45rem);
-    }
-  }
-  @media (min-width: 1280px) {
-    .jovie-homepage-marketing .marketing-h1-linear {
-      font-size: 5.8rem;
-    }
-  }
-  .jovie-homepage-marketing .marketing-h2-linear {
-    font-size: clamp(2.15rem, 6vw, 3.5rem);
-    font-weight: var(--linear-font-weight-medium);
-    letter-spacing: -0.03em;
-    line-height: 0.96;
-    text-wrap: balance;
-  }
-  .jovie-homepage-marketing .marketing-lead-linear {
-    font-size: clamp(1rem, 2.9vw, 1.125rem);
-    line-height: 1.56;
-    letter-spacing: -0.016em;
-    text-wrap: pretty;
-  }
-  @media (min-width: 768px) {
-    .jovie-homepage-marketing .marketing-lead-linear {
-      font-size: 1.0625rem;
-    }
-  }
-  @media (min-width: 1024px) {
-    .jovie-homepage-marketing .marketing-lead-linear {
-      font-size: 1.125rem;
-    }
   }
 }
 

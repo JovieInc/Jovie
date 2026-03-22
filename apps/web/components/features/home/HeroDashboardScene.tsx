@@ -4,12 +4,10 @@ import {
   BellRing,
   CheckCircle2,
   ChevronDown,
-  Clock3,
   Disc3,
   Gauge,
   Home,
   Link2,
-  Mail,
   Search,
   Settings2,
   Sparkles,
@@ -448,50 +446,6 @@ export function HeroDashboardScene() {
               Paid release notifications trigger when the link is live and the
               release is matched.
             </p>
-          </DrawerSurfaceCard>
-
-          <DrawerSurfaceCard
-            variant='card'
-            className={['mt-4 p-4', LINEAR_SURFACE.drawerCard].join(' ')}
-          >
-            <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
-              Destinations
-            </p>
-            <div className='mt-3 flex flex-wrap gap-2'>
-              {activeRelease.destinations.map(destination => (
-                <span
-                  key={destination}
-                  className='rounded-full border border-subtle bg-surface-0 px-2.5 py-1 text-[11px] font-medium text-secondary-token'
-                >
-                  {destination}
-                </span>
-              ))}
-            </div>
-          </DrawerSurfaceCard>
-
-          <DrawerSurfaceCard
-            variant='card'
-            className={['mt-4 p-4', LINEAR_SURFACE.drawerCard].join(' ')}
-          >
-            <p className='text-[11px] uppercase tracking-[0.08em] text-quaternary-token'>
-              Recent activity
-            </p>
-            <div className='mt-3 space-y-3'>
-              {activeRelease.activity.map((item, itemIndex) => (
-                <div key={item} className='flex items-start gap-2.5'>
-                  <span className='mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/[0.06] text-tertiary-token'>
-                    {itemIndex === 0 ? (
-                      <Mail className='h-3 w-3' />
-                    ) : itemIndex === 1 ? (
-                      <Link2 className='h-3 w-3' />
-                    ) : (
-                      <Clock3 className='h-3 w-3' />
-                    )}
-                  </span>
-                  <span className='text-sm text-secondary-token'>{item}</span>
-                </div>
-              ))}
-            </div>
           </DrawerSurfaceCard>
         </aside>
       </div>

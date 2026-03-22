@@ -7,36 +7,28 @@ import { HeroDashboardScene } from './HeroDashboardScene';
 export function HeroScrollSection() {
   return (
     <section className='relative overflow-hidden pb-0 pt-[6rem] md:pt-[6.65rem] lg:pt-[7.35rem] xl:pt-[7.9rem]'>
+      {/* Subtle dark backdrop */}
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{ background: 'var(--linear-hero-backdrop)' }}
       />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-[20%] h-[18rem] w-[42rem] -translate-x-1/2 rounded-full blur-3xl md:h-[20rem] md:w-[56rem] xl:w-[62rem]'
-        style={{
-          background:
-            'radial-gradient(circle at center, rgba(113,112,255,0.1), transparent 60%)',
-        }}
-      />
 
       <Container size='homepage'>
-        <div className='homepage-section-shell max-w-[var(--linear-hero-shell-max)]'>
-          <div className='hero-stagger reveal-on-scroll'>
-            <div className='max-w-[var(--linear-hero-copy-max)] text-left'>
-              <h1 className='marketing-h1-linear max-w-[10.75ch] text-primary-token sm:max-w-[11.2ch] md:max-w-none'>
-                <span className='md:block md:whitespace-nowrap'>
-                  The link your music
-                </span>
-                <span className='md:block md:whitespace-nowrap'>deserves.</span>
+        <div className='mx-auto max-w-[var(--linear-hero-shell-max)]'>
+          <div className='hero-stagger'>
+            {/* Centered hero copy — Linear pattern */}
+            <div className='mx-auto max-w-3xl text-center'>
+              <h1 className='marketing-h1-linear text-primary-token'>
+                The link your music <br className='hidden md:block' />
+                deserves.
               </h1>
 
-              <p className='marketing-lead-linear mt-3.5 max-w-[34rem] text-secondary-token md:mt-4.5'>
+              <p className='marketing-lead-linear mx-auto mt-4 max-w-[34rem] text-secondary-token md:mt-5'>
                 Share every release. Reach every fan. Automatically.
               </p>
 
-              <div className='mt-5 w-full max-w-[35rem] md:mt-6'>
+              <div className='mx-auto mt-5 w-full max-w-[28rem] md:mt-6'>
                 <ClaimHandleForm size='display' />
               </div>
 
@@ -49,17 +41,17 @@ export function HeroScrollSection() {
               </p>
             </div>
 
-            <div className='relative mt-8 w-full sm:mt-10 md:mt-12'>
-              <div className='homepage-surface-card relative max-h-[29rem] overflow-hidden rounded-[1rem] sm:max-h-[34rem] md:max-h-[41rem] md:rounded-[1.1rem] lg:max-h-[49rem] xl:max-h-[51rem]'>
-                <div className='relative -mb-[var(--linear-hero-scene-offset-sm)] md:-mb-[var(--linear-hero-scene-offset-md)] xl:-mb-[var(--linear-hero-scene-offset-lg)]'>
-                  <HeroDashboardScene />
-                </div>
+            {/* Full-width product mockup — let it breathe like Linear */}
+            <div className='relative mt-10 w-full md:mt-14'>
+              <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
+                <HeroDashboardScene />
+                {/* Gentle bottom fade — subtle, not aggressive */}
                 <div
                   aria-hidden='true'
-                  className='pointer-events-none absolute inset-x-0 bottom-0 h-20 md:h-24'
+                  className='pointer-events-none absolute inset-x-0 bottom-0 h-16 md:h-20'
                   style={{
                     background:
-                      'linear-gradient(180deg, rgba(8,9,10,0) 0%, rgba(8,9,10,0.26) 40%, var(--linear-bg-page) 100%)',
+                      'linear-gradient(180deg, transparent 0%, rgba(8,9,10,0.5) 70%, var(--linear-bg-page) 100%)',
                   }}
                 />
               </div>
