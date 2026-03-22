@@ -8,6 +8,19 @@
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
 
+import { APP_URL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
+import {
+  getOAuthErrorMessage,
+  isCodeExpired,
+  isSessionExists,
+  isSignInSuggested,
+  parseClerkError,
+} from '@/lib/auth/clerk-errors';
+import type { LoadingState } from '@/lib/auth/types';
+import { logger } from '@/lib/utils/logger';
+import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
+
 /**
  * At runtime, the signUp object returned by Clerk's useSignUp() implements the
  * "future" Signal API (create returns {error}, plus .verifications.sendEmailCode,
@@ -29,19 +42,6 @@ type SignUpFuture = {
   }) => Promise<{ error: unknown }>;
   finalize: () => Promise<{ error: unknown }>;
 };
-
-import { APP_URL } from '@/constants/domains';
-import { APP_ROUTES } from '@/constants/routes';
-import {
-  getOAuthErrorMessage,
-  isCodeExpired,
-  isSessionExists,
-  isSignInSuggested,
-  parseClerkError,
-} from '@/lib/auth/clerk-errors';
-import type { LoadingState } from '@/lib/auth/types';
-import { logger } from '@/lib/utils/logger';
-import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
 
 /** Use current origin for OAuth callbacks so localhost works correctly */
 const getOAuthBaseUrl = () =>
@@ -133,7 +133,7 @@ export function useSignUpFlow(): UseSignUpFlowReturn {
   const isLoaded =
     'isLoaded' in signUpReturn
       ? (signUpReturn as { isLoaded: boolean }).isLoaded
-      : (signUpReturn as { fetchStatus: string }).fetchStatus !== 'fetching';
+      : (signUpReturn as { fetchStatus: string }).fetchStatus === 'idle';
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup

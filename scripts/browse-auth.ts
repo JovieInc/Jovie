@@ -25,6 +25,13 @@ if (!CLERK_SECRET_KEY) {
   process.exit(1);
 }
 
+if (!CLERK_PK) {
+  console.error(
+    'Missing NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Run with: doppler run -c dev -- bun run scripts/browse-auth.ts'
+  );
+  process.exit(1);
+}
+
 /** Parse Clerk Frontend API hostname from publishable key */
 function parseFrontendApi(pk: string): string {
   // pk_test_<base64> or pk_live_<base64> — the base64 decodes to the FAPI URL
@@ -43,7 +50,17 @@ async function getTestingToken(): Promise<string> {
     method: 'POST',
     headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` },
   });
+  if (!res.ok) {
+    throw new Error(
+      `Failed to get testing token: ${res.status} ${res.statusText}`
+    );
+  }
   const data = await res.json();
+  if (!data.token) {
+    throw new Error(
+      `Testing token response missing token field: ${JSON.stringify(data)}`
+    );
+  }
   return data.token;
 }
 
@@ -52,6 +69,11 @@ async function ensureTestUser(email: string): Promise<void> {
     `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}&limit=1`,
     { headers: { Authorization: `Bearer ${CLERK_SECRET_KEY}` } }
   );
+  if (!searchRes.ok) {
+    throw new Error(
+      `Clerk user search failed: ${searchRes.status} ${searchRes.statusText}`
+    );
+  }
   const users = await searchRes.json();
   if (Array.isArray(users) && users.length > 0) {
     console.log(`Test user exists: ${users[0].id}`);
@@ -71,6 +93,11 @@ async function ensureTestUser(email: string): Promise<void> {
       last_name: 'Bot',
     }),
   });
+  if (!createRes.ok) {
+    throw new Error(
+      `Clerk user create failed: ${createRes.status} ${await createRes.text()}`
+    );
+  }
   const created = await createRes.json();
   if (created.errors) {
     throw new Error(`Failed to create user: ${JSON.stringify(created.errors)}`);
@@ -131,6 +158,10 @@ async function enterOtp(page: Page): Promise<void> {
     for (let i = 0; i < Math.min(count, MAGIC_CODE.length); i++) {
       await digitInputs.nth(i).fill(MAGIC_CODE[i]);
     }
+    // Trigger submission after filling all digits
+    await digitInputs
+      .nth(Math.min(count, MAGIC_CODE.length) - 1)
+      .press('Enter');
     return;
   }
 
@@ -213,9 +244,11 @@ async function main() {
     await page.screenshot({ path: '/tmp/browse-auth-success.png' });
     console.log('Success screenshot: /tmp/browse-auth-success.png');
   } else {
-    console.log('No session cookie — authentication may have failed');
+    console.error('No session cookie — authentication failed');
     await page.screenshot({ path: '/tmp/browse-auth-debug.png' });
     console.log('Debug screenshot: /tmp/browse-auth-debug.png');
+    await browser.close();
+    process.exit(1);
   }
 
   await browser.close();

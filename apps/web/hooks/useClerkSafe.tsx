@@ -140,7 +140,7 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const signInLoaded =
     'isLoaded' in signInSignal
       ? (signInSignal as { isLoaded: boolean }).isLoaded
-      : (signInSignal as { fetchStatus: string }).fetchStatus !== 'fetching';
+      : (signInSignal as { fetchStatus: string }).fetchStatus === 'idle';
   const signIn = useMemo<UseSignInReturn>(
     () => ({
       isLoaded: signInLoaded,
