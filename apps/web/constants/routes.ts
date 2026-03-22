@@ -86,6 +86,8 @@ export const APP_ROUTES = {
   ONBOARDING: '/onboarding',
   ONBOARDING_CHECKOUT: '/onboarding/checkout',
   WAITLIST: '/waitlist',
+  BANNED: '/banned',
+  USER_CREATION_FAILED: '/error/user-creation-failed',
 
   // Billing
   BILLING: '/billing',

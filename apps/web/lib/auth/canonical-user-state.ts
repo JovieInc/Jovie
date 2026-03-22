@@ -2,25 +2,32 @@
  * Canonical User State Resolver
  *
  * Single source of truth for user state determination.
- * Both proxy (edge) and gate (server) call this function.
+ * Consumed by gate.ts (server) today. Proxy (edge) integration is planned
+ * as part of Stream 1 completion (see plan: Streams 1-5).
  *
+ * resolveCanonicalState decision tree (what THIS pure function covers):
  * ┌──────────────────────────────────────────────────────────────┐
- * │                   STATE MACHINE                              │
- * │                                                              │
- * │  UNAUTHENTICATED ──► NEEDS_DB_USER ──► NEEDS_WAITLIST_SUB  │
- * │                                    └──► NEEDS_ONBOARDING    │
- * │  NEEDS_WAITLIST_SUB ──► WAITLIST_PENDING                    │
- * │  WAITLIST_PENDING ──► (approved) ──► NEEDS_ONBOARDING       │
- * │  NEEDS_ONBOARDING ──► ACTIVE                                │
- * │  Any state ──► BANNED (if deleted/suspended/banned)         │
- * │  NEEDS_DB_USER ──► USER_CREATION_FAILED (if retries fail)  │
+ * │  !isAuthenticated ──────────────────► UNAUTHENTICATED       │
+ * │  !hasDbUser ────────────────────────► NEEDS_DB_USER         │
+ * │  deletedAt / banned / suspended ───► BANNED                 │
+ * │  waitlistGate && !approved:                                  │
+ * │    status=waitlist_pending ─────────► WAITLIST_PENDING       │
+ * │    otherwise ──────────────────────► NEEDS_WAITLIST_SUB     │
+ * │  !profileComplete ─────────────────► NEEDS_ONBOARDING       │
+ * │  all checks pass ─────────────────► ACTIVE                  │
  * └──────────────────────────────────────────────────────────────┘
+ *
+ * States NOT produced by this function (handled by gate.ts orchestration):
+ *   - USER_CREATION_FAILED: requires I/O (DB write failure detection)
+ *   - NEEDS_DB_USER → NEEDS_WAITLIST_SUBMISSION: transition handled by
+ *     gate.ts handleMissingDbUser when email isn't on the approved list
  *
  * This module has NO 'server-only' directive and NO DB imports so it
  * works in Edge Runtime (proxy.ts), Node Runtime (gate.ts, dashboard),
  * and test environments.
  */
 
+import { APP_ROUTES } from '@/constants/routes';
 import {
   isProfileComplete,
   type ProfileCompletenessFields,
@@ -143,14 +150,16 @@ export function resolveCanonicalState(
 // Redirect Map
 // ---------------------------------------------------------------------------
 
+const ONBOARDING_FRESH_SIGNUP = `${APP_ROUTES.ONBOARDING}?fresh_signup=true`;
+
 const STATE_REDIRECT_MAP: Record<CanonicalUserState, string | null> = {
-  [CanonicalUserState.UNAUTHENTICATED]: '/signin',
-  [CanonicalUserState.NEEDS_DB_USER]: '/onboarding?fresh_signup=true',
-  [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: '/waitlist',
-  [CanonicalUserState.WAITLIST_PENDING]: '/waitlist',
-  [CanonicalUserState.NEEDS_ONBOARDING]: '/onboarding?fresh_signup=true',
-  [CanonicalUserState.BANNED]: '/banned',
-  [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
+  [CanonicalUserState.UNAUTHENTICATED]: APP_ROUTES.SIGNIN,
+  [CanonicalUserState.NEEDS_DB_USER]: ONBOARDING_FRESH_SIGNUP,
+  [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: APP_ROUTES.WAITLIST,
+  [CanonicalUserState.WAITLIST_PENDING]: APP_ROUTES.WAITLIST,
+  [CanonicalUserState.NEEDS_ONBOARDING]: ONBOARDING_FRESH_SIGNUP,
+  [CanonicalUserState.BANNED]: APP_ROUTES.BANNED,
+  [CanonicalUserState.USER_CREATION_FAILED]: APP_ROUTES.USER_CREATION_FAILED,
   [CanonicalUserState.ACTIVE]: null,
 };
 
