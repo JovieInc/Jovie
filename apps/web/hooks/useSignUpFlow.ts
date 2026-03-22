@@ -125,10 +125,15 @@ export interface UseSignUpFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
-  const { signUp: signUpRaw, isLoaded: isClerkLoaded } = useSignUp();
+  const signUpReturn = useSignUp();
   // Cast to the future Signal API shape used at runtime (see SignUpFuture above).
-  const signUp = signUpRaw as unknown as SignUpFuture | undefined;
-  const isLoaded = isClerkLoaded;
+  const signUp = signUpReturn.signUp as unknown as SignUpFuture | undefined;
+  // Clerk v6 useSignUp may return UseSignUpReturn (has isLoaded) or
+  // SignUpSignalValue (has fetchStatus). Handle both shapes.
+  const isLoaded =
+    'isLoaded' in signUpReturn
+      ? (signUpReturn as { isLoaded: boolean }).isLoaded
+      : (signUpReturn as { fetchStatus: string }).fetchStatus !== 'fetching';
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup

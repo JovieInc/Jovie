@@ -135,15 +135,19 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const session = useSessionOriginal();
   const clerk = useClerkOriginal();
   const signInSignal = useSignInSignalOriginal();
-  // Clerk v6 useSignIn returns { isLoaded, signIn, setActive }.
-  // We derive our safe-hook contract from the standard return shape.
+  // Clerk v6 useSignIn may return UseSignInReturn (has isLoaded) or
+  // SignInSignalValue (has fetchStatus). Handle both shapes.
+  const signInLoaded =
+    'isLoaded' in signInSignal
+      ? (signInSignal as { isLoaded: boolean }).isLoaded
+      : (signInSignal as { fetchStatus: string }).fetchStatus !== 'fetching';
   const signIn = useMemo<UseSignInReturn>(
     () => ({
-      isLoaded: signInSignal.isLoaded,
+      isLoaded: signInLoaded,
       signIn: signInSignal.signIn ?? null,
       setActive: clerk.setActive,
     }),
-    [clerk.setActive, signInSignal.isLoaded, signInSignal.signIn]
+    [clerk.setActive, signInLoaded, signInSignal.signIn]
   );
 
   const value = useMemo(
