@@ -16,6 +16,7 @@ const basePost: BlogPostMetadata = {
 const baseProfile = {
   displayName: 'Tim White',
   username: 'tim',
+  usernameNormalized: 'tim',
   avatarUrl: 'https://cdn.jov.ie/avatars/tim.jpg',
   isVerified: true,
 } as ProfileData;

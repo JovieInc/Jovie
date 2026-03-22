@@ -17,7 +17,7 @@ export function resolveAuthor(
     name: profile?.displayName || post.author,
     title: post.authorTitle,
     avatarUrl: profile?.avatarUrl ?? null,
-    profileUrl: profile ? `/${profile.username}` : post.authorProfile,
+    profileUrl: profile ? `/${profile.usernameNormalized}` : post.authorProfile,
     isVerified: profile?.isVerified ?? false,
   };
 }
