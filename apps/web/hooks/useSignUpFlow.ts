@@ -7,6 +7,7 @@
 
 import { useSignUp } from '@clerk/nextjs';
 import { useCallback, useState } from 'react';
+
 import { APP_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -19,6 +20,28 @@ import {
 import type { LoadingState } from '@/lib/auth/types';
 import { logger } from '@/lib/utils/logger';
 import { type AuthFlowStep, useAuthFlowBase } from './useAuthFlowBase';
+
+/**
+ * At runtime, the signUp object returned by Clerk's useSignUp() implements the
+ * "future" Signal API (create returns {error}, plus .verifications.sendEmailCode,
+ * .verifications.verifyEmailCode, .sso, .finalize methods). However, the published
+ * TypeScript types still expose the legacy SignUpResource interface. We define a
+ * minimal type overlay here so our code type-checks without changing runtime behavior.
+ */
+type SignUpFuture = {
+  status: string | null;
+  create: (params: { emailAddress: string }) => Promise<{ error: unknown }>;
+  verifications: {
+    sendEmailCode: () => Promise<{ error: unknown }>;
+    verifyEmailCode: (params: { code: string }) => Promise<{ error: unknown }>;
+  };
+  sso: (params: {
+    strategy: string;
+    redirectUrl: string;
+    redirectCallbackUrl: string;
+  }) => Promise<{ error: unknown }>;
+  finalize: () => Promise<{ error: unknown }>;
+};
 
 /** Use current origin for OAuth callbacks so localhost works correctly */
 const getOAuthBaseUrl = () =>
@@ -102,8 +125,15 @@ export interface UseSignUpFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignUpFlow(): UseSignUpFlowReturn {
-  const { signUp, fetchStatus } = useSignUp();
-  const isLoaded = signUp !== null && fetchStatus === 'idle';
+  const signUpReturn = useSignUp();
+  // Cast to the future Signal API shape used at runtime (see SignUpFuture above).
+  const signUp = signUpReturn.signUp as unknown as SignUpFuture | undefined;
+  // Clerk v6 useSignUp may return UseSignUpReturn (has isLoaded) or
+  // SignUpSignalValue (has fetchStatus). Handle both shapes.
+  const isLoaded =
+    'isLoaded' in signUpReturn
+      ? (signUpReturn as { isLoaded: boolean }).isLoaded
+      : (signUpReturn as { fetchStatus: string }).fetchStatus === 'idle';
 
   // Use shared auth flow base - sign-up goes to onboarding.
   // useStoredRedirectUrl: true so that a redirect_url stored by useAuthPageSetup
