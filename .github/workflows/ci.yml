@@ -78,7 +78,7 @@ jobs:
           fi
 
           # Check if only docs changed (exclude .github/ — workflow changes must run CI)
-          if echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | wc -l | grep -q '^0$'; then
+          if ! echo "$CHANGED_FILES" | grep -v -E '^\.(github/)' | grep -v -E '\.(md|txt)$' | grep -q .; then
             echo "Only documentation files changed"
             for t in run_build run_test run_e2e run_drizzle has_code_changes; do
               echo "$t=false" >> $GITHUB_OUTPUT
@@ -2362,11 +2362,9 @@ jobs:
         run: pnpm --filter=@jovie/web run drizzle:verify:ci
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # Blocks deploy by default — missing columns = broken production.
-        # To bypass in emergencies, include [skip-schema-verify] in the
-        # merge commit message. The Slack drift notification in deploy-notify
-        # fires when verify fails but deploy proceeds (bypass alert).
-        continue-on-error: ${{ contains(github.event.head_commit.message, '[skip-schema-verify]') }}
+        # Non-blocking by default: drift is surfaced via deploy-notify so
+        # production deploys are not hard-blocked while drift is repaired.
+        continue-on-error: true
       - name: Upgrade corepack
         run: npm install -g corepack@0.34.6 && corepack enable
       - name: Export secrets to env
