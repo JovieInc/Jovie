@@ -20,6 +20,7 @@ import {
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { useFeatureFlagOverrides } from '@/lib/feature-flags/client';
 import {
@@ -54,6 +55,29 @@ const ALL_FLAGS: FlagEntry[] = [
   ),
 ];
 
+const BREAKPOINTS = [
+  { name: '2xl', min: 1536 },
+  { name: 'xl', min: 1280 },
+  { name: 'lg', min: 1024 },
+  { name: 'md', min: 768 },
+  { name: 'sm', min: 640 },
+] as const;
+
+function useBreakpoint() {
+  const [bp, setBp] = useState('xs');
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth;
+      const match = BREAKPOINTS.find(b => w >= b.min);
+      setBp(match?.name ?? 'xs');
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return bp;
+}
+
 const TOOLBAR_STORAGE_KEY = '__dev_toolbar_open';
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 
@@ -83,6 +107,7 @@ export function DevToolbar({
   const overridesCtx = useFeatureFlagOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const breakpoint = useBreakpoint();
 
   // Restore state from localStorage and mark as mounted
   useEffect(() => {
@@ -342,7 +367,11 @@ export function DevToolbar({
       </div>
 
       {/* Bottom bar (always visible) */}
-      <div className='flex items-center h-9 px-4 gap-2 border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+      <div className='relative flex items-center h-9 px-4 gap-2 border-t border-[var(--color-border-default)] backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80 shadow-[0_-2px_8px_rgba(0,0,0,0.1)]'>
+        {/* Center: brand logo */}
+        <div className='absolute left-1/2 -translate-x-1/2 pointer-events-none'>
+          <BrandLogo size={16} tone='auto' aria-hidden rounded={false} />
+        </div>
         {/* Left: env + version */}
         <span
           className={`px-2 py-0.5 rounded border text-[10px] font-semibold shrink-0 ${envColor}`}
@@ -373,6 +402,10 @@ export function DevToolbar({
             {overrideCount} {overrideCount === 1 ? 'override' : 'overrides'}
           </button>
         )}
+
+        <span className='hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
+          {breakpoint}
+        </span>
 
         <div className='flex-1' />
 
