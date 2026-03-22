@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.40] - 2026-03-22
+
+### Fixed
+
+- Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
+- Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+
 ## [26.4.39] - 2026-03-21
 
 > [internal] Audit changelog for customer and investor safety.
