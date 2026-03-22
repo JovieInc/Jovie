@@ -71,7 +71,7 @@ export interface UseSignInFlowReturn {
  * Replaces the declarative Clerk Elements approach with imperative control.
  */
 export function useSignInFlow(): UseSignInFlowReturn {
-  const { signIn, setActive, isLoaded } = useSignInSafe();
+  const { signIn, isLoaded } = useSignInSafe();
 
   // Use shared auth flow base
   const base = useAuthFlowBase({
@@ -113,9 +113,12 @@ export function useSignInFlow(): UseSignInFlowReturn {
         const result = await signIn.create({
           identifier: emailAddress,
         });
+        if (result.error) {
+          throw result.error;
+        }
 
         // Find email_code strategy in supported first factors
-        const emailCodeFactor = result.supportedFirstFactors?.find(
+        const emailCodeFactor = signIn.supportedFirstFactors?.find(
           (factor: { strategy: string }) => factor.strategy === 'email_code'
         );
 
@@ -128,10 +131,12 @@ export function useSignInFlow(): UseSignInFlowReturn {
         }
 
         // Prepare first factor - this sends the verification code
-        await signIn.prepareFirstFactor({
-          strategy: 'email_code',
+        const sendCodeResult = await signIn.emailCode.sendCode({
           emailAddressId: emailCodeFactor.emailAddressId as string,
         });
+        if (sendCodeResult.error) {
+          throw sendCodeResult.error;
+        }
 
         base.setStep('verification');
         base.setLoadingState({ type: 'idle' });
@@ -180,13 +185,23 @@ export function useSignInFlow(): UseSignInFlowReturn {
       try {
         // If we're in a second-factor state, verify via attemptSecondFactor
         if (isSecondFactor) {
-          const result = await signIn.attemptSecondFactor({
-            strategy: secondFactorStrategy,
-            code: verificationCode,
-          });
+          const result =
+            secondFactorStrategy === 'phone_code'
+              ? await signIn.mfa.verifyPhoneCode({
+                  code: verificationCode,
+                })
+              : await signIn.mfa.verifyEmailCode({
+                  code: verificationCode,
+                });
+          if (result.error) {
+            throw result.error;
+          }
 
-          if (result.status === 'complete') {
-            await setActive({ session: result.createdSessionId });
+          if (signIn.status === 'complete') {
+            const finalizeResult = await signIn.finalize();
+            if (finalizeResult.error) {
+              throw finalizeResult.error;
+            }
             const redirectUrl = base.getRedirectUrl();
             base.router.push(redirectUrl);
             return true;
@@ -198,14 +213,18 @@ export function useSignInFlow(): UseSignInFlowReturn {
         }
 
         // Normal first-factor verification
-        const result = await signIn.attemptFirstFactor({
-          strategy: 'email_code',
+        const result = await signIn.emailCode.verifyCode({
           code: verificationCode,
         });
+        if (result.error) {
+          throw result.error;
+        }
 
-        if (result.status === 'complete') {
-          // Set the active session
-          await setActive({ session: result.createdSessionId });
+        if (signIn.status === 'complete') {
+          const finalizeResult = await signIn.finalize();
+          if (finalizeResult.error) {
+            throw finalizeResult.error;
+          }
 
           // Navigate to the redirect URL
           const redirectUrl = base.getRedirectUrl();
@@ -220,8 +239,8 @@ export function useSignInFlow(): UseSignInFlowReturn {
         // Clerk account, or Clerk introduces client trust challenges.
         // TODO: Remove `as string` cast when @clerk/shared types include 'needs_client_trust'
         if (
-          result.status === 'needs_second_factor' ||
-          (result.status as string) === 'needs_client_trust'
+          signIn.status === 'needs_second_factor' ||
+          (signIn.status as string) === 'needs_client_trust'
         ) {
           const secondFactor = signIn.supportedSecondFactors?.find(
             (f: { strategy: string }) =>
@@ -232,11 +251,17 @@ export function useSignInFlow(): UseSignInFlowReturn {
             const strategy = secondFactor.strategy as
               | 'email_code'
               | 'phone_code';
-            await signIn.prepareSecondFactor({ strategy });
+            const secondFactorResult =
+              strategy === 'phone_code'
+                ? await signIn.mfa.sendPhoneCode()
+                : await signIn.mfa.sendEmailCode();
+            if (secondFactorResult.error) {
+              throw secondFactorResult.error;
+            }
             setIsSecondFactor(true);
             setSecondFactorStrategy(strategy);
             setVerificationReason(
-              (result.status as string) === 'needs_client_trust'
+              (signIn.status as string) === 'needs_client_trust'
                 ? 'device_trust'
                 : 'mfa'
             );
@@ -256,7 +281,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
 
         // Statuses that shouldn't occur after attemptFirstFactor in our
         // passwordless flow, but handle defensively with clear messages.
-        if (result.status === 'needs_new_password') {
+        if (signIn.status === 'needs_new_password') {
           base.setError(
             'Password setup is not supported. Please sign in with email or Google.'
           );
@@ -283,15 +308,7 @@ export function useSignInFlow(): UseSignInFlowReturn {
         return false;
       }
     },
-    [
-      signIn,
-      setActive,
-      isLoaded,
-      isSecondFactor,
-      secondFactorStrategy,
-      clearError,
-      base,
-    ]
+    [signIn, isLoaded, isSecondFactor, secondFactorStrategy, clearError, base]
   );
 
   /**
@@ -308,9 +325,13 @@ export function useSignInFlow(): UseSignInFlowReturn {
       // If we're in a second-factor state, resend the second-factor
       // challenge instead of the first-factor email code.
       if (isSecondFactor) {
-        await signIn.prepareSecondFactor({
-          strategy: secondFactorStrategy,
-        });
+        const secondFactorResult =
+          secondFactorStrategy === 'phone_code'
+            ? await signIn.mfa.sendPhoneCode()
+            : await signIn.mfa.sendEmailCode();
+        if (secondFactorResult.error) {
+          throw secondFactorResult.error;
+        }
         base.setLoadingState({ type: 'idle' });
         return true;
       }
@@ -326,10 +347,12 @@ export function useSignInFlow(): UseSignInFlowReturn {
         return false;
       }
 
-      await signIn.prepareFirstFactor({
-        strategy: 'email_code',
+      const sendCodeResult = await signIn.emailCode.sendCode({
         emailAddressId: emailCodeFactor.emailAddressId as string,
       });
+      if (sendCodeResult.error) {
+        throw sendCodeResult.error;
+      }
 
       base.setLoadingState({ type: 'idle' });
       return true;
@@ -367,11 +390,14 @@ export function useSignInFlow(): UseSignInFlowReturn {
       // production all redirect correctly after the OAuth round-trip.
       const oauthBase = getOAuthBaseUrl();
       const storedRedirect = base.getRedirectUrl();
-      await signIn.authenticateWithRedirect({
+      const oauthResult = await signIn.sso({
         strategy: `oauth_${provider}`,
         redirectUrl: `${oauthBase}/signin/sso-callback`,
-        redirectUrlComplete: `${oauthBase}${storedRedirect}`,
+        redirectCallbackUrl: `${oauthBase}${storedRedirect}`,
       });
+      if (oauthResult.error) {
+        throw oauthResult.error;
+      }
     } catch (err) {
       // If user already has a session, redirect to dashboard
       if (isSessionExists(err)) {

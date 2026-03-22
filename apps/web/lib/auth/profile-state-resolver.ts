@@ -2,10 +2,12 @@
  * Profile State Resolver
  *
  * Resolves user state based on creator profile status.
+ * Uses the canonical isProfileComplete() from profile-completeness.ts.
  */
 
 // eslint-disable-next-line import/no-cycle -- mutual dependency with gate.ts for auth state
 import { UserState } from './gate';
+import { isProfileComplete } from './profile-completeness';
 
 /**
  * Profile data for state resolution.
@@ -29,25 +31,8 @@ export interface ProfileStateResult {
   redirectTo: string | null;
 }
 
-/**
- * Determines if a creator profile is considered "complete" for access purposes.
- * A complete profile has: username, display name, is public, and has completed onboarding.
- * Avatar is enforced at the onboarding profile review step and by ProfileCompletionRedirect,
- * but is NOT checked here to avoid proxy redirect loops during onboarding steps 1-2
- * (avatar is uploaded asynchronously after step 0 completes).
- *
- * @param profile - Profile data to check
- * @returns Whether the profile is complete
- */
-export function isProfileComplete(profile: ProfileData): boolean {
-  const hasHandle =
-    Boolean(profile.usernameNormalized) && Boolean(profile.username);
-  const hasName = Boolean(profile.displayName?.trim());
-  const isPublic = profile.isPublic !== false;
-  const hasCompleted = Boolean(profile.onboardingCompletedAt);
-
-  return hasHandle && hasName && isPublic && hasCompleted;
-}
+// Re-export for consumers that imported isProfileComplete from here
+export { isProfileComplete } from './profile-completeness';
 
 /**
  * Resolves user state based on profile status.

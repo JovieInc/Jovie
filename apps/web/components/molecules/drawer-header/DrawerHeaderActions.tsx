@@ -59,7 +59,9 @@ export function DrawerHeaderActions({
   const menuItems: TableActionMenuItem[] = onClose
     ? [
         ...baseMenuItems,
-        ...(baseMenuItems.length > 0 ? [{ id: 'separator', label: '' }] : []),
+        ...(baseMenuItems.length > 0
+          ? [{ id: 'separator-close', label: '' }]
+          : []),
         {
           id: 'close-drawer',
           label: 'Close',
