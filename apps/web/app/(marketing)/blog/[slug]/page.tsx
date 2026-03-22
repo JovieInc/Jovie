@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { BlogPostPage } from '@/components/organisms/BlogPostPage';
 import { APP_URL } from '@/constants/app';
 import { getBlogPost, getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
+import { resolveAuthor } from '@/lib/blog/resolveAuthor';
+import { getProfileByUsername } from '@/lib/services/profile';
 
 interface BlogPostPageProps {
   readonly params: Promise<{ slug: string }>;
@@ -53,7 +55,16 @@ export default async function BlogPostRoute({
 
   try {
     const post = await getBlogPost(slug);
-    return <BlogPostPage post={post} />;
+    let profile = null;
+    if (post.authorUsername) {
+      try {
+        profile = await getProfileByUsername(post.authorUsername);
+      } catch {
+        profile = null;
+      }
+    }
+    const author = resolveAuthor(post, profile);
+    return <BlogPostPage post={post} author={author} />;
   } catch {
     notFound();
   }

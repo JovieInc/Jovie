@@ -2,8 +2,8 @@
 title: The Friday Problem
 date: 2025-01-15
 author: Tim White
+authorUsername: tim
 authorTitle: Founder at Jovie
-authorProfile: https://jov.ie/tim
 category: Release Strategy
 ---
 

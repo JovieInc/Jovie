@@ -2,8 +2,8 @@
 title: The MySpace Problem
 date: 2025-02-03
 author: Tim White
+authorUsername: tim
 authorTitle: Founder at Jovie
-authorProfile: https://jov.ie/tim
 category: Inbound Marketing
 ---
 
