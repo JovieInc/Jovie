@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.41] - 2026-03-22
+
+### Added
+
+- Blog author sections now pull display name, avatar, and verified badge from the author's Jovie profile instead of hardcoded frontmatter
+- Batch profile query `getProfilesByUsernames` for efficient blog index rendering
+- `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
+
 ## [26.4.40] - 2026-03-22
 
 ### Fixed
