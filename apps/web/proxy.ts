@@ -663,9 +663,37 @@ async function handleRequest(req: NextRequest, userId: string | null) {
           res = NextResponse.next({ request: { headers: requestHeaders } });
           res.cookies.delete('jovie_onboarding_complete');
         } else {
-          res = NextResponse.rewrite(new URL('/onboarding', req.url), {
-            request: { headers: requestHeaders },
-          });
+          // Circuit breaker: detect redirect loops between /app and /onboarding.
+          // If we've redirected the same user more than 3 times in 30 seconds,
+          // break the loop and let the request through instead of looping forever.
+          const redirectCount = Number(
+            req.cookies.get('jovie_redirect_count')?.value ?? '0'
+          );
+
+          if (redirectCount >= 3) {
+            await captureError(
+              '[proxy] Redirect loop circuit breaker triggered',
+              new Error('Redirect loop detected'),
+              {
+                pathname,
+                redirectCount,
+                operation: 'proxy_circuit_breaker',
+              }
+            );
+            // Let the request through — the page will handle the state
+            res = NextResponse.next({ request: { headers: requestHeaders } });
+            res.cookies.delete('jovie_redirect_count');
+          } else {
+            res = NextResponse.rewrite(new URL('/onboarding', req.url), {
+              request: { headers: requestHeaders },
+            });
+            res.cookies.set('jovie_redirect_count', String(redirectCount + 1), {
+              maxAge: 30, // 30 second TTL — auto-resets
+              path: '/',
+              httpOnly: true,
+              sameSite: 'lax',
+            });
+          }
         }
       } else if (
         !userState.needsWaitlist &&

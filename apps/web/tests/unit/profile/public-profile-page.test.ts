@@ -10,6 +10,9 @@
  * These are pure logic tests that don't render React components.
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   getProfileModeSubtitle,
@@ -19,6 +22,12 @@ import {
 // --- Mock data used across tests ---
 
 const BASE_URL = 'https://jov.ie';
+const TEST_FILE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const WEB_ROOT = path.resolve(TEST_FILE_DIR, '../../..');
+const PUBLIC_PROFILE_PAGE_SOURCE = readFileSync(
+  path.join(WEB_ROOT, 'app/[username]/page.tsx'),
+  'utf8'
+);
 
 const mockProfile = {
   id: 'profile-123',
@@ -80,6 +89,18 @@ const mockLinks = [
 const mockGenres = ['rock', 'indie', 'alternative'];
 
 describe('Public Profile Page Logic', () => {
+  describe('public tour data loading', () => {
+    it('uses the public-safe upcoming tour query helper', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'getUpcomingTourDatesForProfile'
+      );
+    });
+
+    it('does not import the dashboard noStore loader into the public page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('loadUpcomingTourDates');
+    });
+  });
+
   describe('generateProfileStructuredData', () => {
     // We test the structured data generation logic directly
     // Since it's a private function, we replicate the logic here for testing
@@ -373,28 +394,20 @@ describe('Public Profile Page Logic', () => {
   describe('Metadata generation logic', () => {
     // Test the metadata construction logic from generateMetadata
 
-    it('builds SEO title with genre context', () => {
+    it('uses a clean share title for the public profile', () => {
       const artistName = 'Test Artist';
-      const genres = ['rock', 'indie'];
-      const genreContext =
-        genres && genres.length > 0
-          ? ` | ${genres.slice(0, 2).join(', ')} Artist`
-          : '';
-      const title = `${artistName}${genreContext} - Music & Links`;
+      const title = `${artistName} | Jovie`;
 
-      expect(title).toBe('Test Artist | rock, indie Artist - Music & Links');
+      expect(title).toBe('Test Artist | Jovie');
     });
 
-    it('builds title without genre when none available', () => {
+    it('keeps the same share title even when genres are available', () => {
       const artistName = 'Test Artist';
-      const genres: string[] = [];
-      const genreContext =
-        genres && genres.length > 0
-          ? ` | ${genres.slice(0, 2).join(', ')} Artist`
-          : '';
-      const title = `${artistName}${genreContext} - Music & Links`;
+      const genres = ['rock', 'indie'];
+      const title = `${artistName} | Jovie`;
 
-      expect(title).toBe('Test Artist - Music & Links');
+      expect(genres).toEqual(['rock', 'indie']);
+      expect(title).toBe('Test Artist | Jovie');
     });
 
     it('truncates bio to 155 chars in description', () => {

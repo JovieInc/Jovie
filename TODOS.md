@@ -247,6 +247,20 @@ Implementation note: any PR touching `/api/stripe/`, `/api/billing/`, auth middl
 
 ---
 
+## Defensive column selection for profile/release queries
+
+**What:** Refactor `getProfileByClerkId` (`app/api/dashboard/profile/lib/db-operations.ts:93`) and `updateProfileRecords` (`:70`) to select/return specific columns instead of full-table `select({ profile: creatorProfiles })` and bare `.returning()`.
+
+**Why:** Full-table selects break at runtime when a schema column exists in Drizzle but not in the DB. The verify gate now prevents deploying broken code, but defensive queries prevent runtime errors entirely — belt AND suspenders.
+
+**Context:** Only 2 queries use the full-table pattern. Both are in `db-operations.ts` and serve the profile API route (`GET/PUT /api/dashboard/profile`). Changing them alters the API response shape, so audit all dashboard client consumers first.
+
+**Effort:** M (human: ~2 days / CC: ~30 min)
+**Priority:** P2
+**Depends on:** Nothing.
+
+---
+
 ## Connection pool monitoring
 
 **What:** Add lightweight connection pool utilization logging (active/idle/waiting counts) to dashboard data queries, emitted as Sentry breadcrumbs.

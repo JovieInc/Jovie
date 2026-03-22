@@ -155,13 +155,14 @@ const APPROVED_STATUSES = [
   'active',
 ] as const;
 
+// Uses the canonical isProfileComplete() from profile-completeness.ts.
+// This eliminates the redirect loop bug class where proxy, gate, and
+// dashboard had independent completeness checks that could disagree.
+import { isProfileComplete } from './profile-completeness';
+
 /**
  * Whether the user has a complete profile.
- *
- * IMPORTANT: This MUST match the logic in `profileIsPublishable()` from
- * `lib/db/server.ts`. If the proxy considers a user "active" but the
- * dashboard considers them "needs onboarding", an infinite redirect loop
- * occurs: /app → redirect to /onboarding → proxy redirects back → repeat.
+ * Maps proxy query field names to the canonical check.
  */
 function hasCompleteProfile(result: {
   profileId: string | null;
@@ -172,14 +173,14 @@ function hasCompleteProfile(result: {
   profileAvatarUrl: string | null;
   profileIsPublic: boolean | null;
 }): boolean {
-  return (
-    !!result.profileId &&
-    !!result.profileComplete &&
-    !!result.profileUsername &&
-    !!result.profileUsernameNormalized &&
-    !!result.profileDisplayName?.trim() &&
-    result.profileIsPublic !== false
-  );
+  if (!result.profileId) return false;
+  return isProfileComplete({
+    username: result.profileUsername,
+    usernameNormalized: result.profileUsernameNormalized,
+    displayName: result.profileDisplayName,
+    isPublic: result.profileIsPublic,
+    onboardingCompletedAt: result.profileComplete,
+  });
 }
 
 /**

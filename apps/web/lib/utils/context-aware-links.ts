@@ -1,3 +1,4 @@
+import { MAX_HEADER_SOCIAL_LINKS } from '@/lib/profile/social-link-limits';
 import type { LegacySocialLink } from '@/types/db';
 
 /**
@@ -123,4 +124,54 @@ export function getContextAwareLinks(
 
     return 0;
   });
+}
+
+const HEADER_SOCIAL_PRIORITY = [
+  'instagram',
+  'tiktok',
+  'youtube',
+  'twitter',
+  'facebook',
+] as const;
+
+const HEADER_SOCIAL_PRIORITY_INDEX = new Map<string, number>(
+  HEADER_SOCIAL_PRIORITY.map((platform, index) => [platform, index])
+);
+
+function getHeaderPriority(platform: string): number {
+  return HEADER_SOCIAL_PRIORITY_INDEX.get(platform) ?? Number.MAX_SAFE_INTEGER;
+}
+
+export function getHeaderSocialLinks(
+  links: LegacySocialLink[],
+  sourcePlatform: string | null,
+  maxCount = MAX_HEADER_SOCIAL_LINKS
+): LegacySocialLink[] {
+  const seenPlatforms = new Set<string>();
+
+  return links
+    .filter(link => {
+      const platform = link.platform?.toLowerCase() ?? '';
+      if (!platform || platform === sourcePlatform) {
+        return false;
+      }
+
+      if (!HEADER_SOCIAL_PRIORITY_INDEX.has(platform)) {
+        return false;
+      }
+
+      if (seenPlatforms.has(platform)) {
+        return false;
+      }
+
+      seenPlatforms.add(platform);
+      return true;
+    })
+    .sort((a, b) => {
+      const aPlatform = a.platform?.toLowerCase() ?? '';
+      const bPlatform = b.platform?.toLowerCase() ?? '';
+
+      return getHeaderPriority(aPlatform) - getHeaderPriority(bPlatform);
+    })
+    .slice(0, maxCount);
 }

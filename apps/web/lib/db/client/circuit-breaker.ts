@@ -6,6 +6,7 @@
  */
 
 import * as Sentry from '@sentry/nextjs';
+import { getPoolMetrics } from './connection';
 
 export type DbCircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
 
@@ -143,7 +144,11 @@ class DbCircuitBreaker {
       Sentry.captureMessage('Database circuit breaker opened', {
         level: 'warning',
         tags: { component: 'db-circuit-breaker', transition: 'open' },
-        extra: { previousState, stats: this.getStats() },
+        extra: {
+          previousState,
+          stats: this.getStats(),
+          pool: getPoolMetrics(),
+        },
       });
       return;
     }
@@ -154,7 +159,11 @@ class DbCircuitBreaker {
       Sentry.captureMessage('Database circuit breaker closed', {
         level: 'info',
         tags: { component: 'db-circuit-breaker', transition: 'close' },
-        extra: { previousState, stats: this.getStats() },
+        extra: {
+          previousState,
+          stats: this.getStats(),
+          pool: getPoolMetrics(),
+        },
       });
     }
   }

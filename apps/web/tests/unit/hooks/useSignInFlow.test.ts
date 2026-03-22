@@ -1,24 +1,35 @@
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useSignInFlow } from '@/hooks/useSignInFlow';
 
 // --- Mocks ---
 
 const pushMock = vi.fn();
-const setActiveMock = vi.fn();
+const finalizeMock = vi.fn();
 
 const createMock = vi.fn();
-const prepareFirstFactorMock = vi.fn();
-const attemptFirstFactorMock = vi.fn();
-const prepareSecondFactorMock = vi.fn();
-const attemptSecondFactorMock = vi.fn();
+const sendFirstFactorCodeMock = vi.fn();
+const verifyFirstFactorCodeMock = vi.fn();
+const sendSecondFactorEmailCodeMock = vi.fn();
+const verifySecondFactorEmailCodeMock = vi.fn();
+const sendSecondFactorPhoneCodeMock = vi.fn();
+const verifySecondFactorPhoneCodeMock = vi.fn();
 
 const signInMock = {
   create: createMock,
-  prepareFirstFactor: prepareFirstFactorMock,
-  attemptFirstFactor: attemptFirstFactorMock,
-  prepareSecondFactor: prepareSecondFactorMock,
-  attemptSecondFactor: attemptSecondFactorMock,
+  emailCode: {
+    sendCode: sendFirstFactorCodeMock,
+    verifyCode: verifyFirstFactorCodeMock,
+  },
+  mfa: {
+    sendEmailCode: sendSecondFactorEmailCodeMock,
+    verifyEmailCode: verifySecondFactorEmailCodeMock,
+    sendPhoneCode: sendSecondFactorPhoneCodeMock,
+    verifyPhoneCode: verifySecondFactorPhoneCodeMock,
+  },
+  finalize: finalizeMock,
+  sso: vi.fn(),
+  status: 'needs_identifier' as string,
   supportedFirstFactors: [
     { strategy: 'email_code', emailAddressId: 'eid_123' },
   ],
@@ -32,7 +43,6 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useClerkSafe', () => ({
   useSignInSafe: () => ({
     signIn: signInMock,
-    setActive: setActiveMock,
     isLoaded: true,
   }),
 }));
@@ -51,12 +61,9 @@ vi.mock('@/constants/domains', () => ({
 async function setupVerificationStep(result: {
   current: ReturnType<typeof useSignInFlow>;
 }) {
-  createMock.mockResolvedValue({
-    supportedFirstFactors: [
-      { strategy: 'email_code', emailAddressId: 'eid_123' },
-    ],
-  });
-  prepareFirstFactorMock.mockResolvedValue(undefined);
+  signInMock.status = 'needs_first_factor';
+  createMock.mockResolvedValue({ error: null });
+  sendFirstFactorCodeMock.mockResolvedValue({ error: null });
 
   await act(async () => {
     await result.current.startEmailFlow('test@example.com');
@@ -70,25 +77,26 @@ async function setupVerificationStep(result: {
 describe('useSignInFlow – status handling', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setActiveMock.mockResolvedValue(undefined);
+    signInMock.status = 'needs_identifier';
+    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
+    finalizeMock.mockResolvedValue({ error: null });
   });
 
   it('handles needs_second_factor with supported factor', async () => {
     const { result } = renderHook(() => useSignInFlow());
     await setupVerificationStep(result);
 
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_second_factor';
+      return { error: null };
     });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.verifyCode('123456');
     });
 
-    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'email_code',
-    });
+    expect(sendSecondFactorEmailCodeMock).toHaveBeenCalled();
     expect(result.current.step).toBe('verification');
     expect(result.current.code).toBe('');
     expect(result.current.verificationReason).toBe('mfa');
@@ -102,39 +110,36 @@ describe('useSignInFlow – status handling', () => {
     const { result } = renderHook(() => useSignInFlow());
     await setupVerificationStep(result);
 
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_second_factor';
+      return { error: null };
     });
 
     await act(async () => {
       await result.current.verifyCode('123456');
     });
 
-    expect(prepareSecondFactorMock).not.toHaveBeenCalled();
+    expect(sendSecondFactorEmailCodeMock).not.toHaveBeenCalled();
     expect(result.current.error).toBe(
       'Additional verification is required. Please contact support.'
     );
-
-    // Restore for other tests
-    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
   });
 
   it('handles needs_client_trust (string cast) like needs_second_factor', async () => {
     const { result } = renderHook(() => useSignInFlow());
     await setupVerificationStep(result);
 
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_client_trust',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_client_trust';
+      return { error: null };
     });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.verifyCode('123456');
     });
 
-    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'email_code',
-    });
+    expect(sendSecondFactorEmailCodeMock).toHaveBeenCalled();
     expect(result.current.verificationReason).toBe('device_trust');
     expect(result.current.step).toBe('verification');
   });
@@ -144,30 +149,30 @@ describe('useSignInFlow – status handling', () => {
     await setupVerificationStep(result);
 
     // First attempt returns needs_second_factor
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_second_factor';
+      return { error: null };
     });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.verifyCode('123456');
     });
 
     // Second attempt should use attemptSecondFactor
-    attemptSecondFactorMock.mockResolvedValue({
-      status: 'complete',
-      createdSessionId: 'sess_abc',
+    verifySecondFactorEmailCodeMock.mockImplementation(async () => {
+      signInMock.status = 'complete';
+      return { error: null };
     });
 
     await act(async () => {
       await result.current.verifyCode('789012');
     });
 
-    expect(attemptSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'email_code',
+    expect(verifySecondFactorEmailCodeMock).toHaveBeenCalledWith({
       code: '789012',
     });
-    expect(setActiveMock).toHaveBeenCalledWith({ session: 'sess_abc' });
+    expect(finalizeMock).toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledWith('/app/dashboard');
   });
 
@@ -175,8 +180,9 @@ describe('useSignInFlow – status handling', () => {
     const { result } = renderHook(() => useSignInFlow());
     await setupVerificationStep(result);
 
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_first_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_first_factor';
+      return { error: null };
     });
 
     await act(async () => {
@@ -192,8 +198,9 @@ describe('useSignInFlow – status handling', () => {
     const { result } = renderHook(() => useSignInFlow());
     await setupVerificationStep(result);
 
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_new_password',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_new_password';
+      return { error: null };
     });
 
     await act(async () => {
@@ -210,10 +217,11 @@ describe('useSignInFlow – status handling', () => {
     await setupVerificationStep(result);
 
     // Trigger second-factor state
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_second_factor';
+      return { error: null };
     });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.verifyCode('123456');
@@ -229,43 +237,45 @@ describe('useSignInFlow – status handling', () => {
     expect(result.current.verificationReason).toBe('code');
   });
 
-  it('uses phone_code strategy when that is the supported second factor', async () => {
-    // Override to only support phone_code as second factor
-    signInMock.supportedSecondFactors = [{ strategy: 'phone_code' }];
-
-    const { result } = renderHook(() => useSignInFlow());
-    await setupVerificationStep(result);
-
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
-    });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
-
-    await act(async () => {
-      await result.current.verifyCode('123456');
+  describe('with phone_code second factor', () => {
+    beforeEach(() => {
+      signInMock.supportedSecondFactors = [{ strategy: 'phone_code' }];
     });
 
-    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'phone_code',
+    afterEach(() => {
+      signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
     });
 
-    // Second verification should use phone_code strategy
-    attemptSecondFactorMock.mockResolvedValue({
-      status: 'complete',
-      createdSessionId: 'sess_phone',
-    });
+    it('uses phone_code strategy when that is the supported second factor', async () => {
+      const { result } = renderHook(() => useSignInFlow());
+      await setupVerificationStep(result);
 
-    await act(async () => {
-      await result.current.verifyCode('789012');
-    });
+      verifyFirstFactorCodeMock.mockImplementation(async () => {
+        signInMock.status = 'needs_second_factor';
+        return { error: null };
+      });
+      sendSecondFactorPhoneCodeMock.mockResolvedValue({ error: null });
 
-    expect(attemptSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'phone_code',
-      code: '789012',
-    });
+      await act(async () => {
+        await result.current.verifyCode('123456');
+      });
 
-    // Restore for other tests
-    signInMock.supportedSecondFactors = [{ strategy: 'email_code' }];
+      expect(sendSecondFactorPhoneCodeMock).toHaveBeenCalled();
+
+      // Second verification should use phone_code strategy
+      verifySecondFactorPhoneCodeMock.mockImplementation(async () => {
+        signInMock.status = 'complete';
+        return { error: null };
+      });
+
+      await act(async () => {
+        await result.current.verifyCode('789012');
+      });
+
+      expect(verifySecondFactorPhoneCodeMock).toHaveBeenCalledWith({
+        code: '789012',
+      });
+    });
   });
 
   it('resends second-factor challenge instead of first-factor when in second-factor state', async () => {
@@ -273,26 +283,25 @@ describe('useSignInFlow – status handling', () => {
     await setupVerificationStep(result);
 
     // Enter second-factor state
-    attemptFirstFactorMock.mockResolvedValue({
-      status: 'needs_second_factor',
+    verifyFirstFactorCodeMock.mockImplementation(async () => {
+      signInMock.status = 'needs_second_factor';
+      return { error: null };
     });
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.verifyCode('123456');
     });
 
     // Clear mock to track the resend call
-    prepareSecondFactorMock.mockClear();
-    prepareSecondFactorMock.mockResolvedValue(undefined);
+    sendSecondFactorEmailCodeMock.mockClear();
+    sendSecondFactorEmailCodeMock.mockResolvedValue({ error: null });
 
     await act(async () => {
       await result.current.resendCode();
     });
 
     // Should resend second factor, not first factor
-    expect(prepareSecondFactorMock).toHaveBeenCalledWith({
-      strategy: 'email_code',
-    });
+    expect(sendSecondFactorEmailCodeMock).toHaveBeenCalled();
   });
 });

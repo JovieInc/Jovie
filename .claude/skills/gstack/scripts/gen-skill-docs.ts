@@ -17,9 +17,52 @@ import * as path from 'path';
 const ROOT = path.resolve(import.meta.dir, '..');
 const DRY_RUN = process.argv.includes('--dry-run');
 
+// ─── Template Context ───────────────────────────────────────
+
+type Host = 'claude' | 'codex';
+
+const HOST_ARG = process.argv.find(a => a.startsWith('--host'));
+const HOST: Host = (() => {
+  if (!HOST_ARG) return 'claude';
+  const val = HOST_ARG.includes('=') ? HOST_ARG.split('=')[1] : process.argv[process.argv.indexOf(HOST_ARG) + 1];
+  if (val === 'codex' || val === 'agents') return 'codex';
+  if (val === 'claude') return 'claude';
+  throw new Error(`Unknown host: ${val}. Use claude, codex, or agents.`);
+})();
+
+interface HostPaths {
+  skillRoot: string;
+  localSkillRoot: string;
+  binDir: string;
+  browseDir: string;
+}
+
+const HOST_PATHS: Record<Host, HostPaths> = {
+  claude: {
+    skillRoot: '~/.claude/skills/gstack',
+    localSkillRoot: '.claude/skills/gstack',
+    binDir: '~/.claude/skills/gstack/bin',
+    browseDir: '~/.claude/skills/gstack/browse/dist',
+  },
+  codex: {
+    skillRoot: '~/.codex/skills/gstack',
+    localSkillRoot: '.agents/skills/gstack',
+    binDir: '~/.codex/skills/gstack/bin',
+    browseDir: '~/.codex/skills/gstack/browse/dist',
+  },
+};
+
+interface TemplateContext {
+  skillName: string;
+  tmplPath: string;
+  benefitsFrom?: string[];
+  host: Host;
+  paths: HostPaths;
+}
+
 // ─── Placeholder Resolvers ──────────────────────────────────
 
-function generateCommandReference(): string {
+function generateCommandReference(_ctx: TemplateContext): string {
   // Group commands by category
   const groups = new Map<string, Array<{ command: string; description: string; usage?: string }>>();
   for (const [cmd, meta] of Object.entries(COMMAND_DESCRIPTIONS)) {
@@ -55,7 +98,7 @@ function generateCommandReference(): string {
   return sections.join('\n').trimEnd();
 }
 
-function generateSnapshotFlags(): string {
+function generateSnapshotFlags(_ctx: TemplateContext): string {
   const lines: string[] = [
     'The snapshot is your primary tool for understanding and interacting with pages.',
     '',
@@ -94,28 +137,44 @@ function generateSnapshotFlags(): string {
   return lines.join('\n');
 }
 
-function generatePreamble(): string {
+function generatePreambleBash(ctx: TemplateContext): string {
   return `## Preamble (run first)
 
 \`\`\`bash
-_UPD=$(~/.claude/skills/gstack/bin/gstack-update-check 2>/dev/null || .claude/skills/gstack/bin/gstack-update-check 2>/dev/null || true)
+_UPD=$(${ctx.paths.binDir}/gstack-update-check 2>/dev/null || ${ctx.paths.localSkillRoot}/bin/gstack-update-check 2>/dev/null || true)
 [ -n "$_UPD" ] && echo "$_UPD" || true
 mkdir -p ~/.gstack/sessions
 touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
-_CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_AUTO_LAKE=$(~/.claude/skills/gstack/bin/gstack-config get auto_lake 2>/dev/null || echo "false")
-echo "AUTO_LAKE: $_AUTO_LAKE"
+_CONTRIB=$(${ctx.paths.binDir}/gstack-config get gstack_contributor 2>/dev/null || true)
+_PROACTIVE=$(${ctx.paths.binDir}/gstack-config get proactive 2>/dev/null || echo "true")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
+echo "PROACTIVE: $_PROACTIVE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
-\`\`\`
+_TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
+_TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
+_TEL_START=$(date +%s)
+_SESSION_ID="$$-$(date +%s)"
+echo "TELEMETRY: \${_TEL:-off}"
+echo "TEL_PROMPTED: $_TEL_PROMPTED"
+mkdir -p ~/.gstack/analytics
+echo '{"skill":"${ctx.skillName}","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+for _PF in ~/.gstack/analytics/.pending-*; do [ -f "$_PF" ] && ${ctx.paths.binDir}/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
+\`\`\``;
+}
 
-If output shows \`UPGRADE_AVAILABLE <old> <new>\`: read \`~/.claude/skills/gstack/gstack-upgrade/SKILL.md\` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If \`JUST_UPGRADED <from> <to>\`: tell user "Running gstack v{to} (just updated!)" and continue.
+function generateUpgradeCheck(ctx: TemplateContext): string {
+  return `If \`PROACTIVE\` is \`"false"\`, do not proactively suggest gstack skills — only invoke
+them when the user explicitly asks. The user opted out of proactive suggestions.
 
-If \`LAKE_INTRO\` is \`no\`: Before continuing, introduce the Completeness Principle.
+If output shows \`UPGRADE_AVAILABLE <old> <new>\`: read \`${ctx.paths.skillRoot}/gstack-upgrade/SKILL.md\` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If \`JUST_UPGRADED <from> <to>\`: tell user "Running gstack v{to} (just updated!)" and continue.`;
+}
+
+function generateLakeIntro(): string {
+  return `If \`LAKE_INTRO\` is \`no\`: Before continuing, introduce the Completeness Principle.
 Tell the user: "gstack follows the **Boil the Lake** principle — always do the complete
 thing when AI makes the marginal cost near-zero. Read more: https://garryslist.org/posts/boil-the-ocean"
 Then offer to open the essay in their default browser:
@@ -125,11 +184,46 @@ open https://garryslist.org/posts/boil-the-ocean
 touch ~/.gstack/.completeness-intro-seen
 \`\`\`
 
-Only run \`open\` if the user says yes. Always run \`touch\` to mark as seen. This only happens once.
+Only run \`open\` if the user says yes. Always run \`touch\` to mark as seen. This only happens once.`;
+}
 
-## AskUserQuestion Format
+function generateTelemetryPrompt(ctx: TemplateContext): string {
+  return `If \`TEL_PROMPTED\` is \`no\` AND \`LAKE_INTRO\` is \`yes\`: After the lake intro is handled,
+ask the user about telemetry. Use AskUserQuestion:
 
-**Before calling AskUserQuestion:** If \`AUTO_LAKE\` is \`true\`, classify the decision using the Auto-Lake Decision Tree below. If it is a resource-cost decision, auto-resolve it (choose the complete option) and log with \`[AUTO-LAKE]\` instead of asking. Only proceed with AskUserQuestion for human decisions.
+> Help gstack get better! Community mode shares usage data (which skills you use, how long
+> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
+> No code, file paths, or repo names are ever sent.
+> Change anytime with \`gstack-config set telemetry off\`.
+
+Options:
+- A) Help gstack get better! (recommended)
+- B) No thanks
+
+If A: run \`${ctx.paths.binDir}/gstack-config set telemetry community\`
+
+If B: ask a follow-up AskUserQuestion:
+
+> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
+> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+
+Options:
+- A) Sure, anonymous is fine
+- B) No thanks, fully off
+
+If B→A: run \`${ctx.paths.binDir}/gstack-config set telemetry anonymous\`
+If B→B: run \`${ctx.paths.binDir}/gstack-config set telemetry off\`
+
+Always run:
+\`\`\`bash
+touch ~/.gstack/.telemetry-prompted
+\`\`\`
+
+This only happens once. If \`TEL_PROMPTED\` is \`yes\`, skip this entirely.`;
+}
+
+function generateAskUserFormat(_ctx: TemplateContext): string {
+  return `## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch (use the \`_BRANCH\` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
@@ -139,9 +233,11 @@ Only run \`open\` if the user says yes. Always run \`touch\` to mark as seen. Th
 
 Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
 
-Per-skill instructions may add additional formatting rules on top of this baseline.
+Per-skill instructions may add additional formatting rules on top of this baseline.`;
+}
 
-## Completeness Principle — Boil the Lake
+function generateCompletenessSection(): string {
+  return `## Completeness Principle — Boil the Lake
 
 AI-assisted coding makes the marginal cost of completeness near-zero. When you present options:
 
@@ -164,46 +260,33 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 - BAD: "Choose B — it covers 90% of the value with less code." (If A is only 70 lines more, choose A.)
 - BAD: "We can skip edge case handling to save time." (Edge case handling costs minutes with CC.)
 - BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
-- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
+- BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")`;
+}
 
-## Auto-Lake Protocol
+function generateSearchBeforeBuildingSection(ctx: TemplateContext): string {
+  return `## Search Before Building
 
-If \`AUTO_LAKE\` is \`true\`: automatically choose the complete option for **resource-cost decisions** without calling AskUserQuestion. The user has opted into this because the answer to "should we add tests / error handling / edge cases?" is always "yes" — the only cost is AI compute time, not human effort.
+Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read \`${ctx.paths.skillRoot}/ETHOS.md\` for the full philosophy.
 
-### Decision Tree: Resource-Cost vs. Human
+**Three layers of knowledge:**
+- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
+- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
+- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
 
-**AUTO-RESOLVE (resource-cost — just do it, do NOT ask):**
-- Test coverage gaps — add the tests
-- Error handling / missing edge cases — handle them
-- DRY violations — fix the duplication
-- Linting / formatting issues — fix them
-- Documentation updates for changed code — update the docs
-- Missing type safety / null guards / validation — add them
-- Logging / observability gaps — add logging
-- Dead code — remove it
-- Performance fixes with obvious solutions (N+1 queries, missing indexes) — fix them
-- Stale comments or diagrams — update them
+**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
+"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
 
-**ALWAYS ASK (human decisions — even with auto-lake):**
-- Architecture direction — which approach to take
-- Scope changes — adding or removing features from the plan
-- Feature behavior — how something should work for users
-- UX / UI choices — visual design, user flow decisions
-- Whether to ship / merge / deploy
-- Choosing between approaches where tradeoffs involve product direction
-- Breaking changes or public API modifications
-- Hard-to-reverse decisions
-- Adding new dependencies or infrastructure
-- Anything a skill template explicitly marks as \`ALWAYS_ASK\`
+Log eureka moments:
+\`\`\`bash
+jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
+\`\`\`
+Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
 
-**How to log auto-decisions:**
-When auto-resolving, output a one-liner instead of calling AskUserQuestion:
-\`[AUTO-LAKE] {issue description} -> {action taken} (resource-cost, auto-resolved)\`
+**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."`;
+}
 
-At the end of the skill workflow, include a summary line:
-\`Auto-Lake: N resource-cost decisions auto-resolved, M human decisions asked\`
-
-## Contributor Mode
+function generateContributorMode(): string {
+  return `## Contributor Mode
 
 If \`_CONTRIB\` is \`true\`: you are in **contributor mode**. You're a gstack user who also helps make it better.
 
@@ -238,9 +321,11 @@ Hey gstack team — ran into this while using /{skill-name}:
 **Date:** {YYYY-MM-DD} | **Version:** {gstack version} | **Skill:** /{skill}
 \`\`\`
 
-Slug: lowercase, hyphens, max 60 chars (e.g. \`browse-js-no-await\`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"
+Slug: lowercase, hyphens, max 60 chars (e.g. \`browse-js-no-await\`). Skip if file already exists. Max 3 reports per session. File inline and continue — don't stop the workflow. Tell user: "Filed gstack field report: {title}"`;
+}
 
-## Completion Status Protocol
+function generateCompletionStatus(): string {
+  return `## Completion Status Protocol
 
 When completing a skill workflow, report status using one of:
 - **DONE** — All steps completed successfully. Evidence provided for each claim.
@@ -263,17 +348,59 @@ STATUS: BLOCKED | NEEDS_CONTEXT
 REASON: [1-2 sentences]
 ATTEMPTED: [what you tried]
 RECOMMENDATION: [what the user should do next]
-\`\`\``;
+\`\`\`
+
+## Telemetry (run last)
+
+After the skill workflow completes (success, error, or abort), log the telemetry event.
+Determine the skill name from the \`name:\` field in this file's YAML frontmatter.
+Determine the outcome from the workflow result (success if completed normally, error
+if it failed, abort if the user interrupted).
+
+**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
+\`~/.gstack/analytics/\` (user config directory, not project files). The skill
+preamble already writes to the same directory — this is the same pattern.
+Skipping this command loses session duration and outcome data.
+
+Run this bash:
+
+\`\`\`bash
+_TEL_END=$(date +%s)
+_TEL_DUR=$(( _TEL_END - _TEL_START ))
+rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
+~/.claude/skills/gstack/bin/gstack-telemetry-log \\
+  --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \\
+  --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+\`\`\`
+
+Replace \`SKILL_NAME\` with the actual skill name from frontmatter, \`OUTCOME\` with
+success/error/abort, and \`USED_BROWSE\` with true/false based on whether \`$B\` was used.
+If you cannot determine the outcome, use "unknown". This runs in the background and
+never blocks the user.`;
 }
 
-function generateBrowseSetup(): string {
+function generatePreamble(ctx: TemplateContext): string {
+  return [
+    generatePreambleBash(ctx),
+    generateUpgradeCheck(ctx),
+    generateLakeIntro(),
+    generateTelemetryPrompt(ctx),
+    generateAskUserFormat(ctx),
+    generateCompletenessSection(),
+    generateSearchBeforeBuildingSection(ctx),
+    generateContributorMode(),
+    generateCompletionStatus(),
+  ].join('\n\n');
+}
+
+function generateBrowseSetup(ctx: TemplateContext): string {
   return `## SETUP (run this check BEFORE any browse command)
 
 \`\`\`bash
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
-[ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
-[ -z "$B" ] && B=~/.claude/skills/gstack/browse/dist/browse
+[ -n "$_ROOT" ] && [ -x "$_ROOT/${ctx.paths.localSkillRoot}/browse/dist/browse" ] && B="$_ROOT/${ctx.paths.localSkillRoot}/browse/dist/browse"
+[ -z "$B" ] && B=${ctx.paths.browseDir}/browse
 if [ -x "$B" ]; then
   echo "READY: $B"
 else
@@ -287,7 +414,7 @@ If \`NEEDS_SETUP\`:
 3. If \`bun\` is not installed: \`curl -fsSL https://bun.sh/install | bash\``;
 }
 
-function generateBaseBranchDetect(): string {
+function generateBaseBranchDetect(_ctx: TemplateContext): string {
   return `## Step 0: Detect base branch
 
 Determine which branch this PR targets. Use the result as "the base branch" in all subsequent steps.
@@ -308,7 +435,7 @@ branch name wherever the instructions say "the base branch."
 ---`;
 }
 
-function generateQAMethodology(): string {
+function generateQAMethodology(_ctx: TemplateContext): string {
   return `## Modes
 
 ### Diff-aware (automatic when on a feature branch with no URL)
@@ -328,6 +455,8 @@ This is the **primary mode** for developers verifying their work. When the user 
    - CSS/style files → which pages include those stylesheets
    - API endpoints → test them directly with \`$B js "await fetch('/api/...')"\`
    - Static pages (markdown, HTML) → navigate to them directly
+
+   **If no obvious pages/routes are identified from the diff:** Do not skip browser testing. The user invoked /qa because they want browser-based verification. Fall back to Quick mode — navigate to the homepage, follow the top 5 navigation targets, check console for errors, and test any interactive elements found. Backend, config, and infrastructure changes affect app behavior — always verify the app still works.
 
 3. **Detect the running app** — check common local dev ports:
    \`\`\`bash
@@ -582,16 +711,17 @@ Minimum 0 per category.
 8. **Depth over breadth.** 5-10 well-documented issues with evidence > 20 vague descriptions.
 9. **Never delete output files.** Screenshots and reports accumulate — that's intentional.
 10. **Use \`snapshot -C\` for tricky UIs.** Finds clickable divs that the accessibility tree misses.
-11. **Show screenshots to the user.** After every \`$B screenshot\`, \`$B snapshot -a -o\`, or \`$B responsive\` command, use the Read tool on the output file(s) so the user can see them inline. For \`responsive\` (3 files), Read all three. This is critical — without it, screenshots are invisible to the user.`;
+11. **Show screenshots to the user.** After every \`$B screenshot\`, \`$B snapshot -a -o\`, or \`$B responsive\` command, use the Read tool on the output file(s) so the user can see them inline. For \`responsive\` (3 files), Read all three. This is critical — without it, screenshots are invisible to the user.
+12. **Never refuse to use the browser.** When the user invokes /qa or /qa-only, they are requesting browser-based testing. Never suggest evals, unit tests, or other alternatives as a substitute. Even if the diff appears to have no UI changes, backend changes affect app behavior — always open the browser and test.`;
 }
 
-function generateDesignReviewLite(): string {
+function generateDesignReviewLite(_ctx: TemplateContext): string {
   return `## Design Review (conditional, diff-scoped)
 
 Check if the diff touches frontend files using \`gstack-diff-scope\`:
 
 \`\`\`bash
-eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
+source <(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
 \`\`\`
 
 **If \`SCOPE_FRONTEND=false\`:** Skip design review silently. No output.
@@ -614,17 +744,15 @@ eval $(~/.claude/skills/gstack/bin/gstack-diff-scope <base> 2>/dev/null)
 6. **Log the result** for the Review Readiness Dashboard:
 
 \`\`\`bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
-mkdir -p ~/.gstack/projects/$SLUG
-echo '{"skill":"design-review-lite","timestamp":"TIMESTAMP","status":"STATUS","findings":N,"auto_fixed":M}' >> ~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl
+~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"design-review-lite","timestamp":"TIMESTAMP","status":"STATUS","findings":N,"auto_fixed":M,"commit":"COMMIT"}'
 \`\`\`
 
-Substitute: TIMESTAMP = ISO 8601 datetime, STATUS = "clean" if 0 findings or "issues_found", N = total findings, M = auto-fixed count.`;
+Substitute: TIMESTAMP = ISO 8601 datetime, STATUS = "clean" if 0 findings or "issues_found", N = total findings, M = auto-fixed count, COMMIT = output of \`git rev-parse --short HEAD\`.`;
 }
 
 // NOTE: design-checklist.md is a subset of this methodology for code-level detection.
 // When adding items here, also update review/design-checklist.md, and vice versa.
-function generateDesignMethodology(): string {
+function generateDesignMethodology(_ctx: TemplateContext): string {
   return `## Modes
 
 ### Full (default)
@@ -874,8 +1002,7 @@ Compare screenshots and observations across pages for:
 
 **Project-scoped:**
 \`\`\`bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
-mkdir -p ~/.gstack/projects/$SLUG
+source <(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null) && mkdir -p ~/.gstack/projects/$SLUG
 \`\`\`
 Write to: \`~/.gstack/projects/{slug}/{user}-{branch}-design-audit-{datetime}.md\`
 
@@ -958,19 +1085,16 @@ Tie everything to user goals and product objectives. Always suggest specific imp
 11. **Show screenshots to the user.** After every \`$B screenshot\`, \`$B snapshot -a -o\`, or \`$B responsive\` command, use the Read tool on the output file(s) so the user can see them inline. For \`responsive\` (3 files), Read all three. This is critical — without it, screenshots are invisible to the user.`;
 }
 
-function generateReviewDashboard(): string {
+function generateReviewDashboard(_ctx: TemplateContext): string {
   return `## Review Readiness Dashboard
 
 After completing the review, read the review log and config to display the dashboard.
 
 \`\`\`bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
-cat ~/.gstack/projects/$SLUG/$BRANCH-reviews.jsonl 2>/dev/null || echo "NO_REVIEWS"
-echo "---CONFIG---"
-~/.claude/skills/gstack/bin/gstack-config get skip_eng_review 2>/dev/null || echo "false"
+~/.claude/skills/gstack/bin/gstack-review-read
 \`\`\`
 
-Parse the output. Find the most recent entry for each skill (plan-ceo-review, plan-eng-review, plan-design-review, design-review-lite). Ignore entries with timestamps older than 7 days. For Design Review, show whichever is more recent between \`plan-design-review\` (full visual audit) and \`design-review-lite\` (code-level check). Append "(FULL)" or "(LITE)" to the status to distinguish. Display:
+Parse the output. Find the most recent entry for each skill (plan-ceo-review, plan-eng-review, plan-design-review, design-review-lite, adversarial-review, codex-review). Ignore entries with timestamps older than 7 days. For the Adversarial row, show whichever is more recent between \`adversarial-review\` (new auto-scaled) and \`codex-review\` (legacy). For Design Review, show whichever is more recent between \`plan-design-review\` (full visual audit) and \`design-review-lite\` (code-level check). Append "(FULL)" or "(LITE)" to the status to distinguish. Display:
 
 \`\`\`
 +====================================================================+
@@ -981,6 +1105,7 @@ Parse the output. Find the most recent entry for each skill (plan-ceo-review, pl
 | Eng Review      |  1   | 2026-03-16 15:00    | CLEAR     | YES      |
 | CEO Review      |  0   | —                   | —         | no       |
 | Design Review   |  0   | —                   | —         | no       |
+| Adversarial     |  0   | —                   | —         | no       |
 +--------------------------------------------------------------------+
 | VERDICT: CLEARED — Eng Review passed                                |
 +====================================================================+
@@ -990,15 +1115,91 @@ Parse the output. Find the most recent entry for each skill (plan-ceo-review, pl
 - **Eng Review (required by default):** The only review that gates shipping. Covers architecture, code quality, tests, performance. Can be disabled globally with \\\`gstack-config set skip_eng_review true\\\` (the "don't bother me" setting).
 - **CEO Review (optional):** Use your judgment. Recommend it for big product/business changes, new user-facing features, or scope decisions. Skip for bug fixes, refactors, infra, and cleanup.
 - **Design Review (optional):** Use your judgment. Recommend it for UI/UX changes. Skip for backend-only, infra, or prompt-only changes.
+- **Adversarial Review (automatic):** Auto-scales by diff size. Small diffs (<50 lines) skip adversarial. Medium diffs (50–199) get cross-model adversarial. Large diffs (200+) get all 4 passes: Claude structured, Codex structured, Claude adversarial subagent, Codex adversarial. No configuration needed.
 
 **Verdict logic:**
 - **CLEARED**: Eng Review has >= 1 entry within 7 days with status "clean" (or \\\`skip_eng_review\\\` is \\\`true\\\`)
 - **NOT CLEARED**: Eng Review missing, stale (>7 days), or has open issues
-- CEO and Design reviews are shown for context but never block shipping
-- If \\\`skip_eng_review\\\` config is \\\`true\\\`, Eng Review shows "SKIPPED (global)" and verdict is CLEARED`;
+- CEO, Design, and Codex reviews are shown for context but never block shipping
+- If \\\`skip_eng_review\\\` config is \\\`true\\\`, Eng Review shows "SKIPPED (global)" and verdict is CLEARED
+
+**Staleness detection:** After displaying the dashboard, check if any existing reviews may be stale:
+- Parse the \\\`---HEAD---\\\` section from the bash output to get the current HEAD commit hash
+- For each review entry that has a \\\`commit\\\` field: compare it against the current HEAD. If different, count elapsed commits: \\\`git rev-list --count STORED_COMMIT..HEAD\\\`. Display: "Note: {skill} review from {date} may be stale — {N} commits since review"
+- For entries without a \\\`commit\\\` field (legacy entries): display "Note: {skill} review from {date} has no commit tracking — consider re-running for accurate staleness detection"
+- If all reviews match the current HEAD, do not display any staleness notes`;
 }
 
-function generateTestBootstrap(): string {
+function generatePlanFileReviewReport(_ctx: TemplateContext): string {
+  return `## Plan File Review Report
+
+After displaying the Review Readiness Dashboard in conversation output, also update the
+**plan file** itself so review status is visible to anyone reading the plan.
+
+### Detect the plan file
+
+1. Check if there is an active plan file in this conversation (the host provides plan file
+   paths in system messages — look for plan file references in the conversation context).
+2. If not found, skip this section silently — not every review runs in plan mode.
+
+### Generate the report
+
+Read the review log output you already have from the Review Readiness Dashboard step above.
+Parse each JSONL entry. Each skill logs different fields:
+
+- **plan-ceo-review**: \\\`status\\\`, \\\`unresolved\\\`, \\\`critical_gaps\\\`, \\\`mode\\\`, \\\`scope_proposed\\\`, \\\`scope_accepted\\\`, \\\`scope_deferred\\\`, \\\`commit\\\`
+  → Findings: "{scope_proposed} proposals, {scope_accepted} accepted, {scope_deferred} deferred"
+  → If scope fields are 0 or missing (HOLD/REDUCTION mode): "mode: {mode}, {critical_gaps} critical gaps"
+- **plan-eng-review**: \\\`status\\\`, \\\`unresolved\\\`, \\\`critical_gaps\\\`, \\\`issues_found\\\`, \\\`mode\\\`, \\\`commit\\\`
+  → Findings: "{issues_found} issues, {critical_gaps} critical gaps"
+- **plan-design-review**: \\\`status\\\`, \\\`initial_score\\\`, \\\`overall_score\\\`, \\\`unresolved\\\`, \\\`decisions_made\\\`, \\\`commit\\\`
+  → Findings: "score: {initial_score}/10 → {overall_score}/10, {decisions_made} decisions"
+- **codex-review**: \\\`status\\\`, \\\`gate\\\`, \\\`findings\\\`, \\\`findings_fixed\\\`
+  → Findings: "{findings} findings, {findings_fixed}/{findings} fixed"
+
+All fields needed for the Findings column are now present in the JSONL entries.
+For the review you just completed, you may use richer details from your own Completion
+Summary. For prior reviews, use the JSONL fields directly — they contain all required data.
+
+Produce this markdown table:
+
+\\\`\\\`\\\`markdown
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | \\\`/plan-ceo-review\\\` | Scope & strategy | {runs} | {status} | {findings} |
+| Codex Review | \\\`/codex review\\\` | Independent 2nd opinion | {runs} | {status} | {findings} |
+| Eng Review | \\\`/plan-eng-review\\\` | Architecture & tests (required) | {runs} | {status} | {findings} |
+| Design Review | \\\`/plan-design-review\\\` | UI/UX gaps | {runs} | {status} | {findings} |
+\\\`\\\`\\\`
+
+Below the table, add these lines (omit any that are empty/not applicable):
+
+- **CODEX:** (only if codex-review ran) — one-line summary of codex fixes
+- **CROSS-MODEL:** (only if both Claude and Codex reviews exist) — overlap analysis
+- **UNRESOLVED:** total unresolved decisions across all reviews
+- **VERDICT:** list reviews that are CLEAR (e.g., "CEO + ENG CLEARED — ready to implement").
+  If Eng Review is not CLEAR and not skipped globally, append "eng review required".
+
+### Write to the plan file
+
+**PLAN MODE EXCEPTION — ALWAYS RUN:** This writes to the plan file, which is the one
+file you are allowed to edit in plan mode. The plan file review report is part of the
+plan's living status.
+
+- Search the plan file for a \\\`## GSTACK REVIEW REPORT\\\` section **anywhere** in the file
+  (not just at the end — content may have been added after it).
+- If found, **replace it** entirely using the Edit tool. Match from \\\`## GSTACK REVIEW REPORT\\\`
+  through either the next \\\`## \\\` heading or end of file, whichever comes first. This ensures
+  content added after the report section is preserved, not eaten. If the Edit fails
+  (e.g., concurrent edit changed the content), re-read the plan file and retry once.
+- If no such section exists, **append it** to the end of the plan file.
+- Always place it as the very last section in the plan file. If it was found mid-file,
+  move it: delete the old location and append at the end.`;
+}
+
+function generateTestBootstrap(_ctx: TemplateContext): string {
   return `## Test Framework Bootstrap
 
 **Detect existing test framework and project runtime:**
@@ -1153,7 +1354,337 @@ Only commit if there are changes. Stage all bootstrap files (config, test direct
 ---`;
 }
 
-const RESOLVERS: Record<string, () => string> = {
+function generateSpecReviewLoop(_ctx: TemplateContext): string {
+  return `## Spec Review Loop
+
+Before presenting the document to the user for approval, run an adversarial review.
+
+**Step 1: Dispatch reviewer subagent**
+
+Use the Agent tool to dispatch an independent reviewer. The reviewer has fresh context
+and cannot see the brainstorming conversation — only the document. This ensures genuine
+adversarial independence.
+
+Prompt the subagent with:
+- The file path of the document just written
+- "Read this document and review it on 5 dimensions. For each dimension, note PASS or
+  list specific issues with suggested fixes. At the end, output a quality score (1-10)
+  across all dimensions."
+
+**Dimensions:**
+1. **Completeness** — Are all requirements addressed? Missing edge cases?
+2. **Consistency** — Do parts of the document agree with each other? Contradictions?
+3. **Clarity** — Could an engineer implement this without asking questions? Ambiguous language?
+4. **Scope** — Does the document creep beyond the original problem? YAGNI violations?
+5. **Feasibility** — Can this actually be built with the stated approach? Hidden complexity?
+
+The subagent should return:
+- A quality score (1-10)
+- PASS if no issues, or a numbered list of issues with dimension, description, and fix
+
+**Step 2: Fix and re-dispatch**
+
+If the reviewer returns issues:
+1. Fix each issue in the document on disk (use Edit tool)
+2. Re-dispatch the reviewer subagent with the updated document
+3. Maximum 3 iterations total
+
+**Convergence guard:** If the reviewer returns the same issues on consecutive iterations
+(the fix didn't resolve them or the reviewer disagrees with the fix), stop the loop
+and persist those issues as "Reviewer Concerns" in the document rather than looping
+further.
+
+If the subagent fails, times out, or is unavailable — skip the review loop entirely.
+Tell the user: "Spec review unavailable — presenting unreviewed doc." The document is
+already written to disk; the review is a quality bonus, not a gate.
+
+**Step 3: Report and persist metrics**
+
+After the loop completes (PASS, max iterations, or convergence guard):
+
+1. Tell the user the result — summary by default:
+   "Your doc survived N rounds of adversarial review. M issues caught and fixed.
+   Quality score: X/10."
+   If they ask "what did the reviewer find?", show the full reviewer output.
+
+2. If issues remain after max iterations or convergence, add a "## Reviewer Concerns"
+   section to the document listing each unresolved issue. Downstream skills will see this.
+
+3. Append metrics:
+\`\`\`bash
+mkdir -p ~/.gstack/analytics
+echo '{"skill":"${_ctx.skillName}","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","iterations":ITERATIONS,"issues_found":FOUND,"issues_fixed":FIXED,"remaining":REMAINING,"quality_score":SCORE}' >> ~/.gstack/analytics/spec-review.jsonl 2>/dev/null || true
+\`\`\`
+Replace ITERATIONS, FOUND, FIXED, REMAINING, SCORE with actual values from the review.`;
+}
+
+function generateBenefitsFrom(ctx: TemplateContext): string {
+  if (!ctx.benefitsFrom || ctx.benefitsFrom.length === 0) return '';
+
+  const skillList = ctx.benefitsFrom.map(s => `\`/${s}\``).join(' or ');
+  const first = ctx.benefitsFrom[0];
+
+  return `## Prerequisite Skill Offer
+
+When the design doc check above prints "No design doc found," offer the prerequisite
+skill before proceeding.
+
+Say to the user via AskUserQuestion:
+
+> "No design doc found for this branch. ${skillList} produces a structured problem
+> statement, premise challenge, and explored alternatives — it gives this review much
+> sharper input to work with. Takes about 10 minutes. The design doc is per-feature,
+> not per-product — it captures the thinking behind this specific change."
+
+Options:
+- A) Run /${first} first (in another window, then come back)
+- B) Skip — proceed with standard review
+
+If they skip: "No worries — standard review. If you ever want sharper input, try
+/${first} first next time." Then proceed normally. Do not re-offer later in the session.`;
+}
+
+function generateDesignSketch(_ctx: TemplateContext): string {
+  return `## Visual Sketch (UI ideas only)
+
+If the chosen approach involves user-facing UI (screens, pages, forms, dashboards,
+or interactive elements), generate a rough wireframe to help the user visualize it.
+If the idea is backend-only, infrastructure, or has no UI component — skip this
+section silently.
+
+**Step 1: Gather design context**
+
+1. Check if \`DESIGN.md\` exists in the repo root. If it does, read it for design
+   system constraints (colors, typography, spacing, component patterns). Use these
+   constraints in the wireframe.
+2. Apply core design principles:
+   - **Information hierarchy** — what does the user see first, second, third?
+   - **Interaction states** — loading, empty, error, success, partial
+   - **Edge case paranoia** — what if the name is 47 chars? Zero results? Network fails?
+   - **Subtraction default** — "as little design as possible" (Rams). Every element earns its pixels.
+   - **Design for trust** — every interface element builds or erodes user trust.
+
+**Step 2: Generate wireframe HTML**
+
+Generate a single-page HTML file with these constraints:
+- **Intentionally rough aesthetic** — use system fonts, thin gray borders, no color,
+  hand-drawn-style elements. This is a sketch, not a polished mockup.
+- Self-contained — no external dependencies, no CDN links, inline CSS only
+- Show the core interaction flow (1-3 screens/states max)
+- Include realistic placeholder content (not "Lorem ipsum" — use content that
+  matches the actual use case)
+- Add HTML comments explaining design decisions
+
+Write to a temp file:
+\`\`\`bash
+SKETCH_FILE="/tmp/gstack-sketch-$(date +%s).html"
+\`\`\`
+
+**Step 3: Render and capture**
+
+\`\`\`bash
+$B goto "file://$SKETCH_FILE"
+$B screenshot /tmp/gstack-sketch.png
+\`\`\`
+
+If \`$B\` is not available (browse binary not set up), skip the render step. Tell the
+user: "Visual sketch requires the browse binary. Run the setup script to enable it."
+
+**Step 4: Present and iterate**
+
+Show the screenshot to the user. Ask: "Does this feel right? Want to iterate on the layout?"
+
+If they want changes, regenerate the HTML with their feedback and re-render.
+If they approve or say "good enough," proceed.
+
+**Step 5: Include in design doc**
+
+Reference the wireframe screenshot in the design doc's "Recommended Approach" section.
+The screenshot file at \`/tmp/gstack-sketch.png\` can be referenced by downstream skills
+(\`/plan-design-review\`, \`/design-review\`) to see what was originally envisioned.`;
+}
+
+function generateAdversarialStep(ctx: TemplateContext): string {
+  // Codex host: strip entirely — Codex should never invoke itself
+  if (ctx.host === 'codex') return '';
+
+  const isShip = ctx.skillName === 'ship';
+  const stepNum = isShip ? '3.8' : '5.7';
+
+  return `## Step ${stepNum}: Adversarial review (auto-scaled)
+
+Adversarial review thoroughness scales automatically based on diff size. No configuration needed.
+
+**Detect diff size and tool availability:**
+
+\`\`\`bash
+DIFF_INS=$(git diff origin/<base> --stat | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo "0")
+DIFF_DEL=$(git diff origin/<base> --stat | tail -1 | grep -oE '[0-9]+ deletion' | grep -oE '[0-9]+' || echo "0")
+DIFF_TOTAL=$((DIFF_INS + DIFF_DEL))
+which codex 2>/dev/null && echo "CODEX_AVAILABLE" || echo "CODEX_NOT_AVAILABLE"
+# Respect old opt-out
+OLD_CFG=$(~/.claude/skills/gstack/bin/gstack-config get codex_reviews 2>/dev/null || true)
+echo "DIFF_SIZE: $DIFF_TOTAL"
+echo "OLD_CFG: \${OLD_CFG:-not_set}"
+\`\`\`
+
+If \`OLD_CFG\` is \`disabled\`: skip this step silently. Continue to the next step.
+
+**User override:** If the user explicitly requested a specific tier (e.g., "run all passes", "paranoid review", "full adversarial", "do all 4 passes", "thorough review"), honor that request regardless of diff size. Jump to the matching tier section.
+
+**Auto-select tier based on diff size:**
+- **Small (< 50 lines changed):** Skip adversarial review entirely. Print: "Small diff ($DIFF_TOTAL lines) — adversarial review skipped." Continue to the next step.
+- **Medium (50–199 lines changed):** Run Codex adversarial challenge (or Claude adversarial subagent if Codex unavailable). Jump to the "Medium tier" section.
+- **Large (200+ lines changed):** Run all remaining passes — Codex structured review + Claude adversarial subagent + Codex adversarial. Jump to the "Large tier" section.
+
+---
+
+### Medium tier (50–199 lines)
+
+Claude's structured review already ran. Now add a **cross-model adversarial challenge**.
+
+**If Codex is available:** run the Codex adversarial challenge. **If Codex is NOT available:** fall back to the Claude adversarial subagent instead.
+
+**Codex adversarial:**
+
+\`\`\`bash
+TMPERR_ADV=$(mktemp /tmp/codex-adv-XXXXXXXX)
+codex exec "Review the changes on this branch against the base branch. Run git diff origin/<base> to see the diff. Your job is to find ways this code will fail in production. Think like an attacker and a chaos engineer. Find edge cases, race conditions, security holes, resource leaks, failure modes, and silent data corruption paths. Be adversarial. Be thorough. No compliments — just the problems." -s read-only -c 'model_reasoning_effort="xhigh"' --enable web_search_cached 2>"$TMPERR_ADV"
+\`\`\`
+
+Use a 5-minute timeout (\`timeout: 300000\`). After the command completes, read stderr:
+\`\`\`bash
+cat "$TMPERR_ADV"
+\`\`\`
+
+Present the full output verbatim. This is informational — it never blocks shipping.
+
+**Error handling:** All errors are non-blocking — adversarial review is a quality enhancement, not a prerequisite.
+- **Auth failure:** If stderr contains "auth", "login", "unauthorized", or "API key": "Codex authentication failed. Run \\\`codex login\\\` to authenticate."
+- **Timeout:** "Codex timed out after 5 minutes."
+- **Empty response:** "Codex returned no response. Stderr: <paste relevant error>."
+
+On any Codex error, fall back to the Claude adversarial subagent automatically.
+
+**Claude adversarial subagent** (fallback when Codex unavailable or errored):
+
+Dispatch via the Agent tool. The subagent has fresh context — no checklist bias from the structured review. This genuine independence catches things the primary reviewer is blind to.
+
+Subagent prompt:
+"Read the diff for this branch with \`git diff origin/<base>\`. Think like an attacker and a chaos engineer. Your job is to find ways this code will fail in production. Look for: edge cases, race conditions, security holes, resource leaks, failure modes, silent data corruption, logic errors that produce wrong results silently, error handling that swallows failures, and trust boundary violations. Be adversarial. Be thorough. No compliments — just the problems. For each finding, classify as FIXABLE (you know how to fix it) or INVESTIGATE (needs human judgment)."
+
+Present findings under an \`ADVERSARIAL REVIEW (Claude subagent):\` header. **FIXABLE findings** flow into the same Fix-First pipeline as the structured review. **INVESTIGATE findings** are presented as informational.
+
+If the subagent fails or times out: "Claude adversarial subagent unavailable. Continuing without adversarial review."
+
+**Persist the review result:**
+\`\`\`bash
+~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"adversarial-review","timestamp":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","status":"STATUS","source":"SOURCE","tier":"medium","commit":"'"$(git rev-parse --short HEAD)"'"}'
+\`\`\`
+Substitute STATUS: "clean" if no findings, "issues_found" if findings exist. SOURCE: "codex" if Codex ran, "claude" if subagent ran. If both failed, do NOT persist.
+
+**Cleanup:** Run \`rm -f "$TMPERR_ADV"\` after processing (if Codex was used).
+
+---
+
+### Large tier (200+ lines)
+
+Claude's structured review already ran. Now run **all three remaining passes** for maximum coverage:
+
+**1. Codex structured review (if available):**
+\`\`\`bash
+TMPERR=$(mktemp /tmp/codex-review-XXXXXXXX)
+codex review --base <base> -c 'model_reasoning_effort="xhigh"' --enable web_search_cached 2>"$TMPERR"
+\`\`\`
+
+Use a 5-minute timeout. Present output under \`CODEX SAYS (code review):\` header.
+Check for \`[P1]\` markers: found → \`GATE: FAIL\`, not found → \`GATE: PASS\`.
+
+If GATE is FAIL, use AskUserQuestion:
+\`\`\`
+Codex found N critical issues in the diff.
+
+A) Investigate and fix now (recommended)
+B) Continue — review will still complete
+\`\`\`
+
+If A: address the findings${isShip ? '. After fixing, re-run tests (Step 3) since code has changed' : ''}. Re-run \`codex review\` to verify.
+
+Read stderr for errors (same error handling as medium tier).
+
+After stderr: \`rm -f "$TMPERR"\`
+
+**2. Claude adversarial subagent:** Dispatch a subagent with the adversarial prompt (same prompt as medium tier). This always runs regardless of Codex availability.
+
+**3. Codex adversarial challenge (if available):** Run \`codex exec\` with the adversarial prompt (same as medium tier).
+
+If Codex is not available for steps 1 and 3, note to the user: "Codex CLI not found — large-diff review ran Claude structured + Claude adversarial (2 of 4 passes). Install Codex for full 4-pass coverage: \`npm install -g @openai/codex\`"
+
+**Persist the review result AFTER all passes complete** (not after each sub-step):
+\`\`\`bash
+~/.claude/skills/gstack/bin/gstack-review-log '{"skill":"adversarial-review","timestamp":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","status":"STATUS","source":"SOURCE","tier":"large","gate":"GATE","commit":"'"$(git rev-parse --short HEAD)"'"}'
+\`\`\`
+Substitute: STATUS = "clean" if no findings across ALL passes, "issues_found" if any pass found issues. SOURCE = "both" if Codex ran, "claude" if only Claude subagent ran. GATE = the Codex structured review gate result ("pass"/"fail"), or "informational" if Codex was unavailable. If all passes failed, do NOT persist.
+
+---
+
+### Cross-model synthesis (medium and large tiers)
+
+After all passes complete, synthesize findings across all sources:
+
+\`\`\`
+ADVERSARIAL REVIEW SYNTHESIS (auto: TIER, N lines):
+════════════════════════════════════════════════════════════
+  High confidence (found by multiple sources): [findings agreed on by >1 pass]
+  Unique to Claude structured review: [from earlier step]
+  Unique to Claude adversarial: [from subagent, if ran]
+  Unique to Codex: [from codex adversarial or code review, if ran]
+  Models used: Claude structured ✓  Claude adversarial ✓/✗  Codex ✓/✗
+════════════════════════════════════════════════════════════
+\`\`\`
+
+High-confidence findings (agreed on by multiple sources) should be prioritized for fixes.
+
+---`;
+}
+
+function generateDeployBootstrap(_ctx: TemplateContext): string {
+  return `\`\`\`bash
+# Check for persisted deploy config in CLAUDE.md
+DEPLOY_CONFIG=$(grep -A 20 "## Deploy Configuration" CLAUDE.md 2>/dev/null || echo "NO_CONFIG")
+echo "$DEPLOY_CONFIG"
+
+# If config exists, parse it
+if [ "$DEPLOY_CONFIG" != "NO_CONFIG" ]; then
+  PROD_URL=$(echo "$DEPLOY_CONFIG" | grep -i "production.*url" | head -1 | sed 's/.*: *//')
+  PLATFORM=$(echo "$DEPLOY_CONFIG" | grep -i "platform" | head -1 | sed 's/.*: *//')
+  echo "PERSISTED_PLATFORM:$PLATFORM"
+  echo "PERSISTED_URL:$PROD_URL"
+fi
+
+# Auto-detect platform from config files
+[ -f fly.toml ] && echo "PLATFORM:fly"
+[ -f render.yaml ] && echo "PLATFORM:render"
+([ -f vercel.json ] || [ -d .vercel ]) && echo "PLATFORM:vercel"
+[ -f netlify.toml ] && echo "PLATFORM:netlify"
+[ -f Procfile ] && echo "PLATFORM:heroku"
+([ -f railway.json ] || [ -f railway.toml ]) && echo "PLATFORM:railway"
+
+# Detect deploy workflows
+for f in .github/workflows/*.yml .github/workflows/*.yaml; do
+  [ -f "$f" ] && grep -qiE "deploy|release|production|staging|cd" "$f" 2>/dev/null && echo "DEPLOY_WORKFLOW:$f"
+done
+\`\`\`
+
+If \`PERSISTED_PLATFORM\` and \`PERSISTED_URL\` were found in CLAUDE.md, use them directly
+and skip manual detection. If no persisted config exists, use the auto-detected platform
+to guide deploy verification. If nothing is detected, ask the user via AskUserQuestion
+in the decision tree below.
+
+If you want to persist deploy settings for future runs, suggest the user run \`/setup-deploy\`.`;
+}
+
+const RESOLVERS: Record<string, (ctx: TemplateContext) => string> = {
   COMMAND_REFERENCE: generateCommandReference,
   SNAPSHOT_FLAGS: generateSnapshotFlags,
   PREAMBLE: generatePreamble,
@@ -1163,29 +1694,177 @@ const RESOLVERS: Record<string, () => string> = {
   DESIGN_METHODOLOGY: generateDesignMethodology,
   DESIGN_REVIEW_LITE: generateDesignReviewLite,
   REVIEW_DASHBOARD: generateReviewDashboard,
+  PLAN_FILE_REVIEW_REPORT: generatePlanFileReviewReport,
   TEST_BOOTSTRAP: generateTestBootstrap,
+  SPEC_REVIEW_LOOP: generateSpecReviewLoop,
+  DESIGN_SKETCH: generateDesignSketch,
+  BENEFITS_FROM: generateBenefitsFrom,
+  CODEX_REVIEW_STEP: generateAdversarialStep,
+  ADVERSARIAL_STEP: generateAdversarialStep,
+  DEPLOY_BOOTSTRAP: generateDeployBootstrap,
 };
+
+// ─── Codex Helpers ───────────────────────────────────────────
+
+function codexSkillName(skillDir: string): string {
+  if (skillDir === '.' || skillDir === '') return 'gstack';
+  // Don't double-prefix: gstack-upgrade → gstack-upgrade (not gstack-gstack-upgrade)
+  if (skillDir.startsWith('gstack-')) return skillDir;
+  return `gstack-${skillDir}`;
+}
+
+/**
+ * Transform frontmatter for Codex: keep only name + description.
+ * Strips allowed-tools, hooks, version, and all other fields.
+ * Handles multiline block scalar descriptions (YAML | syntax).
+ */
+function transformFrontmatter(content: string, host: Host): string {
+  if (host === 'claude') return content;
+
+  // Find frontmatter boundaries
+  const fmStart = content.indexOf('---\n');
+  if (fmStart !== 0) return content; // frontmatter must be at the start
+  const fmEnd = content.indexOf('\n---', fmStart + 4);
+  if (fmEnd === -1) return content;
+
+  const frontmatter = content.slice(fmStart + 4, fmEnd);
+  const body = content.slice(fmEnd + 4); // includes the leading \n after ---
+
+  // Parse name
+  const nameMatch = frontmatter.match(/^name:\s*(.+)$/m);
+  const name = nameMatch ? nameMatch[1].trim() : '';
+
+  // Parse description — handle both simple and block scalar (|) formats
+  let description = '';
+  const lines = frontmatter.split('\n');
+  let inDescription = false;
+  const descLines: string[] = [];
+  for (const line of lines) {
+    if (line.match(/^description:\s*\|?\s*$/)) {
+      // Block scalar start: "description: |" or "description:"
+      inDescription = true;
+      continue;
+    }
+    if (line.match(/^description:\s*\S/)) {
+      // Simple inline: "description: some text"
+      description = line.replace(/^description:\s*/, '').trim();
+      break;
+    }
+    if (inDescription) {
+      // Block scalar continuation — indented lines (2 spaces) or blank lines
+      if (line === '' || line.match(/^\s/)) {
+        descLines.push(line.replace(/^  /, ''));
+      } else {
+        // End of block scalar — hit a non-indented, non-blank line
+        break;
+      }
+    }
+  }
+  if (descLines.length > 0) {
+    description = descLines.join('\n').trim();
+  }
+
+  // Re-emit Codex frontmatter (name + description only)
+  const indentedDesc = description.split('\n').map(l => `  ${l}`).join('\n');
+  const codexFm = `---\nname: ${name}\ndescription: |\n${indentedDesc}\n---`;
+  return codexFm + body;
+}
+
+/**
+ * Extract hook descriptions from frontmatter for inline safety prose.
+ * Returns a description of what the hooks do, or null if no hooks.
+ */
+function extractHookSafetyProse(tmplContent: string): string | null {
+  if (!tmplContent.match(/^hooks:/m)) return null;
+
+  // Parse the hook matchers to build a human-readable safety description
+  const matchers: string[] = [];
+  const matcherRegex = /matcher:\s*"(\w+)"/g;
+  let m;
+  while ((m = matcherRegex.exec(tmplContent)) !== null) {
+    if (!matchers.includes(m[1])) matchers.push(m[1]);
+  }
+
+  if (matchers.length === 0) return null;
+
+  // Build safety prose based on what tools are hooked
+  const toolDescriptions: Record<string, string> = {
+    Bash: 'check bash commands for destructive operations (rm -rf, DROP TABLE, force-push, git reset --hard, etc.) before execution',
+    Edit: 'verify file edits are within the allowed scope boundary before applying',
+    Write: 'verify file writes are within the allowed scope boundary before applying',
+  };
+
+  const safetyChecks = matchers
+    .map(t => toolDescriptions[t] || `check ${t} operations for safety`)
+    .join(', and ');
+
+  return `> **Safety Advisory:** This skill includes safety checks that ${safetyChecks}. When using this skill, always pause and verify before executing potentially destructive operations. If uncertain about a command's safety, ask the user for confirmation before proceeding.`;
+}
 
 // ─── Template Processing ────────────────────────────────────
 
 const GENERATED_HEADER = `<!-- AUTO-GENERATED from {{SOURCE}} — do not edit directly -->\n<!-- Regenerate: bun run gen:skill-docs -->\n`;
 
-function processTemplate(tmplPath: string): { outputPath: string; content: string } {
+function processTemplate(tmplPath: string, host: Host = 'claude'): { outputPath: string; content: string } {
   const tmplContent = fs.readFileSync(tmplPath, 'utf-8');
   const relTmplPath = path.relative(ROOT, tmplPath);
-  const outputPath = tmplPath.replace(/\.tmpl$/, '');
+  let outputPath = tmplPath.replace(/\.tmpl$/, '');
+
+  // Determine skill directory relative to ROOT
+  const skillDir = path.relative(ROOT, path.dirname(tmplPath));
+
+  // For codex host, route output to .agents/skills/{codexSkillName}/SKILL.md
+  if (host === 'codex') {
+    const codexName = codexSkillName(skillDir === '.' ? '' : skillDir);
+    const outputDir = path.join(ROOT, '.agents', 'skills', codexName);
+    fs.mkdirSync(outputDir, { recursive: true });
+    outputPath = path.join(outputDir, 'SKILL.md');
+  }
+
+  // Extract skill name from frontmatter for TemplateContext
+  const nameMatch = tmplContent.match(/^name:\s*(.+)$/m);
+  const skillName = nameMatch ? nameMatch[1].trim() : path.basename(path.dirname(tmplPath));
+
+  // Extract benefits-from list from frontmatter (inline YAML: benefits-from: [a, b])
+  const benefitsMatch = tmplContent.match(/^benefits-from:\s*\[([^\]]*)\]/m);
+  const benefitsFrom = benefitsMatch
+    ? benefitsMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+    : undefined;
+
+  const ctx: TemplateContext = { skillName, tmplPath, benefitsFrom, host, paths: HOST_PATHS[host] };
 
   // Replace placeholders
   let content = tmplContent.replace(/\{\{(\w+)\}\}/g, (match, name) => {
     const resolver = RESOLVERS[name];
     if (!resolver) throw new Error(`Unknown placeholder {{${name}}} in ${relTmplPath}`);
-    return resolver();
+    return resolver(ctx);
   });
 
   // Check for any remaining unresolved placeholders
   const remaining = content.match(/\{\{(\w+)\}\}/g);
   if (remaining) {
     throw new Error(`Unresolved placeholders in ${relTmplPath}: ${remaining.join(', ')}`);
+  }
+
+  // For codex host: transform frontmatter and replace Claude-specific paths
+  if (host === 'codex') {
+    // Extract hook safety prose BEFORE transforming frontmatter (which strips hooks)
+    const safetyProse = extractHookSafetyProse(tmplContent);
+
+    // Transform frontmatter: keep only name + description
+    content = transformFrontmatter(content, host);
+
+    // Insert safety advisory at the top of the body (after frontmatter)
+    if (safetyProse) {
+      const bodyStart = content.indexOf('\n---') + 4;
+      content = content.slice(0, bodyStart) + '\n' + safetyProse + '\n' + content.slice(bodyStart);
+    }
+
+    // Replace remaining hardcoded Claude paths with host-appropriate paths
+    content = content.replace(/~\/\.claude\/skills\/gstack/g, ctx.paths.skillRoot);
+    content = content.replace(/\.claude\/skills\/gstack/g, ctx.paths.localSkillRoot);
+    content = content.replace(/\.claude\/skills\/review/g, '.agents/skills/gstack/review');
+    content = content.replace(/\.claude\/skills/g, '.agents/skills');
   }
 
   // Prepend generated header (after frontmatter)
@@ -1205,28 +1884,13 @@ function processTemplate(tmplPath: string): { outputPath: string; content: strin
 
 function findTemplates(): string[] {
   const templates: string[] = [];
-  const candidates = [
-    path.join(ROOT, 'SKILL.md.tmpl'),
-    path.join(ROOT, 'browse', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'qa', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'qa-only', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'setup-browser-cookies', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'ship', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'plan-ceo-review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'plan-eng-review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'retro', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'office-hours', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'debug', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'gstack-upgrade', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'plan-design-review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'design-review', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'design-consultation', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'perf', 'SKILL.md.tmpl'),
-    path.join(ROOT, 'document-release', 'SKILL.md.tmpl'),
-  ];
-  for (const p of candidates) {
-    if (fs.existsSync(p)) templates.push(p);
+  const rootTmpl = path.join(ROOT, 'SKILL.md.tmpl');
+  if (fs.existsSync(rootTmpl)) templates.push(rootTmpl);
+
+  for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+    const tmpl = path.join(ROOT, entry.name, 'SKILL.md.tmpl');
+    if (fs.existsSync(tmpl)) templates.push(tmpl);
   }
   return templates;
 }
@@ -1234,7 +1898,13 @@ function findTemplates(): string[] {
 let hasChanges = false;
 
 for (const tmplPath of findTemplates()) {
-  const { outputPath, content } = processTemplate(tmplPath);
+  // Skip /codex skill for codex host (self-referential — it's a Claude wrapper around codex exec)
+  if (HOST === 'codex') {
+    const dir = path.basename(path.dirname(tmplPath));
+    if (dir === 'codex') continue;
+  }
+
+  const { outputPath, content } = processTemplate(tmplPath, HOST);
   const relOutput = path.relative(ROOT, outputPath);
 
   if (DRY_RUN) {

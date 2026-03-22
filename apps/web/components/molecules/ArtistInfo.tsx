@@ -45,34 +45,35 @@ export function ArtistInfo({
     xl: { mobile: 'display-lg', desktop: 'display-2xl' },
   } as const;
 
-  const { mobile: mobileSize, desktop: desktopSize } =
-    avatarSizeMap[avatarSize];
+  const { desktop: desktopSize } = avatarSizeMap[avatarSize];
+
+  const avatarResponsiveClassName = {
+    sm: 'h-28 w-28 sm:h-28 sm:w-28',
+    md: 'h-32 w-32 sm:h-40 sm:w-40',
+    lg: 'h-32 w-32 sm:h-48 sm:w-48',
+    xl: 'h-40 w-40 sm:h-56 sm:w-56',
+  }[avatarSize];
+
+  const avatarResponsiveSizes = {
+    'display-sm': '(max-width: 639px) 112px, 112px',
+    'display-md': '(max-width: 639px) 128px, 128px',
+    'display-lg': '(max-width: 639px) 128px, 160px',
+    'display-xl': '(max-width: 639px) 128px, 192px',
+    'display-2xl': '(max-width: 639px) 160px, 224px',
+  }[desktopSize];
 
   const avatarContent = (
     <div className='rounded-full p-[2px] ring-1 ring-black/5 dark:ring-white/6 shadow-sm'>
-      {/* Render mobile size by default, desktop size at sm breakpoint */}
-      <div className='sm:hidden'>
-        <Avatar
-          src={artist.image_url || ''}
-          alt={artist.name}
-          name={artist.name}
-          size={mobileSize}
-          priority
-          verified={false}
-          className='ring-0 shadow-none'
-        />
-      </div>
-      <div className='hidden sm:block'>
-        <Avatar
-          src={artist.image_url || ''}
-          alt={artist.name}
-          name={artist.name}
-          size={desktopSize}
-          priority
-          verified={false}
-          className='ring-0 shadow-none'
-        />
-      </div>
+      <Avatar
+        src={artist.image_url || ''}
+        alt={artist.name}
+        name={artist.name}
+        size={desktopSize}
+        priority
+        verified={false}
+        sizes={avatarResponsiveSizes}
+        className={`ring-0 shadow-none ${avatarResponsiveClassName}`}
+      />
     </div>
   );
 

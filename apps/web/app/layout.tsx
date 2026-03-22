@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import Script from 'next/script';
 import React from 'react';
+import { DevToolbarGate } from '@/components/features/dev/DevToolbarGate';
 import { CoreProviders } from '@/components/providers/CoreProviders';
 import { APP_NAME, APP_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
@@ -149,18 +150,8 @@ export default async function RootLayout({
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-  // Dev toolbar: shown in dev/preview, or in production when __dev_toolbar cookie is set.
-  // Dynamic import means zero bundle cost for production users without the cookie.
-  const { cookies } = await import('next/headers');
-  const devCookieSet = (await cookies()).get('__dev_toolbar')?.value === '1';
-  const isProductionEnv =
-    process.env.NODE_ENV === 'production' &&
-    process.env.VERCEL_ENV === 'production';
-  const showDevToolbar =
-    (!isProductionEnv || devCookieSet) && !isE2EClientRuntime;
-  const DevToolbar = showDevToolbar
-    ? (await import('@/features/dev/DevToolbar')).DevToolbar
-    : null;
+  // Keep the root layout fully static for public/ISR routes. Dev toolbar visibility
+  // is resolved client-side so a production cookie doesn't force per-request SSR.
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
@@ -331,9 +322,12 @@ export default async function RootLayout({
       <body className={bodyClassName}>
         <CoreProviders>
           {children}
-          {DevToolbar && (
-            <DevToolbar env={devEnv} sha={devSha} version={devVersion} />
-          )}
+          <DevToolbarGate
+            disabled={isE2EClientRuntime}
+            env={devEnv}
+            sha={devSha}
+            version={devVersion}
+          />
         </CoreProviders>
 
         <CookieBannerSection />

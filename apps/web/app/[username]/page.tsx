@@ -2,7 +2,7 @@ import { type Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
-import { loadUpcomingTourDates } from '@/app/app/(shell)/dashboard/tour-dates/actions';
+import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { BASE_URL } from '@/constants/app';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { ClaimBanner } from '@/features/profile/ClaimBanner';
@@ -37,6 +37,7 @@ import {
 } from '@/lib/services/profile';
 import { getProfileSocialLinks } from '@/lib/services/profile/queries';
 import { isDspPlatform } from '@/lib/services/social-links/types';
+import { getUpcomingTourDatesForProfile } from '@/lib/tour-dates/queries';
 import { buildAvatarSizes } from '@/lib/utils/avatar-sizes';
 import { toISOStringOrFallback, toISOStringSafe } from '@/lib/utils/date';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
@@ -380,6 +381,16 @@ const getCachedLatestReleaseGate = unstable_cache(
   }
 );
 
+const getCachedProfileV2Gate = unstable_cache(
+  async () => {
+    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, false);
+  },
+  ['public-profile-v2-gate'],
+  {
+    revalidate: PROFILE_FLAG_CACHE_TTL_SECONDS,
+  }
+);
+
 const getCachedSubscribeCTAVariant = unstable_cache(
   async (profileId: string) => {
     return getSubscribeCTAVariant(profileId);
@@ -586,11 +597,12 @@ export default async function ArtistPage({
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
+  const profileV2Enabled = await getCachedProfileV2Gate();
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
   // via the StaticArtistPage component which reads cookies on hydration.
-  if (mode === 'listen') {
+  if (mode === 'listen' && !profileV2Enabled) {
     const { schemas, body } = await renderListenMode(
       username,
       isPublicNoAuthSmoke
@@ -658,11 +670,9 @@ export default async function ArtistPage({
     [
       getCachedLatestReleaseGate(),
       getCachedSubscribeCTAVariant(profile.id),
-      mode === 'tour'
-        ? loadUpcomingTourDates(profile.id)
-        : Promise.resolve(
-            [] as Awaited<ReturnType<typeof loadUpcomingTourDates>>
-          ),
+      profileV2Enabled || mode === 'tour'
+        ? getUpcomingTourDatesForProfile(profile.id)
+        : Promise.resolve([] as TourDateViewModel[]),
     ]
   );
 
@@ -735,6 +745,7 @@ export default async function ArtistPage({
         visitTrackingToken={visitTrackingToken}
         showSubscriptionConfirmedBanner={!isPublicNoAuthSmoke}
         showShopButton={isShopEnabled(profileSettings)}
+        profileV2Enabled={profileV2Enabled}
       />
       {isPublicNoAuthSmoke ? null : (
         <DesktopQrOverlayClient handle={artist.handle} />
@@ -753,7 +764,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
   const profileUrl = `${BASE_URL}/${profile.username}?mode=listen`;
 
   return {
-    title: `Listen to ${artistName}`,
+    title: `${artistName} | Jovie`,
     description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
     metadataBase: new URL(BASE_URL),
     alternates: {
@@ -761,7 +772,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
     },
     openGraph: {
       type: 'profile',
-      title: `Listen to ${artistName}`,
+      title: `${artistName} | Jovie`,
       description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
       url: profileUrl,
       siteName: 'Jovie',
@@ -777,7 +788,7 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
     },
     twitter: {
       card: 'summary_large_image',
-      title: `Listen to ${artistName}`,
+      title: `${artistName} | Jovie`,
       description: `Open ${artistName} on Spotify, Apple Music, and more from one Jovie listen page.`,
       creator: '@jovieapp',
       site: '@jovieapp',
@@ -789,14 +800,6 @@ function buildListenModeMetadata(profile: CreatorProfile): Metadata {
       ],
     },
   };
-}
-
-function buildGenreContext(genres: string[] | null): string {
-  if (!genres || genres.length === 0) {
-    return '';
-  }
-
-  return ` | ${genres.slice(0, 2).join(', ')} Artist`;
 }
 
 function buildProfileDescription(
@@ -821,7 +824,7 @@ function buildProfileMetadata(
 ): Metadata {
   const artistName = profile.display_name || profile.username;
   const profileUrl = `${BASE_URL}/${profile.username}`;
-  const title = `${artistName}${buildGenreContext(genres)} - Music & Links`;
+  const title = `${artistName} | Jovie`;
   const description = buildProfileDescription(profile, artistName, genres);
 
   const baseKeywords = [
@@ -860,7 +863,7 @@ function buildProfileMetadata(
     },
     openGraph: {
       type: 'profile',
-      title: `${artistName} - Artist Profile`,
+      title,
       description,
       url: profileUrl,
       siteName: 'Jovie',
@@ -876,7 +879,7 @@ function buildProfileMetadata(
     },
     twitter: {
       card: 'summary_large_image',
-      title: `${artistName} - Artist Profile`,
+      title,
       description,
       creator: '@jovieapp',
       site: '@jovieapp',
@@ -906,8 +909,9 @@ export async function generateMetadata({
   const { username } = await params;
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
+  const profileV2Enabled = await getCachedProfileV2Gate();
 
-  if (mode === 'listen') {
+  if (mode === 'listen' && !profileV2Enabled) {
     const lightweightProfile = await getLightweightProfile(username);
     return lightweightProfile
       ? buildListenModeMetadata(lightweightProfile.profile)

@@ -151,6 +151,16 @@ vi.mock('@/lib/dsp-enrichment/enrichment-status', () => ({
   setEnrichmentJobStatus: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Spotify blacklist — expose real blacklist for integration-like tests
+const mockIsBlacklistedSpotifyId = vi.fn((id: string) => {
+  // Mirror the real blacklist entry used in tests
+  return id === '59NJtiWq8nISIJjDtITQyt';
+});
+
+vi.mock('@/lib/spotify/blacklist', () => ({
+  isBlacklistedSpotifyId: (id: string) => mockIsBlacklistedSpotifyId(id),
+}));
+
 // Mock DB transaction
 const mockTxSelect = vi.fn();
 const mockTxUpdate = vi.fn();
@@ -680,6 +690,86 @@ describe('musicfetch-enrichment', () => {
       );
 
       expect(result.dspFieldsUpdated).not.toContain('avatarUrl');
+    });
+
+    it('blocks entire enrichment for blacklisted Spotify URL', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        image: { url: 'https://i.scdn.co/image/wrong-artist-photo.jpg' },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({
+          avatarUrl: null,
+          spotifyId: null,
+          spotifyUrl: null,
+        }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      const result = await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload({
+          spotifyUrl: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
+        })
+      );
+
+      // Entire enrichment should be skipped
+      expect(result.dspFieldsUpdated).toHaveLength(0);
+      expect(result.errors[0]).toContain('blacklisted');
+      expect(mockFetchArtistBySpotifyUrl).not.toHaveBeenCalled();
+    });
+
+    it('blocks discography import when both stored ID and URL are blacklisted', async () => {
+      const musicFetchResult = makeMusicFetchResult();
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({ spotifyId: '59NJtiWq8nISIJjDtITQyt' }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload({
+          spotifyUrl: 'https://open.spotify.com/artist/59NJtiWq8nISIJjDtITQyt',
+        })
+      );
+
+      // Guard 1 blocks entire enrichment when URL is blacklisted
+      expect(mockImportReleasesFromSpotify).not.toHaveBeenCalled();
+    });
+
+    it('recovers discography when stored ID is blacklisted but URL is correct', async () => {
+      const musicFetchResult = makeMusicFetchResult();
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+      mockTxLimit.mockResolvedValue([
+        makeProfile({ spotifyId: '59NJtiWq8nISIJjDtITQyt' }),
+      ]);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload({
+          spotifyUrl: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        })
+      );
+
+      // URL-derived ID is not blacklisted — discography import should proceed
+      expect(mockImportReleasesFromSpotify).toHaveBeenCalled();
     });
 
     it('YouTube URL falls back to YouTube Music when main YouTube unavailable', async () => {

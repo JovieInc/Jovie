@@ -301,18 +301,30 @@ export async function generateMetadata({
   const artistName = creator.displayName ?? creator.username;
   const title = `${release.title} by ${artistName}`;
   const description = `Listen to "${release.title}" by ${artistName} on your favorite streaming platform.`;
+  const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${release.slug}`;
+  const imageUrl = release.artworkUrl || `${BASE_URL}/og/default.png`;
+  const imageWidth = release.artworkUrl ? 640 : 1200;
+  const imageHeight = release.artworkUrl ? 640 : 630;
 
   return {
     title,
     description,
+    metadataBase: new URL(BASE_URL),
+    alternates: {
+      canonical: canonicalUrl,
+    },
     openGraph: {
+      type: 'music.album',
+      url: canonicalUrl,
       title,
       description,
+      siteName: 'Jovie',
+      locale: 'en_US',
       images: [
         {
-          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
-          width: release.artworkUrl ? 640 : 1200,
-          height: release.artworkUrl ? 640 : 630,
+          url: imageUrl,
+          width: imageWidth,
+          height: imageHeight,
           alt: `${release.title} album artwork`,
         },
       ],
@@ -321,9 +333,11 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
+      creator: '@jovieapp',
+      site: '@jovieapp',
       images: [
         {
-          url: release.artworkUrl || `${BASE_URL}/og/default.png`,
+          url: imageUrl,
           alt: `${release.title} album artwork`,
         },
       ],

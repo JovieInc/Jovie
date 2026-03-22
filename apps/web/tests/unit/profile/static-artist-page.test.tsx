@@ -51,6 +51,11 @@ vi.mock('@/features/profile/VenmoTipSelector', () => ({
     React.createElement('div', { 'data-testid': 'venmo-tip-selector' }),
 }));
 
+vi.mock('@/features/profile/templates/PublicProfileTemplateV2', () => ({
+  PublicProfileTemplateV2: () =>
+    React.createElement('div', { 'data-testid': 'public-profile-template-v2' }),
+}));
+
 vi.mock('@/lib/dsp', () => ({
   DSP_CONFIGS: {
     spotify: {
@@ -298,6 +303,58 @@ describe('StaticArtistPage', () => {
     );
 
     expect(screen.queryByTestId('latest-release-card')).toBeNull();
+  });
+
+  it('renders the V2 template when enabled', () => {
+    render(
+      <StaticArtistPage
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Artist'
+        showTipButton={false}
+        showBackButton={false}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+  });
+
+  it('keeps contact mode on the legacy template when V2 is enabled', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Contact'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.queryByTestId('public-profile-template-v2')).toBeNull();
+    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
+  });
+
+  it('still routes subscribe mode through the V2 template when enabled', () => {
+    render(
+      <StaticArtistPage
+        mode='subscribe'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Get notified'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
   });
 });
 

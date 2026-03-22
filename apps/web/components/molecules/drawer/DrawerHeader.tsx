@@ -16,13 +16,19 @@ export function DrawerHeader({ title, actions, className }: DrawerHeaderProps) {
     <div
       className={cn(
         'min-h-[38px] shrink-0 bg-transparent px-3 py-1.5',
-        'flex items-center justify-between',
+        'flex items-center justify-between gap-3',
         className
       )}
     >
-      <p className='truncate text-[12px] font-[560] tracking-[-0.012em] text-primary-token'>
-        {title}
-      </p>
+      <div className='min-w-0 flex-1'>
+        {typeof title === 'string' ? (
+          <p className='truncate text-[12px] font-[560] tracking-[-0.012em] text-primary-token'>
+            {title}
+          </p>
+        ) : (
+          title
+        )}
+      </div>
       {actions && <div className='flex items-center gap-1'>{actions}</div>}
     </div>
   );

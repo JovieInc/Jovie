@@ -21,10 +21,12 @@ interface OnboardingPageProps {
 }
 
 /**
- * Onboarding page - NO MORE REDIRECTS!
+ * Onboarding page.
  *
- * proxy.ts already routed us here, so we know the user needs onboarding.
- * Just render the onboarding form - no loop detection, no state checks, no redirects.
+ * proxy.ts routes users here when they need onboarding. The only redirect
+ * is an ACTIVE guard: if an already-active user reaches this page (via
+ * stale proxy cache, direct URL, or browser back button), redirect them
+ * to /app to break potential redirect loops.
  */
 export default async function OnboardingPage({
   searchParams,
@@ -34,8 +36,6 @@ export default async function OnboardingPage({
     process.env.E2E_FAST_ONBOARDING === '1' &&
     Boolean(resolvedSearchParams?.handle);
 
-  // proxy.ts already ensured user needsOnboarding
-  // Just get user data and render the form
   const authResult = await resolveUserState();
 
   // Gate blocked states — proxy normally prevents these from reaching here,
@@ -45,6 +45,12 @@ export default async function OnboardingPage({
   }
   if (authResult.state === UserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
+  }
+
+  // ACTIVE guard: break redirect loops caused by stale proxy cache or
+  // direct navigation. If the user is already active, send them to /app.
+  if (authResult.state === UserState.ACTIVE) {
+    redirect('/app');
   }
 
   // Defensive check: ensure we have a valid Clerk user ID
