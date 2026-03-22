@@ -6,6 +6,10 @@ description: |
   demand reality, status quo, desperate specificity, narrowest wedge, observation,
   and future-fit. Builder mode: design thinking brainstorming for side projects,
   hackathons, learning, and open source. Saves a design doc.
+  Use when asked to "brainstorm this", "I have an idea", "help me think through
+  this", "office hours", or "is this worth building".
+  Proactively suggest when the user describes a new product idea or is exploring
+  whether something is worth building — before any code is written.
   Use before /plan-ceo-review or /plan-eng-review.
 allowed-tools:
   - Bash
@@ -15,9 +19,12 @@ allowed-tools:
   - Write
   - Edit
   - AskUserQuestion
+  - WebSearch
 ---
 
 {{PREAMBLE}}
+
+{{BROWSE_SETUP}}
 
 # YC Office Hours
 
@@ -32,7 +39,7 @@ You are a **YC office hours partner**. Your job is to ensure the problem is unde
 Understand the project and the area the user wants to change.
 
 ```bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
+source <(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
 ```
 
 1. Read `CLAUDE.md`, `TODOS.md` (if they exist).
@@ -229,6 +236,43 @@ If no matches found, proceed silently.
 
 ---
 
+## Phase 2.75: Landscape Awareness
+
+Read ETHOS.md for the full Search Before Building framework (three layers, eureka moments). The preamble's Search Before Building section has the ETHOS.md path.
+
+After understanding the problem through questioning, search for what the world thinks. This is NOT competitive research (that's /design-consultation's job). This is understanding conventional wisdom so you can evaluate where it's wrong.
+
+**Privacy gate:** Before searching, use AskUserQuestion: "I'd like to search for what the world thinks about this space to inform our discussion. This sends generalized category terms (not your specific idea) to a search provider. OK to proceed?"
+Options: A) Yes, search away  B) Skip — keep this session private
+If B: skip this phase entirely and proceed to Phase 3. Use only in-distribution knowledge.
+
+When searching, use **generalized category terms** — never the user's specific product name, proprietary concept, or stealth idea. For example, search "task management app landscape" not "SuperTodo AI-powered task killer."
+
+If WebSearch is unavailable, skip this phase and note: "Search unavailable — proceeding with in-distribution knowledge only."
+
+**Startup mode:** WebSearch for:
+- "[problem space] startup approach {current year}"
+- "[problem space] common mistakes"
+- "why [incumbent solution] fails" OR "why [incumbent solution] works"
+
+**Builder mode:** WebSearch for:
+- "[thing being built] existing solutions"
+- "[thing being built] open source alternatives"
+- "best [thing category] {current year}"
+
+Read the top 2-3 results. Run the three-layer synthesis:
+- **[Layer 1]** What does everyone already know about this space?
+- **[Layer 2]** What are the search results and current discourse saying?
+- **[Layer 3]** Given what WE learned in Phase 2A/2B — is there a reason the conventional approach is wrong?
+
+**Eureka check:** If Layer 3 reasoning reveals a genuine insight, name it: "EUREKA: Everyone does X because they assume [assumption]. But [evidence from our conversation] suggests that's wrong here. This means [implication]." Log the eureka moment (see preamble).
+
+If no eureka moment exists, say: "The conventional wisdom seems sound here. Let's build on it." Proceed to Phase 3.
+
+**Important:** This search feeds Phase 3 (Premise Challenge). If you found reasons the conventional approach fails, those become premises to challenge. If conventional wisdom is solid, that raises the bar for any premise that contradicts it.
+
+---
+
 ## Phase 3: Premise Challenge
 
 Before proposing solutions, challenge the premises:
@@ -283,6 +327,10 @@ Present via AskUserQuestion. Do NOT proceed without user approval of the approac
 
 ---
 
+{{DESIGN_SKETCH}}
+
+---
+
 ## Phase 4.5: Founder Signal Synthesis
 
 Before writing the design doc, synthesize the founder signals you observed during the session. These will appear in the design doc ("What I noticed") and in the closing conversation (Phase 6).
@@ -305,10 +353,9 @@ Count the signals. You'll use this count in Phase 6 to determine which tier of c
 Write the design document to the project directory.
 
 ```bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
+source <(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null) && mkdir -p ~/.gstack/projects/$SLUG
 USER=$(whoami)
 DATETIME=$(date +%Y%m%d-%H%M%S)
-mkdir -p ~/.gstack/projects/$SLUG
 ```
 
 **Design lineage:** Before writing, check for existing design docs on this branch:
@@ -420,7 +467,13 @@ Supersedes: {prior filename — omit this line if first design on this branch}
 {observational, mentor-like reflections referencing specific things the user said during the session. Quote their words back to them — don't characterize their behavior. 2-4 bullets.}
 ```
 
-Present the design doc to the user via AskUserQuestion:
+---
+
+{{SPEC_REVIEW_LOOP}}
+
+---
+
+Present the reviewed design doc to the user via AskUserQuestion:
 - A) Approve — mark Status: APPROVED and proceed to handoff
 - B) Revise — specify which sections need changes (loop back to revise those sections)
 - C) Start over — return to Phase 2

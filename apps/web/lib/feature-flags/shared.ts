@@ -4,6 +4,7 @@
  */
 
 export const FEATURE_FLAG_KEYS = {
+  PROFILE_V2: 'feature_profile_v2',
   CLAIM_HANDLE: 'feature_claim_handle',
   HERO_SPOTIFY_CLAIM_FLOW: 'feature_hero_spotify_claim_flow',
   BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect',

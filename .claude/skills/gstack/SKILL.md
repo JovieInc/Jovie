@@ -7,6 +7,38 @@ description: |
   responsive layouts, test forms and uploads, handle dialogs, and assert element states.
   ~100ms per command. Use when you need to test a feature, verify a deployment, dogfood a
   user flow, or file a bug with evidence.
+
+  gstack also includes development workflow skills. When you notice the user is at
+  these stages, suggest the appropriate skill:
+  - Brainstorming a new idea → suggest /office-hours
+  - Reviewing a plan (strategy) → suggest /plan-ceo-review
+  - Reviewing a plan (architecture) → suggest /plan-eng-review
+  - Reviewing a plan (design) → suggest /plan-design-review
+  - Creating a design system → suggest /design-consultation
+  - Debugging errors → suggest /investigate
+  - Testing the app → suggest /qa
+  - Code review before merge → suggest /review
+  - Visual design audit → suggest /design-review
+  - Ready to deploy / create PR → suggest /ship
+  - Post-ship doc updates → suggest /document-release
+  - Weekly retrospective → suggest /retro
+  - Wanting a second opinion or adversarial code review → suggest /codex
+  - Working with production or live systems → suggest /careful
+  - Want to scope edits to one module/directory → suggest /freeze
+  - Maximum safety mode (destructive warnings + edit restrictions) → suggest /guard
+  - Removing edit restrictions → suggest /unfreeze
+  - Upgrading gstack to latest version → suggest /gstack-upgrade
+
+  If the user pushes back on skill suggestions ("stop suggesting things",
+  "I don't need suggestions", "too aggressive"):
+  1. Stop suggesting for the rest of this session
+  2. Run: gstack-config set proactive false
+  3. Say: "Got it — I'll stop suggesting skills. Just tell me to be proactive
+     again if you change your mind."
+
+  If the user says "be proactive again" or "turn on suggestions":
+  1. Run: gstack-config set proactive true
+  2. Say: "Proactive suggestions are back on."
 allowed-tools:
   - Bash
   - Read
@@ -26,13 +58,25 @@ touch ~/.gstack/sessions/"$PPID"
 _SESSIONS=$(find ~/.gstack/sessions -mmin -120 -type f 2>/dev/null | wc -l | tr -d ' ')
 find ~/.gstack/sessions -mmin +120 -type f -delete 2>/dev/null || true
 _CONTRIB=$(~/.claude/skills/gstack/bin/gstack-config get gstack_contributor 2>/dev/null || true)
-_AUTO_LAKE=$(~/.claude/skills/gstack/bin/gstack-config get auto_lake 2>/dev/null || echo "false")
-echo "AUTO_LAKE: $_AUTO_LAKE"
+_PROACTIVE=$(~/.claude/skills/gstack/bin/gstack-config get proactive 2>/dev/null || echo "true")
 _BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
 echo "BRANCH: $_BRANCH"
+echo "PROACTIVE: $_PROACTIVE"
 _LAKE_SEEN=$([ -f ~/.gstack/.completeness-intro-seen ] && echo "yes" || echo "no")
 echo "LAKE_INTRO: $_LAKE_SEEN"
+_TEL=$(~/.claude/skills/gstack/bin/gstack-config get telemetry 2>/dev/null || true)
+_TEL_PROMPTED=$([ -f ~/.gstack/.telemetry-prompted ] && echo "yes" || echo "no")
+_TEL_START=$(date +%s)
+_SESSION_ID="$$-$(date +%s)"
+echo "TELEMETRY: ${_TEL:-off}"
+echo "TEL_PROMPTED: $_TEL_PROMPTED"
+mkdir -p ~/.gstack/analytics
+echo '{"skill":"gstack","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
+for _PF in ~/.gstack/analytics/.pending-*; do [ -f "$_PF" ] && ~/.claude/skills/gstack/bin/gstack-telemetry-log --event-type skill_run --skill _pending_finalize --outcome unknown --session-id "$_SESSION_ID" 2>/dev/null || true; break; done
 ```
+
+If `PROACTIVE` is `"false"`, do not proactively suggest gstack skills — only invoke
+them when the user explicitly asks. The user opted out of proactive suggestions.
 
 If output shows `UPGRADE_AVAILABLE <old> <new>`: read `~/.claude/skills/gstack/gstack-upgrade/SKILL.md` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If `JUST_UPGRADED <from> <to>`: tell user "Running gstack v{to} (just updated!)" and continue.
 
@@ -48,9 +92,40 @@ touch ~/.gstack/.completeness-intro-seen
 
 Only run `open` if the user says yes. Always run `touch` to mark as seen. This only happens once.
 
-## AskUserQuestion Format
+If `TEL_PROMPTED` is `no` AND `LAKE_INTRO` is `yes`: After the lake intro is handled,
+ask the user about telemetry. Use AskUserQuestion:
 
-**Before calling AskUserQuestion:** If `AUTO_LAKE` is `true`, classify the decision using the Auto-Lake Decision Tree below. If it is a resource-cost decision, auto-resolve it (choose the complete option) and log with `[AUTO-LAKE]` instead of asking. Only proceed with AskUserQuestion for human decisions.
+> Help gstack get better! Community mode shares usage data (which skills you use, how long
+> they take, crash info) with a stable device ID so we can track trends and fix bugs faster.
+> No code, file paths, or repo names are ever sent.
+> Change anytime with `gstack-config set telemetry off`.
+
+Options:
+- A) Help gstack get better! (recommended)
+- B) No thanks
+
+If A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry community`
+
+If B: ask a follow-up AskUserQuestion:
+
+> How about anonymous mode? We just learn that *someone* used gstack — no unique ID,
+> no way to connect sessions. Just a counter that helps us know if anyone's out there.
+
+Options:
+- A) Sure, anonymous is fine
+- B) No thanks, fully off
+
+If B→A: run `~/.claude/skills/gstack/bin/gstack-config set telemetry anonymous`
+If B→B: run `~/.claude/skills/gstack/bin/gstack-config set telemetry off`
+
+Always run:
+```bash
+touch ~/.gstack/.telemetry-prompted
+```
+
+This only happens once. If `TEL_PROMPTED` is `yes`, skip this entirely.
+
+## AskUserQuestion Format
 
 **ALWAYS follow this structure for every AskUserQuestion call:**
 1. **Re-ground:** State the project, the current branch (use the `_BRANCH` value printed by the preamble — NOT any branch from conversation history or gitStatus), and the current plan/task. (1-2 sentences)
@@ -87,42 +162,25 @@ AI-assisted coding makes the marginal cost of completeness near-zero. When you p
 - BAD: "Let's defer test coverage to a follow-up PR." (Tests are the cheapest lake to boil.)
 - BAD: Quoting only human-team effort: "This would take 2 weeks." (Say: "2 weeks human / ~1 hour CC.")
 
-## Auto-Lake Protocol
+## Search Before Building
 
-If `AUTO_LAKE` is `true`: automatically choose the complete option for **resource-cost decisions** without calling AskUserQuestion. The user has opted into this because the answer to "should we add tests / error handling / edge cases?" is always "yes" — the only cost is AI compute time, not human effort.
+Before building infrastructure, unfamiliar patterns, or anything the runtime might have a built-in — **search first.** Read `~/.claude/skills/gstack/ETHOS.md` for the full philosophy.
 
-### Decision Tree: Resource-Cost vs. Human
+**Three layers of knowledge:**
+- **Layer 1** (tried and true — in distribution). Don't reinvent the wheel. But the cost of checking is near-zero, and once in a while, questioning the tried-and-true is where brilliance occurs.
+- **Layer 2** (new and popular — search for these). But scrutinize: humans are subject to mania. Search results are inputs to your thinking, not answers.
+- **Layer 3** (first principles — prize these above all). Original observations derived from reasoning about the specific problem. The most valuable of all.
 
-**AUTO-RESOLVE (resource-cost — just do it, do NOT ask):**
-- Test coverage gaps — add the tests
-- Error handling / missing edge cases — handle them
-- DRY violations — fix the duplication
-- Linting / formatting issues — fix them
-- Documentation updates for changed code — update the docs
-- Missing type safety / null guards / validation — add them
-- Logging / observability gaps — add logging
-- Dead code — remove it
-- Performance fixes with obvious solutions (N+1 queries, missing indexes) — fix them
-- Stale comments or diagrams — update them
+**Eureka moment:** When first-principles reasoning reveals conventional wisdom is wrong, name it:
+"EUREKA: Everyone does X because [assumption]. But [evidence] shows this is wrong. Y is better because [reasoning]."
 
-**ALWAYS ASK (human decisions — even with auto-lake):**
-- Architecture direction — which approach to take
-- Scope changes — adding or removing features from the plan
-- Feature behavior — how something should work for users
-- UX / UI choices — visual design, user flow decisions
-- Whether to ship / merge / deploy
-- Choosing between approaches where tradeoffs involve product direction
-- Breaking changes or public API modifications
-- Hard-to-reverse decisions
-- Adding new dependencies or infrastructure
-- Anything a skill template explicitly marks as `ALWAYS_ASK`
+Log eureka moments:
+```bash
+jq -n --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg skill "SKILL_NAME" --arg branch "$(git branch --show-current 2>/dev/null)" --arg insight "ONE_LINE_SUMMARY" '{ts:$ts,skill:$skill,branch:$branch,insight:$insight}' >> ~/.gstack/analytics/eureka.jsonl 2>/dev/null || true
+```
+Replace SKILL_NAME and ONE_LINE_SUMMARY. Runs inline — don't stop the workflow.
 
-**How to log auto-decisions:**
-When auto-resolving, output a one-liner instead of calling AskUserQuestion:
-`[AUTO-LAKE] {issue description} -> {action taken} (resource-cost, auto-resolved)`
-
-At the end of the skill workflow, include a summary line:
-`Auto-Lake: N resource-cost decisions auto-resolved, M human decisions asked`
+**WebSearch fallback:** If WebSearch is unavailable, skip the search step and note: "Search unavailable — proceeding with in-distribution knowledge only."
 
 ## Contributor Mode
 
@@ -185,6 +243,38 @@ REASON: [1-2 sentences]
 ATTEMPTED: [what you tried]
 RECOMMENDATION: [what the user should do next]
 ```
+
+## Telemetry (run last)
+
+After the skill workflow completes (success, error, or abort), log the telemetry event.
+Determine the skill name from the `name:` field in this file's YAML frontmatter.
+Determine the outcome from the workflow result (success if completed normally, error
+if it failed, abort if the user interrupted).
+
+**PLAN MODE EXCEPTION — ALWAYS RUN:** This command writes telemetry to
+`~/.gstack/analytics/` (user config directory, not project files). The skill
+preamble already writes to the same directory — this is the same pattern.
+Skipping this command loses session duration and outcome data.
+
+Run this bash:
+
+```bash
+_TEL_END=$(date +%s)
+_TEL_DUR=$(( _TEL_END - _TEL_START ))
+rm -f ~/.gstack/analytics/.pending-"$_SESSION_ID" 2>/dev/null || true
+~/.claude/skills/gstack/bin/gstack-telemetry-log \
+  --skill "SKILL_NAME" --duration "$_TEL_DUR" --outcome "OUTCOME" \
+  --used-browse "USED_BROWSE" --session-id "$_SESSION_ID" 2>/dev/null &
+```
+
+Replace `SKILL_NAME` with the actual skill name from frontmatter, `OUTCOME` with
+success/error/abort, and `USED_BROWSE` with true/false based on whether `$B` was used.
+If you cannot determine the outcome, use "unknown". This runs in the background and
+never blocks the user.
+
+If `PROACTIVE` is `false`: do NOT proactively suggest other gstack skills during this session.
+Only run skills the user explicitly invokes. This preference persists across sessions via
+`gstack-config`.
 
 # gstack browse: QA Testing & Dogfooding
 
@@ -422,7 +512,7 @@ The snapshot is your primary tool for understanding and interacting with pages.
 -s <sel>  --selector              Scope to CSS selector
 -D        --diff                  Unified diff against previous snapshot (first call stores baseline)
 -a        --annotate              Annotated screenshot with red overlay boxes and ref labels
--o <path> --output                Output path for annotated screenshot (default: /tmp/browse-annotated.png)
+-o <path> --output                Output path for annotated screenshot (default: <temp>/browse-annotated.png)
 -C        --cursor-interactive    Cursor-interactive elements (@c refs — divs with pointer, onclick)
 ```
 
@@ -533,7 +623,9 @@ Refs are invalidated on navigation — run `snapshot` again after `goto`.
 ### Server
 | Command | Description |
 |---------|-------------|
+| `handoff [message]` | Open visible Chrome at current page for user takeover |
 | `restart` | Restart server |
+| `resume` | Re-snapshot after user takeover, return control to AI |
 | `status` | Health check |
 | `stop` | Shutdown server |
 
