@@ -46,6 +46,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
 ## [26.4.37] - 2026-03-22
 ## [26.4.38] - 2026-03-22
+## [26.4.39] - 2026-03-22
 
 ### Added
 
@@ -59,6 +60,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
 - Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
+
+## [26.4.38] - 2026-03-21
+
+### Added
+
+- Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
+- Viewport breakpoint indicator in dev toolbar showing current Tailwind breakpoint (xs–2xl)
 
 ## [26.4.37] - 2026-03-21
 
