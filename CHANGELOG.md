@@ -44,6 +44,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
+## [26.4.37] - 2026-03-22
+
+### Added
+
+- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
+  - Auto-creates test user via Clerk API if not found
+  - Uses `+clerk_test` email suffix with magic OTP code `424242`
+  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
+  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
 
 ## [26.4.36] - 2026-03-21
 
