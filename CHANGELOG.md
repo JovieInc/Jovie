@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.37] - 2026-03-21
+
+### Changed
+
+- Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
+- Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
+- Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)
+
+### Removed
+
+- Remove non-functional `getPlatformIcon()` utility that returned UnoCSS class strings (UnoCSS not installed)
+
 ## [26.4.36] - 2026-03-21
 
 ### Fixed

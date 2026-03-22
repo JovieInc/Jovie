@@ -23,7 +23,7 @@ Brief description of the changes in this PR.
 
 *Complete this section if your PR includes any icon usage*
 
-- [ ] **General UI icons use Heroicons v2** (navigation, actions, states)
+- [ ] **General UI icons use Lucide React** (navigation, actions, states)
 - [ ] **Social/brand icons use SocialIcon component** (social media, DSPs, brands)
 - [ ] **No direct SVG imports** (except approved custom SVGs)
 - [ ] **No inline SVG elements** (except in approved components)
@@ -41,7 +41,7 @@ Brief description of the changes in this PR.
 - [ ] **Added to approved list** in ESLint configuration
 
 **Justification for custom SVG:**
-<!-- Explain why Heroicons or SimpleIcons don't meet your needs -->
+<!-- Explain why Lucide React or SimpleIcons don't meet your needs -->
 
 ## Code Quality
 
@@ -119,7 +119,7 @@ Related to #(issue number)
 
 If this PR includes icon changes, please verify:
 
-1. **Standard Library Usage**: Icons use appropriate libraries (Heroicons for UI, SocialIcon for social/brand)
+1. **Standard Library Usage**: Icons use appropriate libraries (Lucide React for UI, SocialIcon for social/brand)
 2. **No Direct Imports**: No direct SVG imports or inline SVG usage
 3. **Accessibility**: Proper ARIA attributes and consistent sizing
 4. **ESLint Compliance**: No `@jovie/icon-usage` rule violations
