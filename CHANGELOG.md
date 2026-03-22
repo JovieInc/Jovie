@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.36] - 2026-03-21
+
+### Fixed
+
+- Consolidate 5 independent profile completeness checks into one canonical `isProfileComplete()` function, eliminating the redirect loop bug class between `/app` and `/onboarding`
+- Add ACTIVE user guard on onboarding page to break redirect loops from stale proxy cache or direct navigation
+- Add circuit breaker in proxy.ts that detects and breaks redirect loops after 3 redirects in 30 seconds
+
 ## [26.4.35] - 2026-03-21
 
 ### Added
