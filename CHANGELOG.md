@@ -18,6 +18,27 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
 - Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
 
+## [26.4.46] - 2026-03-23
+
+### Changed
+
+- Consolidated settings navigation into Linear-style focused pages with persistent sidebar
+- Every settings section now has its own route-based page instead of a single mega-page
+- Extracted settings sidebar component with Lucide icons and mobile horizontal tabs
+- Simplified all settings page components to render sections directly
+
+### Fixed
+
+- Added feature gate to payments settings page (Stripe Connect flag)
+- Added admin guard to admin settings page (isAdmin check)
+- Fixed settings routes to use proper constants (SETTINGS_ACCOUNT, SETTINGS_DATA_PRIVACY, etc.)
+
+### Removed
+
+- [internal] Removed duplicate /account card-grid dashboard entry point (redirects to /app/settings/account)
+- [internal] Removed hash-based navigation in settings (fully route-based now)
+- [internal] Removed referral nav item from settings sidebar
+
 ## [26.4.45] - 2026-03-23
 
 ### Added
