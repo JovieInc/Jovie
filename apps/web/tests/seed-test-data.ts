@@ -15,7 +15,6 @@ import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
-import { env } from '@/lib/env-server';
 
 // Use the same HTTP driver as the app for consistency
 const {
@@ -150,6 +149,19 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+function getSeedEnv() {
+  // This file is imported by Playwright global setup, so it must not depend on
+  // Next's server-only env modules.
+  return {
+    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    DATABASE_URL: process.env.DATABASE_URL,
+    E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
+    E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+  } as const;
+}
+
 function isAllowlistedE2ESeedEmail(
   email: string | null | undefined
 ): email is string {
@@ -276,7 +288,7 @@ async function resolveSeedUserClerkId(
   fallbackClerkId: string | undefined
 ): Promise<string | null> {
   const normalizedEmail = normalizeEmail(email);
-  const secretKey = env.CLERK_SECRET_KEY;
+  const { CLERK_SECRET_KEY: secretKey } = getSeedEnv();
 
   if (!normalizedEmail || !secretKey) {
     return fallbackClerkId ?? null;
@@ -1054,7 +1066,7 @@ async function seedTracksForRelease(
 export async function seedTestData(options: SeedTestDataOptions = {}) {
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
-  const databaseUrl = env.DATABASE_URL;
+  const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
     console.warn('⚠ DATABASE_URL not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
@@ -1069,10 +1081,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     if (!options.publicProfilesOnly) {
       // Create E2E test user (for authenticated dashboard tests)
       // These values come from the setup script: scripts/setup-e2e-users.ts
-      const configuredE2EClerkUserId = env.E2E_CLERK_USER_ID;
-      const E2E_EMAIL = normalizeEmail(
-        env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie'
-      );
+      const {
+        E2E_CLERK_USER_ID: configuredE2EClerkUserId,
+        E2E_CLERK_USER_USERNAME,
+      } = getSeedEnv();
+      const E2E_EMAIL = normalizeEmail(E2E_CLERK_USER_USERNAME || 'e2e@jov.ie');
       const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
       const E2E_USERNAME = 'e2e-test-user';
       const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
@@ -1141,11 +1154,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           await seedReleasesForProfile(db, profileId);
           await seedTourDatesForProfile(db, profileId);
 
-          if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+          const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+            getSeedEnv();
+          if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
             try {
               const redis = new Redis({
-                url: env.UPSTASH_REDIS_REST_URL,
-                token: env.UPSTASH_REDIS_REST_TOKEN,
+                url: UPSTASH_REDIS_REST_URL,
+                token: UPSTASH_REDIS_REST_TOKEN,
               });
               const clerkIdsToInvalidate = [
                 previousClerkId,
@@ -1312,11 +1327,12 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
       // Invalidate Redis cache for this profile to ensure fresh data
       // Only attempt if Redis credentials are available
-      if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+      const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = getSeedEnv();
+      if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
         try {
           const redis = new Redis({
-            url: env.UPSTASH_REDIS_REST_URL,
-            token: env.UPSTASH_REDIS_REST_TOKEN,
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
           });
           const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
 
