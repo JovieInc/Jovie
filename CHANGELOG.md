@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.44] - 2026-03-22
+
+### Fixed
+
+- Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
+- Invited people on the waitlist can now be fully approved from the admin board
+- Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
+- Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
+- Bulk approve action now includes invited entries, matching individual approval behavior
+
 ## [26.4.43] - 2026-03-22
 
 ### Changed
