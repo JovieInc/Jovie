@@ -1,6 +1,11 @@
 import { auth } from '@clerk/nextjs/server';
+import { Button } from '@jovie/ui';
+import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 
 export const runtime = 'nodejs';
@@ -8,49 +13,48 @@ export const runtime = 'nodejs';
 export default async function UserCreationFailedPage() {
   const { userId } = await auth();
 
-  // If somehow resolved, redirect to dashboard
   if (!userId) {
     redirect(APP_ROUTES.SIGNIN);
   }
 
   return (
-    <div className='flex min-h-screen items-center justify-center p-4'>
-      <div className='max-w-md space-y-6 text-center'>
-        <div className='space-y-2'>
-          <h1 className='text-2xl font-bold'>Account Setup Error</h1>
-          <p className='text-muted-foreground'>
-            We&apos;re having trouble setting up your account. This is usually
-            temporary.
-          </p>
-        </div>
+    <StandaloneProductPage width='sm' centered>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeader
+          density='compact'
+          title='Account setup error'
+          subtitle="We're having trouble setting up your account. This is usually temporary."
+        />
 
-        <div className='space-y-4'>
-          <p className='text-sm text-muted-foreground'>
+        <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
+          <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))]'>
+            <AlertTriangle
+              className='h-5 w-5 text-[var(--linear-warning)]'
+              aria-hidden='true'
+            />
+          </div>
+
+          <p className='text-[13px] leading-5 text-secondary-token'>
             Our team has been notified and is working to resolve this issue.
             Please try again in a few minutes.
           </p>
 
-          <div className='flex flex-col gap-2'>
-            <Link
-              href='/app'
-              className='inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
-            >
-              Try Again
-            </Link>
-
-            <a
-              href='mailto:support@jov.ie?subject=Account%20Setup%20Error'
-              className='inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-8 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50'
-            >
-              Contact Support
-            </a>
+          <div className='flex flex-col gap-2 sm:flex-row'>
+            <Button asChild className='flex-1'>
+              <Link href={APP_ROUTES.DASHBOARD}>Try again</Link>
+            </Button>
+            <Button asChild variant='secondary' className='flex-1'>
+              <a href='mailto:support@jov.ie?subject=Account%20Setup%20Error'>
+                Contact support
+              </a>
+            </Button>
           </div>
-        </div>
 
-        <p className='text-xs text-muted-foreground'>
-          Error Code: USER_CREATION_FAILED
-        </p>
-      </div>
-    </div>
+          <p className='text-[11px] uppercase tracking-[0.14em] text-tertiary-token'>
+            Error code: USER_CREATION_FAILED
+          </p>
+        </div>
+      </ContentSurfaceCard>
+    </StandaloneProductPage>
   );
 }
