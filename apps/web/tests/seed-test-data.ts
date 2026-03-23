@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
@@ -69,6 +69,179 @@ const TEST_PROFILES: TestProfile[] = [
       'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
   },
 ];
+
+type SeededUserValues = Pick<
+  typeof users.$inferInsert,
+  'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
+>;
+
+type SeededCreatorProfileValues = Pick<
+  typeof creatorProfiles.$inferInsert,
+  | 'userId'
+  | 'creatorType'
+  | 'username'
+  | 'usernameNormalized'
+  | 'displayName'
+  | 'bio'
+  | 'avatarUrl'
+  | 'spotifyUrl'
+  | 'appleMusicUrl'
+  | 'appleMusicId'
+  | 'youtubeMusicId'
+  | 'deezerId'
+  | 'tidalId'
+  | 'soundcloudId'
+  | 'isPublic'
+  | 'isVerified'
+  | 'isClaimed'
+  | 'ingestionStatus'
+  | 'onboardingCompletedAt'
+>;
+
+type SeededSocialLinkValues = Pick<
+  typeof socialLinks.$inferInsert,
+  | 'creatorProfileId'
+  | 'platform'
+  | 'platformType'
+  | 'url'
+  | 'displayText'
+  | 'isActive'
+  | 'sortOrder'
+  | 'state'
+>;
+
+type SeededReleaseValues = Pick<
+  typeof discogReleases.$inferInsert,
+  | 'creatorProfileId'
+  | 'title'
+  | 'slug'
+  | 'releaseType'
+  | 'releaseDate'
+  | 'artworkUrl'
+  | 'totalTracks'
+  | 'upc'
+  | 'label'
+  | 'sourceType'
+>;
+
+function isDuplicateKeyError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('duplicate key value');
+}
+
+async function ensureUser(
+  db: ReturnType<typeof drizzle>,
+  values: SeededUserValues
+) {
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, values.clerkId))
+    .limit(1);
+
+  if (existingUser) {
+    await db
+      .update(users)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(users.id, existingUser.id));
+    return existingUser.id;
+  }
+
+  try {
+    const [createdUser] = await db
+      .insert(users)
+      .values(values)
+      .returning({ id: users.id });
+    return createdUser.id;
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
+
+    const [racedUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, values.clerkId))
+      .limit(1);
+
+    if (!racedUser) throw error;
+
+    await db
+      .update(users)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(users.id, racedUser.id));
+
+    return racedUser.id;
+  }
+}
+
+async function ensureCreatorProfile(
+  db: ReturnType<typeof drizzle>,
+  values: SeededCreatorProfileValues
+) {
+  const [existingProfile] = await db
+    .select({ id: creatorProfiles.id })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+    .limit(1);
+
+  if (existingProfile) {
+    await db
+      .update(creatorProfiles)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, existingProfile.id));
+    return existingProfile.id;
+  }
+
+  try {
+    const [createdProfile] = await db
+      .insert(creatorProfiles)
+      .values(values)
+      .returning({ id: creatorProfiles.id });
+    return createdProfile.id;
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
+
+    const [racedProfile] = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, values.usernameNormalized))
+      .limit(1);
+
+    if (!racedProfile) throw error;
+
+    await db
+      .update(creatorProfiles)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(creatorProfiles.id, racedProfile.id));
+
+    return racedProfile.id;
+  }
+}
+
+async function ensureSocialLink(
+  db: ReturnType<typeof drizzle>,
+  values: SeededSocialLinkValues
+) {
+  const [existingLink] = await db
+    .select({ id: socialLinks.id })
+    .from(socialLinks)
+    .where(
+      and(
+        eq(socialLinks.creatorProfileId, values.creatorProfileId),
+        eq(socialLinks.platform, values.platform)
+      )
+    )
+    .limit(1);
+
+  if (existingLink) {
+    await db
+      .update(socialLinks)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(socialLinks.id, existingLink.id));
+    return;
+  }
+
+  await db.insert(socialLinks).values(values);
+}
 
 /** Track template for seeding */
 interface TestTrack {
@@ -583,28 +756,74 @@ async function seedReleasesForProfile(
     existingReleases.map(release => [release.slug, release.id])
   );
 
+  async function ensureRelease(values: SeededReleaseValues) {
+    const [existingRelease] = await db
+      .select({ id: discogReleases.id })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, values.creatorProfileId),
+          eq(discogReleases.slug, values.slug)
+        )
+      )
+      .limit(1);
+
+    if (existingRelease) {
+      await db
+        .update(discogReleases)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(discogReleases.id, existingRelease.id));
+      return existingRelease.id;
+    }
+
+    try {
+      const [createdRelease] = await db
+        .insert(discogReleases)
+        .values(values)
+        .returning({ id: discogReleases.id });
+      return createdRelease.id;
+    } catch (error) {
+      if (!isDuplicateKeyError(error)) throw error;
+
+      const [racedRelease] = await db
+        .select({ id: discogReleases.id })
+        .from(discogReleases)
+        .where(
+          and(
+            eq(discogReleases.creatorProfileId, values.creatorProfileId),
+            eq(discogReleases.slug, values.slug)
+          )
+        )
+        .limit(1);
+
+      if (!racedRelease) throw error;
+
+      await db
+        .update(discogReleases)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(discogReleases.id, racedRelease.id));
+
+      return racedRelease.id;
+    }
+  }
+
   for (const release of TEST_RELEASES) {
     let releaseId = existingBySlug.get(release.slug);
 
     // Create release if it doesn't exist
     if (!releaseId) {
-      const [createdRelease] = await db
-        .insert(discogReleases)
-        .values({
-          creatorProfileId: profileId,
-          title: release.title,
-          slug: release.slug,
-          releaseType: release.releaseType,
-          releaseDate: release.releaseDate,
-          artworkUrl: release.artworkUrl,
-          totalTracks: release.totalTracks,
-          upc: release.upc,
-          label: release.label,
-          sourceType: 'manual',
-        })
-        .returning({ id: discogReleases.id });
-
-      releaseId = createdRelease.id;
+      releaseId = await ensureRelease({
+        creatorProfileId: profileId,
+        title: release.title,
+        slug: release.slug,
+        releaseType: release.releaseType,
+        releaseDate: release.releaseDate,
+        artworkUrl: release.artworkUrl,
+        totalTracks: release.totalTracks,
+        upc: release.upc,
+        label: release.label,
+        sourceType: 'manual',
+      });
       console.log(
         `    ✓ Created release: ${release.title} (${release.releaseType}, ${release.totalTracks} tracks)`
       );
@@ -695,76 +914,45 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       } else {
         console.log('  Creating E2E test user...');
         try {
-          const [existingUser] = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.clerkId, E2E_CLERK_USER_ID))
-            .limit(1);
+          const userId = await ensureUser(db, {
+            clerkId: E2E_CLERK_USER_ID,
+            email: E2E_EMAIL,
+            name: 'E2E Test',
+            userStatus: 'active',
+            isAdmin: true,
+          });
+          console.log(
+            `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
+          );
 
-          if (!existingUser) {
-            // Create the user record with admin privileges for E2E tests
-            const [createdUser] = await db
-              .insert(users)
-              .values({
-                clerkId: E2E_CLERK_USER_ID,
-                email: E2E_EMAIL,
-                name: 'E2E Test',
-                userStatus: 'active', // Active user with completed onboarding
-                isAdmin: true, // Grant admin for E2E admin tests
-              })
-              .returning({ id: users.id });
+          const profileId = await ensureCreatorProfile(db, {
+            userId,
+            username: E2E_USERNAME,
+            usernameNormalized: E2E_USERNAME.toLowerCase(),
+            displayName: 'E2E Test User',
+            bio: 'Automated test user',
+            avatarUrl: null,
+            spotifyUrl: null,
+            appleMusicUrl: null,
+            appleMusicId: null,
+            youtubeMusicId: null,
+            deezerId: null,
+            tidalId: null,
+            soundcloudId: null,
+            creatorType: 'artist',
+            isPublic: true,
+            isVerified: false,
+            isClaimed: true,
+            ingestionStatus: 'idle',
+            onboardingCompletedAt: new Date(),
+          });
 
-            console.log(
-              `    ✓ Created E2E user with admin privileges (ID: ${createdUser.id})`
-            );
+          console.log(
+            `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
+          );
 
-            // Create a creator profile for the E2E user
-            const [createdProfile] = await db
-              .insert(creatorProfiles)
-              .values({
-                userId: createdUser.id,
-                username: E2E_USERNAME,
-                usernameNormalized: E2E_USERNAME.toLowerCase(),
-                displayName: 'E2E Test User',
-                bio: 'Automated test user',
-                creatorType: 'artist',
-                isPublic: true,
-                isVerified: false,
-                isClaimed: true,
-                ingestionStatus: 'idle',
-                onboardingCompletedAt: new Date(), // Mark onboarding as complete
-              })
-              .returning({ id: creatorProfiles.id });
-
-            console.log(
-              `    ✓ Created E2E profile ${E2E_USERNAME} (ID: ${createdProfile.id})`
-            );
-
-            await seedReleasesForProfile(db, createdProfile.id);
-            await seedTourDatesForProfile(db, createdProfile.id);
-          } else {
-            await db
-              .update(users)
-              .set({ isAdmin: true, name: 'E2E Test' })
-              .where(eq(users.clerkId, E2E_CLERK_USER_ID));
-            console.log('    ✓ E2E test user exists, ensured admin privileges');
-
-            const [existingProfile] = await db
-              .select({ id: creatorProfiles.id })
-              .from(creatorProfiles)
-              .where(
-                eq(
-                  creatorProfiles.usernameNormalized,
-                  E2E_USERNAME.toLowerCase()
-                )
-              )
-              .limit(1);
-
-            if (existingProfile) {
-              await seedReleasesForProfile(db, existingProfile.id);
-              await seedTourDatesForProfile(db, existingProfile.id);
-            }
-          }
+          await seedReleasesForProfile(db, profileId);
+          await seedTourDatesForProfile(db, profileId);
         } catch (error) {
           if (!isMissingActiveProfileIdColumn(error)) {
             throw error;
@@ -793,43 +981,40 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               youtubeMusicId: 'UC-J-KZfRV8c13fOCkhXdLiQ',
               soundcloudId: 'dualipa',
             }
-          : {};
+          : {
+              appleMusicId: null,
+              appleMusicUrl: null,
+              deezerId: null,
+              tidalId: null,
+              youtubeMusicId: null,
+              soundcloudId: null,
+            };
 
-      // Delete any existing profile with this username first (also cascades social links).
-      // We delete unconditionally by usernameNormalized — no existence check needed.
-      // The Neon CI branches may inherit data from the parent branch.
-      await db
-        .delete(creatorProfiles)
-        .where(
-          eq(creatorProfiles.usernameNormalized, profile.username.toLowerCase())
-        );
-
-      const [createdProfile] = await db
-        .insert(creatorProfiles)
-        .values({
-          username: profile.username,
-          usernameNormalized: profile.username.toLowerCase(),
-          displayName: profile.displayName,
-          bio: profile.bio,
-          spotifyUrl: profile.spotifyUrl || null,
-          avatarUrl: profile.avatarUrl || null,
-          creatorType: 'artist' as const,
-          isPublic: true,
-          isVerified: false,
-          isClaimed: false,
-          ingestionStatus: 'idle' as const,
-          ...dspFields,
-        })
-        .returning({ id: creatorProfiles.id });
+      const createdProfileId = await ensureCreatorProfile(db, {
+        userId: null,
+        username: profile.username,
+        usernameNormalized: profile.username.toLowerCase(),
+        displayName: profile.displayName,
+        bio: profile.bio,
+        spotifyUrl: profile.spotifyUrl || null,
+        avatarUrl: profile.avatarUrl || null,
+        creatorType: 'artist',
+        isPublic: true,
+        isVerified: false,
+        isClaimed: false,
+        ingestionStatus: 'idle',
+        onboardingCompletedAt: null,
+        ...dspFields,
+      });
 
       console.log(
-        `    ✓ Created profile ${profile.username} (ID: ${createdProfile.id})`
+        `    ✓ Ensured profile ${profile.username} (ID: ${createdProfileId})`
       );
 
       // Add a sample social link
       if (profile.spotifyUrl) {
-        await db.insert(socialLinks).values({
-          creatorProfileId: createdProfile.id,
+        await ensureSocialLink(db, {
+          creatorProfileId: createdProfileId,
           platform: 'spotify',
           platformType: 'music_streaming',
           url: profile.spotifyUrl,
@@ -874,8 +1059,8 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           },
         ];
         for (const link of dualipaSocialLinks) {
-          await db.insert(socialLinks).values({
-            creatorProfileId: createdProfile.id,
+          await ensureSocialLink(db, {
+            creatorProfileId: createdProfileId,
             platform: link.platform,
             platformType: link.platformType,
             url: link.url,
@@ -892,13 +1077,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
       // Add tour dates for dualipa to test public touring display
       if (profile.username === 'dualipa') {
-        await seedTourDatesForProfile(db, createdProfile.id);
+        await seedTourDatesForProfile(db, createdProfileId);
       }
 
       // Add Venmo payment link for tipping tests
       if (profile.username === 'testartist') {
-        await db.insert(socialLinks).values({
-          creatorProfileId: createdProfile.id,
+        await ensureSocialLink(db, {
+          creatorProfileId: createdProfileId,
           platform: 'venmo',
           platformType: 'payment',
           url: 'https://venmo.com/testartist',

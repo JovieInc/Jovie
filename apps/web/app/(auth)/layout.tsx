@@ -1,4 +1,4 @@
-import { ClientProviders } from '@/components/providers/ClientProviders';
+import { AuthClientProviders } from '@/components/providers/AuthClientProviders';
 import { publicEnv } from '@/lib/env-public';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
@@ -14,10 +14,10 @@ export default async function AuthLayout({
   const featureFlagsBootstrap = await getFeatureFlagsBootstrap(null);
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <AuthClientProviders publishableKey={publishableKey}>
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
         <main id='main-content'>{children}</main>
       </FeatureFlagsProvider>
-    </ClientProviders>
+    </AuthClientProviders>
   );
 }
