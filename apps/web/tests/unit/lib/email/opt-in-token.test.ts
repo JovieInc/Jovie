@@ -45,6 +45,15 @@ describe('opt-in-token', () => {
   });
 
   describe('verifyOptInToken rejects invalid tokens', () => {
+    it('rejects a token with extra dot segments', async () => {
+      const { generateOptInToken, verifyOptInToken } = await import(
+        '@/lib/email/opt-in-token'
+      );
+
+      const token = generateOptInToken('a@b.com', 'pid');
+      expect(verifyOptInToken(`${token!}.extra`)).toBeNull();
+    });
+
     it('rejects a tampered HMAC', async () => {
       const { generateOptInToken, verifyOptInToken } = await import(
         '@/lib/email/opt-in-token'
