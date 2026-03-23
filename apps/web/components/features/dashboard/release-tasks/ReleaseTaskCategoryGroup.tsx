@@ -1,5 +1,6 @@
 'use client';
 
+import { Check } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 
 interface ReleaseTaskCategoryGroupProps {
@@ -35,17 +36,7 @@ export function ReleaseTaskCategoryGroup({
             ({done}/{total})
           </span>
           {allDone && (
-            <svg
-              className='h-3 w-3 text-emerald-500'
-              viewBox='0 0 12 12'
-              fill='none'
-              stroke='currentColor'
-              strokeWidth='1.5'
-              aria-hidden='true'
-            >
-              <title>Complete</title>
-              <path d='M2.5 6L5 8.5L9.5 3.5' />
-            </svg>
+            <Check className='h-3 w-3 text-emerald-500' aria-hidden='true' />
           )}
         </span>
         <svg
