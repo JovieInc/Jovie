@@ -64,8 +64,6 @@ function detectMetaBot(userAgent: string): boolean {
 interface PathCategory {
   needsNonce: boolean;
   isAppPath: boolean;
-  isDashboardPath: boolean;
-  isSettingsPath: boolean;
   isProtectedPath: boolean;
   isAuthPath: boolean;
   isAuthCallbackPath: boolean;
@@ -76,22 +74,6 @@ interface PathCategory {
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
-
-/** Check if pathname matches any of the given routes */
-function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
-  return routes.some(route => matchesRoute(pathname, route));
-}
-
-// Route groups for path categorization.
-// The authenticated shell lives at /app and all nested routes under /app/*.
-const DASHBOARD_ROUTES = [
-  '/app',
-  '/app/dashboard',
-  '/app/chat',
-  '/app/contact',
-] as const;
-
-const SETTINGS_ROUTES = ['/app/settings', '/app/admin'] as const;
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -114,12 +96,6 @@ function categorizePath(pathname: string): PathCategory {
 
   const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
 
-  // Dashboard paths within the authenticated shell
-  const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
-
-  // Settings-like paths
-  const isSettingsPath = matchesAnyRoute(pathname, SETTINGS_ROUTES);
-
   // Onboarding/waitlist paths
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
@@ -134,15 +110,12 @@ function categorizePath(pathname: string): PathCategory {
     isWaitlistPath ||
     pathname === '/monitoring' ||
     pathname.startsWith('/monitoring/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/app/');
+    pathname.startsWith('/api/');
 
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
-    pathname === '/app' ||
-    pathname.startsWith('/app/') ||
-    isSettingsPath ||
+    isAppShellPath ||
     isOnboardingPath ||
     isWaitlistPath;
 
@@ -152,8 +125,6 @@ function categorizePath(pathname: string): PathCategory {
   return {
     needsNonce,
     isAppPath,
-    isDashboardPath,
-    isSettingsPath,
     isProtectedPath,
     isAuthPath,
     isAuthCallbackPath,

@@ -36,7 +36,10 @@ export default async function AppShellLayout({
     // Defense in depth: the proxy should already block signed-out app access,
     // but the shell must not render protected UI if auth resolution disagrees.
     if (!auth.userId) {
-      redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.DASHBOARD}`);
+      const signInParams = new URLSearchParams({
+        redirect_url: APP_ROUTES.DASHBOARD,
+      });
+      redirect(`${APP_ROUTES.SIGNIN}?${signInParams.toString()}`);
     }
 
     // Parallelize dashboard data and feature flags.

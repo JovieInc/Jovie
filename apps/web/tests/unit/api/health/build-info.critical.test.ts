@@ -41,4 +41,16 @@ describe('@critical GET /api/health/build-info', () => {
       })
     );
   });
+
+  it('returns development build id without capturing warning in development', async () => {
+    mutableEnv.NODE_ENV = 'development';
+
+    const { GET } = await import('@/app/api/health/build-info/route');
+    const response = GET();
+    expect(response.status).toBe(200);
+    expect(mockCaptureWarning).not.toHaveBeenCalled();
+
+    const body = await response.json();
+    expect(body.buildId).toBe('development');
+  });
 });

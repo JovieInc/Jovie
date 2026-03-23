@@ -142,6 +142,41 @@ function isDuplicateKeyError(error: unknown): boolean {
   return message.includes('duplicate key value');
 }
 
+type MatchedSeedUser = {
+  readonly id: string;
+  readonly clerkId: string | null;
+  readonly email: string | null;
+};
+
+function resolveMatchedSeedUser(
+  matchedUsers: readonly MatchedSeedUser[],
+  values: SeededUserValues
+): MatchedSeedUser | undefined {
+  const clerkIdMatches = matchedUsers.filter(
+    matchedUser => matchedUser.clerkId === values.clerkId
+  );
+  const emailMatches = values.email
+    ? matchedUsers.filter(matchedUser => matchedUser.email === values.email)
+    : [];
+
+  if (clerkIdMatches.length > 1 || emailMatches.length > 1) {
+    throw new Error(
+      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} matched duplicate rows`
+    );
+  }
+
+  const clerkIdMatch = clerkIdMatches[0];
+  const emailMatch = emailMatches[0];
+
+  if (clerkIdMatch && emailMatch && clerkIdMatch.id !== emailMatch.id) {
+    throw new Error(
+      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} resolve to different rows`
+    );
+  }
+
+  return clerkIdMatch ?? emailMatch ?? matchedUsers[0];
+}
+
 async function ensureUser(
   db: ReturnType<typeof drizzle>,
   values: SeededUserValues
@@ -150,11 +185,11 @@ async function ensureUser(
     ? or(eq(users.clerkId, values.clerkId), eq(users.email, values.email))
     : eq(users.clerkId, values.clerkId);
 
-  const [existingUser] = await db
-    .select({ id: users.id, clerkId: users.clerkId })
+  const matchedUsers = await db
+    .select({ id: users.id, clerkId: users.clerkId, email: users.email })
     .from(users)
-    .where(userLookupCondition)
-    .limit(1);
+    .where(userLookupCondition);
+  const existingUser = resolveMatchedSeedUser(matchedUsers, values);
 
   if (existingUser) {
     await db
@@ -180,11 +215,11 @@ async function ensureUser(
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
 
-    const [racedUser] = await db
-      .select({ id: users.id, clerkId: users.clerkId })
+    const racedUsers = await db
+      .select({ id: users.id, clerkId: users.clerkId, email: users.email })
       .from(users)
-      .where(userLookupCondition)
-      .limit(1);
+      .where(userLookupCondition);
+    const racedUser = resolveMatchedSeedUser(racedUsers, values);
 
     if (!racedUser) throw error;
 
@@ -1051,24 +1086,31 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             process.env.UPSTASH_REDIS_REST_URL &&
             process.env.UPSTASH_REDIS_REST_TOKEN
           ) {
-            const redis = new Redis({
-              url: process.env.UPSTASH_REDIS_REST_URL,
-              token: process.env.UPSTASH_REDIS_REST_TOKEN,
-            });
-            const clerkIdsToInvalidate = [
-              previousClerkId,
-              E2E_CLERK_USER_ID,
-            ].filter((clerkId): clerkId is string => Boolean(clerkId));
+            try {
+              const redis = new Redis({
+                url: process.env.UPSTASH_REDIS_REST_URL,
+                token: process.env.UPSTASH_REDIS_REST_TOKEN,
+              });
+              const clerkIdsToInvalidate = [
+                previousClerkId,
+                E2E_CLERK_USER_ID,
+              ].filter((clerkId): clerkId is string => Boolean(clerkId));
 
-            let deletedCount = 0;
-            for (const clerkId of clerkIdsToInvalidate) {
-              const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
-              deletedCount += await redis.del(proxyStateCacheKey);
+              let deletedCount = 0;
+              for (const clerkId of clerkIdsToInvalidate) {
+                const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                deletedCount += await redis.del(proxyStateCacheKey);
+              }
+
+              console.log(
+                `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+              );
+            } catch (error) {
+              console.warn(
+                '    ⚠ Failed to invalidate proxy state cache for E2E user:',
+                error
+              );
             }
-
-            console.log(
-              `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
-            );
           }
         } catch (error) {
           if (!isMissingActiveProfileIdColumn(error)) {
