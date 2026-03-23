@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AiDemo } from '@/features/home/AiDemo';
-
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
