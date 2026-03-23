@@ -9,9 +9,10 @@
  */
 
 /* eslint-disable no-restricted-imports */
+import { createClerkClient } from '@clerk/backend';
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
@@ -39,8 +40,20 @@ interface SeedTestDataOptions {
 }
 
 function isMissingActiveProfileIdColumn(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('active_profile_id');
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42703' || message.includes('does not exist')) &&
+    message.includes('active_profile_id') &&
+    message.includes('column')
+  );
 }
 
 const TEST_PROFILES: TestProfile[] = [
@@ -133,10 +146,14 @@ async function ensureUser(
   db: ReturnType<typeof drizzle>,
   values: SeededUserValues
 ) {
+  const userLookupCondition = values.email
+    ? or(eq(users.clerkId, values.clerkId), eq(users.email, values.email))
+    : eq(users.clerkId, values.clerkId);
+
   const [existingUser] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, clerkId: users.clerkId })
     .from(users)
-    .where(eq(users.clerkId, values.clerkId))
+    .where(userLookupCondition)
     .limit(1);
 
   if (existingUser) {
@@ -144,7 +161,11 @@ async function ensureUser(
       .update(users)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(users.id, existingUser.id));
-    return existingUser.id;
+    return {
+      id: existingUser.id,
+      previousClerkId:
+        existingUser.clerkId !== values.clerkId ? existingUser.clerkId : null,
+    };
   }
 
   try {
@@ -152,14 +173,17 @@ async function ensureUser(
       .insert(users)
       .values(values)
       .returning({ id: users.id });
-    return createdUser.id;
+    return {
+      id: createdUser.id,
+      previousClerkId: null,
+    };
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
 
     const [racedUser] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, clerkId: users.clerkId })
       .from(users)
-      .where(eq(users.clerkId, values.clerkId))
+      .where(userLookupCondition)
       .limit(1);
 
     if (!racedUser) throw error;
@@ -169,8 +193,64 @@ async function ensureUser(
       .set({ ...values, updatedAt: new Date() })
       .where(eq(users.id, racedUser.id));
 
-    return racedUser.id;
+    return {
+      id: racedUser.id,
+      previousClerkId:
+        racedUser.clerkId !== values.clerkId ? racedUser.clerkId : null,
+    };
   }
+}
+
+async function resolveSeedUserClerkId(
+  email: string,
+  fallbackClerkId: string | undefined
+): Promise<string | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const secretKey = process.env.CLERK_SECRET_KEY;
+
+  if (!normalizedEmail || !secretKey) {
+    return fallbackClerkId ?? null;
+  }
+
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+    const resolvedClerkId = existingUsers.data[0]?.id ?? null;
+
+    if (
+      resolvedClerkId &&
+      fallbackClerkId &&
+      resolvedClerkId !== fallbackClerkId
+    ) {
+      console.warn(
+        `    ⚠ E2E_CLERK_USER_ID is stale (${fallbackClerkId}); using Clerk user ${resolvedClerkId} for ${normalizedEmail}`
+      );
+    }
+
+    return resolvedClerkId ?? fallbackClerkId ?? null;
+  } catch (error) {
+    console.warn(
+      `    ⚠ Failed to resolve Clerk user for ${normalizedEmail}; falling back to configured E2E_CLERK_USER_ID`,
+      error
+    );
+    return fallbackClerkId ?? null;
+  }
+}
+
+async function setActiveProfile(
+  db: ReturnType<typeof drizzle>,
+  userId: string,
+  profileId: string
+) {
+  await db
+    .update(users)
+    .set({
+      activeProfileId: profileId,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
 }
 
 async function ensureCreatorProfile(
@@ -900,9 +980,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     if (!options.publicProfilesOnly) {
       // Create E2E test user (for authenticated dashboard tests)
       // These values come from the setup script: scripts/setup-e2e-users.ts
-      const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
+      const configuredE2EClerkUserId = process.env.E2E_CLERK_USER_ID;
       const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
       const E2E_USERNAME = 'e2e-test-user';
+      const E2E_CLERK_USER_ID = await resolveSeedUserClerkId(
+        E2E_EMAIL,
+        configuredE2EClerkUserId
+      );
 
       if (!E2E_CLERK_USER_ID) {
         console.log(
@@ -914,7 +998,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       } else {
         console.log('  Creating E2E test user...');
         try {
-          const userId = await ensureUser(db, {
+          const { id: userId, previousClerkId } = await ensureUser(db, {
             clerkId: E2E_CLERK_USER_ID,
             email: E2E_EMAIL,
             name: 'E2E Test',
@@ -924,6 +1008,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           console.log(
             `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
           );
+          if (previousClerkId) {
+            console.log(
+              `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
+            );
+          }
 
           const profileId = await ensureCreatorProfile(db, {
             userId,
@@ -931,7 +1020,8 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             usernameNormalized: E2E_USERNAME.toLowerCase(),
             displayName: 'E2E Test User',
             bio: 'Automated test user',
-            avatarUrl: null,
+            avatarUrl:
+              'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
             spotifyUrl: null,
             appleMusicUrl: null,
             appleMusicId: null,
@@ -947,12 +1037,39 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             onboardingCompletedAt: new Date(),
           });
 
+          await setActiveProfile(db, userId, profileId);
+
           console.log(
             `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
           );
+          console.log(`    ✓ Set active profile for E2E user`);
 
           await seedReleasesForProfile(db, profileId);
           await seedTourDatesForProfile(db, profileId);
+
+          if (
+            process.env.UPSTASH_REDIS_REST_URL &&
+            process.env.UPSTASH_REDIS_REST_TOKEN
+          ) {
+            const redis = new Redis({
+              url: process.env.UPSTASH_REDIS_REST_URL,
+              token: process.env.UPSTASH_REDIS_REST_TOKEN,
+            });
+            const clerkIdsToInvalidate = [
+              previousClerkId,
+              E2E_CLERK_USER_ID,
+            ].filter((clerkId): clerkId is string => Boolean(clerkId));
+
+            let deletedCount = 0;
+            for (const clerkId of clerkIdsToInvalidate) {
+              const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+              deletedCount += await redis.del(proxyStateCacheKey);
+            }
+
+            console.log(
+              `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+            );
+          }
         } catch (error) {
           if (!isMissingActiveProfileIdColumn(error)) {
             throw error;

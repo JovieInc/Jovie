@@ -278,10 +278,6 @@ const nextConfig = {
         destination: '/app/dashboard/earnings',
       },
       {
-        source: '/app/chat',
-        destination: '/app/dashboard/chat',
-      },
-      {
         source: '/app/insights',
         destination: '/app/dashboard/insights',
       },

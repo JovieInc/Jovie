@@ -82,25 +82,16 @@ function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
   return routes.some(route => matchesRoute(pathname, route));
 }
 
-// Route groups for path categorization
-// All routes use /app/* prefix (single-domain architecture)
+// Route groups for path categorization.
+// The authenticated shell lives at /app and all nested routes under /app/*.
 const DASHBOARD_ROUTES = [
-  '/app/profile',
-  '/app/contacts',
-  '/app/releases',
-  '/app/tour-dates',
-  '/app/audience',
-  '/app/earnings',
-  '/app/links',
+  '/app',
+  '/app/dashboard',
   '/app/chat',
+  '/app/contact',
 ] as const;
 
-const SETTINGS_ROUTES = [
-  '/app/settings',
-  '/app/admin',
-  '/app/billing',
-  '/app/account',
-] as const;
+const SETTINGS_ROUTES = ['/app/settings', '/app/admin'] as const;
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -121,7 +112,9 @@ function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-up/sso-callback' ||
     pathname === '/sign-in/sso-callback';
 
-  // Dashboard paths (used for app subdomain rewrites)
+  const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
+
+  // Dashboard paths within the authenticated shell
   const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
 
   // Settings-like paths
@@ -132,14 +125,11 @@ function categorizePath(pathname: string): PathCategory {
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
 
   // Protected paths (require auth)
-  const isProtectedPath =
-    isDashboardPath || isSettingsPath || isWaitlistPath || isOnboardingPath;
+  const isProtectedPath = isAppShellPath || isWaitlistPath || isOnboardingPath;
 
   // App paths (dashboard and protected routes at /app/*)
   const isAppPath =
-    pathname === '/' ||
-    isDashboardPath ||
-    isSettingsPath ||
+    isAppShellPath ||
     isOnboardingPath ||
     isWaitlistPath ||
     pathname === '/monitoring' ||
