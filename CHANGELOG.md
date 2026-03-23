@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.3.46] - 2026-03-23
+
+### Added
+
+- Added shared standalone product shells, redirect surfaces, and loading-state primitives to align non-marketing product routes with the Linear-inspired app system
+- Added typed dashboard activity-feed normalization and regression tests so stale emoji payloads safely coerce to supported icons
+
+### Changed
+
+- Aligned auth, billing, HUD, investor admin, public redirect, and utility product surfaces to the Linear-inspired product design system and shared page shells
+- Refreshed retargeting ad preview tooling, billing success celebration, and product-shell rhythm for more consistent product-side layout and feedback
+
+### Fixed
+
+- Prevent delayed public-link redirects from firing after unmount and restore standalone billing success scrolling with accessible verification feedback
+- [internal] Fix Vercel preview builds by matching App Router function globs and keep PR smoke runs on the fast E2E iteration path
+- [internal] Normalize CalVer release metadata by syncing `version.json`, workspace package versions, and the changelog head
+
 ## [26.4.45] - 2026-03-23
 
 ### Added
