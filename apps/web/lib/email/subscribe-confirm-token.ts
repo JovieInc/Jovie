@@ -5,32 +5,25 @@
  */
 
 import { APP_URL } from '@/constants/app';
-import {
-  buildTokenUrl,
-  deriveSecret,
-  parseColonPayload,
-  signPayload,
-  verifyToken,
-} from './hmac-token';
+import { buildTokenUrl, createColonTokenFns } from './hmac-token';
 
-const CONFIRM_DOMAIN = 'jovie:subscribe-confirm-token-secret';
+const { sign, verify } = createColonTokenFns({
+  domain: 'jovie:subscribe-confirm-token-secret',
+  emailIndex: 1,
+});
 
 export function generateSubscribeConfirmToken(
   subscriptionId: string,
   email: string
 ): string | null {
-  const secret = deriveSecret(CONFIRM_DOMAIN);
-  const normalizedEmail = email.toLowerCase().trim();
-  return signPayload(`${subscriptionId}:${normalizedEmail}`, secret);
+  return sign(subscriptionId, email);
 }
 
 export function verifySubscribeConfirmToken(
   token: string
 ): { subscriptionId: string; email: string } | null {
-  const payload = verifyToken(token, deriveSecret(CONFIRM_DOMAIN));
-  const parsed = payload ? parseColonPayload(payload) : null;
-  if (!parsed || !parsed.second.includes('@')) return null;
-  return { subscriptionId: parsed.first, email: parsed.second };
+  const result = verify(token);
+  return result ? { subscriptionId: result.first, email: result.second } : null;
 }
 
 export function buildSubscribeConfirmUrl(

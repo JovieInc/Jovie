@@ -127,3 +127,35 @@ export function buildTokenUrl(
   if (!token) return null;
   return `${baseUrl}${path}?token=${encodeURIComponent(token)}`;
 }
+
+/**
+ * Factory for colon-delimited two-field token modules.
+ * Produces sign, verify, and buildUrl functions from a config object.
+ * The emailIndex indicates which field (0 or 1) contains the email (for @ validation).
+ */
+export function createColonTokenFns(config: {
+  domain: string;
+  macLength?: number;
+  emailIndex: 0 | 1;
+}) {
+  const { domain, macLength, emailIndex } = config;
+
+  function sign(fieldA: string, fieldB: string): string | null {
+    const secret = deriveSecret(domain);
+    const normalized =
+      emailIndex === 0
+        ? `${fieldA.toLowerCase().trim()}:${fieldB}`
+        : `${fieldA}:${fieldB.toLowerCase().trim()}`;
+    return signPayload(normalized, secret, macLength);
+  }
+
+  function verify(token: string): { first: string; second: string } | null {
+    const payload = verifyToken(token, deriveSecret(domain), macLength);
+    const parsed = payload ? parseColonPayload(payload) : null;
+    const emailField = emailIndex === 0 ? parsed?.first : parsed?.second;
+    if (!parsed || !emailField?.includes('@')) return null;
+    return parsed;
+  }
+
+  return { sign, verify };
+}

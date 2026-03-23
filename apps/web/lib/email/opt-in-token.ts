@@ -6,32 +6,25 @@
  */
 
 import { BASE_URL } from '@/constants/domains';
-import {
-  buildTokenUrl,
-  deriveSecret,
-  parseColonPayload,
-  signPayload,
-  verifyToken,
-} from './hmac-token';
+import { buildTokenUrl, createColonTokenFns } from './hmac-token';
 
-const OPT_IN_DOMAIN = 'jovie:audience-opt-in-token-secret';
+const { sign, verify } = createColonTokenFns({
+  domain: 'jovie:audience-opt-in-token-secret',
+  emailIndex: 0,
+});
 
 export function generateOptInToken(
   email: string,
   profileId: string
 ): string | null {
-  const secret = deriveSecret(OPT_IN_DOMAIN);
-  const normalizedEmail = email.toLowerCase().trim();
-  return signPayload(`${normalizedEmail}:${profileId}`, secret);
+  return sign(email, profileId);
 }
 
 export function verifyOptInToken(
   token: string
 ): { email: string; profileId: string } | null {
-  const payload = verifyToken(token, deriveSecret(OPT_IN_DOMAIN));
-  const parsed = payload ? parseColonPayload(payload) : null;
-  if (!parsed || !parsed.first.includes('@')) return null;
-  return { email: parsed.first, profileId: parsed.second };
+  const result = verify(token);
+  return result ? { email: result.first, profileId: result.second } : null;
 }
 
 export function buildOptInUrl(email: string, profileId: string): string | null {
