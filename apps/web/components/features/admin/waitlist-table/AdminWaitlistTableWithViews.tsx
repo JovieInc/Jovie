@@ -35,6 +35,8 @@ import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import {
   QueryErrorBoundary,
   useAdminWaitlistInfiniteQuery,
+  useApproveWaitlistMutation,
+  useDisapproveWaitlistMutation,
   useUpdateWaitlistStatusMutation,
 } from '@/lib/queries';
 import { AdminWaitlistTableUnified } from './AdminWaitlistTableUnified';
@@ -99,8 +101,10 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
     },
   });
 
-  // TanStack Query mutation for updating waitlist status
+  // TanStack Query mutations for waitlist status changes
   const updateStatusMutation = useUpdateWaitlistStatusMutation();
+  const approveMutation = useApproveWaitlistMutation();
+  const disapproveMutation = useDisapproveWaitlistMutation();
 
   // Row selection
   const rowIds = useMemo(() => entries.map(entry => entry.id), [entries]);
@@ -238,13 +242,20 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   const handleItemMove = useCallback(
     async (itemId: string, _fromColumnId: string, toColumnId: string) => {
       try {
-        await updateStatusMutation.mutateAsync({
-          entryId: itemId,
-          status: toColumnId as 'new' | 'invited' | 'claimed',
-        });
-
-        // The UI will update optimistically via the KanbanBoard component
-        // Cache invalidation is handled by the mutation
+        if (toColumnId === 'claimed') {
+          // Use proper approval flow — updates users.userStatus, activeProfileId,
+          // profile fields, and invalidates proxy cache
+          await approveMutation.mutateAsync({ entryId: itemId });
+        } else if (toColumnId === 'new') {
+          // Use proper disapproval flow — reverts user status and profile
+          await disapproveMutation.mutateAsync({ entryId: itemId });
+        } else {
+          // Transitional status updates (e.g. to/from 'invited') use simple status update
+          await updateStatusMutation.mutateAsync({
+            entryId: itemId,
+            status: toColumnId as 'new' | 'invited' | 'claimed',
+          });
+        }
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
         toast.error('Failed to update status', {
@@ -253,7 +264,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         });
       }
     },
-    [updateStatusMutation]
+    [approveMutation, disapproveMutation, updateStatusMutation]
   );
 
   return (

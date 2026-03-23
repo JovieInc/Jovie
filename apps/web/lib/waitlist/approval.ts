@@ -43,7 +43,7 @@ export async function approveWaitlistEntryInTx(
 
   if (!entry) return { outcome: 'not_found' };
 
-  if (entry.status !== 'new') {
+  if (entry.status !== 'new' && entry.status !== 'invited') {
     return { outcome: 'already_processed', status: entry.status };
   }
 
