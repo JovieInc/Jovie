@@ -591,4 +591,90 @@ describe('DevToolbar', () => {
       expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('0');
     });
   });
+
+  // ─── Clear Session ────────────────────────────────────────
+
+  describe('clear session', () => {
+    let fetchSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      fetchSpy = vi.fn().mockResolvedValue({
+        json: () => Promise.resolve({ success: true, deleted: ['__session'] }),
+      });
+      vi.stubGlobal('fetch', fetchSpy);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('renders button with correct aria-label', () => {
+      renderToolbar();
+      expect(
+        screen.getByRole('button', { name: 'Clear session' })
+      ).toBeInTheDocument();
+    });
+
+    it('calls /api/dev/clear-session on click', () => {
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+      expect(fetchSpy).toHaveBeenCalledWith('/api/dev/clear-session', {
+        method: 'POST',
+      });
+    });
+
+    it('preserves toolbar localStorage keys after clearing', async () => {
+      localStorage.setItem(TOOLBAR_OPEN_KEY, '1');
+      localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
+      localStorage.setItem(FF_OVERRIDES_KEY, '{"a":true}');
+      localStorage.setItem('jovie-theme', 'dark');
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+
+      // Wait for non-toolbar keys to be cleared (proves async handler completed)
+      await vi.waitFor(() => {
+        expect(localStorage.getItem(FF_OVERRIDES_KEY)).toBeNull();
+      });
+      expect(localStorage.getItem('jovie-theme')).toBeNull();
+      // Toolbar keys preserved
+      expect(localStorage.getItem(TOOLBAR_OPEN_KEY)).toBe('1');
+      expect(localStorage.getItem(TOOLBAR_HIDDEN_KEY)).toBe('0');
+    });
+
+    it('clears sessionStorage', async () => {
+      sessionStorage.setItem('test-key', 'test-value');
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+
+      await vi.waitFor(() => {
+        expect(sessionStorage.getItem('test-key')).toBeNull();
+      });
+    });
+
+    it('shows error state when fetch fails', async () => {
+      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+
+      await vi.waitFor(() => {
+        expect(screen.getByText('Failed')).toBeInTheDocument();
+      });
+    });
+
+    it('shows error state when API returns failure', async () => {
+      fetchSpy.mockResolvedValueOnce({
+        json: () => Promise.resolve({ success: false, error: 'forbidden' }),
+      });
+
+      renderToolbar();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear session' }));
+
+      await vi.waitFor(() => {
+        expect(screen.getByText('Failed')).toBeInTheDocument();
+      });
+    });
+  });
 });
