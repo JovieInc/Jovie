@@ -83,8 +83,8 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
 
 ### Prerequisites
 
-- **Node.js 24+** (LTS)
-- **pnpm 8.0.0+** (package manager)
+- **Node.js 22.13.0+** (22.x only)
+- **pnpm 9.15.4** (exact, via Corepack)
 - **Doppler CLI** (secrets management) - [Install Guide](docs/DOPPLER_SETUP.md)
 - **Accounts Required:**
   - [Neon](https://neon.tech/) - PostgreSQL database
@@ -103,11 +103,13 @@ Jovie uses a modern, secure stack designed for scalability, type safety, and exc
    cd Jovie
    ```
 
-2. **Install dependencies**
+2. **Bootstrap the workspace**
 
    ```bash
-   pnpm install
+   ./scripts/setup.sh
    ```
+
+   This verifies the required Node/pnpm versions, installs dependencies, and checks Doppler access.
 
 3. **Set up Doppler (Recommended)**
 
@@ -254,7 +256,7 @@ Git worktrees enable parallel agent work with shared Turbo cache (2.8+):
 ```bash
 # Create a worktree for parallel work
 git worktree add ../Jovie-agent-1 -b agent/task-name
-cd ../Jovie-agent-1 && pnpm install
+cd ../Jovie-agent-1 && ./scripts/setup.sh
 
 # Work normally -- turbo cache is shared automatically
 pnpm turbo build

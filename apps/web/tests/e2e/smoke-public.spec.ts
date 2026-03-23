@@ -117,7 +117,9 @@ test.describe('Public Profile - dualipa', () => {
       return;
     }
 
-    await expect(page.locator('h1').first()).toContainText(/dua lipa/i, {
+    await expect(
+      page.getByText('Dua Lipa', { exact: true }).first()
+    ).toBeVisible({
       timeout: 60_000,
     });
 

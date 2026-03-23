@@ -26,6 +26,11 @@ export function BrandLogo({
   'aria-hidden': ariaHidden,
 }: BrandLogoProps) {
   const baseClassName = cn(rounded ? 'rounded-full' : undefined, className);
+  const resolvedStyle = {
+    width: 'auto',
+    height: 'auto',
+    ...style,
+  } satisfies CSSProperties;
 
   if (tone === 'auto') {
     // When both theme variants are rendered, avoid using `priority` (which adds
@@ -46,7 +51,7 @@ export function BrandLogo({
           loading={loadingProp}
           fetchPriority={fetchPriorityProp}
           aria-hidden={ariaHidden}
-          style={style}
+          style={resolvedStyle}
           className={cn(baseClassName, 'dark:hidden')}
           unoptimized
         />
@@ -59,7 +64,7 @@ export function BrandLogo({
           loading={loadingProp}
           fetchPriority={fetchPriorityProp}
           aria-hidden={ariaHidden}
-          style={style}
+          style={resolvedStyle}
           className={cn(baseClassName, 'hidden dark:block')}
           unoptimized
         />
@@ -84,7 +89,7 @@ export function BrandLogo({
       sizes={`${size}px`}
       priority={priority}
       aria-hidden={ariaHidden}
-      style={style}
+      style={resolvedStyle}
       className={baseClassName}
       unoptimized
     />
