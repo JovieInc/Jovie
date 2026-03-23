@@ -166,11 +166,14 @@ function SignUpOauthErrorBanner() {
   if (!oauthError) return null;
 
   const isAccountExists = oauthError === 'account_exists';
-  const message = isAccountExists
-    ? 'An account with this email already exists. Try signing in instead.'
-    : oauthError === 'access_denied'
-      ? 'Required permissions were not granted. Please try again and accept all permissions.'
-      : 'Something went wrong with Google sign-up. Please try again.';
+  let message = 'Something went wrong with Google sign-up. Please try again.';
+  if (isAccountExists) {
+    message =
+      'An account with this email already exists. Try signing in instead.';
+  } else if (oauthError === 'access_denied') {
+    message =
+      'Required permissions were not granted. Please try again and accept all permissions.';
+  }
 
   return (
     <div

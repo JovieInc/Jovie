@@ -19,9 +19,10 @@ interface AuthClientProvidersProps {
 }
 
 function getClerkProxyUrl(): string | undefined {
-  if (typeof window === 'undefined') return undefined;
+  const browserWindow = globalThis.window;
+  if (!browserWindow) return undefined;
 
-  const { hostname } = window.location;
+  const { hostname } = browserWindow.location;
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return undefined;
   }

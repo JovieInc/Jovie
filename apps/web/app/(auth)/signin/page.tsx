@@ -10,7 +10,35 @@ import { AuthLayout } from '@/features/auth';
  * Sign-in page using Clerk's prebuilt components for reliability.
  */
 function isValidEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  if (value.length === 0 || value.length > 254) return false;
+
+  const atIndex = value.indexOf('@');
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@')) return false;
+
+  const local = value.slice(0, atIndex);
+  const domain = value.slice(atIndex + 1);
+
+  if (local.length > 64 || domain.length < 3) return false;
+  if (domain.startsWith('.') || domain.endsWith('.') || !domain.includes('.')) {
+    return false;
+  }
+
+  for (const char of value) {
+    if (char <= ' ') return false;
+  }
+
+  for (const char of domain) {
+    const isAlphaNumeric =
+      (char >= 'a' && char <= 'z') ||
+      (char >= 'A' && char <= 'Z') ||
+      (char >= '0' && char <= '9');
+
+    if (!(isAlphaNumeric || char === '.' || char === '-')) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function AuthRoutePrefetch({ href }: { href: string }) {

@@ -73,4 +73,20 @@ describe('signin page', () => {
       })
     );
   });
+
+  it('ignores an invalid email query param', async () => {
+    searchParamsState.value = 'email=not-an-email';
+
+    render(<SignInPage />);
+
+    await waitFor(() => {
+      expect(clerkSignInMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignInMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        initialValues: undefined,
+      })
+    );
+  });
 });
