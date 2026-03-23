@@ -43,7 +43,9 @@ async function renderAuthRouteLayout({
     AuthUnavailableCard: () => <div data-testid='auth-clerk-unavailable' />,
   }));
 
-  const { default: AuthRouteLayout } = await import('../../../app/(auth)/layout');
+  const { default: AuthRouteLayout } = await import(
+    '../../../app/(auth)/layout'
+  );
 
   render(
     await AuthRouteLayout({
@@ -63,7 +65,9 @@ describe('auth route layout', () => {
 
     expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
     expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
-    expect(screen.queryByTestId('auth-client-providers')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('auth-client-providers')
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
   });
 

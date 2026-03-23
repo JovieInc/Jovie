@@ -53,15 +53,6 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
-  // Waitlist guard: if user needs waitlist, redirect to /waitlist.
-  // Prevents rendering onboarding when proxy cache is stale.
-  if (
-    authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
-    authResult.state === CanonicalUserState.WAITLIST_PENDING
-  ) {
-    redirect(APP_ROUTES.WAITLIST);
-  }
-
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. If the user is already active, send them to /app.
   if (authResult.state === CanonicalUserState.ACTIVE) {

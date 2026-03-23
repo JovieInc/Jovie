@@ -68,7 +68,8 @@ const authClerkElements = {
   card: {
     overflow: 'hidden',
     border: '1px solid var(--color-border-subtle)',
-    background: 'color-mix(in srgb, var(--color-bg-surface-0) 94%, transparent)',
+    background:
+      'color-mix(in srgb, var(--color-bg-surface-0) 94%, transparent)',
     borderRadius: 'var(--radius-3xl)',
     boxShadow: '0 24px 80px rgba(0, 0, 0, 0.48)',
     backdropFilter: 'blur(24px)',
@@ -129,7 +130,8 @@ const authClerkElements = {
     boxShadow: '0 12px 40px rgba(0, 0, 0, 0.32)',
     fontSize: '0.9375rem',
     fontWeight: 590,
-    transition: 'transform 150ms ease, opacity 150ms ease, box-shadow 150ms ease',
+    transition:
+      'transform 150ms ease, opacity 150ms ease, box-shadow 150ms ease',
     '&:hover': {
       opacity: 0.96,
       transform: 'translateY(-1px)',
@@ -149,7 +151,8 @@ const authClerkElements = {
     background: 'var(--color-bg-surface-1)',
     color: 'var(--color-text-primary-token)',
     borderRadius: 'var(--radius-xl)',
-    transition: 'background-color 150ms ease, border-color 150ms ease, transform 150ms ease',
+    transition:
+      'background-color 150ms ease, border-color 150ms ease, transform 150ms ease',
     '&:hover': {
       borderColor: 'var(--color-border-default)',
       background: 'var(--color-bg-surface-2)',
