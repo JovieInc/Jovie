@@ -206,9 +206,9 @@ export default async function ChangelogPage() {
                             {meta.label}
                           </span>
                           <ul className='space-y-1.5'>
-                            {entries.map((entry, entryIdx) => (
+                            {entries.map(entry => (
                               <li
-                                key={`${key}-${entryIdx}`}
+                                key={`${release.version}-${key}-${entry.slice(0, 40)}`}
                                 className='text-sm leading-relaxed opacity-75'
                               >
                                 {entry}
