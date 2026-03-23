@@ -1,3 +1,4 @@
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Browser, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { expect, test } from './setup';
@@ -103,8 +104,13 @@ async function createFreshAuthPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext({
     storageState: EMPTY_STORAGE_STATE,
   });
+  const page = await context.newPage();
 
-  return context.newPage();
+  if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
+    await setupClerkTestingToken({ page });
+  }
+
+  return page;
 }
 
 test.describe('Auth', () => {

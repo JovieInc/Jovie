@@ -40,6 +40,10 @@ vi.mock('@/features/auth', () => ({
   AuthLayout: ({ children }: { children: ReactNode }) => (
     <div data-testid='auth-layout'>{children}</div>
   ),
+  AuthRoutePrefetch: ({ href }: { href: string }) => {
+    routerPrefetchMock(href);
+    return null;
+  },
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -163,5 +167,21 @@ describe('signup page', () => {
     );
 
     replaceStateSpy.mockRestore();
+  });
+
+  it('preserves redirect_url on the footer sign-in link', async () => {
+    searchParamsState.value = 'redirect_url=%2Fapp%2Fdashboard';
+
+    render(<SignUpPage />);
+
+    await waitFor(() => {
+      expect(clerkSignUpMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(clerkSignUpMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signInUrl: '/signin?redirect_url=%2Fapp%2Fdashboard',
+      })
+    );
   });
 });

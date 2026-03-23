@@ -8,6 +8,7 @@ import {
   ClerkSafeValuesProvider,
 } from '@/hooks/useClerkSafe';
 import { publicEnv } from '@/lib/env-public';
+import { clerkAppearance } from './clerkAppearance';
 import { NuqsProvider } from './NuqsProvider';
 import { QueryProvider } from './QueryProvider';
 
@@ -46,6 +47,27 @@ function wrapChildren(children: ReactNode) {
   );
 }
 
+function AuthClerkUnavailableFallback() {
+  return (
+    <main
+      id='main-content'
+      data-testid='auth-clerk-unavailable'
+      className='mx-auto flex min-h-screen max-w-xl flex-col items-center justify-center px-6 text-center'
+    >
+      <div className='rounded-2xl border border-subtle bg-surface-0 px-6 py-8 shadow-sm'>
+        <h1 className='text-xl font-semibold text-primary-token'>
+          Authentication is unavailable right now
+        </h1>
+        <p className='mt-3 text-sm text-secondary-token'>
+          Clerk is not configured for this environment yet. Add a real
+          publishable key or disable auth-page access until configuration is
+          complete.
+        </p>
+      </div>
+    </main>
+  );
+}
+
 export function AuthClientProviders({
   children,
   publishableKey,
@@ -58,13 +80,14 @@ export function AuthClientProviders({
   if (shouldBypassClerk) {
     return (
       <ClerkSafeDefaultsProvider>
-        {wrapChildren(children)}
+        {wrapChildren(<AuthClerkUnavailableFallback />)}
       </ClerkSafeDefaultsProvider>
     );
   }
 
   return (
     <ClerkProvider
+      appearance={clerkAppearance}
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl()}
       signInUrl={APP_ROUTES.SIGNIN}

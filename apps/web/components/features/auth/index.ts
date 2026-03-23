@@ -6,6 +6,7 @@ export { AuthFormContainer } from './AuthFormContainer';
 // Organisms
 export { AuthLayout } from './AuthLayout';
 export { AuthPageSkeleton } from './AuthPageSkeleton';
+export { AuthRoutePrefetch } from './AuthRoutePrefetch';
 export {
   AuthBackButton,
   AuthButton,

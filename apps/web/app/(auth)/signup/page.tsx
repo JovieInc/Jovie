@@ -2,10 +2,10 @@
 
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
@@ -16,16 +16,6 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
-
-function AuthRoutePrefetch({ href }: { href: string }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.prefetch(href);
-  }, [href, router]);
-
-  return null;
-}
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -196,6 +186,8 @@ function SignUpOauthErrorBanner() {
 }
 
 function SignUpPageContent() {
+  const searchParams = useSearchParams();
+
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
@@ -204,7 +196,7 @@ function SignUpPageContent() {
       <SignUp
         routing='hash'
         oauthFlow='redirect'
-        signInUrl={APP_ROUTES.SIGNIN}
+        signInUrl={buildSignInUrl(searchParams)}
         fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
       />
       <p className='mt-4 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
