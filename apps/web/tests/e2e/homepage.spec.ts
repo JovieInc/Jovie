@@ -32,7 +32,7 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'Own the link behind every release.'
+      'The link your music deserves.'
     );
     await expect(
       page.getByText(
@@ -93,7 +93,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await expect(page.locator('h1')).toContainText(
-      'Own the link behind every release.',
+      'The link your music deserves.',
       {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       }
