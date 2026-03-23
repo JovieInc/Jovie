@@ -184,7 +184,7 @@ export async function disapproveWaitlistEntryInTx(
       .update(users)
       .set({
         userStatus: 'waitlist_pending',
-        activeProfileId: profile ? null : undefined,
+        activeProfileId: null,
         updatedAt: now,
       })
       .where(eq(users.id, user.id));

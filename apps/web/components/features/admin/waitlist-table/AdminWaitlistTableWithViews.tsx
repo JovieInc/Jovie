@@ -258,12 +258,19 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
             'Move claimed entries to New first, then to Invited if needed.'
           );
           return;
-        } else {
-          // Transitional status updates (e.g. new→invited) use simple status update
+        } else if (toColumnId === 'invited') {
+          // new→invited: simple status update (no user/profile side-effects needed)
           await updateStatusMutation.mutateAsync({
             entryId: itemId,
-            status: toColumnId as 'new' | 'invited' | 'claimed',
+            status: 'invited',
           });
+        } else {
+          console.warn(
+            'Unhandled Kanban transition',
+            fromColumnId,
+            '→',
+            toColumnId
+          );
         }
       } catch (error) {
         console.error('Failed to update waitlist status:', error);
