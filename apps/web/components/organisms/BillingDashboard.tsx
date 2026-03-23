@@ -10,6 +10,7 @@ import {
   useMemo,
   useState,
 } from 'react';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
 import { track } from '@/lib/analytics';
@@ -99,16 +100,19 @@ const BillingDashboardContent = memo(function BillingDashboardContent() {
   return (
     <div className='space-y-8'>
       {billingInfo?.stale && (
-        <div className='flex items-start gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
+        <ContentSurfaceCard
+          className='flex items-start gap-2 border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] px-4 py-3 text-[13px] text-primary-token'
+          surface='nested'
+        >
           <AlertCircle
-            className='mt-0.5 h-4 w-4 shrink-0 text-amber-700'
+            className='mt-0.5 h-4 w-4 shrink-0 text-[color:var(--linear-warning)]'
             aria-hidden='true'
           />
           <p>
             {billingInfo.staleReason ??
               'Billing details are temporarily unavailable. Displaying your latest saved status.'}
           </p>
-        </div>
+        </ContentSurfaceCard>
       )}
 
       <BillingHeader plan={currentPlan} />

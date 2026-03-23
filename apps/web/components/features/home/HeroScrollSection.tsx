@@ -42,12 +42,14 @@ export function HeroScrollSection() {
             <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
               <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
                 <ProductScreenshot
-                  src='/product-screenshots/releases-dashboard-sidebar.png'
-                  alt='Jovie release dashboard showing releases table with sidebar open'
+                  src='/product-screenshots/releases-dashboard-full.png'
+                  alt='Jovie release dashboard showing releases table with smart link details'
                   width={2880}
                   height={1800}
                   title='Jovie'
                   priority
+                  skipCheck
+                  testId='hero-dashboard-screenshot'
                 />
                 {/* Gentle bottom fade — subtle, not aggressive */}
                 <div

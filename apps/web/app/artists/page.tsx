@@ -2,12 +2,14 @@ import * as Sentry from '@sentry/nextjs';
 import { asc, eq } from 'drizzle-orm';
 import Link from 'next/link';
 import { Icon } from '@/components/atoms/Icon';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { OptimizedImage } from '@/components/molecules/OptimizedImage';
-import { Container } from '@/components/site/Container';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 
-export const revalidate = 3600; // Revalidate every hour
+export const revalidate = 3600;
 
 export default async function ArtistsPage() {
   let profiles: Array<{
@@ -21,11 +23,9 @@ export default async function ArtistsPage() {
 
   try {
     if (!process.env.DATABASE_URL) {
-      // Skip DB lookup when database is unavailable (e.g., static builds without env)
       return renderFallback();
     }
 
-    // Fetch all public creator profiles
     profiles = await db
       .select({
         id: creatorProfiles.id,
@@ -47,87 +47,124 @@ export default async function ArtistsPage() {
   }
 
   return (
-    <div className='min-h-screen bg-[#0D0E12]'>
-      <Container className='py-16'>
-        {/* Page Header */}
-        <div className='text-center mb-12'>
-          <h1 className='text-4xl font-semibold text-white sm:text-5xl'>
-            All Artists
-          </h1>
-          <p className='mt-4 text-xl text-white/70'>
-            Discover amazing music artists and their profiles
-          </p>
-        </div>
+    <StandaloneProductPage width='xl'>
+      <div className='space-y-6'>
+        <ContentSurfaceCard surface='details'>
+          <ContentSectionHeader
+            density='compact'
+            title='All artists'
+            subtitle='Discover public creator profiles across Jovie.'
+          />
+          <div className='grid grid-cols-1 gap-3 p-3 pt-0 sm:grid-cols-3 sm:p-4 sm:pt-0'>
+            <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
+              <p className='text-2xl font-semibold tracking-[-0.03em] text-primary-token'>
+                {profiles.length}
+              </p>
+              <p className='text-[12px] font-[560] uppercase tracking-[0.14em] text-tertiary-token'>
+                Public profiles
+              </p>
+              <p className='text-[13px] leading-5 text-secondary-token'>
+                Creator pages currently available to browse.
+              </p>
+            </ContentSurfaceCard>
+            <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
+              <p className='text-[13px] font-[560] text-primary-token'>
+                Discover artists
+              </p>
+              <p className='text-[13px] leading-5 text-secondary-token'>
+                Browse creator pages, profile themes, and public fan
+                experiences.
+              </p>
+            </ContentSurfaceCard>
+            <ContentSurfaceCard surface='nested' className='space-y-1 p-4'>
+              <p className='text-[13px] font-[560] text-primary-token'>
+                Jump straight in
+              </p>
+              <p className='text-[13px] leading-5 text-secondary-token'>
+                Every card opens the artist&apos;s public profile in one click.
+              </p>
+            </ContentSurfaceCard>
+          </div>
+        </ContentSurfaceCard>
 
-        {/* Creator Profiles Grid */}
-        {profiles && profiles.length > 0 ? (
-          <div className='grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
+        {profiles.length > 0 ? (
+          <div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
             {profiles.map(profile => (
-              <Link
-                key={profile.id}
-                href={`/${profile.username}`}
-                className='group block text-center transition-all duration-300 hover:scale-105'
-              >
-                <div className='mx-auto mb-4 h-24 w-24'>
-                  <OptimizedImage
-                    src={profile.avatarUrl}
-                    alt={`${profile.displayName} - Creator Profile`}
-                    size='xl'
-                    shape='circle'
-                    className='mx-auto'
-                    aspectRatio='square'
-                    sizes='(max-width: 640px) 96px, (max-width: 1024px) 96px, 96px'
-                  />
-                </div>
+              <ContentSurfaceCard key={profile.id} surface='nested'>
+                <Link
+                  href={'/' + profile.username}
+                  className='group flex h-full flex-col items-center gap-3 p-5 text-center transition-colors'
+                >
+                  <div className='h-24 w-24'>
+                    <OptimizedImage
+                      src={profile.avatarUrl}
+                      alt={
+                        (profile.displayName || profile.username) +
+                        ' creator profile'
+                      }
+                      size='xl'
+                      shape='circle'
+                      className='mx-auto'
+                      aspectRatio='square'
+                      sizes='(max-width: 640px) 96px, (max-width: 1024px) 96px, 96px'
+                    />
+                  </div>
 
-                <h3 className='text-lg font-semibold text-white group-hover:text-blue-400 transition-colors'>
-                  {profile.displayName || profile.username}
-                </h3>
+                  <div className='space-y-1'>
+                    <h2 className='text-[15px] font-[560] text-primary-token transition-colors group-hover:text-secondary-token'>
+                      {profile.displayName || profile.username}
+                    </h2>
+                    {profile.bio ? (
+                      <p className='line-clamp-3 text-[13px] leading-5 text-secondary-token'>
+                        {profile.bio}
+                      </p>
+                    ) : (
+                      <p className='text-[13px] leading-5 text-tertiary-token'>
+                        Public creator profile on Jovie.
+                      </p>
+                    )}
+                  </div>
 
-                {profile.bio && (
-                  <p className='mt-1 text-sm text-white/70 line-clamp-2'>
-                    {profile.bio}
-                  </p>
-                )}
-
-                <div className='mt-3 inline-flex items-center text-blue-400 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity'>
-                  <span>View Profile</span>
-                  <Icon
-                    name='ChevronRight'
-                    className='ml-1 h-4 w-4 transition-transform group-hover:translate-x-1'
-                  />
-                </div>
-              </Link>
+                  <span className='inline-flex items-center gap-1 text-[12px] font-[560] text-tertiary-token transition-colors group-hover:text-primary-token'>
+                    View profile
+                    <Icon name='ChevronRight' className='h-4 w-4' />
+                  </span>
+                </Link>
+              </ContentSurfaceCard>
             ))}
           </div>
         ) : (
-          <div className='text-center'>
-            <h2 className='text-2xl font-semibold text-white'>
-              No profiles found
-            </h2>
-            <p className='mt-4 text-white/70'>
-              Check back later for new creator profiles.
-            </p>
-          </div>
+          <ContentSurfaceCard surface='details'>
+            <div className='px-5 py-8 text-center sm:px-6'>
+              <p className='text-[15px] font-[560] text-primary-token'>
+                No profiles found
+              </p>
+              <p className='mt-2 text-[13px] leading-5 text-secondary-token'>
+                Check back later for new creator profiles.
+              </p>
+            </div>
+          </ContentSurfaceCard>
         )}
-      </Container>
-    </div>
+      </div>
+    </StandaloneProductPage>
   );
 }
 
 function renderFallback() {
   return (
-    <div className='min-h-screen bg-[#0D0E12]'>
-      <Container className='py-16'>
-        <div className='text-center'>
-          <h1 className='text-2xl font-semibold text-white'>
-            Profiles are loading
-          </h1>
-          <p className='mt-4 text-white/70'>
-            Please check back shortly once the connection is available.
+    <StandaloneProductPage width='lg' centered>
+      <ContentSurfaceCard surface='details' className='overflow-hidden'>
+        <ContentSectionHeader
+          density='compact'
+          title='Profiles are loading'
+          subtitle='Please check back shortly once the connection is available.'
+        />
+        <div className='px-5 py-8 text-center sm:px-6'>
+          <p className='text-[13px] leading-5 text-secondary-token'>
+            Public creator data is temporarily unavailable.
           </p>
         </div>
-      </Container>
-    </div>
+      </ContentSurfaceCard>
+    </StandaloneProductPage>
   );
 }
