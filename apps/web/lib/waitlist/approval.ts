@@ -43,7 +43,7 @@ export async function approveWaitlistEntryInTx(
 
   if (!entry) return { outcome: 'not_found' };
 
-  if (entry.status !== 'new') {
+  if (entry.status !== 'new' && entry.status !== 'invited') {
     return { outcome: 'already_processed', status: entry.status };
   }
 
@@ -182,7 +182,11 @@ export async function disapproveWaitlistEntryInTx(
   if (user) {
     await tx
       .update(users)
-      .set({ userStatus: 'waitlist_pending', updatedAt: now })
+      .set({
+        userStatus: 'waitlist_pending',
+        activeProfileId: profile ? null : undefined,
+        updatedAt: now,
+      })
       .where(eq(users.id, user.id));
   }
 

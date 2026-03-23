@@ -407,7 +407,32 @@ interface Props {
   }>;
   readonly searchParams?: Promise<{
     mode?: ProfileMode;
+    ff_profile_v2?: string;
   }>;
+}
+
+function isDevProfileV2OverrideEnabled(searchParams?: {
+  ff_profile_v2?: string;
+}): boolean {
+  if (process.env.NODE_ENV === 'production') {
+    return false;
+  }
+
+  return searchParams?.ff_profile_v2 === '1';
+}
+
+async function getPublicTourDates(
+  profileId: string
+): Promise<TourDateViewModel[]> {
+  try {
+    return await getUpcomingTourDatesForProfile(profileId);
+  } catch (error) {
+    await captureError('Error fetching public profile tour dates', error, {
+      profileId,
+      route: '/[username]',
+    });
+    return [];
+  }
 }
 
 function mapProfileResultToCreatorProfile(result: {
@@ -597,7 +622,9 @@ export default async function ArtistPage({
   const resolvedSearchParams = await searchParams;
   const mode = getProfileMode(resolvedSearchParams?.mode);
   const isPublicNoAuthSmoke = process.env.PUBLIC_NOAUTH_SMOKE === '1';
-  const profileV2Enabled = await getCachedProfileV2Gate();
+  const profileV2Enabled = isDevProfileV2OverrideEnabled(resolvedSearchParams)
+    ? true
+    : await getCachedProfileV2Gate();
 
   // NOTE: Cookie access removed from server component to enable static optimization.
   // User-specific behavior (isIdentified, spotifyPreferred) is now handled client-side
@@ -671,7 +698,7 @@ export default async function ArtistPage({
       getCachedLatestReleaseGate(),
       getCachedSubscribeCTAVariant(profile.id),
       profileV2Enabled || mode === 'tour'
-        ? getUpcomingTourDatesForProfile(profile.id)
+        ? getPublicTourDates(profile.id)
         : Promise.resolve([] as TourDateViewModel[]),
     ]
   );
