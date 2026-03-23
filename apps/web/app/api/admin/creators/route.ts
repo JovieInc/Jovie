@@ -28,7 +28,10 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
+  const page = Math.min(
+    10000,
+    Math.max(1, Number(searchParams.get('page') ?? '1') || 1)
+  );
   const pageSize = Math.min(
     100,
     Math.max(1, Number(searchParams.get('pageSize') ?? '20') || 20)

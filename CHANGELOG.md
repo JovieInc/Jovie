@@ -19,7 +19,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Added `opt-in-token` module with HMAC token generation, verification, and URL building
 - [internal] Added `tipCheckout` rate limiter (30 sessions/hour per IP) for public checkout endpoint
-- Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
+- [internal] Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
 
 ## [26.4.45] - 2026-03-23
 

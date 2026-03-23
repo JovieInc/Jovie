@@ -82,7 +82,9 @@ export const paymentIntentLimiter = createRateLimiter(
  * Limit: 30 sessions per hour per IP
  * Higher than paymentIntent because this is a public endpoint keyed by IP (shared NATs)
  */
-export const tipCheckoutLimiter = createRateLimiter(RATE_LIMITERS.tipCheckout);
+export const tipCheckoutLimiter = createRateLimiter(RATE_LIMITERS.tipCheckout, {
+  requireRedis: true,
+});
 
 // ============================================================================
 // Admin Operations

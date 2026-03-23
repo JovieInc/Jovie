@@ -64,6 +64,8 @@ export function getTipThankYouText(data: TipThankYouTemplateData): string {
     ? `${BASE_URL}/api/audience/unsubscribe?token=${encodeURIComponent(data.unsubscribeToken)}`
     : null;
 
+  const optInUrl = buildOptInUrl(data.recipientEmail, data.profileId);
+
   return `${greeting}
 
 Your ${amount} tip means the world to ${artistName}. Thank you for your support!
@@ -71,7 +73,7 @@ Your ${amount} tip means the world to ${artistName}. Thank you for your support!
 Check out more from ${artistName}: ${profileUrl}
 
 ${musicSection.length > 0 ? `Listen to ${artistName}:\n${musicSection.join('\n')}\n` : ''}
-- The ${APP_NAME} Team
+${optInUrl ? `Want to hear about upcoming shows and new releases? Stay updated: ${optInUrl}\n` : ''}- The ${APP_NAME} Team
 
 ---
 ${unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : ''}
