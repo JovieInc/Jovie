@@ -25,8 +25,11 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Number(searchParams.get('page') ?? '1');
-  const pageSize = Number(searchParams.get('pageSize') ?? '20');
+  const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
+  const pageSize = Math.min(
+    100,
+    Math.max(1, Number(searchParams.get('pageSize') ?? '20') || 20)
+  );
   const sort = (searchParams.get('sort') ?? 'created_desc') as AdminUsersSort;
   const q = searchParams.get('q') ?? '';
 
