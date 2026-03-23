@@ -20,6 +20,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] Delete the obsolete custom Clerk auth hooks, multi-step auth form components, and their unused tests after the prebuilt auth cutover
+- Fix duplicate "Jovie" in public profile page title — browser tab showed "Tim White | Jovie | Jovie" instead of "Tim White | Jovie"
 ### Added
 
 - Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
