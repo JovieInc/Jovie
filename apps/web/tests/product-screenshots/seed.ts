@@ -18,7 +18,73 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 
-const { creatorProfiles, discogReleases, discogTracks, providerLinks } = schema;
+const {
+  creatorProfiles,
+  discogReleases,
+  discogTracks,
+  providers,
+  providerLinks,
+} = schema;
+
+// ---------------------------------------------------------------------------
+// Provider definitions – ensure these exist before inserting provider links
+// ---------------------------------------------------------------------------
+const REQUIRED_PROVIDERS = [
+  {
+    id: 'spotify',
+    displayName: 'Spotify',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://open.spotify.com',
+  },
+  {
+    id: 'apple_music',
+    displayName: 'Apple Music',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://music.apple.com',
+  },
+  {
+    id: 'youtube',
+    displayName: 'YouTube Music',
+    kind: 'video' as const,
+    baseUrl: 'https://music.youtube.com',
+  },
+  {
+    id: 'soundcloud',
+    displayName: 'SoundCloud',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://soundcloud.com',
+  },
+  {
+    id: 'deezer',
+    displayName: 'Deezer',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://www.deezer.com',
+  },
+  {
+    id: 'tidal',
+    displayName: 'Tidal',
+    kind: 'music_streaming' as const,
+    baseUrl: 'https://tidal.com',
+  },
+  {
+    id: 'amazon_music',
+    displayName: 'Amazon Music',
+    kind: 'retail' as const,
+    baseUrl: 'https://music.amazon.com',
+  },
+  {
+    id: 'bandcamp',
+    displayName: 'Bandcamp',
+    kind: 'retail' as const,
+    baseUrl: 'https://bandcamp.com',
+  },
+  {
+    id: 'beatport',
+    displayName: 'Beatport',
+    kind: 'retail' as const,
+    baseUrl: 'https://www.beatport.com',
+  },
+];
 
 // ---------------------------------------------------------------------------
 // Artwork URLs – using Unsplash images already allowed in the CSP
@@ -586,6 +652,13 @@ export async function seedScreenshotData() {
     })
     .where(eq(creatorProfiles.id, profile.id));
   console.log('  ✓ Updated profile display name to "Aria Chen"\n');
+
+  // Ensure all required providers exist
+  console.log('  Ensuring providers exist...');
+  for (const provider of REQUIRED_PROVIDERS) {
+    await db.insert(providers).values(provider).onConflictDoNothing();
+  }
+  console.log(`  ✓ ${REQUIRED_PROVIDERS.length} providers ensured\n`);
 
   // Seed all releases
   console.log('  Seeding releases...');

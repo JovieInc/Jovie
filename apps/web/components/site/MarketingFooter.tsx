@@ -1,11 +1,15 @@
 import { Footer } from '@/components/site/Footer';
 
 /**
- * Unified marketing footer — always renders the icon logo
- * with the compact (minimal) variant across all marketing pages.
+ * Marketing footer — minimal, dark-only, no theme toggle.
  */
 export function MarketingFooter() {
   return (
-    <Footer version='minimal' brandingMark='icon' containerSize='homepage' />
+    <Footer
+      version='minimal'
+      brandingMark='icon'
+      containerSize='homepage'
+      showThemeToggle={false}
+    />
   );
 }

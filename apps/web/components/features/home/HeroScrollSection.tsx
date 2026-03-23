@@ -1,64 +1,61 @@
-'use client';
-
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
-import { HeroDashboardScene } from './HeroDashboardScene';
+import { ProductScreenshot } from './ProductScreenshot';
 
 export function HeroScrollSection() {
   return (
-    <section className='relative overflow-hidden px-5 pb-0 pt-[6.35rem] sm:px-6 md:pt-[7rem] lg:pt-[7.8rem] xl:pt-[8.4rem]'>
+    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:pt-[6.6rem] xl:pt-[6.9rem]'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
         style={{ background: 'var(--linear-hero-backdrop)' }}
       />
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute left-1/2 top-[20%] h-[18rem] w-[42rem] -translate-x-1/2 rounded-full blur-3xl md:h-[20rem] md:w-[56rem] xl:w-[62rem]'
-        style={{
-          background:
-            'radial-gradient(circle at center, rgba(113,112,255,0.1), transparent 60%)',
-        }}
-      />
+      <div className='hero-glow pointer-events-none absolute inset-0' />
 
       <Container size='homepage'>
-        <div className='homepage-section-shell max-w-[var(--linear-hero-shell-max)]'>
-          <div className='hero-stagger reveal-on-scroll'>
-            <div className='max-w-[var(--linear-hero-copy-max)] text-left'>
-              <h1 className='marketing-h1-linear max-w-[10.5ch] text-primary-token sm:max-w-[11ch]'>
-                <span className='block'>One link to launch</span>
-                <span className='block'>your music career.</span>
-              </h1>
-
-              <p className='marketing-lead-linear mt-4 max-w-[31rem] text-secondary-token md:mt-5'>
-                Smart links, fan capture, tips, and tour dates, all behind a
-                single link.
+        <div className='mx-auto max-w-[1120px]'>
+          <div className='hero-stagger'>
+            <div className='max-w-[44rem] text-center lg:text-left'>
+              <p className='homepage-section-eyebrow'>
+                Built for independent artists
               </p>
 
-              <div className='mt-6 w-full max-w-[35rem] md:mt-7'>
-                <ClaimHandleForm size='display' />
+              <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left'>
+                The link your music deserves.
+              </h1>
+
+              <p className='marketing-lead-linear mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
+                Smart links, release automation, and fan intelligence in one
+                system that helps you launch faster and keep more fans moving.
+              </p>
+
+              <div className='mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
+                <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-3.5 text-[length:var(--linear-label-size)] tracking-[0.01em] text-tertiary-token md:mt-4'>
-                <span
-                  aria-hidden='true'
-                  className='mr-2 inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)] shadow-[0_0_6px_var(--linear-success)]'
-                />{' '}
-                Start free with smart links and your artist profile.
+              <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
+                Start free with your artist link, profile, and next release
+                workflow.
               </p>
             </div>
 
-            <div className='relative mt-10 w-full sm:mt-12 md:mt-14'>
+            <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>
               <div className='homepage-surface-card relative overflow-hidden rounded-[1rem] md:rounded-[1.1rem]'>
-                <div className='relative -mb-[var(--linear-hero-scene-offset-sm)] md:-mb-[var(--linear-hero-scene-offset-md)] xl:-mb-[var(--linear-hero-scene-offset-lg)]'>
-                  <HeroDashboardScene />
-                </div>
+                <ProductScreenshot
+                  src='/product-screenshots/releases-dashboard-sidebar.png'
+                  alt='Jovie release dashboard showing releases table with sidebar open'
+                  width={2880}
+                  height={1800}
+                  title='Jovie'
+                  priority
+                />
+                {/* Gentle bottom fade — subtle, not aggressive */}
                 <div
                   aria-hidden='true'
-                  className='pointer-events-none absolute inset-x-0 bottom-0 h-20 md:h-24'
+                  className='pointer-events-none absolute inset-x-0 bottom-0 h-16 md:h-20'
                   style={{
                     background:
-                      'linear-gradient(180deg, rgba(8,9,10,0) 0%, rgba(8,9,10,0.26) 40%, var(--linear-bg-page) 100%)',
+                      'linear-gradient(180deg, transparent 0%, rgba(8,9,10,0.44) 70%, var(--linear-bg-page) 100%)',
                   }}
                 />
               </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from './claim-handle';
 
 export function FinalCTASection() {
@@ -9,26 +9,39 @@ export function FinalCTASection() {
       className='relative z-10 overflow-hidden'
       style={{
         borderTop: '1px solid var(--linear-border-subtle)',
-        paddingTop: 'calc(var(--linear-cta-section-pt) - 1.5rem)',
-        paddingBottom: 'calc(var(--linear-cta-section-pb) - 2rem)',
+        paddingTop: 'var(--linear-cta-section-pt)',
+        paddingBottom: 'var(--linear-cta-section-pb)',
       }}
     >
-      <Container size='homepage'>
-        <div className='reveal-on-scroll relative mx-auto flex max-w-[38rem] flex-col items-center text-center'>
-          <h2
-            data-testid='final-cta-headline'
-            className='marketing-h2-linear max-w-[8.5ch] text-primary-token'
-          >
-            Take the stage.
-          </h2>
+      <MarketingContainer width='landing'>
+        <div className='reveal-on-scroll relative grid gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start'>
+          <div className='max-w-[32rem]'>
+            <p className='marketing-kicker'>Start free</p>
+            <h2
+              data-testid='final-cta-headline'
+              className='marketing-h2-linear mt-6 text-primary-token'
+            >
+              Available today.
+            </h2>
 
-          <p className='mt-4 max-w-[31rem] marketing-lead-linear text-secondary-token'>
-            Claim your handle and get the release system ready before the next
-            song drops.
-          </p>
+            <p className='mt-4 max-w-[30rem] marketing-lead-linear text-secondary-token'>
+              Claim your handle and get your release system ready before the
+              next song drops.
+            </p>
 
-          {/* Form */}
-          <div className='mt-6 w-full max-w-[34rem] md:mt-7'>
+            <div className='mt-5 flex flex-col items-start gap-2 text-left text-[length:var(--linear-label-size)] text-tertiary-token'>
+              <p className='flex items-center gap-2'>
+                <span
+                  aria-hidden='true'
+                  className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
+                />
+                Live in minutes
+              </p>
+              <p>No credit card required</p>
+            </div>
+          </div>
+
+          <div className='w-full max-w-[34rem] lg:justify-self-end'>
             <div
               id='final-cta-dock'
               data-testid='final-cta-dock'
@@ -40,25 +53,8 @@ export function FinalCTASection() {
               <ClaimHandleForm />
             </div>
           </div>
-
-          {/* Trust signals */}
-          <div className='mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2'>
-            <p className='flex items-center gap-2 text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              <span
-                aria-hidden='true'
-                className='inline-block h-1.5 w-1.5 rounded-full bg-[var(--linear-success)]'
-              />{' '}
-              Live in minutes
-            </p>
-            <span aria-hidden='true' className='text-quaternary-token'>
-              ·
-            </span>
-            <p className='text-[length:var(--linear-label-size)] font-[number:var(--linear-font-weight-normal)] text-tertiary-token'>
-              No credit card required
-            </p>
-          </div>
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

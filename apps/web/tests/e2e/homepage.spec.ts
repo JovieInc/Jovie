@@ -32,11 +32,11 @@ test.describe('Homepage', () => {
     page,
   }) => {
     await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.'
+      'The link your music deserves.'
     );
     await expect(
       page.getByText(
-        'Smart links, fan capture, tips, and tour dates, all behind a single link.'
+        'Smart links, release automation, and fan intelligence in one system that helps you launch faster and keep more fans moving.'
       )
     ).toBeVisible();
 
@@ -44,29 +44,31 @@ test.describe('Homepage', () => {
     await expect(heroSection.locator('input').first()).toBeVisible();
   });
 
-  test('header keeps homepage anchor navigation', async ({ page }) => {
+  test('header shows auth actions without marketing nav links', async ({
+    page,
+  }) => {
     const header = page.locator('header');
     await expect(header).toBeVisible();
-    await expect(page.locator('a[href="#release-proof"]')).toBeVisible();
-    await expect(page.locator('a[href="#profiles"]')).toBeVisible();
-    await expect(
-      page.locator('a[href="#audience-intelligence"]')
-    ).toBeVisible();
-    await expect(page.locator('a[href="#pricing"]')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Log in' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign up' })).toBeVisible();
+    await expect(page.locator('a[href="#release"]')).toHaveCount(0);
+    await expect(page.locator('a[href="#profile"]')).toHaveCount(0);
+    await expect(page.locator('a[href="#audience"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/pricing"]')).toHaveCount(0);
   });
 
   test('core homepage sections render in order', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Release day, automated.' })
+      page.getByRole('heading', { name: 'Built for releases, not just links.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'One Tool. Zero Setup.' })
+      page.getByRole('heading', { name: 'Release day, automated.' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Profiles that convert.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'AI that knows your work.' })
+      page.getByRole('heading', { name: 'AI that knows every song.' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Know every fan by name.' })
@@ -80,7 +82,7 @@ test.describe('Homepage', () => {
     page,
   }) => {
     const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Take the stage.');
+    await expect(finalHeadline).toHaveText('Available today.');
 
     const finalDock = page.getByTestId('final-cta-dock');
     await expect(finalDock).toBeVisible();
@@ -91,7 +93,7 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 375, height: 812 });
 
     await expect(page.locator('h1')).toContainText(
-      'One link to launch your music career.',
+      'The link your music deserves.',
       {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       }

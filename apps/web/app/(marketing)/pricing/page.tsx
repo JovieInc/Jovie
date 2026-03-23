@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Container } from '@/components/site/Container';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
@@ -259,34 +259,20 @@ export default function PricingPage() {
       {/* Structured Data for SEO */}
       <script type='application/ld+json'>{PRICING_SCHEMA}</script>
 
-      <Container size='lg'>
-        <div className='section-spacing-linear'>
-          {/* Header */}
-          <div className='text-center heading-gap-linear'>
-            <h1
-              className='text-3xl md:text-5xl lg:text-6xl'
-              style={{
-                fontWeight: 'var(--linear-font-weight-medium)',
-                lineHeight: 1.1,
-                letterSpacing: '-0.02em',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
-              Simple pricing. No Surprises.
-            </h1>
-            <p
-              className='mt-4 mx-auto max-w-lg'
-              style={{
-                fontSize: 'var(--linear-body-lg-size)',
-                lineHeight: 'var(--linear-body-lg-leading)',
-                color: 'var(--linear-text-secondary)',
-              }}
-            >
-              Start free with unlimited smartlinks. Upgrade when you&apos;re
-              ready to grow.
-            </p>
-          </div>
+      <MarketingHero variant='left'>
+        <p className='marketing-kicker'>Pricing</p>
+        <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
+          Simple pricing. No surprises.
+        </h1>
+        <p className='marketing-lead-linear mt-5 max-w-[34rem] text-secondary-token'>
+          Start free with unlimited smart links. Upgrade when you&apos;re ready
+          to remove branding, see deeper analytics, and keep more of the system
+          working for you automatically.
+        </p>
+      </MarketingHero>
 
+      <MarketingContainer width='page'>
+        <div className='section-spacing-linear'>
           {/* Pricing Grid */}
           <div className='mx-auto max-w-5xl'>
             {/* Desktop: 2-3 columns, Mobile: stacked cards */}
@@ -344,19 +330,14 @@ export default function PricingPage() {
 
           {/* Full Feature Comparison Chart */}
           <div className='mt-20'>
-            <h2
-              className='text-center text-2xl md:text-3xl mb-10'
-              style={{
-                fontWeight: 'var(--linear-font-weight-medium)',
-                color: 'var(--linear-text-primary)',
-              }}
-            >
+            <div className='marketing-divider mb-10' />
+            <h2 className='mb-10 text-2xl font-medium tracking-tight text-primary-token md:text-3xl'>
               Compare all features
             </h2>
             <PricingComparisonChart />
           </div>
         </div>
-      </Container>
+      </MarketingContainer>
 
       {/* CTA Section */}
       <FinalCTASection />

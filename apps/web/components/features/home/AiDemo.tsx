@@ -268,7 +268,7 @@ export function AiDemo() {
       </div>
 
       {/* Demo content */}
-      <div className='px-5 pt-5 pb-6'>
+      <div className='px-6 pt-6 pb-8'>
         {/* Prompt */}
         {currentDemo && (
           <div className='font-mono text-sm text-tertiary-token mb-4'>
@@ -279,7 +279,7 @@ export function AiDemo() {
         {/* Response */}
         <output
           aria-live='polite'
-          className='block text-sm leading-[1.7] text-secondary-token min-h-[80px]'
+          className='block text-sm leading-[1.7] text-secondary-token min-h-[120px]'
         >
           {currentDemo?.segments.map((segment, i) => {
             if (i >= visibleCount) return null;

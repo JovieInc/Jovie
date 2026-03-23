@@ -72,6 +72,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Update hero copy: "The link your music deserves." with subhead "Share every release. Reach every fan. Automatically."
 - [internal] Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
 - [internal] Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
 - [internal] Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)

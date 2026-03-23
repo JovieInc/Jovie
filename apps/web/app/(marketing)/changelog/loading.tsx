@@ -1,21 +1,24 @@
-import { Container } from '@/components/site/Container';
+import { MarketingContainer } from '@/components/marketing';
 
 export default function ChangelogLoading() {
   return (
     <section
-      className='py-16 md:py-24 min-h-screen'
+      className='min-h-screen'
       style={{
         backgroundColor: 'var(--linear-bg-footer)',
         color: 'var(--linear-text-primary)',
       }}
     >
-      <Container>
-        <header className='mb-12 md:mb-16 max-w-2xl'>
-          <div className='h-10 w-48 skeleton rounded-lg' />
-          <div className='mt-3 h-5 w-96 max-w-full skeleton rounded-lg' />
-          <div className='mt-4 h-5 w-32 skeleton rounded-lg' />
-        </header>
+      {/* Hero skeleton */}
+      <div className='pt-16 pb-20 sm:pt-20 sm:pb-24 lg:pt-24 lg:pb-32 text-center'>
+        <MarketingContainer width='page'>
+          <div className='mx-auto h-12 w-56 skeleton rounded-lg' />
+          <div className='mx-auto mt-4 h-5 w-96 max-w-full skeleton rounded-lg' />
+          <div className='mx-auto mt-4 h-5 w-32 skeleton rounded-lg' />
+        </MarketingContainer>
+      </div>
 
+      <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='max-w-3xl space-y-10'>
           {Array.from({ length: 4 }, (_, i) => `cl-skeleton-${i}`).map(key => (
             <div
@@ -34,7 +37,7 @@ export default function ChangelogLoading() {
             </div>
           ))}
         </div>
-      </Container>
+      </MarketingContainer>
     </section>
   );
 }

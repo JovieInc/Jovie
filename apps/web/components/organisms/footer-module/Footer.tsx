@@ -3,13 +3,11 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
-import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { useFeatureGate } from '@/lib/feature-flags/client';
 import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
-import { FEATURES } from '@/lib/features';
 import { cn } from '@/lib/utils';
 
 // Dynamic import to exclude ThemeToggle from bundle when not used
@@ -20,6 +18,52 @@ const ThemeToggle = dynamic(
     })),
   { ssr: false }
 );
+
+const FOOTER_COLUMNS = [
+  {
+    id: 'product',
+    heading: 'Product',
+    links: [
+      { href: '/#release', label: 'Smart Links' },
+      { href: '/#profile', label: 'Artist Profile' },
+      { href: '/#release', label: 'Release Automation' },
+      { href: '/#audience', label: 'Audience Intelligence' },
+      { href: '/#ai', label: 'AI Assistant' },
+      { href: '/pricing', label: 'Pricing' },
+    ],
+  },
+  {
+    id: 'features',
+    heading: 'Features',
+    links: [
+      { href: '/#analytics', label: 'Analytics' },
+      { href: '/#profile', label: 'Fan Capture' },
+      { href: '/#profile', label: 'Tipping' },
+      { href: '/#profile', label: 'Tour Dates' },
+    ],
+  },
+  {
+    id: 'company',
+    heading: 'Company',
+    links: [
+      { href: '/blog', label: 'Blog' },
+      { href: '/changelog', label: 'Changelog' },
+    ],
+  },
+  {
+    id: 'resources',
+    heading: 'Resources',
+    links: [{ href: '/support', label: 'Support' }],
+  },
+  {
+    id: 'connect',
+    heading: 'Connect',
+    links: [
+      { href: 'https://x.com/jovieapp', label: 'X (Twitter)' },
+      { href: 'https://instagram.com/jovieapp', label: 'Instagram' },
+    ],
+  },
+] as const;
 
 import {
   CONTAINER_SIZES,
@@ -96,17 +140,6 @@ export function Footer({
   }
 
   if (variant === 'regular') {
-    const productLinks = [
-      ...FEATURES.map(f => ({ href: f.href, label: f.title })),
-    ];
-
-    const companyLinks = [{ href: '/support', label: 'Support' }];
-
-    const legalLinks = [
-      { href: APP_ROUTES.LEGAL_PRIVACY, label: 'Privacy Policy' },
-      { href: APP_ROUTES.LEGAL_TERMS, label: 'Terms of Service' },
-    ];
-
     return (
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer
@@ -114,7 +147,6 @@ export function Footer({
         style={{ backgroundColor: 'var(--linear-bg-footer)' }}
         aria-label='Site footer'
       >
-        {/* Gradient separator — matches logo bar treatment */}
         <div
           aria-hidden='true'
           className='h-px'
@@ -131,7 +163,7 @@ export function Footer({
             maxWidthClass
           )}
         >
-          <div className='flex flex-col items-center gap-12 lg:gap-16 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,2.5fr)] sm:items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,2fr)]'>
+          <div className='flex flex-col items-center gap-12 lg:gap-16 sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,3fr)] sm:items-start'>
             <div className='flex flex-col items-center text-center sm:items-start sm:text-left'>
               <FooterBranding
                 variant='linear'
@@ -144,100 +176,38 @@ export function Footer({
               />
             </div>
 
-            <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-2 sm:gap-8 sm:text-left lg:grid-cols-3 lg:gap-12'>
-              <nav aria-labelledby='footer-product-heading'>
-                <h2
-                  id='footer-product-heading'
-                  className={SECTION_HEADING_CLASS_NAME}
-                  style={SECTION_HEADING_STYLE}
-                >
-                  Product
-                </h2>
-                <ul className='flex flex-col gap-0.5'>
-                  {productLinks.map(link => (
-                    <li key={`${link.href}-${link.label}`}>
-                      <Link
-                        href={link.href}
-                        className={cn(
-                          FOOTER_LINK_CLASS_NAME,
-                          FOOTER_LINK_HOVER_CLASS
-                        )}
-                        style={FOOTER_LINK_STYLE}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-
-              <nav aria-labelledby='footer-company-heading'>
-                <h2
-                  id='footer-company-heading'
-                  className={SECTION_HEADING_CLASS_NAME}
-                  style={SECTION_HEADING_STYLE}
-                >
-                  Company
-                </h2>
-                <ul className='flex flex-col gap-0.5'>
-                  {companyLinks.map(link => (
-                    <li key={`${link.href}-${link.label}`}>
-                      <Link
-                        href={link.href}
-                        className={cn(
-                          FOOTER_LINK_CLASS_NAME,
-                          FOOTER_LINK_HOVER_CLASS
-                        )}
-                        style={FOOTER_LINK_STYLE}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-
-              <nav
-                aria-labelledby='footer-legal-heading'
-                className='col-span-2 sm:col-span-1'
-              >
-                <h2
-                  id='footer-legal-heading'
-                  className={SECTION_HEADING_CLASS_NAME}
-                  style={SECTION_HEADING_STYLE}
-                >
-                  Legal
-                </h2>
-                <ul className='flex flex-col gap-0.5'>
-                  {legalLinks.map(link => (
-                    <li key={`${link.href}-${link.label}`}>
-                      <Link
-                        href={link.href}
-                        className={cn(
-                          FOOTER_LINK_CLASS_NAME,
-                          FOOTER_LINK_HOVER_CLASS
-                        )}
-                        style={FOOTER_LINK_STYLE}
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                  <li>
-                    <CookieSettingsFooterButton
-                      className={cn(
-                        FOOTER_LINK_CLASS_NAME,
-                        FOOTER_LINK_HOVER_CLASS
-                      )}
-                      style={FOOTER_LINK_STYLE}
-                    />
-                  </li>
-                </ul>
-              </nav>
+            <div className='grid w-full grid-cols-2 gap-10 text-center sm:grid-cols-3 sm:gap-8 sm:text-left lg:grid-cols-5 lg:gap-10'>
+              {FOOTER_COLUMNS.map(col => (
+                <nav key={col.id} aria-labelledby={`footer-${col.id}-heading`}>
+                  <h2
+                    id={`footer-${col.id}-heading`}
+                    className={SECTION_HEADING_CLASS_NAME}
+                    style={SECTION_HEADING_STYLE}
+                  >
+                    {col.heading}
+                  </h2>
+                  <ul className='flex flex-col gap-0.5'>
+                    {col.links.map(link => (
+                      <li key={`${link.href}-${link.label}`}>
+                        <Link
+                          href={link.href}
+                          className={cn(
+                            FOOTER_LINK_CLASS_NAME,
+                            FOOTER_LINK_HOVER_CLASS
+                          )}
+                          style={FOOTER_LINK_STYLE}
+                        >
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
+              ))}
             </div>
           </div>
 
-          <div className='mt-20'>
+          <div className='mt-16'>
             <div className='flex flex-col items-center gap-4 sm:flex-row sm:justify-between'>
               <Copyright
                 variant='light'
@@ -246,24 +216,22 @@ export function Footer({
                   color: 'var(--linear-text-tertiary)',
                 }}
               />
-              {effectiveShowThemeToggle && (
-                <div className='flex items-center gap-3 order-1 sm:order-2'>
-                  <div className='flex items-center sm:hidden'>
-                    <ThemeToggle
-                      appearance='icon'
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                  <div className='hidden sm:flex items-center'>
-                    <ThemeToggle
-                      appearance='segmented'
-                      shortcutKey={themeShortcutKey}
-                      variant='linear'
-                    />
-                  </div>
-                </div>
-              )}
+              <div className='flex items-center gap-4 order-1 sm:order-2'>
+                <Link
+                  href={APP_ROUTES.LEGAL_PRIVACY}
+                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+                  style={{ color: 'var(--linear-text-tertiary)' }}
+                >
+                  Privacy
+                </Link>
+                <Link
+                  href={APP_ROUTES.LEGAL_TERMS}
+                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)]'
+                  style={{ color: 'var(--linear-text-tertiary)' }}
+                >
+                  Terms
+                </Link>
+              </div>
             </div>
           </div>
         </div>

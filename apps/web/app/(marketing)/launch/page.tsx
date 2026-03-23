@@ -1,46 +1,22 @@
 import type { Metadata } from 'next';
-import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
+import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
-import { captureWarning } from '@/lib/error-tracking';
-import { getProfileByUsername } from '@/lib/services/profile';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
-
-/** Fetch the /tim profile data for the subscribe preview mockup (JOV-888). */
-const getTimProfile = unstable_cache(
-  async () => {
-    try {
-      const profile = await getProfileByUsername('tim');
-      if (!profile) return null;
-      return {
-        name: profile.displayName ?? null,
-        tagline: profile.bio ?? null,
-        handle: profile.username,
-        avatarUrl: profile.avatarUrl ?? null,
-      };
-    } catch (error) {
-      void captureWarning('[launch] Failed to fetch /tim profile for mockup', {
-        error,
-      });
-      return null;
-    }
-  },
-  ['launch-tim-profile'],
-  { revalidate: 3600, tags: ['profile:tim'] }
-);
 
 export async function generateMetadata(): Promise<Metadata> {
   const title = `${APP_NAME} — Your Entire Music Career. One Intelligent Link.`;
@@ -198,9 +174,7 @@ function Divider() {
   return <hr className='border-t border-subtle' />;
 }
 
-export default async function LaunchPage() {
-  const timProfile = await getTimProfile();
-
+export default function LaunchPage() {
   return (
     <div className='relative min-h-screen'>
       <AuthRedirectHandler />
@@ -213,64 +187,67 @@ export default async function LaunchPage() {
       {/* ═══ 1. HERO ═══ */}
       <section
         aria-labelledby='hero-heading'
-        className='relative pt-40 md:pt-48 lg:pt-52 pb-16 md:pb-20 lg:pb-24 overflow-hidden'
+        className='relative overflow-hidden'
       >
         <div
           className='hero-glow pointer-events-none absolute inset-0'
           aria-hidden='true'
         />
 
-        <div className={`${WRAP} relative`}>
-          <div className='flex flex-col items-center text-center'>
-            <h1 id='hero-heading' className='marketing-h1-linear max-w-[780px]'>
-              Your entire music career.{' '}
-              <span className='text-secondary-token'>
-                One intelligent link.
-              </span>
-            </h1>
+        <MarketingHero
+          variant='centered'
+          className='relative items-start pt-40 text-left md:pt-48 lg:pt-52'
+        >
+          <p className='marketing-kicker'>Launch</p>
+          <h1
+            id='hero-heading'
+            className='marketing-h1-linear mt-6 max-w-[11ch]'
+          >
+            Your entire music career.{' '}
+            <span className='text-secondary-token'>One intelligent link.</span>
+          </h1>
 
-            <p className='marketing-lead-linear mt-6 max-w-[520px] text-secondary-token'>
-              Import your Spotify, get smart links for every release, and a
-              link-in-bio that converts listeners into fans.
-            </p>
+          <p className='marketing-lead-linear mt-6 max-w-[34rem] text-secondary-token'>
+            Import your Spotify, get smart links for every release, and a
+            link-in-bio that converts listeners into fans.
+          </p>
 
-            <p className='mt-6 text-sm text-tertiary-token'>
-              Free forever. No credit card.
-            </p>
+          <p className='mt-6 text-sm text-tertiary-token'>
+            Free forever. No credit card.
+          </p>
 
-            <div className='mt-4 w-full max-w-[520px]'>
-              <HeroSpotifySearch />
-            </div>
-
-            <a
-              href='#how-it-works'
-              className='mt-6 inline-flex items-center gap-1.5 text-sm text-tertiary-token hover:text-secondary-token transition-colors focus-ring rounded'
-            >
-              See how it works
-              <svg
-                width='12'
-                height='12'
-                viewBox='0 0 12 12'
-                fill='none'
-                className='mt-px'
-                aria-hidden='true'
-              >
-                <path
-                  d='M6 2.5v7M3 7l3 3 3-3'
-                  stroke='currentColor'
-                  strokeWidth='1.5'
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                />
-              </svg>
-            </a>
+          <div className='mt-4 w-full max-w-[520px]'>
+            <HeroSpotifySearch />
           </div>
-        </div>
+
+          <a
+            href='#how-it-works'
+            className='mt-6 inline-flex items-center gap-1.5 text-sm text-tertiary-token hover:text-secondary-token transition-colors focus-ring rounded'
+          >
+            See how it works
+            <svg
+              width='12'
+              height='12'
+              viewBox='0 0 12 12'
+              fill='none'
+              className='mt-px'
+              aria-hidden='true'
+            >
+              <path
+                d='M6 2.5v7M3 7l3 3 3-3'
+                stroke='currentColor'
+                strokeWidth='1.5'
+                strokeLinecap='round'
+                strokeLinejoin='round'
+              />
+            </svg>
+          </a>
+        </MarketingHero>
       </section>
 
       {/* ═══ 2. LOGOS ═══ */}
       <div className='py-14 border-b border-subtle'>
-        <div className={WRAP}>
+        <MarketingContainer width='page'>
           <div className='flex items-center justify-between flex-wrap gap-6'>
             {LOGOS.map(name => (
               <span
@@ -281,7 +258,7 @@ export default async function LaunchPage() {
               </span>
             ))}
           </div>
-        </div>
+        </MarketingContainer>
       </div>
 
       {/* ═══ 3. THESIS ═══ */}
@@ -290,7 +267,7 @@ export default async function LaunchPage() {
         className='pt-32 pb-16'
         id='how-it-works'
       >
-        <div className={WRAP}>
+        <MarketingContainer width='page'>
           <h2 id='thesis-heading' className='marketing-h2-linear max-w-[680px]'>
             A new kind of artist tool.{' '}
             <span className='text-secondary-token'>
@@ -298,11 +275,11 @@ export default async function LaunchPage() {
               link-in-bio that converts &mdash; all in seconds.
             </span>
           </h2>
-        </div>
+        </MarketingContainer>
       </section>
 
       {/* ═══ 4. PILLARS ═══ */}
-      <div className={WRAP}>
+      <MarketingContainer width='page'>
         <div className='grid grid-cols-1 md:grid-cols-3 border-t border-subtle'>
           {[
             {
@@ -337,7 +314,7 @@ export default async function LaunchPage() {
             </div>
           ))}
         </div>
-      </div>
+      </MarketingContainer>
 
       {/* ═══ 5. DYNAMIC PROFILES ═══ */}
       <div className={WRAP}>
@@ -400,10 +377,9 @@ export default async function LaunchPage() {
       {/* ═══ 6. PROFILE MOCKUP ═══ */}
       <div className={`${WRAP} pb-16`}>
         <ProfileMockup
-          name={timProfile?.name}
-          tagline={timProfile?.tagline}
-          handle={timProfile?.handle}
-          avatarUrl={timProfile?.avatarUrl}
+          name={TIM_WHITE_PROFILE.name}
+          handle='tim'
+          avatarUrl={TIM_WHITE_PROFILE.avatarSrc}
         />
       </div>
 

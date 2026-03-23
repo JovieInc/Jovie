@@ -183,12 +183,14 @@
      ============================================ */
   --linear-container-max: 1298px;
   --linear-container-padding: 24px;
-  --linear-content-max: 1250px;
+  --linear-content-max: 1200px;
   --linear-hero-section-max: 1024px;
+  --linear-prose-max: 624px;
+  --linear-homepage-max: 1344px;
   --linear-hero-h1-width: 900px;
   --linear-hero-lead-width: 821.469px;
   --linear-pricing-grid-max: 1024px;
-  --linear-header-height: 73px;
+  --linear-header-height: 72px;
   --linear-hero-height: 392px;
   --linear-button-height-sm: 32px;
   --linear-button-height-md: 40px;
@@ -279,15 +281,18 @@
   --linear-gap-nav: 4px;
   --linear-gap-buttons: 8px;
   --linear-gap-cards: 24px;
-  --linear-section-pt-sm: 48px;
+  --linear-section-pt-sm: 56px;
   --linear-section-pb-sm: 56px;
-  --linear-section-pt-md: 72px;
+  --linear-section-pt-md: 80px;
   --linear-section-pb-md: 80px;
-  --linear-section-pt-lg: 96px;
-  --linear-section-pb-lg: 128px;
+  --linear-section-pt-lg: 120px;
+  --linear-section-pb-lg: 120px;
   --linear-content-gap-sm: 40px;
   --linear-content-gap-md: 56px;
   --linear-content-gap-lg: 72px;
+  --linear-intro-gap-sm: 32px;
+  --linear-intro-gap-md: 48px;
+  --linear-intro-gap-lg: 64px;
   --linear-footer-py: 48px;
   --linear-footer-py-lg: 64px;
   /* ============================================
@@ -303,11 +308,11 @@
      ============================================ */
   --linear-h1-size-sm: 38px;
   --linear-h1-size-md: 56px;
-  --linear-h1-size-lg: 64px;
+  --linear-h1-size-lg: 76px;
   --linear-h2-size-sm: 24px;
-  --linear-h2-size-md: 32px;
-  --linear-h2-size-xl: 40px;
-  --linear-h2-size-lg: 48px;
+  --linear-h2-size-md: 36px;
+  --linear-h2-size-xl: 48px;
+  --linear-h2-size-lg: 56px;
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
 }
