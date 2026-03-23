@@ -12,6 +12,10 @@ import {
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
+import {
+  type ClerkBypassPathInfo,
+  shouldBypassClerkForRequest,
+} from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
@@ -162,11 +166,6 @@ function analyzeHost(hostname: string): HostInfo {
 }
 
 function getClerkProxyUrl(req: NextRequest): string | undefined {
-  const hostname = req.nextUrl.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return undefined;
-  }
-
   return '/clerk';
 }
 
@@ -881,6 +880,9 @@ export default async function middleware(
     }
   }
 
+  const pathname = req.nextUrl.pathname;
+  const pathInfo = categorizePath(pathname);
+
   // Check if Clerk config is missing or mocked
   const clerkConfigMissing = isMockOrMissingClerkConfig();
 
@@ -892,9 +894,6 @@ export default async function middleware(
   // In production/dev, if Clerk config is missing, handle gracefully
   // This can happen during Vercel cold starts when env vars are temporarily unavailable
   if (clerkConfigMissing) {
-    const pathname = req.nextUrl.pathname;
-    const pathInfo = categorizePath(pathname);
-
     // For public routes (non-protected), proceed without auth
     // This allows the homepage, marketing pages, and public profiles to load
     if (!pathInfo.isProtectedPath) {
@@ -916,6 +915,18 @@ export default async function middleware(
         },
       }
     );
+  }
+
+  const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
+
+  if (
+    shouldBypassClerkForRequest({
+      pathname,
+      pathInfo: clerkPathInfo,
+      cookies: req.cookies.getAll(),
+    })
+  ) {
+    return handleRequest(req, null);
   }
 
   return clerkWrappedMiddleware(req, event);

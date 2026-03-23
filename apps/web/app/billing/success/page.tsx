@@ -6,14 +6,13 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { ConfettiOverlay } from '@/components/atoms/Confetti';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { useBillingStatusQuery } from '@/lib/queries';
-
-/* ------------------------------------------------------------------ */
-/*  Unlocked features                                                 */
-/* ------------------------------------------------------------------ */
 
 const UNLOCKED_FEATURES = [
   {
@@ -33,19 +32,25 @@ const UNLOCKED_FEATURES = [
   },
 ] as const;
 
-/* ------------------------------------------------------------------ */
-/*  Verification helper                                               */
-/* ------------------------------------------------------------------ */
-
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';
   if (state === 'submitting') return 'Sending request...';
   return 'Request Verification';
 }
 
-/* ------------------------------------------------------------------ */
-/*  Page                                                              */
-/* ------------------------------------------------------------------ */
+function FeatureCard({
+  icon: Icon,
+  title,
+  description,
+}: Readonly<(typeof UNLOCKED_FEATURES)[number]>) {
+  return (
+    <ContentSurfaceCard surface='nested' className='space-y-2 p-4 text-left'>
+      <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
+      <p className='text-[13px] font-[560] text-primary-token'>{title}</p>
+      <p className='text-[12px] leading-5 text-tertiary-token'>{description}</p>
+    </ContentSurfaceCard>
+  );
+}
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
@@ -74,7 +79,6 @@ export default function CheckoutSuccessPage() {
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // Track celebration event only after billing data loads so planType is accurate
   const onboardingTrackedRef = useRef(false);
   useEffect(() => {
     if (!billingData?.plan) return;
@@ -121,84 +125,82 @@ export default function CheckoutSuccessPage() {
     }
   };
 
+  const successTitle = isOnboardingUpgrade
+    ? 'Your profile is live and upgraded'
+    : `Welcome to ${planName}!`;
+  const successSubtitle = isOnboardingUpgrade
+    ? "You're all set. Here's what you just unlocked."
+    : "Your plan is active. Here's what you just unlocked.";
+
   return (
-    <div className='relative flex min-h-[calc(100dvh-4rem)] items-center justify-center overflow-hidden'>
-      <ConfettiOverlay />
+    <StandaloneProductPage
+      width='lg'
+      centered
+      className='relative'
+      contentClassName='relative z-10'
+    >
+      <ConfettiOverlay viewport />
 
-      {/* Content */}
-      <div
-        className={`relative z-10 w-full max-w-xl px-6 text-center transition-all duration-700 ease-out ${
-          isVisible
-            ? 'opacity-100 translate-y-0 scale-100'
-            : 'opacity-0 translate-y-8 scale-95'
-        }`}
-      >
-        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[var(--color-success-subtle)]'>
-          <PartyPopper className='h-8 w-8 text-[var(--color-success)]' />
+      <ContentSurfaceCard surface='details' className='overflow-hidden'>
+        <ContentSectionHeader
+          density='compact'
+          title={successTitle}
+          subtitle={successSubtitle}
+        />
+
+        <div
+          className={
+            isVisible
+              ? 'space-y-6 px-5 py-5 text-center opacity-100 translate-y-0 scale-100 transition-all duration-700 ease-out sm:px-6'
+              : 'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-all duration-700 ease-out sm:px-6'
+          }
+        >
+          <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
+            <PartyPopper className='h-8 w-8 text-success' />
+          </div>
+
+          <div className='grid gap-4 sm:grid-cols-3'>
+            {UNLOCKED_FEATURES.map(feature => (
+              <FeatureCard key={feature.title} {...feature} />
+            ))}
+          </div>
+
+          <div className='flex flex-col items-center gap-3'>
+            <Button asChild size='lg'>
+              <Link href={APP_ROUTES.DASHBOARD}>
+                {isOnboardingUpgrade
+                  ? 'Explore your dashboard'
+                  : 'Go to Dashboard'}
+              </Link>
+            </Button>
+
+            {billingData?.isPro ? (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                onClick={handleRequestVerification}
+                disabled={
+                  requestState === 'submitting' || requestState === 'success'
+                }
+              >
+                <ShieldCheck className='h-4 w-4' aria-hidden='true' />
+                {getVerificationButtonLabel(requestState)}
+              </Button>
+            ) : null}
+
+            {feedback ? (
+              <output
+                className='text-[13px] text-secondary-token'
+                aria-live='polite'
+                aria-atomic='true'
+              >
+                {feedback}
+              </output>
+            ) : null}
+          </div>
         </div>
-
-        <h1 className='mt-6 text-3xl font-bold text-primary-token'>
-          {isOnboardingUpgrade
-            ? 'Your profile is live — and upgraded!'
-            : `Welcome to ${planName}!`}
-        </h1>
-
-        <p className='mt-3 text-lg text-secondary-token'>
-          {isOnboardingUpgrade
-            ? "You're all set. Here's what you just unlocked:"
-            : "Your plan is active. Here's what you just unlocked:"}
-        </p>
-
-        {/* Feature cards */}
-        <div className='mt-8 grid gap-4 sm:grid-cols-3'>
-          {UNLOCKED_FEATURES.map(feature => (
-            <div
-              key={feature.title}
-              className='rounded-xl border border-subtle bg-surface-1 p-4 text-left'
-            >
-              <feature.icon
-                className='h-5 w-5 text-[var(--linear-accent)]'
-                aria-hidden='true'
-              />
-              <p className='mt-2 text-sm font-medium text-primary-token'>
-                {feature.title}
-              </p>
-              <p className='mt-1 text-xs text-tertiary-token'>
-                {feature.description}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* CTAs */}
-        <div className='mt-8 flex flex-col items-center gap-3'>
-          <Button asChild>
-            <Link href={APP_ROUTES.DASHBOARD}>
-              {isOnboardingUpgrade
-                ? 'Explore your dashboard'
-                : 'Go to Dashboard'}
-            </Link>
-          </Button>
-
-          {billingData?.isPro ? (
-            <button
-              type='button'
-              onClick={handleRequestVerification}
-              disabled={
-                requestState === 'submitting' || requestState === 'success'
-              }
-              className='inline-flex items-center gap-1.5 text-sm text-secondary-token transition-colors hover:text-primary-token disabled:opacity-50'
-            >
-              <ShieldCheck className='h-4 w-4' aria-hidden='true' />
-              {getVerificationButtonLabel(requestState)}
-            </button>
-          ) : null}
-
-          {feedback ? (
-            <output className='text-sm text-secondary-token'>{feedback}</output>
-          ) : null}
-        </div>
-      </div>
-    </div>
+      </ContentSurfaceCard>
+    </StandaloneProductPage>
   );
 }

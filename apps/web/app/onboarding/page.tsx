@@ -46,9 +46,6 @@ export default async function OnboardingPage({
   if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
   }
-
-  // Waitlist guard: if user needs waitlist, redirect to /waitlist.
-  // Prevents rendering onboarding when proxy cache is stale.
   if (
     authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
     authResult.state === CanonicalUserState.WAITLIST_PENDING

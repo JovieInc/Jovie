@@ -71,4 +71,12 @@ describe('ConfettiOverlay', () => {
     expect(span.style.animationDuration).toBeTruthy();
     expect(span.style.left).toBeTruthy();
   });
+
+  it('supports viewport positioning when requested', () => {
+    const { container } = render(<ConfettiOverlay count={1} viewport />);
+    const overlay = container.querySelector('[aria-hidden="true"]');
+
+    expect(overlay).toHaveClass('fixed');
+    expect(overlay).toHaveClass('inset-0');
+  });
 });

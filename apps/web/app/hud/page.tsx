@@ -1,5 +1,8 @@
 import * as Sentry from '@sentry/nextjs';
 import { headers } from 'next/headers';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { authorizeHud } from '@/lib/auth/hud';
 import { publicEnv } from '@/lib/env-public';
 import { getHudMetrics } from '@/lib/hud/metrics';
@@ -60,22 +63,34 @@ export default async function HudPage({
   const auth = await authorizeHud(kioskToken);
 
   if (!auth.ok) {
+    const message =
+      auth.reason === 'not_configured'
+        ? 'This HUD is not configured for kiosk access. Sign in as an admin to view it, or set HUD_KIOSK_TOKEN to enable kiosk mode.'
+        : 'Unauthorized. Sign in as an admin, or provide a valid kiosk token.';
+
     return (
-      <main className='min-h-screen bg-black text-white flex items-center justify-center p-10'>
-        <div className='max-w-2xl w-full space-y-4'>
-          <div className='text-3xl font-semibold tracking-tight'>
-            HUD access
+      <StandaloneProductPage width='md' centered>
+        <ContentSurfaceCard surface='details' className='overflow-hidden'>
+          <ContentSectionHeader
+            density='compact'
+            title='HUD access'
+            subtitle='Admin sign-in or a valid kiosk token is required.'
+          />
+
+          <div className='space-y-4 px-5 py-5 sm:px-6'>
+            <p className='text-[13px] leading-6 text-secondary-token'>
+              {message}
+            </p>
+            <div className='rounded-[12px] border border-subtle bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
+              Tip: open{' '}
+              <span className='font-mono text-[11px] text-primary-token'>
+                /hud?kiosk=YOUR_TOKEN
+              </span>{' '}
+              on the TV.
+            </div>
           </div>
-          <div className='text-white/70 text-lg'>
-            {auth.reason === 'not_configured'
-              ? 'This HUD is not configured for kiosk access. Sign in as an admin to view it, or set HUD_KIOSK_TOKEN to enable kiosk mode.'
-              : 'Unauthorized. Sign in as an admin, or provide a valid kiosk token.'}
-          </div>
-          <div className='text-white/50 text-sm'>
-            Tip: load this page as /hud?kiosk=YOUR_TOKEN on the TV.
-          </div>
-        </div>
-      </main>
+        </ContentSurfaceCard>
+      </StandaloneProductPage>
     );
   }
 
@@ -83,7 +98,7 @@ export default async function HudPage({
   const hudUrl = await getHudAbsoluteUrl(kioskToken);
 
   return (
-    <main className='min-h-screen bg-black text-white'>
+    <main className='min-h-screen bg-page text-primary-token'>
       <HudDashboardClient
         initialMetrics={metrics}
         hudUrl={hudUrl}
