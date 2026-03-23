@@ -38,28 +38,18 @@ export default async function OnboardingPage({
 
   const authResult = await resolveUserState();
 
-  // Gate blocked states — proxy normally prevents these from reaching here,
-  // but the page must not render for banned/failed users regardless.
-  if (authResult.state === CanonicalUserState.BANNED) {
-    redirect('/banned');
-  }
-  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
-    redirect('/error/user-creation-failed');
-  }
-
-  // Waitlist guard: if user needs waitlist, redirect to /waitlist.
-  // Prevents rendering onboarding when proxy cache is stale.
-  if (
-    authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
-    authResult.state === CanonicalUserState.WAITLIST_PENDING
-  ) {
-    redirect(APP_ROUTES.WAITLIST);
-  }
-
-  // ACTIVE guard: break redirect loops caused by stale proxy cache or
-  // direct navigation. If the user is already active, send them to /app.
-  if (authResult.state === CanonicalUserState.ACTIVE) {
-    redirect('/app');
+  // State guards — redirect users who shouldn't reach onboarding.
+  // Proxy normally prevents these, but handles stale cache and direct navigation.
+  const stateRedirects: Partial<Record<CanonicalUserState, string>> = {
+    [CanonicalUserState.BANNED]: '/banned',
+    [CanonicalUserState.USER_CREATION_FAILED]: '/error/user-creation-failed',
+    [CanonicalUserState.NEEDS_WAITLIST_SUBMISSION]: APP_ROUTES.WAITLIST,
+    [CanonicalUserState.WAITLIST_PENDING]: APP_ROUTES.WAITLIST,
+    [CanonicalUserState.ACTIVE]: '/app',
+  };
+  const guardRedirect = stateRedirects[authResult.state];
+  if (guardRedirect) {
+    redirect(guardRedirect);
   }
 
   // Defensive check: ensure we have a valid Clerk user ID
