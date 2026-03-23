@@ -2,9 +2,7 @@
 
 import {
   useAuth as useAuthOriginal,
-  useClerk as useClerkOriginal,
   useSession as useSessionOriginal,
-  useSignIn as useSignInSignalOriginal,
   useUser as useUserOriginal,
 } from '@clerk/nextjs';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
@@ -13,47 +11,6 @@ import { createContext, type ReactNode, useContext, useMemo } from 'react';
 type UseUserReturn = ReturnType<typeof useUserOriginal>;
 type UseAuthReturn = ReturnType<typeof useAuthOriginal>;
 type UseSessionReturn = ReturnType<typeof useSessionOriginal>;
-type UseSignInSignalReturn = ReturnType<typeof useSignInSignalOriginal>;
-type UseClerkReturn = ReturnType<typeof useClerkOriginal>;
-type UseSignInReturn = {
-  isLoaded: boolean;
-  signIn: UseSignInSignalReturn['signIn'] | null;
-  setActive: UseClerkReturn['setActive'];
-};
-
-/**
- * Context to track whether Clerk is available in the current provider tree.
- * When Clerk is bypassed (e.g., missing publishableKey or mock mode),
- * this context will be false and safe hooks will return defaults.
- */
-const ClerkAvailabilityContext = createContext<boolean>(false);
-
-interface ClerkAvailabilityProviderProps {
-  readonly children: ReactNode;
-  readonly isAvailable: boolean;
-}
-
-/**
- * Provider that indicates whether Clerk is available.
- * Wrap your app with this to enable safe Clerk hooks.
- */
-export function ClerkAvailabilityProvider({
-  children,
-  isAvailable,
-}: ClerkAvailabilityProviderProps) {
-  return (
-    <ClerkAvailabilityContext.Provider value={isAvailable}>
-      {children}
-    </ClerkAvailabilityContext.Provider>
-  );
-}
-
-/**
- * Hook to check if Clerk is available in the current context.
- */
-export function useClerkAvailable(): boolean {
-  return useContext(ClerkAvailabilityContext);
-}
 
 /**
  * Default return value when Clerk is not available.
@@ -94,16 +51,6 @@ const DEFAULT_SESSION_RETURN: UseSessionReturn = {
   session: null,
 };
 
-/**
- * Default return value when Clerk is not available.
- * Matches the shape of useSignIn() return type.
- */
-const DEFAULT_SIGN_IN_RETURN = {
-  isLoaded: true,
-  signIn: undefined,
-  setActive: async () => {},
-} as unknown as UseSignInReturn;
-
 // ============================================================================
 // Context-based Safe Hooks
 // ============================================================================
@@ -120,7 +67,6 @@ interface ClerkSafeContextValue {
   user: UseUserReturn;
   auth: UseAuthReturn;
   session: UseSessionReturn;
-  signIn: UseSignInReturn;
 }
 
 const ClerkSafeContext = createContext<ClerkSafeContextValue | null>(null);
@@ -133,27 +79,7 @@ export function ClerkSafeValuesProvider({ children }: { children: ReactNode }) {
   const user = useUserOriginal();
   const auth = useAuthOriginal();
   const session = useSessionOriginal();
-  const clerk = useClerkOriginal();
-  const signInSignal = useSignInSignalOriginal();
-  // Clerk v6 useSignIn may return UseSignInReturn (has isLoaded) or
-  // SignInSignalValue (has fetchStatus). Handle both shapes.
-  const signInLoaded =
-    'isLoaded' in signInSignal
-      ? (signInSignal as { isLoaded: boolean }).isLoaded
-      : (signInSignal as { fetchStatus: string }).fetchStatus === 'idle';
-  const signIn = useMemo<UseSignInReturn>(
-    () => ({
-      isLoaded: signInLoaded,
-      signIn: signInSignal.signIn ?? null,
-      setActive: clerk.setActive,
-    }),
-    [clerk.setActive, signInLoaded, signInSignal.signIn]
-  );
-
-  const value = useMemo(
-    () => ({ user, auth, session, signIn }),
-    [user, auth, session, signIn]
-  );
+  const value = useMemo(() => ({ user, auth, session }), [user, auth, session]);
 
   return (
     <ClerkSafeContext.Provider value={value}>
@@ -176,7 +102,6 @@ export function ClerkSafeDefaultsProvider({
         user: DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
-        signIn: DEFAULT_SIGN_IN_RETURN,
       }}
     >
       {children}
@@ -234,18 +159,5 @@ export function useSessionSafe(): UseSessionReturn {
   return context.session;
 }
 
-/**
- * Safe version of useSignIn that returns defaults when Clerk is unavailable.
- * Use this instead of useSignIn from @clerk/nextjs to prevent provider errors
- * on routes rendered in mock/bypass mode.
- */
-export function useSignInSafe(): UseSignInReturn {
-  const context = useContext(ClerkSafeContext);
-  if (!context) {
-    return DEFAULT_SIGN_IN_RETURN;
-  }
-  return context.signIn;
-}
-
 // Re-export types for convenience
-export type { UseAuthReturn, UseSessionReturn, UseSignInReturn, UseUserReturn };
+export type { UseAuthReturn, UseSessionReturn, UseUserReturn };

@@ -6,7 +6,6 @@ FILES=(
   "app/waitlist/error.tsx"
   "components/atoms/Logo.tsx"
   "components/atoms/LogoLink.tsx"
-  "components/auth/forms/VerificationStep.tsx"
   "components/site/theme-toggle/ThemeToggleIcon.tsx"
   "components/site/theme-toggle/ThemeToggleSkeleton.tsx"
   "components/site/theme-toggle/ThemeToggleSegmented.tsx"
