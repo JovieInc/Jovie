@@ -1,10 +1,22 @@
+import { Badge, Button } from '@jovie/ui';
 import { desc, sql as drizzleSql } from 'drizzle-orm';
+import {
+  CheckCircle2,
+  CircleSlash,
+  Link2,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'Investor Pipeline',
@@ -19,16 +31,51 @@ export const dynamic = 'force-dynamic';
  */
 export default function InvestorPipelinePage() {
   return (
-    <div className='space-y-6 p-6'>
-      <div className='flex items-center justify-between'>
-        <h1 className='text-xl font-semibold'>Investor Pipeline</h1>
-        <CreateLinkButton />
-      </div>
+    <PageShell>
+      <PageContent>
+        <div className='space-y-4'>
+          <h1 className='sr-only'>Investor pipeline</h1>
+          <ContentSurfaceCard className='overflow-hidden p-0'>
+            <ContentSectionHeader
+              title='Investor pipeline'
+              subtitle='Track investor links, interest signals, and active fundraising conversations without leaving the admin shell.'
+              actions={
+                <div className='flex items-center gap-2'>
+                  <Button variant='secondary' size='sm' asChild>
+                    <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
+                      <Settings2 className='mr-1.5 h-3.5 w-3.5' />
+                      Settings
+                    </Link>
+                  </Button>
+                  <CreateLinkButton />
+                </div>
+              }
+            />
+            <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-3'>
+              <SummaryCard
+                label='Pipeline view'
+                value='Investor links'
+                description='Every link is a lightweight deal room with stage tracking.'
+              />
+              <SummaryCard
+                label='Signal capture'
+                value='View + stage history'
+                description='Keep engagement, recency, and status visible in one list.'
+              />
+              <SummaryCard
+                label='Next action'
+                value='Create or follow up'
+                description='Use links, notes, and stage changes to keep momentum moving.'
+              />
+            </div>
+          </ContentSurfaceCard>
 
-      <Suspense fallback={<TableSkeleton />}>
-        <InvestorTable />
-      </Suspense>
-    </div>
+          <Suspense fallback={<TableSkeleton />}>
+            <InvestorTable />
+          </Suspense>
+        </div>
+      </PageContent>
+    </PageShell>
   );
 }
 
@@ -61,95 +108,185 @@ async function InvestorTable() {
 
   if (links.length === 0) {
     return (
-      <div className='rounded-lg border border-dashed p-12 text-center'>
-        <p className='text-sm text-muted-foreground'>
-          No investor links yet. Create one to get started.
-        </p>
-      </div>
+      <ContentSurfaceCard className='overflow-hidden p-0'>
+        <ContentSectionHeader
+          title='No investor links yet'
+          subtitle='Create a first link to start tracking investor views and responses.'
+        />
+        <div className='flex flex-col items-center gap-3 px-6 py-10 text-center'>
+          <div className='flex h-11 w-11 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
+            <Link2 className='h-4 w-4' aria-hidden='true' />
+          </div>
+          <p className='max-w-md text-[13px] leading-[19px] text-secondary-token'>
+            Investor links become the canonical handoff surface for deck access,
+            memo reviews, and response tracking.
+          </p>
+          <CreateLinkButton />
+        </div>
+      </ContentSurfaceCard>
     );
   }
 
   return (
-    <div className='overflow-x-auto rounded-lg border'>
-      <table className='w-full text-sm'>
-        <thead>
-          <tr className='border-b bg-muted/50'>
-            <th className='px-4 py-3 text-left font-medium'>Label</th>
-            <th className='px-4 py-3 text-left font-medium'>Name</th>
-            <th className='px-4 py-3 text-left font-medium'>Stage</th>
-            <th className='px-4 py-3 text-left font-medium'>Score</th>
-            <th className='px-4 py-3 text-left font-medium'>Views</th>
-            <th className='px-4 py-3 text-left font-medium'>Last Viewed</th>
-            <th className='px-4 py-3 text-left font-medium'>Active</th>
-          </tr>
-        </thead>
-        <tbody>
-          {links.map(link => (
-            <tr key={link.id} className='border-b hover:bg-muted/30'>
-              <td className='px-4 py-3 font-medium'>{link.label}</td>
-              <td className='px-4 py-3 text-muted-foreground'>
-                {link.investorName || '—'}
-              </td>
-              <td className='px-4 py-3'>
-                <StageBadge stage={link.stage} />
-              </td>
-              <td className='px-4 py-3'>
-                <ScoreBadge score={link.engagementScore} />
-              </td>
-              <td className='px-4 py-3 text-muted-foreground'>
-                {link.viewCount}
-              </td>
-              <td className='px-4 py-3 text-muted-foreground'>
-                {link.lastViewed
-                  ? new Date(link.lastViewed).toLocaleDateString()
-                  : '—'}
-              </td>
-              <td className='px-4 py-3'>{link.isActive ? '✓' : '✗'}</td>
+    <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Active investor links'
+        subtitle={`${links.length} tracked link${links.length === 1 ? '' : 's'} across your pipeline.`}
+      />
+      <div className='overflow-x-auto'>
+        <table className='w-full min-w-[760px] border-collapse text-[13px]'>
+          <thead className='bg-surface-0'>
+            <tr className='border-b border-subtle text-left text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+              <th className='px-4 py-2.5 font-[560]'>Label</th>
+              <th className='px-4 py-2.5 font-[560]'>Investor</th>
+              <th className='px-4 py-2.5 font-[560]'>Stage</th>
+              <th className='px-4 py-2.5 font-[560]'>Score</th>
+              <th className='px-4 py-2.5 font-[560]'>Views</th>
+              <th className='px-4 py-2.5 font-[560]'>Last viewed</th>
+              <th className='px-4 py-2.5 font-[560]'>Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {links.map(link => (
+              <tr
+                key={link.id}
+                className='border-b border-subtle bg-transparent transition-colors duration-150 hover:bg-surface-1'
+              >
+                <td className='px-4 py-3 align-middle'>
+                  <div className='flex min-w-0 flex-col'>
+                    <span className='truncate font-[560] text-primary-token'>
+                      {link.label}
+                    </span>
+                    <span className='text-[11px] text-tertiary-token'>
+                      Token: {link.token}
+                    </span>
+                  </div>
+                </td>
+                <td className='px-4 py-3 align-middle text-secondary-token'>
+                  {link.investorName || 'Unknown investor'}
+                </td>
+                <td className='px-4 py-3 align-middle'>
+                  <StageBadge stage={link.stage} />
+                </td>
+                <td className='px-4 py-3 align-middle'>
+                  <ScoreBadge score={link.engagementScore} />
+                </td>
+                <td className='px-4 py-3 align-middle text-secondary-token'>
+                  {link.viewCount}
+                </td>
+                <td className='px-4 py-3 align-middle text-secondary-token'>
+                  {link.lastViewed
+                    ? new Date(link.lastViewed).toLocaleDateString()
+                    : 'No views yet'}
+                </td>
+                <td className='px-4 py-3 align-middle'>
+                  <StatusBadge isActive={link.isActive} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </ContentSurfaceCard>
   );
 }
 
 function StageBadge({ stage }: { stage: string }) {
-  const colors: Record<string, string> = {
-    shared: 'bg-gray-500/20 text-gray-400',
-    viewed: 'bg-blue-500/20 text-blue-400',
-    engaged: 'bg-amber-500/20 text-amber-400',
-    meeting_booked: 'bg-purple-500/20 text-purple-400',
-    committed: 'bg-green-500/20 text-green-400',
-    wired: 'bg-emerald-500/20 text-emerald-300',
-    passed: 'bg-red-500/20 text-red-400',
-    declined: 'bg-red-500/20 text-red-400',
+  const styles: Record<
+    string,
+    {
+      label: string;
+      variant: 'default' | 'secondary' | 'warning' | 'success' | 'destructive';
+    }
+  > = {
+    shared: { label: 'Shared', variant: 'secondary' },
+    viewed: { label: 'Viewed', variant: 'default' },
+    engaged: { label: 'Engaged', variant: 'warning' },
+    meeting_booked: { label: 'Meeting booked', variant: 'default' },
+    committed: { label: 'Committed', variant: 'success' },
+    wired: { label: 'Wired', variant: 'success' },
+    passed: { label: 'Passed', variant: 'destructive' },
+    declined: { label: 'Declined', variant: 'destructive' },
+  };
+  const style = styles[stage] ?? {
+    label: stage.replaceAll('_', ' '),
+    variant: 'secondary' as const,
   };
 
   return (
-    <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[stage] ?? 'bg-gray-500/20 text-gray-400'}`}
-    >
-      {stage.replace('_', ' ')}
-    </span>
+    <Badge variant={style.variant} size='sm'>
+      {style.label}
+    </Badge>
   );
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  let color = 'text-muted-foreground';
-  if (score >= 50) color = 'text-green-400';
-  else if (score >= 25) color = 'text-amber-400';
+  let toneClassName = 'text-secondary-token';
 
-  return <span className={`font-mono text-xs ${color}`}>{score}</span>;
+  if (score >= 50) {
+    toneClassName = 'text-success';
+  } else if (score >= 25) {
+    toneClassName = 'text-warning';
+  }
+
+  return (
+    <span
+      className={cn(
+        'inline-flex min-w-[2.5rem] items-center justify-end font-mono text-[12px] font-[590] tabular-nums',
+        toneClassName
+      )}
+    >
+      {score}
+    </span>
+  );
+}
+
+function StatusBadge({ isActive }: { readonly isActive: boolean }) {
+  return isActive ? (
+    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+      <CheckCircle2 className='h-3.5 w-3.5 text-success' />
+      Active
+    </span>
+  ) : (
+    <span className='inline-flex items-center gap-1.5 text-[12px] text-secondary-token'>
+      <CircleSlash className='h-3.5 w-3.5 text-tertiary-token' />
+      Disabled
+    </span>
+  );
 }
 
 function CreateLinkButton() {
   return (
-    <Link
-      href={APP_ROUTES.ADMIN_INVESTORS_LINKS}
-      className='rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground'
-    >
-      Create Link
-    </Link>
+    <Button size='sm' asChild>
+      <Link href={APP_ROUTES.ADMIN_INVESTORS_LINKS}>
+        <Plus className='mr-1.5 h-3.5 w-3.5' />
+        Create link
+      </Link>
+    </Button>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  description,
+}: Readonly<{
+  label: string;
+  value: string;
+  description: string;
+}>) {
+  return (
+    <ContentSurfaceCard surface='nested' className='p-3.5'>
+      <p className='text-[11px] uppercase tracking-[0.08em] text-tertiary-token'>
+        {label}
+      </p>
+      <p className='mt-1 text-[14px] font-[560] tracking-[-0.016em] text-primary-token'>
+        {value}
+      </p>
+      <p className='mt-1 text-[12px] leading-[18px] text-secondary-token'>
+        {description}
+      </p>
+    </ContentSurfaceCard>
   );
 }
 
@@ -163,13 +300,19 @@ const TABLE_SKELETON_KEYS = [
 
 function TableSkeleton() {
   return (
-    <div className='space-y-2'>
-      {TABLE_SKELETON_KEYS.map(skeletonKey => (
-        <div
-          key={skeletonKey}
-          className='h-12 animate-pulse rounded bg-muted/30'
-        />
-      ))}
-    </div>
+    <ContentSurfaceCard className='overflow-hidden p-0'>
+      <ContentSectionHeader
+        title='Loading investor links'
+        subtitle='Preparing the latest pipeline state.'
+      />
+      <div className='space-y-2 px-3 py-3'>
+        {TABLE_SKELETON_KEYS.map(skeletonKey => (
+          <div
+            key={skeletonKey}
+            className='h-11 animate-pulse rounded-[12px] bg-surface-0'
+          />
+        ))}
+      </div>
+    </ContentSurfaceCard>
   );
 }

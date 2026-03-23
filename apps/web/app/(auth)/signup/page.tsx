@@ -193,14 +193,14 @@ function SignUpPageContent() {
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='rounded-md text-secondary-token underline underline-offset-2 hover:text-primary-token focus-ring-themed'
+          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='rounded-md text-secondary-token underline underline-offset-2 hover:text-primary-token focus-ring-themed'
+          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Privacy Policy
         </Link>
