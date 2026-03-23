@@ -659,14 +659,14 @@ test.describe('Content Gate — Authenticated Pages', () => {
     const settingsPages = fastIteration
       ? [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },
         ]
       : [
           {
-            path: APP_ROUTES.SETTINGS,
+            path: APP_ROUTES.SETTINGS_ACCOUNT,
             name: 'Settings',
             readyText: /settings|preferences|account/i,
           },

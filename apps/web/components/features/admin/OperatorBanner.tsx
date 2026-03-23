@@ -22,6 +22,7 @@ import { useEnvHealthQuery } from '@/lib/queries';
 export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
   // Check if QueryClient is available in the React tree.
   // This prevents "No QueryClient set" errors when the component renders
@@ -60,6 +61,7 @@ export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const showBanner =
     isMounted &&
     isAdmin &&
+    !isE2EClientRuntime &&
     hasQueryClient &&
     (process.env.NODE_ENV !== 'production' ||
       publicEnv.NEXT_PUBLIC_SHOW_OPERATOR_BANNER === 'true');
