@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { ProfileHeaderV2 } from '@/components/organisms/profile-header-v2/ProfileHeaderV2';
 import {
@@ -66,6 +66,21 @@ function buildModeHref(mode: SwipeableProfileMode): string {
   return `${url.pathname}${search ? `?${search}` : ''}`;
 }
 
+function getModeFromLocation(): SwipeableProfileMode {
+  const searchMode = new URLSearchParams(globalThis.location.search).get(
+    'mode'
+  );
+
+  if (
+    searchMode &&
+    SWIPEABLE_MODES.includes(searchMode as SwipeableProfileMode)
+  ) {
+    return searchMode as SwipeableProfileMode;
+  }
+
+  return 'profile';
+}
+
 export function PublicProfileTemplateV2({
   mode,
   artist,
@@ -79,6 +94,7 @@ export function PublicProfileTemplateV2({
   visitTrackingToken,
 }: PublicProfileTemplateV2Props) {
   const [listenDrawerOpen, setListenDrawerOpen] = useState(false);
+  const lastNavigationModeRef = useRef<SwipeableProfileMode | null>(null);
   const initialMode = normalizeInitialMode(mode);
   const initialIndex = SWIPEABLE_MODES.indexOf(initialMode);
   const mergedDSPs = useMemo(
@@ -118,16 +134,40 @@ export function PublicProfileTemplateV2({
   useEffect(() => {
     const nextMode = normalizeInitialMode(mode);
     const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
-
-    if (nextIndex !== activeIndex) {
-      setActiveIndex(nextIndex);
-    }
-  }, [activeIndex, mode, setActiveIndex]);
+    setActiveIndex(nextIndex);
+  }, [mode, setActiveIndex]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      const nextMode = getModeFromLocation();
+      const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
+      lastNavigationModeRef.current = nextMode;
+      setActiveIndex(nextIndex);
+    };
+
+    globalThis.addEventListener('popstate', handlePopState);
+    return () => globalThis.removeEventListener('popstate', handlePopState);
+  }, [setActiveIndex]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const href = buildModeHref(activeMode);
-    globalThis.history.replaceState(globalThis.history.state, '', href);
+    const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
+
+    if (currentHref === href) {
+      lastNavigationModeRef.current = activeMode;
+      return;
+    }
+
+    if (lastNavigationModeRef.current === activeMode) {
+      return;
+    }
+
+    globalThis.history.pushState(globalThis.history.state, '', href);
+    lastNavigationModeRef.current = activeMode;
   }, [activeMode]);
 
   const headerSocialLinks = useMemo(() => {
