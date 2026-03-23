@@ -207,18 +207,18 @@ function SignUpPageContent() {
         signInUrl={APP_ROUTES.SIGNIN}
         fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
       />
-      <p className='mt-4 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
+      <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
+          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
+          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
         >
           Privacy Policy
         </Link>
