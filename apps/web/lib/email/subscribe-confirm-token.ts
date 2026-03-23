@@ -8,7 +8,6 @@ import { APP_URL } from '@/constants/app';
 import {
   buildTokenUrl,
   deriveSecret,
-  MAC_HEX_LENGTH_LEGACY,
   parseColonPayload,
   signPayload,
   verifyToken,
@@ -22,21 +21,13 @@ export function generateSubscribeConfirmToken(
 ): string | null {
   const secret = deriveSecret(CONFIRM_DOMAIN);
   const normalizedEmail = email.toLowerCase().trim();
-  return signPayload(
-    `${subscriptionId}:${normalizedEmail}`,
-    secret,
-    MAC_HEX_LENGTH_LEGACY
-  );
+  return signPayload(`${subscriptionId}:${normalizedEmail}`, secret);
 }
 
 export function verifySubscribeConfirmToken(
   token: string
 ): { subscriptionId: string; email: string } | null {
-  const payload = verifyToken(
-    token,
-    deriveSecret(CONFIRM_DOMAIN),
-    MAC_HEX_LENGTH_LEGACY
-  );
+  const payload = verifyToken(token, deriveSecret(CONFIRM_DOMAIN));
   const parsed = payload ? parseColonPayload(payload) : null;
   if (!parsed || !parsed.second.includes('@')) return null;
   return { subscriptionId: parsed.first, email: parsed.second };

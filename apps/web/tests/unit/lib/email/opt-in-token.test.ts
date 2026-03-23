@@ -69,17 +69,27 @@ describe('opt-in-token', () => {
       expect(verifyOptInToken('abc.')).toBeNull();
     });
 
-    it('rejects a token where payload has no @ in email', async () => {
+    it('rejects a properly-signed token where payload has no @ in email', async () => {
       const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
-      // Manually craft a base64url payload with no @ in email portion
-      const payload = Buffer.from('noemail:pid').toString('base64url');
-      expect(verifyOptInToken(`${payload}.${'0'.repeat(32)}`)).toBeNull();
+      const { deriveSecret, signPayload } = await import(
+        '@/lib/email/hmac-token'
+      );
+      // Sign a valid token with a payload that lacks @ in the email part
+      const secret = deriveSecret('jovie:audience-opt-in-token-secret');
+      const token = signPayload('noemail:pid', secret);
+      expect(token).toBeTruthy();
+      expect(verifyOptInToken(token!)).toBeNull();
     });
 
-    it('rejects a token where payload has no colon separator', async () => {
+    it('rejects a properly-signed token where payload has no colon separator', async () => {
       const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
-      const payload = Buffer.from('nocolon').toString('base64url');
-      expect(verifyOptInToken(`${payload}.${'0'.repeat(32)}`)).toBeNull();
+      const { deriveSecret, signPayload } = await import(
+        '@/lib/email/hmac-token'
+      );
+      const secret = deriveSecret('jovie:audience-opt-in-token-secret');
+      const token = signPayload('nocolonseparator', secret);
+      expect(token).toBeTruthy();
+      expect(verifyOptInToken(token!)).toBeNull();
     });
   });
 
