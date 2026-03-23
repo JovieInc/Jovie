@@ -1,11 +1,38 @@
 'use client';
 
-import { Zap } from 'lucide-react';
+import {
+  Camera,
+  DollarSign,
+  Eye,
+  Link2,
+  Mail,
+  MessageSquare,
+  Music2,
+  Zap,
+} from 'lucide-react';
 import Link from 'next/link';
 import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
+
+const ACTIVITY_ICONS: Record<Activity['icon'], typeof Zap> = {
+  listen: Music2,
+  social: Camera,
+  tip: DollarSign,
+  link: Link2,
+  visit: Eye,
+  sms: MessageSquare,
+  email: Mail,
+};
+
+function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] }) {
+  const Icon = ACTIVITY_ICONS[icon];
+
+  return (
+    <Icon className='h-3.5 w-3.5 text-tertiary-token' aria-hidden='true' />
+  );
+}
 
 function ActivityEmptyState({
   isRefreshing,
@@ -48,7 +75,7 @@ function ActivityItem({ activity }: { readonly activity: Activity }) {
         aria-hidden='true'
         className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-base'
       >
-        <span className='scale-90 text-tertiary-token'>{activity.icon}</span>
+        <ActivityGlyph icon={activity.icon} />
       </span>
       <div className='min-w-0 flex-1'>
         <p className='text-[13px] leading-5 tracking-[-0.01em] text-secondary-token'>

@@ -14,11 +14,20 @@ export type ActivityType =
   // | 'release'
   | 'unknown';
 
+export type ActivityIcon =
+  | 'listen'
+  | 'social'
+  | 'tip'
+  | 'link'
+  | 'visit'
+  | 'sms'
+  | 'email';
+
 export interface Activity {
   id: string;
   type: ActivityType;
   description: string;
-  icon: string;
+  icon: ActivityIcon;
   timestamp: string;
   /** Navigation URL for when the activity item is clicked */
   href?: string;

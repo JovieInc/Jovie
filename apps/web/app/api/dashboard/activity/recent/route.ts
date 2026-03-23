@@ -24,10 +24,10 @@ const CACHE_HEADERS = {
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
+  listen: 'listen',
+  social: 'social',
+  tip: 'tip',
+  other: 'link',
 };
 
 type ActivityType = 'click' | 'visit' | 'subscribe' | 'unknown';
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
           row.clickCountry ?? row.memberCountry,
         ]);
         const phrase = getClickPhrase(row.linkType, row.target ?? null);
-        const icon = ACTION_ICONS[row.linkType] ?? '✨';
+        const icon = ACTION_ICONS[row.linkType] ?? 'link';
         return {
           id: row.id,
           type: 'click' as const,
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
             id: `visit:${row.id}:${timestamp}`,
             type: 'visit' as const,
             description: `${actorLabel}${locationLabel} visited your Jovie profile.`,
-            icon: '👀',
+            icon: 'visit',
             timestamp,
             href: APP_ROUTES.AUDIENCE,
           };
@@ -251,7 +251,7 @@ export async function GET(request: NextRequest) {
           id: `subscribe:${row.id}`,
           type: 'subscribe' as const,
           description: `Someone${locationLabel} just subscribed.`,
-          icon: row.channel === 'sms' ? '📱' : '📩',
+          icon: row.channel === 'sms' ? 'sms' : 'email',
           timestamp: toISOStringSafe(row.createdAt),
           href: APP_ROUTES.SETTINGS_CONTACTS,
         };
