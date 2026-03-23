@@ -68,7 +68,7 @@ describe('AuthClientProviders', () => {
 
   it('bypasses Clerk when the publishable key looks mocked', () => {
     render(
-      <AuthClientProviders publishableKey='pk_test_mock_key'>
+      <AuthClientProviders publishableKey='mock-publishable-key'>
         <div data-testid='child'>child</div>
       </AuthClientProviders>
     );

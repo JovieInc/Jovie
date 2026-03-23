@@ -1,10 +1,10 @@
+const VALID_CLERK_PUBLISHABLE_KEY_PREFIXES = ['pk_live_', 'pk_test_'] as const;
+
 export function isMockPublishableKey(publishableKey: string): boolean {
-  const lower = publishableKey.toLowerCase();
-  return (
-    lower.includes('mock') ||
-    lower.includes('dummy') ||
-    lower.includes('placeholder') ||
-    lower.includes('test-key')
+  const normalizedKey = publishableKey.trim().toLowerCase();
+
+  return !VALID_CLERK_PUBLISHABLE_KEY_PREFIXES.some(prefix =>
+    normalizedKey.startsWith(prefix)
   );
 }
 
@@ -28,7 +28,8 @@ export function getClerkProxyUrl(): string | undefined {
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
-    hostname === '::1'
+    hostname === '::1' ||
+    hostname === '[::1]'
   ) {
     return undefined;
   }

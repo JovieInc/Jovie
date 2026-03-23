@@ -81,6 +81,9 @@
 :is(.cl-signIn-root, .cl-signUp-root)
   .cl-formFieldInputShowPasswordButton:focus-visible,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formResendCodeLink:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-otpCodeFieldResendButton:focus-visible,
 :is(.cl-signIn-root, .cl-signUp-root)
   .cl-identityPreviewEditButton:focus-visible {
   outline: none;

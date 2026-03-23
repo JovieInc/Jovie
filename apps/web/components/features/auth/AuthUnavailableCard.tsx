@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 export function AuthUnavailableCard() {
   return (
     <div
@@ -13,6 +15,12 @@ export function AuthUnavailableCard() {
       <p className='mt-3 text-[0.9375rem] leading-[1.55] text-secondary-token'>
         Clerk is not configured for this environment.
       </p>
+      <Link
+        href='/'
+        className='mt-5 inline-flex text-sm font-medium text-primary-token underline underline-offset-4 transition-opacity hover:opacity-90'
+      >
+        Go to homepage
+      </Link>
     </div>
   );
 }

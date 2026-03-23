@@ -80,4 +80,18 @@ describe('auth route layout', () => {
       screen.queryByTestId('auth-clerk-unavailable')
     ).not.toBeInTheDocument();
   });
+
+  it('renders the unavailable fallback when Clerk mock mode is enabled', async () => {
+    await renderAuthRouteLayout({
+      clerkMockFlag: '1',
+      publishableKey: 'pk_test_example',
+    });
+
+    expect(screen.getByTestId('auth-layout')).toBeInTheDocument();
+    expect(screen.getByTestId('auth-clerk-unavailable')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('auth-client-providers')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-child')).not.toBeInTheDocument();
+  });
 });

@@ -1,3 +1,7 @@
+type ClerkAppearance = NonNullable<
+  Parameters<typeof import('@clerk/nextjs').ClerkProvider>[0]['appearance']
+>;
+
 const clerkAppearanceVariables = {
   colorPrimary: 'var(--color-accent)',
   colorPrimaryForeground: '#ffffff',
@@ -249,7 +253,7 @@ export const clerkAppearanceBase = {
   cssLayerName: 'clerk',
   variables: clerkAppearanceVariables,
   elements: clerkBaseElements,
-} as const;
+} satisfies ClerkAppearance;
 
 export const authClerkAppearance = {
   ...clerkAppearanceBase,
@@ -264,4 +268,4 @@ export const authClerkAppearance = {
     colorInput: 'var(--color-bg-input)',
   },
   elements: authClerkElements,
-} as const;
+} satisfies ClerkAppearance;
