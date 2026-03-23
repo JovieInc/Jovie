@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.45] - 2026-03-23
+
+### Added
+
+- [internal] Added 5 agent reference docs: database schema map, API route map, cron registry, webhook map, and library module index
+- [internal] Added documentation index section to AGENTS.md linking to all reference docs
+
 ## [26.4.44] - 2026-03-22
 
 ### Fixed
