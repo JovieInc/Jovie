@@ -9,12 +9,11 @@
       pathname.startsWith('/signup') ||
       pathname.startsWith('/waitlist');
 
-    var storageValue =
-      typeof localStorage !== 'undefined'
-        ? localStorage.getItem('jovie-theme')
-        : null;
-
     if (isThemeEnabledRoute) {
+      var storageValue =
+        typeof localStorage !== 'undefined'
+          ? localStorage.getItem('jovie-theme')
+          : null;
       var theme =
         storageValue === 'light' ||
         storageValue === 'dark' ||

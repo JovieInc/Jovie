@@ -15,7 +15,7 @@ export const OUTPUT_DIR = 'public/product-screenshots';
 
 /** Wait for network to settle and animations to finish */
 export async function waitForSettle(page: Page, ms: number = TIMEOUTS.SETTLE) {
-  await page.waitForLoadState('networkidle').catch(() => {});
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
   await page.waitForTimeout(ms);
 }
 

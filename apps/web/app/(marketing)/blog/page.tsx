@@ -44,7 +44,7 @@ export default async function BlogIndexPage() {
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHero variant='left'>
         <p
           className='marketing-kicker mb-0'
           style={{ color: 'var(--linear-text-tertiary)' }}

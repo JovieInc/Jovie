@@ -48,7 +48,6 @@ export function HeroScrollSection() {
                   height={1800}
                   title='Jovie'
                   priority
-                  skipCheck
                 />
                 {/* Gentle bottom fade — subtle, not aggressive */}
                 <div

@@ -116,7 +116,7 @@ export default async function ChangelogPage() {
   return (
     <section className='min-h-screen bg-page text-primary-token'>
       {/* Header */}
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHero variant='left'>
         <p className='marketing-kicker'>Changelog</p>
         <h1 className='marketing-h1-linear mb-4 mt-6 max-w-[10ch]'>
           What&apos;s new

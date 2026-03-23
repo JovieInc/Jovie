@@ -290,6 +290,9 @@
   --linear-content-gap-sm: 40px;
   --linear-content-gap-md: 56px;
   --linear-content-gap-lg: 72px;
+  --linear-intro-gap-sm: 32px;
+  --linear-intro-gap-md: 48px;
+  --linear-intro-gap-lg: 64px;
   --linear-footer-py: 48px;
   --linear-footer-py-lg: 64px;
   /* ============================================

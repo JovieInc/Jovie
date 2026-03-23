@@ -117,8 +117,8 @@ Auth, onboarding, and waitlist are part of the **product funnel**. They belong t
 This is a canonical rule, not a temporary exception:
 
 - auth pages render through `AuthLayout`
-- onboarding pages currently render through `AuthLayout`
-- waitlist currently renders through `AuthLayout` even though the route is public
+- onboarding pages render through `AuthLayout`
+- waitlist renders through `AuthLayout` even though the route is public
 
 These pages should:
 

@@ -117,7 +117,7 @@ function getButtonStyle(
     };
   }
   return {
-    height: isDisplay ? 64 : isHero ? 42 : 36,
+    height: isDisplay ? 64 : 36,
     fontSize: isDisplay ? '16px' : '13px',
     fontWeight: 510,
     letterSpacing: '-0.01em',

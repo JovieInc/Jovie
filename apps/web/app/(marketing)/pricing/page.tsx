@@ -259,7 +259,7 @@ export default function PricingPage() {
       {/* Structured Data for SEO */}
       <script type='application/ld+json'>{PRICING_SCHEMA}</script>
 
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHero variant='left'>
         <p className='marketing-kicker'>Pricing</p>
         <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
           Simple pricing. No surprises.

@@ -41,6 +41,7 @@ export function ProductScreenshot({
   const [isAvailable, setIsAvailable] = useState<boolean | null>(
     skipCheck ? true : null
   );
+  const aspectRatio = `${width} / ${height}`;
 
   useEffect(() => {
     if (skipCheck) return;
@@ -103,7 +104,10 @@ export function ProductScreenshot({
 
       {/* Screenshot image */}
       {isAvailable === false ? (
-        <div className='grid aspect-[16/10] w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'>
+        <div
+          className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
+          style={{ aspectRatio }}
+        >
           <div className='max-w-[22rem]'>
             <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
               Product preview
@@ -127,7 +131,10 @@ export function ProductScreenshot({
           className='w-full'
         />
       ) : (
-        <div className='aspect-[16/10] w-full animate-pulse bg-surface-1' />
+        <div
+          className='w-full animate-pulse bg-surface-1'
+          style={{ aspectRatio }}
+        />
       )}
     </figure>
   );

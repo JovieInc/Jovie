@@ -32,7 +32,7 @@ export function MarketingSectionFrame({
         <div
           className={cn(
             'homepage-section-intro',
-            reverse && 'md:[direction:rtl] md:[&>*]:[direction:ltr]'
+            reverse && 'md:flex md:flex-row-reverse'
           )}
         >
           {children}

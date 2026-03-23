@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
 
 const TESTIMONIALS = [
@@ -22,10 +21,9 @@ export function TestimonialsSection() {
       <MarketingContainer width='landing'>
         <div className='grid gap-6 md:grid-cols-2'>
           {TESTIMONIALS.map(testimonial => (
-            <Link
+            <article
               key={testimonial.name}
-              href='/'
-              className='group block rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 transition-colors hover:border-[rgba(255,255,255,0.1)] md:p-8'
+              className='rounded-[1rem] border border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] p-6 transition-colors hover:border-[rgba(255,255,255,0.1)] md:p-8'
             >
               <p className='text-[17px] leading-relaxed text-primary-token'>
                 {testimonial.quote}
@@ -36,7 +34,7 @@ export function TestimonialsSection() {
                   {testimonial.role}
                 </span>
               </p>
-            </Link>
+            </article>
           ))}
         </div>
 

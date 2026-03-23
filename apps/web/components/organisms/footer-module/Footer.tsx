@@ -19,6 +19,52 @@ const ThemeToggle = dynamic(
   { ssr: false }
 );
 
+const FOOTER_COLUMNS = [
+  {
+    id: 'product',
+    heading: 'Product',
+    links: [
+      { href: '/#release', label: 'Smart Links' },
+      { href: '/#profile', label: 'Artist Profile' },
+      { href: '/#release', label: 'Release Automation' },
+      { href: '/#audience', label: 'Audience Intelligence' },
+      { href: '/#ai', label: 'AI Assistant' },
+      { href: '/pricing', label: 'Pricing' },
+    ],
+  },
+  {
+    id: 'features',
+    heading: 'Features',
+    links: [
+      { href: '/#analytics', label: 'Analytics' },
+      { href: '/#profile', label: 'Fan Capture' },
+      { href: '/#profile', label: 'Tipping' },
+      { href: '/#profile', label: 'Tour Dates' },
+    ],
+  },
+  {
+    id: 'company',
+    heading: 'Company',
+    links: [
+      { href: '/blog', label: 'Blog' },
+      { href: '/changelog', label: 'Changelog' },
+    ],
+  },
+  {
+    id: 'resources',
+    heading: 'Resources',
+    links: [{ href: '/support', label: 'Support' }],
+  },
+  {
+    id: 'connect',
+    heading: 'Connect',
+    links: [
+      { href: 'https://x.com/jovieapp', label: 'X (Twitter)' },
+      { href: 'https://instagram.com/jovieapp', label: 'Instagram' },
+    ],
+  },
+] as const;
+
 import {
   CONTAINER_SIZES,
   FOOTER_LINK_CLASS_NAME,
@@ -94,52 +140,6 @@ export function Footer({
   }
 
   if (variant === 'regular') {
-    const FOOTER_COLUMNS = [
-      {
-        id: 'product',
-        heading: 'Product',
-        links: [
-          { href: '/#release', label: 'Smart Links' },
-          { href: '/#profile', label: 'Artist Profile' },
-          { href: '/#release', label: 'Release Automation' },
-          { href: '/#audience', label: 'Audience Intelligence' },
-          { href: '/#ai', label: 'AI Assistant' },
-          { href: '/pricing', label: 'Pricing' },
-        ],
-      },
-      {
-        id: 'features',
-        heading: 'Features',
-        links: [
-          { href: '/#analytics', label: 'Analytics' },
-          { href: '/#profile', label: 'Fan Capture' },
-          { href: '/#profile', label: 'Tipping' },
-          { href: '/#profile', label: 'Tour Dates' },
-        ],
-      },
-      {
-        id: 'company',
-        heading: 'Company',
-        links: [
-          { href: '/blog', label: 'Blog' },
-          { href: '/changelog', label: 'Changelog' },
-        ],
-      },
-      {
-        id: 'resources',
-        heading: 'Resources',
-        links: [{ href: '/support', label: 'Support' }],
-      },
-      {
-        id: 'connect',
-        heading: 'Connect',
-        links: [
-          { href: 'https://x.com/jovieapp', label: 'X (Twitter)' },
-          { href: 'https://instagram.com/jovieapp', label: 'Instagram' },
-        ],
-      },
-    ];
-
     return (
       // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for footer accessibility
       <footer

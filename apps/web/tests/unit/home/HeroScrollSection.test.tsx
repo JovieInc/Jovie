@@ -17,9 +17,9 @@ describe('HeroScrollSection', () => {
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Jovie release dashboard')
+      screen.getByLabelText(
+        'Jovie release dashboard showing releases table with sidebar open'
+      )
     ).toBeInTheDocument();
-    expect(screen.getByText('Release drawer')).toBeInTheDocument();
-    expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
   });
 });

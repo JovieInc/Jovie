@@ -18,15 +18,19 @@ export function FeatureAccordion({ items }: FeatureAccordionProps) {
     <div className='flex flex-wrap gap-2'>
       {items.map((item, index) => {
         const isOpen = openIndex === index;
+        const triggerId = `accordion-trigger-${item.number}`;
+        const panelId = `accordion-panel-${item.number}`;
 
         return (
           <div key={item.number} className='w-full sm:w-auto'>
             <button
               type='button'
+              id={triggerId}
               className='accordion-trigger'
               data-open={isOpen}
               onClick={() => setOpenIndex(isOpen ? null : index)}
               aria-expanded={isOpen}
+              aria-controls={panelId}
             >
               <span className='section-number-label'>{item.number}</span>
               <span>{item.title}</span>
@@ -35,13 +39,17 @@ export function FeatureAccordion({ items }: FeatureAccordionProps) {
               </span>
             </button>
 
-            <div className='accordion-content' data-open={isOpen}>
-              <div>
-                <p className='px-4 pt-3 pb-1 text-[13px] leading-relaxed text-tertiary-token'>
-                  {item.description}
-                </p>
-              </div>
-            </div>
+            <section
+              id={panelId}
+              className='accordion-content'
+              data-open={isOpen}
+              aria-labelledby={triggerId}
+              hidden={!isOpen}
+            >
+              <p className='px-4 pt-3 pb-1 text-[13px] leading-relaxed text-tertiary-token'>
+                {item.description}
+              </p>
+            </section>
           </div>
         );
       })}

@@ -12,9 +12,11 @@ export const metadata: Metadata = {
   },
 };
 
+export const revalidate = false;
+
 export default function SupportPage() {
   return (
-    <MarketingHero variant='centered' className='items-start text-left'>
+    <MarketingHero variant='left'>
       <p className='marketing-kicker'>Support</p>
       <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
         We&apos;re here to help.
