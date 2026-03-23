@@ -1,6 +1,7 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
@@ -11,10 +12,15 @@ export default function SettingsPaymentsPage() {
   const isStripeConnectEnabled = useFeatureGate(
     FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
   );
+  const router = useRouter();
 
-  if (!isStripeConnectEnabled) {
-    redirect(APP_ROUTES.SETTINGS_BILLING);
-  }
+  useEffect(() => {
+    if (!isStripeConnectEnabled) {
+      router.replace(APP_ROUTES.SETTINGS_BILLING);
+    }
+  }, [isStripeConnectEnabled, router]);
+
+  if (!isStripeConnectEnabled) return null;
 
   return (
     <SettingsSection

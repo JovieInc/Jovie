@@ -16,6 +16,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
+      aria-label='Open links and music preview panel'
       className='flex w-full items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>

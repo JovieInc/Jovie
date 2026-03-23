@@ -115,7 +115,7 @@ function getSettingsNavGroups(options: {
       items: [
         {
           id: 'admin',
-          title: 'General',
+          title: 'Admin',
           href: APP_ROUTES.SETTINGS_ADMIN,
           icon: Settings,
         },
@@ -194,7 +194,7 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
             const Icon = item.icon;
             return (
               <Link
-                key={item.id}
+                key={`${group.id}-${item.id}`}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(

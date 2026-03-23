@@ -22,8 +22,8 @@ export default function SettingsAccountPage() {
             Account settings unavailable
           </h3>
           <p className='text-[13px] text-secondary'>
-            Clerk is not configured. Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to
-            enable account management.
+            Account management is currently unavailable. Please contact support
+            if this issue persists.
           </p>
         </div>
       )}
