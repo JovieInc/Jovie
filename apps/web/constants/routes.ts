@@ -32,15 +32,21 @@ export const APP_ROUTES = {
 
   // Settings
   SETTINGS: '/app/settings',
+  SETTINGS_ACCOUNT: '/app/settings/account',
   SETTINGS_ARTIST_PROFILE: '/app/settings/artist-profile',
   SETTINGS_APPEARANCE: '/app/settings/appearance',
   SETTINGS_NOTIFICATIONS: '/app/settings/notifications',
   SETTINGS_BILLING: '/app/settings/billing',
+  SETTINGS_PAYMENTS: '/app/settings/payments',
+  SETTINGS_DATA_PRIVACY: '/app/settings/data-privacy',
   SETTINGS_CONTACTS: '/app/settings/contacts',
   SETTINGS_TOURING: '/app/settings/touring',
   SETTINGS_AUDIENCE: '/app/settings/audience',
+  SETTINGS_ANALYTICS: '/app/settings/analytics',
+  /** @deprecated Use SETTINGS_AUDIENCE instead */
   SETTINGS_RETARGETING_ADS: '/app/settings/retargeting-ads',
   SETTINGS_ADMIN: '/app/settings/admin',
+  /** @deprecated Use SETTINGS_DATA_PRIVACY instead */
   SETTINGS_DELETE_ACCOUNT: '/app/settings/delete-account',
 
   // Admin
@@ -95,7 +101,6 @@ export const APP_ROUTES = {
 
   // Referrals
   REFERRALS: '/app/referrals',
-  SETTINGS_REFERRAL: '/app/settings/referral',
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];

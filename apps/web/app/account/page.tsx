@@ -1,7 +1,9 @@
-import { AccountDashboard } from '@/components/organisms/AccountDashboard';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
+// Account dashboard consolidated into /app/settings/account
 export default function AccountPage() {
-  return <AccountDashboard />;
+  redirect(APP_ROUTES.SETTINGS_ACCOUNT);
 }
 
 export const metadata = {

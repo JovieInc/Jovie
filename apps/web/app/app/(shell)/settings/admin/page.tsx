@@ -1,22 +1,16 @@
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+'use client';
 
-export const runtime = 'nodejs';
+import { SettingsAdminSection } from '@/features/dashboard/organisms/SettingsAdminSection';
+import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
-export default async function SettingsAdminPage() {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/admin`);
-  }
-
-  const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  return <DashboardSettings focusSection='admin' />;
+export default function SettingsAdminPage() {
+  return (
+    <SettingsSection
+      id='admin'
+      title='General'
+      description='Dev toolbar, waitlist controls, campaign targeting, and admin quick links.'
+    >
+      <SettingsAdminSection />
+    </SettingsSection>
+  );
 }
