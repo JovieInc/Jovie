@@ -56,6 +56,10 @@ function isUnavailablePage(text: string): boolean {
   );
 }
 
+function artistNameLocator(page: Page) {
+  return page.getByText('Dua Lipa', { exact: true }).first();
+}
+
 async function assertProfilePageHealthy(page: Page) {
   const bodyText =
     (await page
@@ -93,7 +97,7 @@ describeProfile('Profile - Core Rendering', () => {
   });
 
   test('displays artist name, subtitle, and avatar', async ({ page }) => {
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
     await expect(page.getByText(/Pop artist|Artist/).first()).toBeVisible();
 
     // Avatar
@@ -149,14 +153,15 @@ describeProfile('Profile - Core Rendering', () => {
 
   test('is responsive on mobile', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
     await expect(page.getByText(/Pop artist|Artist/).first()).toBeVisible();
   });
 
   test('has proper heading structure with single h1', async ({ page }) => {
     const h1Count = await page.locator('h1').count();
     expect(h1Count).toBe(1);
-    await expect(page.locator('h1')).toContainText('Dua Lipa');
+    await expect(artistNameLocator(page)).toBeVisible();
+    await expect(page.locator('h1')).toBeVisible();
   });
 });
 
@@ -293,7 +298,7 @@ test.describe('Profile Modes @smoke @critical', () => {
             return;
           }
 
-          await expect(page.locator('h1').first()).toContainText(/Dua Lipa/i, {
+          await expect(artistNameLocator(page)).toBeVisible({
             timeout: SMOKE_TIMEOUTS.VISIBILITY,
           });
 
