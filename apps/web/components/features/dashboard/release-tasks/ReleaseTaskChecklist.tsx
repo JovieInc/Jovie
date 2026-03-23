@@ -47,6 +47,11 @@ function isPastRelease(releaseDate?: Date | string | null): boolean {
   return d.getTime() < Date.now();
 }
 
+function getRelativeDueDays(dueDate: Date | string): number {
+  const due = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
+  return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+}
+
 export function ReleaseTaskChecklist({
   releaseId,
   variant,
@@ -67,13 +72,12 @@ export function ReleaseTaskChecklist({
   const totalTasks = tasks?.length ?? 0;
   const overdueCount = useMemo(() => {
     if (!tasks) return 0;
-    const now = Date.now();
     return tasks.filter(
       t =>
         t.status !== 'done' &&
         t.status !== 'cancelled' &&
         t.dueDate &&
-        new Date(t.dueDate).getTime() < now
+        getRelativeDueDays(t.dueDate) < 0
     ).length;
   }, [tasks]);
 

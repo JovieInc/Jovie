@@ -11,7 +11,7 @@ interface ReleaseTaskDueBadgeProps {
 
 function formatOverdue(absDays: number): string {
   if (absDays <= 6) return `${absDays}d overdue`;
-  if (absDays <= 27) return `${Math.round(absDays / 7)}w overdue`;
+  if (absDays < 30) return `${Math.round(absDays / 7)}w overdue`;
   if (absDays <= 364) return `${Math.round(absDays / 30)}mo overdue`;
   return `${Math.round(absDays / 365)}y overdue`;
 }

@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { notFound } from 'next/navigation';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
 import { db } from '@/lib/db';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -26,11 +27,15 @@ export default async function TasksPage({ params }: TasksPageProps) {
     )
     .limit(1);
 
+  if (!release) {
+    notFound();
+  }
+
   return (
     <ReleaseTaskPage
       releaseId={releaseId}
-      releaseTitle={release?.title ?? 'Release'}
-      releaseDate={release?.releaseDate}
+      releaseTitle={release.title ?? 'Release'}
+      releaseDate={release.releaseDate}
     />
   );
 }
