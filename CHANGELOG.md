@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.3.44] - 2026-03-23
+
+### Fixed
+
+- Theme Clerk's prebuilt auth UI to match Jovie dark mode and bundle the Core 3 UI assets through the auth provider instead of falling back to the stock dark styling
+- Route post-signup users through the canonical waitlist and onboarding gate so waitlist-state users no longer fall into onboarding and see the flow flip underneath them
+- Preserve redirect-aware auth navigation while hardening mock and misconfigured Clerk fallback handling, provider config, and related auth smoke coverage
+
+### Added
+
+- Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
+- Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
+
 ## [26.4.43] - 2026-03-22
 
 ### Changed
