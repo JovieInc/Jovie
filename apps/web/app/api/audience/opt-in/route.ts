@@ -3,9 +3,11 @@
  *
  * POST /api/audience/opt-in
  * Updates the marketing_opt_in flag for a tip audience member.
+ * Requires a signed token to prevent unauthenticated manipulation.
  *
- * GET /api/audience/opt-in?email=...&profileId=...
+ * GET /api/audience/opt-in?token=...
  * One-click opt-in from email CTA button (sets marketing_opt_in = true).
+ * Token is HMAC-signed to prevent URL forgery.
  */
 
 import { and, eq } from 'drizzle-orm';
@@ -14,19 +16,20 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { db } from '@/lib/db';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
+import { verifyOptInToken } from '@/lib/email/opt-in-token';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
 const optInBodySchema = z.object({
-  email: z.string().email(),
-  profileId: z.string().uuid(),
+  token: z.string().min(1),
   optIn: z.boolean(),
 });
 
 /**
- * POST handler — JSON body with { email, profileId, optIn }
+ * POST handler — JSON body with { token, optIn }
+ * Token is HMAC-signed and encodes email + profileId.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -40,7 +43,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, profileId, optIn } = parsed.data;
+    const { token, optIn } = parsed.data;
+
+    const verified = verifyOptInToken(token);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 403 }
+      );
+    }
+
+    const { email, profileId } = verified;
 
     const [updated] = await db
       .update(tipAudience)
@@ -49,10 +62,7 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(tipAudience.profileId, profileId),
-          eq(tipAudience.email, email.toLowerCase().trim())
-        )
+        and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
       )
       .returning({ id: tipAudience.id });
 
@@ -81,15 +91,14 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET handler — one-click opt-in from email CTA
- * Redirects to a confirmation page after updating.
+ * Requires a signed token query parameter.
  */
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const email = searchParams.get('email');
-    const profileId = searchParams.get('profileId');
+    const token = searchParams.get('token');
 
-    if (!email || !profileId) {
+    if (!token) {
       return new NextResponse(
         buildHtmlPage(
           'Invalid Link',
@@ -102,6 +111,22 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const verified = verifyOptInToken(token);
+    if (!verified) {
+      return new NextResponse(
+        buildHtmlPage(
+          'Invalid Link',
+          'This opt-in link is invalid or expired.'
+        ),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }
+      );
+    }
+
+    const { email, profileId } = verified;
+
     const [updated] = await db
       .update(tipAudience)
       .set({
@@ -109,10 +134,7 @@ export async function GET(req: NextRequest) {
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(tipAudience.profileId, profileId),
-          eq(tipAudience.email, email.toLowerCase().trim())
-        )
+        and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
       )
       .returning({ id: tipAudience.id });
 
