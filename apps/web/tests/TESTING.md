@@ -27,16 +27,16 @@ pnpm test:watch
 
 ```bash
 # Full E2E suite
-pnpm test:e2e
+doppler run -- pnpm test:e2e
 
 # Smoke tests only (fast)
-SMOKE_ONLY=1 pnpm e2e:smoke
+SMOKE_ONLY=1 doppler run -- pnpm e2e:smoke
 
 # Specific test file
-pnpm test:e2e tests/e2e/smoke-public.spec.ts
+doppler run -- pnpm test:e2e tests/e2e/smoke-public.spec.ts
 
 # With UI
-pnpm test:e2e:ui
+doppler run -- pnpm test:e2e:ui
 ```
 
 ## Smoke Test Files
@@ -49,9 +49,15 @@ Smoke tests are designed for **fast PR feedback** (< 10 min target):
   - 404/error handling
   - Critical pages (/, /sign-up, /pricing)
 
-- `smoke-auth.spec.ts` - Auth-related pages (requires Clerk)
-  - Auth pages (signin/signup)
+- `auth.spec.ts` - Signed-out auth page coverage
+  - `/signin` and `/signup` render Clerk prebuilt auth UI
+  - Canonical navigation between auth routes
+  - No runtime errors during auth-page hydration
+
+- `smoke-auth.spec.ts` - Authenticated dashboard smoke coverage
   - Protected route redirects
+  - Dashboard navigation after Clerk test-mode sign-in
+  - Quick auth-page availability checks
 
 ## Full Suite Files
 
@@ -129,6 +135,7 @@ PR created
 - Check if test is doing too much (should be < 30s)
 - Verify network mocks are in place
 - Consider moving to full suite if test is slow
+- For auth pages, confirm the spec is not accidentally reusing authenticated storage state
 
 ### Flaky tests
 
