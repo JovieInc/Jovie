@@ -10,9 +10,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Admin Kanban drag-to-Claimed now uses proper approval flow instead of bare status update — previously left users with `waitlist_pending` status despite appearing approved
-- Allow waitlist approval of entries with `invited` status (not just `new`), fixing Kanban Invited→Claimed transitions
-- Onboarding page now redirects to `/waitlist` when user state is `NEEDS_WAITLIST_SUBMISSION` or `WAITLIST_PENDING`, preventing waitlist content from rendering at onboarding URL via stale proxy cache
+- Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
+- Invited people on the waitlist can now be fully approved from the admin board
+- Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
+- Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
+- Bulk approve action now includes invited entries, matching individual approval behavior
 
 ## [26.4.43] - 2026-03-22
 

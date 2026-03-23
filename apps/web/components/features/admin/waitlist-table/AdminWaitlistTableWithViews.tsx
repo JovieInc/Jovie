@@ -156,10 +156,12 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         label: 'Approve',
         icon: <CheckCircle className='h-3.5 w-3.5' />,
         onClick: async () => {
-          const eligible = selectedEntries.filter(e => e.status === 'new');
+          const eligible = selectedEntries.filter(
+            e => e.status === 'new' || e.status === 'invited'
+          );
           if (eligible.length === 0) {
             toast.info(
-              'No entries eligible for approval (must have status "new")'
+              'No entries eligible for approval (must have status "new" or "invited")'
             );
             return;
           }
@@ -240,7 +242,7 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
   );
 
   const handleItemMove = useCallback(
-    async (itemId: string, _fromColumnId: string, toColumnId: string) => {
+    async (itemId: string, fromColumnId: string, toColumnId: string) => {
       try {
         if (toColumnId === 'claimed') {
           // Use proper approval flow — updates users.userStatus, activeProfileId,
@@ -249,8 +251,15 @@ export function AdminWaitlistTableWithViews(props: WaitlistTableProps) {
         } else if (toColumnId === 'new') {
           // Use proper disapproval flow — reverts user status and profile
           await disapproveMutation.mutateAsync({ entryId: itemId });
+        } else if (fromColumnId === 'claimed' && toColumnId === 'invited') {
+          // Block claimed→invited: no backend path to partially revert approval.
+          // Admin should move to New first, then to Invited if needed.
+          toast.error(
+            'Move claimed entries to New first, then to Invited if needed.'
+          );
+          return;
         } else {
-          // Transitional status updates (e.g. to/from 'invited') use simple status update
+          // Transitional status updates (e.g. new→invited) use simple status update
           await updateStatusMutation.mutateAsync({
             entryId: itemId,
             status: toColumnId as 'new' | 'invited' | 'claimed',

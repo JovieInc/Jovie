@@ -53,7 +53,7 @@ export default async function OnboardingPage({
     authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
     authResult.state === CanonicalUserState.WAITLIST_PENDING
   ) {
-    redirect('/waitlist');
+    redirect(APP_ROUTES.WAITLIST);
   }
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
