@@ -551,33 +551,35 @@ export function DevToolbar({
             <span className='hidden sm:inline text-[10px]'>Admin</span>
           </Link>
 
-          <button
-            type='button'
-            onClick={handleClearSession}
-            disabled={
-              clearSessionState === 'loading' || clearSessionState === 'done'
-            }
-            title='Clear all cookies, localStorage, and sessionStorage'
-            className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-            aria-label='Clear session'
-          >
-            {clearSessionState === 'loading' ? (
-              <Loader2 size={11} className='animate-spin' />
-            ) : clearSessionState === 'done' ? (
-              <Check size={11} className='text-[var(--color-accent)]' />
-            ) : (
-              <Trash2 size={11} />
-            )}
-            <span className='hidden sm:inline text-[10px]'>
-              {clearSessionState === 'loading'
-                ? 'Clearing...'
-                : clearSessionState === 'done'
-                  ? 'Cleared!'
-                  : clearSessionState === 'error'
-                    ? 'Failed'
-                    : 'Clear'}
-            </span>
-          </button>
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={handleClearSession}
+              disabled={
+                clearSessionState === 'loading' || clearSessionState === 'done'
+              }
+              title='Clear all cookies, localStorage, and sessionStorage'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              aria-label='Clear session'
+            >
+              {clearSessionState === 'loading' ? (
+                <Loader2 size={11} className='animate-spin' />
+              ) : clearSessionState === 'done' ? (
+                <Check size={11} className='text-[var(--color-accent)]' />
+              ) : (
+                <Trash2 size={11} />
+              )}
+              <span className='hidden sm:inline text-[10px]'>
+                {clearSessionState === 'loading'
+                  ? 'Clearing...'
+                  : clearSessionState === 'done'
+                    ? 'Cleared!'
+                    : clearSessionState === 'error'
+                      ? 'Failed'
+                      : 'Clear'}
+              </span>
+            </button>
+          )}
 
           {env !== 'production' && (
             <button
