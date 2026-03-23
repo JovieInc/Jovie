@@ -1,7 +1,7 @@
 'use client';
 
 import { Check, Minus } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import {
   type ComparisonFeature,
   ENTITLEMENT_REGISTRY,
@@ -308,12 +308,9 @@ export function PricingComparisonChart() {
 
           <tbody>
             {PRICING_COMPARISON.map(category => (
-              <>
+              <Fragment key={`cat-${category.category}`}>
                 {/* Category header */}
-                <tr
-                  key={`cat-${category.category}`}
-                  style={{ backgroundColor: 'var(--linear-bg-page)' }}
-                >
+                <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
                   <td
                     colSpan={growthPlanEnabled ? 4 : 3}
                     className='px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider'
@@ -326,7 +323,7 @@ export function PricingComparisonChart() {
                 {category.features.map(feature => (
                   <FeatureRow key={`feat-${feature.name}`} feature={feature} />
                 ))}
-              </>
+              </Fragment>
             ))}
           </tbody>
         </table>
