@@ -44,7 +44,7 @@
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
     "demo:record": "doppler run -- playwright test --config playwright.config.demo.ts",
     "test:e2e:sentry:red": "node scripts/run-sentry-red-lane.mjs",
-    "e2e:smoke": "SMOKE_ONLY=1 playwright test -g @smoke",
+    "e2e:smoke": "SMOKE_ONLY=1 E2E_FAST_ITERATION=1 playwright test -g @smoke",
     "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/smoke-auth.spec.ts",
     "e2e:smoke:noauth": "playwright test -g @smoke --config=playwright.config.noauth.ts",
     "e2e:full": "playwright test",
