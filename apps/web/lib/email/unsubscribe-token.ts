@@ -2,24 +2,12 @@
  * Unsubscribe Token Utilities
  *
  * Functions for generating and verifying unsubscribe tokens for email templates.
+ * Uses legacy (non-domain-separated) secret derivation for backwards compatibility
+ * with tokens already in circulation.
  */
 
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { BASE_URL } from '@/constants/domains';
-import { env } from '@/lib/env-server';
-
-/**
- * Secret key for signing unsubscribe tokens.
- * Derived from the RESEND_API_KEY to avoid adding a new env variable.
- * Returns null if RESEND_API_KEY is not set.
- */
-function getUnsubscribeSecret(): string | null {
-  const apiKey = env.RESEND_API_KEY;
-  if (!apiKey) {
-    return null;
-  }
-  return createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
-}
+import { deriveSecretLegacy, signPayload, verifyToken } from './hmac-token';
 
 /**
  * Generate an unsubscribe token for an email address.
@@ -27,17 +15,9 @@ function getUnsubscribeSecret(): string | null {
  * Returns null if RESEND_API_KEY is not configured.
  */
 export function generateUnsubscribeToken(email: string): string | null {
-  const secret = getUnsubscribeSecret();
-  if (!secret) {
-    return null;
-  }
+  const secret = deriveSecretLegacy();
   const normalizedEmail = email.toLowerCase().trim();
-  const hmac = createHmac('sha256', secret)
-    .update(normalizedEmail)
-    .digest('hex')
-    .slice(0, 16);
-  const emailBase64 = Buffer.from(normalizedEmail).toString('base64url');
-  return `${emailBase64}.${hmac}`;
+  return signPayload(normalizedEmail, secret);
 }
 
 /**
@@ -45,36 +25,11 @@ export function generateUnsubscribeToken(email: string): string | null {
  * Returns the email address if valid, null otherwise.
  */
 export function verifyUnsubscribeToken(token: string): string | null {
-  try {
-    const [emailBase64, providedHmac] = token.split('.');
-    if (!emailBase64 || !providedHmac) return null;
-
-    const email = Buffer.from(emailBase64, 'base64url').toString('utf8');
-    if (!email.includes('@')) return null;
-
-    const secret = getUnsubscribeSecret();
-    if (!secret) return null;
-
-    const expectedHmac = createHmac('sha256', secret)
-      .update(email)
-      .digest('hex')
-      .slice(0, 16);
-
-    // Use timing-safe comparison to prevent timing attacks
-    const providedBuffer = Buffer.from(providedHmac, 'hex');
-    const expectedBuffer = Buffer.from(expectedHmac, 'hex');
-
-    if (
-      providedBuffer.length !== expectedBuffer.length ||
-      !timingSafeEqual(providedBuffer, expectedBuffer)
-    ) {
-      return null;
-    }
-
-    return email;
-  } catch {
-    return null;
-  }
+  const secret = deriveSecretLegacy();
+  const payload = verifyToken(token, secret);
+  if (!payload) return null;
+  if (!payload.includes('@')) return null;
+  return payload;
 }
 
 /**

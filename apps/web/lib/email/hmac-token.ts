@@ -6,7 +6,7 @@
  * secret derivation and payload format; this module handles the crypto.
  */
 
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '@/lib/env-server';
 
 /**
@@ -20,6 +20,19 @@ export function deriveSecret(domain: string): string | null {
     return null;
   }
   return createHmac('sha256', apiKey).update(domain).digest('hex').slice(0, 32);
+}
+
+/**
+ * Legacy secret derivation using plain SHA-256 hash (no domain separation).
+ * Used by the original unsubscribe token module — kept for backwards compatibility
+ * with tokens already in circulation.
+ */
+export function deriveSecretLegacy(): string | null {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    return null;
+  }
+  return createHash('sha256').update(apiKey).digest('hex').slice(0, 32);
 }
 
 /**
