@@ -11,6 +11,7 @@
  * Flags:
  *   --json         Emit machine-readable JSON to stdout
  *   --path <path>  Restrict to one or more configured budget paths
+ *   --auth-path     Override the Clerk storage state path for auth routes
  */
 
 import { chromium } from '@playwright/test';
@@ -26,7 +27,8 @@ type TimingMetricName =
   | 'cumulative-layout-shift'
   | 'first-input-delay'
   | 'time-to-first-byte'
-  | 'skeleton-to-content';
+  | 'skeleton-to-content'
+  | 'warm-shell-response';
 
 type ResourceMetricName = 'script' | 'image' | 'font' | 'stylesheet' | 'total';
 
@@ -57,6 +59,7 @@ type PageMetrics = {
 };
 
 type CliOptions = {
+  authPath?: string;
   json: boolean;
   paths: string[];
 };
@@ -81,6 +84,8 @@ type PageResult = {
   auth: boolean;
   timings: MetricResult[];
   resourceSizes: MetricResult[];
+  rawTimings: Record<TimingMetricName, number>;
+  rawResourceSizes: Record<ResourceMetricName, number>;
   violations: ViolationResult[];
 };
 
@@ -101,6 +106,12 @@ const AUTH_STORAGE_PATH = resolve(
   import.meta.dirname ?? __dirname,
   '../.auth/session.json'
 );
+const DASHBOARD_WARM_SHELL_START_PATH = '/app';
+const DASHBOARD_RELEASES_LINK_SELECTOR = 'a[href="/app/releases"]';
+const DASHBOARD_RELEASES_READY_SELECTOR =
+  '[data-testid="releases-loading"], [data-testid="releases-matrix"]';
+const DASHBOARD_RELEASES_URL_PATTERN =
+  /\/app(?:\/dashboard)?\/releases(?:[/?#].*)?$/;
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
@@ -124,6 +135,16 @@ const parseCliArgs = (args: string[]): CliOptions => {
         throw new TypeError('Missing value for --path');
       }
       options.paths.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--auth-path') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --auth-path');
+      }
+      options.authPath = value;
       index += 1;
       continue;
     }
@@ -224,6 +245,10 @@ const loadAuthCookies = (
   domain: string;
   path: string;
 }> => {
+  const authStoragePath =
+    CLI_OPTIONS.authPath ||
+    process.env.PERF_BUDGET_AUTH_PATH ||
+    AUTH_STORAGE_PATH;
   const cookieValue = process.env.CLERK_SESSION_COOKIE;
   if (cookieValue) {
     const domain = new URL(baseUrl).hostname;
@@ -232,9 +257,9 @@ const loadAuthCookies = (
     return [{ name: '__session', value: cookieValue, domain, path: '/' }];
   }
 
-  if (existsSync(AUTH_STORAGE_PATH)) {
+  if (existsSync(authStoragePath)) {
     try {
-      const raw = readFileSync(AUTH_STORAGE_PATH, 'utf-8');
+      const raw = readFileSync(authStoragePath, 'utf-8');
       const data = JSON.parse(raw);
       if (Array.isArray(data.cookies)) {
         return data.cookies;
@@ -245,6 +270,55 @@ const loadAuthCookies = (
   }
 
   return [];
+};
+
+const shouldMeasureWarmShellResponse = (url: string, needsAuth: boolean) => {
+  if (!needsAuth) {
+    return false;
+  }
+
+  const pathname = new URL(url).pathname;
+  return DASHBOARD_RELEASES_URL_PATTERN.test(pathname);
+};
+
+/**
+ * Measure in-app navigation time from a warm authenticated dashboard shell
+ * to the first visible releases shell state.
+ */
+const measureWarmShellResponse = async (
+  page: Awaited<
+    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
+  >,
+  baseUrl: string
+): Promise<number> => {
+  const appRootUrl = `${baseUrl.replace(/\/$/, '')}${DASHBOARD_WARM_SHELL_START_PATH}`;
+  await page.goto(appRootUrl, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
+  await page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
+    state: 'visible',
+    timeout: 15000,
+  });
+
+  const releasesLink = page.locator(DASHBOARD_RELEASES_LINK_SELECTOR).first();
+  await releasesLink.waitFor({ state: 'visible', timeout: 15000 });
+  await releasesLink.hover().catch(() => undefined);
+  await page.waitForTimeout(250);
+
+  const start = Date.now();
+  await Promise.all([
+    page.waitForURL(url => DASHBOARD_RELEASES_URL_PATTERN.test(url.pathname), {
+      timeout: 15000,
+    }),
+    releasesLink.click(),
+  ]);
+  await page.waitForSelector(DASHBOARD_RELEASES_READY_SELECTOR, {
+    state: 'visible',
+    timeout: 15000,
+  });
+
+  return Date.now() - start;
 };
 
 /**
@@ -285,20 +359,29 @@ const collectMetrics = async (
   needsAuth: boolean
 ): Promise<PageMetrics> => {
   const browser = await chromium.launch();
+  const context = await browser.newContext();
   let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
-    const context = await browser.newContext();
-
     if (needsAuth) {
       const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
         throw new Error(
-          'No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide apps/web/.auth/session.json.'
+          `No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide ${CLI_OPTIONS.authPath || process.env.PERF_BUDGET_AUTH_PATH || AUTH_STORAGE_PATH}.`
         );
       }
       await context.addCookies(cookies);
       logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
+    }
+
+    let warmShellResponse = 0;
+    if (shouldMeasureWarmShellResponse(url, needsAuth)) {
+      const warmPage = await context.newPage();
+      try {
+        warmShellResponse = await measureWarmShellResponse(warmPage, BASE_URL);
+      } finally {
+        await warmPage.close().catch(() => undefined);
+      }
     }
 
     page = await context.newPage();
@@ -447,6 +530,7 @@ const collectMetrics = async (
         'first-input-delay': metrics.timings['first-input-delay'],
         'time-to-first-byte': metrics.timings['time-to-first-byte'],
         'skeleton-to-content': skeletonToContent,
+        'warm-shell-response': warmShellResponse,
       },
       resourceSizes: {
         script: toKilobytes(metrics.resourceSizes.script),
@@ -493,6 +577,8 @@ const buildPageResult = (
     auth: budgetEntry.auth === true,
     timings: timingResults,
     resourceSizes: resourceResults,
+    rawTimings: metrics.timings,
+    rawResourceSizes: metrics.resourceSizes,
     violations: [
       ...timingResults
         .filter(result => !result.passed)

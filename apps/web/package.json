@@ -106,7 +106,8 @@
     "storybook:build": "storybook build",
     "storybook:test": "vitest --config=vitest.config.storybook.mts",
     "test:a11y": "vitest run --config=vitest.config.storybook.mts",
-    "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y"
+    "test:visual-a11y": "pnpm run e2e:visual && pnpm run test:a11y",
+    "perf:loop": "tsx scripts/performance-optimizer.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.66",
