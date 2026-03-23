@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.48] - 2026-03-23
+
+### Added
+
+- Brand disambiguation in llms.txt and new llms-full.txt for AI engine optimization
+- /about page with founder story, feature overview, and FAQ schema
+- FAQ section with FAQPage JSON-LD schema on homepage
+- /compare/linktree and /compare/linkfire comparison pages with feature tables
+- /alternatives/linktree and /alternatives/link-in-bio pages targeting commercial keywords
+- Article and BreadcrumbList JSON-LD schemas on all blog posts
+- FAQ schema builder, Article schema builder, and Breadcrumb schema builder utilities
+- Entity IDs (@id) for consistent knowledge graph across Organization, WebSite, and SoftwareApplication schemas
+- knowsAbout, foundingDate, and additionalType fields on Organization schema
+- /about, /pricing, /support, /tips, /changelog added to sitemap
+
+### Fixed
+
+- Corrected sameAs schema links from non-existent @jovieapp accounts to real @meetjovie Instagram
+
 ## [26.3.47] - 2026-03-23
 
 ### Changed
