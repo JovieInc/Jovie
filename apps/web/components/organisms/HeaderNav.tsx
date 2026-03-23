@@ -1,5 +1,3 @@
-'use client';
-
 import Link from 'next/link';
 import type { LogoVariant } from '@/components/atoms/Logo';
 import { LogoLink } from '@/components/atoms/LogoLink';
@@ -21,6 +19,20 @@ export interface HeaderNavProps {
   readonly hideNav?: boolean;
   readonly containerSize?: 'sm' | 'md' | 'lg' | 'xl' | 'full' | 'homepage';
   readonly navLinks?: ReadonlyArray<{ href: string; label: string }>;
+  readonly authMode?: 'client' | 'public-static';
+}
+
+function PublicAuthActions() {
+  return (
+    <div className='flex items-center gap-1'>
+      <Link href='/signin' className='btn-linear-login focus-ring-themed'>
+        Log in
+      </Link>
+      <Link href='/signup' className='btn-linear-signup focus-ring-themed'>
+        Sign up
+      </Link>
+    </div>
+  );
 }
 
 export function HeaderNav({
@@ -32,6 +44,7 @@ export function HeaderNav({
   hideNav = false,
   containerSize: _containerSize = 'lg',
   navLinks,
+  authMode = 'client',
 }: HeaderNavProps = {}) {
   const navLinkClass = 'nav-link-linear focus-ring-themed';
   const hasNavLinks = !hideNav && !!navLinks?.length;
@@ -114,7 +127,11 @@ export function HeaderNav({
 
           {/* Auth actions - visible on all sizes (Linear shows Log in + Sign up on mobile) */}
           <div className='flex items-center gap-1'>
-            <AuthActions />
+            {authMode === 'public-static' ? (
+              <PublicAuthActions />
+            ) : (
+              <AuthActions />
+            )}
           </div>
 
           {/* Mobile hamburger menu - shown on small screens only */}

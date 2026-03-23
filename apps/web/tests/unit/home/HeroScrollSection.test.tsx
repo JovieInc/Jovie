@@ -18,7 +18,7 @@ describe('HeroScrollSection', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByLabelText(
-        'Jovie release dashboard showing releases table with sidebar open'
+        'Jovie release dashboard showing releases table with smart link details'
       )
     ).toBeInTheDocument();
   });
