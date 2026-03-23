@@ -78,20 +78,13 @@ describe('SupportPage', () => {
     render(<SupportPage />);
 
     const heading = screen.getByRole('heading', { level: 1 });
-    expect(heading).toHaveClass('text-5xl', 'font-bold', 'tracking-tight');
-    expect(heading).toHaveStyle({ color: 'var(--linear-text-primary)' });
-
-    const contactButton = screen.getByRole('link', {
-      name: /send email to support team/i,
-    });
-    expect(contactButton).toHaveClass('mt-8');
+    expect(heading).toHaveClass('marketing-h1-linear');
   });
 
-  it('renders within a Container component', () => {
+  it('renders within a MarketingHero component', () => {
     const { container } = render(<SupportPage />);
 
-    // The Container component should wrap the content
-    const containerDiv = container.querySelector('.py-24.text-center');
-    expect(containerDiv).toBeInTheDocument();
+    const section = container.querySelector('section');
+    expect(section).toBeInTheDocument();
   });
 });
