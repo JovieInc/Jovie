@@ -5,8 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-
-## [26.3.44] - 2026-03-23
+## [26.3.46] - 2026-03-23
 
 ### Fixed
 
@@ -18,6 +17,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
 - Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
+
+## [26.4.45] - 2026-03-23
+
+### Added
+
+- [internal] Added 5 agent reference docs: database schema map, API route map, cron registry, webhook map, and library module index
+- [internal] Added documentation index section to AGENTS.md linking to all reference docs
+
+## [26.4.44] - 2026-03-22
+
+### Fixed
+
+- Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
+- Invited people on the waitlist can now be fully approved from the admin board
+- Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
+- Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
+- Bulk approve action now includes invited entries, matching individual approval behavior
 
 ## [26.4.43] - 2026-03-22
 
