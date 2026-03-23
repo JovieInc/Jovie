@@ -18,10 +18,6 @@ interface ActivityFeedOptions {
   enabled?: boolean;
 }
 
-interface ActivityFeedResponse {
-  activities?: unknown;
-}
-
 /**
  * Fetch activity feed data from the API.
  * @internal Used by useActivityFeedQuery
@@ -36,7 +32,7 @@ async function fetchActivityFeed(
     range,
   });
 
-  const response = await fetchWithTimeout<ActivityFeedResponse>(
+  const response = await fetchWithTimeout<unknown>(
     `/api/dashboard/activity/recent?${params.toString()}`,
     { signal }
   );

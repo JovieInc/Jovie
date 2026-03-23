@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { captureError } from '@/lib/error-tracking';
 
 class SentryExampleFrontendError extends Error {
   constructor(message: string | undefined) {
@@ -25,7 +26,12 @@ export function SentryExamplePageClient() {
         const result = await Sentry.diagnoseSdkConnectivity();
         setIsConnected(result !== 'sentry-unreachable');
       } catch (error) {
-        console.error('Failed to check Sentry connectivity:', error);
+        void captureError(
+          'Failed to check Sentry connectivity',
+          error,
+          { route: '/sentry-example-page' },
+          'warning'
+        );
         setIsConnected(false);
       }
     }
@@ -54,7 +60,7 @@ export function SentryExamplePageClient() {
               >
                 Issues page
               </a>
-              . For setup details, read the{' '}
+              {'. For setup details, read the '}
               <a
                 target='_blank'
                 rel='noreferrer'
@@ -63,7 +69,7 @@ export function SentryExamplePageClient() {
               >
                 Next.js docs
               </a>
-              .
+              {'.'}
             </p>
           </div>
 

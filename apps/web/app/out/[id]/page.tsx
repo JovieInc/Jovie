@@ -71,9 +71,9 @@ export default async function InterstitialPage({
         />
 
         <div className='space-y-5 px-5 py-5 sm:px-6'>
-          <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-warning)_32%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))]'>
+          <div className='mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-warning/20 bg-warning-subtle'>
             <AlertTriangle
-              className='h-6 w-6 text-[var(--linear-warning)]'
+              className='h-6 w-6 text-warning'
               aria-hidden='true'
             />
           </div>

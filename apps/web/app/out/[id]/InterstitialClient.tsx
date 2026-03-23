@@ -2,7 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import { CheckCircle2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useLinkVerificationMutation } from '@/lib/queries';
 
@@ -21,12 +21,24 @@ export function InterstitialClient({
 }: Readonly<InterstitialClientProps>) {
   const [error, setError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const { mutate: verifyLink, isPending: isVerifying } =
     useLinkVerificationMutation({
       onSuccess: data => {
         setIsVerified(true);
-        setTimeout(() => {
+        if (redirectTimeoutRef.current) {
+          clearTimeout(redirectTimeoutRef.current);
+        }
+        redirectTimeoutRef.current = setTimeout(() => {
           globalThis.location.replace(data.url);
         }, 1000);
       },
@@ -49,11 +61,8 @@ export function InterstitialClient({
   if (isVerified) {
     return (
       <div className='space-y-4 text-center'>
-        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[color-mix(in_oklab,var(--linear-success)_28%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))]'>
-          <CheckCircle2
-            className='h-7 w-7 text-[var(--linear-success)]'
-            aria-hidden='true'
-          />
+        <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
+          <CheckCircle2 className='h-7 w-7 text-success' aria-hidden='true' />
         </div>
         <p className='text-[13px] font-[560] text-primary-token'>
           Verified. Redirecting...
@@ -65,7 +74,7 @@ export function InterstitialClient({
   return (
     <div className='space-y-4'>
       <noscript>
-        <p className='mb-4 text-[13px] text-[var(--linear-error)]'>
+        <p className='mb-4 text-[13px] text-error'>
           JavaScript is required to continue to this link.
         </p>
       </noscript>
@@ -85,7 +94,7 @@ export function InterstitialClient({
       {error ? (
         <ContentSurfaceCard
           surface='nested'
-          className='border-[color-mix(in_oklab,var(--linear-error)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-error)_10%,var(--linear-app-content-surface))] p-4'
+          className='border-error/20 bg-error-subtle p-4'
         >
           <p className='text-[13px] text-primary-token'>{error}</p>
         </ContentSurfaceCard>

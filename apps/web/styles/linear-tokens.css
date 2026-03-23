@@ -209,6 +209,8 @@
   --linear-app-shell-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.045), 0 18px 42px rgba(0, 0, 0, 0.055);
   --linear-app-header-height: 40px;
+  /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
+  --linear-app-header-height-compact: 36px;
   --linear-app-header-padding-x: 12px;
   --linear-app-content-padding-x: 12px;
   --linear-app-content-padding-y: 8px;

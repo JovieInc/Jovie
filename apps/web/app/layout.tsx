@@ -299,7 +299,7 @@ export default async function RootLayout({
           {headContent}
           <body className={bodyClassName}>
             <div className='flex min-h-screen items-center justify-center bg-page px-6 text-primary-token'>
-              <div className='max-w-sm rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-6 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+              <div className='max-w-sm rounded-[14px] border border-subtle bg-surface-0 px-6 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
                 <h1 className='text-[18px] font-[560] tracking-[-0.018em]'>
                   Configuration error
                 </h1>

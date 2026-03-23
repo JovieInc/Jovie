@@ -81,7 +81,7 @@ export default async function HudPage({
             <p className='text-[13px] leading-6 text-secondary-token'>
               {message}
             </p>
-            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
+            <div className='rounded-[12px] border border-subtle bg-surface-0 px-4 py-3 text-[12px] leading-5 text-tertiary-token'>
               Tip: open{' '}
               <span className='font-mono text-[11px] text-primary-token'>
                 /hud?kiosk=YOUR_TOKEN

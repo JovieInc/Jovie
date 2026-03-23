@@ -29,7 +29,7 @@ export function InvestorThemeToggle({
       onClick={handleToggle}
       aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
       className={cn(
-        'focus-ring-themed flex h-8 w-8 items-center justify-center rounded-full border border-(--linear-app-frame-seam) text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token',
+        'focus-ring-themed flex h-8 w-8 items-center justify-center rounded-full border border-subtle text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token',
         isLight && 'bg-surface-1 text-primary-token'
       )}
     >

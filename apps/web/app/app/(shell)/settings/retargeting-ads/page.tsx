@@ -45,23 +45,67 @@ function SummaryCard({
 
 function AttributionStatsCard() {
   const [stats, setStats] = useState<AttributionStats | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const controller = new AbortController();
 
-    fetch('/api/dashboard/retargeting/attribution')
-      .then(res => (res.ok ? res.json() : null))
+    fetch('/api/dashboard/retargeting/attribution', {
+      signal: controller.signal,
+    })
+      .then(async res => {
+        if (!res.ok) {
+          throw new Error('Failed to load attribution stats');
+        }
+        return (await res.json()) as AttributionStats | null;
+      })
       .then((data: AttributionStats | null) => {
         if (!cancelled && data) {
           setStats(data);
         }
       })
-      .catch(() => {});
+      .catch((fetchError: unknown) => {
+        if (cancelled) return;
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          return;
+        }
+        setError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : 'Failed to load attribution stats'
+        );
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      });
 
     return () => {
       cancelled = true;
+      controller.abort();
     };
   }, []);
+
+  if (isLoading) {
+    return (
+      <ContentSurfaceCard surface='details' className='p-4'>
+        <p className='text-[13px] text-secondary-token'>
+          Loading attribution stats...
+        </p>
+      </ContentSurfaceCard>
+    );
+  }
+
+  if (error) {
+    return (
+      <ContentSurfaceCard surface='details' className='p-4'>
+        <p className='text-[13px] text-error'>{error}</p>
+      </ContentSurfaceCard>
+    );
+  }
 
   if (!stats || stats.total === 0) {
     return null;
@@ -148,9 +192,7 @@ const AD_VARIANTS: AdVariant[] = [
 ];
 
 function getAdCreativeUrl(type: string, size: string): string {
-  return (
-    '/api/dashboard/retargeting/ad-creative?type=' + type + '&size=' + size
-  );
+  return `/api/dashboard/retargeting/ad-creative?type=${type}&size=${size}`;
 }
 
 function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
@@ -205,7 +247,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
   }, [notifications, variant.size, variant.type]);
 
   const previewUrl = cacheKey
-    ? getAdCreativeUrl(variant.type, variant.size) + '&v=' + cacheKey
+    ? `${getAdCreativeUrl(variant.type, variant.size)}&v=${cacheKey}`
     : getAdCreativeUrl(variant.type, variant.size);
 
   return (
@@ -254,6 +296,7 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
             size='sm'
             onClick={handleDownload}
             disabled={downloading || regenerating}
+            aria-label={'Download ' + variant.label + ' ad'}
           >
             <Download className='mr-1.5 h-3.5 w-3.5' />
             {downloading ? 'Generating...' : 'Download'}

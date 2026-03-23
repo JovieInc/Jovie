@@ -24,7 +24,7 @@ vi.mock('@/lib/queries', () => ({
   useBillingStatusQuery: useBillingStatusQueryMock,
 }));
 
-import CheckoutSuccessPage from '../../../app/billing/success/page';
+import CheckoutSuccessPage from './page';
 
 describe('billing success page', () => {
   beforeEach(() => {

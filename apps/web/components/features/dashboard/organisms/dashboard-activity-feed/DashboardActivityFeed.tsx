@@ -27,7 +27,7 @@ const ACTIVITY_ICONS: Record<Activity['icon'], typeof Zap> = {
   email: Mail,
 };
 
-function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] | string }) {
+function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] }) {
   const normalizedIcon = normalizeDashboardActivityIcon(icon);
   const Icon = ACTIVITY_ICONS[normalizedIcon] ?? Link2;
 

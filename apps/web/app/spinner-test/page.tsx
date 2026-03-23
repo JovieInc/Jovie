@@ -1,5 +1,3 @@
-'use client';
-
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -16,7 +14,7 @@ export default function SpinnerTestPage() {
 
         <div className='space-y-5 px-5 py-5 text-center sm:px-6'>
           <div className='flex justify-center'>
-            <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0 p-6'>
+            <div className='rounded-[14px] border border-subtle bg-surface-0 p-6'>
               <svg
                 width='64'
                 height='64'
