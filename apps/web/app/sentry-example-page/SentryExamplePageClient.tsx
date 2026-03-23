@@ -112,7 +112,7 @@ export function SentryExamplePageClient() {
             </ContentSurfaceCard>
           ) : null}
 
-          {!isConnected ? (
+          {isConnected ? null : (
             <ContentSurfaceCard
               surface='nested'
               className='border-warning/20 bg-warning-subtle p-4'
@@ -128,7 +128,7 @@ export function SentryExamplePageClient() {
                 </p>
               </div>
             </ContentSurfaceCard>
-          ) : null}
+          )}
         </div>
       </ContentSurfaceCard>
     </StandaloneProductPage>
