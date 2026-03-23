@@ -1,10 +1,11 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import type {
-  Activity,
-  ActivityRange,
-} from '@/features/dashboard/organisms/dashboard-activity-feed/types';
+import type { ActivityRange } from '@/features/dashboard/organisms/dashboard-activity-feed/types';
+import {
+  type DashboardActivity,
+  parseDashboardActivityFeedResponse,
+} from '@/lib/activity/dashboard-feed';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -18,7 +19,7 @@ interface ActivityFeedOptions {
 }
 
 interface ActivityFeedResponse {
-  activities: Activity[];
+  activities?: unknown;
 }
 
 /**
@@ -29,7 +30,7 @@ async function fetchActivityFeed(
   profileId: string,
   range: ActivityRange,
   signal?: AbortSignal
-): Promise<Activity[]> {
+): Promise<DashboardActivity[]> {
   const params = new URLSearchParams({
     profileId,
     range,
@@ -40,7 +41,7 @@ async function fetchActivityFeed(
     { signal }
   );
 
-  return response.activities ?? [];
+  return parseDashboardActivityFeedResponse(response);
 }
 
 /**

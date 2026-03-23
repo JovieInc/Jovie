@@ -1,6 +1,7 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DashboardActivityIcon } from '@/lib/activity/dashboard-feed';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -23,7 +24,7 @@ const CACHE_HEADERS = {
 } as const;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const ACTION_ICONS: Record<string, string> = {
+const ACTION_ICONS: Record<string, DashboardActivityIcon> = {
   listen: 'listen',
   social: 'social',
   tip: 'tip',
@@ -36,7 +37,7 @@ type ActivityRow = {
   id: string;
   type: ActivityType;
   description: string;
-  icon: string;
+  icon: DashboardActivityIcon;
   timestamp: string;
   href?: string;
 };

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
+import { normalizeDashboardActivityIcon } from '@/lib/activity/dashboard-feed';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import type { Activity, DashboardActivityFeedProps } from './types';
@@ -26,8 +27,9 @@ const ACTIVITY_ICONS: Record<Activity['icon'], typeof Zap> = {
   email: Mail,
 };
 
-function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] }) {
-  const Icon = ACTIVITY_ICONS[icon];
+function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] | string }) {
+  const normalizedIcon = normalizeDashboardActivityIcon(icon);
+  const Icon = ACTIVITY_ICONS[normalizedIcon] ?? Link2;
 
   return (
     <Icon className='h-3.5 w-3.5 text-tertiary-token' aria-hidden='true' />

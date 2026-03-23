@@ -139,7 +139,7 @@ export default function CheckoutSuccessPage() {
     <StandaloneProductPage
       width='lg'
       centered
-      className='relative overflow-hidden'
+      className='relative'
       contentClassName='relative z-10'
     >
       <ConfettiOverlay />
