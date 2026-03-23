@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 
+## [26.4.44] - 2026-03-22
+
+### Fixed
+
+- Admin Kanban drag-to-Claimed now uses proper approval flow instead of bare status update — previously left users with `waitlist_pending` status despite appearing approved
+- Allow waitlist approval of entries with `invited` status (not just `new`), fixing Kanban Invited→Claimed transitions
+- Onboarding page now redirects to `/waitlist` when user state is `NEEDS_WAITLIST_SUBMISSION` or `WAITLIST_PENDING`, preventing waitlist content from rendering at onboarding URL via stale proxy cache
+
 ## [26.4.43] - 2026-03-22
 
 ### Changed
