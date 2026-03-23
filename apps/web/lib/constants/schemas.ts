@@ -4,6 +4,13 @@ import { APP_NAME, APP_URL } from '@/constants/app';
 export const jsonLd = (value: unknown) =>
   JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
 
+/** Schema entity IDs for consistent knowledge graph across pages */
+export const SCHEMA_IDS = {
+  organization: `${APP_URL}#organization`,
+  website: `${APP_URL}#website`,
+  software: `${APP_URL}#software`,
+} as const;
+
 /** Reusable schema fragments shared across marketing pages */
 export const SCHEMA_FRAGMENTS = {
   offers: {
@@ -64,13 +71,14 @@ export function buildWebsiteSchema(overrides: {
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'WebSite',
+    '@id': SCHEMA_IDS.website,
     name: APP_NAME,
     alternateName: overrides.alternateName,
     description: overrides.description,
     url: APP_URL,
     inLanguage: 'en-US',
     potentialAction: SCHEMA_FRAGMENTS.searchAction,
-    publisher: SCHEMA_FRAGMENTS.publisher,
+    publisher: { '@id': SCHEMA_IDS.organization },
   });
 }
 
@@ -79,6 +87,7 @@ export function buildSoftwareSchema(description: string) {
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
+    '@id': SCHEMA_IDS.software,
     name: APP_NAME,
     description,
     url: APP_URL,
@@ -86,7 +95,7 @@ export function buildSoftwareSchema(description: string) {
     operatingSystem: 'Web',
     offers: SCHEMA_FRAGMENTS.offers,
     aggregateRating: SCHEMA_FRAGMENTS.aggregateRating,
-    author: SCHEMA_FRAGMENTS.author,
+    author: { '@id': SCHEMA_IDS.organization },
   });
 }
 
@@ -99,6 +108,7 @@ export function buildOrganizationSchema(overrides: {
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'Organization',
+    '@id': SCHEMA_IDS.organization,
     name: APP_NAME,
     legalName: overrides.legalName,
     url: APP_URL,
@@ -107,5 +117,78 @@ export function buildOrganizationSchema(overrides: {
     description: overrides.description,
     sameAs: overrides.sameAs,
     contactPoint: SCHEMA_FRAGMENTS.contactPoint,
+    foundingDate: '2024',
+    additionalType: 'https://schema.org/SoftwareApplication',
+    knowsAbout: [
+      'Music Technology',
+      'Smart Links',
+      'Music Marketing',
+      'Independent Musicians',
+      'Music Distribution',
+      'Fan Engagement',
+    ],
+  });
+}
+
+/** Build a FAQPage schema from question/answer pairs */
+export function buildFaqSchema(
+  items: Array<{ question: string; answer: string }>
+) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: items.map(item => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
+      },
+    })),
+  });
+}
+
+/** Build an Article schema for blog posts */
+export function buildArticleSchema(overrides: {
+  headline: string;
+  description: string;
+  datePublished: string;
+  dateModified?: string;
+  authorName: string;
+  url: string;
+}) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: overrides.headline,
+    description: overrides.description,
+    datePublished: overrides.datePublished,
+    dateModified: overrides.dateModified ?? overrides.datePublished,
+    url: overrides.url,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': overrides.url },
+    author: {
+      '@type': 'Person',
+      name: overrides.authorName,
+    },
+    publisher: {
+      '@id': SCHEMA_IDS.organization,
+    },
+    image: `${APP_URL}/og/default.png`,
+  });
+}
+
+/** Build a BreadcrumbList schema */
+export function buildBreadcrumbSchema(
+  items: Array<{ name: string; url: string }>
+) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
   });
 }
