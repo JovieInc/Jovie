@@ -18,6 +18,7 @@ import { chromium } from '@playwright/test';
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { resolve } from 'path';
+import { APP_ROUTES } from '../constants/routes';
 
 const require = createRequire(import.meta.url);
 
@@ -106,12 +107,16 @@ const AUTH_STORAGE_PATH = resolve(
   import.meta.dirname ?? __dirname,
   '../.auth/session.json'
 );
-const DASHBOARD_WARM_SHELL_START_PATH = '/app';
-const DASHBOARD_RELEASES_LINK_SELECTOR = 'a[href="/app/releases"]';
+const DASHBOARD_WARM_SHELL_START_PATH = APP_ROUTES.DASHBOARD;
+const DASHBOARD_RELEASES_PATHS = [
+  APP_ROUTES.RELEASES,
+  APP_ROUTES.DASHBOARD_RELEASES,
+] as const;
+const DASHBOARD_RELEASES_LINK_SELECTOR = DASHBOARD_RELEASES_PATHS.map(
+  path => `a[href="${path}"]`
+).join(', ');
 const DASHBOARD_RELEASES_READY_SELECTOR =
   '[data-testid="releases-loading"], [data-testid="releases-matrix"]';
-const DASHBOARD_RELEASES_URL_PATTERN =
-  /\/app(?:\/dashboard)?\/releases(?:[/?#].*)?$/;
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
@@ -192,6 +197,12 @@ const resolvePath = (path: string) =>
 
 const formatMetric = (value: number, unit: string) =>
   `${value.toFixed(1)}${unit}`;
+
+const matchesRoute = (pathname: string, route: string) =>
+  pathname === route || pathname.startsWith(`${route}/`);
+
+const matchesDashboardReleasesPath = (pathname: string) =>
+  DASHBOARD_RELEASES_PATHS.some(route => matchesRoute(pathname, route));
 
 const calculateOvershootPct = (measured: number, budget: number) => {
   if (measured <= budget || budget === 0) {
@@ -278,7 +289,7 @@ const shouldMeasureWarmShellResponse = (url: string, needsAuth: boolean) => {
   }
 
   const pathname = new URL(url).pathname;
-  return DASHBOARD_RELEASES_URL_PATTERN.test(pathname);
+  return matchesDashboardReleasesPath(pathname);
 };
 
 /**
@@ -308,7 +319,7 @@ const measureWarmShellResponse = async (
 
   const start = Date.now();
   await Promise.all([
-    page.waitForURL(url => DASHBOARD_RELEASES_URL_PATTERN.test(url.pathname), {
+    page.waitForURL(url => matchesDashboardReleasesPath(url.pathname), {
       timeout: 15000,
     }),
     releasesLink.click(),

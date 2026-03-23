@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { shouldBypassClerkForRequest } from '@/lib/auth/clerk-middleware-bypass';
+import {
+  type ClerkBypassPathInfo,
+  shouldBypassClerkForRequest,
+} from '@/lib/auth/clerk-middleware-bypass';
 
 describe('shouldBypassClerkForRequest', () => {
-  const publicPathInfo = {
+  const publicPathInfo: ClerkBypassPathInfo = {
     isAuthCallbackPath: false,
     isAuthPath: false,
     isProtectedPath: false,
@@ -51,6 +54,19 @@ describe('shouldBypassClerkForRequest', () => {
     ).toBe(false);
   });
 
+  it('does not bypass Clerk on auth callback routes', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        pathname: '/sso-callback',
+        pathInfo: {
+          ...publicPathInfo,
+          isAuthCallbackPath: true,
+        },
+        cookies: [],
+      })
+    ).toBe(false);
+  });
+
   it('does not bypass Clerk on protected app routes', () => {
     expect(
       shouldBypassClerkForRequest({
@@ -62,5 +78,28 @@ describe('shouldBypassClerkForRequest', () => {
         cookies: [],
       })
     ).toBe(false);
+  });
+
+  it('does not bypass when any cookie indicates an active session', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        pathname: '/',
+        pathInfo: publicPathInfo,
+        cookies: [
+          { name: '__client_uat', value: '0' },
+          { name: '__session', value: 'sess_123' },
+        ],
+      })
+    ).toBe(false);
+  });
+
+  it('treats blank session cookies as anonymous', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        pathname: '/',
+        pathInfo: publicPathInfo,
+        cookies: [{ name: '__session', value: '   ' }],
+      })
+    ).toBe(true);
   });
 });

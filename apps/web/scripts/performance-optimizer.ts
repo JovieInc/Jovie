@@ -433,7 +433,7 @@ async function measureCurrentState(
         samples,
         config.threshold,
         rawSamples
-      ) as never;
+      ) as PerfMeasurement<HomepageSample | DashboardSample>;
     }
 
     const samples: DashboardSample[] = [];
@@ -455,7 +455,7 @@ async function measureCurrentState(
       samples,
       config.threshold,
       rawSamples
-    ) as never;
+    ) as PerfMeasurement<HomepageSample | DashboardSample>;
   } finally {
     await stopServer(server);
   }
@@ -518,7 +518,7 @@ async function maybeLowerThreshold(state: PerfRunState) {
 
   const recommendation =
     state.config.mode === 'homepage'
-      ? String(Math.max(state.config.threshold, 98))
+      ? String(Math.min(100, state.config.threshold + 1))
       : String(Math.max(25, state.config.threshold - 25));
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });

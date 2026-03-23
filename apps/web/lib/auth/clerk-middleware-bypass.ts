@@ -1,4 +1,6 @@
-interface ClerkBypassPathInfo {
+import { APP_ROUTES } from '@/constants/routes';
+
+export interface ClerkBypassPathInfo {
   isAuthCallbackPath: boolean;
   isAuthPath: boolean;
   isProtectedPath: boolean;
@@ -9,6 +11,20 @@ interface ClerkCookieLike {
   value: string;
 }
 
+const CLERK_REQUIRED_EXACT_PATHS = [
+  APP_ROUTES.DASHBOARD,
+  '/clerk',
+  '/monitoring',
+] as const;
+
+const CLERK_REQUIRED_PREFIXES = [
+  `${APP_ROUTES.DASHBOARD}/`,
+  '/api/',
+  '/trpc',
+  '/clerk/',
+  '/monitoring/',
+] as const;
+
 function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
   if (
     pathInfo.isProtectedPath ||
@@ -18,15 +34,12 @@ function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
     return true;
   }
 
+  // Keep this Clerk-specific subset aligned with categorizePath() in proxy.ts.
+  // Duplicating the minimal matcher here avoids coupling this utility to proxy.
   return (
-    pathname === '/app' ||
-    pathname.startsWith('/app/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/trpc') ||
-    pathname === '/clerk' ||
-    pathname.startsWith('/clerk/') ||
-    pathname === '/monitoring' ||
-    pathname.startsWith('/monitoring/')
+    CLERK_REQUIRED_EXACT_PATHS.includes(
+      pathname as (typeof CLERK_REQUIRED_EXACT_PATHS)[number]
+    ) || CLERK_REQUIRED_PREFIXES.some(prefix => pathname.startsWith(prefix))
   );
 }
 

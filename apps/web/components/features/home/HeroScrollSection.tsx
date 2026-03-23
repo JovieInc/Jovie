@@ -49,6 +49,7 @@ export function HeroScrollSection() {
                   title='Jovie'
                   priority
                   skipCheck
+                  testId='hero-dashboard-screenshot'
                 />
                 {/* Gentle bottom fade — subtle, not aggressive */}
                 <div

@@ -12,7 +12,10 @@ import {
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
-import { shouldBypassClerkForRequest } from '@/lib/auth/clerk-middleware-bypass';
+import {
+  type ClerkBypassPathInfo,
+  shouldBypassClerkForRequest,
+} from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
@@ -969,10 +972,12 @@ export default async function middleware(
     );
   }
 
+  const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
+
   if (
     shouldBypassClerkForRequest({
       pathname,
-      pathInfo,
+      pathInfo: clerkPathInfo,
       cookies: req.cookies.getAll(),
     })
   ) {

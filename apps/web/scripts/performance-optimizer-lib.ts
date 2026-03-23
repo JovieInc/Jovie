@@ -733,7 +733,7 @@ const HOMEPAGE_HYPOTHESES: PerfHypothesis[] = [
     summary:
       'Reduce the hero screenshot cost and verify the priority image is truly earning its bytes.',
     evidence: [
-      'apps/web/components/features/home/HeroScrollSection.tsx renders a priority ProductScreenshot using /product-screenshots/releases-dashboard-sidebar.png.',
+      'apps/web/components/features/home/HeroScrollSection.tsx renders a priority ProductScreenshot using /product-screenshots/releases-dashboard-full.png.',
       'Large above-the-fold image bytes can dominate Lighthouse LCP even when server work is already static.',
     ],
     targetFiles: [

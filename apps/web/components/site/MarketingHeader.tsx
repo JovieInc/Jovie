@@ -18,7 +18,6 @@ export type MarketingHeaderVariant = 'landing' | 'content' | 'minimal';
 export interface MarketingHeaderProps
   extends Readonly<{
     readonly logoSize?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-    readonly scrollThresholdPx?: number;
     readonly variant?: MarketingHeaderVariant;
   }> {}
 
@@ -27,7 +26,6 @@ export interface MarketingHeaderProps
  */
 export function MarketingHeader({
   logoSize = 'xs',
-  scrollThresholdPx: _scrollThresholdPx = 0,
   variant = 'landing',
 }: MarketingHeaderProps) {
   const hideNav = variant === 'minimal';
