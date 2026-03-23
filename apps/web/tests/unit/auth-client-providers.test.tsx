@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { clerkProviderMock, envState } = vi.hoisted(() => ({
+const { bundledUiMock, clerkProviderMock, envState } = vi.hoisted(() => ({
+  bundledUiMock: { __bundled: true },
   clerkProviderMock: vi.fn(),
   envState: { clerkMockFlag: '0' },
 }));
@@ -12,6 +13,10 @@ vi.mock('@clerk/nextjs', () => ({
     clerkProviderMock(props);
     return <div data-testid='clerk-provider'>{children}</div>;
   },
+}));
+
+vi.mock('@clerk/ui', () => ({
+  ui: bundledUiMock,
 }));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
@@ -92,6 +97,7 @@ describe('AuthClientProviders', () => {
     expect(props).toMatchObject({
       publishableKey: 'pk_test_example',
       proxyUrl: undefined,
+      ui: bundledUiMock,
       signInUrl: APP_ROUTES.SIGNIN,
       signUpUrl: APP_ROUTES.SIGNUP,
       signInFallbackRedirectUrl: APP_ROUTES.DASHBOARD,
