@@ -46,6 +46,12 @@ export default async function OnboardingPage({
   if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
     redirect('/error/user-creation-failed');
   }
+  if (
+    authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
+    authResult.state === CanonicalUserState.WAITLIST_PENDING
+  ) {
+    redirect(APP_ROUTES.WAITLIST);
+  }
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. If the user is already active, send them to /app.

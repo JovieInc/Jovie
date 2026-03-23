@@ -72,6 +72,12 @@ describe('BrandLogo', () => {
     expect(img).toHaveAttribute('height', '48');
   });
 
+  it('defaults the inline style to width and height auto to preserve aspect ratio warnings', () => {
+    render(<BrandLogo tone='white' />);
+    const img = screen.getByAltText('Jovie');
+    expect(img).toHaveStyle({ width: 'auto', height: 'auto' });
+  });
+
   it('applies rounded-full class when rounded=true (default)', () => {
     render(<BrandLogo tone='white' />);
     const img = screen.getByAltText('Jovie');

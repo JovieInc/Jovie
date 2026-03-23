@@ -12,7 +12,7 @@ export default function SignUpSsoCallbackPage() {
     <div className='min-h-dvh grid place-items-center bg-base'>
       <SsoCallbackHandler
         signInFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
-        signUpFallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+        signUpFallbackRedirectUrl={APP_ROUTES.WAITLIST}
       />
     </div>
   );
