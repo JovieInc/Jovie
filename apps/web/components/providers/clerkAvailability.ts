@@ -20,9 +20,6 @@ export function shouldBypassClerk(
   );
 }
 
-export function getClerkProxyUrl(): string | undefined {
-  const browserWindow = globalThis.window;
-  if (!browserWindow) return undefined;
-
+export function getClerkProxyUrl(): string {
   return '/clerk';
 }

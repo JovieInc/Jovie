@@ -25,15 +25,15 @@ export default async function AuthLayout({
   if (isClerkUnavailable) {
     return (
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
-        <AuthShellLayout
-          formTitle='Auth unavailable'
-          showFormTitle={false}
-          showFooterPrompt={false}
-        >
-          <main id='main-content'>
+        <main id='main-content'>
+          <AuthShellLayout
+            formTitle='Auth unavailable'
+            showFormTitle={false}
+            showFooterPrompt={false}
+          >
             <AuthUnavailableCard />
-          </main>
-        </AuthShellLayout>
+          </AuthShellLayout>
+        </main>
       </FeatureFlagsProvider>
     );
   }
