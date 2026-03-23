@@ -28,172 +28,11 @@ const optInBodySchema = z.object({
   optIn: z.boolean(),
 });
 
-/**
- * POST handler — JSON body with { token, optIn }
- * Token is HMAC-signed and encodes email + profileId.
- */
-export async function POST(req: NextRequest) {
-  try {
-    const ip = getClientIP(req);
-    const rl = await generalLimiter.limit(ip);
-    if (!rl.success) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
-    }
+const HTML_HEADERS = { 'Content-Type': 'text/html; charset=utf-8' } as const;
 
-    const body = await req.json();
-    const parsed = optInBodySchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid request body', details: parsed.error.flatten() },
-        { status: 400 }
-      );
-    }
-
-    const { token, optIn } = parsed.data;
-
-    const verified = verifyOptInToken(token);
-    if (!verified) {
-      return NextResponse.json(
-        { error: 'Invalid or expired token' },
-        { status: 403 }
-      );
-    }
-
-    const { email, profileId } = verified;
-
-    const [updated] = await db
-      .update(tipAudience)
-      .set({
-        marketingOptIn: optIn,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
-      )
-      .returning({ id: tipAudience.id });
-
-    if (!updated) {
-      return NextResponse.json(
-        { error: 'Audience member not found' },
-        { status: 404 }
-      );
-    }
-
-    logger.info('Tip audience opt-in updated', {
-      profileId,
-      optIn,
-      audienceId: updated.id,
-    });
-
-    return NextResponse.json({ success: true, optIn });
-  } catch (error) {
-    captureError('[audience] opt-in error', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * GET handler — one-click opt-in from email CTA
- * Requires a signed token query parameter.
- */
-export async function GET(req: NextRequest) {
-  try {
-    const ip = getClientIP(req);
-    const rl = await generalLimiter.limit(ip);
-    if (!rl.success) {
-      return new NextResponse(
-        buildHtmlPage('Too Many Requests', 'Please try again later.'),
-        {
-          status: 429,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
-    }
-
-    const { searchParams } = new URL(req.url);
-    const token = searchParams.get('token');
-
-    if (!token) {
-      return new NextResponse(
-        buildHtmlPage(
-          'Invalid Link',
-          'This opt-in link is invalid or expired.'
-        ),
-        {
-          status: 400,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
-    }
-
-    const verified = verifyOptInToken(token);
-    if (!verified) {
-      return new NextResponse(
-        buildHtmlPage(
-          'Invalid Link',
-          'This opt-in link is invalid or expired.'
-        ),
-        {
-          status: 403,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
-    }
-
-    const { email, profileId } = verified;
-
-    const [updated] = await db
-      .update(tipAudience)
-      .set({
-        marketingOptIn: true,
-        updatedAt: new Date(),
-      })
-      .where(
-        and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
-      )
-      .returning({ id: tipAudience.id });
-
-    if (!updated) {
-      return new NextResponse(
-        buildHtmlPage(
-          'Not Found',
-          'We could not find your subscription record.'
-        ),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'text/html; charset=utf-8' },
-        }
-      );
-    }
-
-    return new NextResponse(
-      buildHtmlPage(
-        "You're Subscribed!",
-        "You'll now receive updates about upcoming shows and new releases. You can unsubscribe at any time from any email."
-      ),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      }
-    );
-  } catch (error) {
-    captureError('[audience] opt-in GET error', error);
-    return new NextResponse(
-      buildHtmlPage('Something went wrong', 'Please try again later.'),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'text/html; charset=utf-8' },
-      }
-    );
-  }
-}
-
-function buildHtmlPage(title: string, message: string): string {
-  return `<!DOCTYPE html>
+function htmlResponse(title: string, message: string, status: number) {
+  return new NextResponse(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -212,5 +51,123 @@ function buildHtmlPage(title: string, message: string): string {
     <p>${message}</p>
   </div>
 </body>
-</html>`;
+</html>`,
+    { status, headers: HTML_HEADERS }
+  );
+}
+
+async function applyOptIn(email: string, profileId: string, optIn: boolean) {
+  const [updated] = await db
+    .update(tipAudience)
+    .set({ marketingOptIn: optIn, updatedAt: new Date() })
+    .where(
+      and(eq(tipAudience.profileId, profileId), eq(tipAudience.email, email))
+    )
+    .returning({ id: tipAudience.id });
+  return updated ?? null;
+}
+
+/**
+ * POST handler — JSON body with { token, optIn }
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const ip = getClientIP(req);
+    const rl = await generalLimiter.limit(ip);
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
+    const body = await req.json();
+    const parsed = optInBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const verified = verifyOptInToken(parsed.data.token);
+    if (!verified) {
+      return NextResponse.json(
+        { error: 'Invalid or expired token' },
+        { status: 403 }
+      );
+    }
+
+    const updated = await applyOptIn(
+      verified.email,
+      verified.profileId,
+      parsed.data.optIn
+    );
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Audience member not found' },
+        { status: 404 }
+      );
+    }
+
+    logger.info('Tip audience opt-in updated', {
+      profileId: verified.profileId,
+      optIn: parsed.data.optIn,
+      audienceId: updated.id,
+    });
+
+    return NextResponse.json({ success: true, optIn: parsed.data.optIn });
+  } catch (error) {
+    captureError('[audience] opt-in error', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET handler — one-click opt-in from email CTA
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const ip = getClientIP(req);
+    const rl = await generalLimiter.limit(ip);
+    if (!rl.success) {
+      return htmlResponse('Too Many Requests', 'Please try again later.', 429);
+    }
+
+    const token = new URL(req.url).searchParams.get('token');
+    if (!token) {
+      return htmlResponse(
+        'Invalid Link',
+        'This opt-in link is invalid or expired.',
+        400
+      );
+    }
+
+    const verified = verifyOptInToken(token);
+    if (!verified) {
+      return htmlResponse(
+        'Invalid Link',
+        'This opt-in link is invalid or expired.',
+        403
+      );
+    }
+
+    const updated = await applyOptIn(verified.email, verified.profileId, true);
+    if (!updated) {
+      return htmlResponse(
+        'Not Found',
+        'We could not find your subscription record.',
+        404
+      );
+    }
+
+    return htmlResponse(
+      "You're Subscribed!",
+      "You'll now receive updates about upcoming shows and new releases. You can unsubscribe at any time from any email.",
+      200
+    );
+  } catch (error) {
+    captureError('[audience] opt-in GET error', error);
+    return htmlResponse('Something went wrong', 'Please try again later.', 500);
+  }
 }

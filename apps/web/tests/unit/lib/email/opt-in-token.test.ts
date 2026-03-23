@@ -69,25 +69,16 @@ describe('opt-in-token', () => {
       expect(verifyOptInToken('abc.')).toBeNull();
     });
 
-    it('rejects a properly-signed token where payload has no @ in email', async () => {
-      const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
-      const { deriveSecret, signPayload } = await import(
-        '@/lib/email/hmac-token'
-      );
-      // Sign a valid token with a payload that lacks @ in the email part
-      const secret = deriveSecret('jovie:audience-opt-in-token-secret');
-      const token = signPayload('noemail:pid', secret);
-      expect(token).toBeTruthy();
-      expect(verifyOptInToken(token!)).toBeNull();
-    });
-
-    it('rejects a properly-signed token where payload has no colon separator', async () => {
+    it.each([
+      ['no @ in email field', 'noemail:pid'],
+      ['no colon separator', 'nocolonseparator'],
+    ])('rejects a properly-signed token with %s', async (_label, payload) => {
       const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
       const { deriveSecret, signPayload } = await import(
         '@/lib/email/hmac-token'
       );
       const secret = deriveSecret('jovie:audience-opt-in-token-secret');
-      const token = signPayload('nocolonseparator', secret);
+      const token = signPayload(payload, secret);
       expect(token).toBeTruthy();
       expect(verifyOptInToken(token!)).toBeNull();
     });
