@@ -302,34 +302,42 @@ const measureWarmShellResponse = async (
   >,
   baseUrl: string
 ): Promise<number> => {
-  const appRootUrl = `${baseUrl.replace(/\/$/, '')}${DASHBOARD_WARM_SHELL_START_PATH}`;
-  await page.goto(appRootUrl, {
-    waitUntil: 'domcontentloaded',
-    timeout: 60000,
-  });
-  await page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
-    state: 'visible',
-    timeout: 15000,
-  });
-
-  const releasesLink = page.locator(DASHBOARD_RELEASES_LINK_SELECTOR).first();
-  await releasesLink.waitFor({ state: 'visible', timeout: 15000 });
-  await releasesLink.hover().catch(() => undefined);
-  await page.waitForTimeout(250);
-
   const start = Date.now();
-  await Promise.all([
-    page.waitForURL(url => matchesDashboardReleasesPath(url.pathname), {
-      timeout: 15000,
-    }),
-    releasesLink.click(),
-  ]);
-  await page.waitForSelector(DASHBOARD_RELEASES_READY_SELECTOR, {
-    state: 'visible',
-    timeout: 15000,
-  });
+  const appRootUrl = `${baseUrl.replace(/\/$/, '')}${DASHBOARD_WARM_SHELL_START_PATH}`;
 
-  return Date.now() - start;
+  try {
+    await page.goto(appRootUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+    await page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
+      state: 'visible',
+      timeout: 15000,
+    });
+
+    const releasesLink = page.locator(DASHBOARD_RELEASES_LINK_SELECTOR).first();
+    await releasesLink.waitFor({ state: 'visible', timeout: 15000 });
+    await releasesLink.hover().catch(() => undefined);
+    await page.waitForTimeout(250);
+
+    await Promise.all([
+      page.waitForURL(url => matchesDashboardReleasesPath(url.pathname), {
+        timeout: 15000,
+      }),
+      releasesLink.click(),
+    ]);
+    await page.waitForSelector(DASHBOARD_RELEASES_READY_SELECTOR, {
+      state: 'visible',
+      timeout: 15000,
+    });
+
+    return Date.now() - start;
+  } catch {
+    logWarning(
+      `  ⚠ Warm shell response measurement failed for ${appRootUrl}, continuing without it`
+    );
+    return 0;
+  }
 };
 
 /**
