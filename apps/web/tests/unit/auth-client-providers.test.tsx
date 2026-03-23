@@ -93,9 +93,9 @@ describe('AuthClientProviders', () => {
       expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
     });
     expect(screen.getByTestId('child')).toBeInTheDocument();
-    expect(clerkProviderMock).toHaveBeenCalledTimes(1);
+    expect(clerkProviderMock).toHaveBeenCalled();
 
-    const props = clerkProviderMock.mock.calls[0]?.[0];
+    const props = clerkProviderMock.mock.lastCall?.[0];
     expect(props).toMatchObject({
       publishableKey: 'pk_test_example',
       proxyUrl: '/clerk',

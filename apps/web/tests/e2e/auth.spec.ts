@@ -106,6 +106,8 @@ async function createFreshAuthPage(browser: Browser): Promise<Page> {
   });
   const page = await context.newPage();
 
+  // This flag is set in Playwright global setup after Clerk testing
+  // credentials are verified and the token helper can run safely.
   if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
     await setupClerkTestingToken({ page }).catch((error: unknown) => {
       // Signed-out auth-page assertions do not require the Clerk testing token.

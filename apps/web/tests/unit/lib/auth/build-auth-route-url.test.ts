@@ -20,13 +20,11 @@ describe('buildAuthRouteUrl', () => {
     expect(buildAuthRouteUrl('/signup', searchParams)).toBe('/signup');
   });
 
-  it('does not leak the parsing base for protocol-relative paths', () => {
+  it('does not forward protocol-relative redirect_url values', () => {
     const searchParams = new URLSearchParams(
-      'redirect_url=%2Fonboarding&plan=founding'
+      'redirect_url=%2F%2Fevil.com%2Fphish&plan=founding'
     );
 
-    expect(buildAuthRouteUrl('//evil.com/path', searchParams)).toBe(
-      '/path?redirect_url=%2Fonboarding'
-    );
+    expect(buildAuthRouteUrl('/signin', searchParams)).toBe('/signin');
   });
 });

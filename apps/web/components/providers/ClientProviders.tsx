@@ -57,14 +57,16 @@ export function ClientProviders({
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
-  const [isClerkReady, setIsClerkReady] = useState(false);
+  const [proxyUrl, setProxyUrl] = useState<string | undefined>(undefined);
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK
   );
 
   useEffect(() => {
-    setIsClerkReady(true);
+    // Keep the app shell rendered during SSR while avoiding Clerk's
+    // window access on the server render path.
+    setProxyUrl(getClerkProxyUrl());
   }, []);
 
   if (shouldSkipClerk) {
@@ -82,14 +84,10 @@ export function ClientProviders({
     );
   }
 
-  if (!isClerkReady) {
-    return null;
-  }
-
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl()}
+      proxyUrl={proxyUrl}
       appearance={clerkAppearanceBase}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}

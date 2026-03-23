@@ -10,6 +10,10 @@ describe('clerkAvailability', () => {
     expect(shouldBypassClerk('   ', '0')).toBe(true);
   });
 
+  it('accepts whitespace-padded valid publishable keys', () => {
+    expect(shouldBypassClerk('  pk_test_example  ', '0')).toBe(false);
+  });
+
   it('treats non-Clerk publishable keys as mocked', () => {
     expect(isMockPublishableKey('mock-publishable-key')).toBe(true);
     expect(isMockPublishableKey('dummy')).toBe(true);

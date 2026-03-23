@@ -32,14 +32,16 @@ export function AuthClientProviders({
   children,
   publishableKey,
 }: AuthClientProvidersProps) {
-  const [isClerkReady, setIsClerkReady] = useState(false);
+  const [proxyUrl, setProxyUrl] = useState<string | undefined>(undefined);
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK
   );
 
   useEffect(() => {
-    setIsClerkReady(true);
+    // Clerk's SSR path can touch window when proxyUrl is provided eagerly.
+    // Defer proxy configuration until mount so the page shell still renders.
+    setProxyUrl(getClerkProxyUrl());
   }, []);
 
   if (shouldSkipClerk) {
@@ -50,14 +52,10 @@ export function AuthClientProviders({
     );
   }
 
-  if (!isClerkReady) {
-    return null;
-  }
-
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl()}
+      proxyUrl={proxyUrl}
       ui={ui}
       appearance={authClerkAppearance}
       signInUrl={APP_ROUTES.SIGNIN}
