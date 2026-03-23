@@ -99,6 +99,15 @@ describe('Public Profile Page Logic', () => {
     it('does not import the dashboard noStore loader into the public page', () => {
       expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('loadUpcomingTourDates');
     });
+
+    it('falls back to an empty tour list when public tour loading fails', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'Error fetching public profile tour dates'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        '? getPublicTourDates(profile.id)'
+      );
+    });
   });
 
   describe('generateProfileStructuredData', () => {
