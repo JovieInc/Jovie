@@ -1,25 +1,13 @@
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
 import { queryKeys } from '@/lib/queries';
 import { getQueryClient } from '@/lib/queries/server';
 import { getDashboardData } from '../../dashboard/actions';
 import { getProfileContactsForOwner } from '../../dashboard/contacts/actions';
+import { ContactsContent } from './ContactsContent';
 
 export const runtime = 'nodejs';
 
 export default async function SettingsContactsPage() {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/contacts`);
-  }
-
   const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
 
   // Prefetch contacts into the shared QueryClient so the client component
   // gets an instant cache hit instead of showing a loading skeleton.
@@ -32,5 +20,5 @@ export default async function SettingsContactsPage() {
     });
   }
 
-  return <DashboardSettings focusSection='contacts' />;
+  return <ContactsContent />;
 }

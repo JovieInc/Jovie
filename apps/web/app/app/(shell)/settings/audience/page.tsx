@@ -1,22 +1,23 @@
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+'use client';
 
-export const runtime = 'nodejs';
+import { SettingsAdPixelsSection } from '@/features/dashboard/organisms/SettingsAdPixelsSection';
+import { SettingsAudienceSection } from '@/features/dashboard/organisms/SettingsAudienceSection';
+import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
+import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 
-export default async function SettingsAudiencePage() {
-  const { userId } = await getCachedAuth();
+export default function SettingsAudiencePage() {
+  const { isPro } = useSettingsContext();
 
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/audience`);
-  }
-
-  const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  return <DashboardSettings focusSection='audience-tracking' />;
+  return (
+    <SettingsSection
+      id='audience-tracking'
+      title='Audience & Tracking'
+      description='Fan verification, opt-in preferences, and conversion pixel tracking.'
+    >
+      <div className='space-y-4'>
+        <SettingsAudienceSection />
+        <SettingsAdPixelsSection isPro={isPro} />
+      </div>
+    </SettingsSection>
+  );
 }

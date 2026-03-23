@@ -15,7 +15,7 @@ import { getDashboardData } from '../actions';
 
 // ─── Auth Helper ────────────────────────────────────────────────────
 
-async function requireProfileId(): Promise<string> {
+export async function requireProfileId(): Promise<string> {
   const data = await getDashboardData();
 
   if (data.needsOnboarding && !data.dashboardLoadError) {
