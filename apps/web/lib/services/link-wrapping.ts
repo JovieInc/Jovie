@@ -18,8 +18,12 @@ import {
   generateShortId,
   isValidUrl,
   simpleDecryptUrl,
-  simpleEncryptUrl,
 } from '@/lib/utils/url-encryption';
+import {
+  decryptUrlRawKey,
+  encryptUrlRawKey,
+  type RawKeyEncryptionResult,
+} from '@/lib/utils/url-encryption.server';
 
 export interface WrappedLink {
   id: string;
@@ -109,8 +113,8 @@ export async function createWrappedLink(
       throw new Error('Failed to generate unique short ID');
     }
 
-    // Encrypt URL for storage
-    const encryptedUrl = simpleEncryptUrl(url);
+    // Encrypt URL for storage (AES-256-GCM with versioned envelope)
+    const encryptedUrl = JSON.stringify(encryptUrlRawKey(url));
 
     // Calculate expiration
     expiresAt = expiresInHours
@@ -187,8 +191,30 @@ export async function getWrappedLink(
       return null;
     }
 
-    // Decrypt URL
-    const originalUrl = simpleDecryptUrl(data.encryptedUrl);
+    // Decrypt URL — try versioned AES-GCM envelope first, fall back to legacy base64
+    let originalUrl: string;
+    let isJsonEnvelope = false;
+    try {
+      const parsed = JSON.parse(data.encryptedUrl) as RawKeyEncryptionResult;
+      isJsonEnvelope = true;
+      if (parsed.v === 1 && parsed.iv && parsed.authTag) {
+        // AES-GCM envelope — do NOT fall back to base64 if decryption fails
+        originalUrl = decryptUrlRawKey(parsed);
+      } else {
+        // Unknown JSON format — not legacy base64, not v:1 envelope
+        throw new Error(
+          `[link-wrapping] Unknown encryption envelope format: v=${String(parsed.v)}`
+        );
+      }
+    } catch (err) {
+      if (isJsonEnvelope) {
+        // JSON parsed but decryption failed — propagate error instead of
+        // base64-decoding the JSON string (which produces garbage URLs)
+        throw err;
+      }
+      // Not valid JSON — legacy base64 encoding
+      originalUrl = simpleDecryptUrl(data.encryptedUrl);
+    }
 
     return buildWrappedLinkFromRecord(data, originalUrl);
   } catch (error: unknown) {

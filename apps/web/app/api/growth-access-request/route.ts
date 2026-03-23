@@ -7,6 +7,7 @@
 
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -15,27 +16,30 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { notifySlackGrowthRequest } from '@/lib/notifications/providers/slack';
 import { logger } from '@/lib/utils/logger';
 
+const growthAccessSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(1, 'Please tell us what feature excites you most')
+    .max(2000, 'Response is too long (max 2000 characters)'),
+});
+
 export async function POST(request: Request) {
   const { userId, error } = await requireAuth();
   if (error) return error;
 
   try {
     const body = await request.json();
-    const { reason } = body;
+    const parsed = growthAccessSchema.safeParse(body);
 
-    if (!reason || typeof reason !== 'string' || reason.trim().length === 0) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Please tell us what feature excites you most' },
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    if (reason.length > 2000) {
-      return NextResponse.json(
-        { error: 'Response is too long (max 2000 characters)' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
+    const { reason } = parsed.data;
 
     // Look up the user
     const [user] = await db
@@ -78,7 +82,7 @@ export async function POST(request: Request) {
       .update(users)
       .set({
         growthAccessRequestedAt: new Date(),
-        growthAccessReason: reason.trim(),
+        growthAccessReason: reason,
         updatedAt: new Date(),
       })
       .where(eq(users.clerkId, userId));
@@ -88,7 +92,7 @@ export async function POST(request: Request) {
       user.name ?? 'Unknown',
       user.email ?? 'No email',
       user.plan ?? 'free',
-      reason.trim()
+      reason
     ).catch(err => {
       logger.error('[growth-access] Failed to send Slack notification', err);
     });

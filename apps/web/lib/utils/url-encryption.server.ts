@@ -129,6 +129,106 @@ export function decryptUrl(encryptionResult: EncryptionResult): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Raw-key AES-256-GCM helpers for link wrapping (no scrypt key derivation).
+//
+// The URL_ENCRYPTION_KEY env var is already a cryptographically random 32-byte
+// key (base64-encoded). Using it directly avoids the ~50-100ms scrypt cost per
+// call, which matters on the hot /go/:shortId redirect path.
+// ---------------------------------------------------------------------------
+
+export interface RawKeyEncryptionResult {
+  /** Envelope version — always 1 for raw-key AES-GCM */
+  v: 1;
+  /** AES-GCM ciphertext (hex) */
+  encrypted: string;
+  /** Random 16-byte IV (hex) */
+  iv: string;
+  /** GCM auth tag (hex) */
+  authTag: string;
+}
+
+/**
+ * Resolve the raw 32-byte AES key from the env var or test fallback.
+ * Throws if no key material is available.
+ */
+function getRawAesKey(): Buffer {
+  const keyMaterial = ENCRYPTION_KEY || DEV_FALLBACK_KEY;
+  if (!keyMaterial) {
+    throw new Error(
+      '[url-encryption] Cannot encrypt/decrypt: URL_ENCRYPTION_KEY not configured.'
+    );
+  }
+  // The key material is base64-encoded. Decode and ensure exactly 32 bytes for AES-256.
+  const decoded = Buffer.from(keyMaterial, 'base64');
+  if (decoded.length >= 32) {
+    return decoded.subarray(0, 32);
+  }
+  // Key material decoded to fewer than 32 bytes — likely misconfigured
+  captureWarning(
+    `[url-encryption] URL_ENCRYPTION_KEY decoded to ${decoded.length} bytes (expected ≥32). ` +
+      'Falling back to SHA-256 derivation. Generate a proper key with: openssl rand -base64 32'
+  );
+  return crypto.createHash('sha256').update(keyMaterial).digest();
+}
+
+/**
+ * Encrypt a URL with AES-256-GCM using the raw key (no scrypt).
+ * Returns a versioned envelope for forward-compatible format detection.
+ */
+export function encryptUrlRawKey(url: string): RawKeyEncryptionResult {
+  try {
+    const key = getRawAesKey();
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+
+    const encryptedBuffer = Buffer.concat([
+      cipher.update(url, 'utf8'),
+      cipher.final(),
+    ]);
+    const authTag = cipher.getAuthTag();
+
+    return {
+      v: 1,
+      encrypted: encryptedBuffer.toString('hex'),
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
+    };
+  } catch (error) {
+    captureError('[url-encryption] Raw-key encryption failed', error);
+    throw new SyntaxError('Failed to encrypt URL');
+  }
+}
+
+/**
+ * Decrypt a URL from a raw-key AES-256-GCM versioned envelope.
+ * Expects the output of `encryptUrlRawKey()`.
+ */
+export function decryptUrlRawKey(data: RawKeyEncryptionResult): string {
+  try {
+    if (data.v !== 1 || !data.iv || !data.authTag || !data.encrypted) {
+      throw new Error(
+        '[url-encryption] Invalid raw-key envelope: missing required fields'
+      );
+    }
+
+    const key = getRawAesKey();
+    const iv = Buffer.from(data.iv, 'hex');
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(Buffer.from(data.authTag, 'hex'));
+
+    const decryptedBuffer = Buffer.concat([
+      decipher.update(Buffer.from(data.encrypted, 'hex')),
+      decipher.final(),
+    ]);
+
+    return decryptedBuffer.toString('utf8');
+  } catch (error) {
+    captureError('[url-encryption] Raw-key decryption failed', error);
+    throw new SyntaxError('Failed to decrypt URL');
+  }
+}
+
 export function generateSignedToken(): string {
   return crypto.randomBytes(32).toString('hex');
 }
