@@ -87,7 +87,8 @@ jobs:
         with:
           results_file: scorecard-results.sarif
           results_format: sarif
-          publish_results: true
+          # Avoid flaky failures from transient api.scorecard.dev timeouts.
+          publish_results: false
 
       - name: Upload Scorecard results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@0d579ffd059c29b07949a3cce3983f0780820c98 # v3.28.15

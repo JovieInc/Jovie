@@ -67,7 +67,7 @@ jobs:
             pnpm playwright test "${{ github.event.inputs.test_filter }}" --project=${{ matrix.browser }} --reporter=line
           else
             # Exclude nightly tests (they run daily in nightly-e2e-tests.yml)
-            pnpm playwright test --ignore-snapshots --ignore='tests/e2e/nightly/**' --project=${{ matrix.browser }} --reporter=line
+            pnpm playwright test --ignore-snapshots --project=${{ matrix.browser }} --reporter=line
           fi
         env:
           DATABASE_URL: ${{ steps.neon-branch.outputs.db_url }}
