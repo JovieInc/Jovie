@@ -151,9 +151,9 @@ export default async function ChangelogPage() {
             <p className='opacity-40'>No updates yet. Check back soon!</p>
           ) : (
             <div className='space-y-10'>
-              {releases.map((release, idx) => (
+              {releases.map(release => (
                 <article
-                  key={`${release.version}-${idx}`}
+                  key={`${release.version}-${release.date ?? 'unreleased'}`}
                   className='relative pl-6 border-l-2'
                   style={{
                     borderColor:
@@ -206,9 +206,9 @@ export default async function ChangelogPage() {
                             {meta.label}
                           </span>
                           <ul className='space-y-1.5'>
-                            {entries.map(entry => (
+                            {entries.map((entry, entryIdx) => (
                               <li
-                                key={`${release.version}-${key}-${entry.slice(0, 40)}`}
+                                key={`${release.version}-${key}-${entryIdx}`}
                                 className='text-sm leading-relaxed opacity-75'
                               >
                                 {entry}
