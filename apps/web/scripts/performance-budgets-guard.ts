@@ -370,10 +370,12 @@ const collectMetrics = async (
   needsAuth: boolean
 ): Promise<PageMetrics> => {
   const browser = await chromium.launch();
-  const context = await browser.newContext();
+  let context: Awaited<ReturnType<typeof browser.newContext>> | null = null;
   let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
+    context = await browser.newContext();
+
     if (needsAuth) {
       const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
@@ -553,6 +555,7 @@ const collectMetrics = async (
     };
   } finally {
     await page?.close().catch(() => undefined);
+    await context?.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
   }
 };
