@@ -1,3 +1,30 @@
+/**
+ * Contact payload obfuscation for public profile pages.
+ *
+ * SECURITY THREAT MODEL:
+ * This module uses base64 + character rotation (offset 3), which is intentional
+ * anti-scraping obfuscation — NOT cryptographic protection. A determined attacker
+ * can reverse it trivially.
+ *
+ * WHY NOT REAL ENCRYPTION:
+ * The decode happens client-side in useArtistContacts.ts to construct mailto:/tel:/sms:
+ * URIs synchronously. Moving to server-side decrypt would require an async API call
+ * before navigation, which breaks mobile browser user-gesture requirements for
+ * protocol handlers.
+ *
+ * WHAT IT PREVENTS:
+ * - Trivial grep-for-emails scraping of API responses
+ * - Automated email harvesting by bots that don't execute JS
+ * - Casual inspection of network traffic
+ *
+ * WHAT IT DOES NOT PREVENT:
+ * - Determined attackers who reverse-engineer the encoding
+ * - Bots that execute the client-side JS
+ *
+ * FUTURE: A proper server-side encryption design (with proof-of-interaction,
+ * captcha, or token-per-session binding) is tracked separately.
+ */
+
 import * as Sentry from '@sentry/nextjs';
 
 export interface EncodedContactPayload {
