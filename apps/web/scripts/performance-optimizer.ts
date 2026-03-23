@@ -503,6 +503,10 @@ function loadState(
   }
 
   const state = readJsonFile<PerfRunState>(statePath);
+  if (state.config.mode !== config.mode) {
+    return createEmptyRunState(config, promptPath);
+  }
+
   const nextState = {
     ...state,
     config,
@@ -574,6 +578,24 @@ export function getThresholdRecommendation(
     : Math.max(1, config.threshold - 25);
 }
 
+export function isStricterThreshold(
+  config: Pick<PerfRunConfig, 'mode'>,
+  currentBest: number,
+  nextThreshold: number
+) {
+  return config.mode === 'homepage'
+    ? nextThreshold > currentBest
+    : nextThreshold < currentBest;
+}
+
+export function getNextHypothesisIndex(currentIndex: number, total: number) {
+  if (total <= 0) {
+    return 0;
+  }
+
+  return Math.min(currentIndex + 1, total - 1);
+}
+
 async function maybeLowerThreshold(state: PerfRunState) {
   if (!process.stdin.isTTY || !process.stdout.isTTY || !state.bestMeasurement) {
     return;
@@ -603,6 +625,23 @@ async function maybeLowerThreshold(state: PerfRunState) {
   const nextThreshold = Number(answer);
   if (!Number.isFinite(nextThreshold)) {
     console.warn('Ignoring non-numeric threshold:', answer);
+    return;
+  }
+
+  if (
+    !isStricterThreshold(
+      state.config,
+      state.bestMeasurement.primaryMetric,
+      nextThreshold
+    )
+  ) {
+    console.warn(
+      'Threshold ' +
+        nextThreshold +
+        ' is already met by the current best (' +
+        state.bestMeasurement.primaryMetric.toFixed(2) +
+        '). Enter a stricter value.'
+    );
     return;
   }
 
@@ -749,18 +788,17 @@ async function main() {
   } else {
     state.noProgressCount += 1;
   }
-  state.nextHypothesisIndex = Math.min(
-    state.nextHypothesisIndex + 1,
+  state.nextHypothesisIndex = getNextHypothesisIndex(
+    state.nextHypothesisIndex,
     hypotheses.length
   );
 
-  if (decision.thresholdReached && decision.accepted) {
-    state.status = 'threshold-hit';
-  } else if (state.noProgressCount >= state.config.maxNoProgress) {
-    state.status = 'stalled';
-  } else {
-    state.status = 'running';
-  }
+  state.status = deriveRunStatus({
+    bestMeasurement: state.bestMeasurement,
+    config: state.config,
+    noProgressCount: state.noProgressCount,
+    fallbackStatus: state.status,
+  });
 
   writePrompt(state, changedFiles);
   saveState(state);

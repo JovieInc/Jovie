@@ -374,10 +374,11 @@ const collectMetrics = async (
   let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
+    const cookies = needsAuth ? loadAuthCookies(BASE_URL) : [];
+
     context = await browser.newContext();
 
     if (needsAuth) {
-      const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
         throw new Error(
           `No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide ${CLI_OPTIONS.authPath || process.env.PERF_BUDGET_AUTH_PATH || AUTH_STORAGE_PATH}.`
@@ -389,11 +390,17 @@ const collectMetrics = async (
 
     let warmShellResponse = 0;
     if (shouldMeasureWarmShellResponse(url, needsAuth)) {
-      const warmPage = await context.newPage();
+      const warmContext = await browser.newContext();
+      let warmPage: Awaited<ReturnType<typeof browser.newPage>> | null = null;
       try {
+        if (cookies.length > 0) {
+          await warmContext.addCookies(cookies);
+        }
+        warmPage = await warmContext.newPage();
         warmShellResponse = await measureWarmShellResponse(warmPage, BASE_URL);
       } finally {
-        await warmPage.close().catch(() => undefined);
+        await warmPage?.close().catch(() => undefined);
+        await warmContext.close().catch(() => undefined);
       }
     }
 

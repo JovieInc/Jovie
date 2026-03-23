@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   deriveRunStatus,
   filterChangedFiles,
+  getNextHypothesisIndex,
   getThresholdRecommendation,
+  isStricterThreshold,
 } from './performance-optimizer';
 import {
   createDashboardMeasurement,
@@ -83,5 +85,18 @@ describe('performance optimizer helpers', () => {
         threshold: 25,
       })
     ).toBe(1);
+  });
+
+  it('requires stricter interactive thresholds relative to the current best measurement', () => {
+    expect(isStricterThreshold({ mode: 'homepage' }, 95, 96)).toBe(true);
+    expect(isStricterThreshold({ mode: 'homepage' }, 95, 94)).toBe(false);
+    expect(isStricterThreshold({ mode: 'dashboard' }, 90, 80)).toBe(true);
+    expect(isStricterThreshold({ mode: 'dashboard' }, 90, 95)).toBe(false);
+  });
+
+  it('clamps the next hypothesis index to the last valid slot', () => {
+    expect(getNextHypothesisIndex(0, 4)).toBe(1);
+    expect(getNextHypothesisIndex(3, 4)).toBe(3);
+    expect(getNextHypothesisIndex(0, 0)).toBe(0);
   });
 });

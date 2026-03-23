@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '../../../constants/routes';
+import { APP_ROUTES } from '../constants/routes';
 import {
   buildDashboardBudgetGuardArgs,
   buildOptimizerPrompt,
@@ -11,7 +11,7 @@ import {
   extractHomepageSample,
   getRankedHypotheses,
   parsePerfLoopArgs,
-} from '../../../scripts/performance-optimizer-lib';
+} from './performance-optimizer-lib';
 
 describe('performance optimizer lib', () => {
   it('ignores the literal pnpm argument separator when parsing cli flags', () => {
