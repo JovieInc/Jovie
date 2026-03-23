@@ -38,7 +38,9 @@
         );
       }
     } else {
-      // Public surfaces are intentionally forced dark.
+      // Public/marketing routes: always dark — the design system assumes dark mode.
+      // Ignoring stored preference prevents hybrid light/dark rendering since the
+      // marketing layout hardcodes a .dark ancestor class.
       root.classList.add('dark');
       root.style.colorScheme = 'dark';
 

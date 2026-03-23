@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
+import { MarketingContentShell } from '@/components/marketing';
 import { DocPage } from '@/components/organisms/DocPage';
-import { Container } from '@/components/site/Container';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 
@@ -27,20 +27,16 @@ export default async function InvestorsPage() {
   const toc = doc.toc.filter(entry => entry.level === 2);
 
   return (
-    <div className='bg-white dark:bg-[#0a0a0b]'>
-      <div className='py-16 sm:py-20'>
-        <Container size='lg'>
-          <DocPage
-            doc={{ ...doc, toc }}
-            hero={{
-              eyebrow: 'Investors',
-              title: 'Investor Memo',
-              description: 'Jovie (Angel Round)',
-            }}
-            pdfTitle='Investor Memo'
-          />
-        </Container>
-      </div>
-    </div>
+    <MarketingContentShell>
+      <DocPage
+        doc={{ ...doc, toc }}
+        hero={{
+          eyebrow: 'Investors',
+          title: 'Investor Memo',
+          description: 'Jovie (Angel Round)',
+        }}
+        pdfTitle='Investor Memo'
+      />
+    </MarketingContentShell>
   );
 }

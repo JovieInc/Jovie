@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Container } from '@/components/site/Container';
+import { MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { SupportContent } from './SupportContent';
 
@@ -12,16 +12,16 @@ export const metadata: Metadata = {
   },
 };
 
+export const revalidate = false;
+
 export default function SupportPage() {
   return (
-    <Container className='py-24 text-center'>
-      <h1
-        className='text-5xl font-bold tracking-tight'
-        style={{ color: 'var(--linear-text-primary)' }}
-      >
+    <MarketingHero variant='left'>
+      <p className='marketing-kicker'>Support</p>
+      <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
         We&apos;re here to help.
       </h1>
       <SupportContent />
-    </Container>
+    </MarketingHero>
   );
 }

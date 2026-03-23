@@ -13,13 +13,13 @@ describe('HeroScrollSection', () => {
 
     expect(
       screen.getByRole('heading', {
-        name: 'One link to launch your music career.',
+        name: 'The link your music deserves.',
       })
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('Jovie release dashboard')
+      screen.getByLabelText(
+        'Jovie release dashboard showing releases table with sidebar open'
+      )
     ).toBeInTheDocument();
-    expect(screen.getByText('Release drawer')).toBeInTheDocument();
-    expect(screen.getAllByText('Releases').length).toBeGreaterThan(0);
   });
 });

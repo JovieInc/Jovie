@@ -51,11 +51,11 @@ export function PricingSection() {
       <Container size='homepage'>
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
-            <div className='flex max-w-[22rem] flex-col gap-4'>
+            <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
               <Badge variant='outline' size='xl' className='w-fit'>
                 Pricing
               </Badge>
-              <h2 className='marketing-h2-linear max-w-[9ch] text-primary-token'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
                 Simple pricing.
               </h2>
             </div>
@@ -91,7 +91,7 @@ export function PricingSection() {
                 Smart links, your artist profile, and the core launch surface.
               </p>
 
-              <ul className='mt-6 flex flex-1 flex-col gap-2.5'>
+              <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
                 {FREE_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -159,7 +159,7 @@ export function PricingSection() {
                 and deeper fan ownership.
               </p>
 
-              <ul className='mt-6 flex flex-1 flex-col gap-2.5'>
+              <ul className='mt-6 flex flex-1 flex-col gap-2.25'>
                 {FOUNDING_OUTCOMES.map(feature => (
                   <li
                     key={feature}
@@ -190,7 +190,7 @@ export function PricingSection() {
                 asChild
                 variant='accent'
                 size='xl'
-                className='mt-7 w-full text-[rgb(8,9,10)] hover:text-[rgb(8,9,10)]'
+                className='mt-7 w-full text-[var(--linear-btn-primary-fg)] hover:text-[var(--linear-btn-primary-fg)]'
               >
                 <Link href='/signup?plan=founding'>Choose Founding Member</Link>
               </Button>

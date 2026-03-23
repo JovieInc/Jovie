@@ -1,230 +1,113 @@
 # E2E Tests
 
-This directory contains end-to-end tests for the Jovie application using Playwright.
+This directory contains Playwright end-to-end coverage for the Jovie web app.
 
 ## Running E2E Tests
 
-### Basic Tests
-
-Run all E2E tests:
+All commands that need secrets should be run with Doppler from the repo root.
 
 ```bash
-pnpm test:e2e
+# Full E2E suite
+doppler run -- pnpm test:e2e
+
+# Headed mode
+doppler run -- pnpm test:e2e -- --headed
+
+# Single spec
+doppler run -- pnpm test:e2e tests/e2e/auth.spec.ts
+
+# Playwright UI
+doppler run -- pnpm test:e2e:ui
 ```
 
-Run tests in headed mode (see browser):
+## Auth Test Model
+
+Jovie now has two different auth-testing modes:
+
+### 1. Authenticated app coverage
+
+- [`auth.setup.ts`](./auth.setup.ts) uses `@clerk/testing/playwright`.
+- It calls `setupClerkTestingToken()` and `clerk.signIn()` to create the shared authenticated storage state at `tests/.auth/user.json`.
+- Most dashboard, onboarding, billing, and protected-route specs reuse that signed-in state through Playwright config.
+
+### 2. Signed-out auth-page coverage
+
+- [`auth.spec.ts`](./auth.spec.ts) does **not** reuse the shared signed-in state.
+- It creates a fresh browser context with an empty `storageState` so `/signin` and `/signup` render the real public Clerk auth UI.
+- This is required because Clerk will redirect an already signed-in user away from `<SignIn />` and `<SignUp />`.
+
+### Production smoke auth
+
+- [`smoke-prod-auth.spec.ts`](./smoke-prod-auth.spec.ts) uses real credentials and drives the rendered Clerk sign-in flow.
+- It does not assume a fixed second step. The spec branches depending on whether Clerk shows:
+  - password entry
+  - email-code verification
+  - an immediate authenticated redirect
+
+## Useful Auth Specs
+
+- `auth.spec.ts`
+  - Signed-out render checks for `/signin` and `/signup`
+  - Canonical navigation between those routes
+  - Clerk UI hydration without runtime errors
+- `smoke-auth.spec.ts`
+  - Authenticated dashboard smoke coverage
+  - Protected-route redirect behavior
+  - Quick auth-page availability checks
+- `smoke-prod-auth.spec.ts`
+  - Real credential sign-in smoke on deployed environments
+
+## Writing New Auth Tests
+
+- Use the shared authenticated state only for routes that should load as a signed-in user.
+- Create a fresh empty browser context for tests that assert `/signin`, `/signup`, redirect boundaries, or Clerk public auth UI.
+- Do not hardcode assumptions about password-only or OTP-only flows. Let Clerk Dashboard configuration decide what renders.
+
+## Debugging
 
 ```bash
-pnpm test:e2e -- --headed
+# Debug one spec
+PWDEBUG=1 doppler run -- pnpm test:e2e tests/e2e/auth.spec.ts
+
+# Open the Playwright report
+pnpm exec playwright show-report
 ```
 
-Run a specific test file:
+When auth tests fail:
 
-```bash
-pnpm test:e2e tests/e2e/onboarding.spec.ts
-```
+- check that Clerk test-mode secrets are present
+- check `tests/e2e/auth.setup.ts` first
+- confirm whether the failing spec should be signed in or signed out
+- remember that `/signin` and `/signup` will redirect when a valid session is already present
 
-### Onboarding Happy Path Tests
+## Manual Browser QA With gstack
 
-The onboarding happy path tests verify the complete user onboarding flow from sign-in to profile creation.
+### Signed-out auth pages
 
-#### Requirements
+No cookie import is needed. Open `/signin` or `/signup` directly in `/browse`.
 
-1. **Environment Variables**: The following real environment variables must be set:
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-   - `DATABASE_URL` (Neon connection string)
+Recommended checks:
 
-2. **Enable Full Onboarding Tests**: Set `E2E_ONBOARDING_FULL=1`
+- `/signin`
+- `/signin?email=test@example.com`
+- `/signup`
+- `/signup?oauth_error=account_exists&redirect_url=%2Fonboarding`
 
-3. **Optional Configuration**:
-   - `E2E_TEST_EMAIL`: Email for test user (defaults to generated email)
-   - `E2E_TEST_PASSWORD`: Password for test user (defaults to 'TestPassword123!')
-   - `E2E_EXISTING_USER_EMAIL`: Email of existing user to test dashboard access
-   - `E2E_EXISTING_USER_PASSWORD`: Password of existing user
+### Signed-in app QA
 
-#### Running Onboarding Tests
+Use `/setup-browser-cookies` first, then reopen the app in `/browse`.
 
-Run the full onboarding happy path test:
+Recommended flow:
 
-```bash
-E2E_ONBOARDING_FULL=1 pnpm test:e2e tests/e2e/onboarding.spec.ts
-```
+1. Sign in to Jovie in your normal browser.
+2. Run `/setup-browser-cookies`.
+3. Import the Jovie and Clerk-related domains into the browse session.
+4. Use `/browse` to verify `/app`, `/onboarding`, or other authenticated routes.
 
-Run with custom test user:
+This is separate from the Playwright Clerk testing package. `/browse` uses your imported browser cookies, not Playwright's `tests/.auth/user.json`.
 
-```bash
-E2E_ONBOARDING_FULL=1 \
-E2E_TEST_EMAIL="test@example.com" \
-E2E_TEST_PASSWORD="SecurePassword123!" \
-pnpm test:e2e tests/e2e/onboarding.spec.ts
-```
+## Visual And Full-Suite Notes
 
-Run in CI with Preview URL:
-
-```bash
-E2E_ONBOARDING_FULL=1 \
-BASE_URL="https://jovie-preview.vercel.app" \
-pnpm test:e2e tests/e2e/onboarding.spec.ts
-```
-
-### Test Structure
-
-- **onboarding.spec.ts**: Comprehensive onboarding tests (happy path, existing user, taken handle)
-- **onboarding-flow.spec.ts**: Unauthenticated onboarding flows (redirects, handle API)
-
-### Debugging Tests
-
-1. **Run in debug mode**:
-
-   ```bash
-   pnpm test:e2e -- --debug
-   ```
-
-2. **Use Playwright Inspector**:
-
-   ```bash
-   PWDEBUG=1 pnpm test:e2e tests/e2e/onboarding.spec.ts
-   ```
-
-3. **Generate trace on failure**:
-
-   ```bash
-   pnpm test:e2e -- --trace on-first-retry
-   ```
-
-4. **View test report**:
-   ```bash
-   pnpm exec playwright show-report
-   ```
-
-### Writing New Tests
-
-When writing new E2E tests:
-
-1. **Use deterministic waits**:
-
-   ```typescript
-   // Good: Use waitForURL
-   await page.waitForURL('**/app/dashboard', { timeout: 10_000 });
-
-   // Good: Use expect.poll
-   await expect
-     .poll(
-       async () => {
-         return await button.isEnabled();
-       },
-       { timeout: 5_000 }
-     )
-     .toBe(true);
-
-   // Avoid: Fixed timeouts
-   await page.waitForTimeout(5000); // Don't do this
-   ```
-
-2. **Set appropriate timeouts**:
-
-   ```typescript
-   test('my test', async ({ page }) => {
-     test.setTimeout(60_000); // 60 seconds for complex flows
-   });
-   ```
-
-3. **Use proper selectors**:
-
-   ```typescript
-   // Good: Semantic selectors
-   page.getByLabel('Enter your desired handle');
-   page.getByRole('button', { name: 'Create Profile' });
-
-   // Avoid: Brittle selectors
-   page.locator('#handle-input');
-   page.locator('.submit-btn');
-   ```
-
-4. **Handle authentication**:
-
-   ```typescript
-   import { setupClerkTestingToken } from '@clerk/testing/playwright';
-
-   // Setup test authentication
-   await setupClerkTestingToken({ page });
-   ```
-
-### Visual Regression Tests
-
-Visual regression tests capture screenshots of key pages to detect unintended visual changes.
-
-#### Running Visual Tests
-
-```bash
-# Run visual regression tests
-pnpm test:e2e --grep "Visual Regression"
-
-# Update baseline snapshots after intentional changes
-pnpm test:e2e --grep "Visual Regression" --update-snapshots
-```
-
-#### Snapshot Storage
-
-- Snapshots are stored in `*.spec.ts-snapshots/` directories next to test files
-- **Snapshots must be committed to git** for baseline comparison
-- Each browser/platform has separate snapshots (e.g., `chromium-darwin/`, `chromium-linux/`)
-
-#### Test Coverage
-
-Visual tests cover:
-- **Public pages**: Homepage, pricing, signin, signup
-- **Public profiles**: Light/dark modes, mobile viewport
-- **Dashboard**: Home, links, analytics, tipping, settings (requires auth)
-- **Admin pages**: Creators, overview, activity (requires admin auth)
-- **Responsive viewports**: Mobile (375px), tablet (768px), desktop (1440px)
-
-#### Configuration
-
-- `E2E_TEST_PROFILE_HANDLE`: Handle for public profile tests (default: `demo`)
-- Threshold: 5% pixel difference allowed (`maxDiffPixelRatio: 0.05`)
-- Dynamic content (timestamps, counters) is masked automatically
-
-#### Updating Snapshots
-
-When making intentional UI changes:
-
-1. Run tests to see failures: `pnpm test:e2e --grep "Visual Regression"`
-2. Review the diff in `test-results/` directory
-3. Update snapshots: `pnpm test:e2e --grep "Visual Regression" --update-snapshots`
-4. Commit the updated snapshots
-
-### CI/CD Integration
-
-E2E tests run automatically in CI:
-
-1. **Pull Request Checks**: Basic smoke tests run on every PR
-2. **Preview Deployments**: Full E2E suite runs against Vercel preview URLs
-3. **Production Monitoring**: Critical user journeys tested after deployment
-
-### Troubleshooting
-
-**Tests timing out?**
-
-- Increase test timeout: `test.setTimeout(120_000)`
-- Check network conditions
-- Verify environment variables are set
-
-**Authentication failing?**
-
-- Ensure Clerk test mode is enabled
-- Check `CLERK_SECRET_KEY` is valid
-- Verify test user credentials
-
-**Flaky tests?**
-
-- Use `expect.poll()` instead of fixed waits
-- Add more specific error messages
-- Check for race conditions in async operations
-
-**Cannot find elements?**
-
-- Use Playwright Inspector to debug
-- Check if elements are within Shadow DOM
-- Verify selectors with `page.locator().count()`
+- Public auth pages can still be covered by broader smoke or visual suites.
+- Snapshot updates should only happen after intentional UI changes.
+- Prefer behavior assertions over DOM-shape assertions for Clerk surfaces.

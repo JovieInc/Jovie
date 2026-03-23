@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
@@ -28,7 +29,6 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const WRAP = 'mx-auto max-w-[1100px] px-6';
 const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
 const free = ENTITLEMENT_REGISTRY.free;
@@ -57,17 +57,15 @@ function FeatureList({ features }: FeatureListProps) {
 
 export default function PricingPage() {
   return (
-    <div className='section-spacing-linear'>
-      <section aria-labelledby='pricing-heading' className={WRAP}>
-        <div className='pb-8'>
-          <h2
-            id='pricing-heading'
-            className='marketing-h2-linear max-w-[680px]'
-          >
-            Simple pricing.{' '}
-            <span className='text-secondary-token'>No surprises.</span>
-          </h2>
-        </div>
+    <div>
+      <MarketingHero variant='centered'>
+        <h2 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+          Simple pricing.{' '}
+          <span className='text-secondary-token'>No surprises.</span>
+        </h2>
+      </MarketingHero>
+
+      <MarketingContainer width='page'>
         <div
           className={`grid grid-cols-1 ${growthPlanEnabled ? 'md:grid-cols-3' : 'md:grid-cols-2'} border-t border-subtle`}
         >
@@ -153,7 +151,7 @@ export default function PricingPage() {
             </div>
           )}
         </div>
-      </section>
+      </MarketingContainer>
     </div>
   );
 }

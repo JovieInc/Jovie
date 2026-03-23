@@ -2,267 +2,137 @@
 
 ## Overview
 
-E2E tests use **real Clerk test users** that are created once and reused across all test runs. This provides reliable authentication testing without the overhead of dynamic user creation.
+E2E tests use a small pool of real Clerk test users that are created once and reused. Each test run seeds app data locally, then uses Clerk's Playwright testing helpers to establish the authenticated browser session.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────┐
-│ ONE-TIME SETUP (run manually or in CI setup)           │
-├─────────────────────────────────────────────────────────┤
-│ 1. scripts/setup-e2e-users.ts                          │
-│    → Creates users in Clerk via API                    │
-│    → Tags with { role: 'e2e', env: 'test' }            │
-│    → Outputs Clerk user IDs                            │
-│                                                         │
-│ 2. Add to Doppler                                      │
-│    → E2E_CLERK_USER_ID=user_xxx                        │
-│    → E2E_CLERK_USER_USERNAME=e2e@jov.ie                │
-│    → E2E_CLERK_USER_PASSWORD=xxx                       │
-└─────────────────────────────────────────────────────────┘
-                        ↓
-┌─────────────────────────────────────────────────────────┐
-│ EVERY TEST RUN (fast, no Clerk API calls)              │
-├─────────────────────────────────────────────────────────┤
-│ global-setup.ts:                                        │
-│ - Reads E2E_CLERK_USER_ID from env                     │
-│ - Seeds DB with user record                            │
-│ - Seeds test profiles (dualipa, taylorswift)           │
-│                                                         │
-│ Tests:                                                  │
-│ - Sign in with E2E_CLERK_USER_USERNAME/PASSWORD        │
-│ - Clerk user already exists → fast auth                │
-│ - DB records seeded → tests find data                  │
-│                                                         │
-│ global-teardown.ts: (optional)                          │
-│ - Clean up DB records only                             │
-│ - DON'T touch Clerk (reuse users next run)             │
-└─────────────────────────────────────────────────────────┘
+```text
+ONE-TIME SETUP
+  scripts/setup-e2e-users.ts
+    -> creates reusable Clerk test users
+    -> outputs E2E_CLERK_USER_* secrets
+
+EVERY TEST RUN
+  tests/global-setup.ts
+    -> loads env
+    -> seeds app data
+    -> warms core routes
+
+  tests/e2e/auth.setup.ts
+    -> uses @clerk/testing/playwright
+    -> calls setupClerkTestingToken()
+    -> signs in programmatically
+    -> saves tests/.auth/user.json
+
+  authenticated specs
+    -> reuse tests/.auth/user.json
+
+  tests/e2e/auth.spec.ts
+    -> creates a fresh empty browser context
+    -> verifies signed-out /signin and /signup
 ```
 
 ## Initial Setup
 
-### 1. Create Test Users in Clerk
-
-Run the setup script to create E2E test users:
+### 1. Create Clerk test users
 
 ```bash
 doppler run -- pnpm tsx scripts/setup-e2e-users.ts
 ```
 
-This will:
-- Create 2 test users in Clerk
-- Tag them with `{ role: 'e2e', env: 'test' }`
-- Generate secure passwords
-- Output the user IDs and credentials
+Add the generated secrets to Doppler:
 
-Example output:
-```
-✅ E2E Test Users Setup Complete!
-
-📋 Add these secrets to Doppler (dev config):
-
-E2E_CLERK_USER_ID=user_2abc123xyz
-E2E_CLERK_USER_USERNAME=e2e@jov.ie
-E2E_CLERK_USER_PASSWORD=aBc123!@#XyZ
-```
-
-### 2. Add Secrets to Doppler
-
-Copy the output from step 1 and add to Doppler:
-
-1. Go to https://dashboard.doppler.com
-2. Navigate to `jovie-web` → `dev` config
-3. Add the three secrets:
-   - `E2E_CLERK_USER_ID`
-   - `E2E_CLERK_USER_USERNAME`
-   - `E2E_CLERK_USER_PASSWORD`
-
-### 3. Seed Database
-
-Create DB records for the test users:
-
-```bash
-doppler run -- pnpm tsx tests/seed-test-data.ts
-```
-
-This will:
-- Create a `users` record with the Clerk user ID
-- Create a `creator_profiles` record for the user
-- Create test profiles (dualipa, taylorswift)
-
-### 4. Run Tests
-
-Now you can run E2E tests:
-
-```bash
-doppler run -- pnpm playwright test
-```
-
-## Running Tests
-
-### Local Development
-
-```bash
-# Run all E2E tests
-doppler run -- pnpm playwright test
-
-# Run specific test file
-doppler run -- pnpm playwright test dashboard.spec.ts
-
-# Run with UI mode
-doppler run -- pnpm playwright test --ui
-
-# Run with headed browser (see what's happening)
-doppler run -- pnpm playwright test --headed
-```
-
-### CI/CD
-
-In GitHub Actions, ensure these secrets are available:
 - `E2E_CLERK_USER_ID`
 - `E2E_CLERK_USER_USERNAME`
 - `E2E_CLERK_USER_PASSWORD`
 
-The CI workflow should:
-1. Pull secrets from Doppler
-2. Run seed script (fast, just DB inserts)
-3. Run Playwright tests
-4. (Optional) Clean up DB records
+### 2. Seed app data
 
-## Maintenance
-
-### Recreating Test Users
-
-If you need to recreate test users (e.g., password reset, Clerk instance change):
-
-1. Clean up old users:
-```bash
-doppler run -- pnpm tsx scripts/cleanup-e2e-users.ts
-```
-
-2. Create fresh users:
-```bash
-doppler run -- pnpm tsx scripts/setup-e2e-users.ts
-```
-
-3. Update Doppler with new credentials
-
-4. Re-seed database:
 ```bash
 doppler run -- pnpm tsx tests/seed-test-data.ts
 ```
 
-### Adding More Test Users
+This creates the app-side records and shared test profiles the suite expects.
 
-Edit `scripts/setup-e2e-users.ts` and add to the `TEST_USERS` array:
+### 3. Run Playwright
 
-```typescript
-{
-  username: 'e2e-admin-user',
-  email: 'e2e-admin@jov.ie',
-  password: generateSecurePassword(),
-  firstName: 'E2E',
-  lastName: 'Admin',
-  metadata: {
-    role: 'e2e',
-    env: 'test',
-    purpose: 'Admin user for permission testing',
-  },
-}
+```bash
+doppler run -- pnpm playwright test
 ```
 
-Then run the setup script again.
+## Auth Behavior In Tests
+
+### Authenticated suite behavior
+
+- `auth.setup.ts` is the source of truth for authenticated browser setup.
+- It uses Clerk's Playwright testing package, not hand-written form automation.
+- The helper attempts password auth first and can fall back to email-code auth when Clerk is configured that way.
+
+### Signed-out auth-page behavior
+
+- `tests/e2e/auth.spec.ts` must stay signed out.
+- It creates a new context with empty cookies and local storage so `/signin` and `/signup` do not redirect to `/app`.
+- If those tests suddenly start landing on `/app`, the browser context is probably inheriting authenticated state by mistake.
+
+## Local Commands
+
+```bash
+# Full suite
+doppler run -- pnpm playwright test
+
+# One file
+doppler run -- pnpm playwright test tests/e2e/auth.spec.ts
+
+# Headed mode
+doppler run -- pnpm playwright test --headed
+
+# UI mode
+doppler run -- pnpm playwright test --ui
+```
 
 ## Troubleshooting
 
-### Tests fail with "Clerk user not found"
+### Auth setup fails
 
-**Cause**: E2E_CLERK_USER_ID not set or user doesn't exist in Clerk
+Check:
 
-**Fix**:
-1. Check Doppler has `E2E_CLERK_USER_ID` set
-2. Run setup script to create user
-3. Verify you're using correct Doppler config: `doppler configure get`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `E2E_CLERK_USER_ID`
+- `E2E_CLERK_USER_USERNAME`
+- `E2E_CLERK_USER_PASSWORD`
 
-### Tests fail with "Invalid credentials"
+Use test-instance Clerk keys only.
 
-**Cause**: Password in Doppler doesn't match Clerk user password
+### Auth pages redirect to `/app`
 
-**Fix**:
-1. Run cleanup script
-2. Run setup script to create fresh user with new password
-3. Update Doppler with new credentials
+Cause:
 
-### Seed script skips E2E user creation
+- the spec is running with authenticated storage state
 
-**Cause**: `E2E_CLERK_USER_ID` not set in environment
+Fix:
 
-**Fix**:
-```bash
-# Verify Doppler config
-doppler configure get
+- use a fresh browser context with empty `storageState`
+- do not reuse `tests/.auth/user.json` for `/signin` or `/signup` render checks
 
-# Should show: jovie-web dev
+### Clerk instance keys do not match
 
-# Run with Doppler
-doppler run -- pnpm tsx tests/seed-test-data.ts
-```
+Cause:
 
-### "Clerk instance keys do not match"
+- publishable and secret keys are coming from different Clerk instances
 
-**Cause**: Using production Clerk keys instead of test keys
+Fix:
 
-**Fix**:
-1. Verify Doppler config has test keys:
-   - `CLERK_SECRET_KEY` should start with `sk_test_`
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` should start with `pk_test_`
-2. Never use production keys for E2E testing
-
-## Best Practices
-
-### ✅ DO
-
-- Reuse the same test users across runs (fast, reliable)
-- Tag users with metadata for easy identification
-- Use test instance Clerk keys only
-- Keep passwords secure in Doppler
-- Clean up DB records between test runs (not Clerk users)
-
-### ❌ DON'T
-
-- Create/delete Clerk users dynamically on every test run (slow, unreliable)
-- Use production Clerk keys for testing
-- Hardcode user IDs in test files (use environment variables)
-- Commit passwords or Clerk IDs to git
-- Delete Clerk test users after each run (defeats the purpose)
-
-## Why This Approach?
-
-### Advantages
-
-- ✅ **Fast**: No Clerk API calls during test runs
-- ✅ **Reliable**: No network dependency during tests
-- ✅ **Real auth**: Uses actual Clerk users for realistic testing
-- ✅ **Debuggable**: Same users every time, easy to reproduce issues
-- ✅ **Simple**: Just read env vars + seed DB
-- ✅ **Cost-effective**: Minimal API usage
-
-### Compared to Dynamic Creation
-
-| Aspect | Fixed Pool (Our Approach) | Dynamic Creation |
-|--------|---------------------------|------------------|
-| Speed | Fast (0-1s setup) | Slow (5-10s per run) |
-| Reliability | High (no network) | Medium (depends on Clerk API) |
-| Debugging | Easy (same users) | Hard (ephemeral users) |
-| Cost | Low (one-time API calls) | High (API calls every run) |
-| Complexity | Simple | Complex |
+- verify both keys point at the same test Clerk instance
+- recreate test users if the instance changed
 
 ## Related Files
 
-- `scripts/setup-e2e-users.ts` - Creates test users in Clerk
-- `scripts/cleanup-e2e-users.ts` - Removes E2E test users
-- `tests/seed-test-data.ts` - Seeds database with user records
-- `tests/global-setup.ts` - Runs before all tests (calls seed)
-- `tests/helpers/clerk-auth.ts` - Sign-in helper for tests
-- `playwright.config.ts` - Playwright configuration
+- `scripts/setup-e2e-users.ts`
+- `scripts/cleanup-e2e-users.ts`
+- `tests/seed-test-data.ts`
+- `tests/global-setup.ts`
+- `tests/e2e/auth.setup.ts`
+- `tests/e2e/auth.spec.ts`
+- `tests/e2e/smoke-prod-auth.spec.ts`
+- `playwright.config.ts`

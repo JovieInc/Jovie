@@ -295,7 +295,7 @@ export default async function RootLayout({
       });
 
       return (
-        <html lang='en' suppressHydrationWarning>
+        <html lang='en' data-scroll-behavior='smooth' suppressHydrationWarning>
           {headContent}
           <body className={bodyClassName}>
             <div className='flex items-center justify-center min-h-screen'>
@@ -317,7 +317,12 @@ export default async function RootLayout({
   // publishableKey may be undefined in test/dev mode
   // CoreProviders handle base client providers; Clerk is mounted per route.
   return (
-    <html lang='en' className='dark' suppressHydrationWarning>
+    <html
+      lang='en'
+      className='dark'
+      data-scroll-behavior='smooth'
+      suppressHydrationWarning
+    >
       {headContent}
       <body className={bodyClassName}>
         <CoreProviders>

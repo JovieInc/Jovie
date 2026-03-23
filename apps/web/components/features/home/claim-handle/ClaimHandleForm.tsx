@@ -25,6 +25,7 @@ function getInputRowStyle(
 ) {
   const isHeroLike = size !== 'default';
   const isDisplay = size === 'display';
+  const isHero = size === 'hero';
   let borderColor: string;
   if (isAvailable) {
     borderColor = 'rgba(74,222,128,0.25)';
@@ -35,11 +36,11 @@ function getInputRowStyle(
   }
 
   const heroShadow = [
-    '0 20px 50px rgba(0,0,0,0.22)',
-    'inset 0 1px 3px rgba(0,0,0,0.25)',
+    '0 14px 38px rgba(0,0,0,0.18)',
+    'inset 0 1px 0 rgba(255,255,255,0.04)',
     isAvailable
-      ? '0 0 24px rgba(74,222,128,0.08)'
-      : '0 2px 8px rgba(0,0,0,0.2)',
+      ? '0 0 18px rgba(74,222,128,0.06)'
+      : '0 1px 4px rgba(0,0,0,0.18)',
   ].join(', ');
 
   const defaultShadow = [
@@ -49,10 +50,24 @@ function getInputRowStyle(
       : '0 1px 2px rgba(0,0,0,0.1)',
   ].join(', ');
 
+  if (isHero) {
+    return {
+      minHeight: 56,
+      background:
+        'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.018) 100%)',
+      border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.22)' : 'rgba(255,255,255,0.08)'}`,
+      boxShadow: isAvailable
+        ? '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 16px rgba(74,222,128,0.05)'
+        : '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04)',
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
+    };
+  }
+
   return {
-    minHeight: isDisplay ? 88 : isHeroLike ? 68 : 52,
+    minHeight: isDisplay ? 88 : isHeroLike ? 58 : 52,
     background: isHeroLike
-      ? 'linear-gradient(180deg, rgba(255,255,255,0.055) 0%, rgba(255,255,255,0.032) 100%)'
+      ? 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.024) 100%)'
       : 'rgba(255,255,255,0.03)',
     border: `${isDisplay ? 1.5 : 1}px solid ${borderColor}`,
     boxShadow: isHeroLike ? heroShadow : defaultShadow,
@@ -74,7 +89,7 @@ function getInputStyle(
         color,
       }
     : isHero
-      ? { fontSize: '19px', fontWeight: 510, letterSpacing: '-0.03em', color }
+      ? { fontSize: '16px', fontWeight: 500, letterSpacing: '-0.022em', color }
       : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
 }
 
@@ -84,9 +99,26 @@ function getButtonStyle(
 ) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
+  if (isHero) {
+    return {
+      height: 38,
+      fontSize: '12px',
+      fontWeight: 510,
+      letterSpacing: '-0.005em',
+      background:
+        'linear-gradient(180deg, rgba(244,245,246,0.96) 0%, rgba(228,230,232,0.92) 100%)',
+      color: isDisabled ? 'var(--linear-text-quaternary)' : 'rgb(8,9,10)',
+      boxShadow: isDisabled
+        ? 'none'
+        : '0 6px 18px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.34)',
+      border: isDisabled
+        ? '1px solid transparent'
+        : '1px solid rgba(255,255,255,0.12)',
+    };
+  }
   return {
-    height: isDisplay ? 64 : isHero ? 50 : 36,
-    fontSize: isDisplay ? '16px' : isHero ? '14px' : '13px',
+    height: isDisplay ? 64 : 36,
+    fontSize: isDisplay ? '16px' : '13px',
     fontWeight: 510,
     letterSpacing: '-0.01em',
     background: isDisabled
@@ -222,7 +254,7 @@ export function ClaimHandleForm({
           isDisplay
             ? 'rounded-[1.4rem] p-1.5 sm:p-2'
             : isHero
-              ? 'rounded-2xl p-1 sm:p-1.5'
+              ? 'rounded-[1rem] p-[0.35rem]'
               : 'rounded-xl p-1',
           isAvailable && 'claim-input-row--available'
         )}
@@ -239,7 +271,12 @@ export function ClaimHandleForm({
           />
         )}
 
-        <div className='flex items-center flex-1 min-w-0 pl-3 pr-1 gap-0'>
+        <div
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-0',
+            isHero ? 'pl-3.5 pr-1.5' : 'pl-3 pr-1'
+          )}
+        >
           {/* Domain prefix — etched, permanent feel */}
           <span
             className='shrink-0 select-none'
@@ -254,10 +291,10 @@ export function ClaimHandleForm({
                   }
                 : isHero
                   ? {
-                      fontSize: '19px',
-                      fontWeight: 510,
-                      letterSpacing: '-0.03em',
-                      color: 'var(--linear-text-quaternary)',
+                      fontSize: '15px',
+                      fontWeight: 460,
+                      letterSpacing: '-0.016em',
+                      color: 'var(--linear-text-tertiary)',
                       fontFamily: 'inherit',
                     }
                   : {
@@ -278,7 +315,7 @@ export function ClaimHandleForm({
             type='text'
             value={handle}
             onChange={e => setHandle(e.target.value.toLowerCase())}
-            placeholder={isHero ? 'you' : 'your-name'}
+            placeholder='your-name'
             required
             autoCapitalize='none'
             autoCorrect='off'
@@ -306,7 +343,7 @@ export function ClaimHandleForm({
             isDisplay
               ? 'rounded-[1rem] px-6 sm:px-7'
               : isHero
-                ? 'rounded-xl px-5'
+                ? 'rounded-[0.8rem] px-4'
                 : 'rounded-lg px-3.5 sm:px-4',
             isDisabled
               ? 'cursor-not-allowed opacity-40'

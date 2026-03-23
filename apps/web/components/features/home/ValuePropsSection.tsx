@@ -1,58 +1,50 @@
-import { Container } from '@/components/site/Container';
-
-const VALUE_PROPS = [
-  {
-    title: 'Skip the setup',
-    body: 'Connect Spotify once. Your catalog, artwork, and release-ready smart links stay in sync without rebuilding the launch every time.',
-  },
-  {
-    title: 'Release smarter',
-    body: 'Keep the launch surface free, then turn on paid release notifications and automation when you want more than a basic smart link.',
-  },
-  {
-    title: 'Retarget every touchpoint',
-    body: 'Your smart links, profile, and fan capture flows stay instrumented so every release builds a warmer audience before you open an ads manager.',
-  },
-] as const;
+import { Music, Rocket, Users } from 'lucide-react';
+import { FigCard, MarketingContainer } from '@/components/marketing';
 
 export function ValuePropsSection() {
   return (
     <section className='section-spacing-linear relative overflow-hidden bg-page'>
-      <Container size='homepage'>
+      <MarketingContainer width='landing'>
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
-            <div className='flex max-w-[22rem] flex-col gap-4'>
-              <span className='homepage-section-eyebrow'>One platform</span>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token'>
-                One Tool. Zero Setup.
+            <div>
+              <p className='marketing-kicker'>Why artists switch</p>
+              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
+                Built for releases, not just links.
               </h2>
             </div>
-            <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
-              Jovie replaces the release work artists usually skip when they are
-              trying to move fast.
-            </p>
-          </div>
 
-          <div
-            className='homepage-section-stack reveal-on-scroll grid gap-3.5 md:grid-cols-3'
-            data-delay='80'
-          >
-            {VALUE_PROPS.map(prop => (
-              <article
-                key={prop.title}
-                className='homepage-surface-card rounded-[1rem] p-5 md:p-6'
-              >
-                <p className='text-lg font-medium tracking-tight text-primary-token'>
-                  {prop.title}
-                </p>
-                <p className='mt-3 text-sm leading-6 text-secondary-token'>
-                  {prop.body}
-                </p>
-              </article>
-            ))}
+            <div className='homepage-section-copy'>
+              <p className='marketing-lead-linear text-secondary-token'>
+                Jovie combines the public profile, release workflow, and
+                follow-up system into one surface. The result feels closer to a
+                product system than a generic link page.
+              </p>
+            </div>
           </div>
         </div>
-      </Container>
+
+        <div
+          className='reveal-on-scroll homepage-section-stack grid gap-3.5 md:grid-cols-3'
+          data-delay='80'
+        >
+          <FigCard
+            title='Built for artists'
+            description='Shaped around the way independent musicians launch: one catalog, many release moments, one place to send people.'
+            icon={<Music className='h-5 w-5' />}
+          />
+          <FigCard
+            title='Automated releases'
+            description='Smart links, notifications, and launch follow-up trigger the moment a release goes live. No manual checklist.'
+            icon={<Rocket className='h-5 w-5' />}
+          />
+          <FigCard
+            title='Fan intelligence'
+            description='See who shows up, where they came from, and what converts before you guess at the next push.'
+            icon={<Users className='h-5 w-5' />}
+          />
+        </div>
+      </MarketingContainer>
     </section>
   );
 }

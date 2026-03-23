@@ -1,20 +1,19 @@
+import { MarketingContainer } from '@/components/marketing';
+
 /**
  * Support page loading skeleton
  */
 export default function SupportLoading() {
   return (
-    <div className='min-h-screen bg-white dark:bg-[#0D0E12]'>
-      <section className='relative flex min-h-[60vh] flex-col items-center justify-center px-4 py-20 text-center'>
-        {/* Title skeleton */}
-        <div className='h-12 w-64 skeleton rounded-lg mb-4' />
-        {/* Subtitle skeleton */}
-        <div className='h-6 w-96 max-w-full skeleton rounded-md mb-8' />
-        {/* Contact options skeleton */}
-        <div className='grid md:grid-cols-2 gap-6 max-w-2xl w-full'>
-          <div className='h-32 skeleton rounded-xl' />
-          <div className='h-32 skeleton rounded-xl' />
+    <div className='pt-16 pb-20 sm:pt-20 sm:pb-24 lg:pt-24 lg:pb-32'>
+      <MarketingContainer width='page'>
+        <div className='flex flex-col items-center text-center'>
+          {/* Title skeleton */}
+          <div className='h-12 w-64 skeleton rounded-lg mb-6' />
+          {/* Button skeleton */}
+          <div className='h-10 w-40 skeleton rounded-lg' />
         </div>
-      </section>
+      </MarketingContainer>
     </div>
   );
 }
