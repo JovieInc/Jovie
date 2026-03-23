@@ -432,7 +432,8 @@ Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass
 |------|---------|----------------|----------|
 | `lint-check.sh` | After: Edit/Write | Biome lint/format errors | Auto-fixes first; fix remaining errors manually |
 | `typecheck.sh` | After: Edit/Write | TypeScript errors in modified file | Fix the type error; run `pnpm typecheck` for full output |
-| `console-check.sh` | After: Edit/Write | `console.log/error/warn/info/debug` in production code (skips tests, scripts, configs) | Use `Sentry.captureException(error)` or `logger` from Sentry |
+| `biome-formatter.sh` | After: Edit/Write | N/A (non-blocking) | Auto-applies `biome check --write` silently; no action required |
+| `console-check.sh` | After: Edit/Write | `console.log/error/warn/info/debug` in production code (skips tests, scripts, configs) | Use `import { captureError } from '@/lib/error-tracking'` for errors; `import { logger } from '@/lib/utils/logger'` for logs |
 | `ts-strict-check.sh` | After: Edit/Write | `any` type in production code (**blocks**); `@ts-ignore` (**warns**) | Use proper types or `unknown`; use `@ts-expect-error` with explanation |
 | `file-size-check.sh` | After: Edit/Write | Files exceeding 500 lines (**warns**, skips tests/migrations/generated) | Split into smaller modules by concern |
 | `db-patterns-check.sh` | After: Edit/Write | `db.transaction()`, `pg`/`pg-pool` imports, `new Pool()`, `@/lib/db/client` import | Use `import { db } from '@/lib/db'`; batch for atomicity |
