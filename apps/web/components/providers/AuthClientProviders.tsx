@@ -1,8 +1,6 @@
 'use client';
 
-import '@clerk/ui/register';
 import { ClerkProvider } from '@clerk/nextjs';
-import { ui } from '@clerk/ui';
 import type { ReactNode } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -68,9 +66,7 @@ export function AuthClientProviders({
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      prefetchUI={false}
       proxyUrl={getClerkProxyUrl()}
-      ui={ui}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
       signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}
