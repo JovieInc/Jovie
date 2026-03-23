@@ -63,7 +63,6 @@ function detectMetaBot(userAgent: string): boolean {
 
 interface PathCategory {
   needsNonce: boolean;
-  isAppPath: boolean;
   isProtectedPath: boolean;
   isAuthPath: boolean;
   isAuthCallbackPath: boolean;
@@ -103,15 +102,6 @@ function categorizePath(pathname: string): PathCategory {
   // Protected paths (require auth)
   const isProtectedPath = isAppShellPath || isWaitlistPath || isOnboardingPath;
 
-  // App paths (dashboard and protected routes at /app/*)
-  const isAppPath =
-    isAppShellPath ||
-    isOnboardingPath ||
-    isWaitlistPath ||
-    pathname === '/monitoring' ||
-    pathname.startsWith('/monitoring/') ||
-    pathname.startsWith('/api/');
-
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
@@ -124,7 +114,6 @@ function categorizePath(pathname: string): PathCategory {
 
   return {
     needsNonce,
-    isAppPath,
     isProtectedPath,
     isAuthPath,
     isAuthCallbackPath,

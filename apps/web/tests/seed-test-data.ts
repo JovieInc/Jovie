@@ -15,6 +15,7 @@ import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { env } from '@/lib/env-server';
 
 // Use the same HTTP driver as the app for consistency
 const {
@@ -83,6 +84,9 @@ const TEST_PROFILES: TestProfile[] = [
   },
 ];
 
+const E2E_SEED_EMAIL_REGEX = /^e2e(?:-[a-z0-9]+)?(?:\+clerk_test)?@jov\.ie$/i;
+const E2E_TEST_AVATAR_URL = '/avatars/default-user.png';
+
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
   'clerkId' | 'email' | 'name' | 'userStatus' | 'isAdmin'
@@ -142,6 +146,19 @@ function isDuplicateKeyError(error: unknown): boolean {
   return message.includes('duplicate key value');
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function isAllowlistedE2ESeedEmail(
+  email: string | null | undefined
+): email is string {
+  return (
+    typeof email === 'string' &&
+    E2E_SEED_EMAIL_REGEX.test(normalizeEmail(email))
+  );
+}
+
 type MatchedSeedUser = {
   readonly id: string;
   readonly clerkId: string | null;
@@ -152,11 +169,12 @@ function resolveMatchedSeedUser(
   matchedUsers: readonly MatchedSeedUser[],
   values: SeededUserValues
 ): MatchedSeedUser | undefined {
+  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
   const clerkIdMatches = matchedUsers.filter(
     matchedUser => matchedUser.clerkId === values.clerkId
   );
-  const emailMatches = values.email
-    ? matchedUsers.filter(matchedUser => matchedUser.email === values.email)
+  const emailMatches = normalizedEmail
+    ? matchedUsers.filter(matchedUser => matchedUser.email === normalizedEmail)
     : [];
 
   if (clerkIdMatches.length > 1 || emailMatches.length > 1) {
@@ -177,13 +195,30 @@ function resolveMatchedSeedUser(
   return clerkIdMatch ?? emailMatch ?? matchedUsers[0];
 }
 
+function buildSeedUserLookupCondition(values: SeededUserValues) {
+  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
+  const emailAdoptionAllowed = isAllowlistedE2ESeedEmail(normalizedEmail);
+
+  const userLookupCondition =
+    emailAdoptionAllowed && normalizedEmail
+      ? or(eq(users.clerkId, values.clerkId), eq(users.email, normalizedEmail))
+      : eq(users.clerkId, values.clerkId);
+
+  return { emailAdoptionAllowed, normalizedEmail, userLookupCondition };
+}
+
 async function ensureUser(
   db: ReturnType<typeof drizzle>,
   values: SeededUserValues
 ) {
-  const userLookupCondition = values.email
-    ? or(eq(users.clerkId, values.clerkId), eq(users.email, values.email))
-    : eq(users.clerkId, values.clerkId);
+  const { emailAdoptionAllowed, normalizedEmail, userLookupCondition } =
+    buildSeedUserLookupCondition(values);
+
+  if (normalizedEmail && !emailAdoptionAllowed) {
+    console.warn(
+      `    ⚠ Refusing email-based adoption for non-allowlisted E2E email ${normalizedEmail}; Clerk ID match required`
+    );
+  }
 
   const matchedUsers = await db
     .select({ id: users.id, clerkId: users.clerkId, email: users.email })
@@ -240,8 +275,8 @@ async function resolveSeedUserClerkId(
   email: string,
   fallbackClerkId: string | undefined
 ): Promise<string | null> {
-  const normalizedEmail = email.trim().toLowerCase();
-  const secretKey = process.env.CLERK_SECRET_KEY;
+  const normalizedEmail = normalizeEmail(email);
+  const secretKey = env.CLERK_SECRET_KEY;
 
   if (!normalizedEmail || !secretKey) {
     return fallbackClerkId ?? null;
@@ -252,7 +287,26 @@ async function resolveSeedUserClerkId(
     const existingUsers = await clerk.users.getUserList({
       emailAddress: [normalizedEmail],
     });
+
+    if (existingUsers.data.length > 1) {
+      console.warn(
+        `    ⚠ Multiple Clerk users found for ${normalizedEmail} (${existingUsers.data.length} total); using first match ${existingUsers.data[0]?.id ?? 'unknown'}`
+      );
+    }
+
     const resolvedClerkId = existingUsers.data[0]?.id ?? null;
+
+    if (!resolvedClerkId) {
+      if (fallbackClerkId) {
+        console.warn(
+          `    ⚠ No Clerk user found for ${normalizedEmail}; falling back to configured E2E_CLERK_USER_ID ${fallbackClerkId}`
+        );
+      } else {
+        console.warn(
+          `    ⚠ No Clerk user found for ${normalizedEmail}, and no configured E2E_CLERK_USER_ID fallback is available`
+        );
+      }
+    }
 
     if (
       resolvedClerkId &&
@@ -1000,7 +1054,7 @@ async function seedTracksForRelease(
 export async function seedTestData(options: SeedTestDataOptions = {}) {
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = env.DATABASE_URL;
   if (!databaseUrl) {
     console.warn('⚠ DATABASE_URL not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
@@ -1015,15 +1069,21 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     if (!options.publicProfilesOnly) {
       // Create E2E test user (for authenticated dashboard tests)
       // These values come from the setup script: scripts/setup-e2e-users.ts
-      const configuredE2EClerkUserId = process.env.E2E_CLERK_USER_ID;
-      const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
-      const E2E_USERNAME = 'e2e-test-user';
-      const E2E_CLERK_USER_ID = await resolveSeedUserClerkId(
-        E2E_EMAIL,
-        configuredE2EClerkUserId
+      const configuredE2EClerkUserId = env.E2E_CLERK_USER_ID;
+      const E2E_EMAIL = normalizeEmail(
+        env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie'
       );
+      const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
+      const E2E_USERNAME = 'e2e-test-user';
+      const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
+        ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+        : null;
 
-      if (!E2E_CLERK_USER_ID) {
+      if (!isAllowlistedE2EEmail) {
+        console.warn(
+          `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
+        );
+      } else if (!E2E_CLERK_USER_ID) {
         console.log(
           '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
         );
@@ -1055,8 +1115,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             usernameNormalized: E2E_USERNAME.toLowerCase(),
             displayName: 'E2E Test User',
             bio: 'Automated test user',
-            avatarUrl:
-              'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
+            avatarUrl: E2E_TEST_AVATAR_URL,
             spotifyUrl: null,
             appleMusicUrl: null,
             appleMusicId: null,
@@ -1082,14 +1141,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           await seedReleasesForProfile(db, profileId);
           await seedTourDatesForProfile(db, profileId);
 
-          if (
-            process.env.UPSTASH_REDIS_REST_URL &&
-            process.env.UPSTASH_REDIS_REST_TOKEN
-          ) {
+          if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
             try {
               const redis = new Redis({
-                url: process.env.UPSTASH_REDIS_REST_URL,
-                token: process.env.UPSTASH_REDIS_REST_TOKEN,
+                url: env.UPSTASH_REDIS_REST_URL,
+                token: env.UPSTASH_REDIS_REST_TOKEN,
               });
               const clerkIdsToInvalidate = [
                 previousClerkId,
@@ -1256,14 +1312,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
       // Invalidate Redis cache for this profile to ensure fresh data
       // Only attempt if Redis credentials are available
-      if (
-        process.env.UPSTASH_REDIS_REST_URL &&
-        process.env.UPSTASH_REDIS_REST_TOKEN
-      ) {
+      if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
         try {
           const redis = new Redis({
-            url: process.env.UPSTASH_REDIS_REST_URL,
-            token: process.env.UPSTASH_REDIS_REST_TOKEN,
+            url: env.UPSTASH_REDIS_REST_URL,
+            token: env.UPSTASH_REDIS_REST_TOKEN,
           });
           const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
 

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockCaptureWarning = vi.hoisted(() => vi.fn());
 const mutableEnv = process.env as Record<string, string | undefined>;
+let originalNodeEnv: string | undefined;
 
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -18,12 +19,18 @@ vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
 
 describe('@critical GET /api/health/build-info', () => {
   beforeEach(() => {
+    originalNodeEnv = mutableEnv.NODE_ENV;
     vi.clearAllMocks();
     vi.resetModules();
   });
 
   afterEach(() => {
-    delete mutableEnv.NODE_ENV;
+    if (originalNodeEnv === undefined) {
+      delete mutableEnv.NODE_ENV;
+      return;
+    }
+
+    mutableEnv.NODE_ENV = originalNodeEnv;
   });
 
   it('captures warning when build info read fails in production', async () => {

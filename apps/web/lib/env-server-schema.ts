@@ -116,6 +116,10 @@ export const ServerEnvSchema = z.object({
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
+  // E2E test credentials
+  E2E_CLERK_USER_ID: z.string().optional(),
+  E2E_CLERK_USER_USERNAME: z.string().optional(),
+
   // Analytics
   ANALYTICS_RETENTION_DAYS: z.string().optional(),
   TRACKING_TOKEN_SECRET: z.string().optional(),
@@ -227,6 +231,8 @@ export const ENV_KEYS = [
   'MERCURY_ACCOUNT_ID',
   'UPSTASH_REDIS_REST_URL',
   'UPSTASH_REDIS_REST_TOKEN',
+  'E2E_CLERK_USER_ID',
+  'E2E_CLERK_USER_USERNAME',
   'ANALYTICS_RETENTION_DAYS',
   'TRACKING_TOKEN_SECRET',
   'TRACKING_RATE_LIMIT_CLICKS_PER_HOUR',
