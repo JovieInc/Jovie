@@ -61,6 +61,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
         <ReleaseTaskDueBadge
           dueDate={task.dueDate}
           dueDaysOffset={task.dueDaysOffset}
+          isCompleted={isDone}
         />
       </div>
 
