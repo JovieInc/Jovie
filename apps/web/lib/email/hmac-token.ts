@@ -99,3 +99,31 @@ export function verifyToken(
     return null;
   }
 }
+
+/**
+ * Parse a colon-delimited payload into its two parts.
+ * Returns null if the payload doesn't contain exactly one colon with non-empty parts.
+ */
+export function parseColonPayload(
+  payload: string
+): { first: string; second: string } | null {
+  const colonIndex = payload.indexOf(':');
+  if (colonIndex === -1) return null;
+  const first = payload.slice(0, colonIndex);
+  const second = payload.slice(colonIndex + 1);
+  if (!first || !second) return null;
+  return { first, second };
+}
+
+/**
+ * Build a full URL with an encoded token query parameter.
+ * Returns null if the token is null.
+ */
+export function buildTokenUrl(
+  baseUrl: string,
+  path: string,
+  token: string | null
+): string | null {
+  if (!token) return null;
+  return `${baseUrl}${path}?token=${encodeURIComponent(token)}`;
+}

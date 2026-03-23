@@ -6,18 +6,16 @@
 
 import { APP_URL } from '@/constants/app';
 import {
+  buildTokenUrl,
   deriveSecret,
   MAC_HEX_LENGTH_LEGACY,
+  parseColonPayload,
   signPayload,
   verifyToken,
 } from './hmac-token';
 
 const CONFIRM_DOMAIN = 'jovie:subscribe-confirm-token-secret';
 
-/**
- * Generate a subscribe confirmation token encoding the subscription ID and email.
- * Token format: base64url(subscriptionId:email).hmac
- */
 export function generateSubscribeConfirmToken(
   subscriptionId: string,
   email: string
@@ -31,38 +29,27 @@ export function generateSubscribeConfirmToken(
   );
 }
 
-/**
- * Verify and decode a subscribe confirmation token.
- * Returns { subscriptionId, email } if valid, null otherwise.
- */
 export function verifySubscribeConfirmToken(
   token: string
 ): { subscriptionId: string; email: string } | null {
-  const secret = deriveSecret(CONFIRM_DOMAIN);
-  const payload = verifyToken(token, secret, MAC_HEX_LENGTH_LEGACY);
-  if (!payload) return null;
-
-  const colonIndex = payload.indexOf(':');
-  if (colonIndex === -1) return null;
-
-  const subscriptionId = payload.slice(0, colonIndex);
-  const email = payload.slice(colonIndex + 1);
-  if (!subscriptionId || !email.includes('@')) return null;
-
-  return { subscriptionId, email };
+  const payload = verifyToken(
+    token,
+    deriveSecret(CONFIRM_DOMAIN),
+    MAC_HEX_LENGTH_LEGACY
+  );
+  const parsed = payload ? parseColonPayload(payload) : null;
+  if (!parsed || !parsed.second.includes('@')) return null;
+  return { subscriptionId: parsed.first, email: parsed.second };
 }
 
-/**
- * Build the full confirmation URL for subscribe verification emails.
- */
 export function buildSubscribeConfirmUrl(
   subscriptionId: string,
   email: string
 ): string | null {
-  const token = generateSubscribeConfirmToken(subscriptionId, email);
-  if (!token) {
-    return null;
-  }
   const baseUrl = APP_URL.replace(/\/$/, '');
-  return `${baseUrl}/api/notifications/confirm?token=${encodeURIComponent(token)}`;
+  return buildTokenUrl(
+    baseUrl,
+    '/api/notifications/confirm',
+    generateSubscribeConfirmToken(subscriptionId, email)
+  );
 }
