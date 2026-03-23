@@ -13,7 +13,7 @@ export function HeroScrollSection() {
       <div className='hero-glow pointer-events-none absolute inset-0' />
 
       <Container size='homepage'>
-        <div className='mx-auto max-w-[var(--linear-hero-shell-max)]'>
+        <div className='mx-auto max-w-[1120px]'>
           <div className='hero-stagger'>
             <div className='max-w-[44rem] text-center lg:text-left'>
               <p className='homepage-section-eyebrow'>
@@ -21,7 +21,7 @@ export function HeroScrollSection() {
               </p>
 
               <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left'>
-                Own the link behind every release.
+                The link your music deserves.
               </h1>
 
               <p className='marketing-lead-linear mx-auto mt-4 max-w-[31rem] text-secondary-token md:mt-5 lg:mx-0'>
