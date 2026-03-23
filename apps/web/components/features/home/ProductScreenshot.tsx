@@ -22,6 +22,8 @@ interface ProductScreenshotProps {
    *  Use for committed screenshots where the file is guaranteed to exist.
    *  This preserves the next/image priority preload for above-fold images. */
   readonly skipCheck?: boolean;
+  /** Stable test selector for screenshot wrapper assertions. */
+  readonly testId?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ProductScreenshot({
   priority = false,
   className,
   skipCheck = false,
+  testId,
 }: ProductScreenshotProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(
     skipCheck ? true : null
@@ -68,6 +71,7 @@ export function ProductScreenshot({
   return (
     <figure
       aria-label={alt}
+      data-testid={testId}
       className={[
         'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-[1rem]',
         className,
