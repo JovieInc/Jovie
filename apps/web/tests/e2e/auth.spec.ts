@@ -107,8 +107,12 @@ async function createFreshAuthPage(browser: Browser): Promise<Page> {
   const page = await context.newPage();
 
   if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
-    await setupClerkTestingToken({ page }).catch(() => {
+    await setupClerkTestingToken({ page }).catch((error: unknown) => {
       // Signed-out auth-page assertions do not require the Clerk testing token.
+      console.warn(
+        '[auth.spec] setupClerkTestingToken skipped:',
+        error instanceof Error ? error.message : String(error)
+      );
     });
   }
 
