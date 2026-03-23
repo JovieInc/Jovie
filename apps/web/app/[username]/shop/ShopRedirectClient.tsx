@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { ProfileRedirectSurface } from '@/components/features/profile/ProfileRedirectSurface';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 
 interface ShopRedirectClientProps {
@@ -11,15 +12,13 @@ interface ShopRedirectClientProps {
 export function ShopRedirectClient({
   redirectUrl,
   username,
-}: ShopRedirectClientProps) {
+}: Readonly<ShopRedirectClientProps>) {
   const tracked = useRef(false);
 
   useEffect(() => {
     if (tracked.current) return;
     tracked.current = true;
 
-    // Fire tracking beacon before redirect
-    // Uses /api/track which requires: handle, linkType, target
     try {
       postJsonBeacon('/api/track', {
         handle: username,
@@ -30,21 +29,23 @@ export function ShopRedirectClient({
         },
       });
     } catch {
-      // Tracking failure should never block the redirect
+      // Tracking failure should never block the redirect.
     }
 
-    // Redirect after a small delay to let the beacon fire
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       globalThis.location.href = redirectUrl;
     }, 50);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
   }, [redirectUrl, username]);
 
   return (
-    <div className='flex items-center justify-center min-h-screen'>
-      <div className='text-center'>
-        <div className='animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white mx-auto mb-4' />
-        <p className='text-gray-600 dark:text-gray-400'>Redirecting to shop…</p>
-      </div>
-    </div>
+    <ProfileRedirectSurface
+      title='Opening shop'
+      description='Loading the artist shop for this profile.'
+      helperText='You will be redirected to the external storefront.'
+    />
   );
 }
