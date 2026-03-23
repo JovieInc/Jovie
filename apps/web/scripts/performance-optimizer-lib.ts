@@ -121,7 +121,7 @@ interface LighthouseAuditLike {
   numericValue?: number | null;
 }
 
-interface LighthouseResultLike {
+export interface LighthouseResultLike {
   finalDisplayedUrl?: string;
   categories?: Record<string, LighthouseCategoryLike | undefined>;
   audits?: Record<string, LighthouseAuditLike | undefined>;
@@ -132,7 +132,7 @@ interface BudgetGuardPageLike {
   rawTimings?: Record<string, number>;
 }
 
-interface BudgetGuardSummaryLike {
+export interface BudgetGuardSummaryLike {
   pages?: BudgetGuardPageLike[];
 }
 

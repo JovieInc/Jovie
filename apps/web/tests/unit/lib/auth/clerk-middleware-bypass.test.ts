@@ -80,6 +80,26 @@ describe('shouldBypassClerkForRequest', () => {
     ).toBe(false);
   });
 
+  it('does not bypass Clerk on api routes even without path flags', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        pathname: '/api/user/profile',
+        pathInfo: publicPathInfo,
+        cookies: [],
+      })
+    ).toBe(false);
+  });
+
+  it('does not bypass Clerk on trpc routes even without path flags', () => {
+    expect(
+      shouldBypassClerkForRequest({
+        pathname: '/trpc/release.get',
+        pathInfo: publicPathInfo,
+        cookies: [],
+      })
+    ).toBe(false);
+  });
+
   it('does not bypass when any cookie indicates an active session', () => {
     expect(
       shouldBypassClerkForRequest({

@@ -14,6 +14,7 @@ import { dirname, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import {
+  type BudgetGuardSummaryLike,
   buildDashboardBudgetGuardArgs,
   buildOptimizerPrompt,
   createDashboardMeasurement,
@@ -25,6 +26,7 @@ import {
   extractHomepageSample,
   getRankedHypotheses,
   type HomepageSample,
+  type LighthouseResultLike,
   type PerfHypothesis,
   type PerfLoopCliOptions,
   type PerfMeasurement,
@@ -366,7 +368,10 @@ function measureHomepageSample(baseUrl: string) {
 
   const lhrPath = resolve(lighthouseDir, latestReport);
   const lhr = readJsonFile<unknown>(lhrPath);
-  return { raw: lhr, sample: extractHomepageSample(lhr as never) };
+  return {
+    raw: lhr,
+    sample: extractHomepageSample(lhr as LighthouseResultLike),
+  };
 }
 
 function parseJsonOutput(output: string, message: string) {
@@ -398,7 +403,7 @@ function measureDashboardSample(baseUrl: string, authPath?: string) {
 
   return {
     raw: rawSummary,
-    sample: extractDashboardSample(rawSummary as never),
+    sample: extractDashboardSample(rawSummary as BudgetGuardSummaryLike),
   };
 }
 
@@ -519,7 +524,7 @@ async function maybeLowerThreshold(state: PerfRunState) {
   const recommendation =
     state.config.mode === 'homepage'
       ? String(Math.min(100, state.config.threshold + 1))
-      : String(Math.max(25, state.config.threshold - 25));
+      : String(Math.max(1, state.config.threshold - 25));
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = (
