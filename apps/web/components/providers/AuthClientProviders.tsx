@@ -3,6 +3,7 @@
 import { ClerkProvider } from '@clerk/nextjs';
 import { ui } from '@clerk/ui';
 import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
@@ -31,10 +32,15 @@ export function AuthClientProviders({
   children,
   publishableKey,
 }: AuthClientProvidersProps) {
+  const [isClerkReady, setIsClerkReady] = useState(false);
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK
   );
+
+  useEffect(() => {
+    setIsClerkReady(true);
+  }, []);
 
   if (shouldSkipClerk) {
     return (
@@ -42,6 +48,10 @@ export function AuthClientProviders({
         {wrapChildren(children)}
       </ClerkSafeDefaultsProvider>
     );
+  }
+
+  if (!isClerkReady) {
+    return null;
   }
 
   return (

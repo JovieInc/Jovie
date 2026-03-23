@@ -1,7 +1,7 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
@@ -57,10 +57,15 @@ export function ClientProviders({
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
+  const [isClerkReady, setIsClerkReady] = useState(false);
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK
   );
+
+  useEffect(() => {
+    setIsClerkReady(true);
+  }, []);
 
   if (shouldSkipClerk) {
     // When Clerk is bypassed, wrap with ClerkSafeDefaultsProvider
@@ -75,6 +80,10 @@ export function ClientProviders({
         })}
       </ClerkSafeDefaultsProvider>
     );
+  }
+
+  if (!isClerkReady) {
+    return null;
   }
 
   return (

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -82,14 +82,16 @@ describe('AuthClientProviders', () => {
     expect(clerkProviderMock).not.toHaveBeenCalled();
   });
 
-  it('passes the expected Clerk provider props for a real publishable key', () => {
+  it('passes the expected Clerk provider props for a real publishable key', async () => {
     render(
       <AuthClientProviders publishableKey='pk_test_example'>
         <div data-testid='child'>child</div>
       </AuthClientProviders>
     );
 
-    expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('clerk-provider')).toBeInTheDocument();
+    });
     expect(screen.getByTestId('child')).toBeInTheDocument();
     expect(clerkProviderMock).toHaveBeenCalledTimes(1);
 
