@@ -10,6 +10,7 @@ import { ReleaseTaskRow } from './ReleaseTaskRow';
 interface ReleaseTaskPageProps {
   readonly releaseId: string;
   readonly releaseTitle: string;
+  readonly releaseDate?: Date | string | null;
 }
 
 function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
@@ -35,6 +36,7 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 export function ReleaseTaskPage({
   releaseId,
   releaseTitle,
+  releaseDate,
 }: ReleaseTaskPageProps) {
   const { data: tasks } = useReleaseTasksQuery(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -85,7 +87,11 @@ export function ReleaseTaskPage({
       )}
 
       {/* Main checklist */}
-      <ReleaseTaskChecklist releaseId={releaseId} variant='full' />
+      <ReleaseTaskChecklist
+        releaseId={releaseId}
+        variant='full'
+        releaseDate={releaseDate}
+      />
     </div>
   );
 }

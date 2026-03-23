@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect } from 'react';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { page } from '@/lib/analytics';
 
 const BillingDashboard = dynamic(
@@ -37,5 +38,9 @@ export default function BillingPage() {
     });
   }, []);
 
-  return <BillingDashboard />;
+  return (
+    <StandaloneProductPage width='xl'>
+      <BillingDashboard />
+    </StandaloneProductPage>
+  );
 }

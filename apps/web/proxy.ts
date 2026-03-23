@@ -212,11 +212,6 @@ function analyzeHost(hostname: string): HostInfo {
 }
 
 function getClerkProxyUrl(req: NextRequest): string | undefined {
-  const hostname = req.nextUrl.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return undefined;
-  }
-
   return '/clerk';
 }
 

@@ -111,15 +111,18 @@ export function AuthLayout({
 
   return (
     <div
+      data-auth-shell
       className={cn(
         // Fixed positioning prevents iOS Safari rubber-band overscroll completely
         // max-w-[100dvw] prevents any content from causing horizontal scroll on mobile
-        'fixed inset-0 flex flex-col items-center bg-page text-primary-token overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw]',
+        'fixed inset-0 isolate flex flex-col items-center bg-page text-primary-token overflow-y-auto overflow-x-clip overscroll-none max-w-[100dvw] [color-scheme:dark]',
         // Horizontal padding with safe area support for notched devices
         'px-4 sm:px-6',
-        // Vertical padding - reduced on mobile, increases on larger screens
+        // Vertical padding - reduced on mobile, balanced on larger screens
         // Use smaller top padding when keyboard is visible
-        isKeyboardVisible ? 'pt-8 pb-4' : 'pt-[18vh] sm:pt-[20vh] pb-12',
+        isKeyboardVisible
+          ? 'pt-8 pb-4'
+          : 'pt-10 pb-10 sm:pt-14 sm:pb-12 lg:pt-16',
         // Safe area insets for notched devices (iPhone X+, Android with notches)
         'pb-[max(1.5rem,env(safe-area-inset-bottom))]',
         'pl-[max(1rem,env(safe-area-inset-left))]',
@@ -128,6 +131,15 @@ export function AuthLayout({
         'transition-[padding] duration-200 ease-out'
       )}
     >
+      <div
+        aria-hidden='true'
+        className='pointer-events-none absolute inset-0 overflow-hidden'
+      >
+        <div className='absolute left-1/2 top-[8%] h-[28rem] w-[28rem] -translate-x-1/2 rounded-full bg-accent/12 blur-[120px] sm:top-[10%] sm:h-[34rem] sm:w-[34rem]' />
+        <div className='absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.045),transparent_42%)]' />
+        <div className='absolute inset-0 bg-[linear-gradient(180deg,rgba(15,16,17,0.72)_0%,rgba(8,9,10,0.96)_68%)]' />
+      </div>
+
       {/* Skip to main content link for keyboard users */}
       {showSkipLink && (
         <Link
@@ -162,7 +174,7 @@ export function AuthLayout({
       {/* Logo container - fixed dimensions to prevent layout shift between screens */}
       <div
         className={cn(
-          'mb-8 h-8 w-8 flex items-center justify-center',
+          'relative z-10 mb-6 h-8 w-8 flex items-center justify-center sm:mb-8',
           'transition-opacity duration-200 ease-out',
           // Hide visually when keyboard visible or showLogo=false, but preserve space
           (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'

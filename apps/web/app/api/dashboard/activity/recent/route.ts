@@ -1,6 +1,7 @@
 import { and, desc, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { APP_ROUTES } from '@/constants/routes';
+import type { DashboardActivityIcon } from '@/lib/activity/dashboard-feed';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { verifyProfileOwnership } from '@/lib/db/queries/shared';
@@ -23,11 +24,11 @@ const CACHE_HEADERS = {
 } as const;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-const ACTION_ICONS: Record<string, string> = {
-  listen: '🎧',
-  social: '📸',
-  tip: '💸',
-  other: '🔗',
+const ACTION_ICONS: Record<string, DashboardActivityIcon> = {
+  listen: 'listen',
+  social: 'social',
+  tip: 'tip',
+  other: 'link',
 };
 
 type ActivityType = 'click' | 'visit' | 'subscribe' | 'unknown';
@@ -36,7 +37,7 @@ type ActivityRow = {
   id: string;
   type: ActivityType;
   description: string;
-  icon: string;
+  icon: DashboardActivityIcon;
   timestamp: string;
   href?: string;
 };
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
           row.clickCountry ?? row.memberCountry,
         ]);
         const phrase = getClickPhrase(row.linkType, row.target ?? null);
-        const icon = ACTION_ICONS[row.linkType] ?? '✨';
+        const icon = ACTION_ICONS[row.linkType] ?? 'link';
         return {
           id: row.id,
           type: 'click' as const,
@@ -234,7 +235,7 @@ export async function GET(request: NextRequest) {
             id: `visit:${row.id}:${timestamp}`,
             type: 'visit' as const,
             description: `${actorLabel}${locationLabel} visited your Jovie profile.`,
-            icon: '👀',
+            icon: 'visit',
             timestamp,
             href: APP_ROUTES.AUDIENCE,
           };
@@ -251,7 +252,7 @@ export async function GET(request: NextRequest) {
           id: `subscribe:${row.id}`,
           type: 'subscribe' as const,
           description: `Someone${locationLabel} just subscribed.`,
-          icon: row.channel === 'sms' ? '📱' : '📩',
+          icon: row.channel === 'sms' ? 'sms' : 'email',
           timestamp: toISOStringSafe(row.createdAt),
           href: APP_ROUTES.SETTINGS_CONTACTS,
         };
