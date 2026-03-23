@@ -1,11 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
@@ -36,10 +37,8 @@ export default async function AppShellLayout({
     // Defense in depth: the proxy should already block signed-out app access,
     // but the shell must not render protected UI if auth resolution disagrees.
     if (!auth.userId) {
-      const signInParams = new URLSearchParams({
-        redirect_url: APP_ROUTES.DASHBOARD,
-      });
-      redirect(`${APP_ROUTES.SIGNIN}?${signInParams.toString()}`);
+      const headerStore = await headers();
+      redirect(buildAppShellSignInUrl(headerStore));
     }
 
     // Parallelize dashboard data and feature flags.

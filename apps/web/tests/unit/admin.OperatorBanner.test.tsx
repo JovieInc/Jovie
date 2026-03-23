@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 
@@ -46,7 +46,7 @@ describe('OperatorBanner', () => {
     expect(await screen.findByText('Environment Issues:')).toBeInTheDocument();
   });
 
-  it('stays hidden in E2E mode', async () => {
+  it('stays hidden in E2E mode', () => {
     mockClientEnv.IS_E2E = true;
 
     const queryClient = new QueryClient();
@@ -56,8 +56,6 @@ describe('OperatorBanner', () => {
       </QueryClientProvider>
     );
 
-    await waitFor(() => {
-      expect(screen.queryByText('Environment Issues:')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByText('Environment Issues:')).not.toBeInTheDocument();
   });
 });

@@ -15,6 +15,7 @@ import { Redis } from '@upstash/redis';
 import { and, eq, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { normalizeEmail } from '@/lib/utils/email';
 
 // Use the same HTTP driver as the app for consistency
 const {
@@ -143,10 +144,6 @@ type SeededReleaseValues = Pick<
 function isDuplicateKeyError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes('duplicate key value');
-}
-
-function normalizeEmail(email: string): string {
-  return email.trim().toLowerCase();
 }
 
 function getSeedEnv() {
@@ -345,13 +342,20 @@ async function setActiveProfile(
   userId: string,
   profileId: string
 ) {
-  await db
+  const [updatedUser] = await db
     .update(users)
     .set({
       activeProfileId: profileId,
       updatedAt: new Date(),
     })
-    .where(eq(users.id, userId));
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+
+  if (!updatedUser) {
+    throw new Error(
+      `Failed to set active profile ${profileId} for seeded user ${userId}`
+    );
+  }
 }
 
 async function ensureCreatorProfile(
