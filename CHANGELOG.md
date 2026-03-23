@@ -11,6 +11,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Fix duplicate "Jovie" in public profile page title — browser tab showed "Tim White | Jovie | Jovie" instead of "Tim White | Jovie"
+### Added
+
+- Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
+- Server-side `/api/dev/clear-session` endpoint with prefix-based Clerk cookie deletion (catches suffixed variants like `__session_<suffix>`) and production guard
+- Toolbar state (`__dev_toolbar` cookie and localStorage keys) preserved across session clear so the toolbar stays visible after reload
 
 ## [26.4.41] - 2026-03-22
 
