@@ -171,6 +171,20 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('should filter CSP violation events from message (browser extension noise)', () => {
+    const event = { message: "Blocked 'script' from 'inline:'" };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
+  it('should filter CSP violation events from exception value', () => {
+    const event = {
+      exception: {
+        values: [{ value: "Blocked 'eval' from 'inline:'" }],
+      },
+    };
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should filter hydration mismatch errors from exception text', () => {
     const event = {
       exception: {

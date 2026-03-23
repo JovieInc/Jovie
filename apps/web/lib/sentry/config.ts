@@ -349,6 +349,16 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
+  // Drop Content Security Policy violations — typically caused by browser
+  // extensions injecting inline scripts that violate our strict CSP. Not actionable.
+  const cspValue = event.message || event.exception?.values?.[0]?.value || '';
+  if (
+    cspValue.includes("Blocked 'script'") ||
+    cspValue.includes("Blocked 'eval'")
+  ) {
+    return null;
+  }
+
   // Anonymize IP addresses if present
   if (event.user?.ip_address) {
     event.user.ip_address = '{{auto}}';
