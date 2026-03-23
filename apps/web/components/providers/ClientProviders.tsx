@@ -1,7 +1,6 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import { ui } from '@clerk/ui';
 import React from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -82,7 +81,6 @@ export function ClientProviders({
     <ClerkProvider
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl()}
-      ui={ui}
       appearance={clerkAppearanceBase}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
