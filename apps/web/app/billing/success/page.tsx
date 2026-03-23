@@ -127,7 +127,7 @@ export default function CheckoutSuccessPage() {
 
   const successTitle = isOnboardingUpgrade
     ? 'Your profile is live and upgraded'
-    : 'Welcome to ' + planName + '!';
+    : `Welcome to ${planName}!`;
   const successSubtitle = isOnboardingUpgrade
     ? "You're all set. Here's what you just unlocked."
     : "Your plan is active. Here's what you just unlocked.";

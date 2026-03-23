@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-[12px]',
+        'z-20 border-b border-subtle bg-surface-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-[12px]',
         className
       )}
     >
@@ -48,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-1 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (

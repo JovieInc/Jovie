@@ -246,9 +246,10 @@ function AdPreviewCard({ variant }: { readonly variant: AdVariant }) {
     }
   }, [notifications, variant.size, variant.type]);
 
+  const basePreviewUrl = getAdCreativeUrl(variant.type, variant.size);
   const previewUrl = cacheKey
-    ? `${getAdCreativeUrl(variant.type, variant.size)}&v=${cacheKey}`
-    : getAdCreativeUrl(variant.type, variant.size);
+    ? `${basePreviewUrl}&v=${cacheKey}`
+    : basePreviewUrl;
 
   return (
     <ContentSurfaceCard surface='nested' className='space-y-3 p-4'>

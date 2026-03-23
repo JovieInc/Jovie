@@ -21,12 +21,8 @@ export default function SpinnerTestPage() {
                 viewBox='0 0 44 44'
                 xmlns='http://www.w3.org/2000/svg'
                 aria-hidden='true'
+                className='text-primary-token'
               >
-                <style>
-                  {
-                    '.spinner{transform-origin:50% 50%;animation:spin 1s linear infinite;}@keyframes spin{to{transform:rotate(360deg);}}'
-                  }
-                </style>
                 <defs>
                   <linearGradient
                     id='spinnerTail'
@@ -37,12 +33,24 @@ export default function SpinnerTestPage() {
                     gradientUnits='userSpaceOnUse'
                     gradientTransform='rotate(-40 22 22)'
                   >
-                    <stop offset='0%' stopColor='white' stopOpacity='1' />
-                    <stop offset='70%' stopColor='white' stopOpacity='1' />
-                    <stop offset='100%' stopColor='white' stopOpacity='0' />
+                    <stop
+                      offset='0%'
+                      stopColor='currentColor'
+                      stopOpacity='1'
+                    />
+                    <stop
+                      offset='70%'
+                      stopColor='currentColor'
+                      stopOpacity='1'
+                    />
+                    <stop
+                      offset='100%'
+                      stopColor='currentColor'
+                      stopOpacity='0'
+                    />
                   </linearGradient>
                 </defs>
-                <g className='spinner'>
+                <g className='origin-center animate-spin'>
                   <circle
                     cx='22'
                     cy='22'

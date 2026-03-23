@@ -86,9 +86,9 @@ export function InterstitialClient({
         <p className='text-[13px] font-[560] text-primary-token'>
           {titleAlias}
         </p>
-        {domain !== 'External Site' ? (
+        {domain === 'External Site' ? null : (
           <p className='text-[12px] text-tertiary-token'>Domain: {domain}</p>
-        ) : null}
+        )}
       </ContentSurfaceCard>
 
       {error ? (

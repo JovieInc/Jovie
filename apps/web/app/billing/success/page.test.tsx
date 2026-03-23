@@ -40,12 +40,22 @@ describe('billing success page', () => {
   });
 
   it('keeps the standalone shell vertically scrollable', () => {
-    const { container } = render(<CheckoutSuccessPage />);
-    const pageShell = container.querySelector('main');
+    render(<CheckoutSuccessPage />);
+    const pageShell = screen.getByRole('main');
 
-    expect(pageShell).not.toBeNull();
-    expect(pageShell?.className).toContain('overflow-y-auto');
-    expect(pageShell?.className).not.toContain('overflow-hidden');
+    expect(trackMock).toHaveBeenCalledWith(
+      'subscription_success',
+      expect.any(Object)
+    );
+    expect(pageMock).toHaveBeenCalledWith(
+      'checkout_success',
+      expect.any(Object)
+    );
+    expect(pageShell.className).toContain('overflow-y-auto');
+    expect(pageShell.className).not.toContain('overflow-hidden');
+    expect(
+      screen.getByRole('button', { name: /request verification/i })
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Go to Dashboard' })
     ).toHaveAttribute('href', '/app');
