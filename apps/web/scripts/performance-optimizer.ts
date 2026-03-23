@@ -10,7 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createServer } from 'node:net';
-import { dirname, resolve } from 'node:path';
+import { dirname, relative, resolve } from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 import {
@@ -46,6 +46,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const webRoot = resolve(scriptDir, '..');
 const repoRoot = resolve(webRoot, '..', '..');
 const perfRoot = resolve(repoRoot, '.context', 'perf');
+const perfRootRelative = relative(repoRoot, perfRoot);
 const defaultAuthPath = resolve(webRoot, '.auth', 'session.json');
 
 export function printHelp() {
@@ -161,6 +162,21 @@ function resolveAuthPath(authPath?: string) {
   return existsSync(defaultAuthPath) ? defaultAuthPath : undefined;
 }
 
+export function filterChangedFiles(files: readonly string[]) {
+  return [
+    ...new Set(
+      files
+        .map(line => line.trim())
+        .filter(Boolean)
+        .filter(
+          file =>
+            file !== perfRootRelative &&
+            !file.startsWith(`${perfRootRelative}/`)
+        )
+    ),
+  ];
+}
+
 function collectChangedFiles() {
   const tracked = runCommand(
     'git',
@@ -176,13 +192,10 @@ function collectChangedFiles() {
   );
   assertSuccess(untracked, 'Failed to list untracked changes.');
 
-  return [
-    ...new Set(
-      [...tracked.stdout.split('\n'), ...untracked.stdout.split('\n')]
-        .map(line => line.trim())
-        .filter(Boolean)
-    ),
-  ];
+  return filterChangedFiles([
+    ...tracked.stdout.split('\n'),
+    ...untracked.stdout.split('\n'),
+  ]);
 }
 
 function getBaseUrlServerConfig(baseUrl: string) {
@@ -490,12 +503,21 @@ function loadState(
   }
 
   const state = readJsonFile<PerfRunState>(statePath);
-  return {
+  const nextState = {
     ...state,
     config,
     artifactDir,
     promptPath,
   } satisfies PerfRunState;
+
+  nextState.status = deriveRunStatus({
+    bestMeasurement: nextState.bestMeasurement,
+    config: nextState.config,
+    noProgressCount: nextState.noProgressCount,
+    fallbackStatus: nextState.status,
+  });
+
+  return nextState;
 }
 
 function saveState(state: PerfRunState) {
@@ -516,15 +538,48 @@ function hasReachedThreshold(
   return measurement.primaryMetric <= threshold;
 }
 
+export function deriveRunStatus(options: {
+  bestMeasurement?: PerfMeasurement<HomepageSample | DashboardSample>;
+  config: PerfRunConfig;
+  noProgressCount: number;
+  fallbackStatus?: PerfRunState['status'];
+}): PerfRunState['status'] {
+  const {
+    bestMeasurement,
+    config,
+    noProgressCount,
+    fallbackStatus = 'baseline',
+  } = options;
+
+  if (!bestMeasurement) {
+    return fallbackStatus;
+  }
+
+  if (hasReachedThreshold(bestMeasurement, config.threshold, config.mode)) {
+    return 'threshold-hit';
+  }
+
+  if (noProgressCount >= config.maxNoProgress) {
+    return 'stalled';
+  }
+
+  return 'running';
+}
+
+export function getThresholdRecommendation(
+  config: Pick<PerfRunConfig, 'mode' | 'threshold'>
+) {
+  return config.mode === 'homepage'
+    ? Math.min(100, config.threshold + 1)
+    : Math.max(1, config.threshold - 25);
+}
+
 async function maybeLowerThreshold(state: PerfRunState) {
   if (!process.stdin.isTTY || !process.stdout.isTTY || !state.bestMeasurement) {
     return;
   }
 
-  const recommendation =
-    state.config.mode === 'homepage'
-      ? String(Math.min(100, state.config.threshold + 1))
-      : String(Math.max(1, state.config.threshold - 25));
+  const recommendation = String(getThresholdRecommendation(state.config));
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = (
@@ -552,7 +607,12 @@ async function maybeLowerThreshold(state: PerfRunState) {
   }
 
   state.config.threshold = nextThreshold;
-  state.status = 'running';
+  state.status = deriveRunStatus({
+    bestMeasurement: state.bestMeasurement,
+    config: state.config,
+    noProgressCount: state.noProgressCount,
+    fallbackStatus: state.status,
+  });
 }
 
 function printMeasurementSummary(state: PerfRunState) {
@@ -723,10 +783,16 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(
-    'perf:loop failed:',
-    error instanceof Error ? error.message : error
-  );
-  process.exit(1);
-});
+const isEntrypoint =
+  process.argv[1] !== undefined &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (isEntrypoint) {
+  main().catch(error => {
+    console.error(
+      'perf:loop failed:',
+      error instanceof Error ? error.message : error
+    );
+    process.exit(1);
+  });
+}

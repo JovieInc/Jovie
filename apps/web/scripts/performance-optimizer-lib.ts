@@ -390,9 +390,11 @@ export function parsePerfLoopArgs(
 
     if (arg === '--runs-per-sample') {
       const value = Number(args[index + 1]);
-      if (!Number.isInteger(value) || value <= 0) {
+      // Even sample counts bias median selection because medianSampleBy()
+      // intentionally chooses a single representative run.
+      if (!Number.isInteger(value) || value <= 0 || value % 2 === 0) {
         throw new TypeError(
-          'Expected a positive integer for --runs-per-sample'
+          'Expected a positive odd integer for --runs-per-sample'
         );
       }
       options.runsPerSample = value;
@@ -868,7 +870,7 @@ export function buildOptimizerPrompt(options: {
     'Primary metric:',
     state.config.mode === 'homepage'
       ? '- Lighthouse performance score for / with LCP <= 2500ms, FCP <= 1800ms, TBT <= 200ms, CLS <= 0.05, and no accessibility/SEO regression.'
-      : '- Warm authenticated navigation-to-visible-shell time for /app/dashboard/releases with TTFB <= 500ms and skeleton-to-content <= 300ms.',
+      : `- Warm authenticated navigation-to-visible-shell time for ${APP_ROUTES.DASHBOARD_RELEASES} with TTFB <= 500ms and skeleton-to-content <= 300ms.`,
   ];
 
   if (nextHypothesis) {
@@ -887,10 +889,10 @@ export function buildOptimizerPrompt(options: {
   lines.push(
     '',
     'Loop:',
-    '1. Measure a 3-run baseline and use the median.',
+    `1. Measure a ${state.config.runsPerSample}-run baseline and use the median.`,
     '2. Rank the next hypotheses using actual repo evidence, not generic advice.',
     '3. Try exactly one optimization.',
-    '4. Rebuild and remeasure 3 times.',
+    `4. Rebuild and remeasure ${state.config.runsPerSample} times.`,
     '5. Accept only if the median beats noise: >=1 Lighthouse point or >=25ms, with no guardrail regression >5%.',
     '6. If accepted, stack it and continue.',
     '7. If rejected, revert it, record why, and try a different optimization class.',

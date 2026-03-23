@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '../../../constants/routes';
 import {
   buildDashboardBudgetGuardArgs,
   buildOptimizerPrompt,
@@ -36,6 +37,19 @@ describe('performance optimizer lib', () => {
 
     expect(parsed.mode).toBe('dashboard');
     expect(parsed.threshold).toBe(90);
+  });
+
+  it('rejects even runs-per-sample values so median selection stays unbiased', () => {
+    expect(() =>
+      parsePerfLoopArgs([
+        '--mode',
+        'homepage',
+        '--threshold',
+        '95',
+        '--runs-per-sample',
+        '4',
+      ])
+    ).toThrow('Expected a positive odd integer for --runs-per-sample');
   });
 
   it('uses the package-relative budget guard script path', () => {
@@ -255,7 +269,7 @@ describe('performance optimizer lib', () => {
         baseUrl: 'http://localhost:3000',
         authPath: 'apps/web/.auth/session.json',
         maxNoProgress: 3,
-        runsPerSample: 3,
+        runsPerSample: 5,
         artifactsDir: '.context/perf/dashboard-test',
       },
       '.context/perf/dashboard-test/optimizer-prompt.txt'
@@ -289,5 +303,8 @@ describe('performance optimizer lib', () => {
     expect(prompt).toContain(
       'Warm authenticated navigation-to-visible-shell time'
     );
+    expect(prompt).toContain(APP_ROUTES.DASHBOARD_RELEASES);
+    expect(prompt).toContain('Measure a 5-run baseline and use the median.');
+    expect(prompt).toContain('Rebuild and remeasure 5 times.');
   });
 });
