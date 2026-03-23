@@ -361,7 +361,7 @@ Forbidden patterns:
 
 For deeper implementation guidance, use `.claude/skills/entitlements.md`.
 
-### 10. Self-Improvement Loop
+### 13. Self-Improvement Loop
 
 After any correction from a human reviewer:
 
@@ -372,7 +372,7 @@ After any correction from a human reviewer:
 
 If you realize mid-task that you've made an assumption that turned out wrong, document it immediately without being asked.
 
-### 11. Plan Before Executing Complex Tasks
+### 14. Plan Before Executing Complex Tasks
 
 For any task with 3 or more steps, architectural decisions, schema changes, or significant refactors:
 
@@ -380,7 +380,7 @@ For any task with 3 or more steps, architectural decisions, schema changes, or s
 - Wait for human approval before executing
 - Single-step bug fixes and trivial copy changes do not require plan mode
 
-### 12. Verify Before Marking Done
+### 15. Verify Before Marking Done
 
 Never mark a task complete without confirming the fix works:
 
@@ -389,6 +389,61 @@ Never mark a task complete without confirming the fix works:
 - For UI changes: confirm the component renders without errors
 - For API changes: confirm the endpoint returns expected shape
 - Paste the passing output as evidence in the PR description
+
+---
+
+## Custom ESLint Rules (Quick Reference)
+
+11 custom rules in `apps/web/eslint-rules/` run via `pnpm --filter web lint:eslint`. Violations block CI.
+
+| Rule | What It Blocks | Fix |
+|------|---------------|-----|
+| `use-client-directive` | React hooks (`useState`, `useEffect`, etc.) in files without `'use client'` | Add `'use client'` at top of file |
+| `server-only-imports` | `@/lib/db`, `@clerk/nextjs/server`, `stripe`, `resend`, `drizzle-orm`, `*.server.ts` in `'use client'` files | Move logic to server component or API route |
+| `icon-usage` | Emoji in JSX, non-Lucide UI icons, direct `simple-icons` imports | Use `lucide-react` for UI icons; `SocialIcon` component for social/brand icons |
+| `no-db-transaction` | `db.transaction()` or `tx.transaction()` calls | Use sequential operations or `db.insert().values([...])` batch |
+| `no-handler-initialization` | `new Stripe()`, `new Pool()`, `new Resend()`, `new Client()` inside `GET`/`POST`/`PUT`/`DELETE` handlers | Move to module-level singleton: `const stripe = getStripe()` at file top |
+| `no-hardcoded-routes` | String literals like `'/app/dashboard/audience'` in app code | Import from `APP_ROUTES`: `import { APP_ROUTES } from '@/constants/routes'` |
+| `no-manual-db-pooling` | `import { Pool } from 'pg'` or `import pg from 'pg'` | Use `import { db } from '@/lib/db'` |
+| `require-abort-signal` | `queryFn` in `useQuery`/`useSuspenseQuery` that doesn't destructure `{ signal }` | `queryFn: ({ signal }) => fetchThing(id, { signal })` |
+| `require-query-cache-config` | `useQuery` without `staleTime` and `gcTime` | Add both, or spread a preset from `lib/queries/cache-strategies.ts` |
+| `readonly-component-props` | Props interface/type properties without `readonly` modifier | Add `readonly` before each property (auto-fixable: ESLint will fix this for you) |
+| `edge-runtime-node-imports` | `node:fs`, `crypto`, `stripe`, `path`, `stream` in files with `export const runtime = 'edge'` | Remove the Node-only import or remove the Edge runtime declaration |
+
+**Run:** `pnpm --filter web lint:eslint` (all rules) or `pnpm --filter web lint:server-boundaries` (boundary rules only)
+
+---
+
+## Claude Hooks Reference
+
+Hooks in `.claude/hooks/` run automatically on every tool use. You cannot bypass them. Understanding what triggers them saves debugging time.
+
+**Pre-execution hooks** (block the operation before it runs):
+
+| Hook | Trigger | What It Blocks | Recovery |
+|------|---------|---------------|----------|
+| `bash-safety-check.sh` | Before: Bash | `rm -rf /`, force push to main, `npm publish` | Don't run destructive commands |
+| `file-protection-check.sh` | Before: Edit/Write | Editing existing migration SQL/snapshots; creating `middleware.ts`; `biome-ignore` comments; hardcoded dashboard route literals; dynamic `revalidate` in marketing pages; global UI singletons in nested layouts | See matching Hard Guardrail above |
+| `infra-guardrails-check.sh` | Before: Edit/Write | New cron route files (`app/api/cron/*/route.ts`); `vercel.json` cron changes | Get human approval first |
+
+**Post-execution hooks** (check the result and may block or warn):
+
+| Hook | Trigger | What It Catches | Recovery |
+|------|---------|----------------|----------|
+| `lint-check.sh` | After: Edit/Write | Biome lint/format errors | Auto-fixes first; fix remaining errors manually |
+| `typecheck.sh` | After: Edit/Write | TypeScript errors in modified file | Fix the type error; run `pnpm typecheck` for full output |
+| `biome-formatter.sh` | After: Edit/Write | N/A (non-blocking) | Auto-applies `biome check --write` silently; no action required |
+| `console-check.sh` | After: Edit/Write | `console.log/error/warn/info/debug` in production code (skips tests, scripts, configs) | Use `import { captureError } from '@/lib/error-tracking'` for errors; `import { logger } from '@/lib/utils/logger'` for logs |
+| `ts-strict-check.sh` | After: Edit/Write | `any` type in production code (**blocks**); `@ts-ignore` (**warns**) | Use proper types or `unknown`; use `@ts-expect-error` with explanation |
+| `file-size-check.sh` | After: Edit/Write | Files exceeding 500 lines (**warns**, skips tests/migrations/generated) | Split into smaller modules by concern |
+| `db-patterns-check.sh` | After: Edit/Write | `db.transaction()`, `pg`/`pg-pool` imports, `new Pool()`, `@/lib/db/client` import | Use `import { db } from '@/lib/db'`; batch for atomicity |
+
+**Lifecycle hooks:**
+
+| Hook | Trigger | Purpose |
+|------|---------|---------|
+| `session-start.sh` | Session start | Verifies Node/pnpm versions, installs deps, builds gstack |
+| `post-task-validate.sh` | Task completion (Stop) | Blocks completion if typecheck, Biome lint, server boundaries, or affected tests fail |
 
 ---
 
@@ -586,6 +641,95 @@ apps/web/components/
 
 **Token reference style:** Use Tailwind-named utilities (`text-primary-token`, `bg-surface-1`, `border-subtle`), NOT CSS variable arbitrary values (`text-(--linear-text-primary)`).
 
+### File Creation Patterns
+
+When creating new files, follow these templates. They reflect actual codebase patterns (derived from `app/api/feedback/route.ts` and similar).
+
+#### New API Route
+
+Location: `apps/web/app/api/{domain}/{action}/route.ts`
+
+```typescript
+import { auth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { db } from '@/lib/db';
+import { captureError } from '@/lib/error-tracking';
+import { logger } from '@/lib/utils/logger';
+
+const payloadSchema = z.object({ /* ... */ });
+
+export async function POST(request: Request) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await request.json();
+    const parsed = payloadSchema.safeParse(body);
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+
+    // ... business logic using db ...
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    logger.error('[api/{domain}] Operation failed:', error);
+    await captureError('Description', error, { route: '/api/{domain}', method: 'POST' });
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+  }
+}
+```
+
+Key rules: Zod validation on input, auth check, try/catch with `captureError` + `logger.error`, no `new Stripe()` inside the handler (use module-level singletons). Only add `export const runtime = 'nodejs'` when documenting a specific constraint.
+
+#### New Component
+
+| Type | Location | When to use |
+|------|----------|-------------|
+| Design system atom | `packages/ui/atoms/MyComponent.tsx` | Pure UI, no Next.js/app imports |
+| App atom | `apps/web/components/atoms/MyComponent.tsx` | Small, reusable, may use Next.js hooks |
+| Molecule | `apps/web/components/molecules/MyComponent.tsx` | Composes 2+ atoms |
+| Organism | `apps/web/components/organisms/{feature}/MyComponent.tsx` | Complex shared widget |
+| Feature component | `apps/web/components/features/{feature}/MyComponent.tsx` | Feature-specific, can have internal atoms/molecules |
+
+```typescript
+'use client'; // ONLY if using hooks (useState, useEffect, etc.) — omit for server components
+
+import type { ReactNode } from 'react';
+
+interface MyComponentProps {
+  readonly title: string;        // Every prop MUST be readonly
+  readonly children?: ReactNode;
+  readonly onAction?: () => void;
+}
+
+export function MyComponent({ title, children, onAction }: MyComponentProps) {
+  return <div>{title}{children}</div>;
+}
+```
+
+#### New Server Action
+
+Location: `apps/web/app/{route}/actions.ts` or `apps/web/lib/actions/{domain}.ts`
+
+```typescript
+'use server';
+
+import { auth } from '@clerk/nextjs/server';
+import { revalidatePath } from 'next/cache';
+import { db } from '@/lib/db';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+```
+
+#### New Test
+
+Co-locate with source: `{name}.test.ts` or `{name}.test.tsx` (not `__tests__/` directories unless shared fixtures needed).
+
+```typescript
+import { describe, expect, it, vi } from 'vitest';
+```
+
+Name tests by behavior: `describe('ComponentName')` → `it('shows error when input is empty')`.
+
 ### Tech Stack
 
 | Layer | Technology |
@@ -723,6 +867,25 @@ The project uses `@neondatabase/serverless` with the HTTP driver and Neon's buil
 | `new Pool()` or `pool.connect()`   | Manual connection management      | Use `import { db } from '@/lib/db'`   |
 | Loop with individual `db.insert()` | O(N) database operations          | `db.insert().values([...items])` batch |
 
+### Canonical Imports (Use These Exact Paths)
+
+Agents frequently import from wrong paths. This is the authoritative reference:
+
+| What | Correct Import | NOT This |
+|------|---------------|----------|
+| Database | `import { db } from '@/lib/db'` | `@/lib/db/client` (legacy, hook-blocked) |
+| Env vars | `import { env } from '@/lib/env'` | `process.env.X` (no validation) |
+| Routes | `import { APP_ROUTES } from '@/constants/routes'` | Hardcoded `'/app/dashboard/...'` strings (hook-blocked) |
+| Entitlements (server) | `import { getCurrentUserEntitlements } from '@/lib/entitlements/server'` | Reading billing rows directly in handlers |
+| Entitlements (registry) | `import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry'` | Duplicating plan matrices in components |
+| UI Icons | `import { IconName } from 'lucide-react'` | Emoji, FontAwesome, heroicons, custom SVGs |
+| Social/Brand Icons | `import { SocialIcon } from '@/components/atoms/SocialIcon'` | Lucide for social platforms, direct `simple-icons` |
+| Auth (client) | `import { useUser, useAuth } from '@clerk/nextjs'` | `@clerk/nextjs/server` in client files |
+| Auth (server) | `import { auth, currentUser } from '@clerk/nextjs/server'` | Server imports in `'use client'` files |
+| Error tracking | `import { captureError } from '@/lib/error-tracking'` | `console.error()` (hook-blocked in production code) |
+| Logger | `import { logger } from '@/lib/utils/logger'` | `console.log()` (hook-blocked in production code) |
+| Cache presets | `import { STABLE_CACHE } from '@/lib/queries/cache-strategies'` | Inline `staleTime`/`gcTime` values without presets |
+
 ### Data Serialization (Server → Client Boundaries)
 
 **Date objects MUST be serialized** before:
@@ -796,9 +959,13 @@ useQuery({
 - Without signal, requests continue after navigation, wasting resources
 
 **Cache Presets:**
-Use presets from `lib/queries/cache.ts` for consistency:
-- `STABLE_CACHE` - for data that rarely changes (user profile, billing status)
-- `DYNAMIC_CACHE` - for frequently updated data (notifications, real-time feeds)
+Use presets from `lib/queries/cache-strategies.ts` for consistency:
+- `REALTIME_CACHE` - for live data (notifications, active sessions)
+- `FREQUENT_CACHE` - for frequently updated data (dashboard stats)
+- `STANDARD_CACHE` - for typical data (5 min stale, 30 min gc)
+- `STABLE_CACHE` - for slowly changing data (user profile, billing status, feature flags)
+- `STATIC_CACHE` - for reference data that rarely changes (categories, platform lists)
+- `PAGINATED_CACHE` / `SEARCH_CACHE` - for list/search results
 
 **Disable Aggressive Refetch:**
 
