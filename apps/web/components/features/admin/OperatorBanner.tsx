@@ -3,6 +3,7 @@
 import { QueryClient, QueryClientContext } from '@tanstack/react-query';
 import { AlertTriangle, X } from 'lucide-react';
 import { useContext, useEffect, useMemo, useState } from 'react';
+import { env } from '@/lib/env-client';
 import { publicEnv } from '@/lib/env-public';
 import { useEnvHealthQuery } from '@/lib/queries';
 
@@ -22,7 +23,7 @@ import { useEnvHealthQuery } from '@/lib/queries';
 export function OperatorBanner({ isAdmin }: Readonly<{ isAdmin: boolean }>) {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+  const isE2EClientRuntime = env.IS_E2E;
 
   // Check if QueryClient is available in the React tree.
   // This prevents "No QueryClient set" errors when the component renders

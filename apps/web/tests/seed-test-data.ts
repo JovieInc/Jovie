@@ -299,7 +299,7 @@ async function resolveSeedUserClerkId(
     if (!resolvedClerkId) {
       if (fallbackClerkId) {
         console.warn(
-          `    ⚠ No Clerk user found for ${normalizedEmail}; falling back to configured E2E_CLERK_USER_ID ${fallbackClerkId}`
+          `    ⚠ Clerk returned no users for ${normalizedEmail}; seeding with configured E2E_CLERK_USER_ID ${fallbackClerkId}, which may be stale`
         );
       } else {
         console.warn(

@@ -3,7 +3,13 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 
-const mutableEnv = process.env as Record<string, string | undefined>;
+const mockClientEnv = vi.hoisted(() => ({
+  IS_E2E: false,
+}));
+
+vi.mock('@/lib/env-client', () => ({
+  env: mockClientEnv,
+}));
 
 vi.mock('@/lib/queries/useEnvHealthQuery', () => ({
   useEnvHealthQuery: vi.fn().mockReturnValue({
@@ -22,7 +28,7 @@ vi.mock('@/lib/queries/useEnvHealthQuery', () => ({
 
 describe('OperatorBanner', () => {
   afterEach(() => {
-    delete mutableEnv.NEXT_PUBLIC_E2E_MODE;
+    mockClientEnv.IS_E2E = false;
   });
 
   it('renders without QueryClientProvider', () => {
@@ -41,7 +47,7 @@ describe('OperatorBanner', () => {
   });
 
   it('stays hidden in E2E mode', async () => {
-    mutableEnv.NEXT_PUBLIC_E2E_MODE = '1';
+    mockClientEnv.IS_E2E = true;
 
     const queryClient = new QueryClient();
     render(
