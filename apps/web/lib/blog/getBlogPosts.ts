@@ -12,6 +12,7 @@ export interface BlogPostMetadata {
   title: string;
   date: string;
   author: string;
+  authorUsername?: string;
   authorTitle?: string;
   authorProfile?: string;
   category?: string;
@@ -74,6 +75,7 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     title: data.title ?? formatTitleFromSlug(slug),
     date: data.date ?? new Date().toISOString().split('T')[0],
     author: data.author ?? DEFAULT_AUTHOR,
+    authorUsername: data.authorUsername,
     authorTitle: data.authorTitle,
     authorProfile: data.authorProfile,
     category: data.category,
@@ -101,6 +103,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         title: data.title ?? formatTitleFromSlug(slug),
         date: data.date ?? new Date().toISOString().split('T')[0],
         author: data.author ?? DEFAULT_AUTHOR,
+        authorUsername: data.authorUsername,
         authorTitle: data.authorTitle,
         authorProfile: data.authorProfile,
         category: data.category,
