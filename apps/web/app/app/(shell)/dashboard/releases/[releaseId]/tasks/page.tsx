@@ -1,4 +1,9 @@
+import { and, eq } from 'drizzle-orm';
+import { notFound } from 'next/navigation';
 import { ReleaseTaskPage } from '@/components/features/dashboard/release-tasks';
+import { db } from '@/lib/db';
+import { discogReleases } from '@/lib/db/schema/content';
+import { requireProfileId } from '../../task-actions';
 
 interface TasksPageProps {
   readonly params: Promise<{ releaseId: string }>;
@@ -6,6 +11,31 @@ interface TasksPageProps {
 
 export default async function TasksPage({ params }: TasksPageProps) {
   const { releaseId } = await params;
+  const profileId = await requireProfileId();
 
-  return <ReleaseTaskPage releaseId={releaseId} releaseTitle='Release' />;
+  const [release] = await db
+    .select({
+      title: discogReleases.title,
+      releaseDate: discogReleases.releaseDate,
+    })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.id, releaseId),
+        eq(discogReleases.creatorProfileId, profileId)
+      )
+    )
+    .limit(1);
+
+  if (!release) {
+    notFound();
+  }
+
+  return (
+    <ReleaseTaskPage
+      releaseId={releaseId}
+      releaseTitle={release.title ?? 'Release'}
+      releaseDate={release.releaseDate}
+    />
+  );
 }
