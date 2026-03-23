@@ -3,7 +3,6 @@
 /* Animation classes now provided by tw-animate-css */
 /* Shimmer keyframes defined in globals.css */
 
-
 /* Clerk auth surfaces use stable cl-* selectors so the auth shell stays on-brand even when Clerk changes its internal styling implementation. */
 :is(.cl-signIn-root, .cl-signUp-root) {
   --clerk-color-primary: var(--color-accent);
@@ -77,11 +76,13 @@
   color: var(--color-text-tertiary-token);
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput:focus,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput:focus,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInputShowPasswordButton:focus,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink:focus,
-:is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton:focus {
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-formFieldInputShowPasswordButton:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-footerActionLink:focus-visible,
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-identityPreviewEditButton:focus-visible {
   outline: none;
   border-color: var(--color-border-default);
   box-shadow: 0 0 0 2px rgba(113, 112, 255, 0.28);
@@ -92,7 +93,8 @@
   color: var(--color-text-secondary-token);
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInputShowPasswordButton:hover,
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-formFieldInputShowPasswordButton:hover,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewEditButton:hover {
   color: var(--color-text-primary-token);
 }
