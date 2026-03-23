@@ -1,10 +1,13 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
+import { SignUp } from '@clerk/nextjs';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout, SignUpForm } from '@/features/auth';
+import { AuthLayout } from '@/features/auth';
 import { track } from '@/lib/analytics';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
@@ -13,6 +16,16 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
+
+function AuthRoutePrefetch({ href }: { href: string }) {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.prefetch(href);
+  }, [href, router]);
+
+  return null;
+}
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -123,22 +136,108 @@ function SignUpClaimDataPersistence() {
   );
 }
 
+function buildSignInUrl(searchParams: { get: (key: string) => string | null }) {
+  const signInUrl = new URL(APP_ROUTES.SIGNIN, globalThis.location.origin);
+  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url'));
+
+  if (redirectUrl) {
+    signInUrl.searchParams.set('redirect_url', redirectUrl);
+  }
+
+  return signInUrl.pathname + signInUrl.search;
+}
+
+function SignUpOauthErrorBanner() {
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get('oauth_error');
+
+  useEffect(() => {
+    if (!oauthError) return;
+
+    const url = new URL(globalThis.location.href);
+    url.searchParams.delete('oauth_error');
+    globalThis.history.replaceState(
+      globalThis.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`
+    );
+  }, [oauthError]);
+
+  if (!oauthError) return null;
+
+  const isAccountExists = oauthError === 'account_exists';
+  const message = isAccountExists
+    ? 'An account with this email already exists. Try signing in instead.'
+    : oauthError === 'access_denied'
+      ? 'Required permissions were not granted. Please try again and accept all permissions.'
+      : 'Something went wrong with Google sign-up. Please try again.';
+
+  return (
+    <div
+      className='mb-4 rounded-(--linear-radius-sm) border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      role='alert'
+    >
+      <p className='text-sm font-medium text-destructive'>{message}</p>
+      {isAccountExists ? (
+        <p className='mt-2 text-sm text-secondary-token'>
+          <Link
+            href={buildSignInUrl(searchParams)}
+            className='text-primary-token underline focus-ring-themed rounded-md'
+          >
+            Sign in instead
+          </Link>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SignUpPageContent() {
+  return (
+    <>
+      <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
+      <SignUpClaimDataPersistence />
+      <SignUpOauthErrorBanner />
+      <SignUp
+        routing='hash'
+        oauthFlow='redirect'
+        signInUrl={APP_ROUTES.SIGNIN}
+        fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+      />
+      <p className='mt-4 text-[11px] leading-relaxed text-[#6b6f76] dark:text-[#969799] text-center'>
+        By signing up, you agree to our{' '}
+        <Link
+          href={APP_ROUTES.LEGAL_TERMS}
+          className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
+        >
+          Terms of Service
+        </Link>{' '}
+        and{' '}
+        <Link
+          href={APP_ROUTES.LEGAL_PRIVACY}
+          className='underline hover:text-[#1f2023] dark:hover:text-[#e3e4e6] focus-ring-themed rounded-md'
+        >
+          Privacy Policy
+        </Link>
+        .
+      </p>
+    </>
+  );
+}
+
 /**
- * Sign-up page using new Clerk Core API implementation.
+ * Sign-up page using Clerk's prebuilt components for reliability.
  */
 export default function SignUpPage() {
   return (
     <AuthLayout
       formTitle='Create your account'
       showFormTitle={false}
-      footerPrompt='Already have an account?'
-      footerLinkText='Sign in'
-      footerLinkHref={APP_ROUTES.SIGNIN}
+      showFooterPrompt={false}
     >
-      <Suspense>
-        <SignUpClaimDataPersistence />
+      <Suspense fallback={null}>
+        <SignUpPageContent />
       </Suspense>
-      <SignUpForm />
     </AuthLayout>
   );
 }
