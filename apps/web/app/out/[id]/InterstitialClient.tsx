@@ -60,9 +60,13 @@ export function InterstitialClient({
 
   if (isVerified) {
     return (
-      <div className='space-y-4 text-center'>
+      <div
+        className='space-y-4 text-center'
+        aria-live='polite'
+        aria-atomic='true'
+      >
         <div className='mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'>
-          <CheckCircle2 className='h-7 w-7 text-success' aria-hidden='true' />
+          <CheckCircle2 className='h-6 w-6 text-success' aria-hidden='true' />
         </div>
         <p className='text-[13px] font-[560] text-primary-token'>
           Verified. Redirecting...
@@ -94,6 +98,8 @@ export function InterstitialClient({
       {error ? (
         <ContentSurfaceCard
           surface='nested'
+          role='alert'
+          aria-live='assertive'
           className='border-error/20 bg-error-subtle p-4'
         >
           <p className='text-[13px] text-primary-token'>{error}</p>

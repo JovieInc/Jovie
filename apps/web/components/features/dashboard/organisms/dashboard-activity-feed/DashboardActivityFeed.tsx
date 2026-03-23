@@ -140,7 +140,7 @@ export function DashboardActivityFeed({
       <div className='flex items-center justify-between gap-4'>
         <div className='flex items-center gap-2'>
           <div className='flex h-6 w-6 items-center justify-center rounded-full bg-surface-0'>
-            <Zap className='h-4 w-4 text-tertiary-token' />
+            <Zap className='h-4 w-4 text-tertiary-token' aria-hidden='true' />
           </div>
           <h3 className='text-[13px] font-[510] tracking-[-0.01em] text-secondary-token'>
             Activity

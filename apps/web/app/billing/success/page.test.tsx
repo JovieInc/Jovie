@@ -12,7 +12,12 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('@/components/atoms/Confetti', () => ({
-  ConfettiOverlay: () => <div data-testid='confetti-overlay' />,
+  ConfettiOverlay: (props: { readonly viewport?: boolean }) => (
+    <div
+      data-testid='confetti-overlay'
+      data-viewport={props.viewport ? 'true' : 'false'}
+    />
+  ),
 }));
 
 vi.mock('@/lib/analytics', () => ({
@@ -50,6 +55,10 @@ describe('billing success page', () => {
     expect(pageMock).toHaveBeenCalledWith(
       'checkout_success',
       expect.any(Object)
+    );
+    expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
+      'data-viewport',
+      'true'
     );
     expect(pageShell.className).toContain('overflow-y-auto');
     expect(pageShell.className).not.toContain('overflow-hidden');

@@ -139,7 +139,7 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      <ConfettiOverlay />
+      <ConfettiOverlay viewport />
 
       <ContentSurfaceCard surface='details' className='overflow-hidden'>
         <ContentSectionHeader
