@@ -18,6 +18,10 @@ interface ProductScreenshotProps {
   readonly priority?: boolean;
   /** Additional className for the outer wrapper */
   readonly className?: string;
+  /** Skip the HEAD availability check — render the image immediately.
+   *  Use for committed screenshots where the file is guaranteed to exist.
+   *  This preserves the next/image priority preload for above-fold images. */
+  readonly skipCheck?: boolean;
 }
 
 /**
@@ -32,10 +36,14 @@ export function ProductScreenshot({
   title = 'Jovie',
   priority = false,
   className,
+  skipCheck = false,
 }: ProductScreenshotProps) {
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
+  const [isAvailable, setIsAvailable] = useState<boolean | null>(
+    skipCheck ? true : null
+  );
 
   useEffect(() => {
+    if (skipCheck) return;
     let isActive = true;
 
     fetch(src, { method: 'HEAD' })
@@ -54,7 +62,7 @@ export function ProductScreenshot({
     return () => {
       isActive = false;
     };
-  }, [src]);
+  }, [src, skipCheck]);
 
   return (
     <figure

@@ -39,36 +39,15 @@
         );
       }
     } else {
-      // Public/marketing routes: respect stored preference, default to dark.
-      var hasStoredPref =
-        storageValue === 'light' ||
-        storageValue === 'dark' ||
-        storageValue === 'system';
-
-      var publicDark;
-      if (hasStoredPref) {
-        if (storageValue === 'system') {
-          var sysDark =
-            typeof globalThis.matchMedia === 'function' &&
-            globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
-          publicDark = sysDark;
-        } else {
-          publicDark = storageValue !== 'light';
-        }
-      } else {
-        // No stored preference — default to dark
-        publicDark = true;
-      }
-
-      root.classList.toggle('dark', publicDark);
-      root.style.colorScheme = publicDark ? 'dark' : 'light';
+      // Public/marketing routes: always dark — the design system assumes dark mode.
+      // Ignoring stored preference prevents hybrid light/dark rendering since the
+      // marketing layout hardcodes a .dark ancestor class.
+      root.classList.add('dark');
+      root.style.colorScheme = 'dark';
 
       var metaThemeDark = document.querySelector('meta[name="theme-color"]');
       if (metaThemeDark) {
-        metaThemeDark.setAttribute(
-          'content',
-          publicDark ? '#0a0a0a' : '#ffffff'
-        );
+        metaThemeDark.setAttribute('content', '#0a0a0a');
       }
     }
 

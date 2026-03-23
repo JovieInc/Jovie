@@ -781,17 +781,17 @@ body {
       opacity: 0.9;
     }
   }
-  /* Linear Spacing System - compact vertical rhythm */
+  /* Linear Spacing System — symmetric section padding from tokens */
   .section-spacing-linear {
-    padding-top: clamp(4.5rem, 8vw, 6.5rem);
-    padding-bottom: clamp(4.5rem, 8vw, 6.5rem);
+    padding-top: var(--linear-section-pt-sm);
+    padding-bottom: var(--linear-section-pt-sm);
     @media (min-width: 768px) {
-      padding-top: clamp(5.5rem, 8vw, 7.5rem);
-      padding-bottom: clamp(5.5rem, 8vw, 7.5rem);
+      padding-top: var(--linear-section-pt-md);
+      padding-bottom: var(--linear-section-pt-md);
     }
     @media (min-width: 1024px) {
-      padding-top: clamp(6rem, 7vw, 8rem);
-      padding-bottom: clamp(6rem, 7vw, 8rem);
+      padding-top: var(--linear-section-pt-lg);
+      padding-bottom: var(--linear-section-pb-lg);
     }
   }
   /* Smaller section spacing for tighter groupings */
