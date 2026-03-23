@@ -605,6 +605,22 @@ Jovie/
 └── turbo.json               # Monorepo task configuration
 ```
 
+### Documentation Index
+
+Reference docs for common agent lookups. These are table-driven and answer specific navigation questions:
+
+| Doc | Question It Answers |
+|-----|---------------------|
+| [`docs/SCHEMA_MAP.md`](docs/SCHEMA_MAP.md) | Which schema file defines this table? What are the key relationships? |
+| [`docs/API_ROUTE_MAP.md`](docs/API_ROUTE_MAP.md) | Does an API endpoint already exist for this? What auth does it need? |
+| [`docs/CRON_REGISTRY.md`](docs/CRON_REGISTRY.md) | What scheduled jobs already run? Can I add my logic to an existing one? |
+| [`docs/WEBHOOK_MAP.md`](docs/WEBHOOK_MAP.md) | Which webhooks handle this provider's events? |
+| [`docs/LIB_MODULE_INDEX.md`](docs/LIB_MODULE_INDEX.md) | Which lib module provides the functionality I need? |
+| [`docs/FEATURE_REGISTRY.md`](docs/FEATURE_REGISTRY.md) | What feature flags exist? What are their current states? |
+| [`docs/DB_MIGRATIONS.md`](docs/DB_MIGRATIONS.md) | How do I create/run migrations? What are the invariants? |
+| [`docs/TESTING_GUIDELINES.md`](docs/TESTING_GUIDELINES.md) | Testing philosophy, patterns, and when to write tests |
+| [`docs/DOPPLER_SETUP.md`](docs/DOPPLER_SETUP.md) | How to set up and use Doppler for secrets management |
+
 ### Component Architecture & Dependency Rules
 
 Components follow atomic design with feature-based grouping:
