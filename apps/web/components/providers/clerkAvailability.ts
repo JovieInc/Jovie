@@ -24,15 +24,5 @@ export function getClerkProxyUrl(): string | undefined {
   const browserWindow = globalThis.window;
   if (!browserWindow) return undefined;
 
-  const { hostname } = browserWindow.location;
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname === '[::1]'
-  ) {
-    return undefined;
-  }
-
   return '/clerk';
 }

@@ -43,15 +43,15 @@ describe('clerkAvailability', () => {
     expect(isMockPublishableKey('pk_test_example')).toBe(false);
   });
 
-  it('does not use the Clerk proxy on IPv6 localhost', () => {
+  it('uses the Clerk proxy on IPv6 localhost', () => {
     setTestWindow('::1');
 
-    expect(getClerkProxyUrl()).toBeUndefined();
+    expect(getClerkProxyUrl()).toBe('/clerk');
   });
 
-  it('does not use the Clerk proxy on bracketed IPv6 localhost', () => {
+  it('uses the Clerk proxy on bracketed IPv6 localhost', () => {
     setTestWindow('[::1]');
 
-    expect(getClerkProxyUrl()).toBeUndefined();
+    expect(getClerkProxyUrl()).toBe('/clerk');
   });
 });
