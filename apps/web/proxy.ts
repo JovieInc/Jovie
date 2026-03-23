@@ -12,8 +12,8 @@ import {
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { PROFILE_HOSTNAME } from '@/constants/domains';
-import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import { shouldBypassClerkForRequest } from '@/lib/auth/clerk-middleware-bypass';
+import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
 import {

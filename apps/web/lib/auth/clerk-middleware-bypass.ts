@@ -9,11 +9,12 @@ interface ClerkCookieLike {
   value: string;
 }
 
-function isClerkRequiredPath(
-  pathname: string,
-  pathInfo: ClerkBypassPathInfo
-) {
-  if (pathInfo.isProtectedPath || pathInfo.isAuthPath || pathInfo.isAuthCallbackPath) {
+function isClerkRequiredPath(pathname: string, pathInfo: ClerkBypassPathInfo) {
+  if (
+    pathInfo.isProtectedPath ||
+    pathInfo.isAuthPath ||
+    pathInfo.isAuthCallbackPath
+  ) {
     return true;
   }
 
