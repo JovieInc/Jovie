@@ -7,10 +7,6 @@ const { clerkProviderMock, envState } = vi.hoisted(() => ({
   envState: { clerkMockFlag: '0' },
 }));
 
-vi.mock('@clerk/ui', () => ({
-  ui: { source: 'bundled-clerk-ui' },
-}));
-
 vi.mock('@clerk/nextjs', () => ({
   ClerkProvider: ({ children, ...props }: { children: ReactNode }) => {
     clerkProviderMock(props);
@@ -101,7 +97,6 @@ describe('AuthClientProviders', () => {
       signInFallbackRedirectUrl: APP_ROUTES.DASHBOARD,
       signUpFallbackRedirectUrl: APP_ROUTES.WAITLIST,
       appearance: authClerkAppearance,
-      ui: { source: 'bundled-clerk-ui' },
     });
   });
 });
