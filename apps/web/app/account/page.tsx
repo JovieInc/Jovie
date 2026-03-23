@@ -1,7 +1,12 @@
 import { AccountDashboard } from '@/components/organisms/AccountDashboard';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 
 export default function AccountPage() {
-  return <AccountDashboard />;
+  return (
+    <StandaloneProductPage width='lg'>
+      <AccountDashboard />
+    </StandaloneProductPage>
+  );
 }
 
 export const metadata = {
