@@ -3,12 +3,14 @@
 interface ReleaseTaskProgressBarProps {
   readonly done: number;
   readonly total: number;
+  readonly overdueCount?: number;
   readonly className?: string;
 }
 
 export function ReleaseTaskProgressBar({
   done,
   total,
+  overdueCount = 0,
   className,
 }: ReleaseTaskProgressBarProps) {
   if (total === 0) return null;
@@ -26,6 +28,12 @@ export function ReleaseTaskProgressBar({
         ) : (
           <>
             {done}/{total} done
+            {overdueCount > 0 && (
+              <span className='text-red-400'>
+                {' '}
+                &middot; {overdueCount} overdue
+              </span>
+            )}
           </>
         )}
       </p>

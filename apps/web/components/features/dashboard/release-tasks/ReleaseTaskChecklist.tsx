@@ -10,12 +10,14 @@ import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { ReleaseTaskCategoryGroup } from './ReleaseTaskCategoryGroup';
 import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
 import { ReleaseTaskEmptyState } from './ReleaseTaskEmptyState';
+import { ReleaseTaskPastReleaseState } from './ReleaseTaskPastReleaseState';
 import { ReleaseTaskProgressBar } from './ReleaseTaskProgressBar';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
 
 interface ReleaseTaskChecklistProps {
   readonly releaseId: string;
   readonly variant: 'compact' | 'full';
+  readonly releaseDate?: Date | string | null;
   readonly onNavigateToTask?: (taskId: string) => void;
   readonly onNavigateToFullPage?: () => void;
 }
@@ -38,9 +40,17 @@ function groupByCategory(tasks: ReleaseTaskView[]) {
   return groups;
 }
 
+function isPastRelease(releaseDate?: Date | string | null): boolean {
+  if (!releaseDate) return false;
+  const d =
+    typeof releaseDate === 'string' ? new Date(releaseDate) : releaseDate;
+  return d.getTime() < Date.now();
+}
+
 export function ReleaseTaskChecklist({
   releaseId,
   variant,
+  releaseDate,
   onNavigateToTask,
   onNavigateToFullPage,
 }: ReleaseTaskChecklistProps) {
@@ -55,6 +65,17 @@ export function ReleaseTaskChecklist({
 
   const totalDone = tasks?.filter(t => t.status === 'done').length ?? 0;
   const totalTasks = tasks?.length ?? 0;
+  const overdueCount = useMemo(() => {
+    if (!tasks) return 0;
+    const now = Date.now();
+    return tasks.filter(
+      t =>
+        t.status !== 'done' &&
+        t.status !== 'cancelled' &&
+        t.dueDate &&
+        new Date(t.dueDate).getTime() < now
+    ).length;
+  }, [tasks]);
 
   const handleToggle = (taskId: string, done: boolean) => {
     toggle.mutate({ taskId, done });
@@ -79,10 +100,17 @@ export function ReleaseTaskChecklist({
   if (!tasks || tasks.length === 0) {
     return (
       <div className={variant === 'compact' ? 'px-2 py-2' : ''}>
-        <ReleaseTaskEmptyState
-          onSetUp={() => instantiate.mutate()}
-          isLoading={instantiate.isPending}
-        />
+        {isPastRelease(releaseDate) ? (
+          <ReleaseTaskPastReleaseState
+            onSetUpAnyway={() => instantiate.mutate()}
+            isLoading={instantiate.isPending}
+          />
+        ) : (
+          <ReleaseTaskEmptyState
+            onSetUp={() => instantiate.mutate()}
+            isLoading={instantiate.isPending}
+          />
+        )}
       </div>
     );
   }
@@ -94,6 +122,7 @@ export function ReleaseTaskChecklist({
         <ReleaseTaskProgressBar
           done={totalDone}
           total={totalTasks}
+          overdueCount={overdueCount}
           className='flex-1'
         />
         {variant === 'compact' && onNavigateToFullPage && (
@@ -115,6 +144,7 @@ export function ReleaseTaskChecklist({
             category={category}
             done={group.done}
             total={group.total}
+            allDone={group.done === group.total}
           >
             {group.tasks.map((task: ReleaseTaskView) =>
               variant === 'compact' ? (

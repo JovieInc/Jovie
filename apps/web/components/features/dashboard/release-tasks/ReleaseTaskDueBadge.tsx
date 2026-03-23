@@ -5,21 +5,30 @@ import { DotBadge } from '@/components/atoms/DotBadge';
 interface ReleaseTaskDueBadgeProps {
   readonly dueDate: Date | null;
   readonly dueDaysOffset: number | null;
+  readonly isCompleted?: boolean;
   readonly onSetDate?: () => void;
+}
+
+function formatOverdue(absDays: number): string {
+  if (absDays <= 6) return `${absDays}d overdue`;
+  if (absDays <= 27) return `${Math.round(absDays / 7)}w overdue`;
+  if (absDays <= 364) return `${Math.round(absDays / 30)}mo overdue`;
+  return `${Math.round(absDays / 365)}y overdue`;
 }
 
 function formatRelativeDue(dueDate: Date): {
   label: string;
-  variant: 'future' | 'soon' | 'overdue' | 'today';
+  variant: 'future' | 'soon' | 'overdue' | 'stale' | 'today';
 } {
   const now = new Date();
   const diffMs = dueDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {
+    const absDays = Math.abs(diffDays);
     return {
-      label: `${Math.abs(diffDays)}d overdue`,
-      variant: 'overdue',
+      label: formatOverdue(absDays),
+      variant: absDays > 90 ? 'stale' : 'overdue',
     };
   }
   if (diffDays === 0) {
@@ -44,6 +53,10 @@ const VARIANT_STYLES = {
     className: 'border-red-500/20 bg-red-500/5',
     dotClassName: 'bg-red-500',
   },
+  stale: {
+    className: 'border-zinc-400/20 bg-zinc-400/5',
+    dotClassName: 'bg-zinc-400',
+  },
   today: {
     className: 'border-amber-500/20 bg-amber-500/5',
     dotClassName: 'bg-amber-500',
@@ -53,8 +66,11 @@ const VARIANT_STYLES = {
 export function ReleaseTaskDueBadge({
   dueDate,
   dueDaysOffset,
+  isCompleted,
   onSetDate,
 }: ReleaseTaskDueBadgeProps) {
+  if (isCompleted) return null;
+
   if (!dueDate) {
     if (dueDaysOffset !== null) {
       // Show offset hint when no release date set

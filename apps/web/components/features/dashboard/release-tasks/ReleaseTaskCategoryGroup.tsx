@@ -8,6 +8,7 @@ interface ReleaseTaskCategoryGroupProps {
   readonly total: number;
   readonly children: ReactNode;
   readonly defaultOpen?: boolean;
+  readonly allDone?: boolean;
 }
 
 export function ReleaseTaskCategoryGroup({
@@ -15,9 +16,10 @@ export function ReleaseTaskCategoryGroup({
   done,
   total,
   children,
-  defaultOpen = true,
+  defaultOpen,
+  allDone,
 }: ReleaseTaskCategoryGroupProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [isOpen, setIsOpen] = useState(defaultOpen ?? !allDone);
 
   return (
     <section aria-label={`${category} — ${done} of ${total} complete`}>
@@ -27,11 +29,24 @@ export function ReleaseTaskCategoryGroup({
         className='flex w-full items-center justify-between px-4 py-1.5 text-[13px] font-[510] text-secondary-token hover:bg-surface-1/50 rounded transition-colors'
         aria-expanded={isOpen}
       >
-        <span>
+        <span className='flex items-center gap-1.5'>
           {category}{' '}
           <span className='text-[11px] text-tertiary-token font-normal'>
             ({done}/{total})
           </span>
+          {allDone && (
+            <svg
+              className='h-3 w-3 text-emerald-500'
+              viewBox='0 0 12 12'
+              fill='none'
+              stroke='currentColor'
+              strokeWidth='1.5'
+              aria-hidden='true'
+            >
+              <title>Complete</title>
+              <path d='M2.5 6L5 8.5L9.5 3.5' />
+            </svg>
+          )}
         </span>
         <svg
           className={`h-3 w-3 text-tertiary-token transition-transform ${
