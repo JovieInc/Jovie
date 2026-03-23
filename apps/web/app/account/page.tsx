@@ -1,12 +1,9 @@
-import { AccountDashboard } from '@/components/organisms/AccountDashboard';
-import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+import { redirect } from 'next/navigation';
+import { APP_ROUTES } from '@/constants/routes';
 
+// Account dashboard consolidated into /app/settings/account
 export default function AccountPage() {
-  return (
-    <StandaloneProductPage width='lg'>
-      <AccountDashboard />
-    </StandaloneProductPage>
-  );
+  redirect(APP_ROUTES.SETTINGS_ACCOUNT);
 }
 
 export const metadata = {
