@@ -2,12 +2,12 @@
 
 import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { track } from '@/lib/analytics';
-import { sanitizeRedirectUrl } from '@/lib/auth/constants';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 import { setPlanIntent, validatePlan } from '@/lib/auth/plan-intent';
 import {
   clearSignupClaimValue,
@@ -16,16 +16,6 @@ import {
   SIGNUP_SPOTIFY_EXPECTED_KEY,
   SIGNUP_SPOTIFY_URL_KEY,
 } from '@/lib/auth/signup-claim-storage';
-
-function AuthRoutePrefetch({ href }: { href: string }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.prefetch(href);
-  }, [href, router]);
-
-  return null;
-}
 
 /**
  * Persist pre-signup claim data from the homepage hero into sessionStorage,
@@ -136,17 +126,6 @@ function SignUpClaimDataPersistence() {
   );
 }
 
-function buildSignInUrl(searchParams: { get: (key: string) => string | null }) {
-  const signInUrl = new URL(APP_ROUTES.SIGNIN, globalThis.location.origin);
-  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url'));
-
-  if (redirectUrl) {
-    signInUrl.searchParams.set('redirect_url', redirectUrl);
-  }
-
-  return signInUrl.pathname + signInUrl.search;
-}
-
 function SignUpOauthErrorBanner() {
   const searchParams = useSearchParams();
   const oauthError = searchParams.get('oauth_error');
@@ -184,7 +163,7 @@ function SignUpOauthErrorBanner() {
       {isAccountExists ? (
         <p className='mt-2 text-sm text-secondary-token'>
           <Link
-            href={buildSignInUrl(searchParams)}
+            href={buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams)}
             className='text-primary-token underline focus-ring-themed rounded-md'
           >
             Sign in instead
@@ -196,6 +175,9 @@ function SignUpOauthErrorBanner() {
 }
 
 function SignUpPageContent() {
+  const searchParams = useSearchParams();
+  const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+
   return (
     <>
       <AuthRoutePrefetch href={APP_ROUTES.SIGNIN} />
@@ -204,21 +186,21 @@ function SignUpPageContent() {
       <SignUp
         routing='hash'
         oauthFlow='redirect'
-        signInUrl={APP_ROUTES.SIGNIN}
-        fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
+        signInUrl={signInUrl}
+        fallbackRedirectUrl={APP_ROUTES.WAITLIST}
       />
       <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md text-secondary-token underline transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Privacy Policy
         </Link>

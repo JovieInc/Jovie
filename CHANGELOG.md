@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-
 ## [26.3.47] - 2026-03-23
 
 ### Changed
@@ -31,6 +30,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
+- Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
+- Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
 - Added shared standalone product shells, redirect surfaces, and loading-state primitives to align non-marketing product routes with the Linear-inspired app system
 - Added typed dashboard activity-feed normalization and regression tests so stale emoji payloads safely coerce to supported icons
 
@@ -41,6 +42,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Theme Clerk's prebuilt auth UI to match Jovie dark mode and bundle the Core 3 UI assets through the auth provider instead of falling back to the stock dark styling
+- Route post-signup users through the canonical waitlist and onboarding gate so waitlist-state users no longer fall into onboarding and see the flow flip underneath them
+- Preserve redirect-aware auth navigation while hardening mock and misconfigured Clerk fallback handling, provider config, and related auth smoke coverage
 - Prevent delayed public-link redirects from firing after unmount and restore standalone billing success scrolling with accessible verification feedback
 - [internal] Fix Vercel preview builds by matching App Router function globs and keep PR smoke runs on the fast E2E iteration path
 - [internal] Normalize CalVer release metadata by syncing `version.json`, workspace package versions, and the changelog head

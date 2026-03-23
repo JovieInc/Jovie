@@ -240,7 +240,29 @@ async function ensureSocialLink(
     return;
   }
 
-  await db.insert(socialLinks).values(values);
+  try {
+    await db.insert(socialLinks).values(values);
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
+
+    const [racedLink] = await db
+      .select({ id: socialLinks.id })
+      .from(socialLinks)
+      .where(
+        and(
+          eq(socialLinks.creatorProfileId, values.creatorProfileId),
+          eq(socialLinks.platform, values.platform)
+        )
+      )
+      .limit(1);
+
+    if (!racedLink) throw error;
+
+    await db
+      .update(socialLinks)
+      .set({ ...values, updatedAt: new Date() })
+      .where(eq(socialLinks.id, racedLink.id));
+  }
 }
 
 /** Track template for seeding */
