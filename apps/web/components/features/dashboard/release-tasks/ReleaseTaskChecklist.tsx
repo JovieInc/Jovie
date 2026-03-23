@@ -7,12 +7,15 @@ import {
 } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { toDateOnlySafe } from '@/lib/utils/date';
 import { ReleaseTaskCategoryGroup } from './ReleaseTaskCategoryGroup';
 import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
 import { ReleaseTaskEmptyState } from './ReleaseTaskEmptyState';
 import { ReleaseTaskPastReleaseState } from './ReleaseTaskPastReleaseState';
 import { ReleaseTaskProgressBar } from './ReleaseTaskProgressBar';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
+
+const DAY_MS = 1000 * 60 * 60 * 24;
 
 interface ReleaseTaskChecklistProps {
   readonly releaseId: string;
@@ -40,16 +43,19 @@ function groupByCategory(tasks: ReleaseTaskView[]) {
   return groups;
 }
 
-function isPastRelease(releaseDate?: Date | string | null): boolean {
-  if (!releaseDate) return false;
-  const d =
-    typeof releaseDate === 'string' ? new Date(releaseDate) : releaseDate;
-  return d.getTime() < Date.now();
+function parseCalendarDate(value: Date | string): Date {
+  const [year, month, day] = toDateOnlySafe(value).split('-').map(Number);
+  return new Date(year, month - 1, day);
 }
 
 function getRelativeDueDays(dueDate: Date | string): number {
-  const due = typeof dueDate === 'string' ? new Date(dueDate) : dueDate;
-  return Math.ceil((due.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const due = parseCalendarDate(dueDate);
+  return Math.ceil((due.getTime() - Date.now()) / DAY_MS);
+}
+
+function isPastRelease(releaseDate?: Date | string | null): boolean {
+  if (!releaseDate) return false;
+  return getRelativeDueDays(releaseDate) < 0;
 }
 
 export function ReleaseTaskChecklist({
