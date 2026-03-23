@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AiDemo } from '@/features/home/AiDemo';
-import { AnalyticsSection } from '@/features/home/AnalyticsSection';
+
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
@@ -231,9 +231,6 @@ export default function HomePage() {
 
       {/* 4.0 AI */}
       <AiSection />
-
-      {/* 5.0 Analytics */}
-      <AnalyticsSection />
 
       {/* Pricing — must show before CTA for conversion */}
       <PricingSection />
