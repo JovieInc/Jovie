@@ -18,6 +18,7 @@ import { db } from '@/lib/db';
 import { tipAudience } from '@/lib/db/schema/tip-audience';
 import { verifyOptInToken } from '@/lib/email/opt-in-token';
 import { captureError } from '@/lib/error-tracking';
+import { generalLimiter, getClientIP } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -33,6 +34,12 @@ const optInBodySchema = z.object({
  */
 export async function POST(req: NextRequest) {
   try {
+    const ip = getClientIP(req);
+    const rl = await generalLimiter.limit(ip);
+    if (!rl.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    }
+
     const body = await req.json();
     const parsed = optInBodySchema.safeParse(body);
 
@@ -95,6 +102,18 @@ export async function POST(req: NextRequest) {
  */
 export async function GET(req: NextRequest) {
   try {
+    const ip = getClientIP(req);
+    const rl = await generalLimiter.limit(ip);
+    if (!rl.success) {
+      return new NextResponse(
+        buildHtmlPage('Too Many Requests', 'Please try again later.'),
+        {
+          status: 429,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
 

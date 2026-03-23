@@ -7,7 +7,12 @@
  */
 
 import { BASE_URL } from '@/constants/domains';
-import { deriveSecretLegacy, signPayload, verifyToken } from './hmac-token';
+import {
+  deriveSecretLegacy,
+  MAC_HEX_LENGTH_LEGACY,
+  signPayload,
+  verifyToken,
+} from './hmac-token';
 
 /**
  * Generate an unsubscribe token for an email address.
@@ -17,7 +22,7 @@ import { deriveSecretLegacy, signPayload, verifyToken } from './hmac-token';
 export function generateUnsubscribeToken(email: string): string | null {
   const secret = deriveSecretLegacy();
   const normalizedEmail = email.toLowerCase().trim();
-  return signPayload(normalizedEmail, secret);
+  return signPayload(normalizedEmail, secret, MAC_HEX_LENGTH_LEGACY);
 }
 
 /**
@@ -26,7 +31,7 @@ export function generateUnsubscribeToken(email: string): string | null {
  */
 export function verifyUnsubscribeToken(token: string): string | null {
   const secret = deriveSecretLegacy();
-  const payload = verifyToken(token, secret);
+  const payload = verifyToken(token, secret, MAC_HEX_LENGTH_LEGACY);
   if (!payload) return null;
   if (!payload.includes('@')) return null;
   return payload;

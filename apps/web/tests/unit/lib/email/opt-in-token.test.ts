@@ -53,7 +53,7 @@ describe('opt-in-token', () => {
       const token = generateOptInToken('a@b.com', 'pid');
       expect(token).toBeTruthy();
       const [payload] = token!.split('.');
-      const tampered = `${payload}.0000000000000000`;
+      const tampered = `${payload}.${'0'.repeat(32)}`;
 
       expect(verifyOptInToken(tampered)).toBeNull();
     });
@@ -73,13 +73,13 @@ describe('opt-in-token', () => {
       const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
       // Manually craft a base64url payload with no @ in email portion
       const payload = Buffer.from('noemail:pid').toString('base64url');
-      expect(verifyOptInToken(`${payload}.0000000000000000`)).toBeNull();
+      expect(verifyOptInToken(`${payload}.${'0'.repeat(32)}`)).toBeNull();
     });
 
     it('rejects a token where payload has no colon separator', async () => {
       const { verifyOptInToken } = await import('@/lib/email/opt-in-token');
       const payload = Buffer.from('nocolon').toString('base64url');
-      expect(verifyOptInToken(`${payload}.0000000000000000`)).toBeNull();
+      expect(verifyOptInToken(`${payload}.${'0'.repeat(32)}`)).toBeNull();
     });
   });
 

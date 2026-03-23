@@ -5,7 +5,12 @@
  */
 
 import { APP_URL } from '@/constants/app';
-import { deriveSecret, signPayload, verifyToken } from './hmac-token';
+import {
+  deriveSecret,
+  MAC_HEX_LENGTH_LEGACY,
+  signPayload,
+  verifyToken,
+} from './hmac-token';
 
 const CONFIRM_DOMAIN = 'jovie:subscribe-confirm-token-secret';
 
@@ -19,7 +24,11 @@ export function generateSubscribeConfirmToken(
 ): string | null {
   const secret = deriveSecret(CONFIRM_DOMAIN);
   const normalizedEmail = email.toLowerCase().trim();
-  return signPayload(`${subscriptionId}:${normalizedEmail}`, secret);
+  return signPayload(
+    `${subscriptionId}:${normalizedEmail}`,
+    secret,
+    MAC_HEX_LENGTH_LEGACY
+  );
 }
 
 /**
@@ -30,7 +39,7 @@ export function verifySubscribeConfirmToken(
   token: string
 ): { subscriptionId: string; email: string } | null {
   const secret = deriveSecret(CONFIRM_DOMAIN);
-  const payload = verifyToken(token, secret);
+  const payload = verifyToken(token, secret, MAC_HEX_LENGTH_LEGACY);
   if (!payload) return null;
 
   const colonIndex = payload.indexOf(':');
