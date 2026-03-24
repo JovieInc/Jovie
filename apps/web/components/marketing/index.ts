@@ -1,3 +1,4 @@
+export { FaqSection } from './FaqSection';
 export { FeatureAccordion } from './FeatureAccordion';
 export type { FigCardProps } from './FigCard';
 export { FigCard } from './FigCard';

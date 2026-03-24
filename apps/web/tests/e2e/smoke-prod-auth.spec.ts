@@ -13,7 +13,7 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * 2. Dashboard loads with real data (not empty state)
  * 3. Navigation between key tabs works
  *
- * Max ~30s total. No golden path, no content gate, no admin tests.
+ * Max ~2min total. No golden path, no content gate, no admin tests.
  *
  * @production-smoke
  */
@@ -50,6 +50,7 @@ async function waitForClerk(page: Page): Promise<void> {
   await page
     .waitForFunction(
       () => !!(window as { Clerk?: { loaded?: boolean } }).Clerk?.loaded,
+      undefined,
       {
         timeout: 30_000,
       }
@@ -109,6 +110,7 @@ async function detectNextStep(page: Page): Promise<SignInNextStep> {
         }
         return false;
       },
+      undefined,
       { timeout: 15_000 }
     )
     .then(handle => handle.jsonValue() as Promise<SignInNextStep>)

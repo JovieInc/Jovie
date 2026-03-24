@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
+import { ProfileRedirectSurface } from '@/components/features/profile/ProfileRedirectSurface';
+import { getProfileModeHref } from '@/features/profile/registry';
 
 interface Props {
   readonly params: Promise<{
@@ -14,21 +16,27 @@ export default function TipPage({ params }: Readonly<Props>) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Get the username from params and redirect
+    let cancelled = false;
+
     params.then(({ username }) => {
+      if (cancelled) {
+        return;
+      }
+
       const source = searchParams?.get('source');
-      const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
-      router.replace(`/${username}?mode=tip${sourceParam}`);
+      const sourceSuffix = source ? 'source=' + encodeURIComponent(source) : '';
+      router.replace(getProfileModeHref(username, 'tip', sourceSuffix));
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [params, router, searchParams]);
 
-  // Show loading while redirecting
   return (
-    <div className='flex items-center justify-center min-h-screen'>
-      <div className='text-center'>
-        <div className='animate-spin motion-reduce:animate-none rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-white mx-auto mb-4' />
-        <p className='text-gray-600 dark:text-gray-400'>Redirecting...</p>
-      </div>
-    </div>
+    <ProfileRedirectSurface
+      title='Opening tip flow'
+      description='Loading the tipping view for this profile.'
+    />
   );
 }

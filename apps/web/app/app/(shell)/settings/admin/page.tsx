@@ -1,22 +1,31 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { APP_ROUTES } from '@/constants/routes';
-import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+import { SettingsAdminSection } from '@/features/dashboard/organisms/SettingsAdminSection';
+import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
-export const runtime = 'nodejs';
+export default function SettingsAdminPage() {
+  const { isAdmin } = useDashboardData();
+  const router = useRouter();
 
-export default async function SettingsAdminPage() {
-  const { userId } = await getCachedAuth();
+  useEffect(() => {
+    if (!isAdmin) {
+      router.replace(APP_ROUTES.SETTINGS_ARTIST_PROFILE);
+    }
+  }, [isAdmin, router]);
 
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/admin`);
-  }
+  if (!isAdmin) return null;
 
-  const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  return <DashboardSettings focusSection='admin' />;
+  return (
+    <SettingsSection
+      id='admin'
+      title='Admin'
+      description='Dev toolbar, waitlist controls, campaign targeting, and admin quick links.'
+    >
+      <SettingsAdminSection />
+    </SettingsSection>
+  );
 }
