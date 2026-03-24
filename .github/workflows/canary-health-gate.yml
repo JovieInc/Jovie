@@ -10,6 +10,10 @@ on:
         description: Base URL for the deployment to verify.
         required: true
         type: string
+      commit_sha:
+        description: Git commit SHA for the deployment.
+        required: true
+        type: string
       fallback_health_url:
         description: Fallback health check endpoint if the deployment URL is rate-limited.
         required: true
@@ -46,13 +50,69 @@ jobs:
         env:
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          COMMIT_SHA: ${{ inputs.commit_sha }}
           FALLBACK_HEALTH_URL: ${{ inputs.fallback_health_url }}
           WAIT_SECONDS: ${{ inputs.wait_seconds }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           echo "Running canary health check..."
           deployment_url="${DEPLOYMENT_URL}"
-          health_url_primary="${deployment_url%/}/api/health"
           health_url_fallback="${FALLBACK_HEALTH_URL}"
+
+          if [ -z "$deployment_url" ]; then
+            echo "⚠ deployment_url missing from upstream outputs; resolving from Vercel API..."
+            deployment_url="$(python - <<'PY'
+            import json
+            import os
+            import sys
+            import urllib.parse
+            import urllib.request
+
+            token = os.environ.get("VERCEL_TOKEN", "")
+            project_id = os.environ.get("VERCEL_PROJECT_ID", "")
+            commit_sha = os.environ.get("COMMIT_SHA", "")
+
+            if not token or not project_id or not commit_sha:
+                print("", end="")
+                sys.exit(0)
+
+            base_url = "https://api.vercel.com/v6/deployments"
+            query = urllib.parse.urlencode(
+                {
+                    "projectId": project_id,
+                    "target": "production",
+                    "state": "READY",
+                    "limit": 20,
+                }
+            )
+            request = urllib.request.Request(
+                f"{base_url}?{query}",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+            with urllib.request.urlopen(request, timeout=15) as response:
+                payload = json.load(response)
+
+            for deployment in payload.get("deployments", []):
+                meta = deployment.get("meta") or {}
+                if meta.get("githubCommitSha") == commit_sha:
+                    print(f"https://{deployment['url']}")
+                    break
+            PY
+            )"
+          fi
+
+          if [ -z "$deployment_url" ]; then
+            echo "❌ Canary failed: could not resolve deployment URL from inputs or Vercel API."
+            echo "canary_status=failed" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          if [[ "$health_url_fallback" = /* ]]; then
+            health_url_fallback="${deployment_url%/}${health_url_fallback}"
+          fi
+
+          health_url_primary="${deployment_url%/}/api/health"
           health_url="$health_url_primary"
 
           # Wait a moment for deployment to be ready

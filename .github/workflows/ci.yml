@@ -2454,7 +2454,8 @@ jobs:
     uses: ./.github/workflows/canary-health-gate.yml
     with:
       deployment_url: ${{ needs.deploy-staging.outputs.canary_url }}
-      fallback_health_url: ${{ format('{0}/api/health', needs.deploy-staging.outputs.deploy_url) }}
+      commit_sha: ${{ github.sha }}
+      fallback_health_url: /api/health
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
