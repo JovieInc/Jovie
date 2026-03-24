@@ -2,6 +2,7 @@
 
 import * as Switch from '@radix-ui/react-switch';
 import {
+  ArrowUpCircle,
   Check,
   ChevronDown,
   ChevronUp,
@@ -144,6 +145,13 @@ export function DevToolbar({
   const [clearSessionState, setClearSessionState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
+  const [promoteState, setPromoteState] = useState<
+    'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
+  >('idle');
+  const [promoteSha, setPromoteSha] = useState<{
+    staging: string;
+    prod: string;
+  } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useLocalOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -197,6 +205,61 @@ export function DevToolbar({
       document.body.style.paddingBottom = '';
     };
   }, [open, hidden]);
+
+  // Poll deploy status for promote button (preview only)
+  useEffect(() => {
+    if (env !== 'preview') return;
+    let active = true;
+
+    async function checkStatus() {
+      try {
+        setPromoteState(prev => (prev === 'idle' ? 'checking' : prev));
+        const res = await fetch('/api/deploy/status');
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (!active) return;
+        setPromoteSha({
+          staging: data.stagingSha,
+          prod: data.prodSha,
+        });
+        setPromoteState(prev =>
+          prev === 'promoting' || prev === 'done'
+            ? prev
+            : data.needsPromote
+              ? 'ready'
+              : 'idle'
+        );
+      } catch {
+        // Silent fail — status is best-effort
+      }
+    }
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 30_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [env]);
+
+  async function handlePromote() {
+    setPromoteState('promoting');
+    try {
+      const res = await fetch('/api/deploy/promote', { method: 'POST' });
+      if (res.ok) {
+        setPromoteState('done');
+        setTimeout(() => setPromoteState('idle'), 120_000);
+      } else if (res.status === 429) {
+        setPromoteState('ready');
+      } else {
+        setPromoteState('error');
+        setTimeout(() => setPromoteState('ready'), 3000);
+      }
+    } catch {
+      setPromoteState('error');
+      setTimeout(() => setPromoteState('ready'), 3000);
+    }
+  }
 
   function toggleOpen() {
     setOpen(prev => {
@@ -610,6 +673,57 @@ export function DevToolbar({
               </span>
             </button>
           )}
+
+          {/* Promote to production — preview only */}
+          {env === 'preview' &&
+            promoteState !== 'idle' &&
+            promoteState !== 'checking' && (
+              <>
+                <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+                <button
+                  type='button'
+                  onClick={handlePromote}
+                  disabled={
+                    promoteState === 'promoting' || promoteState === 'done'
+                  }
+                  title={
+                    promoteSha
+                      ? `Promote ${promoteSha.staging} → prod (currently ${promoteSha.prod})`
+                      : 'Promote to production'
+                  }
+                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    promoteState === 'done'
+                      ? 'text-[var(--color-accent)]'
+                      : promoteState === 'error'
+                        ? 'text-red-400'
+                        : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                  }`}
+                  aria-label='Promote to production'
+                >
+                  {promoteState === 'promoting' ? (
+                    <Loader2 size={11} className='animate-spin' />
+                  ) : promoteState === 'done' ? (
+                    <Check size={11} />
+                  ) : (
+                    <ArrowUpCircle size={11} />
+                  )}
+                  <span className='hidden sm:inline text-[10px]'>
+                    {promoteState === 'promoting'
+                      ? 'Deploying...'
+                      : promoteState === 'done'
+                        ? 'Deployed!'
+                        : promoteState === 'error'
+                          ? 'Failed'
+                          : 'Promote'}
+                  </span>
+                  {promoteState === 'ready' && promoteSha && (
+                    <span className='hidden md:inline text-[9px] opacity-60'>
+                      {promoteSha.staging}→{promoteSha.prod}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
 
           <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
 
