@@ -149,9 +149,20 @@ export function buildArticleSchema(overrides: {
   datePublished: string;
   dateModified?: string;
   authorName: string;
+  authorUrl?: string;
+  authorImageUrl?: string;
   url: string;
   image?: string;
+  keywords?: string[];
+  wordCount?: number;
 }) {
+  const author: Record<string, unknown> = {
+    '@type': 'Person',
+    name: overrides.authorName,
+  };
+  if (overrides.authorUrl) author.url = overrides.authorUrl;
+  if (overrides.authorImageUrl) author.image = overrides.authorImageUrl;
+
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -161,14 +172,34 @@ export function buildArticleSchema(overrides: {
     dateModified: overrides.dateModified ?? overrides.datePublished,
     url: overrides.url,
     mainEntityOfPage: { '@type': 'WebPage', '@id': overrides.url },
-    author: {
-      '@type': 'Person',
-      name: overrides.authorName,
-    },
+    author,
     publisher: {
       '@id': SCHEMA_IDS.organization,
     },
     image: overrides.image ?? `${APP_URL}/og/default.png`,
+    ...(overrides.keywords?.length
+      ? { keywords: overrides.keywords.join(', ') }
+      : {}),
+    ...(overrides.wordCount ? { wordCount: overrides.wordCount } : {}),
+  });
+}
+
+/** Build a Person schema for author pages */
+export function buildPersonSchema(overrides: {
+  name: string;
+  url: string;
+  image?: string;
+  description?: string;
+  sameAs?: string[];
+}) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    name: overrides.name,
+    url: overrides.url,
+    ...(overrides.image ? { image: overrides.image } : {}),
+    ...(overrides.description ? { description: overrides.description } : {}),
+    ...(overrides.sameAs?.length ? { sameAs: overrides.sameAs } : {}),
   });
 }
 

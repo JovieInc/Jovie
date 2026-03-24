@@ -11,12 +11,15 @@ const BLOG_DIRECTORY = path.join(process.cwd(), 'content', 'blog');
 export interface BlogPostMetadata {
   title: string;
   date: string;
+  updatedDate?: string;
   author: string;
   authorUsername?: string;
   authorTitle?: string;
   authorProfile?: string;
   category?: string;
+  tags: string[];
   excerpt: string;
+  readingTime: number;
 }
 
 export interface BlogPost extends MarkdownDocument, BlogPostMetadata {
@@ -28,6 +31,56 @@ export interface BlogPostSummary extends BlogPostMetadata {
 }
 
 const DEFAULT_AUTHOR = 'Jovie';
+
+/** Calculate reading time in minutes (238 WPM average) */
+function calculateReadingTime(content: string): number {
+  const text = content
+    .replaceAll(/^---[\s\S]*?---/g, '') // strip frontmatter
+    .replaceAll(/```[\s\S]*?```/g, '') // strip code blocks
+    .replaceAll(/[#*_`>\[\]()!|-]/g, '') // strip markdown syntax
+    .trim();
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(wordCount / 238));
+}
+
+/** Parse comma-separated tags from frontmatter string */
+function parseTags(tagsString?: string): string[] {
+  if (!tagsString) return [];
+  return tagsString
+    .split(',')
+    .map(tag => tag.trim())
+    .filter(Boolean);
+}
+
+/** Slugify a category name for URL use */
+export function slugifyCategory(category: string): string {
+  return category
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9\s-]/g, '')
+    .replaceAll(/\s+/g, '-')
+    .replaceAll(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+/** Get related posts by category match, then by recency */
+export async function getRelatedPosts(
+  slug: string,
+  category?: string,
+  limit = 2
+): Promise<BlogPostSummary[]> {
+  const allPosts = await getBlogPosts();
+  const otherPosts = allPosts.filter(p => p.slug !== slug);
+
+  if (otherPosts.length === 0) return [];
+
+  // Prioritize same category, then by date
+  const sameCategoryPosts = category
+    ? otherPosts.filter(p => p.category === category)
+    : [];
+  const remainingPosts = otherPosts.filter(p => !sameCategoryPosts.includes(p));
+
+  return [...sameCategoryPosts, ...remainingPosts].slice(0, limit);
+}
 
 function createExcerpt(content: string): string {
   const safeContent = content.slice(0, 20000);
@@ -74,12 +127,15 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     slug,
     title: data.title ?? formatTitleFromSlug(slug),
     date: data.date ?? new Date().toISOString().split('T')[0],
+    updatedDate: data.updatedDate,
     author: data.author ?? DEFAULT_AUTHOR,
     authorUsername: data.authorUsername,
     authorTitle: data.authorTitle,
     authorProfile: data.authorProfile,
     category: data.category,
+    tags: parseTags(data.tags),
     excerpt,
+    readingTime: calculateReadingTime(content),
     ...doc,
   };
 }
@@ -102,12 +158,15 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         slug,
         title: data.title ?? formatTitleFromSlug(slug),
         date: data.date ?? new Date().toISOString().split('T')[0],
+        updatedDate: data.updatedDate,
         author: data.author ?? DEFAULT_AUTHOR,
         authorUsername: data.authorUsername,
         authorTitle: data.authorTitle,
         authorProfile: data.authorProfile,
         category: data.category,
+        tags: parseTags(data.tags),
         excerpt: createExcerpt(content),
+        readingTime: calculateReadingTime(content),
       };
     })
   );
