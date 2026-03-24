@@ -52,7 +52,7 @@
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
   --linear-bg-page: oklch(98.5% 0.002 282);
-  --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
+  --linear-bg-header: oklch(98.5% 0.002 282 / 0.85);
   --linear-bg-surface-0: oklch(100% 0 0);
   /* Pure white — elevated surfaces (menus, popovers, cards) */
   --linear-bg-surface-1: oklch(97% 0.002 282);
@@ -311,11 +311,11 @@
      ============================================ */
   --linear-h1-size-sm: 38px;
   --linear-h1-size-md: 56px;
-  --linear-h1-size-lg: 76px;
+  /* --linear-h1-size-lg removed: Linear caps H1 at 64px (--linear-h1-size), never 76px */
   --linear-h2-size-sm: 24px;
   --linear-h2-size-md: 36px;
   --linear-h2-size-xl: 48px;
-  --linear-h2-size-lg: 56px;
+  /* --linear-h2-size-lg removed: Linear caps H2 at 48px (--linear-h2-size), never 56px */
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
 }
