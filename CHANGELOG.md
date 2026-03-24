@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.49] - 2026-03-23
+
+### Changed
+
+- Migrated investor portal from subdomain (`investors.jov.ie`) to path-based auth (`/investor-portal`)
+- Legacy subdomain now 301 redirects to `/investor-portal`, preserving token params
+- Replaced emoji-based deck navigation with Lucide icons (ChevronLeft/Right, Download, Maximize2)
+- Added touch swipe support and slide dot navigation to pitch deck viewer
+- Implemented mobile hamburger slide-out sheet navigation for investor portal
+- Improved responsive typography and padding across deck viewer and memo content
+- Added loading skeleton for investor memo pages
+- Token display in admin investor table now shows truncated token with copy-to-clipboard
+
+### Removed
+
+- Removed subdomain-based token validation from investor page components (now handled by middleware)
+- Removed duplicate `requireInvestorAccess` from layout (middleware is single source of truth)
+
+### Fixed
+
+- Added top padding on mobile to prevent content hiding behind fixed header
+- Added `dark` class to investor respond page containers for consistent theming
+- Fixed sticky bar button layout for proper mobile stacking
+
 ## [26.4.48] - 2026-03-23
 
 ### Fixed
