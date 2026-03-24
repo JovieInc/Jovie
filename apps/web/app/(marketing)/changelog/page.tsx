@@ -91,7 +91,7 @@ const SECTION_LABELS: Record<
 // ---------------------------------------------------------------------------
 
 export const metadata: Metadata = {
-  title: `What's New | ${APP_NAME}`,
+  title: "What's New",
   description: `Product updates and improvements to ${APP_NAME}. See what we've been shipping.`,
   alternates: {
     canonical: `${APP_URL}/changelog`,

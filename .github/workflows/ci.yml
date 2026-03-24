@@ -2384,8 +2384,8 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
-      - name: Build (production)
-        run: vercel build --prod --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Build (production, preview target for staging deploy)
+        run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0

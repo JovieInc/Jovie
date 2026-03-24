@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
 // Full SSG - markdown content is read at build time, no runtime regeneration needed
 export const dynamic = 'force-static';
 
 export const metadata: Metadata = {
-  title: `Privacy Policy | ${APP_NAME}`,
+  title: 'Privacy Policy',
   description:
     'We collect only what is essential, guard it with modern controls, and keep you in the loop about every change.',
   alternates: {
