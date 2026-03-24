@@ -92,7 +92,13 @@ export default async function AuthorPage({
     url: `${APP_URL}/blog/authors/${username}`,
     image: author.avatarUrl ?? undefined,
     description: author.bio,
-    sameAs: author.profileUrl ? [`${APP_URL}${author.profileUrl}`] : [],
+    sameAs: author.profileUrl
+      ? [
+          author.profileUrl.startsWith('http')
+            ? author.profileUrl
+            : `${APP_URL}${author.profileUrl}`,
+        ]
+      : [],
   });
 
   const breadcrumbSchema = buildBreadcrumbSchema([
