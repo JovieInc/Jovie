@@ -2410,6 +2410,8 @@ jobs:
               "DOPPLER_TOKEN_DEV", "DOPPLER_TOKEN_STG", "DOPPLER_TOKEN_PRD",
               "JOVIE_BOT_PRIVATE_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
               "NEON_API_KEY",
+              # Canary gate bypass — CI-only, not needed at app runtime
+              "VERCEL_AUTOMATION_BYPASS_SECRET",
               # E2E test credentials — only needed in CI test runners
               "E2E_CLERK_USER_USERNAME", "E2E_CLERK_USER_PASSWORD",
               "PLAYWRIGHT_TEST_BASE_URL",
