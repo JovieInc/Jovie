@@ -33,11 +33,10 @@ export function resolveBunPath(): string {
   }
   const home = process.env.HOME || process.env.USERPROFILE;
   const bunBin = IS_WINDOWS ? 'bun.exe' : 'bun';
-  const candidates = home ? [
-    path.join(home, '.bun', 'bin', bunBin),
-    '/usr/local/bin/bun',
-    '/opt/homebrew/bin/bun',
-  ] : ['/usr/local/bin/bun', '/opt/homebrew/bin/bun'];
+  const unixPaths = IS_WINDOWS ? [] : ['/usr/local/bin/bun', '/opt/homebrew/bin/bun'];
+  const candidates = home
+    ? [path.join(home, '.bun', 'bin', bunBin), ...unixPaths]
+    : unixPaths;
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }

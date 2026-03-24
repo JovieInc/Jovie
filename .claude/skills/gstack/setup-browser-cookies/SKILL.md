@@ -336,7 +336,7 @@ If Keychain access doesn't cooperate, you can export cookies manually:
 3. Export cookies for that domain as JSON
 4. Save to a unique temp file with restricted permissions:
    ```bash
-   COOKIE_FILE="$(mktemp /tmp/gstack-cookies.XXXXXX.json)" && chmod 600 "$COOKIE_FILE"
+   COOKIE_FILE="/tmp/gstack-cookies-$$.json" && touch "$COOKIE_FILE" && chmod 600 "$COOKIE_FILE"
    ```
 5. Import them directly:
 
