@@ -7,7 +7,7 @@
 import { and, desc, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import type { withDbSessionTx } from '@/lib/auth/session';
 import { users } from '@/lib/db/schema/auth';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import type { CompletionResult, CreatorProfile } from './types';
 
@@ -95,6 +95,16 @@ export async function createProfileForExistingUser(
         .update(users)
         .set({ activeProfileId: profile.id, updatedAt: new Date() })
         .where(eq(users.id, userId));
+
+      // Insert userProfileClaims row for canonical ownership tracking
+      await tx
+        .insert(userProfileClaims)
+        .values({
+          userId,
+          creatorProfileId: profile.id,
+          role: 'owner',
+        })
+        .onConflictDoNothing();
     }
 
     return {
