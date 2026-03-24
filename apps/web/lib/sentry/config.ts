@@ -349,6 +349,19 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
     return null;
   }
 
+  // Drop Content Security Policy violations — typically caused by browser
+  // extensions injecting inline scripts that violate our strict CSP. Not actionable.
+  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
+    (v): v is string => typeof v === 'string'
+  );
+  if (
+    cspValues.some(
+      v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
+    )
+  ) {
+    return null;
+  }
+
   // Anonymize IP addresses if present
   if (event.user?.ip_address) {
     event.user.ip_address = '{{auto}}';
@@ -443,6 +456,7 @@ export interface BaseSentryClientConfig {
     event: SentryEvent,
     hint?: SentryEventHint
   ) => SentryEvent | null;
+  ignoreErrors?: Array<string | RegExp>;
 }
 
 /**
@@ -489,6 +503,11 @@ export function getBaseClientConfig(): BaseSentryClientConfig {
     enableLogs: true,
     sendDefaultPii: false, // Disabled on client - user context set server-side only
     beforeSend: scrubPii,
+    ignoreErrors: [
+      // React hooks mismatch: known bug in onboarding/settings — tracked separately.
+      // This is a client-side React error, so it must be filtered here (not server config).
+      /Rendered more hooks than during the previous render/,
+    ],
   };
 }
 

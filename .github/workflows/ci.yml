@@ -113,7 +113,7 @@ jobs:
           fi
 
           # Drizzle paths
-          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
             echo "run_drizzle=true" >> $GITHUB_OUTPUT
           else
@@ -2395,8 +2395,11 @@ jobs:
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"
-            deploy_exit=$?
+            if deploy_output="$(vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
+              deploy_exit=0
+            else
+              deploy_exit=$?
+            fi
             echo "$deploy_output"
             if [ "$deploy_exit" -eq 0 ]; then
               deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"

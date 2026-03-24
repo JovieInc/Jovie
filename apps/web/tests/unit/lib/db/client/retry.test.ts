@@ -156,4 +156,19 @@ describe('withRetry', () => {
     // Non-retryable: captured as Sentry exception immediately
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
   });
+
+  it('logs exhausted retryable failures as breadcrumbs, not Sentry exceptions', async () => {
+    const operation = vi.fn(async () => {
+      throw new Error('connection reset by peer');
+    });
+
+    await expect(
+      withRetry(operation, 'test-retryable-exhaust', 2)
+    ).rejects.toThrow('connection reset by peer');
+
+    // Retryable errors should be breadcrumbs even on final failure —
+    // circuit breaker handles the aggregate alert
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalled();
+  });
 });

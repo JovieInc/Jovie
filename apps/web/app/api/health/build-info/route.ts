@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NextResponse } from 'next/server';
-import { captureWarning } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,14 +18,11 @@ export function GET() {
         join(process.cwd(), '.next/BUILD_ID'),
         'utf-8'
       ).trim();
-    } catch (error) {
+    } catch {
       if (isDevelopment) {
         _cachedBuildId = 'development';
       } else {
-        void captureWarning('Build info health check failed', error, {
-          service: 'build-info',
-          route: '/api/health/build-info',
-        });
+        console.warn('[build-info] BUILD_ID not found — using fallback');
         _cachedBuildId = 'unknown';
       }
     }
