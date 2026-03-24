@@ -162,6 +162,14 @@ jobs:
               continue
             fi
 
+            if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
+              sleep_seconds=$((attempt * 10))
+              echo "⚠ Canary got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+              continue
+            fi
+
             echo "❌ Canary failed: HTTP $response_code"
             echo "canary_status=failed" >> "$GITHUB_OUTPUT"
             exit 1
@@ -189,6 +197,14 @@ jobs:
                   sleep_seconds=$((attempt * 15))
                   echo "⚠ Canary fallback got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
                   echo "429 response preview: ${body_preview}"
+                  sleep "$sleep_seconds"
+                  attempt=$((attempt + 1))
+                  continue
+                fi
+
+                if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
+                  sleep_seconds=$((attempt * 15))
+                  echo "⚠ Canary fallback got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
                   sleep "$sleep_seconds"
                   attempt=$((attempt + 1))
                   continue

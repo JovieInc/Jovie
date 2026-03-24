@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.56] - 2026-03-24
+
+### Fixed
+
+- Auth pages missing Inter font features (`cv01`, `ss03`) on Clerk-rendered elements — added `font-feature-settings` to auth root CSS
+- Blank screen flash on signin/signup while Clerk JS loads — replaced `Suspense fallback={null}` with skeleton loading state
+- ToS and Privacy Policy links on signup too small for mobile tap targets — added vertical padding
+
 ## [26.4.55] - 2026-03-24
 
 ### Fixed

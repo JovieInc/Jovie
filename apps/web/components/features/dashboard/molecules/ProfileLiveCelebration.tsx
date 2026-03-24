@@ -143,7 +143,10 @@ export function ProfileLiveCelebration({
       }
 
       const first = tabbable[0];
-      const last = tabbable.at(-1)!;
+      const last = tabbable[tabbable.length - 1];
+      if (!last) {
+        return;
+      }
 
       if (event.shiftKey && globalThis.document.activeElement === first) {
         event.preventDefault();

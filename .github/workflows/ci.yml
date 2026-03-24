@@ -1085,7 +1085,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           URL_ENCRYPTION_KEY: ${{ secrets.URL_ENCRYPTION_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
   ci-unit-tests:
     name: Unit Tests (${{ matrix.shard }})
@@ -1388,7 +1388,7 @@ jobs:
           SENTRY_RELEASE: ${{ github.sha }}
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: pnpm --filter=@jovie/web run e2e:smoke --project=chromium
 
       - name: Upload Playwright Artifacts on Failure
@@ -1505,7 +1505,7 @@ jobs:
           E2E_CLERK_ADMIN_PASSWORD: ${{ secrets.E2E_CLERK_ADMIN_PASSWORD }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         # dashboard-pages-health is temporarily quarantined in apps/web/tests/quarantine.json due to JOV-782 flakiness.
         run: pnpm --filter=@jovie/web exec playwright test tests/e2e/dashboard-pages-health.spec.ts --grep "Admin Pages Health Check" --project=chromium
 
@@ -1722,7 +1722,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -1749,7 +1749,7 @@ jobs:
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           # Optional: enable deterministic spotify-only UI check
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           cd apps/web && pnpm --filter=@jovie/web run e2e:auth-smoke --project=chromium
 
@@ -1768,7 +1768,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
         run: |
           if [ -z "${{ steps.quarantine.outputs.allowed_specs }}" ]; then
             echo "No non-quarantined E2E specs to run."
@@ -1788,7 +1788,7 @@ jobs:
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
           NEXT_PUBLIC_STATSIG_CLIENT_KEY: ${{ secrets.NEXT_PUBLIC_STATSIG_CLIENT_KEY }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
           SENTRY_E2E_REPORTING: '1'
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           SENTRY_ENVIRONMENT: ci-main-e2e-quarantine
@@ -2207,7 +2207,7 @@ jobs:
           export DATABASE_URL="${{ steps.resolve_neon.outputs.db_url }}"
           export NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
-          export FLAGS_SECRET="E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          export FLAGS_SECRET="${{ secrets.FLAGS_SECRET }}"
           PORT=3100 node .next/standalone/apps/web/server.js &
           SERVER_PID=$!
           trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
@@ -2240,7 +2240,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           E2E_CLERK_USER_USERNAME: ${{ secrets.E2E_CLERK_USER_USERNAME }}
           E2E_CLERK_USER_PASSWORD: ${{ secrets.E2E_CLERK_USER_PASSWORD }}
-          FLAGS_SECRET: "E3HuCQ8FSiOkqhKVgguBOEL7U47UMW0gMQ8xMbEoI3w="
+          FLAGS_SECRET: ${{ secrets.FLAGS_SECRET }}
 
       - name: Upload Playwright Artifacts on Failure
         if: ${{ failure() }}
@@ -2423,7 +2423,7 @@ jobs:
 
       - name: Alias preview to staging.jov.ie
         run: |
-          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
+          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -2466,7 +2466,7 @@ jobs:
           # Use the staging alias directly — GitHub Actions masks job outputs
           # containing secret substrings (org name in Vercel URLs), so we
           # cannot rely on deploy_url passed between jobs.
-          vercel promote https://staging.jov.ie --yes --token ${{ secrets.VERCEL_TOKEN }}
+          vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

@@ -1,5 +1,6 @@
 ---
 name: land-and-deploy
+preamble-tier: 4
 version: 1.0.0
 description: |
   Land and deploy workflow. Merges the PR, waits for CI and deploy,
@@ -542,7 +543,7 @@ Save report to `.gstack/deploy-reports/{date}-pr{number}-deploy.md`.
 Log to the review dashboard:
 
 ```bash
-eval $(~/.claude/skills/gstack/bin/gstack-slug 2>/dev/null)
+{{SLUG_EVAL}}
 mkdir -p ~/.gstack/projects/$SLUG
 ```
 

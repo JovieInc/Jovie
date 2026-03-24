@@ -3,6 +3,7 @@
 import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
+import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
@@ -72,7 +73,7 @@ export default function SignInPage() {
       showFormTitle={false}
       showFooterPrompt={false}
     >
-      <Suspense fallback={null}>
+      <Suspense fallback={<AuthFormSkeleton />}>
         <SignInPageContent />
       </Suspense>
     </AuthLayout>
