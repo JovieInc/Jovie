@@ -5,11 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.3.50] - 2026-03-24
+## [26.4.51.1] - 2026-03-24
+
+### Fixed
+
+- Screenshot pipeline auth guard now allows `+clerk_test` emails without password
+- Clerk proxy disabled for screenshot dev server (avoids HTTPS requirement on localhost)
+- Profile screenshot locator no longer matches hidden dark-mode logo images
+
+### Added
+
+- Homepage product screenshots: audience CRM dashboard, artist profile (phone + desktop)
+- E2E authentication documentation in TESTING.md and CLAUDE.md
 
 ### Removed
 
 - Founder quote from homepage testimonials section (Tim White quote card)
+
 ## [26.4.51] - 2026-03-24
 
 ### Fixed
