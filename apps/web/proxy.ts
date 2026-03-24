@@ -4,7 +4,6 @@ import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
-import { getClerkProxyUrl } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -871,9 +870,9 @@ const clerkWrappedMiddleware = clerkMiddleware(
     const { userId } = await auth();
     return handleRequest(req, userId);
   },
-  () => ({
-    proxyUrl: getClerkProxyUrl(),
-  })
+  {
+    frontendApiProxy: { enabled: true },
+  }
 );
 
 export default async function middleware(
@@ -951,7 +950,7 @@ export const config = {
   matcher: [
     // Skip Next.js internals, all static files, and .well-known directory
     '/((?!_next|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
-    '/(api|trpc)(.*)',
+    // Always run for API routes and the Clerk FAPI proxy
+    '/(api|trpc|__clerk)(.*)',
   ],
 };
