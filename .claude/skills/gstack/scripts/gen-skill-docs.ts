@@ -397,6 +397,7 @@ function generateBrowseSetup(ctx: TemplateContext): string {
   return `## SETUP (run this check BEFORE any browse command)
 
 \`\`\`bash
+command -v bun >/dev/null 2>&1 || export PATH="$HOME/.bun/bin:$PATH"
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/${ctx.paths.localSkillRoot}/browse/dist/browse" ] && B="$_ROOT/${ctx.paths.localSkillRoot}/browse/dist/browse"
@@ -458,13 +459,22 @@ This is the **primary mode** for developers verifying their work. When the user 
 
    **If no obvious pages/routes are identified from the diff:** Do not skip browser testing. The user invoked /qa because they want browser-based verification. Fall back to Quick mode — navigate to the homepage, follow the top 5 navigation targets, check console for errors, and test any interactive elements found. Backend, config, and infrastructure changes affect app behavior — always verify the app still works.
 
-3. **Detect the running app** — check common local dev ports:
+3. **Detect the running app** — use fast curl check before browser navigation:
    \`\`\`bash
-   $B goto http://localhost:3000 2>/dev/null && echo "Found app on :3000" || \\
-   $B goto http://localhost:4000 2>/dev/null && echo "Found app on :4000" || \\
-   $B goto http://localhost:8080 2>/dev/null && echo "Found app on :8080"
+   # Fast port check (~2s total instead of ~45s with browser navigation)
+   DEV_URL=""
+   for port in 3000 4000 8080; do
+     if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$port 2>/dev/null | grep -qE '^[23]'; then
+       DEV_URL="http://localhost:$port"
+       echo "Found dev server on :$port"
+       break
+     fi
+   done
+   [ -z "$DEV_URL" ] && echo "No local dev server found"
    \`\`\`
-   If no local app is found, check for a staging/preview URL in the PR or environment. If nothing works, ask the user for the URL.
+   If no local server found, check the project's CLAUDE.md for staging/production URLs (look for "Staging URL", "Production URL", or deploy configuration). Use the staging URL if available, falling back to production. If nothing works, ask the user for the URL.
+
+   **Cold compile handling:** If the dev server IS detected but the first \`$B goto\` times out or returns an error page, the server may be doing a cold Turbopack/webpack compilation. Wait 15 seconds and retry once. Localhost URLs automatically get a 60-second browser timeout (vs 15s for remote URLs).
 
 4. **Test each affected page/route:**
    - Navigate to the page
