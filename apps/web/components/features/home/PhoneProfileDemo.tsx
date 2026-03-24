@@ -74,12 +74,12 @@ export function PhoneProfileDemo() {
         }}
       >
         <div
-          className='scale-[1.06] sm:scale-[1.1] lg:scale-[1.14] xl:scale-[1.18]'
+          className='pb-4 sm:pb-6'
           style={{
             filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
           }}
         >
-          <PhoneFrame>
+          <PhoneFrame className='lg:h-[634px] lg:w-[302px] xl:h-[664px] xl:w-[316px]'>
             <Image
               src='/product-screenshots/profile-phone.png'
               alt='Artist profile page showing streaming links, tips, and tour dates'
