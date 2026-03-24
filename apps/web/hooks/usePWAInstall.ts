@@ -1,6 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  isSwEnabled,
+  registerServiceWorker,
+  unregisterServiceWorker,
+} from '@/lib/service-worker/control';
 
 interface BeforeInstallPromptEvent extends Event {
   readonly userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
@@ -24,8 +29,12 @@ let _earlyPromptEvent: BeforeInstallPromptEvent | null = null;
 if (typeof window !== 'undefined') {
   // Register the service worker early -- Chrome requires a registered SW with
   // a fetch handler before it will fire beforeinstallprompt.
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // In development, skip registration (and unregister any stale SW) unless
+  // explicitly opted in via the dev toolbar toggle.
+  if (isSwEnabled()) {
+    registerServiceWorker();
+  } else {
+    unregisterServiceWorker().catch(() => {});
   }
 
   window.addEventListener('beforeinstallprompt', e => {
