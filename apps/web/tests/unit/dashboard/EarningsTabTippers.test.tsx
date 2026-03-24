@@ -64,73 +64,69 @@ describe('EarningsTab - Tippers Table', () => {
     vi.clearAllMocks();
   });
 
-  it(
-    'renders tippers with formatted amounts and dates',
-    { timeout: 15_000 },
-    async () => {
-      mockEarningsQuery.mockReturnValue({
-        data: {
-          stats: {
-            totalRevenueCents: 1500,
-            totalTips: 2,
-            averageTipCents: 750,
+  it('renders tippers with formatted amounts and dates', {
+    timeout: 15_000,
+  }, async () => {
+    mockEarningsQuery.mockReturnValue({
+      data: {
+        stats: {
+          totalRevenueCents: 1500,
+          totalTips: 2,
+          averageTipCents: 750,
+        },
+        tippers: [
+          {
+            id: 't1',
+            tipperName: 'Alice',
+            contactEmail: 'alice@example.com',
+            amountCents: 500,
+            createdAt: '2026-01-15T00:00:00Z',
           },
-          tippers: [
-            {
-              id: 't1',
-              tipperName: 'Alice',
-              contactEmail: 'alice@example.com',
-              amountCents: 500,
-              createdAt: '2026-01-15T00:00:00Z',
-            },
-            {
-              id: 't2',
-              tipperName: null,
-              contactEmail: null,
-              amountCents: 1000,
-              createdAt: '2026-02-20T00:00:00Z',
-            },
-          ],
-        },
-        isLoading: false,
-      });
+          {
+            id: 't2',
+            tipperName: null,
+            contactEmail: null,
+            amountCents: 1000,
+            createdAt: '2026-02-20T00:00:00Z',
+          },
+        ],
+      },
+      isLoading: false,
+    });
 
-      const EarningsTab = await getEarningsTab();
-      renderWithProviders(<EarningsTab />);
+    const EarningsTab = await getEarningsTab();
+    renderWithProviders(<EarningsTab />);
 
-      // Check tipper names (unique to the table)
-      expect(screen.getByText('Alice')).toBeInTheDocument();
-      expect(screen.getByText('Anonymous')).toBeInTheDocument();
+    // Check tipper names (unique to the table)
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('Anonymous')).toBeInTheDocument();
 
-      // Check email
-      expect(screen.getByText('alice@example.com')).toBeInTheDocument();
+    // Check email
+    expect(screen.getByText('alice@example.com')).toBeInTheDocument();
 
-      // Check formatted amounts exist (may also appear in stats cards)
-      expect(screen.getAllByText('$5.00').length).toBeGreaterThanOrEqual(1);
-      expect(screen.getAllByText('$10.00').length).toBeGreaterThanOrEqual(1);
-    }
-  );
+    // Check formatted amounts exist (may also appear in stats cards)
+    expect(screen.getAllByText('$5.00').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('$10.00').length).toBeGreaterThanOrEqual(1);
+  });
 
-  it(
-    'renders empty state when no tippers exist',
-    { timeout: 15_000 },
-    async () => {
-      mockEarningsQuery.mockReturnValue({
-        data: {
-          stats: { totalRevenueCents: 0, totalTips: 0, averageTipCents: 0 },
-          tippers: [],
-        },
-        isLoading: false,
-      });
+  it('renders empty state when no tippers exist', {
+    timeout: 15_000,
+  }, async () => {
+    mockEarningsQuery.mockReturnValue({
+      data: {
+        stats: { totalRevenueCents: 0, totalTips: 0, averageTipCents: 0 },
+        tippers: [],
+      },
+      isLoading: false,
+    });
 
-      const EarningsTab = await getEarningsTab();
-      renderWithProviders(<EarningsTab />);
+    const EarningsTab = await getEarningsTab();
+    renderWithProviders(<EarningsTab />);
 
-      expect(
-        screen.getByText('Share your tip link to get started.')
-      ).toBeInTheDocument();
-    }
-  );
+    expect(
+      screen.getByText('Share your tip link to get started.')
+    ).toBeInTheDocument();
+  });
 
   it('renders loading state', async () => {
     mockEarningsQuery.mockReturnValue({

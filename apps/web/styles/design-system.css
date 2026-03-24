@@ -18,12 +18,12 @@
    ============================================ */
 :root {
   /* Core Theme Inputs */
-  --theme-base-hue: 272;
-  /* Neutral foundation hue (blue-gray) */
+  --theme-base-hue: 282;
+  /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
   --theme-base-chroma: 0.015;
   /* Very low chroma for neutrals */
-  --theme-accent-hue: 271;
-  /* Brand accent hue (purple) */
+  --theme-accent-hue: 282;
+  /* Brand accent hue — aligned with base hue per Linear refresh */
   --theme-accent-chroma: 0.18;
   /* Vibrant accent saturation */
   --theme-contrast: 65;
@@ -85,7 +85,8 @@
   --color-bg-active: #ebecef;
   /* Same as surface-3 */
   --color-bg-primary: lch(98.94% 0.5 282);
-  --color-bg-secondary: lch(93.797% 1.529 282);
+  --color-bg-secondary: lch(95.94% 0.5 282);
+  /* Linear March 2026 exact — was lch(93.797% 1.529 282), too dark/saturated */
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
@@ -231,16 +232,16 @@
      --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
      --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
      --content-color:         #6b6f76               = content/meta text */
-  --color-text-primary-token: lch(100% 0 272);
-  /* Pure white — Linear exact */
-  --color-text-secondary-token: lch(90.65% 1.35 272);
+  --color-text-primary-token: lch(100% 0 282);
+  /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
+  --color-text-secondary-token: lch(90.65% 1.35 282);
   /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(62.6% 1.35 272);
+  --color-text-tertiary-token: lch(62.6% 1.35 282);
   /* #969799 — Linear exact */
   --color-text-quaternary-token: #62666d;
   /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
-  --color-text-disabled-token: oklch(28% 0.006 272);
-  --color-text-tooltip: lch(100% 0 272);
+  --color-text-disabled-token: oklch(28% 0.006 282);
+  --color-text-tooltip: lch(100% 0 282);
   /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
@@ -440,7 +441,7 @@
   --color-text-quaternary-token: oklch(
     55% var(--theme-base-chroma) var(--theme-base-hue)
   );
-  --color-text-disabled-token: oklch(40% 0.006 272);
+  --color-text-disabled-token: oklch(40% 0.006 282);
 
   /* Borders — much stronger */
   --color-border-subtle: oklch(100% 0 0 / 15%);
@@ -449,7 +450,7 @@
 
   /* Surfaces — more separation between layers */
   --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-elevated: lch(8% 0.7 272);
+  --color-bg-elevated: lch(8% 0.7 282);
 
   /* Interactive states — more visible */
   --color-interactive-hover: rgba(255, 255, 255, 0.08);
@@ -678,7 +679,8 @@
        --font-weight-bold: 700 */
   --font-weight-normal: 400;
   /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
-  --font-weight-book: 400;
+  --font-weight-book: 450;
+  /* Linear's "book" weight — their default UI weight (confirmed from live extraction) */
   /* Alias for normal */
   --font-weight-medium: 510;
   /* Linear: --font-weight-medium = 510 */

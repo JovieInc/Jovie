@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.48] - 2026-03-23
+
+### Changed
+
+- Expanded support page with documentation links, FAQ section, and structured data for SEO
+- Added JSON-LD FAQ and breadcrumb schemas to support page
+
+### Fixed
+
+- Deduplicated "Jovie" from support page title tag (was "Support - Jovie - Jovie")
+## [26.3.48] - 2026-03-23
+
+### Changed
+
+- Bumped all dependencies to latest compatible versions across monorepo
+- Updated Next.js 16.1.7 → 16.2.1, Sentry 10.39.0 → 10.45.0, Tailwind CSS 4.1.18 → 4.2.2
+- Upgraded Biome 2.3.11 → 2.4.8, Turbo 2.8.9 → 2.8.20, Vitest 4.0.18 → 4.1.1
+- Bumped Storybook 10.2.x → 10.3.3, AI SDK 6.0.116 → 6.0.137, Motion 12.29.0 → 12.38.0
+- Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
+- Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
+- Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+
+## [26.4.47] - 2026-03-23
+
+### Changed
+
+- Updated design system and color tokens to match Linear's March 2026 refresh
+- [internal] Rewrote DESIGN.md as complete design system spec (typography, colors, spacing, motion, component patterns)
+- [internal] Updated theme base hue 272→282, font weight book 400→450, light sidebar color corrected
+- [internal] Normalized all OKLCH hue references from 260/272 to 282 across token files
+
+### Fixed
+
+- Fixed oversized marketing headlines on wide screens
+- Improved text spacing consistency across navigation and UI elements
+- [internal] Marketing H1 capped at 64px (was 76px at >=1280px), H2 capped at 48px (was 56px at >=1440px)
+- [internal] H1 line-height corrected from 1.0 to 1.06; removed global letter-spacing from body
+
 ## [26.3.48] - 2026-03-23
 
 ### Fixed

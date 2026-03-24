@@ -18,6 +18,7 @@
 import { chromium, type Browser, type BrowserContext, type BrowserContextOptions, type Page, type Locator, type Cookie } from 'playwright';
 import { addConsoleEntry, addNetworkEntry, addDialogEntry, networkBuffer, type DialogEntry } from './buffers';
 import { validateNavigationUrl } from './url-validation';
+import { isLocalhostUrl, LOCALHOST_PAGE_TIMEOUT, REMOTE_PAGE_TIMEOUT } from './config';
 
 export interface RefEntry {
   locator: Locator;
@@ -134,7 +135,8 @@ export class BrowserManager {
     this.wirePageEvents(page);
 
     if (url) {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      const timeout = isLocalhostUrl(url) ? LOCALHOST_PAGE_TIMEOUT : REMOTE_PAGE_TIMEOUT;
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
     }
 
     return id;
