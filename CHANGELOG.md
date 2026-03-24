@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.50] - 2026-03-24
+
+### Removed
+
+- Founder quote from homepage testimonials section (Tim White quote card)
+
 ## [26.3.49] - 2026-03-23
 
 ### Added
