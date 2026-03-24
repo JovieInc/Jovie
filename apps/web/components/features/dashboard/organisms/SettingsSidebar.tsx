@@ -145,7 +145,7 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
   return (
     <aside className='h-fit' data-testid='settings-sidebar'>
       {/* Desktop sidebar */}
-      <div className='hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm lg:block'>
+      <div className='hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm lg:block'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
             <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>

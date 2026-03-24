@@ -21,7 +21,7 @@ export function DrawerEmptyState({
       variant='card'
       testId={testId}
       className={cn(
-        'flex min-h-[88px] items-center rounded-[14px] px-3 py-3',
+        'flex min-h-[88px] items-center rounded-[10px] px-3 py-3',
         className
       )}
     >

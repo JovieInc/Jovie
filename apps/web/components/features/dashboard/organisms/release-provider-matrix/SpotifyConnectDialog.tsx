@@ -425,7 +425,7 @@ export function SpotifyConnectDialog({
       <DialogBody className='space-y-3'>
         <DrawerSurfaceCard
           variant='card'
-          className='overflow-visible rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+          className='overflow-visible rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
         >
           <div className='mb-2.5'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
