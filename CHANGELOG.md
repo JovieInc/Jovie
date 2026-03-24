@@ -9,8 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Made Clerk proxy URL environment-driven to support separate staging Clerk instance
-- Production uses `/clerk` Vercel rewrite; staging uses direct `https://clerk.staging.jov.ie`
+- [internal] Made Clerk proxy URL environment-driven to support separate staging Clerk instance
+- [internal] Production uses `/clerk` Vercel rewrite; staging uses direct `https://clerk.staging.jov.ie`
 
 ## [26.3.49] - 2026-03-23
 

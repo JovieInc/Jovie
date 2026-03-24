@@ -26,8 +26,12 @@ describe('clerkAvailability', () => {
       expect(getClerkProxyUrl()).toBe('/clerk');
     });
 
-    it('returns undefined when env var is not set', () => {
+    it('returns undefined when env var is empty string', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '');
+      expect(getClerkProxyUrl()).toBeUndefined();
+    });
+
+    it('returns undefined when env var is not present', () => {
       expect(getClerkProxyUrl()).toBeUndefined();
     });
 
