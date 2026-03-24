@@ -1,7 +1,15 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Children,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { Avatar } from '@/components/molecules/Avatar';
@@ -141,21 +149,30 @@ function CrossfadeBlock({
   readonly activeIndex: number;
   readonly children: React.ReactNode[];
 }) {
+  const childNodes = Children.toArray(children);
+
   return (
     <div className='grid'>
-      {children.map((child, i) => (
-        <div
-          key={`${i}-${activeIndex}`}
-          aria-hidden={i !== activeIndex}
-          className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
-          style={{
-            opacity: i === activeIndex ? 1 : 0,
-            gridArea: '1 / 1',
-          }}
-        >
-          {child}
-        </div>
-      ))}
+      {childNodes.map((child, index) => {
+        const childKey =
+          isValidElement(child) && child.key !== null
+            ? String(child.key)
+            : 'crossfade-panel';
+
+        return (
+          <div
+            key={childKey}
+            aria-hidden={index !== activeIndex}
+            className='transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+            style={{
+              opacity: index === activeIndex ? 1 : 0,
+              gridArea: '1 / 1',
+            }}
+          >
+            {child}
+          </div>
+        );
+      })}
     </div>
   );
 }

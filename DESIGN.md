@@ -225,19 +225,23 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 2px | Tags, tiny elements |
-| DEFAULT | 4px | Buttons (Linear exact) |
-| sm / md | 8px | Controls, inputs, cards — **primary radius** |
-| lg | 12px | Large cards |
-| 3xl | 14px | App shell frame |
-| pill | 48px / 9999px | Pill buttons, badges |
+| DEFAULT | 4px | Marketing buttons (preserved — changing risks silent regressions across all DEFAULT consumers) |
+| sm | 8px | Badges, issue rows, small cards |
+| md | 10px | Inner cards, drawer cards, properties panels |
+| lg | 12px | App shell frame, content surface cards |
+| xl | 16px | Large decorative elements |
+| pill | 9999px | App buttons, inputs, controls, tab buttons |
 
 ### App Shell Radius
 
 | Token | Value |
 |-------|-------|
+| App shell gap | 8px |
+| Inner cards | 10px |
+| Nested cards | 8px |
 | App item | 8px |
 | App menu | 8px |
-| App shell frame | 14px |
+| App shell frame | 12px |
 | App control | 9999px (pill) |
 
 ---
@@ -295,7 +299,7 @@ Pure neutral HSL — no hue tint. Used across both systems.
 | Accent | `#7170ff` | white | `#7170ff` | white |
 | Marketing CTA | `#5E6AD2` | white | `#5E6AD2` | white |
 
-Height: sm=32px, md=40px. Radius: 4px (DEFAULT). Padding: 12px horizontal.
+Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padding: 12px horizontal.
 
 ### Sidebar (App Shell)
 
@@ -316,12 +320,22 @@ Height: sm=32px, md=40px. Radius: 4px (DEFAULT). Padding: 12px horizontal.
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Gap | 6px | 6px |
-| Radius | 14px | 14px |
+| Gap | 8px | 8px |
+| Radius | 12px | 12px |
 | Border | `rgba(0,0,0,0.065)` | `rgba(255,255,255,0.05)` |
 | Sidebar seam | `rgba(0,0,0,0.05)` | `rgba(255,255,255,0.05)` |
 | Frame seam | `rgba(0,0,0,0.055)` | `rgba(255,255,255,0.04)` |
 | Shadow | `0 0 0 1px rgba(0,0,0,0.045), 0 18px 42px rgba(0,0,0,0.055)` | deeper |
+
+### Right Panel Cards
+
+| Token | Light | Dark |
+|-------|-------|------|
+| Background | `color-mix(oklab, content-surface 97%, surface-0)` | same token |
+| Border | `frame-seam token` | same token |
+| Radius | 10px | 10px |
+| Layout | Stacked cards with `space-y-3` gap, no outer container | same |
+| Pattern | `EntitySidebarShell` + `DrawerSurfaceCard variant='card'` | same |
 
 ### Button Tabs
 
@@ -340,7 +354,7 @@ Height: sm=32px, md=40px. Radius: 4px (DEFAULT). Padding: 12px horizontal.
 | Background | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.05)` |
 | Border | `rgba(0,0,0,0.06)` | `rgba(255,255,255,0.05)` |
 | Text | `oklch(10% 0 0)` | `#F7F8F8` |
-| Radius | 2px | 2px |
+| Radius | 8px | 8px |
 | Font | 10px / weight 510 | — |
 
 ### Row / Table States

@@ -4,6 +4,17 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { FunnelMetricsStrip } from '@/features/admin/FunnelMetricsStrip';
 import { getAdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
 
+const CORE_KPI_SKELETON_KEYS = [
+  'signup-rate',
+  'profile-rate',
+  'activation-rate',
+  'subscriber-rate',
+  'retention-rate',
+  'conversion-rate',
+] as const;
+
+const YC_KPI_SKELETON_KEYS = ['week-1', 'week-2', 'week-3', 'week-4'] as const;
+
 export async function AdminKpiSection() {
   const metrics = await getAdminFunnelMetrics();
 
@@ -24,8 +35,8 @@ export function AdminKpiSectionSkeleton() {
           className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
-          {Array.from({ length: 6 }, (_, i) => (
-            <ContentMetricCardSkeleton key={`core-${i + 1}`} />
+          {CORE_KPI_SKELETON_KEYS.map(metricKey => (
+            <ContentMetricCardSkeleton key={metricKey} />
           ))}
         </div>
       </ContentSurfaceCard>
@@ -36,8 +47,8 @@ export function AdminKpiSectionSkeleton() {
           className='min-h-0 px-(--linear-app-header-padding-x) py-3'
         />
         <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
-          {Array.from({ length: 4 }, (_, i) => (
-            <ContentMetricCardSkeleton key={`yc-${i + 1}`} showIcon={false} />
+          {YC_KPI_SKELETON_KEYS.map(metricKey => (
+            <ContentMetricCardSkeleton key={metricKey} showIcon={false} />
           ))}
         </div>
       </ContentSurfaceCard>

@@ -1,9 +1,9 @@
 'use client';
 
-import { useClerk, useUser } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { env } from '@/lib/env-client';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
@@ -28,7 +28,7 @@ export interface BillingStatus {
 
 export interface UseUserButtonReturn {
   isLoaded: boolean;
-  user: ReturnType<typeof useUser>['user'];
+  user: ReturnType<typeof useUserSafe>['user'];
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   isFeedbackOpen: boolean;
@@ -43,8 +43,8 @@ export function useUserButton({
   profileHref,
   settingsHref,
 }: UseUserButtonProps): UseUserButtonReturn {
-  const { isLoaded, user } = useUser();
-  const { signOut } = useClerk();
+  const { isLoaded, user } = useUserSafe();
+  const { signOut } = useAuthSafe();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isPassiveRuntime = env.IS_E2E;
