@@ -44,5 +44,11 @@ describe('clerkAvailability', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
       expect(getClerkProxyUrl()).toBeUndefined();
     });
+
+    it('prefers disabled flag over explicit proxy URL', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '/clerk');
+      expect(getClerkProxyUrl()).toBeUndefined();
+    });
   });
 });
