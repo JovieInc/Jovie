@@ -1,6 +1,7 @@
 ---
 name: guard
 description: |
+  MANUAL TRIGGER ONLY: invoke only when user types /guard.
   Full safety mode: destructive command warnings + directory-scoped edits.
   Combines /careful (warns before rm -rf, DROP TABLE, force-push, etc.) with
   /freeze (blocks edits outside a specified directory). Use for maximum safety

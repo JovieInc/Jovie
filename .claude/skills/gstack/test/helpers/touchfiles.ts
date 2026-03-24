@@ -68,9 +68,16 @@ export const E2E_TOUCHFILES: Record<string, string[]> = {
   'plan-ceo-review-benefits':  ['plan-ceo-review/**', 'scripts/gen-skill-docs.ts'],
   'plan-eng-review':           ['plan-eng-review/**'],
   'plan-eng-review-artifact':  ['plan-eng-review/**'],
+  'plan-review-report':        ['plan-eng-review/**', 'scripts/gen-skill-docs.ts'],
+
+  // Codex offering verification
+  'codex-offered-office-hours':  ['office-hours/**', 'scripts/gen-skill-docs.ts'],
+  'codex-offered-ceo-review':    ['plan-ceo-review/**', 'scripts/gen-skill-docs.ts'],
+  'codex-offered-design-review': ['plan-design-review/**', 'scripts/gen-skill-docs.ts'],
+  'codex-offered-eng-review':    ['plan-eng-review/**', 'scripts/gen-skill-docs.ts'],
 
   // Ship
-  'ship-base-branch':    ['ship/**'],
+  'ship-base-branch': ['ship/**', 'bin/gstack-repo-mode'],
   'ship-local-workflow': ['ship/**', 'scripts/gen-skill-docs.ts'],
 
   // Setup browser cookies
@@ -79,6 +86,14 @@ export const E2E_TOUCHFILES: Record<string, string[]> = {
   // Retro
   'retro':             ['retro/**'],
   'retro-base-branch': ['retro/**'],
+
+  // Global discover
+  'global-discover':   ['bin/gstack-global-discover.ts', 'test/global-discover.test.ts'],
+
+  // CSO
+  'cso-full-audit':   ['cso/**'],
+  'cso-diff-mode':    ['cso/**'],
+  'cso-infra-scope':  ['cso/**'],
 
   // Document-release
   'document-release': ['document-release/**'],
@@ -95,17 +110,20 @@ export const E2E_TOUCHFILES: Record<string, string[]> = {
   'gemini-review-findings': ['review/**', '.agents/skills/gstack-review/**', 'test/helpers/gemini-session-runner.ts'],
 
 
-  // Ship coverage audit
-  'ship-coverage-audit': ['ship/**'],
+  // Coverage audit (shared fixture) + triage
+  'ship-coverage-audit': ['ship/**', 'test/fixtures/coverage-audit-fixture.ts', 'bin/gstack-repo-mode'],
+  'review-coverage-audit': ['review/**', 'test/fixtures/coverage-audit-fixture.ts'],
+  'plan-eng-coverage-audit': ['plan-eng-review/**', 'test/fixtures/coverage-audit-fixture.ts'],
+  'ship-triage': ['ship/**', 'bin/gstack-repo-mode'],
 
   // Design
-  'design-consultation-core':       ['design-consultation/**'],
-  'design-consultation-existing':   ['design-consultation/**'],
-  'design-consultation-research':   ['design-consultation/**'],
-  'design-consultation-preview':    ['design-consultation/**'],
-  'plan-design-review-plan-mode':   ['plan-design-review/**'],
-  'plan-design-review-no-ui-scope': ['plan-design-review/**'],
-  'design-review-fix':              ['design-review/**', 'browse/src/**'],
+  'design-consultation-core':       ['design-consultation/**', 'scripts/gen-skill-docs.ts'],
+  'design-consultation-existing':   ['design-consultation/**', 'scripts/gen-skill-docs.ts'],
+  'design-consultation-research':   ['design-consultation/**', 'scripts/gen-skill-docs.ts'],
+  'design-consultation-preview':    ['design-consultation/**', 'scripts/gen-skill-docs.ts'],
+  'plan-design-review-plan-mode':   ['plan-design-review/**', 'scripts/gen-skill-docs.ts'],
+  'plan-design-review-no-ui-scope': ['plan-design-review/**', 'scripts/gen-skill-docs.ts'],
+  'design-review-fix':              ['design-review/**', 'browse/src/**', 'scripts/gen-skill-docs.ts'],
 
   // gstack-upgrade
   'gstack-upgrade-happy-path': ['gstack-upgrade/**'],
@@ -115,6 +133,9 @@ export const E2E_TOUCHFILES: Record<string, string[]> = {
   'canary-workflow':            ['canary/**', 'browse/src/**'],
   'benchmark-workflow':         ['benchmark/**', 'browse/src/**'],
   'setup-deploy-workflow':      ['setup-deploy/**', 'scripts/gen-skill-docs.ts'],
+
+  // Autoplan
+  'autoplan-core':  ['autoplan/**', 'plan-ceo-review/**', 'plan-eng-review/**', 'plan-design-review/**'],
 
   // Skill routing — journey-stage tests (depend on ALL skill descriptions)
   'journey-ideation':       ['*/SKILL.md.tmpl', 'SKILL.md.tmpl', 'scripts/gen-skill-docs.ts'],
@@ -186,6 +207,7 @@ export const GLOBAL_TOUCHFILES = [
   'scripts/gen-skill-docs.ts',
   'test/helpers/touchfiles.ts',
   'browse/test/test-server.ts',
+  'lib/worktree.ts',
 ];
 
 // --- Base branch detection ---
