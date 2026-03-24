@@ -77,6 +77,13 @@ export const paymentIntentLimiter = createRateLimiter(
   RATE_LIMITERS.paymentIntent
 );
 
+/**
+ * Tip checkout session rate limiter
+ * Limit: 30 sessions per hour per IP
+ * Higher than paymentIntent because this is a public endpoint keyed by IP (shared NATs)
+ */
+export const tipCheckoutLimiter = createRateLimiter(RATE_LIMITERS.tipCheckout);
+
 // ============================================================================
 // Admin Operations
 // ============================================================================
@@ -825,6 +832,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     handleCheck: handleCheckLimiter,
     dashboardLinks: dashboardLinksLimiter,
     paymentIntent: paymentIntentLimiter,
+    tipCheckout: tipCheckoutLimiter,
     adminImpersonate: adminImpersonateLimiter,
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,

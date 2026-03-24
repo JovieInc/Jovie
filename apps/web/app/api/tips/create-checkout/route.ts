@@ -9,6 +9,11 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { checkGate, FEATURE_FLAG_KEYS } from '@/lib/feature-flags/server';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  createRateLimitHeaders,
+  getClientIP,
+  tipCheckoutLimiter,
+} from '@/lib/rate-limit';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -37,6 +42,22 @@ function getPlatformFeePercent(): number {
 
 export async function POST(req: NextRequest) {
   try {
+    // Rate limit by IP (public endpoint, no auth required)
+    const ip = getClientIP(req);
+    const rateLimitResult = await tipCheckoutLimiter.limit(ip);
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        { error: 'Too many checkout requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            ...NO_STORE_HEADERS,
+            ...createRateLimitHeaders(rateLimitResult),
+          },
+        }
+      );
+    }
+
     const body = await req.json();
     const parsed = createCheckoutSchema.safeParse(body);
 

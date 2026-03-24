@@ -7,6 +7,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.47] - 2026-03-23
 
+### Fixed
+
+- [internal] Secured audience opt-in endpoint with HMAC-signed tokens to prevent unauthenticated email manipulation
+- Fixed broken opt-in URL in tip thank-you emails (was passing profileId as email parameter)
+- Added rate limiting (30/hour per IP) to tip checkout session creation endpoint
+- [internal] Clamped admin list endpoints (creators, users) to max 100 pageSize to prevent unbounded queries
+
+### Added
+
+- [internal] Added `opt-in-token` module with HMAC token generation, verification, and URL building
+- [internal] Added `tipCheckout` rate limiter (30 sessions/hour per IP) for public checkout endpoint
+- [internal] Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
 ### Changed
 
 - Consolidated settings navigation into Linear-style focused pages with persistent sidebar
