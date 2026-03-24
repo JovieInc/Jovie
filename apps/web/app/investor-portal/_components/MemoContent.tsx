@@ -58,8 +58,8 @@ export function MemoContent({
         <div className='flex gap-10'>
           {/* Main prose — light mode applies white bg + dark text */}
           <article
-            className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors ${
-              isLight ? 'bg-white p-6 text-gray-800' : ''
+            className={`investor-prose min-w-0 flex-1 rounded-[var(--radius-xl)] transition-colors duration-200 ${
+              isLight ? 'bg-[#fafaf9] p-6' : ''
             }`}
             style={{
               fontSize: '15px',

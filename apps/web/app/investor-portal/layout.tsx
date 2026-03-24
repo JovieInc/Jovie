@@ -60,7 +60,7 @@ export default async function InvestorLayout({
         <InvestorNav investorName={investorName} pages={navPages} />
 
         {/* Main content area */}
-        <main className='flex-1 pb-20 lg:pb-24'>{children}</main>
+        <main className='flex-1 pb-20 pt-14 lg:pb-24 lg:pt-0'>{children}</main>
       </div>
 
       {/* Bottom sticky action bar */}

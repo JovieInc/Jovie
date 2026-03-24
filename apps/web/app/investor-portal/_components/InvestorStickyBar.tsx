@@ -53,7 +53,7 @@ export function InvestorStickyBar({
               href={investUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='flex-1 rounded-[var(--radius-pill)] px-6 py-2.5 text-center text-[length:var(--text-sm)] font-[var(--font-weight-semibold)] sm:flex-initial'
+              className='w-full rounded-[var(--radius-pill)] px-6 py-2.5 text-center text-[length:var(--text-sm)] font-[var(--font-weight-semibold)] sm:w-auto'
               style={{
                 background: 'var(--color-btn-primary-bg)',
                 color: 'var(--color-btn-primary-fg)',
@@ -68,7 +68,7 @@ export function InvestorStickyBar({
               href={bookCallUrl}
               target='_blank'
               rel='noopener noreferrer'
-              className='flex-1 rounded-[var(--radius-pill)] px-6 py-2.5 text-center text-[length:var(--text-sm)] font-[var(--font-weight-semibold)] sm:flex-initial'
+              className='w-full rounded-[var(--radius-pill)] px-6 py-2.5 text-center text-[length:var(--text-sm)] font-[var(--font-weight-semibold)] sm:w-auto'
               style={{
                 background: 'var(--color-btn-secondary-bg)',
                 color: 'var(--color-btn-secondary-fg)',
