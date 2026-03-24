@@ -85,11 +85,9 @@ export const onRouterTransitionStart = captureRouterTransitionStart;
       const { initLiteSentry } = await import('./lib/sentry/client-lite');
       initLiteSentry();
     }
-  } catch (error) {
-    // Silently fail Sentry initialization to avoid breaking the app
-    // In production, this would be caught by the global error handler
-    if ((process.env.NODE_ENV as string) !== 'production') {
-      console.error('[Sentry] Failed to initialize SDK:', error);
-    }
+  } catch {
+    // Silently swallow — non-production already exited above,
+    // so this only runs in production where errors surface via
+    // the global error handler.
   }
 })();
