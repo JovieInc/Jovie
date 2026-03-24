@@ -206,9 +206,9 @@ export function DevToolbar({
     };
   }, [open, hidden]);
 
-  // Poll deploy status for promote button (preview only)
+  // Poll deploy status for promote button (preview only, when toolbar visible)
   useEffect(() => {
-    if (env !== 'preview') return;
+    if (env !== 'preview' || hidden) return;
     let active = true;
 
     async function checkStatus() {
@@ -240,7 +240,7 @@ export function DevToolbar({
       active = false;
       clearInterval(interval);
     };
-  }, [env]);
+  }, [env, hidden]);
 
   async function handlePromote() {
     setPromoteState('promoting');

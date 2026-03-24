@@ -4,6 +4,8 @@ import { requireAdmin } from '@/lib/admin';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
+// Best-effort rate limit — not durable across serverless instances.
+// Acceptable for V1 since this is admin-only and double-deploys are idempotent.
 let lastPromoteTimestamp = 0;
 const RATE_LIMIT_MS = 60_000;
 
@@ -12,9 +14,12 @@ const RATE_LIMIT_MS = 60_000;
  * Trigger a production deployment via Vercel Deploy Hook.
  *
  * Requires: Admin privileges
- * Rate limit: 1 per 60 seconds (in-memory)
+ * Rate limit: 1 per 60 seconds (best-effort, in-memory)
  */
 export async function POST() {
+  // Cache auth result for both admin check and logging
+  const { userId } = await auth();
+
   const authError = await requireAdmin();
   if (authError) return authError;
 
@@ -39,7 +44,10 @@ export async function POST() {
   }
 
   try {
-    const response = await fetch(hookUrl, { method: 'POST' });
+    const response = await fetch(hookUrl, {
+      method: 'POST',
+      signal: AbortSignal.timeout(30_000),
+    });
 
     if (!response.ok) {
       const body = await response.text().catch(() => 'unknown');
@@ -50,11 +58,11 @@ export async function POST() {
 
     lastPromoteTimestamp = Date.now();
 
-    const { userId } = await auth();
     logger.info(
       `[deploy/promote] Production deploy triggered by ${userId ?? 'unknown'}`
     );
 
+    // Note: .json() is safe here — .text() is only called in the throw-path above
     const data = await response.json().catch(() => ({}));
 
     return NextResponse.json({

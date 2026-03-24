@@ -28,8 +28,7 @@ export async function hideTransientUI(page: Page) {
         .forEach(el => ((el as HTMLElement).style.display = 'none'));
 
     hide('[data-sonner-toaster]');
-    hide('[data-testid="cookie-banner"]');
-    hide('[aria-label="Cookie consent"]');
+    hide('[data-testid="cookie-banner"], [data-cookie-banner]');
     hide('[role="tooltip"]');
     hide('#intercom-container, .intercom-lightweight-app');
   });

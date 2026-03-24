@@ -15,14 +15,13 @@ export async function GET() {
   if (authError) return authError;
 
   const token = process.env.VERCEL_API_TOKEN;
-  const projectId =
-    process.env.VERCEL_PROJECT_ID ?? 'prj_HPZm5iGtARQ2qef6g2xtjgFIGDVY';
-  const teamId = process.env.VERCEL_TEAM_ID ?? 'team_bpNDbti6srVLYPKdmQLu4UgT';
+  const projectId = process.env.VERCEL_PROJECT_ID;
+  const teamId = process.env.VERCEL_TEAM_ID;
   const stagingSha = process.env.NEXT_PUBLIC_BUILD_SHA ?? '';
 
-  if (!token) {
+  if (!token || !projectId || !teamId) {
     return NextResponse.json(
-      { error: 'VERCEL_API_TOKEN not configured' },
+      { error: 'Deploy status not configured' },
       { status: 500 }
     );
   }
@@ -31,6 +30,7 @@ export async function GET() {
     const url = `${VERCEL_API}/v6/deployments?projectId=${projectId}&teamId=${teamId}&target=production&limit=1&state=READY`;
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
       next: { revalidate: 0 },
     });
 
@@ -51,8 +51,11 @@ export async function GET() {
       ? new Date(latestProd.created).toISOString()
       : null;
 
+    // Normalize both SHAs to 7 chars before comparing
     const needsPromote =
-      stagingSha.length > 0 && prodSha.length > 0 && stagingSha !== prodSha;
+      stagingSha.length > 0 &&
+      prodSha.length > 0 &&
+      stagingSha.slice(0, 7) !== prodSha;
 
     return NextResponse.json({
       needsPromote,

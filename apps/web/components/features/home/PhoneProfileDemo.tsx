@@ -85,6 +85,7 @@ export function PhoneProfileDemo() {
               alt='Artist profile page showing streaming links, tips, and tour dates'
               width={780}
               height={1688}
+              sizes='(min-width: 1280px) 316px, (min-width: 1024px) 302px, 282px'
               className='h-full w-full object-cover object-top'
             />
           </PhoneFrame>
