@@ -27,7 +27,7 @@ const SUPPORT_FAQ_ITEMS = [
 ];
 
 export const metadata: Metadata = {
-  title: `Support - ${APP_NAME}`,
+  title: 'Support',
   description:
     'Get help with Jovie. Browse documentation, find answers to common questions, or contact our support team.',
   keywords: [
