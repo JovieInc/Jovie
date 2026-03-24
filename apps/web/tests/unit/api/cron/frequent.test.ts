@@ -126,6 +126,7 @@ vi.mock('@/app/api/cron/send-release-notifications/route', () => ({
 describe('GET /api/cron/frequent', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-03-24T10:30:00.000Z'));
 
@@ -214,5 +215,25 @@ describe('GET /api/cron/frequent', () => {
     expect(data.results.scheduleNotifications.error).toBe(
       'entitlements unavailable'
     );
+  });
+
+  it('returns 207 when sendPendingNotifications fails', async () => {
+    mockSendPendingNotifications.mockRejectedValue(
+      new Error('send service down')
+    );
+
+    const { GET } = await import('@/app/api/cron/frequent/route');
+
+    const response = await GET(
+      new Request('http://localhost/api/cron/frequent', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(207);
+    expect(data.success).toBe(false);
+    expect(data.results.sendNotifications.success).toBe(false);
+    expect(data.results.sendNotifications.error).toBe('send service down');
   });
 });
