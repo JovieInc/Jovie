@@ -11,6 +11,8 @@ const basePost: BlogPostMetadata = {
   authorTitle: 'Founder at Jovie',
   authorProfile: 'https://jov.ie/tim',
   excerpt: 'Test excerpt',
+  tags: [],
+  readingTime: 3,
 };
 
 const baseProfile = {

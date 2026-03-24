@@ -15,8 +15,17 @@ vi.mock('@/lib/env-server', () => ({
 }));
 
 const getBlogPostSlugs = vi.fn();
+const getBlogPosts = vi.fn();
+const slugifyCategory = vi.fn((name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+);
 vi.mock('@/lib/blog/getBlogPosts', () => ({
   getBlogPostSlugs,
+  getBlogPosts,
+  slugifyCategory,
 }));
 
 const queryMock = vi.fn();
@@ -72,6 +81,19 @@ vi.mock('@sentry/nextjs', () => ({
 describe('sitemap', () => {
   it('returns marketing, blog, profile, release, and deduplicated track URLs', async () => {
     getBlogPostSlugs.mockResolvedValue(['hello-world']);
+    getBlogPosts.mockResolvedValue([
+      {
+        slug: 'hello-world',
+        title: 'Hello World',
+        date: '2026-01-01',
+        author: 'Tim',
+        authorUsername: 'tim',
+        category: 'Test',
+        tags: [],
+        excerpt: 'Test',
+        readingTime: 3,
+      },
+    ]);
 
     whereMock
       .mockResolvedValueOnce([

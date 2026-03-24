@@ -5,7 +5,11 @@ import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
+import {
+  getBlogPostSlugs,
+  getBlogPosts,
+  slugifyCategory,
+} from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -83,9 +87,10 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogSlugs] = await Promise.all([
+  const [catalog, blogSlugs, blogPosts] = await Promise.all([
     getSitemapCatalog(),
     getBlogPostSlugs(),
+    getBlogPosts(),
   ]);
 
   const now = new Date();
@@ -147,12 +152,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
+  // Create a date lookup from blog posts for more accurate lastModified
+  const postDateMap = new Map(
+    blogPosts.map(p => [p.slug, new Date(p.updatedDate ?? p.date)])
+  );
+
   const blogPages: MetadataRoute.Sitemap = blogSlugs.map(slug => ({
     url: `${BASE_URL}/blog/${slug}`,
+    lastModified: postDateMap.get(slug) ?? now,
+    changeFrequency: 'monthly',
+    priority: 0.7,
+  }));
+
+  // Blog author pages
+  const blogAuthors = [
+    ...new Set(
+      blogPosts.map(p => p.authorUsername).filter((u): u is string => u != null)
+    ),
+  ];
+  const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => ({
+    url: `${BASE_URL}/blog/authors/${username}`,
     lastModified: now,
     changeFrequency: 'monthly',
     priority: 0.6,
   }));
+
+  // Blog category pages
+  const blogCategories = [
+    ...new Set(
+      blogPosts.map(p => p.category).filter((c): c is string => c != null)
+    ),
+  ];
+  const blogCategoryPages: MetadataRoute.Sitemap = blogCategories.map(
+    category => ({
+      url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    })
+  );
 
   const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
     slug => ({
@@ -202,6 +240,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPages,
     ...blogPages,
+    ...blogAuthorPages,
+    ...blogCategoryPages,
     ...comparisonPages,
     ...alternativePages,
     ...profilePages,

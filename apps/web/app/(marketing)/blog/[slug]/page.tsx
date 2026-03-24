@@ -1,13 +1,21 @@
 import { notFound } from 'next/navigation';
 import { BlogPostPage } from '@/components/organisms/BlogPostPage';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { getBlogPost, getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
+import {
+  getBlogPost,
+  getBlogPostSlugs,
+  getRelatedPosts,
+} from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import {
   buildArticleSchema,
   buildBreadcrumbSchema,
 } from '@/lib/constants/schemas';
-import { getProfileByUsername } from '@/lib/services/profile';
+import type { ProfileData } from '@/lib/services/profile';
+import {
+  getProfileByUsername,
+  getProfilesByUsernames,
+} from '@/lib/services/profile';
 
 interface BlogPostPageProps {
   readonly params: Promise<{ slug: string }>;
@@ -37,10 +45,15 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
         title: post.title,
         description: post.excerpt,
         url: `${APP_URL}/blog/${post.slug}`,
-        type: 'article',
+        type: 'article' as const,
+        publishedTime: post.date,
+        modifiedTime: post.updatedDate ?? post.date,
+        authors: [post.author],
+        section: post.category,
+        tags: post.tags,
       },
       twitter: {
-        card: 'summary_large_image',
+        card: 'summary_large_image' as const,
         title: post.title,
         description: post.excerpt,
       },
@@ -59,7 +72,9 @@ export default async function BlogPostRoute({
 
   try {
     const post = await getBlogPost(slug);
-    let profile = null;
+
+    // Resolve author profile
+    let profile: ProfileData | null = null;
     if (post.authorUsername) {
       try {
         profile = await getProfileByUsername(post.authorUsername);
@@ -69,12 +84,47 @@ export default async function BlogPostRoute({
     }
     const author = resolveAuthor(post, profile);
 
+    // Get related posts with author data
+    const relatedPosts = await getRelatedPosts(slug, post.category);
+    const relatedUsernames = [
+      ...new Set(
+        relatedPosts
+          .map(p => p.authorUsername)
+          .filter((u): u is string => u != null)
+      ),
+    ];
+    let relatedProfileMap: Map<string, ProfileData> = new Map();
+    try {
+      relatedProfileMap = await getProfilesByUsernames(relatedUsernames);
+    } catch {
+      // Fallback to frontmatter-only
+    }
+    const relatedAuthors = new Map(
+      relatedPosts.map(p => [
+        p.slug,
+        resolveAuthor(
+          p,
+          p.authorUsername
+            ? relatedProfileMap.get(p.authorUsername.toLowerCase())
+            : null
+        ),
+      ])
+    );
+
+    // Build schemas
     const articleSchema = buildArticleSchema({
       headline: post.title,
       description: post.excerpt,
       datePublished: post.date,
+      dateModified: post.updatedDate ?? post.date,
       authorName: post.author,
+      authorUrl: author.profileUrl
+        ? `${APP_URL}${author.profileUrl}`
+        : undefined,
+      authorImageUrl: author.avatarUrl ?? undefined,
       url: `${APP_URL}/blog/${post.slug}`,
+      keywords: post.tags,
+      wordCount: post.html.split(/\s+/).length,
     });
 
     const breadcrumbSchema = buildBreadcrumbSchema([
@@ -87,7 +137,13 @@ export default async function BlogPostRoute({
       <>
         <script type='application/ld+json'>{articleSchema}</script>
         <script type='application/ld+json'>{breadcrumbSchema}</script>
-        <BlogPostPage post={post} author={author} />
+        <BlogPostPage
+          post={post}
+          author={author}
+          toc={post.toc}
+          relatedPosts={relatedPosts}
+          relatedAuthors={relatedAuthors}
+        />
       </>
     );
   } catch {
