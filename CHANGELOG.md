@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.55] - 2026-03-24
+
+### Fixed
+
+- OAuth login on staging redirecting to `jov.ie/__clerk` instead of `staging.jov.ie/__clerk` — added runtime hostname-based Clerk key selection so staging uses its own Clerk instance
+- [internal] Dual Clerk middleware instances (production + staging) with lazy initialization
+- [internal] 8 dynamic layouts now resolve publishable key from request headers instead of build-time env var
+
 ## [26.4.54] - 2026-03-24
 
 ### Fixed
