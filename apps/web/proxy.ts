@@ -871,7 +871,13 @@ const clerkWrappedMiddleware = clerkMiddleware(
     return handleRequest(req, userId);
   },
   {
-    frontendApiProxy: { enabled: true },
+    // Proxy Clerk JS through /__clerk in production/preview to avoid CORS/CSP
+    // issues with the custom domain. Disabled in dev — the proxy target
+    // (clerk.jov.ie) isn't reachable from localhost.
+    frontendApiProxy: {
+      enabled:
+        process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV,
+    },
   }
 );
 
