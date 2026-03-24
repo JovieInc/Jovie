@@ -157,10 +157,13 @@
   background: var(--color-bg-surface-1);
 }
 
-/* OTP error state — Clerk uses data-feedback="error" and data-error attributes */
+/* OTP error state — covers @clerk/ui (data-error, data-feedback) and Clerk Elements (data-invalid) */
 :is(.cl-signIn-root, .cl-signUp-root)
   .cl-otpCodeFieldInput[data-feedback="error"],
 :is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-error],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-invalid],
+:is(.cl-signIn-root, .cl-signUp-root)
+  .cl-otpCodeFieldInput[aria-invalid="true"],
 :is(.cl-signIn-root, .cl-signUp-root) .cl-error .cl-otpCodeFieldInput {
   border-color: var(--linear-error);
   animation: otp-shake 300ms var(--ease-interactive);
@@ -185,6 +188,15 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  @keyframes otp-shake {
+    0%,
+    100% {
+      transform: none;
+    }
+  }
+}
+
 /* --- F. Focus rings (consolidated) --- */
 :is(.cl-signIn-root, .cl-signUp-root)
   :is(
@@ -200,7 +212,9 @@
     .cl-headerBackLink,
     .cl-alternativeMethodsBlockButton,
     .cl-selectButton,
-    .cl-phoneInputBox
+    .cl-selectSearchInput,
+    .cl-phoneInputBox,
+    .cl-formButtonReset
   ):focus-visible {
   outline: none;
   border-color: var(--color-border-default);
@@ -290,7 +304,11 @@
   font-size: 0.9375rem;
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButtonText,
+:is(.cl-signIn-root, .cl-signUp-root) .cl-socialButtonsBlockButtonText {
+  color: var(--color-text-primary-token);
+  font-weight: 510;
+}
+
 :is(.cl-signIn-root, .cl-signUp-root) .cl-alertText,
 :is(.cl-signIn-root, .cl-signUp-root) .cl-identityPreviewText {
   color: var(--color-text-primary-token);
