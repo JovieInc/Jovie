@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { NumberedSection } from '@/components/marketing';
+import { FaqSection, NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
@@ -270,23 +270,11 @@ export default function HomePage() {
       <TestimonialsSection />
 
       {/* FAQ */}
-      <section className='mx-auto max-w-[720px] px-6 py-20 sm:px-8 lg:px-10'>
-        <h2 className='text-center text-3xl font-semibold tracking-tight text-primary-token'>
-          Frequently asked questions
-        </h2>
-        <div className='mt-10 divide-y divide-border-primary'>
-          {HOME_FAQ_ITEMS.map(item => (
-            <details key={item.question} className='group py-5'>
-              <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
-                {item.question}
-              </summary>
-              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                {item.answer}
-              </p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <FaqSection
+        items={HOME_FAQ_ITEMS}
+        className='mx-auto max-w-[720px] px-6 py-20 sm:px-8 lg:px-10'
+        headingClassName='text-center text-3xl font-semibold tracking-tight text-primary-token'
+      />
 
       {/* Final CTA */}
       <FinalCTASection />

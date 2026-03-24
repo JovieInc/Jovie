@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { MarketingHero } from '@/components/marketing';
+import { FaqSection, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
@@ -123,23 +123,7 @@ export default async function AlternativesPage({
       </section>
 
       {/* FAQ */}
-      <section className='mx-auto max-w-[720px] px-6 pb-24 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Frequently asked questions
-        </h2>
-        <div className='mt-8 divide-y divide-border-primary'>
-          {data.faq.map(item => (
-            <details key={item.question} className='group py-5'>
-              <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
-                {item.question}
-              </summary>
-              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                {item.answer}
-              </p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <FaqSection items={data.faq} />
     </>
   );
 }

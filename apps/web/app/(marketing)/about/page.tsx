@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { MarketingHero } from '@/components/marketing';
+import { FaqSection, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import {
   buildBreadcrumbSchema,
@@ -185,23 +185,7 @@ export default function AboutPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className='mx-auto max-w-[720px] px-6 pb-24 sm:px-8 lg:px-10'>
-        <h2 className='text-2xl font-semibold text-primary-token'>
-          Frequently asked questions
-        </h2>
-        <div className='mt-8 divide-y divide-border-primary'>
-          {FAQ_ITEMS.map(item => (
-            <details key={item.question} className='group py-5'>
-              <summary className='cursor-pointer text-base font-medium text-primary-token transition-colors hover:text-accent-token'>
-                {item.question}
-              </summary>
-              <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
-                {item.answer}
-              </p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <FaqSection items={FAQ_ITEMS} />
     </>
   );
 }
