@@ -17,14 +17,14 @@ export const revalidate = false;
 
 export async function generateStaticParams() {
   const posts = await getBlogPosts();
-  const categories = [
-    ...new Set(
-      posts.map(p => p.category).filter((c): c is string => c != null)
-    ),
-  ];
-  return categories.map(category => ({
-    slug: slugifyCategory(category),
-  }));
+  const slugSet = new Set(
+    posts
+      .map(p => p.category)
+      .filter((c): c is string => c != null)
+      .map(slugifyCategory)
+      .filter(Boolean)
+  );
+  return [...slugSet].map(slug => ({ slug }));
 }
 
 export async function generateMetadata({ params }: CategoryPageProps) {

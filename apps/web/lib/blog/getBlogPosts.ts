@@ -38,9 +38,17 @@ function countWords(content: string): number {
   const text = content
     .replaceAll(/^---[\s\S]*?---/g, '') // strip frontmatter
     .replaceAll(/```[\s\S]*?```/g, '') // strip code blocks
+    .replaceAll(/<[^>]+>/g, ' ') // strip raw HTML tags
     .replaceAll(/[#*_`>[\]()!|-]/g, '') // strip markdown syntax
     .trim();
   return text.split(/\s+/).filter(Boolean).length;
+}
+
+/** Validate and normalize a date string from frontmatter */
+function parseDate(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed || Number.isNaN(Date.parse(trimmed))) return undefined;
+  return trimmed;
 }
 
 /** Calculate reading time in minutes (238 WPM average) */
@@ -133,7 +141,7 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     slug,
     title: data.title ?? formatTitleFromSlug(slug),
     date: data.date ?? new Date().toISOString().split('T')[0],
-    updatedDate: data.updatedDate,
+    updatedDate: parseDate(data.updatedDate),
     author: data.author ?? DEFAULT_AUTHOR,
     authorUsername: data.authorUsername,
     authorTitle: data.authorTitle,
@@ -166,7 +174,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         slug,
         title: data.title ?? formatTitleFromSlug(slug),
         date: data.date ?? new Date().toISOString().split('T')[0],
-        updatedDate: data.updatedDate,
+        updatedDate: parseDate(data.updatedDate),
         author: data.author ?? DEFAULT_AUTHOR,
         authorUsername: data.authorUsername,
         authorTitle: data.authorTitle,

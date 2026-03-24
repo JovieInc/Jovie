@@ -154,14 +154,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
-  // Blog author pages
+  // Blog author pages — normalize to lowercase to avoid duplicates
   const blogAuthors = [
     ...new Set(
-      blogPosts.map(p => p.authorUsername).filter((u): u is string => u != null)
+      blogPosts
+        .map(p => p.authorUsername?.trim().toLowerCase())
+        .filter((u): u is string => Boolean(u))
     ),
   ];
   const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => {
-    const authorPosts = blogPosts.filter(p => p.authorUsername === username);
+    const authorPosts = blogPosts.filter(
+      p => p.authorUsername?.trim().toLowerCase() === username
+    );
     const latestDate =
       authorPosts.length > 0
         ? new Date(
@@ -180,33 +184,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  // Blog category pages
-  const blogCategories = [
-    ...new Set(
-      blogPosts.map(p => p.category).filter((c): c is string => c != null)
-    ),
-  ];
-  const blogCategoryPages: MetadataRoute.Sitemap = blogCategories.map(
-    category => {
-      const catPosts = blogPosts.filter(p => p.category === category);
-      const latestDate =
-        catPosts.length > 0
-          ? new Date(
-              Math.max(
-                ...catPosts.map(p =>
-                  new Date(p.updatedDate ?? p.date).getTime()
-                )
-              )
-            )
-          : now;
-      return {
-        url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
-        lastModified: latestDate,
-        changeFrequency: 'monthly' as const,
-        priority: 0.6,
-      };
+  // Blog category pages — deduplicate by slug to avoid collisions
+  const categorySlugMap = new Map<string, string>();
+  for (const post of blogPosts) {
+    const cat = post.category?.trim();
+    if (!cat) continue;
+    const slug = slugifyCategory(cat);
+    if (slug && !categorySlugMap.has(slug)) {
+      categorySlugMap.set(slug, cat);
     }
-  );
+  }
+  const blogCategoryPages: MetadataRoute.Sitemap = [
+    ...categorySlugMap.entries(),
+  ].map(([slug, category]) => {
+    const catPosts = blogPosts.filter(
+      p => p.category && slugifyCategory(p.category) === slug
+    );
+    const latestDate =
+      catPosts.length > 0
+        ? new Date(
+            Math.max(
+              ...catPosts.map(p => new Date(p.updatedDate ?? p.date).getTime())
+            )
+          )
+        : now;
+    return {
+      url: `${BASE_URL}/blog/category/${slug}`,
+      lastModified: latestDate,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    };
+  });
 
   const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
     slug => ({

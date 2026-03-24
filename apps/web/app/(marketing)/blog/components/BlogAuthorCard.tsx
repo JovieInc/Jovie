@@ -36,7 +36,8 @@ export function BlogAuthorCard({
           {author.profileUrl && (
             <Link
               href={author.profileUrl}
-              className='mt-4 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200'
+              aria-label={`View ${author.name}'s profile`}
+              className='mt-4 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
             >
               View profile →
             </Link>
@@ -73,7 +74,8 @@ export function BlogAuthorCard({
       {author.profileUrl && (
         <Link
           href={author.profileUrl}
-          className='text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 whitespace-nowrap self-start sm:self-center'
+          aria-label={`View ${author.name}'s profile`}
+          className='text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 whitespace-nowrap self-start sm:self-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token focus-visible:ring-offset-2'
         >
           View profile →
         </Link>
