@@ -437,12 +437,12 @@ const DASHBOARD_PAGES = [
 const FAST_DASHBOARD_PAGES = [APP_ROUTES.AUDIENCE];
 
 const SETTINGS_PAGES = [
-  '/app/settings',
+  APP_ROUTES.SETTINGS_ACCOUNT,
   '/app/settings/billing',
   '/app/settings/branding',
   '/app/settings/ad-pixels',
 ];
-const FAST_SETTINGS_PAGES = ['/app/settings'];
+const FAST_SETTINGS_PAGES = [APP_ROUTES.SETTINGS_ACCOUNT];
 
 const ADMIN_PAGES = [
   '/app/admin',

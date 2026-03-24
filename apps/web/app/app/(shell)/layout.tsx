@@ -1,10 +1,12 @@
 import * as Sentry from '@sentry/nextjs';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
 import { APP_ROUTES } from '@/constants/routes';
 import { ImpersonationBannerWrapper } from '@/features/admin/ImpersonationBannerWrapper';
 import { OperatorBanner } from '@/features/admin/OperatorBanner';
 import { ErrorBanner } from '@/features/feedback/ErrorBanner';
+import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
@@ -27,13 +29,17 @@ export default async function AppShellLayout({
 }) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-  // NO MORE AUTH GATE - proxy.ts already routed us correctly!
-  // If we're rendering this layout, user is ACTIVE and can access the app.
   try {
     // Get auth first (fast — reads from request headers, cached via React cache()).
     // This lets us start feature flags in parallel with dashboard data,
     // rather than waiting for the entire Promise.all to complete before starting flags.
     const auth = await getCachedAuth();
+    // Defense in depth: the proxy should already block signed-out app access,
+    // but the shell must not render protected UI if auth resolution disagrees.
+    if (!auth.userId) {
+      const headerStore = await headers();
+      redirect(buildAppShellSignInUrl(headerStore));
+    }
 
     // Parallelize dashboard data and feature flags.
     // getDashboardData internally calls getCachedAuth() which is deduplicated.
