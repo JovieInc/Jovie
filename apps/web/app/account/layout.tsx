@@ -2,7 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { APP_ROUTES } from '@/constants/routes';
-import { publicEnv } from '@/lib/env-public';
+import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,7 @@ export default async function AccountLayout({
     redirect(APP_ROUTES.SIGNIN);
   }
 
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (
     <ClientProviders publishableKey={publishableKey} skipCoreProviders>

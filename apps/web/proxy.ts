@@ -1,6 +1,7 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import {
   type NextFetchEvent,
+  type NextMiddleware,
   type NextRequest,
   NextResponse,
 } from 'next/server';
@@ -19,6 +20,7 @@ import {
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
@@ -390,14 +392,13 @@ const CLERK_SENSITIVE_PATTERNS = [
   'placeholder',
 ] as const;
 
-function isMockOrMissingClerkConfig(): boolean {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const secretKey = process.env.CLERK_SECRET_KEY;
+function isMockOrMissingClerkConfig(hostname: string): boolean {
+  const keys = resolveClerkKeys(hostname);
 
-  if (!publishableKey || !secretKey) return true;
+  if (!keys.publishableKey || !keys.secretKey) return true;
 
-  const publishableLower = publishableKey.toLowerCase();
-  const secretLower = secretKey.toLowerCase();
+  const publishableLower = keys.publishableKey.toLowerCase();
+  const secretLower = keys.secretKey.toLowerCase();
 
   return CLERK_SENSITIVE_PATTERNS.some(
     pattern =>
@@ -865,7 +866,11 @@ function buildFinalResponse(
   return res;
 }
 
-const clerkWrappedMiddleware = clerkMiddleware(
+const frontendApiProxyEnabled =
+  process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV;
+
+// Production Clerk middleware (default keys from env)
+const clerkProductionMiddleware = clerkMiddleware(
   async (auth, req) => {
     const { userId } = await auth();
     return handleRequest(req, userId);
@@ -874,12 +879,34 @@ const clerkWrappedMiddleware = clerkMiddleware(
     // Proxy Clerk JS through /__clerk in production/preview to avoid CORS/CSP
     // issues with the custom domain. Disabled in dev — the proxy target
     // (clerk.jov.ie) isn't reachable from localhost.
-    frontendApiProxy: {
-      enabled:
-        process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV,
-    },
+    frontendApiProxy: { enabled: frontendApiProxyEnabled },
   }
 );
+
+// Staging Clerk middleware — lazy-initialized with separate instance keys.
+// The same build is promoted staging → production, so staging keys are
+// stored as server-only runtime env vars (not NEXT_PUBLIC_).
+let _clerkStagingMiddleware: NextMiddleware | null = null;
+function getClerkStagingMiddleware() {
+  if (_clerkStagingMiddleware === null) {
+    const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
+    if (stagingPk && stagingSk) {
+      _clerkStagingMiddleware = clerkMiddleware(
+        async (auth, req) => {
+          const { userId } = await auth();
+          return handleRequest(req, userId);
+        },
+        {
+          publishableKey: stagingPk,
+          secretKey: stagingSk,
+          frontendApiProxy: { enabled: true },
+        }
+      );
+    }
+  }
+  return _clerkStagingMiddleware;
+}
 
 export default async function middleware(
   req: NextRequest,
@@ -903,8 +930,10 @@ export default async function middleware(
   const pathname = req.nextUrl.pathname;
   const pathInfo = categorizePath(pathname);
 
-  // Check if Clerk config is missing or mocked
-  const clerkConfigMissing = isMockOrMissingClerkConfig();
+  const hostname = req.nextUrl.hostname;
+
+  // Check if Clerk config is missing or mocked (staging-aware)
+  const clerkConfigMissing = isMockOrMissingClerkConfig(hostname);
 
   // In test mode, always bypass Clerk if config is missing
   if (process.env.NODE_ENV === 'test' && clerkConfigMissing) {
@@ -949,7 +978,12 @@ export default async function middleware(
     return handleRequest(req, null);
   }
 
-  return clerkWrappedMiddleware(req, event);
+  // Select the correct Clerk middleware based on hostname.
+  // Staging uses a separate Clerk instance with its own keys.
+  const selectedMiddleware = isStagingHost(hostname)
+    ? (getClerkStagingMiddleware() ?? clerkProductionMiddleware)
+    : clerkProductionMiddleware;
+  return selectedMiddleware(req, event);
 }
 
 export const config = {
