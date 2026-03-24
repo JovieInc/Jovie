@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.57] - 2026-03-24
+
+### Fixed
+
+- Marketing homepage background color mismatched DESIGN.md spec — corrected from dark gray `#08090a` to pure black `#000000`
+- Signup CTA button using light gray instead of DESIGN.md accent color — aligned to `#5E6AD2`
+- Releases dashboard hero image missing `priority` prop — added for faster LCP
+- Artist name on profile using regular weight instead of DESIGN.md semibold (590) spec
+
+### Added
+
+- Golden path E2E test coverage: onboarding completion, responsive layout, pro feature gates, payment flow
+- Shared Stripe test helpers for consistent payment E2E testing
+
 ## [26.4.56] - 2026-03-24
 
 ### Fixed
