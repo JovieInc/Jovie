@@ -1,8 +1,8 @@
 'use client';
 
-import { Disc, Music, Play } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { PhoneFrame } from './PhoneFrame';
 import { TIM_WHITE_PROFILE } from './tim-white';
 
@@ -22,40 +22,52 @@ const PROFILE = {
 
 function ListenContent() {
   const dsps = [
-    { name: 'Spotify', icon: Disc, color: '#1DB954' },
-    { name: 'Apple Music', icon: Music, color: '#FA243C' },
-    { name: 'YouTube', icon: Play, color: '#FF0000' },
+    {
+      name: 'Spotify',
+      icon: <SocialIcon platform='spotify' className='w-3.5 h-3.5' />,
+      color: '#1DB954',
+    },
+    {
+      name: 'Apple Music',
+      icon: <SocialIcon platform='apple' className='w-3.5 h-3.5' />,
+      color: '#FA243C',
+    },
+    {
+      name: 'YouTube',
+      icon: <SocialIcon platform='youtube' className='w-3.5 h-3.5' />,
+      color: '#FF0000',
+    },
   ];
   return (
     <div className='flex flex-col gap-2'>
-      {dsps.map(dsp => {
-        const Icon = dsp.icon;
-        return (
-          <div
-            key={dsp.name}
-            className='flex items-center justify-between p-2.5 rounded-xl'
-            style={{
-              backgroundColor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div className='flex items-center gap-2.5'>
-              <div
-                className='w-7 h-7 rounded-lg flex items-center justify-center'
-                style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
-              >
-                <Icon className='w-3.5 h-3.5' style={{ color: dsp.color }} />
-              </div>
-              <span className='text-[13px] font-medium text-white/90'>
-                {dsp.name}
-              </span>
+      {dsps.map(dsp => (
+        <div
+          key={dsp.name}
+          className='flex items-center justify-between p-2.5 rounded-xl'
+          style={{
+            backgroundColor: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <div className='flex items-center gap-2.5'>
+            <div
+              className='w-7 h-7 rounded-lg flex items-center justify-center'
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: dsp.color,
+              }}
+            >
+              {dsp.icon}
             </div>
-            <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
-              Play
+            <span className='text-[13px] font-medium text-white/90'>
+              {dsp.name}
             </span>
           </div>
-        );
-      })}
+          <span className='px-3 py-1 rounded-full text-[11px] font-medium bg-white text-black'>
+            Play
+          </span>
+        </div>
+      ))}
     </div>
   );
 }

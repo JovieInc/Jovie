@@ -1,4 +1,5 @@
-import { AtSign, Camera, Mail, Music2 } from 'lucide-react';
+import { Mail, Music2 } from 'lucide-react';
+import React from 'react';
 import { describe, expect, it } from 'vitest';
 import {
   buildUTMContext,
@@ -28,10 +29,15 @@ describe('getUTMShareDropdownItems', () => {
         .map(item => [item.id, item.icon])
     );
 
-    expect(iconById['utm-share-instagram-story']).toBe(Camera);
-    expect(iconById['utm-share-instagram-bio']).toBe(Camera);
+    // Social platform icons are now ReactNode elements via SocialIcon
+    expect(React.isValidElement(iconById['utm-share-instagram-story'])).toBe(
+      true
+    );
+    expect(React.isValidElement(iconById['utm-share-instagram-bio'])).toBe(
+      true
+    );
     expect(iconById['utm-share-tiktok-bio']).toBe(Music2);
-    expect(iconById['utm-share-twitter-post']).toBe(AtSign);
+    expect(React.isValidElement(iconById['utm-share-twitter-post'])).toBe(true);
     expect(iconById['utm-share-newsletter']).toBe(Mail);
   });
 });
