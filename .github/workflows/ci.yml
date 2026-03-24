@@ -2424,14 +2424,25 @@ jobs:
 
       - name: Alias preview to staging.jov.ie
         id: alias-staging
-        run: vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}; then
+            echo "alias_success=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Could not alias preview to staging.jov.ie; falling back to preview URL for canary checks."
+            echo "alias_success=false" >> "$GITHUB_OUTPUT"
+          fi
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Resolve canary URL
         id: resolve-canary-url
-        run: echo "canary_url=https://staging.jov.ie" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ steps.alias-staging.outputs.alias_success }}" = "true" ]; then
+            echo "canary_url=https://staging.jov.ie" >> "$GITHUB_OUTPUT"
+          else
+            echo "canary_url=${{ steps.deploy.outputs.deploy_url }}" >> "$GITHUB_OUTPUT"
+          fi
 
   canary-health-gate:
     name: Canary Health Gate (staging)
