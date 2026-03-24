@@ -155,7 +155,7 @@
     "dompurify": "^3.3.3",
     "dotenv": "^17.3.1",
     "drizzle-orm": "0.45.1",
-    "flags": "^4.0.3",
+    "flags": "^4.0.5",
     "heic2any": "^0.0.4",
     "isomorphic-dompurify": "2.35.0",
     "jose": "^6.1.3",
