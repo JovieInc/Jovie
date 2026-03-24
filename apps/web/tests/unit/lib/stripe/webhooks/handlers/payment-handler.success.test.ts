@@ -225,6 +225,10 @@ describe('@critical PaymentHandler - payment succeeded', () => {
 
     expect(result.success).toBe(true);
     expect(result.skipped).toBeFalsy();
+    expect(mockLogFallback).toHaveBeenCalledWith(
+      'No user ID in subscription metadata',
+      expect.objectContaining({ event: 'invoice.payment_succeeded' })
+    );
     expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_789');
     expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
       expect.objectContaining({
