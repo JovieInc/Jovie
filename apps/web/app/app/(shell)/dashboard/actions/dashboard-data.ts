@@ -259,7 +259,11 @@ async function fetchDashboardCoreWithSession(
         const [userData] = await dashboardQuery(
           () =>
             tx
-              .select({ id: users.id, email: users.email })
+              .select({
+                id: users.id,
+                email: users.email,
+                activeProfileId: users.activeProfileId,
+              })
               .from(users)
               .where(eq(users.clerkId, sessionUserId))
               .limit(1),
@@ -323,7 +327,11 @@ async function fetchDashboardCoreWithSession(
           };
         }
 
-        const selected = selectDashboardProfile(creatorData);
+        // Respect explicit activeProfileId, fall back to heuristic
+        const selected = userData.activeProfileId
+          ? (creatorData.find(p => p.id === userData.activeProfileId) ??
+            selectDashboardProfile(creatorData))
+          : selectDashboardProfile(creatorData);
 
         // Fetch settings, link counts, and tipping stats sequentially.
         // These share a single transaction connection (pg serializes queries
