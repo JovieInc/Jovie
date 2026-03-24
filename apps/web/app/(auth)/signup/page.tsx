@@ -191,7 +191,7 @@ function SignUpPageContent() {
         routing='hash'
         oauthFlow='redirect'
         signInUrl={signInUrl}
-        fallbackRedirectUrl={APP_ROUTES.WAITLIST}
+        fallbackRedirectUrl={APP_ROUTES.ONBOARDING}
       />
       <p className='mt-4 text-center text-[11px] leading-relaxed text-tertiary-token'>
         By signing up, you agree to our{' '}

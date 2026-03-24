@@ -100,7 +100,7 @@ describe('signup page', () => {
         routing: 'hash',
         oauthFlow: 'redirect',
         signInUrl: APP_ROUTES.SIGNIN,
-        fallbackRedirectUrl: APP_ROUTES.WAITLIST,
+        fallbackRedirectUrl: APP_ROUTES.ONBOARDING,
       })
     );
     expect(

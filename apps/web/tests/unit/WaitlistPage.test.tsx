@@ -7,7 +7,7 @@ const { mockPush, mockReplace, mockFetch } = vi.hoisted(() => ({
   mockReplace: vi.fn(),
   mockFetch: vi.fn().mockResolvedValue({
     ok: true,
-    json: async () => ({ hasEntry: false, status: null, inviteToken: null }),
+    json: async () => ({ hasEntry: false, status: null }),
   }),
 }));
 

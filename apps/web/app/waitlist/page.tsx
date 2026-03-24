@@ -189,18 +189,6 @@ export default function WaitlistPage() {
     if (!waitlistStatus) return;
 
     if (waitlistStatus.hasEntry) {
-      if (
-        waitlistStatus.status === 'invited' &&
-        waitlistStatus.inviteToken &&
-        waitlistStatus.inviteUsername
-      ) {
-        clearWaitlistStorage();
-        router.replace(
-          `/${encodeURIComponent(waitlistStatus.inviteUsername)}/claim?token=${encodeURIComponent(waitlistStatus.inviteToken)}`
-        );
-        return;
-      }
-
       if (waitlistStatus.status === 'claimed') {
         clearWaitlistStorage();
         router.replace(APP_ROUTES.DASHBOARD);
