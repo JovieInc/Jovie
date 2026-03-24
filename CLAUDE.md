@@ -53,6 +53,17 @@ This project includes [gstack](https://github.com/garrytan/gstack) vendored at `
 
 This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
 
+## E2E Test Authentication
+
+Test auth uses Clerk `+clerk_test` emails with magic OTP `424242`. **No password needed.**
+
+- Doppler: `jovie-web` project, `dev` config, binary at `/opt/homebrew/bin/doppler`
+- Test user: `E2E_CLERK_USER_USERNAME` in Doppler (format `*+clerk_test@jov.ie`)
+- Auth guard: `apps/web/tests/product-screenshots/helpers.ts` — `shouldSkipAuth()` skips if username missing or Clerk setup failed. `+clerk_test` emails bypass password requirement.
+- Screenshots: `doppler run -p jovie-web -c dev -- pnpm --filter web screenshots`
+- Browse auth: `doppler run -p jovie-web -c dev -- bun run scripts/browse-auth.ts`
+- Full docs: `apps/web/tests/TESTING.md` (E2E Authentication section)
+
 ## Design System
 
 Always read `DESIGN.md` before making any visual or UI decisions. All font choices, colors, spacing, and aesthetic direction are defined there. Do not deviate without explicit user approval. In QA mode, flag any code that doesn't match `DESIGN.md`.

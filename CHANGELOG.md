@@ -23,6 +23,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Removed stale `NEXT_PUBLIC_CLERK_PROXY_URL` from Doppler prd/stg configs
 - [internal] Updated Clerk middleware bypass paths from `/clerk` to `/__clerk` (SDK default)
 - Deduplicated `| Jovie` suffix in page titles (was appearing twice on some pages)
+- Screenshot pipeline auth guard now allows `+clerk_test` emails without password
+- Clerk proxy disabled for screenshot dev server (avoids HTTPS requirement on localhost)
+- Profile screenshot locator no longer matches hidden dark-mode logo images
+
+### Added
+
+- Homepage product screenshots: audience CRM dashboard, artist profile (phone + desktop)
+- E2E authentication documentation in TESTING.md and CLAUDE.md
+
+### Removed
+
+- Founder quote from homepage testimonials section (Tim White quote card)
 
 ## [26.4.51] - 2026-03-24
 
