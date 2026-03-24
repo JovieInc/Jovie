@@ -7,6 +7,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.48] - 2026-03-23
 
+### Fixed
+
+- Reduced Sentry error noise (~80% of monthly budget) by filtering known non-actionable errors
+- Replaced `captureWarning` with `console.warn` for expected build-info read failures in dev
+- Changed retryable DB errors to log as Sentry breadcrumbs instead of exceptions
+- Added CSP violation filtering (browser extension noise) to `scrubPii`
+- Added `ignoreErrors` patterns for build-info, FeaturedCreators timeout, daily budget, hooks mismatch
+
+### Removed
+
+- [internal] Removed Sentry example page and API route (dev-only test scaffolding)
 ### Added
 
 - Brand disambiguation in llms.txt and new llms-full.txt for AI engine optimization
