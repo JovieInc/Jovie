@@ -675,7 +675,7 @@ export async function sendPendingNotifications(): Promise<{
 /**
  * Cron job to send pending release day notifications.
  *
- * Schedule: Every hour (configured in vercel.json)
+ * Schedule: Every 15 minutes via /api/cron/frequent
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');

@@ -217,7 +217,10 @@ describe('sendPendingNotifications', () => {
     const result = await sendPendingNotifications();
     expect(result).toBeDefined();
     expect(mockGetBatchCreatorEntitlements).toHaveBeenCalledWith(['creator_1']);
-    // Notification should be cancelled (not sent) since creator lacks entitlement
-    expect(result.skipped + result.failed).toBeGreaterThanOrEqual(0);
+    // Ineligible creator's notification should be cancelled, not sent
+    expect(result.sent).toBe(0);
+    expect(mockDbUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'cancelled' })
+    );
   });
 });
