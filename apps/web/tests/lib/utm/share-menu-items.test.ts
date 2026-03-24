@@ -1,4 +1,4 @@
-import { Instagram, Mail, Music2, Twitter } from 'lucide-react';
+import { AtSign, Camera, Mail, Music2 } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import {
   buildUTMContext,
@@ -28,10 +28,10 @@ describe('getUTMShareDropdownItems', () => {
         .map(item => [item.id, item.icon])
     );
 
-    expect(iconById['utm-share-instagram-story']).toBe(Instagram);
-    expect(iconById['utm-share-instagram-bio']).toBe(Instagram);
+    expect(iconById['utm-share-instagram-story']).toBe(Camera);
+    expect(iconById['utm-share-instagram-bio']).toBe(Camera);
     expect(iconById['utm-share-tiktok-bio']).toBe(Music2);
-    expect(iconById['utm-share-twitter-post']).toBe(Twitter);
+    expect(iconById['utm-share-twitter-post']).toBe(AtSign);
     expect(iconById['utm-share-newsletter']).toBe(Mail);
   });
 });

@@ -256,6 +256,7 @@ Import logged-in sessions from your real Chromium browser into the headless brow
 ## SETUP (run this check BEFORE any browse command)
 
 ```bash
+command -v bun >/dev/null 2>&1 || export PATH="$HOME/.bun/bin:$PATH"
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"
@@ -313,3 +314,29 @@ Show the user a summary of imported cookies (domain counts).
 - Cookie picker is served on the same port as the browse server (no extra process)
 - Only domain names and cookie counts are shown in the UI — no cookie values are exposed
 - The browse session persists cookies between commands, so imported cookies work immediately
+
+## Troubleshooting
+
+### "Keychain access denied" or "interaction not allowed"
+
+The first time you import cookies, macOS asks for Keychain permission. If you're running inside Claude Code, the dialog may be invisible. To fix permanently:
+
+1. Open **Terminal.app** (the real one, not Claude Code's terminal)
+2. Run: `security find-generic-password -s "Chrome Safe Storage" -w`
+   (Replace "Chrome" with your browser: Arc, Brave, Comet, or Edge)
+3. Click **"Always Allow"** in the macOS dialog
+4. Come back to Claude Code and retry the cookie import
+
+### Alternative: JSON file import
+
+If Keychain access doesn't cooperate, you can export cookies manually:
+
+1. Install a cookie export extension in your browser (e.g., "EditThisCookie" or "Cookie-Editor")
+2. Navigate to the site you want cookies from
+3. Export cookies for that domain as JSON
+4. Save to `~/.gstack/cookies.json` (not /tmp — avoids exposing session tokens)
+5. Import them directly:
+
+```bash
+$B cookie-import ~/.gstack/cookies.json
+```

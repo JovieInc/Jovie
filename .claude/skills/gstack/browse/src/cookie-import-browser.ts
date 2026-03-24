@@ -182,6 +182,20 @@ export async function importCookies(
   }
 }
 
+/**
+ * Pre-check whether Keychain access will work for a given browser.
+ * Useful for diagnostics before attempting a full cookie import.
+ */
+export async function testKeychainAccess(browserName: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const browser = resolveBrowser(browserName);
+    await getKeychainPassword(browser.keychainService);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
 // ─── Internal: Browser Resolution ───────────────────────────────
 
 function resolveBrowser(nameOrAlias: string): BrowserInfo {
@@ -295,7 +309,10 @@ async function getKeychainPassword(service: string): Promise<string> {
     setTimeout(() => {
       proc.kill();
       reject(new CookieImportError(
-        `macOS is waiting for Keychain permission. Look for a dialog asking to allow access to "${service}".`,
+        `macOS Keychain dialog is waiting for permission (may be behind other windows).\n` +
+        `If you can't find it, open Terminal.app and run:\n` +
+        `  security find-generic-password -s "${service}" -w\n` +
+        `Click "Always Allow" to permanently authorize.`,
         'keychain_timeout',
         'retry',
       ));
@@ -312,7 +329,11 @@ async function getKeychainPassword(service: string): Promise<string> {
       const errText = stderr.trim().toLowerCase();
       if (errText.includes('user canceled') || errText.includes('denied') || errText.includes('interaction not allowed')) {
         throw new CookieImportError(
-          `Keychain access denied. Click "Allow" in the macOS dialog for "${service}".`,
+          `Keychain access denied for "${service}". To fix permanently:\n` +
+          `  1. Open Terminal.app (not Claude Code)\n` +
+          `  2. Run: security find-generic-password -s "${service}" -w\n` +
+          `  3. Click "Always Allow" in the macOS dialog\n` +
+          `After that, cookie import will work automatically.`,
           'keychain_denied',
           'retry',
         );

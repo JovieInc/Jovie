@@ -3,9 +3,19 @@
 set -e
 
 if ! command -v bun >/dev/null 2>&1; then
-  echo "Error: bun is required but not installed." >&2
-  echo "Install it: curl -fsSL https://bun.sh/install | bash" >&2
-  exit 1
+  # Check common install locations before failing
+  for _bun_path in "$HOME/.bun/bin/bun" "/usr/local/bin/bun" "/opt/homebrew/bin/bun"; do
+    if [ -x "$_bun_path" ]; then
+      export PATH="$(dirname "$_bun_path"):$PATH"
+      break
+    fi
+  done
+  if ! command -v bun >/dev/null 2>&1; then
+    echo "Error: bun is required but not installed." >&2
+    echo "Install it: curl -fsSL https://bun.sh/install | bash" >&2
+    echo "  Then add to your shell: export PATH=\"\$HOME/.bun/bin:\$PATH\"" >&2
+    exit 1
+  fi
 fi
 
 GSTACK_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -128,6 +138,27 @@ if ! ensure_playwright_browser; then
     echo "gstack setup failed: Playwright Chromium could not be launched" >&2
   fi
   exit 1
+fi
+
+# 2b. Pre-check Keychain access for cookie import (macOS only, installed browsers only)
+if [ "$(uname -s)" = "Darwin" ]; then
+  _APP_SUPPORT="$HOME/Library/Application Support"
+  _BROWSERS_CHECKED=0
+  for _pair in "Google/Chrome/:Chrome Safe Storage" "Arc/User Data/:Arc Safe Storage" "Comet/:Comet Safe Storage"; do
+    _dir="${_pair%%:*}"
+    _svc="${_pair##*:}"
+    if [ -d "$_APP_SUPPORT/$_dir" ]; then
+      _BROWSERS_CHECKED=$((_BROWSERS_CHECKED + 1))
+      if security find-generic-password -s "$_svc" -w >/dev/null 2>&1; then
+        echo "  Keychain: $_svc ✓"
+      else
+        echo "  Keychain: $_svc — needs 'Always Allow' (run: security find-generic-password -s \"$_svc\" -w)"
+      fi
+    fi
+  done
+  if [ "$_BROWSERS_CHECKED" -gt 0 ]; then
+    echo "  Tip: Click 'Always Allow' on any Keychain dialogs for automatic cookie import."
+  fi
 fi
 
 # 3. Ensure ~/.gstack global state directory exists

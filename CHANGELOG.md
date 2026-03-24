@@ -19,6 +19,25 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - PWA standalone mode CSS polish: contained overscroll, disabled nav text selection
 - `display_override` in manifest for progressive enhancement
 - `maximumScale: 5` viewport for accessibility (no pinch-zoom lock)
+### Changed
+
+- Expanded support page with documentation links, FAQ section, and structured data for SEO
+- Added JSON-LD FAQ and breadcrumb schemas to support page
+
+### Fixed
+
+- Deduplicated "Jovie" from support page title tag (was "Support - Jovie - Jovie")
+## [26.3.48] - 2026-03-23
+
+### Changed
+
+- Bumped all dependencies to latest compatible versions across monorepo
+- Updated Next.js 16.1.7 → 16.2.1, Sentry 10.39.0 → 10.45.0, Tailwind CSS 4.1.18 → 4.2.2
+- Upgraded Biome 2.3.11 → 2.4.8, Turbo 2.8.9 → 2.8.20, Vitest 4.0.18 → 4.1.1
+- Bumped Storybook 10.2.x → 10.3.3, AI SDK 6.0.116 → 6.0.137, Motion 12.29.0 → 12.38.0
+- Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
+- Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
+- Excluded HTML files from Biome lint (new in 2.4, not previously linted)
 
 ## [26.4.47] - 2026-03-23
 

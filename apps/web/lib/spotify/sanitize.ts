@@ -370,4 +370,4 @@ export function sanitizeSearchResult(raw: RawSpotifyArtist): {
 // Exports for specific use cases
 // ============================================================================
 
-export { ALLOWED_IMAGE_HOSTS, ALLOWED_EXTERNAL_DOMAINS };
+export { ALLOWED_EXTERNAL_DOMAINS, ALLOWED_IMAGE_HOSTS };

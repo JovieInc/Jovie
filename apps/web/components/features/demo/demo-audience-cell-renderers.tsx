@@ -3,17 +3,17 @@
 import type { CellContext } from '@tanstack/react-table';
 import {
   ArrowLeftRight,
+  AtSign,
+  Camera,
   Flame,
   Globe,
-  Instagram,
   Music,
+  Play,
   Search,
   Sparkles,
   Star,
   TrendingDown,
   TrendingUp,
-  Twitter,
-  Youtube,
 } from 'lucide-react';
 import type {
   AudienceIntentLevel,
@@ -98,13 +98,11 @@ const DOMAIN_MAP: Record<string, string> = {
 };
 
 const SOURCE_ICONS: Record<string, React.ReactElement> = {
-  X: <Twitter className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
+  X: <AtSign className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Instagram: (
-    <Instagram className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
+    <Camera className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
   ),
-  YouTube: (
-    <Youtube className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
-  ),
+  YouTube: <Play className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Spotify: <Music className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Google: <Search className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
 };
