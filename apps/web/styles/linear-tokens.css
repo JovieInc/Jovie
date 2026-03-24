@@ -360,11 +360,11 @@
   --linear-border-default: rgba(255, 255, 255, 0.08);
   --linear-border-strong: rgba(255, 255, 255, 0.14);
   --linear-border-focus: oklch(60% 0.12 282);
-  /* Buttons — primary is light gray on dark (Linear pattern, extracted 2026-03-17) */
-  --linear-btn-primary-bg: #e6e6e6;
-  --linear-btn-primary-fg: #08090a;
-  --linear-btn-primary-hover: #f0f0f0;
-  --linear-btn-primary-border: #e6e6e6;
+  /* Buttons — CTA accent per DESIGN.md (Linear indigo for sign-up buttons) */
+  --linear-btn-primary-bg: #5e6ad2;
+  --linear-btn-primary-fg: #ffffff;
+  --linear-btn-primary-hover: #6872d6;
+  --linear-btn-primary-border: #5e6ad2;
   --linear-btn-secondary-bg: #232326;
   --linear-btn-secondary-fg: #f7f8f8;
   --linear-btn-secondary-hover: #2a2a2e;
