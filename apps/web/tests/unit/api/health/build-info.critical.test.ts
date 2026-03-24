@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockCaptureWarning = vi.hoisted(() => vi.fn());
+const mockConsoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 vi.mock('node:fs', async importOriginal => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -13,24 +13,19 @@ vi.mock('node:fs', async importOriginal => {
   };
 });
 
-vi.mock('@/lib/error-tracking', () => ({ captureWarning: mockCaptureWarning }));
-
 describe('@critical GET /api/health/build-info', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('captures warning when build info read fails', async () => {
+  it('logs warning and returns fallback when build info read fails', async () => {
     const { GET } = await import('@/app/api/health/build-info/route');
     const response = GET();
     expect(response.status).toBe(200);
-    expect(mockCaptureWarning).toHaveBeenCalledWith(
-      'Build info health check failed',
-      expect.any(Error),
-      expect.objectContaining({
-        service: 'build-info',
-        route: '/api/health/build-info',
-      })
+    const body = await response.json();
+    expect(body.buildId).toBe('unknown');
+    expect(mockConsoleWarn).toHaveBeenCalledWith(
+      '[build-info] BUILD_ID not found — expected in dev, using fallback'
     );
   });
 });
