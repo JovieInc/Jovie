@@ -16,9 +16,8 @@ export function ValuePropsSection() {
 
             <div className='homepage-section-copy'>
               <p className='marketing-lead-linear text-secondary-token'>
-                Jovie combines the public profile, release workflow, and
-                follow-up system into one surface. The result feels closer to a
-                product system than a generic link page.
+                Jovie brings your profile, release workflow, and follow-up into
+                one launch surface.
               </p>
             </div>
           </div>
@@ -30,17 +29,17 @@ export function ValuePropsSection() {
         >
           <FigCard
             title='Built for artists'
-            description='Shaped around the way independent musicians launch: one catalog, many release moments, one place to send people.'
+            description='Built around how independent artists launch, with one home for every release moment.'
             icon={<Music className='h-5 w-5' />}
           />
           <FigCard
             title='Automated releases'
-            description='Smart links, notifications, and launch follow-up trigger the moment a release goes live. No manual checklist.'
+            description='Smart links and launch follow-up trigger the moment a release goes live.'
             icon={<Rocket className='h-5 w-5' />}
           />
           <FigCard
             title='Fan intelligence'
-            description='See who shows up, where they came from, and what converts before you guess at the next push.'
+            description='See who shows up, where they came from, and what converts before the next push.'
             icon={<Users className='h-5 w-5' />}
           />
         </div>

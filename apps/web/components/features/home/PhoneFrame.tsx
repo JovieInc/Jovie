@@ -1,12 +1,17 @@
+import { cn } from '@/lib/utils';
+
 interface PhoneFrameProps {
   readonly children: React.ReactNode;
+  readonly className?: string;
 }
 
-export function PhoneFrame({ children }: PhoneFrameProps) {
+export function PhoneFrame({ children, className }: PhoneFrameProps) {
   return (
     <div
-      className='relative mx-auto flex flex-col items-center'
-      style={{ width: 282, height: 592 }}
+      className={cn(
+        'relative mx-auto flex h-[592px] w-[282px] flex-col items-center',
+        className
+      )}
     >
       {/* Outer bezel */}
       <div
