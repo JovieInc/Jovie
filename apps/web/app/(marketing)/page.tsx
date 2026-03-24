@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { NumberedSection } from '@/components/marketing';
+import { FaqSection, NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
@@ -13,6 +13,7 @@ import { ReleasesSection } from '@/features/home/ReleasesSection';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 import { ValuePropsSection } from '@/features/home/ValuePropsSection';
 import {
+  buildFaqSchema,
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
@@ -151,8 +152,38 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
     'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
-  sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
+  sameAs: ['https://instagram.com/meetjovie'],
 });
+
+const HOME_FAQ_ITEMS = [
+  {
+    question: 'What is Jovie?',
+    answer:
+      'Jovie is a release platform for independent musicians. It gives you smart links, an artist profile, audience intelligence, release automation, and AI tools — all in one place. Create your profile free at jov.ie.',
+  },
+  {
+    question: 'Is Jovie free?',
+    answer:
+      'Yes. Jovie has a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, branding removal, contact export, and more.',
+  },
+  {
+    question: 'How do smart links work?',
+    answer:
+      'When you add a release to Jovie, it automatically generates a smart link. When a fan clicks it, Jovie detects which streaming platform they prefer (Spotify, Apple Music, YouTube, etc.) and routes them there. One link, every platform.',
+  },
+  {
+    question: 'How is Jovie different from Linktree?',
+    answer:
+      'Linktree is a general-purpose link-in-bio tool. Jovie is built specifically for musicians — it auto-generates smart links for releases, routes fans to the right streaming platform, collects and manages fan contacts, sends automatic notifications when you drop new music, and includes AI tools that understand your career data.',
+  },
+  {
+    question: 'Can I notify fans when I release music?',
+    answer:
+      'Yes. Jovie automatically notifies your fans via email when you release new music. Fans opt in through your profile page — you build your audience, and Jovie handles the delivery.',
+  },
+];
+
+const HOME_FAQ_SCHEMA = buildFaqSchema(HOME_FAQ_ITEMS);
 
 const AI_SUB_ITEMS = [
   {
@@ -209,6 +240,7 @@ export default function HomePage() {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
+      <script type='application/ld+json'>{HOME_FAQ_SCHEMA}</script>
 
       {/* 1. Hero */}
       <HeroScrollSection />
@@ -236,6 +268,13 @@ export default function HomePage() {
 
       {/* Testimonials */}
       <TestimonialsSection />
+
+      {/* FAQ */}
+      <FaqSection
+        items={HOME_FAQ_ITEMS}
+        className='mx-auto max-w-[720px] px-6 py-20 sm:px-8 lg:px-10'
+        headingClassName='text-center text-3xl font-semibold tracking-tight text-primary-token'
+      />
 
       {/* Final CTA */}
       <FinalCTASection />

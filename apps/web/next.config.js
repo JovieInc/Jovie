@@ -252,6 +252,10 @@ const nextConfig = {
   },
   async rewrites() {
     return [
+      {
+        source: '/clerk/:path*',
+        destination: 'https://clerk.jov.ie/:path*',
+      },
       // Rewrite /app/* to /app/dashboard/* for cleaner URLs
       {
         source: '/app/profile',
@@ -276,10 +280,6 @@ const nextConfig = {
       {
         source: '/app/earnings',
         destination: '/app/dashboard/earnings',
-      },
-      {
-        source: '/app/chat',
-        destination: '/app/dashboard/chat',
       },
       {
         source: '/app/insights',

@@ -203,12 +203,14 @@
   --linear-app-radius-menu: 8px;
   --linear-app-shell-gap: 6px;
   --linear-app-shell-radius: 14px;
-  --linear-app-shell-border: rgba(0, 0, 0, 0.08);
+  --linear-app-shell-border: rgba(0, 0, 0, 0.065);
   --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
-  --linear-app-frame-seam: rgba(0, 0, 0, 0.07);
+  --linear-app-frame-seam: rgba(0, 0, 0, 0.055);
   --linear-app-shell-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.045), 0 18px 42px rgba(0, 0, 0, 0.055);
   --linear-app-header-height: 40px;
+  /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
+  --linear-app-header-height-compact: 36px;
   --linear-app-header-padding-x: 12px;
   --linear-app-content-padding-x: 12px;
   --linear-app-content-padding-y: 8px;
@@ -219,8 +221,8 @@
   --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.035), 0 12px 28px rgba(0, 0, 0, 0.045);
-  --linear-row-hover: oklch(96.9% 0.002 260);
-  --linear-row-selected: oklch(95.4% 0.004 260);
+  --linear-row-hover: oklch(96.2% 0.003 260);
+  --linear-row-selected: oklch(94.8% 0.006 260);
   --linear-app-sidebar-width: 244px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
@@ -380,15 +382,15 @@
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
   --linear-app-content-surface: var(--linear-bg-surface-1);
-  --linear-app-shell-border: rgba(255, 255, 255, 0.06);
-  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.06);
-  --linear-app-frame-seam: rgba(255, 255, 255, 0.05);
+  --linear-app-shell-border: rgba(255, 255, 255, 0.05);
+  --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.05);
+  --linear-app-frame-seam: rgba(255, 255, 255, 0.04);
   --linear-app-shell-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.045), 0 18px 42px rgba(0, 0, 0, 0.28);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.035), -12px 0 24px rgba(0, 0, 0, 0.2);
-  --linear-row-hover: rgba(255, 255, 255, 0.028);
-  --linear-row-selected: rgba(255, 255, 255, 0.038);
+  --linear-row-hover: rgba(255, 255, 255, 0.022);
+  --linear-row-selected: rgba(255, 255, 255, 0.048);
   --linear-app-sidebar-background-rgb: 15 16 17;
   --linear-app-sidebar-foreground-rgb: 227 228 229;
   --linear-app-sidebar-border-rgb: 255 255 255 / 0.06;
