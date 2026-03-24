@@ -42,7 +42,7 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 | Level | Size | Weight | Letter-spacing | Line-height | Usage |
 |-------|------|--------|----------------|-------------|-------|
-| H1 | 64px | 510 | -1.408px (-2.2%) | 64px (1.0) | Hero headlines |
+| H1 | 64px | 510 | -1.408px (-2.2%) | 67.84px (1.06) | Hero headlines |
 | H2 | 48px | 510 | -1.056px (-2.2%) | 48px (1.0) | Section headlines |
 | H3 | 20px | 590 | -0.24px (-1.2%) | 26.6px (1.33) | Sub-section titles |
 | H4 | 18px | 538 | — | 24px (1.33) | Card titles |
@@ -67,8 +67,8 @@ See the [Surface Classification](#canonical-surface-split) section below for ful
 
 | Level | Small (mobile) | Medium | Large (desktop) |
 |-------|---------------|--------|-----------------|
-| H1 | 38px | 56px | 76px |
-| H2 | 24px | 36px | 48–56px |
+| H1 | 38px | 56px | 64px |
+| H2 | 24px | 36px | 48px |
 | Body LG | 16px | — | 17px |
 
 ### OpenType Features
