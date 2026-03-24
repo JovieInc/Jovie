@@ -3,6 +3,7 @@ import { desc, sql as drizzleSql } from 'drizzle-orm';
 import {
   CheckCircle2,
   CircleSlash,
+  Copy,
   Link2,
   Plus,
   Settings2,
@@ -157,9 +158,7 @@ async function InvestorTable() {
                     <span className='truncate font-[560] text-primary-token'>
                       {link.label}
                     </span>
-                    <span className='text-[11px] text-tertiary-token'>
-                      Token: {link.token}
-                    </span>
+                    <TokenDisplay token={link.token} />
                   </div>
                 </td>
                 <td className='px-4 py-3 align-middle text-secondary-token'>
@@ -287,6 +286,24 @@ function SummaryCard({
         {description}
       </p>
     </ContentSurfaceCard>
+  );
+}
+
+function TokenDisplay({ token }: { readonly token: string }) {
+  return (
+    <button
+      type='button'
+      onClick={() => {
+        navigator.clipboard.writeText(token).catch(() => {
+          // Fallback for HTTP contexts
+        });
+      }}
+      className='inline-flex items-center gap-1 text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
+      title='Click to copy full token'
+    >
+      {token.slice(0, 8)}&hellip;{' '}
+      <Copy className='h-3 w-3' aria-hidden='true' />
+    </button>
   );
 }
 
