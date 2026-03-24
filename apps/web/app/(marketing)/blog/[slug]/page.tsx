@@ -126,10 +126,7 @@ export default async function BlogPostRoute({
       authorImageUrl: author.avatarUrl ?? undefined,
       url: `${APP_URL}/blog/${post.slug}`,
       keywords: post.tags,
-      wordCount: post.html
-        .replace(/<[^>]*>/g, '')
-        .split(/\s+/)
-        .filter(Boolean).length,
+      wordCount: post.wordCount,
     });
 
     const breadcrumbSchema = buildBreadcrumbSchema([

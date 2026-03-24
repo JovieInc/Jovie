@@ -13,6 +13,7 @@ const basePost: BlogPostMetadata = {
   excerpt: 'Test excerpt',
   tags: [],
   readingTime: 3,
+  wordCount: 714,
 };
 
 const baseProfile = {

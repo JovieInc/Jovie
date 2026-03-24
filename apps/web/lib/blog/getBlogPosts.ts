@@ -20,6 +20,7 @@ export interface BlogPostMetadata {
   tags: string[];
   excerpt: string;
   readingTime: number;
+  wordCount: number;
 }
 
 export interface BlogPost extends MarkdownDocument, BlogPostMetadata {
@@ -32,14 +33,18 @@ export interface BlogPostSummary extends BlogPostMetadata {
 
 const DEFAULT_AUTHOR = 'Jovie';
 
-/** Calculate reading time in minutes (238 WPM average) */
-function calculateReadingTime(content: string): number {
+/** Count words in markdown content (strips frontmatter, code blocks, and syntax) */
+function countWords(content: string): number {
   const text = content
     .replaceAll(/^---[\s\S]*?---/g, '') // strip frontmatter
     .replaceAll(/```[\s\S]*?```/g, '') // strip code blocks
     .replaceAll(/[#*_`>\[\]()!|-]/g, '') // strip markdown syntax
     .trim();
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+/** Calculate reading time in minutes (238 WPM average) */
+function calculateReadingTime(wordCount: number): number {
   return Math.max(1, Math.ceil(wordCount / 238));
 }
 
@@ -135,7 +140,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     category: data.category,
     tags: parseTags(data.tags),
     excerpt,
-    readingTime: calculateReadingTime(content),
+    readingTime: calculateReadingTime(countWords(content)),
+    wordCount: countWords(content),
     ...doc,
   };
 }
@@ -166,7 +172,8 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         category: data.category,
         tags: parseTags(data.tags),
         excerpt: createExcerpt(content),
-        readingTime: calculateReadingTime(content),
+        readingTime: calculateReadingTime(countWords(content)),
+        wordCount: countWords(content),
       };
     })
   );

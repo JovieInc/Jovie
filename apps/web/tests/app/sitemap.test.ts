@@ -92,6 +92,7 @@ describe('sitemap', () => {
         tags: [],
         excerpt: 'Test',
         readingTime: 3,
+        wordCount: 714,
       },
     ]);
 
