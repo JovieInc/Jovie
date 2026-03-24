@@ -61,7 +61,7 @@ describe('SupportPage', () => {
 
     expect(track).toHaveBeenCalledWith('Support Email Clicked', {
       email: 'support@jov.ie',
-      source: 'support_page',
+      source: 'support_page_cta',
     });
   });
 

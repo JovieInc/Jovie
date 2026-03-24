@@ -26,6 +26,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - `BlogMarkdownReader` semantic HTML: moved `<article>` wrapper to page level
 - Extended `ResolvedAuthor` with `bio` and `username` fields from Jovie profile data
 
+## [26.4.48] - 2026-03-23
+
+### Changed
+
+- Expanded support page with documentation links, FAQ section, and structured data for SEO
+- Added JSON-LD FAQ and breadcrumb schemas to support page
+
+### Fixed
+
+- Deduplicated "Jovie" from support page title tag (was "Support - Jovie - Jovie")
 ## [26.3.48] - 2026-03-23
 
 ### Changed
