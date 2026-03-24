@@ -28,6 +28,7 @@ import {
   COOKIE_BANNER_REQUIRED_COOKIE,
   isCookieBannerRequired,
 } from '@/lib/cookies/consent-regions';
+import { publicEnv } from '@/lib/env-public';
 import { captureError } from '@/lib/error-tracking';
 import {
   buildContentSecurityPolicy,
@@ -173,8 +174,8 @@ function analyzeHost(hostname: string): HostInfo {
   return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
 }
 
-function getClerkProxyUrl(req: NextRequest): string | undefined {
-  return process.env.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
+function getClerkProxyUrl(): string | undefined {
+  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
 }
 
 /** Dashboard is always at /app in single-domain architecture */
@@ -874,8 +875,8 @@ const clerkWrappedMiddleware = clerkMiddleware(
     const { userId } = await auth();
     return handleRequest(req, userId);
   },
-  req => ({
-    proxyUrl: getClerkProxyUrl(req),
+  _req => ({
+    proxyUrl: getClerkProxyUrl(),
   })
 );
 
