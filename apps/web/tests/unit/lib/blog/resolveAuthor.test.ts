@@ -11,6 +11,9 @@ const basePost: BlogPostMetadata = {
   authorTitle: 'Founder at Jovie',
   authorProfile: 'https://jov.ie/tim',
   excerpt: 'Test excerpt',
+  tags: [],
+  readingTime: 3,
+  wordCount: 714,
 };
 
 const baseProfile = {
@@ -118,6 +121,37 @@ describe('resolveAuthor', () => {
     it('defaults to false when no profile', () => {
       const author = resolveAuthor(basePost, null);
       expect(author.isVerified).toBe(false);
+    });
+  });
+
+  describe('bio resolution', () => {
+    it('uses profile bio when available', () => {
+      const profile = { ...baseProfile, bio: 'Author biography' };
+      const author = resolveAuthor(basePost, profile);
+      expect(author.bio).toBe('Author biography');
+    });
+
+    it('returns undefined when profile bio is null', () => {
+      const profile = { ...baseProfile, bio: null };
+      const author = resolveAuthor(basePost, profile);
+      expect(author.bio).toBeUndefined();
+    });
+
+    it('returns undefined when profile is null', () => {
+      const author = resolveAuthor(basePost, null);
+      expect(author.bio).toBeUndefined();
+    });
+  });
+
+  describe('username resolution', () => {
+    it('uses profile usernameNormalized when available', () => {
+      const author = resolveAuthor(basePost, baseProfile);
+      expect(author.username).toBe('tim');
+    });
+
+    it('falls back to frontmatter authorUsername when no profile', () => {
+      const author = resolveAuthor(basePost, null);
+      expect(author.username).toBe('tim');
     });
   });
 });

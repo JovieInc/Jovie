@@ -80,12 +80,12 @@ export function BlogMarkdownReader({
   const sanitizedHtml = useMemo(() => DOMPurify.sanitize(html), [html]);
 
   return (
-    <article className={cn('relative', className)}>
+    <div className={cn('relative', className)}>
       <div
         className={MARKDOWN_STYLES}
         // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML sanitized with DOMPurify
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
-    </article>
+    </div>
   );
 }

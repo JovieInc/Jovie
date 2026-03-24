@@ -1,13 +1,21 @@
 import Link from 'next/link';
+import { BlogAuthorCard } from '@/app/(marketing)/blog/components/BlogAuthorCard';
+import { BlogRelatedPosts } from '@/app/(marketing)/blog/components/BlogRelatedPosts';
+import { BlogTableOfContents } from '@/app/(marketing)/blog/components/BlogTableOfContents';
+import { CategoryPill } from '@/app/(marketing)/blog/components/CategoryPill';
 import { Avatar } from '@/components/molecules/Avatar';
 import { BlogMarkdownReader } from '@/components/molecules/BlogMarkdownReader';
 import { Container } from '@/components/site/Container';
-import type { BlogPost } from '@/lib/blog/getBlogPosts';
+import type { BlogPost, BlogPostSummary } from '@/lib/blog/getBlogPosts';
 import type { ResolvedAuthor } from '@/lib/blog/resolveAuthor';
+import type { TocEntry } from '@/types/docs';
 
 export interface BlogPostPageProps {
   readonly post: BlogPost;
   readonly author: ResolvedAuthor;
+  readonly toc: TocEntry[];
+  readonly relatedPosts: BlogPostSummary[];
+  readonly relatedAuthors: Map<string, ResolvedAuthor>;
 }
 
 function formatDate(dateString: string): string {
@@ -19,12 +27,18 @@ function formatDate(dateString: string): string {
   });
 }
 
-export function BlogPostPage({ post, author }: BlogPostPageProps) {
+export function BlogPostPage({
+  post,
+  author,
+  toc,
+  relatedPosts,
+  relatedAuthors,
+}: BlogPostPageProps) {
   return (
-    <div className='min-h-screen'>
+    <article className='min-h-screen'>
       {/* Header Section */}
       <Container size='lg' className='pt-16 sm:pt-24 pb-12'>
-        <div className='mx-auto max-w-3xl'>
+        <div className='mx-auto max-w-4xl'>
           {/* Back link */}
           <Link
             href='/blog'
@@ -44,7 +58,7 @@ export function BlogPostPage({ post, author }: BlogPostPageProps) {
                 d='M15 19l-7-7 7-7'
               />
             </svg>
-            Back to updates
+            Blog
           </Link>
 
           {/* Meta info */}
@@ -55,26 +69,28 @@ export function BlogPostPage({ post, author }: BlogPostPageProps) {
             >
               {formatDate(post.date)}
             </time>
+            <span className='text-quaternary-token'>·</span>
+            <span className='text-sm text-tertiary-token'>
+              {post.readingTime} min read
+            </span>
             {post.category && (
               <>
                 <span className='text-quaternary-token'>·</span>
-                <span className='text-sm font-medium text-tertiary-token'>
-                  {post.category}
-                </span>
+                <CategoryPill category={post.category} />
               </>
             )}
           </div>
 
           {/* Title */}
           <h1
-            className='marketing-h1-linear text-primary-token mb-6'
+            className='marketing-h1-linear text-primary-token mb-6 max-w-3xl'
             data-testid='blog-post-page'
           >
             {post.title}
           </h1>
 
           {/* Excerpt / Lede */}
-          <p className='marketing-lead-linear text-secondary-token mb-10'>
+          <p className='marketing-lead-linear text-secondary-token mb-10 max-w-3xl'>
             {post.excerpt}
           </p>
 
@@ -88,57 +104,54 @@ export function BlogPostPage({ post, author }: BlogPostPageProps) {
               verified={author.isVerified}
             />
             <div className='flex flex-col'>
-              <span className='font-semibold text-primary-token'>
-                {author.name}
-              </span>
+              {author.profileUrl ? (
+                <Link
+                  href={author.profileUrl}
+                  className='font-semibold text-primary-token hover:underline underline-offset-4'
+                >
+                  {author.name}
+                </Link>
+              ) : (
+                <span className='font-semibold text-primary-token'>
+                  {author.name}
+                </span>
+              )}
               {author.title && (
                 <span className='text-sm text-tertiary-token'>
                   {author.title}
                 </span>
               )}
             </div>
-            {author.profileUrl && (
-              <Link
-                href={author.profileUrl}
-                className='ml-auto text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200'
-              >
-                View profile →
-              </Link>
-            )}
           </div>
         </div>
       </Container>
 
-      {/* Article Content */}
+      {/* Article Content + TOC Sidebar */}
       <Container size='lg' className='pb-16 sm:pb-24'>
-        <div className='mx-auto max-w-3xl'>
-          <BlogMarkdownReader html={post.html} />
+        <div className='mx-auto max-w-4xl'>
+          <div className='grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-12'>
+            {/* Main content */}
+            <div className='min-w-0'>
+              <BlogMarkdownReader html={post.html} />
+            </div>
 
-          {/* Footer */}
-          <div className='mt-16 pt-10 border-t border-border-subtle'>
-            <Link
-              href='/blog'
-              className='inline-flex items-center gap-2 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200 group'
-            >
-              <svg
-                className='w-4 h-4 transition-transform duration-200 group-hover:-translate-x-1'
-                fill='none'
-                viewBox='0 0 24 24'
-                stroke='currentColor'
-                strokeWidth={2}
-                aria-hidden='true'
-              >
-                <path
-                  strokeLinecap='round'
-                  strokeLinejoin='round'
-                  d='M15 19l-7-7 7-7'
-                />
-              </svg>
-              Back to updates
-            </Link>
+            {/* TOC Sidebar */}
+            <BlogTableOfContents toc={toc} />
           </div>
+
+          {/* Author Card */}
+          <div className='mt-16 pt-10 border-t border-border-subtle'>
+            <BlogAuthorCard author={author} variant='inline' />
+          </div>
+
+          {/* Related Posts */}
+          {relatedPosts.length > 0 && (
+            <div className='mt-12'>
+              <BlogRelatedPosts posts={relatedPosts} authors={relatedAuthors} />
+            </div>
+          )}
         </div>
       </Container>
-    </div>
+    </article>
   );
 }
