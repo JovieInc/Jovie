@@ -2395,8 +2395,11 @@ jobs:
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"
-            deploy_exit=$?
+            if deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"; then
+              deploy_exit=0
+            else
+              deploy_exit=$?
+            fi
             echo "$deploy_output"
             if [ "$deploy_exit" -eq 0 ]; then
               deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
