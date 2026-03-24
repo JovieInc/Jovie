@@ -7,6 +7,7 @@
 // Import and re-export SOCIAL_PLATFORMS from canonical source
 // (import needed for local use in isValidSocialPlatform, export for consumers)
 import { SOCIAL_PLATFORMS } from '@/constants/platforms';
+
 export { SOCIAL_PLATFORMS }; // NOSONAR - must import locally for isValidSocialPlatform
 
 // Import types for internal use

@@ -115,4 +115,4 @@ export function DspProviderIcon({
   );
 }
 
-export { PROVIDER_LABELS, PROVIDER_COLORS };
+export { PROVIDER_COLORS, PROVIDER_LABELS };

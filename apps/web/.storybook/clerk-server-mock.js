@@ -69,10 +69,10 @@ const clerkMiddleware = () => (req, res, next) => next?.();
 // Export all server-side functions using ES modules for consistency
 export {
   auth,
-  currentUser,
   clerkClient,
-  isClerkAPIResponseError,
   clerkMiddleware,
+  currentUser,
+  isClerkAPIResponseError,
 };
 
 // Also provide default export for compatibility
