@@ -146,7 +146,8 @@
      ============================================ */
   --linear-h1-size: 64px;
   --linear-h1-weight: 510;
-  --linear-h1-leading: 64px;
+  --linear-h1-leading: 67.84px;
+  /* Linear renders 1.06 ratio: 64px × 1.06 = 67.84px (verified 2026-03-23) */
   --linear-h1-tracking: -1.408px;
   --linear-h2-size: 48px;
   --linear-h2-weight: 510;

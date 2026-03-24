@@ -401,8 +401,9 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Discrete breakpoints matching Linear.app (measured 2026-03-21):
-       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px: 76px/1.0 */
+    /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
+       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
+       Linear caps at 64px — never goes to 76px at any viewport width */
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
@@ -418,18 +419,17 @@ body {
   }
   @media (min-width: 1280px) {
     .marketing-h1-linear {
-      font-size: var(--linear-h1-size-lg);
-      line-height: 1;
+      font-size: var(--linear-h1-size);
+      line-height: 1.06;
     }
   }
   .marketing-h2-linear {
-    /* Exact Linear.app values:
-       font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
-    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
-       375px: 24px/1.33  |  768px: 32px/1.125  |  1280px: 40px/1.1  |  1440px: 48px/1.0 */
+    /* Linear.app verified 2026-03-23:
+       Desktop max: 48px/510/-2.2%/1.0 — caps here, never goes to 56px
+       375px: 24px/1.33  |  768px: 36px/1.125  |  1280px+: 48px/1.0 */
     font-size: var(--linear-h2-size-sm);
     font-weight: 510;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.022em;
     line-height: 1.33;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
@@ -443,13 +443,7 @@ body {
   }
   @media (min-width: 1280px) {
     .marketing-h2-linear {
-      font-size: var(--linear-h2-size-xl);
-      line-height: 1.1;
-    }
-  }
-  @media (min-width: 1440px) {
-    .marketing-h2-linear {
-      font-size: var(--linear-h2-size-lg);
+      font-size: var(--linear-h2-size);
       line-height: 1;
     }
   }
