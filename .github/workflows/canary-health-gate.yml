@@ -82,7 +82,7 @@ jobs:
           base_url = "https://api.vercel.com/v6/deployments"
           query_params = {
               "projectId": project_id,
-              "target": "production",
+              "target": "preview",
               "state": "READY",
               "limit": 20,
           }

@@ -2423,7 +2423,13 @@ jobs:
 
       - name: Alias preview to staging.jov.ie
         run: |
-          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
+          if vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}; then
+            echo "Staging alias updated successfully."
+          else
+            # Some org tokens cannot manage the staging custom domain.
+            # Keep deploy green and let canary/promotion use commit-resolved preview URL.
+            echo "::warning::Could not alias preview to staging.jov.ie; continuing with preview deployment URL."
+          fi
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -2437,7 +2443,7 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: https://staging.jov.ie
+      deployment_url: ${{ needs.deploy-staging.outputs.deploy_url }}
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
@@ -2461,13 +2467,66 @@ jobs:
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@50.22.1
-      - name: Promote verified staging to production
+      - name: Promote verified deployment to production
         run: |
-          # Use the staging alias directly — GitHub Actions masks job outputs
-          # containing secret substrings (org name in Vercel URLs), so we
-          # cannot rely on deploy_url passed between jobs.
-          vercel promote https://staging.jov.ie --yes --token ${{ secrets.VERCEL_TOKEN }}
+          deployment_url="${{ needs.deploy-staging.outputs.deploy_url }}"
+
+          if [ -z "$deployment_url" ]; then
+            echo "deploy_url missing from upstream outputs; resolving from Vercel API..."
+            deployment_url="$(python3 - <<'PY'
+import json
+import os
+import sys
+import urllib.parse
+import urllib.request
+
+token = os.environ.get("VERCEL_TOKEN", "")
+org_id = os.environ.get("VERCEL_ORG_ID", "")
+project_id = os.environ.get("VERCEL_PROJECT_ID", "")
+commit_sha = os.environ.get("COMMIT_SHA", "")
+
+if not token or not project_id or not commit_sha:
+    print("", end="")
+    sys.exit(0)
+
+base_url = "https://api.vercel.com/v6/deployments"
+query_params = {
+    "projectId": project_id,
+    "target": "preview",
+    "state": "READY",
+    "limit": 20,
+}
+
+if org_id.startswith("team_"):
+    query_params["teamId"] = org_id
+
+query = urllib.parse.urlencode(query_params)
+request = urllib.request.Request(
+    f"{base_url}?{query}",
+    headers={"Authorization": f"Bearer {token}"},
+)
+with urllib.request.urlopen(request, timeout=15) as response:
+    payload = json.load(response)
+
+for deployment in payload.get("deployments", []):
+    meta = deployment.get("meta") or {}
+    if meta.get("githubCommitSha") == commit_sha:
+        print(f"https://{deployment['url']}")
+        break
+PY
+)"
+          fi
+
+          if [ -z "$deployment_url" ]; then
+            echo "Could not resolve deployment URL for commit ${COMMIT_SHA}."
+            exit 1
+          fi
+
+          echo "Promoting ${deployment_url} to production..."
+          vercel promote "$deployment_url" --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
+          COMMIT_SHA: ${{ github.sha }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
