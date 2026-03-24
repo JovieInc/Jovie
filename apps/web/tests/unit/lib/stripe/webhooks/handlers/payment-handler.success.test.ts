@@ -190,7 +190,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     expect(mockInvalidateBillingCache).not.toHaveBeenCalled();
   });
 
-  it('skips processing when no user ID in subscription metadata', async () => {
+  it('falls back to Stripe customer lookup when metadata is missing', async () => {
     const mockSubscription = {
       id: 'sub_no_meta',
       status: 'active',
@@ -200,6 +200,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     } as unknown as Stripe.Subscription;
 
     mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockGetUserIdFromStripeCustomer.mockResolvedValue('user_fallback_789');
 
     const context: WebhookContext = {
       event: {
@@ -223,13 +224,56 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     const result = await handler.handle(context);
 
     expect(result.success).toBe(true);
+    expect(result.skipped).toBeFalsy();
+    expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_789');
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_fallback_789',
+      })
+    );
+  });
+
+  it('skips when the user cannot be identified after fallback', async () => {
+    const mockSubscription = {
+      id: 'sub_unknown_user',
+      status: 'active',
+      customer: 'cus_unknown',
+      metadata: {},
+      items: { data: [{ price: { id: 'price_pro' } }] },
+    } as unknown as Stripe.Subscription;
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockGetUserIdFromStripeCustomer.mockResolvedValue(null);
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_unknown_user',
+        type: 'invoice.payment_succeeded',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'in_unknown_user',
+            customer: 'cus_unknown',
+            subscription: 'sub_unknown_user',
+            amount_due: 2000,
+            attempt_count: 1,
+          } as unknown as Stripe.Invoice,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_unknown_user',
+      stripeEventTimestamp: new Date(),
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
     expect(result.skipped).toBe(true);
-    expect(result.reason).toBe('no_user_id_in_subscription_metadata');
-    expect(mockGetUserIdFromStripeCustomer).not.toHaveBeenCalled();
+    expect(result.reason).toBe('cannot_identify_user_for_payment_success');
+    expect(mockGetUserIdFromStripeCustomer).toHaveBeenCalledWith('cus_unknown');
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
   });
 
-  it('handles errors gracefully without throwing', async () => {
+  it('throws on payment success errors so Stripe can retry', async () => {
     mockStripeSubscriptionsRetrieve.mockRejectedValue(
       new Error('Stripe API error')
     );
@@ -253,12 +297,7 @@ describe('@critical PaymentHandler - payment succeeded', () => {
       stripeEventTimestamp: new Date(),
     };
 
-    const result = await handler.handle(context);
-
-    expect(result.success).toBe(true);
-    expect(result.skipped).toBe(true);
-    expect(result.reason).toBe('error_processing_payment_success');
-    expect(result.error).toBe('Stripe API error');
+    await expect(handler.handle(context)).rejects.toThrow('Stripe API error');
 
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Error handling payment success webhook',
