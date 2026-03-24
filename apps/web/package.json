@@ -190,7 +190,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.1",
-    "@biomejs/biome": "^2.3.11",
+    "@biomejs/biome": "^2.4.8",
     "@chromatic-com/storybook": "^5.0.0",
     "@clerk/backend": "^3.2.2",
     "@clerk/clerk-js": "^6.3.2",
