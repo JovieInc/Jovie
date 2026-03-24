@@ -24,7 +24,7 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Release More Music.`;
+  const title = { absolute: `${APP_NAME} | Release More Music.` };
   const description =
     'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.';
   const keywords = [
