@@ -81,6 +81,7 @@ export function ReleasesSection() {
                 width={2880}
                 height={1800}
                 title='Jovie - Release Flow'
+                priority
                 skipCheck
               />
             </div>
