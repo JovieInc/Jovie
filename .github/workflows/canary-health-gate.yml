@@ -61,54 +61,52 @@ jobs:
           deployment_url="${DEPLOYMENT_URL}"
           health_url_fallback="${FALLBACK_HEALTH_URL}"
 
-          resolve_deployment_url_from_vercel() {
-            python - <<'PY'
-import json
-import os
-import sys
-import urllib.parse
-import urllib.request
-
-token = os.environ.get("VERCEL_TOKEN", "")
-org_id = os.environ.get("VERCEL_ORG_ID", "")
-project_id = os.environ.get("VERCEL_PROJECT_ID", "")
-commit_sha = os.environ.get("COMMIT_SHA", "")
-
-if not token or not project_id or not commit_sha:
-    print("", end="")
-    sys.exit(0)
-
-base_url = "https://api.vercel.com/v6/deployments"
-query_params = {
-    "projectId": project_id,
-    "target": "production",
-    "state": "READY",
-    "limit": 20,
-}
-
-# Team-owned projects require teamId scoping to list deployments.
-if org_id.startswith("team_"):
-    query_params["teamId"] = org_id
-
-query = urllib.parse.urlencode(query_params)
-request = urllib.request.Request(
-    f"{base_url}?{query}",
-    headers={"Authorization": f"Bearer {token}"},
-)
-with urllib.request.urlopen(request, timeout=15) as response:
-    payload = json.load(response)
-
-for deployment in payload.get("deployments", []):
-    meta = deployment.get("meta") or {}
-    if meta.get("githubCommitSha") == commit_sha:
-        print(f"https://{deployment['url']}")
-        break
-PY
-          }
-
           if [ -z "$deployment_url" ]; then
             echo "⚠ deployment_url missing from upstream outputs; resolving from Vercel API..."
-            deployment_url="$(resolve_deployment_url_from_vercel)"
+            deployment_url="$(
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("VERCEL_TOKEN", "")
+          org_id = os.environ.get("VERCEL_ORG_ID", "")
+          project_id = os.environ.get("VERCEL_PROJECT_ID", "")
+          commit_sha = os.environ.get("COMMIT_SHA", "")
+
+          if not token or not project_id or not commit_sha:
+              print("", end="")
+              sys.exit(0)
+
+          base_url = "https://api.vercel.com/v6/deployments"
+          query_params = {
+              "projectId": project_id,
+              "target": "production",
+              "state": "READY",
+              "limit": 20,
+          }
+
+          # Team-owned projects require teamId scoping to list deployments.
+          if org_id.startswith("team_"):
+              query_params["teamId"] = org_id
+
+          query = urllib.parse.urlencode(query_params)
+          request = urllib.request.Request(
+              f"{base_url}?{query}",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              payload = json.load(response)
+
+          for deployment in payload.get("deployments", []):
+              meta = deployment.get("meta") or {}
+              if meta.get("githubCommitSha") == commit_sha:
+                  print(f"https://{deployment['url']}")
+                  break
+          PY
+          )"
           fi
 
           if [ -z "$deployment_url" ]; then
