@@ -43,6 +43,20 @@ body:has(.linear-marketing) {
   overscroll-behavior: auto;
 }
 
+/* PWA standalone mode polish — native-feel when installed */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  nav,
+  [data-testid="sidebar"],
+  [data-testid="mobile-tabs"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* Prevent Chrome autofill from bleeding background onto sibling elements */
 
 input:-webkit-autofill,
