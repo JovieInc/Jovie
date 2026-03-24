@@ -37,30 +37,30 @@
   /* rgb(247,248,248) → primary text */
   /* Base chroma for Linear's neutral grays */
   --linear-chroma: 0.008;
-  --linear-hue: 260;
-  /* Slight blue-ish tint */
+  --linear-hue: 282;
+  /* Linear March 2026 refresh hue (shifted from 260→282) */
   /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
-  --linear-text-primary: oklch(12% 0.005 260);
-  --linear-text-secondary: oklch(45% 0.012 260);
-  --linear-text-tertiary: oklch(55% 0.01 260);
-  --linear-text-quaternary: oklch(70% 0.008 260);
-  --linear-text-inverse: oklch(97% 0.005 260);
+  --linear-text-primary: oklch(12% 0.005 282);
+  --linear-text-secondary: oklch(45% 0.012 282);
+  --linear-text-tertiary: oklch(55% 0.01 282);
+  --linear-text-quaternary: oklch(70% 0.008 282);
+  --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
-  --linear-bg-page: oklch(98.5% 0.002 260);
+  --linear-bg-page: oklch(98.5% 0.002 282);
   --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
   --linear-bg-surface-0: oklch(100% 0 0);
   /* Pure white — elevated surfaces (menus, popovers, cards) */
-  --linear-bg-surface-1: oklch(97% 0.002 260);
+  --linear-bg-surface-1: oklch(97% 0.002 282);
   /* Item hover / secondary surface */
-  --linear-bg-surface-2: oklch(95% 0.003 260);
-  --linear-bg-button: oklch(92% 0.005 260);
-  --linear-bg-footer: oklch(98.5% 0.002 260);
-  --linear-border-footer: oklch(90% 0.005 260);
+  --linear-bg-surface-2: oklch(95% 0.003 282);
+  --linear-bg-button: oklch(92% 0.005 282);
+  --linear-bg-footer: oklch(98.5% 0.002 282);
+  --linear-border-footer: oklch(90% 0.005 282);
   --linear-bg-hover: rgba(0, 0, 0, 0.04);
   /* ============================================
      BORDERS — LIGHT MODE
@@ -73,14 +73,14 @@
      BUTTON COLORS — LIGHT MODE
      ============================================ */
   /* Primary button — dark on light */
-  --linear-btn-primary-bg: oklch(15% 0.005 260);
+  --linear-btn-primary-bg: oklch(15% 0.005 282);
   --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 260);
-  --linear-btn-primary-border: oklch(15% 0.005 260);
+  --linear-btn-primary-hover: oklch(22% 0.005 282);
+  --linear-btn-primary-border: oklch(15% 0.005 282);
   /* Secondary button — subtle gray */
-  --linear-btn-secondary-bg: oklch(94% 0.005 260);
-  --linear-btn-secondary-fg: oklch(20% 0.005 260);
-  --linear-btn-secondary-hover: oklch(90% 0.005 260);
+  --linear-btn-secondary-bg: oklch(94% 0.005 282);
+  --linear-btn-secondary-fg: oklch(20% 0.005 282);
+  --linear-btn-secondary-hover: oklch(90% 0.005 282);
   /* Accent button — purple (same in both modes, extracted 2026-03-16) */
   --linear-btn-accent-bg: #7170ff;
   --linear-btn-accent-fg: oklch(100% 0 0);
@@ -221,8 +221,8 @@
   --linear-app-content-surface: var(--linear-bg-surface-0);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.035), 0 12px 28px rgba(0, 0, 0, 0.045);
-  --linear-row-hover: oklch(96.2% 0.003 260);
-  --linear-row-selected: oklch(94.8% 0.006 260);
+  --linear-row-hover: oklch(96.2% 0.003 282);
+  --linear-row-selected: oklch(94.8% 0.006 282);
   --linear-app-sidebar-width: 244px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
@@ -334,7 +334,7 @@
   --linear-text-secondary: #d0d6e0;
   --linear-text-tertiary: #8a8f98;
   --linear-text-quaternary: #62666d;
-  --linear-text-inverse: oklch(5% 0.005 260);
+  --linear-text-inverse: oklch(5% 0.005 282);
   /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
      --color-bg-primary: #08090a  body bg
      --color-bg-secondary: #1c1c1f  cards/panels
@@ -358,7 +358,7 @@
   --linear-border-subtle: rgba(255, 255, 255, 0.05);
   --linear-border-default: rgba(255, 255, 255, 0.08);
   --linear-border-strong: rgba(255, 255, 255, 0.14);
-  --linear-border-focus: oklch(60% 0.12 260);
+  --linear-border-focus: oklch(60% 0.12 282);
   /* Buttons — primary is light gray on dark (Linear pattern, extracted 2026-03-17) */
   --linear-btn-primary-bg: #e6e6e6;
   --linear-btn-primary-fg: #08090a;
