@@ -3,18 +3,16 @@
 import type { CellContext } from '@tanstack/react-table';
 import {
   ArrowLeftRight,
-  AtSign,
-  Camera,
   Flame,
   Globe,
   Music,
-  Play,
   Search,
   Sparkles,
   Star,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type {
   AudienceIntentLevel,
   AudienceMember,
@@ -98,11 +96,27 @@ const DOMAIN_MAP: Record<string, string> = {
 };
 
 const SOURCE_ICONS: Record<string, React.ReactElement> = {
-  X: <AtSign className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
-  Instagram: (
-    <Camera className={`${ICON_CLS} text-tertiary-token`} aria-hidden />
+  X: (
+    <SocialIcon
+      platform='twitter'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
   ),
-  YouTube: <Play className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
+  Instagram: (
+    <SocialIcon
+      platform='instagram'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
+  ),
+  YouTube: (
+    <SocialIcon
+      platform='youtube'
+      className={`${ICON_CLS} text-tertiary-token`}
+      aria-hidden
+    />
+  ),
   Spotify: <Music className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
   Google: <Search className={`${ICON_CLS} text-tertiary-token`} aria-hidden />,
 };

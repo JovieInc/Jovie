@@ -485,9 +485,9 @@ jobs:
           echo "ci-fast: $FAST_RESULT"
           echo "ci-unit-tests: $UNIT_RESULT"
 
-          # ci-fast must succeed
-          if [[ "$FAST_RESULT" != "success" ]]; then
-            echo "❌ ci-fast did not pass"
+          # ci-fast must succeed (or be skipped when path-gated with no app files changed)
+          if [[ "$FAST_RESULT" != "success" && "$FAST_RESULT" != "skipped" ]]; then
+            echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
             exit 1
           fi
 

@@ -144,7 +144,7 @@ fi
 if [ "$(uname -s)" = "Darwin" ]; then
   _APP_SUPPORT="$HOME/Library/Application Support"
   _BROWSERS_CHECKED=0
-  for _pair in "Google/Chrome/:Chrome Safe Storage" "Arc/User Data/:Arc Safe Storage" "Comet/:Comet Safe Storage"; do
+  for _pair in "Google/Chrome/:Chrome Safe Storage" "Arc/User Data/:Arc Safe Storage" "Comet/:Comet Safe Storage" "BraveSoftware/Brave-Browser/:Brave Safe Storage" "Microsoft Edge/:Microsoft Edge Safe Storage"; do
     _dir="${_pair%%:*}"
     _svc="${_pair##*:}"
     if [ -d "$_APP_SUPPORT/$_dir" ]; then

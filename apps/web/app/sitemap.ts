@@ -5,7 +5,7 @@ import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
+import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -83,9 +83,9 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogSlugs] = await Promise.all([
+  const [catalog, blogPosts] = await Promise.all([
     getSitemapCatalog(),
-    getBlogPostSlugs(),
+    getBlogPosts(),
   ]);
 
   const now = new Date();
@@ -147,12 +147,66 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  const blogPages: MetadataRoute.Sitemap = blogSlugs.map(slug => ({
-    url: `${BASE_URL}/blog/${slug}`,
-    lastModified: now,
+  const blogPages: MetadataRoute.Sitemap = blogPosts.map(post => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.updatedDate ?? post.date),
     changeFrequency: 'monthly',
-    priority: 0.6,
+    priority: 0.7,
   }));
+
+  // Blog author pages
+  const blogAuthors = [
+    ...new Set(
+      blogPosts.map(p => p.authorUsername).filter((u): u is string => u != null)
+    ),
+  ];
+  const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => {
+    const authorPosts = blogPosts.filter(p => p.authorUsername === username);
+    const latestDate =
+      authorPosts.length > 0
+        ? new Date(
+            Math.max(
+              ...authorPosts.map(p =>
+                new Date(p.updatedDate ?? p.date).getTime()
+              )
+            )
+          )
+        : now;
+    return {
+      url: `${BASE_URL}/blog/authors/${username}`,
+      lastModified: latestDate,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    };
+  });
+
+  // Blog category pages
+  const blogCategories = [
+    ...new Set(
+      blogPosts.map(p => p.category).filter((c): c is string => c != null)
+    ),
+  ];
+  const blogCategoryPages: MetadataRoute.Sitemap = blogCategories.map(
+    category => {
+      const catPosts = blogPosts.filter(p => p.category === category);
+      const latestDate =
+        catPosts.length > 0
+          ? new Date(
+              Math.max(
+                ...catPosts.map(p =>
+                  new Date(p.updatedDate ?? p.date).getTime()
+                )
+              )
+            )
+          : now;
+      return {
+        url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
+        lastModified: latestDate,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      };
+    }
+  );
 
   const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
     slug => ({
@@ -202,6 +256,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPages,
     ...blogPages,
+    ...blogAuthorPages,
+    ...blogCategoryPages,
     ...comparisonPages,
     ...alternativePages,
     ...profilePages,
