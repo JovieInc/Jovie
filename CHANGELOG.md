@@ -7,6 +7,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.48] - 2026-03-23
 
+### Fixed
+
+- Fixed cropped PWA icons by separating maskable and any-purpose icons at 192/512px
+- Fixed service worker to only intercept GET navigations with 8s timeout fallback
+- Removed misleading screenshots array from web manifest
+
+### Added
+
+- Offline fallback page matching Jovie's dark theme for installed PWA
+- PWA standalone mode CSS polish: contained overscroll, disabled nav text selection
+- `display_override` in manifest for progressive enhancement
+- `maximumScale: 5` viewport for accessibility (no pinch-zoom lock)
 ### Changed
 
 - Expanded support page with documentation links, FAQ section, and structured data for SEO
