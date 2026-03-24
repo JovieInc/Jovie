@@ -104,11 +104,9 @@
   color: var(--color-text-tertiary-token);
 }
 
-/* Input error state */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput[data-invalid],
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-formField--invalid
-  .cl-formFieldInput {
+/* Input error state — Clerk uses data-feedback="error" and aria-invalid="true" */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput[data-feedback="error"],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldInput[aria-invalid="true"] {
   border-color: var(--linear-error);
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.16),
@@ -153,25 +151,24 @@
   color: var(--color-text-tertiary-token);
 }
 
-/* OTP filled state */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-filled] {
+/* OTP filled state — active input being typed into */
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-active] {
   border-color: var(--color-border-default);
   background: var(--color-bg-surface-1);
 }
 
-/* OTP error state */
+/* OTP error state — Clerk uses data-feedback="error" and data-error attributes */
 :is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeFieldInput[data-status="error"],
-:is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeField--error
-  .cl-otpCodeFieldInput {
+  .cl-otpCodeFieldInput[data-feedback="error"],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-otpCodeFieldInput[data-error],
+:is(.cl-signIn-root, .cl-signUp-root) .cl-error .cl-otpCodeFieldInput {
   border-color: var(--linear-error);
   animation: otp-shake 300ms var(--ease-interactive);
 }
 
 /* OTP success state */
 :is(.cl-signIn-root, .cl-signUp-root)
-  .cl-otpCodeFieldInput[data-status="success"] {
+  .cl-otpCodeFieldInput[data-feedback="success"] {
   border-color: var(--linear-success);
 }
 
@@ -385,7 +382,7 @@
 
 /* Warning text */
 :is(.cl-signIn-root, .cl-signUp-root) .cl-formFieldWarningText {
-  color: oklch(82% 0.17 85);
+  color: var(--linear-warning);
   font-size: 0.8125rem;
 }
 
@@ -473,13 +470,14 @@
   border-radius: 9999px;
 }
 
-/* Modal */
-:is(.cl-signIn-root, .cl-signUp-root) .cl-modalBackdrop {
+/* Modal — Clerk renders modals via ReactDOM.createPortal, so they are NOT
+   descendants of .cl-signIn-root/.cl-signUp-root. Target them at top level. */
+.cl-modalBackdrop {
   background: rgba(8, 9, 10, 0.72);
   backdrop-filter: blur(16px);
 }
 
-:is(.cl-signIn-root, .cl-signUp-root) .cl-modalContent {
+.cl-modalContent {
   border: 1px solid var(--color-border-subtle);
   background: var(--color-bg-surface-0);
   border-radius: var(--radius-3xl);
