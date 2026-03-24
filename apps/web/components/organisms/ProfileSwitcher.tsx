@@ -26,10 +26,6 @@ export function ProfileSwitcher() {
   );
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  if (creatorProfiles.length < 2 && !showCreateDialog) {
-    return null;
-  }
-
   function handleSwitch(profileId: string) {
     if (profileId === selectedProfile?.id) return;
     setSwitchingProfileId(profileId);

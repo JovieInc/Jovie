@@ -1,12 +1,14 @@
 'use client';
 
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
 } from '@jovie/ui';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -84,7 +86,7 @@ export function CreateProfileDialog({
             >
               Display name
             </label>
-            <input
+            <Input
               id='create-profile-display-name'
               type='text'
               value={displayName}
@@ -93,7 +95,6 @@ export function CreateProfileDialog({
                 setError(null);
               }}
               placeholder='Artist name'
-              className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               autoFocus
               disabled={isPending}
             />
@@ -106,16 +107,17 @@ export function CreateProfileDialog({
             >
               Username
             </label>
-            <input
+            <Input
               id='create-profile-username'
               type='text'
               value={username}
               onChange={e => {
-                setUsername(e.target.value.toLowerCase().replace(/\s/g, '-'));
+                setUsername(
+                  e.target.value.trim().toLowerCase().replaceAll(/\s/g, '-')
+                );
                 setError(null);
               }}
               placeholder='username'
-              className='flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               disabled={isPending}
             />
           </div>
@@ -127,22 +129,21 @@ export function CreateProfileDialog({
           )}
 
           <DialogFooter>
-            <button
+            <Button
               type='button'
+              variant='outline'
               onClick={handleClose}
-              className='inline-flex h-9 items-center justify-center rounded-md border border-input bg-transparent px-4 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
               disabled={isPending}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type='submit'
-              className='inline-flex h-9 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50'
               disabled={isPending || !displayName.trim() || !username.trim()}
             >
               {isPending && <Loader2 className='size-3.5 animate-spin' />}
               Create profile
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

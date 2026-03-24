@@ -166,13 +166,13 @@ export async function createAdditionalProfile(input: {
       return { success: false, error: 'User not found' };
     }
 
-    // Soft limit: max profiles per user
-    const existingProfiles = await db
-      .select({ id: creatorProfiles.id })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.userId, user.id));
+    // Soft limit: max profiles per user (count via claims for accuracy)
+    const existingClaims = await db
+      .select({ id: userProfileClaims.creatorProfileId })
+      .from(userProfileClaims)
+      .where(eq(userProfileClaims.userId, user.id));
 
-    if (existingProfiles.length >= MAX_PROFILES_PER_USER) {
+    if (existingClaims.length >= MAX_PROFILES_PER_USER) {
       return {
         success: false,
         error: `Maximum of ${MAX_PROFILES_PER_USER} profiles reached`,

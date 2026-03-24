@@ -168,13 +168,11 @@ function SidebarHeaderNav({
   isAdmin,
   isDashboardOrAdmin,
   profileHref,
-  hasMultipleProfiles,
 }: Readonly<{
   isInSettings: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   profileHref: string | undefined;
-  hasMultipleProfiles: boolean;
 }>) {
   return (
     <div className='flex w-full items-center'>
@@ -205,7 +203,7 @@ function SidebarHeaderNav({
             </span>
           </Link>
         </div>
-      ) : hasMultipleProfiles && !isAdmin ? (
+      ) : !isAdmin ? (
         <ProfileSwitcher />
       ) : (
         <UserButton
@@ -258,12 +256,11 @@ function SidebarHeaderNav({
  * No footer — user menu lives in the header.
  */
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
-  const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
+  const { isAdmin: isUserAdmin } = useDashboardData();
   const pathname = usePathname();
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
-  const hasMultipleProfiles = creatorProfiles.length >= 2;
 
   const { profileHref } = useProfileData(isDashboardOrAdmin);
 
@@ -288,7 +285,6 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           isAdmin={isAdmin}
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
-          hasMultipleProfiles={hasMultipleProfiles}
         />
       </SidebarHeader>
 
