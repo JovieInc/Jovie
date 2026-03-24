@@ -6,8 +6,10 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { AtSign, Camera, Link2, Mail, Music2, Share2 } from 'lucide-react';
+import { Link2, Mail, Music2, Share2 } from 'lucide-react';
+import React from 'react';
 import { toast } from 'sonner';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type {
   ContextMenuAction,
@@ -17,16 +19,29 @@ import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
 
-const UTM_PRESET_ICONS = {
-  Instagram: Camera,
+const UTM_PRESET_LUCIDE_ICONS = {
   Music2,
-  Twitter: AtSign,
   Mail,
 } as const;
 
+const UTM_PRESET_SOCIAL_ICONS: Record<string, React.ReactNode> = {
+  Instagram: React.createElement(SocialIcon, {
+    platform: 'instagram',
+    className: 'h-4 w-4',
+  }),
+  Twitter: React.createElement(SocialIcon, {
+    platform: 'twitter',
+    className: 'h-4 w-4',
+  }),
+};
+
 function resolvePresetIcon(preset: UTMPreset) {
+  const social = UTM_PRESET_SOCIAL_ICONS[preset.icon as string];
+  if (social) return social;
   return (
-    UTM_PRESET_ICONS[preset.icon as keyof typeof UTM_PRESET_ICONS] ?? Link2
+    UTM_PRESET_LUCIDE_ICONS[
+      preset.icon as keyof typeof UTM_PRESET_LUCIDE_ICONS
+    ] ?? Link2
   );
 }
 
