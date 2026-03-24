@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-[14px]',
+        'z-20 border-b border-subtle bg-surface-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-[12px]',
         className
       )}
     >
@@ -48,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-(--linear-app-frame-seam) [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-1 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (
@@ -57,7 +57,7 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-(--linear-app-header-height) w-full items-center gap-2 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative hidden h-(--linear-app-header-height-compact) w-full items-center gap-1.5 px-(--linear-app-header-padding-x) sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
@@ -70,14 +70,14 @@ export function DashboardHeader({
           </div>
         ) : null}
         {/* Desktop: Simplified breadcrumb - just current page */}
-        <div className='flex min-w-0 flex-1 items-center gap-1.5 tracking-[-0.012em]'>
+        <div className='flex min-w-0 flex-1 items-center gap-1 tracking-[-0.012em]'>
           {usesSectionTitleLayout ? (
-            <span className='truncate text-[12px] font-[570] tracking-[-0.014em] text-primary-token'>
+            <span className='truncate text-[11px] font-[565] tracking-[-0.014em] text-primary-token'>
               {currentLabel}
             </span>
           ) : (
             <>
-              <span className='shrink-0 text-[10px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+              <span className='shrink-0 text-[10px] font-[555] uppercase tracking-[0.08em] text-tertiary-token'>
                 {rootLabel}
               </span>
               <ChevronRight className='size-3 shrink-0 text-quaternary-token' />
@@ -86,7 +86,7 @@ export function DashboardHeader({
                   {breadcrumbSuffix}
                 </div>
               ) : (
-                <span className='truncate text-[11px] font-[560] text-primary-token'>
+                <span className='truncate text-[11px] font-[555] text-primary-token'>
                   {currentLabel}
                 </span>
               )}

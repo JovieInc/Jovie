@@ -25,10 +25,16 @@
     }
   ],
   "functions": {
-    "app/api/**/*.ts": {
+    "app/api/**/route.ts": {
       "maxDuration": 30
     },
-    "app/api/cron/**/*.ts": {
+    "app/api/**/route.tsx": {
+      "maxDuration": 30
+    },
+    "app/api/cron/**/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/cron/**/route.tsx": {
       "maxDuration": 300
     }
   },

@@ -11,12 +11,14 @@
  * Flags:
  *   --json         Emit machine-readable JSON to stdout
  *   --path <path>  Restrict to one or more configured budget paths
+ *   --auth-path     Override the Clerk storage state path for auth routes
  */
 
 import { chromium } from '@playwright/test';
 import { existsSync, readFileSync } from 'fs';
 import { createRequire } from 'module';
 import { resolve } from 'path';
+import { APP_ROUTES } from '../constants/routes';
 
 const require = createRequire(import.meta.url);
 
@@ -26,7 +28,8 @@ type TimingMetricName =
   | 'cumulative-layout-shift'
   | 'first-input-delay'
   | 'time-to-first-byte'
-  | 'skeleton-to-content';
+  | 'skeleton-to-content'
+  | 'warm-shell-response';
 
 type ResourceMetricName = 'script' | 'image' | 'font' | 'stylesheet' | 'total';
 
@@ -57,6 +60,7 @@ type PageMetrics = {
 };
 
 type CliOptions = {
+  authPath?: string;
   json: boolean;
   paths: string[];
 };
@@ -81,6 +85,8 @@ type PageResult = {
   auth: boolean;
   timings: MetricResult[];
   resourceSizes: MetricResult[];
+  rawTimings: Record<TimingMetricName, number>;
+  rawResourceSizes: Record<ResourceMetricName, number>;
   violations: ViolationResult[];
 };
 
@@ -101,6 +107,16 @@ const AUTH_STORAGE_PATH = resolve(
   import.meta.dirname ?? __dirname,
   '../.auth/session.json'
 );
+const DASHBOARD_WARM_SHELL_START_PATH = APP_ROUTES.DASHBOARD;
+const DASHBOARD_RELEASES_PATHS = [
+  APP_ROUTES.RELEASES,
+  APP_ROUTES.DASHBOARD_RELEASES,
+] as const;
+const DASHBOARD_RELEASES_LINK_SELECTOR = DASHBOARD_RELEASES_PATHS.map(
+  path => `a[href="${path}"]`
+).join(', ');
+const DASHBOARD_RELEASES_READY_SELECTOR =
+  '[data-testid="releases-loading"], [data-testid="releases-matrix"]';
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
@@ -124,6 +140,16 @@ const parseCliArgs = (args: string[]): CliOptions => {
         throw new TypeError('Missing value for --path');
       }
       options.paths.push(value);
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--auth-path') {
+      const value = args[index + 1];
+      if (!value) {
+        throw new TypeError('Missing value for --auth-path');
+      }
+      options.authPath = value;
       index += 1;
       continue;
     }
@@ -171,6 +197,12 @@ const resolvePath = (path: string) =>
 
 const formatMetric = (value: number, unit: string) =>
   `${value.toFixed(1)}${unit}`;
+
+const matchesRoute = (pathname: string, route: string) =>
+  pathname === route || pathname.startsWith(`${route}/`);
+
+const matchesDashboardReleasesPath = (pathname: string) =>
+  DASHBOARD_RELEASES_PATHS.some(route => matchesRoute(pathname, route));
 
 const calculateOvershootPct = (measured: number, budget: number) => {
   if (measured <= budget || budget === 0) {
@@ -224,6 +256,10 @@ const loadAuthCookies = (
   domain: string;
   path: string;
 }> => {
+  const authStoragePath =
+    CLI_OPTIONS.authPath ||
+    process.env.PERF_BUDGET_AUTH_PATH ||
+    AUTH_STORAGE_PATH;
   const cookieValue = process.env.CLERK_SESSION_COOKIE;
   if (cookieValue) {
     const domain = new URL(baseUrl).hostname;
@@ -232,9 +268,9 @@ const loadAuthCookies = (
     return [{ name: '__session', value: cookieValue, domain, path: '/' }];
   }
 
-  if (existsSync(AUTH_STORAGE_PATH)) {
+  if (existsSync(authStoragePath)) {
     try {
-      const raw = readFileSync(AUTH_STORAGE_PATH, 'utf-8');
+      const raw = readFileSync(authStoragePath, 'utf-8');
       const data = JSON.parse(raw);
       if (Array.isArray(data.cookies)) {
         return data.cookies;
@@ -245,6 +281,63 @@ const loadAuthCookies = (
   }
 
   return [];
+};
+
+const shouldMeasureWarmShellResponse = (url: string, needsAuth: boolean) => {
+  if (!needsAuth) {
+    return false;
+  }
+
+  const pathname = new URL(url).pathname;
+  return matchesDashboardReleasesPath(pathname);
+};
+
+/**
+ * Measure in-app navigation time from a warm authenticated dashboard shell
+ * to the first visible releases shell state.
+ */
+const measureWarmShellResponse = async (
+  page: Awaited<
+    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
+  >,
+  baseUrl: string
+): Promise<number> => {
+  const start = Date.now();
+  const appRootUrl = `${baseUrl.replace(/\/$/, '')}${DASHBOARD_WARM_SHELL_START_PATH}`;
+
+  try {
+    await page.goto(appRootUrl, {
+      waitUntil: 'domcontentloaded',
+      timeout: 60000,
+    });
+    await page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
+      state: 'visible',
+      timeout: 15000,
+    });
+
+    const releasesLink = page.locator(DASHBOARD_RELEASES_LINK_SELECTOR).first();
+    await releasesLink.waitFor({ state: 'visible', timeout: 15000 });
+    await releasesLink.hover().catch(() => undefined);
+    await page.waitForTimeout(250);
+
+    await Promise.all([
+      page.waitForURL(url => matchesDashboardReleasesPath(url.pathname), {
+        timeout: 15000,
+      }),
+      releasesLink.click(),
+    ]);
+    await page.waitForSelector(DASHBOARD_RELEASES_READY_SELECTOR, {
+      state: 'visible',
+      timeout: 15000,
+    });
+
+    return Date.now() - start;
+  } catch {
+    logWarning(
+      `  ⚠ Warm shell response measurement failed for ${appRootUrl}, continuing without it`
+    );
+    return 0;
+  }
 };
 
 /**
@@ -285,20 +378,38 @@ const collectMetrics = async (
   needsAuth: boolean
 ): Promise<PageMetrics> => {
   const browser = await chromium.launch();
+  let context: Awaited<ReturnType<typeof browser.newContext>> | null = null;
   let page: Awaited<ReturnType<typeof browser.newPage>> | null = null;
 
   try {
-    const context = await browser.newContext();
+    const cookies = needsAuth ? loadAuthCookies(BASE_URL) : [];
+
+    context = await browser.newContext();
 
     if (needsAuth) {
-      const cookies = loadAuthCookies(BASE_URL);
       if (cookies.length === 0) {
         throw new Error(
-          'No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide apps/web/.auth/session.json.'
+          `No auth cookies found for authenticated route. Set CLERK_SESSION_COOKIE or provide ${CLI_OPTIONS.authPath || process.env.PERF_BUDGET_AUTH_PATH || AUTH_STORAGE_PATH}.`
         );
       }
       await context.addCookies(cookies);
       logInfo(`  🔐 Injected ${cookies.length} auth cookies`);
+    }
+
+    let warmShellResponse = 0;
+    if (shouldMeasureWarmShellResponse(url, needsAuth)) {
+      const warmContext = await browser.newContext();
+      let warmPage: Awaited<ReturnType<typeof browser.newPage>> | null = null;
+      try {
+        if (cookies.length > 0) {
+          await warmContext.addCookies(cookies);
+        }
+        warmPage = await warmContext.newPage();
+        warmShellResponse = await measureWarmShellResponse(warmPage, BASE_URL);
+      } finally {
+        await warmPage?.close().catch(() => undefined);
+        await warmContext.close().catch(() => undefined);
+      }
     }
 
     page = await context.newPage();
@@ -447,6 +558,7 @@ const collectMetrics = async (
         'first-input-delay': metrics.timings['first-input-delay'],
         'time-to-first-byte': metrics.timings['time-to-first-byte'],
         'skeleton-to-content': skeletonToContent,
+        'warm-shell-response': warmShellResponse,
       },
       resourceSizes: {
         script: toKilobytes(metrics.resourceSizes.script),
@@ -458,6 +570,7 @@ const collectMetrics = async (
     };
   } finally {
     await page?.close().catch(() => undefined);
+    await context?.close().catch(() => undefined);
     await browser.close().catch(() => undefined);
   }
 };
@@ -493,6 +606,8 @@ const buildPageResult = (
     auth: budgetEntry.auth === true,
     timings: timingResults,
     resourceSizes: resourceResults,
+    rawTimings: metrics.timings,
+    rawResourceSizes: metrics.resourceSizes,
     violations: [
       ...timingResults
         .filter(result => !result.passed)

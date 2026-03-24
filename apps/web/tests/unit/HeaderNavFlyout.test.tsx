@@ -28,4 +28,17 @@ describe('HeaderNav flyout interactions', () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
+
+  it('renders static public auth actions without client auth state', () => {
+    render(<HeaderNav authMode='public-static' />);
+
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+    expect(screen.getByRole('link', { name: 'Sign up' })).toHaveAttribute(
+      'href',
+      '/signup'
+    );
+  });
 });

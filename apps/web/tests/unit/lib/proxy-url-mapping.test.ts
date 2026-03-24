@@ -47,6 +47,18 @@ function isAuthCallbackPath(pathname: string): boolean {
   );
 }
 
+function matchesRoute(pathname: string, route: string): boolean {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+function isProtectedPath(pathname: string): boolean {
+  return (
+    matchesRoute(pathname, '/app') ||
+    matchesRoute(pathname, '/waitlist') ||
+    matchesRoute(pathname, '/onboarding')
+  );
+}
+
 describe('Proxy URL Mapping', () => {
   describe('isDevOrPreview', () => {
     it('returns true for localhost', () => {
@@ -120,6 +132,24 @@ describe('Proxy URL Mapping', () => {
   describe('DASHBOARD_URL', () => {
     it('dashboard is always at /app in single domain architecture', () => {
       expect(DASHBOARD_URL).toBe('/app');
+    });
+  });
+
+  describe('protected route classification', () => {
+    it('treats the authenticated shell root as protected', () => {
+      expect(isProtectedPath('/app')).toBe(true);
+    });
+
+    it('treats nested dashboard and settings routes as protected', () => {
+      expect(isProtectedPath('/app/dashboard/earnings')).toBe(true);
+      expect(isProtectedPath('/app/settings/artist-profile')).toBe(true);
+      expect(isProtectedPath('/app/admin/users')).toBe(true);
+    });
+
+    it('does not classify public marketing routes as protected', () => {
+      expect(isProtectedPath('/')).toBe(false);
+      expect(isProtectedPath('/pricing')).toBe(false);
+      expect(isProtectedPath('/tim')).toBe(false);
     });
   });
 

@@ -10,6 +10,8 @@
  * ⚠️  CHANGING THESE WILL BREAK ALL STYLING
  */
 
+@layer theme, base, clerk, components, utilities;
+
 @import "tailwindcss";
 @import "../styles/design-system.css";
 @import "../styles/theme.css";
@@ -95,6 +97,10 @@ html {
 body {
   background: #ffffff;
   color: #0c0c0c;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 .dark body {
