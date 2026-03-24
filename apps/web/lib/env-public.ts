@@ -19,6 +19,9 @@ export const publicEnv = {
   get NEXT_PUBLIC_CLERK_PROXY_URL() {
     return process.env.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
   },
+  get NEXT_PUBLIC_CLERK_PROXY_DISABLED() {
+    return process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED || undefined;
+  },
   get NEXT_PUBLIC_APP_URL() {
     // Single domain architecture: app routes are at jov.ie/app/*
     return process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';

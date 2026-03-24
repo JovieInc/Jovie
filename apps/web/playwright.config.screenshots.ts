@@ -82,9 +82,15 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: '3100',
             NEXT_DISABLE_TOOLBAR: '1',
+            // Disable Clerk proxy for screenshots — Clerk JS loads from its own
+            // CDN instead of proxying through localhost (which requires HTTPS).
+            NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
           },
           url: 'http://localhost:3100',
-          reuseExistingServer: true,
+          // Default to fresh server so NEXT_PUBLIC_CLERK_PROXY_DISABLED is always
+          // applied. A pre-running server won't have this flag, causing silent
+          // Clerk JS loading failures. Opt in with REUSE_EXISTING_SERVER=1.
+          reuseExistingServer: process.env.REUSE_EXISTING_SERVER === '1',
           timeout: 300_000,
           stdout: 'pipe',
           stderr: 'pipe',

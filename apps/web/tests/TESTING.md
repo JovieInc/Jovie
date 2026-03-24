@@ -128,6 +128,85 @@ PR created
     └── Deploy (if all pass)
 ```
 
+## E2E Authentication
+
+### How Clerk Test Auth Works
+
+E2E tests authenticate using Clerk's official testing library (`@clerk/testing/playwright`). The test user uses a **`+clerk_test` email** pattern which enables passwordless auth via a magic OTP code.
+
+| Concept | Detail |
+|---------|--------|
+| Test email format | `*+clerk_test@jov.ie` (e.g. `browse+clerk_test@jov.ie`) |
+| Magic OTP code | `424242` (auto-handled by Clerk testing library) |
+| Auth strategy | `email_code` (not password) |
+| Password needed? | **NO** — `+clerk_test` emails are passwordless |
+| Testing token | Generated via `@clerk/testing/playwright`'s `clerkSetup()` |
+
+### Required Doppler Environment Variables
+
+All E2E auth credentials are stored in Doppler (`jovie-web` project, `dev` config):
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `E2E_CLERK_USER_USERNAME` | Yes | Test user email (must contain `+clerk_test`) |
+| `E2E_CLERK_USER_PASSWORD` | No | Not needed for `+clerk_test` emails |
+| `CLERK_SECRET_KEY` | Yes | Server-side Clerk API key |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Client-side Clerk key |
+| `DATABASE_URL` | Yes | For seeding test data |
+
+### Auth Flow in Tests
+
+1. **`global-setup.ts`**: Loads env vars, calls `clerkSetup()` to get testing token, seeds test data
+2. **`auth.setup.ts`**: Navigates to `/signin`, signs in via `clerk.signIn()` with `email_code` strategy, saves session to `tests/.auth/user.json`
+3. **Screenshot/E2E specs**: Use `signInUser(page)` from `helpers/clerk-auth.ts` which detects `+clerk_test` emails and uses the correct auth strategy
+4. **`shouldSkipAuth()`**: Guards authenticated specs — skips if credentials missing or Clerk setup failed. `+clerk_test` emails do NOT require a password.
+
+### Product Screenshots
+
+Generate marketing screenshots for the homepage:
+
+```bash
+# Full pipeline: seed data + auth + capture all screenshots
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots
+
+# Capture only (skip seed, use existing data)
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:capture
+
+# Seed only (populate "Aria Chen" test artist data)
+doppler run -p jovie-web -c dev -- pnpm --filter web screenshots:seed
+```
+
+Screenshots are saved to `apps/web/public/product-screenshots/` and used by homepage components (`ReleasesSection`, `PhoneProfileDemo`, `AudienceCRMSection`).
+
+### Creating Test Users via Clerk API
+
+If the test user doesn't exist, the `browse-auth.ts` script creates one automatically:
+
+```bash
+# Authenticate headless browser for /browse QA
+doppler run -p jovie-web -c dev -- bun run scripts/browse-auth.ts [email]
+```
+
+Default email: `browse+clerk_test@jov.ie`. The script:
+1. Checks if user exists via Clerk Admin API
+2. Creates user if missing
+3. Gets a testing token
+4. Signs in via email + OTP `424242`
+5. Exports cookies to `/tmp/browse-clerk-cookies.json`
+
+### Common Auth Failures
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `⚠ Skipping: E2E_CLERK_USER_USERNAME not configured` | Missing Doppler env var | Run with `doppler run -p jovie-web -c dev --` |
+| `⚠ Skipping: Clerk testing setup was not successful` | `clerkSetup()` failed | Check `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` are real keys |
+| Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
+| `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
+| `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
+| `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | Set `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when starting the dev server (done automatically by the screenshots pipeline). If using `reuseExistingServer`, stop the existing server and re-run via `doppler run -p jovie-web -c dev -- pnpm --filter web screenshots` so the flag is active |
+| OTP input not visible | Testing token not set before navigation | Check `setupClerkTestingToken()` runs in `auth.setup.ts` |
+| `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |
+
 ## Troubleshooting
 
 ### Tests timing out
