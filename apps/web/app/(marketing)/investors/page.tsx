@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { PROFILE_HOSTNAME } from '@/constants/domains';
 
 export const metadata: Metadata = {
   robots: {
@@ -12,8 +11,8 @@ export const metadata: Metadata = {
 
 /**
  * Public /investors route redirects to the token-gated investor portal.
- * The investor memo is only accessible through investors.jov.ie with a valid token.
+ * Without a valid token cookie, the middleware will return 404.
  */
 export default function InvestorsPage() {
-  redirect(`https://investors.${PROFILE_HOSTNAME}`);
+  redirect('/investor-portal');
 }

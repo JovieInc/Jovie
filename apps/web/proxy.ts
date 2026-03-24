@@ -82,10 +82,11 @@ const STAGING_HOSTNAMES = new Set([
   `main.${HOSTNAME}`, // Legacy staging hostname
 ]);
 
+// Legacy subdomain set — kept for redirect to /investor-portal
 const INVESTOR_HOSTNAMES = new Set([
   `investors.${HOSTNAME}`,
   'investors.localhost',
-  'investors.jov.ie', // Legacy canonical alias on jov.ie
+  'investors.jov.ie',
 ]);
 
 /**
@@ -149,7 +150,7 @@ interface HostInfo {
 /**
  * Analyze hostname once for all routing decisions.
  * Single domain architecture: everything on jov.ie.
- * Investor portal: investors.jov.ie (subdomain, bypasses Clerk auth)
+ * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
  */
 function analyzeHost(hostname: string): HostInfo {
   const isDevOrPreview =
@@ -180,10 +181,11 @@ function getClerkProxyUrl(req: NextRequest): string | undefined {
 const DASHBOARD_URL = '/app';
 
 // ============================================================================
-// Investor Portal — Token-gated subdomain (investors.jov.ie)
+// Investor Portal — Path-based token auth (/investor-portal?t=TOKEN)
 // ============================================================================
 // Bypasses Clerk entirely. Auth is via a secret token in URL param or cookie.
 // Token validated against investor_links table on every request (volume is tiny).
+// Legacy subdomain (investors.jov.ie) redirects to /investor-portal.
 // ============================================================================
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
@@ -191,8 +193,10 @@ const INVESTOR_TOKEN_PARAM = 't';
 
 /**
  * Handle investor portal requests.
- * Validates token from URL param or cookie, sets cookie, rewrites to /investor-portal.
- * Returns null if the request is NOT for the investor portal.
+ *
+ * 1. Legacy subdomain (investors.jov.ie) → 301 redirect to /investor-portal
+ * 2. /investor-portal?t=TOKEN → validate, set cookie, strip param
+ * 3. /investor-portal with cookie → validate, record view, continue
  */
 async function handleInvestorRequest(
   req: NextRequest,
@@ -200,30 +204,44 @@ async function handleInvestorRequest(
 ): Promise<NextResponse | null> {
   const hostname = req.nextUrl.hostname;
   const hostInfo = analyzeHost(hostname);
-
-  if (!hostInfo.isInvestorPortal) {
-    return null;
-  }
-
   const pathname = req.nextUrl.pathname;
 
-  // Allow Next.js internals and static files to pass through
+  // --- Legacy subdomain redirect ---
+  if (hostInfo.isInvestorPortal) {
+    // Allow Next.js internals and static files to pass through
+    if (
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/favicon') ||
+      pathname.endsWith('.ico') ||
+      pathname.endsWith('.png') ||
+      pathname.endsWith('.jpg') ||
+      pathname.endsWith('.svg')
+    ) {
+      return NextResponse.next();
+    }
+
+    // Redirect to main host /investor-portal, preserving token param
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.hostname = HOSTNAME;
+    redirectUrl.port = '';
+    const subPath = pathname === '/' ? '' : pathname;
+    redirectUrl.pathname = `/investor-portal${subPath}`;
+
+    return NextResponse.redirect(redirectUrl, 301);
+  }
+
+  // --- Path-based investor portal ---
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.endsWith('.ico') ||
-    pathname.endsWith('.png') ||
-    pathname.endsWith('.jpg') ||
-    pathname.endsWith('.svg')
+    !pathname.startsWith('/investor-portal') ||
+    pathname.startsWith('/_next')
   ) {
-    return NextResponse.next();
+    return null;
   }
 
   // Check for token in URL param (first visit from shared link)
   const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
 
   if (tokenParam) {
-    // Validate token against DB
     const isValid = await validateInvestorToken(tokenParam);
 
     if (!isValid) {
@@ -257,20 +275,12 @@ async function handleInvestorRequest(
   const isValid = await validateInvestorToken(tokenCookie);
 
   if (!isValid) {
-    // Invalid/expired/deactivated token: clear cookie, return 404
     const res = new NextResponse(null, { status: 404 });
     res.cookies.delete(INVESTOR_TOKEN_COOKIE);
     return res;
   }
 
-  // Valid token: rewrite to /investor-portal route group
-  const rewriteUrl = req.nextUrl.clone();
-  // Map / to /investor-portal, /ai to /investor-portal/ai, etc.
-  const investorPath =
-    pathname === '/' ? '/investor-portal' : `/investor-portal${pathname}`;
-  rewriteUrl.pathname = investorPath;
-
-  const res = NextResponse.rewrite(rewriteUrl);
+  const res = NextResponse.next();
 
   // Anti-scraping headers
   res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
@@ -875,7 +885,8 @@ export default async function middleware(
 ) {
   // ========================================================================
   // Investor portal: handle before Clerk (no auth needed)
-  // investors.jov.ie uses token-based access, not Clerk sessions
+  // /investor-portal uses token-based access, not Clerk sessions
+  // Legacy investors.jov.ie subdomain redirects to /investor-portal
   // ========================================================================
   const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
