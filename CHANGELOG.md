@@ -9,18 +9,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Rewrote DESIGN.md as complete Linear March 2026 design system spec (typography, colors, spacing, motion, component patterns)
-- Updated theme base hue from 272 to 282 to match Linear's March 2026 UI refresh
-- Updated font weight book from 400 to 450 (Linear's default UI weight)
-- Fixed light sidebar color to match Linear's exact lch(95.94% 0.5 282)
-- Normalized all OKLCH hue references from 260/272 to 282 across token files
+- Updated design system and color tokens to match Linear's March 2026 refresh
+- [internal] Rewrote DESIGN.md as complete design system spec (typography, colors, spacing, motion, component patterns)
+- [internal] Updated theme base hue 272→282, font weight book 400→450, light sidebar color corrected
+- [internal] Normalized all OKLCH hue references from 260/272 to 282 across token files
 
 ### Fixed
 
-- Marketing H1 capped at 64px (was incorrectly scaling to 76px at wide viewports)
-- Marketing H2 capped at 48px (was incorrectly scaling to 56px at >=1440px)
-- H1 line-height corrected from 1.0 to 1.06 to match Linear's rendered value
-- Removed global letter-spacing from body (Linear applies tracking per-element, not globally)
+- Fixed oversized marketing headlines on wide screens
+- Improved text spacing consistency across navigation and UI elements
+- [internal] Marketing H1 capped at 64px (was 76px at >=1280px), H2 capped at 48px (was 56px at >=1440px)
+- [internal] H1 line-height corrected from 1.0 to 1.06; removed global letter-spacing from body
 
 ## [26.3.48] - 2026-03-23
 
