@@ -217,7 +217,7 @@
     "@vitest/browser": "^4.0.18",
     "@vitest/browser-playwright": "^4.0.18",
     "@vitest/coverage-v8": "^4.0.18",
-    "autoprefixer": "^10.4.23",
+    "autoprefixer": "^10.4.27",
     "axe-core": "^4.11.1",
     "babel-plugin-react-compiler": "^19.1.0-rc.1",
     "danger": "^13.0.4",
