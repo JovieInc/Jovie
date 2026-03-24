@@ -1,11 +1,15 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
+import { notFound } from 'next/navigation';
+import { PROFILE_HOSTNAME } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { InvestorNav } from './_components/InvestorNav';
 import { InvestorStickyBar } from './_components/InvestorStickyBar';
+
+const INVESTOR_TOKEN_COOKIE = '__investor_token';
 
 export const metadata: Metadata = {
   title: 'Jovie — Investors',
@@ -17,20 +21,65 @@ export const metadata: Metadata = {
 };
 
 /**
+ * Validate that the request is from the investor subdomain or has a valid token.
+ * Prevents unauthenticated access on the primary host.
+ */
+async function requireInvestorAccess(): Promise<void> {
+  const headersList = await headers();
+  const host = headersList.get('host') ?? '';
+
+  const isInvestorHost =
+    host === `investors.${PROFILE_HOSTNAME}` ||
+    host === 'investors.localhost' ||
+    host === 'investors.localhost:3000' ||
+    host === 'investors.jov.ie';
+
+  if (isInvestorHost) return;
+
+  const cookieStore = await cookies();
+  const token = cookieStore.get(INVESTOR_TOKEN_COOKIE)?.value;
+
+  if (!token) {
+    notFound();
+  }
+
+  const [link] = await db
+    .select({
+      id: investorLinks.id,
+      isActive: investorLinks.isActive,
+      expiresAt: investorLinks.expiresAt,
+    })
+    .from(investorLinks)
+    .where(
+      and(eq(investorLinks.token, token), eq(investorLinks.isActive, true))
+    )
+    .limit(1);
+
+  if (!link) {
+    notFound();
+  }
+
+  if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+    notFound();
+  }
+}
+
+/**
  * Investor portal layout.
  * Dark mode only. No marketing header/footer.
  * Left sidebar nav + bottom sticky action bar.
  *
- * Token is already validated by proxy.ts middleware.
- * We read the cookie here to get investor name for personalization.
+ * Access guard: validates token via cookie or subdomain.
  */
 export default async function InvestorLayout({
   children,
 }: {
   readonly children: React.ReactNode;
 }) {
+  await requireInvestorAccess();
+
   const cookieStore = await cookies();
-  const token = cookieStore.get('__investor_token')?.value;
+  const token = cookieStore.get(INVESTOR_TOKEN_COOKIE)?.value;
 
   // Fetch investor name for personalized greeting
   let investorName: string | null = null;

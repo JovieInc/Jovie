@@ -1,42 +1,19 @@
 import type { Metadata } from 'next';
-import { MarketingContentShell } from '@/components/marketing';
-import { DocPage } from '@/components/organisms/DocPage';
-import { APP_NAME, APP_URL } from '@/constants/app';
-import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
-
-const INVESTOR_MEMO_RELATIVE_PATH = 'content/investors/investor-memo.md';
+import { redirect } from 'next/navigation';
+import { PROFILE_HOSTNAME } from '@/constants/domains';
 
 export const metadata: Metadata = {
-  title: `Investor Memo | ${APP_NAME}`,
-  description: `Investor memo for ${APP_NAME}`,
-  alternates: {
-    canonical: `${APP_URL}/investors`,
-  },
   robots: {
     index: false,
     follow: false,
-    googleBot: {
-      index: false,
-      follow: false,
-    },
+    googleBot: { index: false, follow: false },
   },
 };
 
-export default async function InvestorsPage() {
-  const doc = await getMarkdownDocument(INVESTOR_MEMO_RELATIVE_PATH);
-  const toc = doc.toc.filter(entry => entry.level === 2);
-
-  return (
-    <MarketingContentShell>
-      <DocPage
-        doc={{ ...doc, toc }}
-        hero={{
-          eyebrow: 'Investors',
-          title: 'Investor Memo',
-          description: 'Jovie (Angel Round)',
-        }}
-        pdfTitle='Investor Memo'
-      />
-    </MarketingContentShell>
-  );
+/**
+ * Public /investors route redirects to the token-gated investor portal.
+ * The investor memo is only accessible through investors.jov.ie with a valid token.
+ */
+export default function InvestorsPage() {
+  redirect(`https://investors.${PROFILE_HOSTNAME}`);
 }
