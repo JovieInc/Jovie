@@ -151,9 +151,9 @@ export default async function ChangelogPage() {
             <p className='opacity-40'>No updates yet. Check back soon!</p>
           ) : (
             <div className='space-y-10'>
-              {releases.map(release => (
+              {releases.map((release, index) => (
                 <article
-                  key={`${release.version}-${release.date ?? 'unreleased'}`}
+                  key={`${release.version}-${release.date ?? 'unreleased'}-${index}`}
                   className='relative pl-6 border-l-2'
                   style={{
                     borderColor:

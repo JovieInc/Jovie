@@ -169,7 +169,7 @@ const HOME_FAQ_ITEMS = [
   {
     question: 'How do smart links work?',
     answer:
-      'When you add a release to Jovie, it automatically generates a smart link. When a fan clicks it, Jovie detects which streaming platform they prefer (Spotify, Apple Music, YouTube, etc.) and routes them there. One link, every platform.',
+      'When you release new music, Jovie automatically generates a smart link and emails it to every fan on release day — no setup required. Want to customize it? Add the release manually beforehand.',
   },
   {
     question: 'How is Jovie different from Linktree?',
@@ -273,7 +273,7 @@ export default function HomePage() {
       <FaqSection
         items={HOME_FAQ_ITEMS}
         className='mx-auto max-w-[720px] px-6 py-20 sm:px-8 lg:px-10'
-        headingClassName='text-center text-3xl font-semibold tracking-tight text-primary-token'
+        headingClassName='text-3xl font-semibold tracking-tight text-primary-token'
       />
 
       {/* Final CTA */}
