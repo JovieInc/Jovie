@@ -2398,7 +2398,9 @@ jobs:
           org_id = os.environ["VERCEL_ORG_ID"]
           secrets = json.loads(os.environ["SECRETS_JSON"])
 
-          # CI-only secrets — not needed as app runtime env vars
+          # CI-only secrets and E2E test creds — not needed as app runtime env vars.
+          # Preview env vars apply to ALL preview deployments (not just staging),
+          # so keep this list tight to avoid leaking test credentials.
           SKIP = {
               "GITHUB_TOKEN", "GH_DISPATCH_TOKEN",
               "VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID",
@@ -2408,6 +2410,9 @@ jobs:
               "DOPPLER_TOKEN_DEV", "DOPPLER_TOKEN_STG", "DOPPLER_TOKEN_PRD",
               "JOVIE_BOT_PRIVATE_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
               "NEON_API_KEY",
+              # E2E test credentials — only needed in CI test runners
+              "E2E_CLERK_USER_USERNAME", "E2E_CLERK_USER_PASSWORD",
+              "PLAYWRIGHT_TEST_BASE_URL",
           }
 
           env_vars = []
@@ -2442,9 +2447,10 @@ jobs:
           except urllib.error.HTTPError as e:
               body = e.read().decode()
               print(f"Vercel API error {e.code}: {body[:500]}")
-              # Non-fatal for 4xx (vars may already exist); fatal for 5xx
-              if e.code >= 500:
-                  sys.exit(1)
+              # Fail on any HTTP error — auth failures (401/403) or server errors
+              # must not be silently ignored, as the deploy would proceed without
+              # runtime env vars and staging would return 503.
+              sys.exit(1)
           PYEOF
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
