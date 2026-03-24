@@ -5,6 +5,7 @@ author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
 category: Release Strategy
+tags: release strategy, momentum, content calendar, marketing
 ---
 
 # The Friday Problem
