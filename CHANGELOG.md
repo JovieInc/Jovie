@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.48] - 2026-03-23
+
+### Changed
+
+- Expanded support page with documentation links, FAQ section, and structured data for SEO
+- Added JSON-LD FAQ and breadcrumb schemas to support page
+
+### Fixed
+
+- Deduplicated "Jovie" from support page title tag (was "Support - Jovie - Jovie")
 ## [26.3.48] - 2026-03-23
 
 ### Changed
