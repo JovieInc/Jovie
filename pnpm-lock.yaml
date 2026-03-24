@@ -301,8 +301,8 @@ importers:
         specifier: ^0.0.4
         version: 0.0.4
       isomorphic-dompurify:
-        specifier: 2.35.0
-        version: 2.35.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: 3.6.0
+        version: 3.6.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       jose:
         specifier: ^6.1.3
         version: 6.1.3
@@ -7760,9 +7760,9 @@ packages:
     resolution: {integrity: sha512-WhB9zCku7EGTj/HQQRz5aUQEUeoQZH2bWcltRErOpymJ4boYE6wL9Tbr23krRPSZ+C5zqNSrSw+Cc7sZZ4b7vg==}
     engines: {node: '>=0.10.0'}
 
-  isomorphic-dompurify@2.35.0:
-    resolution: {integrity: sha512-a9+LQqylQCU8f1zmsYmg2tfrbdY2YS/Hc+xntcq/mDI2MY3Q108nq8K23BWDIg6YGC5JsUMC15fj2ZMqCzt/+A==}
-    engines: {node: '>=20.19.5'}
+  isomorphic-dompurify@3.6.0:
+    resolution: {integrity: sha512-0dF93ZF/7SgzdnCjXTsqSteJmhlR5PNhq/mJXRMQtnFdaGdG94ul6mYF80hSKfh6VfmLsaGKBd0Eye4eUHyeWA==}
+    engines: {node: ^20.19.0 || ^22.13.0 || >=24.0.0}
 
   isomorphic-fetch@3.0.0:
     resolution: {integrity: sha512-qvUtwJ3j6qwsF3jLxkZ72qCgjMysPzDfeV240JHiGZsANBYd+EEuu35v7dfrJ9Up0Ak07D7GGSkGhCHTqg/5wA==}
@@ -19096,7 +19096,7 @@ snapshots:
 
   isobject@3.0.1: {}
 
-  isomorphic-dompurify@2.35.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
+  isomorphic-dompurify@3.6.0(bufferutil@4.1.0)(utf-8-validate@6.0.6):
     dependencies:
       dompurify: 3.3.3
       jsdom: 26.1.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
