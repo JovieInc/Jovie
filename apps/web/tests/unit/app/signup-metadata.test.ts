@@ -4,7 +4,7 @@ describe('signup metadata', () => {
   it('exports share metadata for the sign-up page', async () => {
     const { metadata } = await import('../../../app/(auth)/signup/layout');
 
-    expect(metadata.title).toBe('Sign up | Jovie');
+    expect(metadata.title).toBe('Sign up');
     expect(metadata.description).toContain('Create your Jovie account');
     expect(metadata.alternates?.canonical).toBe('/signup');
     expect(metadata.openGraph?.url).toBe('https://jov.ie/signup');
