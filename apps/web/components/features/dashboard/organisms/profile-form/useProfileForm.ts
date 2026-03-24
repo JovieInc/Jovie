@@ -1,8 +1,8 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildProfileIdentityFields } from '@/features/profile/view-models';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useProfileMutation } from '@/lib/queries';
 import { Artist, convertDrizzleCreatorProfileToArtist } from '@/types/db';
 import type { ProfileFormData, UseProfileFormReturn } from './types';
@@ -16,7 +16,7 @@ export function useProfileForm({
   artist,
   onUpdate,
 }: UseProfileFormOptions): UseProfileFormReturn {
-  const { has } = useAuth();
+  const { has } = useAuthSafe();
   const formRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
