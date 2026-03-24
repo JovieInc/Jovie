@@ -73,30 +73,26 @@ describe('Integration Health Diagnostics', () => {
   });
 
   describe('Database Integration Health', () => {
-    it(
-      'should have the necessary database configuration',
-      {
-        timeout: 30000,
-      },
-      async () => {
-        const databaseUrl = env.DATABASE_URL;
+    it('should have the necessary database configuration', {
+      timeout: 30000,
+    }, async () => {
+      const databaseUrl = env.DATABASE_URL;
 
-        if (!databaseUrl) {
-          console.log('⏭ Skipping database integration test - no DATABASE_URL');
-          return;
-        }
-
-        // Strip wrapping quotes if present (some environments include literal quotes in the value)
-        const cleanUrl = databaseUrl.replace(/^['"]|['"]$/g, '');
-        expect(cleanUrl).toMatch(/^(postgres|postgresql):/);
-        console.log('✓ Database URL format is valid');
-
-        // Test that we can import database modules without errors
-        const { db } = await import('@/lib/db');
-        expect(db).toBeDefined();
-        console.log('✓ Database module imports successfully');
+      if (!databaseUrl) {
+        console.log('⏭ Skipping database integration test - no DATABASE_URL');
+        return;
       }
-    );
+
+      // Strip wrapping quotes if present (some environments include literal quotes in the value)
+      const cleanUrl = databaseUrl.replace(/^['"]|['"]$/g, '');
+      expect(cleanUrl).toMatch(/^(postgres|postgresql):/);
+      console.log('✓ Database URL format is valid');
+
+      // Test that we can import database modules without errors
+      const { db } = await import('@/lib/db');
+      expect(db).toBeDefined();
+      console.log('✓ Database module imports successfully');
+    });
   });
 
   describe('Stripe Integration Health', () => {
