@@ -9,11 +9,13 @@
  */
 
 /* eslint-disable no-restricted-imports */
+import { createClerkClient } from '@clerk/backend';
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
+import { normalizeEmail } from '@/lib/utils/email';
 
 // Use the same HTTP driver as the app for consistency
 const {
@@ -39,8 +41,20 @@ interface SeedTestDataOptions {
 }
 
 function isMissingActiveProfileIdColumn(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('active_profile_id');
+  const message = (
+    error instanceof Error ? error.message : String(error)
+  ).toLowerCase();
+  const code =
+    typeof error === 'object' && error !== null
+      ? ((error as { code?: string; cause?: { code?: string } }).code ??
+        (error as { cause?: { code?: string } }).cause?.code)
+      : undefined;
+
+  return (
+    (code === '42703' || message.includes('does not exist')) &&
+    message.includes('active_profile_id') &&
+    message.includes('column')
+  );
 }
 
 const TEST_PROFILES: TestProfile[] = [
@@ -69,6 +83,9 @@ const TEST_PROFILES: TestProfile[] = [
       'https://i.scdn.co/image/ab6761610000e5eb0bae7cfd3fb1b2866db6bc8d',
   },
 ];
+
+const E2E_SEED_EMAIL_REGEX = /^e2e(?:-[a-z0-9]+)?(?:\+clerk_test)?@jov\.ie$/i;
+const E2E_TEST_AVATAR_URL = '/avatars/default-user.png';
 
 type SeededUserValues = Pick<
   typeof users.$inferInsert,
@@ -129,22 +146,105 @@ function isDuplicateKeyError(error: unknown): boolean {
   return message.includes('duplicate key value');
 }
 
+function getSeedEnv() {
+  // This file is imported by Playwright global setup, so it must not depend on
+  // Next's server-only env modules.
+  return {
+    CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
+    DATABASE_URL: process.env.DATABASE_URL,
+    E2E_CLERK_USER_ID: process.env.E2E_CLERK_USER_ID,
+    E2E_CLERK_USER_USERNAME: process.env.E2E_CLERK_USER_USERNAME,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+  } as const;
+}
+
+function isAllowlistedE2ESeedEmail(
+  email: string | null | undefined
+): email is string {
+  return (
+    typeof email === 'string' &&
+    E2E_SEED_EMAIL_REGEX.test(normalizeEmail(email))
+  );
+}
+
+type MatchedSeedUser = {
+  readonly id: string;
+  readonly clerkId: string | null;
+  readonly email: string | null;
+};
+
+function resolveMatchedSeedUser(
+  matchedUsers: readonly MatchedSeedUser[],
+  values: SeededUserValues
+): MatchedSeedUser | undefined {
+  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
+  const clerkIdMatches = matchedUsers.filter(
+    matchedUser => matchedUser.clerkId === values.clerkId
+  );
+  const emailMatches = normalizedEmail
+    ? matchedUsers.filter(matchedUser => matchedUser.email === normalizedEmail)
+    : [];
+
+  if (clerkIdMatches.length > 1 || emailMatches.length > 1) {
+    throw new Error(
+      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} matched duplicate rows`
+    );
+  }
+
+  const clerkIdMatch = clerkIdMatches[0];
+  const emailMatch = emailMatches[0];
+
+  if (clerkIdMatch && emailMatch && clerkIdMatch.id !== emailMatch.id) {
+    throw new Error(
+      `Ambiguous E2E seed user: ${values.email ?? 'unknown email'} and ${values.clerkId} resolve to different rows`
+    );
+  }
+
+  return clerkIdMatch ?? emailMatch ?? matchedUsers[0];
+}
+
+function buildSeedUserLookupCondition(values: SeededUserValues) {
+  const normalizedEmail = values.email ? normalizeEmail(values.email) : null;
+  const emailAdoptionAllowed = isAllowlistedE2ESeedEmail(normalizedEmail);
+
+  const userLookupCondition =
+    emailAdoptionAllowed && normalizedEmail
+      ? or(eq(users.clerkId, values.clerkId), eq(users.email, normalizedEmail))
+      : eq(users.clerkId, values.clerkId);
+
+  return { emailAdoptionAllowed, normalizedEmail, userLookupCondition };
+}
+
 async function ensureUser(
   db: ReturnType<typeof drizzle>,
   values: SeededUserValues
 ) {
-  const [existingUser] = await db
-    .select({ id: users.id })
+  const { emailAdoptionAllowed, normalizedEmail, userLookupCondition } =
+    buildSeedUserLookupCondition(values);
+
+  if (normalizedEmail && !emailAdoptionAllowed) {
+    console.warn(
+      `    ⚠ Refusing email-based adoption for non-allowlisted E2E email ${normalizedEmail}; Clerk ID match required`
+    );
+  }
+
+  const matchedUsers = await db
+    .select({ id: users.id, clerkId: users.clerkId, email: users.email })
     .from(users)
-    .where(eq(users.clerkId, values.clerkId))
-    .limit(1);
+    .where(userLookupCondition);
+  const existingUser = resolveMatchedSeedUser(matchedUsers, values);
 
   if (existingUser) {
     await db
       .update(users)
       .set({ ...values, updatedAt: new Date() })
       .where(eq(users.id, existingUser.id));
-    return existingUser.id;
+    return {
+      id: existingUser.id,
+      previousClerkId:
+        existingUser.clerkId !== values.clerkId ? existingUser.clerkId : null,
+    };
   }
 
   try {
@@ -152,15 +252,18 @@ async function ensureUser(
       .insert(users)
       .values(values)
       .returning({ id: users.id });
-    return createdUser.id;
+    return {
+      id: createdUser.id,
+      previousClerkId: null,
+    };
   } catch (error) {
     if (!isDuplicateKeyError(error)) throw error;
 
-    const [racedUser] = await db
-      .select({ id: users.id })
+    const racedUsers = await db
+      .select({ id: users.id, clerkId: users.clerkId, email: users.email })
       .from(users)
-      .where(eq(users.clerkId, values.clerkId))
-      .limit(1);
+      .where(userLookupCondition);
+    const racedUser = resolveMatchedSeedUser(racedUsers, values);
 
     if (!racedUser) throw error;
 
@@ -169,7 +272,89 @@ async function ensureUser(
       .set({ ...values, updatedAt: new Date() })
       .where(eq(users.id, racedUser.id));
 
-    return racedUser.id;
+    return {
+      id: racedUser.id,
+      previousClerkId:
+        racedUser.clerkId !== values.clerkId ? racedUser.clerkId : null,
+    };
+  }
+}
+
+async function resolveSeedUserClerkId(
+  email: string,
+  fallbackClerkId: string | undefined
+): Promise<string | null> {
+  const normalizedEmail = normalizeEmail(email);
+  const { CLERK_SECRET_KEY: secretKey } = getSeedEnv();
+
+  if (!normalizedEmail || !secretKey) {
+    return fallbackClerkId ?? null;
+  }
+
+  try {
+    const clerk = createClerkClient({ secretKey });
+    const existingUsers = await clerk.users.getUserList({
+      emailAddress: [normalizedEmail],
+    });
+
+    if (existingUsers.data.length > 1) {
+      console.warn(
+        `    ⚠ Multiple Clerk users found for ${normalizedEmail} (${existingUsers.data.length} total); using first match ${existingUsers.data[0]?.id ?? 'unknown'}`
+      );
+    }
+
+    const resolvedClerkId = existingUsers.data[0]?.id ?? null;
+
+    if (!resolvedClerkId) {
+      if (fallbackClerkId) {
+        console.warn(
+          `    ⚠ Clerk returned no users for ${normalizedEmail}; seeding with configured E2E_CLERK_USER_ID ${fallbackClerkId}, which may be stale`
+        );
+      } else {
+        console.warn(
+          `    ⚠ No Clerk user found for ${normalizedEmail}, and no configured E2E_CLERK_USER_ID fallback is available`
+        );
+      }
+    }
+
+    if (
+      resolvedClerkId &&
+      fallbackClerkId &&
+      resolvedClerkId !== fallbackClerkId
+    ) {
+      console.warn(
+        `    ⚠ E2E_CLERK_USER_ID is stale (${fallbackClerkId}); using Clerk user ${resolvedClerkId} for ${normalizedEmail}`
+      );
+    }
+
+    return resolvedClerkId ?? fallbackClerkId ?? null;
+  } catch (error) {
+    console.warn(
+      `    ⚠ Failed to resolve Clerk user for ${normalizedEmail}; falling back to configured E2E_CLERK_USER_ID`,
+      error
+    );
+    return fallbackClerkId ?? null;
+  }
+}
+
+async function setActiveProfile(
+  db: ReturnType<typeof drizzle>,
+  userId: string,
+  profileId: string
+) {
+  const [updatedUser] = await db
+    .update(users)
+    .set({
+      activeProfileId: profileId,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+
+  if (!updatedUser) {
+    throw new Error(
+      `Failed to set active profile ${profileId} for seeded user ${userId}`
+    );
   }
 }
 
@@ -907,7 +1092,7 @@ async function seedTracksForRelease(
 export async function seedTestData(options: SeedTestDataOptions = {}) {
   console.log('🌱 Seeding test data for E2E smoke tests...');
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const { DATABASE_URL: databaseUrl } = getSeedEnv();
   if (!databaseUrl) {
     console.warn('⚠ DATABASE_URL not set, skipping seed');
     return { success: false, reason: 'no_database_url' };
@@ -922,11 +1107,22 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
     if (!options.publicProfilesOnly) {
       // Create E2E test user (for authenticated dashboard tests)
       // These values come from the setup script: scripts/setup-e2e-users.ts
-      const E2E_CLERK_USER_ID = process.env.E2E_CLERK_USER_ID;
-      const E2E_EMAIL = process.env.E2E_CLERK_USER_USERNAME || 'e2e@jov.ie';
+      const {
+        E2E_CLERK_USER_ID: configuredE2EClerkUserId,
+        E2E_CLERK_USER_USERNAME,
+      } = getSeedEnv();
+      const E2E_EMAIL = normalizeEmail(E2E_CLERK_USER_USERNAME || 'e2e@jov.ie');
+      const isAllowlistedE2EEmail = isAllowlistedE2ESeedEmail(E2E_EMAIL);
       const E2E_USERNAME = 'e2e-test-user';
+      const E2E_CLERK_USER_ID = isAllowlistedE2EEmail
+        ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
+        : null;
 
-      if (!E2E_CLERK_USER_ID) {
+      if (!isAllowlistedE2EEmail) {
+        console.warn(
+          `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
+        );
+      } else if (!E2E_CLERK_USER_ID) {
         console.log(
           '  ⚠ E2E_CLERK_USER_ID not set, skipping E2E user creation'
         );
@@ -936,7 +1132,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
       } else {
         console.log('  Creating E2E test user...');
         try {
-          const userId = await ensureUser(db, {
+          const { id: userId, previousClerkId } = await ensureUser(db, {
             clerkId: E2E_CLERK_USER_ID,
             email: E2E_EMAIL,
             name: 'E2E Test',
@@ -946,6 +1142,11 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
           console.log(
             `    ✓ Ensured E2E user with admin privileges (ID: ${userId})`
           );
+          if (previousClerkId) {
+            console.log(
+              `    ✓ Adopted existing E2E user from stale Clerk ID ${previousClerkId} to ${E2E_CLERK_USER_ID}`
+            );
+          }
 
           const profileId = await ensureCreatorProfile(db, {
             userId,
@@ -953,7 +1154,7 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             usernameNormalized: E2E_USERNAME.toLowerCase(),
             displayName: 'E2E Test User',
             bio: 'Automated test user',
-            avatarUrl: null,
+            avatarUrl: E2E_TEST_AVATAR_URL,
             spotifyUrl: null,
             appleMusicUrl: null,
             appleMusicId: null,
@@ -969,12 +1170,45 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
             onboardingCompletedAt: new Date(),
           });
 
+          await setActiveProfile(db, userId, profileId);
+
           console.log(
             `    ✓ Ensured E2E profile ${E2E_USERNAME} (ID: ${profileId})`
           );
+          console.log(`    ✓ Set active profile for E2E user`);
 
           await seedReleasesForProfile(db, profileId);
           await seedTourDatesForProfile(db, profileId);
+
+          const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } =
+            getSeedEnv();
+          if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
+            try {
+              const redis = new Redis({
+                url: UPSTASH_REDIS_REST_URL,
+                token: UPSTASH_REDIS_REST_TOKEN,
+              });
+              const clerkIdsToInvalidate = [
+                previousClerkId,
+                E2E_CLERK_USER_ID,
+              ].filter((clerkId): clerkId is string => Boolean(clerkId));
+
+              let deletedCount = 0;
+              for (const clerkId of clerkIdsToInvalidate) {
+                const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                deletedCount += await redis.del(proxyStateCacheKey);
+              }
+
+              console.log(
+                `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+              );
+            } catch (error) {
+              console.warn(
+                '    ⚠ Failed to invalidate proxy state cache for E2E user:',
+                error
+              );
+            }
+          }
         } catch (error) {
           if (!isMissingActiveProfileIdColumn(error)) {
             throw error;
@@ -1119,14 +1353,12 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
 
       // Invalidate Redis cache for this profile to ensure fresh data
       // Only attempt if Redis credentials are available
-      if (
-        process.env.UPSTASH_REDIS_REST_URL &&
-        process.env.UPSTASH_REDIS_REST_TOKEN
-      ) {
+      const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = getSeedEnv();
+      if (UPSTASH_REDIS_REST_URL && UPSTASH_REDIS_REST_TOKEN) {
         try {
           const redis = new Redis({
-            url: process.env.UPSTASH_REDIS_REST_URL,
-            token: process.env.UPSTASH_REDIS_REST_TOKEN,
+            url: UPSTASH_REDIS_REST_URL,
+            token: UPSTASH_REDIS_REST_TOKEN,
           });
           const cacheKey = `profile:data:${profile.username.toLowerCase()}`;
 
