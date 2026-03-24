@@ -31,12 +31,13 @@ export function resolveBunPath(): string {
     const p = which.stdout.toString().trim();
     if (p) return p;
   }
-  const home = process.env.HOME || '';
-  const candidates = [
-    path.join(home, '.bun', 'bin', 'bun'),
+  const home = process.env.HOME || process.env.USERPROFILE;
+  const bunBin = IS_WINDOWS ? 'bun.exe' : 'bun';
+  const candidates = home ? [
+    path.join(home, '.bun', 'bin', bunBin),
     '/usr/local/bin/bun',
     '/opt/homebrew/bin/bun',
-  ];
+  ] : ['/usr/local/bin/bun', '/opt/homebrew/bin/bun'];
   for (const c of candidates) {
     if (fs.existsSync(c)) return c;
   }

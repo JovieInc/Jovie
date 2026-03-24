@@ -334,9 +334,14 @@ If Keychain access doesn't cooperate, you can export cookies manually:
 1. Install a cookie export extension in your browser (e.g., "EditThisCookie" or "Cookie-Editor")
 2. Navigate to the site you want cookies from
 3. Export cookies for that domain as JSON
-4. Save to `~/.gstack/cookies.json` (not /tmp — avoids exposing session tokens)
+4. Save to a unique temp file with restricted permissions:
+   ```bash
+   COOKIE_FILE="$(mktemp /tmp/gstack-cookies.XXXXXX.json)" && chmod 600 "$COOKIE_FILE"
+   ```
 5. Import them directly:
 
 ```bash
-$B cookie-import ~/.gstack/cookies.json
+$B cookie-import "$COOKIE_FILE"
 ```
+
+Note: Delete the file after importing (`rm -f "$COOKIE_FILE"`) to avoid leaving session tokens on disk.
