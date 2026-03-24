@@ -727,9 +727,9 @@ jobs:
   # dynamic content assertions, hydration timing, and excessive retries.
   ci-public-profile-smoke:
     name: Post-Deploy Smoke (Production)
-    needs: [deploy]
+    needs: [promote-production]
     # Run after successful deploy to production
-    if: ${{ always() && needs.deploy.result == 'success' }}
+    if: ${{ always() && needs.promote-production.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -927,8 +927,8 @@ jobs:
   # Non-blocking initially — promote to blocking once stable.
   ci-post-deploy-auth-smoke:
     name: Post-Deploy Auth Smoke (Production)
-    needs: [deploy]
-    if: ${{ always() && needs.deploy.result == 'success' }}
+    needs: [promote-production]
+    if: ${{ always() && needs.promote-production.result == 'success' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 10
@@ -2317,10 +2317,10 @@ jobs:
 
           echo "✅ Homepage smoke passed"
 
-  deploy:
+  deploy-staging:
     needs: [ci-fast]
-    # Fast production path: merge on deterministic checks, then deploy immediately.
-    # Longer validation lanes run on preview or asynchronously after deploy.
+    # Fast main path: merge on deterministic checks, deploy a production build to
+    # a preview URL, verify it on staging, then promote only if it passes.
     if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -2335,12 +2335,17 @@ jobs:
       # Note: if deploy is cancelled before verify completes, outcome is '' (not 'failure'),
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
+      deploy_url: ${{ steps.deploy.outputs.deploy_url }}
+      canary_url: ${{ steps.resolve-canary-url.outputs.canary_url }}
     env:
-      # Trunk-based: main deploys directly to production
+      # Migrations still run against the production database before staging
+      # verification, so they must remain additive.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    # Reuse the existing production environment until a dedicated staging
+    # environment exists with the same deploy secrets scoped to it.
     environment:
       name: Production – jovie
-      url: https://jov.ie
+      url: https://staging.jov.ie
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-node-pnpm
@@ -2384,13 +2389,22 @@ jobs:
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
-      - name: Deploy (production, prebuilt)
+      - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
           # Retry up to 3 times for transient Vercel failures
           for attempt in 1 2 3; do
             echo "Deploy attempt $attempt/3"
-            if vercel deploy --prebuilt --prod --archive=tgz --token ${{ secrets.VERCEL_TOKEN }}; then
+            deploy_output="$(vercel deploy --prebuilt --archive=tgz --token ${{ secrets.VERCEL_TOKEN }} 2>&1)"
+            deploy_exit=$?
+            echo "$deploy_output"
+            if [ "$deploy_exit" -eq 0 ]; then
+              deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
+              if [ -z "$deploy_url" ]; then
+                echo "Deploy succeeded but no preview URL was found in Vercel output"
+                exit 1
+              fi
+              echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
               echo "Deploy succeeded on attempt $attempt"
               exit 0
             fi
@@ -2405,29 +2419,59 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Alias preview to staging.jov.ie
+        id: alias-staging
+        run: vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Resolve canary URL
+        id: resolve-canary-url
+        run: echo "canary_url=https://staging.jov.ie" >> "$GITHUB_OUTPUT"
+
   canary-health-gate:
-    name: Canary Health Gate (production)
-    needs: [deploy]
-    if: ${{ always() && needs.deploy.result == 'success' }}
+    name: Canary Health Gate (staging)
+    needs: [deploy-staging]
+    if: ${{ always() && needs.deploy-staging.result == 'success' }}
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: true
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      # Pass production URL as literal — NOT from deploy outputs.
-      # GitHub Actions masks output values that match secrets, and
-      # secrets-to-env-action registers all secrets. Since a secret
-      # contains "https://jov.ie", any output with that value becomes
-      # empty (***) in downstream jobs.
-      deployment_url: https://jov.ie
-      fallback_health_url: https://jov.ie/api/health
+      deployment_url: ${{ needs.deploy-staging.outputs.canary_url }}
+      fallback_health_url: ${{ format('{0}/api/health', needs.deploy-staging.outputs.deploy_url) }}
     secrets:
       VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+  promote-production:
+    name: Promote to Production
+    needs: [deploy-staging, canary-health-gate]
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: true
+    environment:
+      name: Production – jovie
+      url: https://jov.ie
+    steps:
+      - name: Install Vercel CLI
+        run: npm install -g vercel@50.22.1
+      - name: Promote verified preview to production
+        run: vercel promote "${{ needs.deploy-staging.outputs.deploy_url }}" --yes --token ${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
   sentry-error-gate:
     name: Sentry Error Gate (production)
-    needs: [deploy, canary-health-gate]
-    if: ${{ always() && needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' }}
+    needs: [promote-production, canary-health-gate]
+    if: ${{ always() && needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' }}
     uses: ./.github/workflows/sentry-error-gate.yml
     with:
       deployment_url: https://jov.ie
@@ -2446,7 +2490,7 @@ jobs:
 
   deploy-notify:
     name: Notify production deploy
-    needs: [deploy, canary-health-gate, sentry-error-gate]
+    needs: [deploy-staging, canary-health-gate, promote-production, sentry-error-gate]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -2479,7 +2523,7 @@ jobs:
           echo "job_url=$job_url" >> "$GITHUB_OUTPUT"
 
       - name: Slack notify (production deploy)
-        if: ${{ needs.deploy.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.promote-production.result == 'success' && needs.canary-health-gate.result == 'success' && (needs.sentry-error-gate.result == 'success' || needs.sentry-error-gate.result == 'skipped') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2503,7 +2547,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (schema drift warning)
-        if: ${{ needs.deploy.result == 'success' && needs.deploy.outputs.schema_drift == 'true' && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ needs.deploy-staging.result == 'success' && needs.deploy-staging.outputs.schema_drift == 'true' && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2527,13 +2571,14 @@ jobs:
 
       - name: Classify failure type
         id: classify-failure
-        if: ${{ always() && (needs.deploy.result != 'success' || needs.canary-health-gate.result != 'success' || needs.sentry-error-gate.result == 'failure') }}
+        if: ${{ always() && (needs.deploy-staging.result == 'failure' || needs.canary-health-gate.result == 'failure' || needs.promote-production.result == 'failure' || needs.sentry-error-gate.result == 'failure') }}
         run: |
           # Determine failure type for accurate Slack notification
-          MIGRATION_STATUS="${{ needs.deploy.outputs.migration_status }}"
-          PREFLIGHT_STATUS="${{ needs.deploy.outputs.preflight_status }}"
-          DEPLOY_RESULT="${{ needs.deploy.result }}"
+          MIGRATION_STATUS="${{ needs.deploy-staging.outputs.migration_status }}"
+          PREFLIGHT_STATUS="${{ needs.deploy-staging.outputs.preflight_status }}"
+          DEPLOY_RESULT="${{ needs.deploy-staging.result }}"
           CANARY_RESULT="${{ needs.canary-health-gate.result }}"
+          PROMOTE_RESULT="${{ needs.promote-production.result }}"
           SENTRY_RESULT="${{ needs.sentry-error-gate.result }}"
 
           if [ "$PREFLIGHT_STATUS" = "failure" ]; then
@@ -2546,16 +2591,21 @@ jobs:
             echo "failure_emoji=🚨" >> "$GITHUB_OUTPUT"
             echo "failure_title=DATABASE MIGRATION FAILED" >> "$GITHUB_OUTPUT"
             echo "failure_detail=Migration failed on production database - deployment was BLOCKED (no code deployed)" >> "$GITHUB_OUTPUT"
-          elif [ "$DEPLOY_RESULT" != "success" ]; then
+          elif [ "$DEPLOY_RESULT" = "failure" ]; then
             echo "failure_type=deploy" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=🔥" >> "$GITHUB_OUTPUT"
-            echo "failure_title=Production deploy failed" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Vercel deployment failed" >> "$GITHUB_OUTPUT"
-          elif [ "$CANARY_RESULT" != "success" ]; then
+            echo "failure_title=Staging deploy failed" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Vercel preview deployment failed before production promotion" >> "$GITHUB_OUTPUT"
+          elif [ "$CANARY_RESULT" = "failure" ]; then
             echo "failure_type=canary" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=⚠️" >> "$GITHUB_OUTPUT"
             echo "failure_title=CANARY HEALTH CHECK FAILED" >> "$GITHUB_OUTPUT"
-            echo "failure_detail=Deployment is LIVE but health check failed - investigate immediately" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Staging health check failed - production was NOT updated" >> "$GITHUB_OUTPUT"
+          elif [ "$PROMOTE_RESULT" = "failure" ]; then
+            echo "failure_type=promote" >> "$GITHUB_OUTPUT"
+            echo "failure_emoji=🔥" >> "$GITHUB_OUTPUT"
+            echo "failure_title=Production promotion failed" >> "$GITHUB_OUTPUT"
+            echo "failure_detail=Verified staging deploy could not be promoted to production" >> "$GITHUB_OUTPUT"
           elif [ "$SENTRY_RESULT" = "failure" ]; then
             echo "failure_type=sentry" >> "$GITHUB_OUTPUT"
             echo "failure_emoji=📈" >> "$GITHUB_OUTPUT"
@@ -2629,15 +2679,15 @@ jobs:
           author_name: 'Deploy'
           custom_payload: |
             {
-              "text": "⚠️ CANARY HEALTH CHECK FAILED - Deployment may be broken: jov.ie",
+              "text": "⚠️ STAGING HEALTH CHECK FAILED - Production was NOT updated: staging.jov.ie",
               "attachments": [
                 {
                   "color": "warning",
                   "fields": [
-                    { "title": "Status", "value": "⚠️ DEPLOYMENT IS LIVE but health check failed", "short": false },
+                    { "title": "Status", "value": "⚠️ STAGING verification failed before promotion", "short": false },
                     { "title": "Failure", "value": "Canary health gate failed", "short": true },
                     { "title": "Branch", "value": "main", "short": true },
-                    { "title": "Action Required", "value": "Check https://jov.ie immediately - may need rollback", "short": false },
+                    { "title": "Action Required", "value": "Check https://staging.jov.ie or the preview deployment logs - production is still unchanged", "short": false },
                     { "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>", "short": false }
                   ]
                 }
@@ -2672,7 +2722,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
       - name: Slack notify (general deploy failure)
-        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
+        if: ${{ always() && (steps.classify-failure.outputs.failure_type == 'deploy' || steps.classify-failure.outputs.failure_type == 'promote' || steps.classify-failure.outputs.failure_type == 'unknown') && env.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -2680,11 +2730,12 @@ jobs:
           author_name: 'Deploy'
           custom_payload: |
             {
-              "text": "🔥 Production deploy failed: jov.ie",
+              "text": "${{ steps.classify-failure.outputs.failure_emoji }} ${{ steps.classify-failure.outputs.failure_title }}: jov.ie",
               "attachments": [
                 {
                   "color": "danger",
                   "fields": [
+                    { "title": "Detail", "value": "${{ steps.classify-failure.outputs.failure_detail }}", "short": false },
                     { "title": "Branch", "value": "main", "short": true },
                     { "title": "Failing job", "value": "${{ steps.failure-provenance.outputs.job_name }}", "short": true },
                     { "title": "Failing job URL", "value": "<${{ steps.failure-provenance.outputs.job_url }}|View job>", "short": false },
@@ -2699,10 +2750,10 @@ jobs:
   # Lighthouse CI - runs after production deploy to check performance on homepage + public profiles
   lighthouse-ci:
     name: Lighthouse CI (Production)
-    needs: [deploy]
+    needs: [promote-production]
     # Run after successful deploy (tests homepage + /tim profile)
     # Informational only -- performance regressions should not block deploys
-    if: ${{ always() && needs.deploy.result == 'success' }}
+    if: ${{ always() && needs.promote-production.result == 'success' }}
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 20

@@ -15,6 +15,10 @@ import { publicEnv } from '@/lib/env-public';
 
 /** Main domain hostname (jov.ie) */
 export const HOSTNAME = publicEnv.NEXT_PUBLIC_PROFILE_HOSTNAME;
+const STAGING_HOSTNAMES = new Set([
+  `staging.${HOSTNAME}`,
+  `main.${HOSTNAME}`, // Legacy staging hostname
+]);
 
 /** @deprecated Use HOSTNAME instead */
 export const PROFILE_HOSTNAME = HOSTNAME;
@@ -68,7 +72,11 @@ export function getAppUrl(path: string = ''): string {
  * Check if a hostname matches the main domain
  */
 export function isMainDomain(hostname: string): boolean {
-  return hostname === HOSTNAME || hostname === `www.${HOSTNAME}`;
+  return (
+    hostname === HOSTNAME ||
+    hostname === `www.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname)
+  );
 }
 
 /** @deprecated Use isMainDomain instead */
@@ -83,7 +91,7 @@ export const isAppDomain = isMainDomain;
 export function isPreviewEnvironment(hostname: string): boolean {
   return (
     hostname.includes('vercel.app') ||
-    hostname === `main.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname) ||
     hostname === 'localhost'
   );
 }

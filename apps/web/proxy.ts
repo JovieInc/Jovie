@@ -11,7 +11,7 @@ import {
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
-import { PROFILE_HOSTNAME } from '@/constants/domains';
+import { HOSTNAME } from '@/constants/domains';
 import {
   type ClerkBypassPathInfo,
   shouldBypassClerkForRequest,
@@ -52,7 +52,6 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
 const META_BOT_REGEX =
   /facebookexternalhit|facebot|facebook|instagram|whatsapp/i;
-const SENSITIVE_API_REGEX = /^\/api\/link\//;
 
 /**
  * Fast bot detection using pre-compiled regex
@@ -77,6 +76,17 @@ interface PathCategory {
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
+
+const STAGING_HOSTNAMES = new Set([
+  `staging.${HOSTNAME}`,
+  `main.${HOSTNAME}`, // Legacy staging hostname
+]);
+
+const INVESTOR_HOSTNAMES = new Set([
+  `investors.${HOSTNAME}`,
+  'investors.localhost',
+  'investors.jov.ie', // Legacy canonical alias on jov.ie
+]);
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -114,7 +124,7 @@ function categorizePath(pathname: string): PathCategory {
     isWaitlistPath;
 
   // Sensitive API paths for bot blocking
-  const isSensitiveAPI = SENSITIVE_API_REGEX.test(pathname);
+  const isSensitiveAPI = pathname.startsWith('/api/link/');
 
   return {
     needsNonce,
@@ -146,21 +156,18 @@ function analyzeHost(hostname: string): HostInfo {
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
-    hostname.startsWith('main.');
+    STAGING_HOSTNAMES.has(hostname);
 
   const isMainHost =
-    hostname === PROFILE_HOSTNAME ||
-    hostname === `www.${PROFILE_HOSTNAME}` ||
-    hostname === `main.${PROFILE_HOSTNAME}` ||
+    hostname === HOSTNAME ||
+    hostname === `www.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname) ||
     isDevOrPreview;
 
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
 
-  const isInvestorPortal =
-    hostname === `investors.${PROFILE_HOSTNAME}` ||
-    hostname === 'investors.localhost' ||
-    hostname === 'investors.jov.ie';
+  const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
 
   return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
 }
@@ -401,7 +408,7 @@ function generateNonce(): string {
   crypto.getRandomValues(nonceBytes);
   let binary = '';
   for (let i = 0; i < 16; i++) {
-    binary += String.fromCharCode(nonceBytes[i]);
+    binary += String.fromCodePoint(nonceBytes[i]);
   }
   return btoa(binary);
 }

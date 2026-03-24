@@ -52,3 +52,29 @@ This project includes [gstack](https://github.com/garrytan/gstack) vendored at `
 > **Full Guidelines:** See `AGENTS.md` at repo root for complete AI agent rules, engineering guardrails, and architecture guidance.
 
 This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
+
+## Deploy Configuration (configured by /setup-deploy)
+
+- Platform: Vercel
+- Production URL: https://jov.ie
+- Staging URL: https://staging.jov.ie (Vercel preview alias)
+- Deploy workflow: `.github/workflows/ci.yml` (`deploy-staging` -> `canary-health-gate` -> `promote-production`)
+- Merge method: squash (merge queue)
+- Project type: Web app (Next.js monorepo)
+- Post-deploy health check: https://jov.ie/api/health
+
+### Deploy flow
+
+- Deploy trigger: automatic on push to `main`, with Vercel Git auto-aliasing disabled in `vercel.json`
+- Staging deploy: `vercel deploy --prebuilt` -> preview URL -> `vercel alias` to `staging.jov.ie`
+- Canary verification: health check + homepage + profile route against `staging.jov.ie`
+- Production promotion: `vercel promote` after canary passes
+- Post-promotion: Sentry error gate (5 minute soak) with auto-rollback
+- Deploy status: `vercel promote` exit code + `canary-health-gate` + `sentry-error-gate`
+
+### Custom deploy hooks
+
+- Pre-merge: typecheck + lint (CI fast path, ~10-15s)
+- DB migrations: run before staging deploy (production DB, additive only)
+- Deploy trigger: automatic on push to `main`
+- Health check: https://jov.ie/api/health (returns `{"status":"ok"}`)
