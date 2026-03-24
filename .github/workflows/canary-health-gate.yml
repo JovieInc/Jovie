@@ -7,8 +7,9 @@ on:
   workflow_call:
     inputs:
       deployment_url:
-        description: Base URL for the deployment to verify.
-        required: true
+        description: Base URL for the deployment to verify. If empty, resolves from Vercel API.
+        required: false
+        default: ''
         type: string
       commit_sha:
         description: Git commit SHA for the deployment.
@@ -80,10 +81,9 @@ jobs:
               sys.exit(0)
 
           base_url = "https://api.vercel.com/v6/deployments"
+          # Don't filter by target — staging deploys use preview target.
           query_params = {
               "projectId": project_id,
-              "target": "production",
-              "state": "READY",
               "limit": 20,
           }
 

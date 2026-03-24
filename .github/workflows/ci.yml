@@ -2422,6 +2422,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Alias preview to staging.jov.ie
+        continue-on-error: true
         run: |
           vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
         env:
@@ -2437,7 +2438,10 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: https://staging.jov.ie
+      # Empty string triggers Vercel API fallback in canary-health-gate.yml.
+      # We cannot pass the preview URL as a job output because GitHub Actions
+      # masks outputs containing secret substrings (VERCEL_ORG_ID appears in URLs).
+      deployment_url: ''
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
@@ -2461,12 +2465,42 @@ jobs:
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@50.22.1
-      - name: Promote verified staging to production
+      - name: Resolve deployment URL
+        id: resolve
         run: |
-          # Use the staging alias directly — GitHub Actions masks job outputs
-          # containing secret substrings (org name in Vercel URLs), so we
-          # cannot rely on deploy_url passed between jobs.
-          vercel promote https://staging.jov.ie --yes --token ${{ secrets.VERCEL_TOKEN }}
+          # GitHub Actions masks job outputs containing secret substrings
+          # (VERCEL_ORG_ID appears in Vercel URLs). Resolve via API instead.
+          DEPLOY_URL=$(python3 - <<'PY'
+          import json, os, sys, urllib.parse, urllib.request
+          token = os.environ["VERCEL_TOKEN"]
+          org_id = os.environ.get("VERCEL_ORG_ID", "")
+          project_id = os.environ["VERCEL_PROJECT_ID"]
+          commit_sha = os.environ["COMMIT_SHA"]
+          params = {"projectId": project_id, "limit": "5"}
+          if org_id.startswith("team_"):
+              params["teamId"] = org_id
+          url = f"https://api.vercel.com/v6/deployments?{urllib.parse.urlencode(params)}"
+          req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+          with urllib.request.urlopen(req, timeout=15) as resp:
+              data = json.load(resp)
+          for d in data.get("deployments", []):
+              meta = d.get("meta") or {}
+              if meta.get("githubCommitSha") == commit_sha:
+                  print(f"https://{d['url']}")
+                  sys.exit(0)
+          print("", file=sys.stderr)
+          sys.exit(1)
+          PY
+          )
+          echo "Resolved deployment: $DEPLOY_URL"
+          echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          COMMIT_SHA: ${{ github.sha }}
+      - name: Promote verified deployment to production
+        run: vercel promote "${{ steps.resolve.outputs.url }}" --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
