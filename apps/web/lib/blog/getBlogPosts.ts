@@ -127,6 +127,7 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
   const { content, data } = await readBlogPostFile(slug);
   const doc = await createMarkdownDocument(content);
   const excerpt = createExcerpt(content);
+  const words = countWords(content);
 
   return {
     slug,
@@ -140,8 +141,8 @@ async function loadBlogPost(slug: string): Promise<BlogPost> {
     category: data.category,
     tags: parseTags(data.tags),
     excerpt,
-    readingTime: calculateReadingTime(countWords(content)),
-    wordCount: countWords(content),
+    readingTime: calculateReadingTime(words),
+    wordCount: words,
     ...doc,
   };
 }
@@ -160,6 +161,7 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
   const posts = await Promise.all(
     slugs.map(async slug => {
       const { content, data } = await readBlogPostFile(slug);
+      const words = countWords(content);
       return {
         slug,
         title: data.title ?? formatTitleFromSlug(slug),
@@ -172,8 +174,8 @@ export const getBlogPosts = cache(async (): Promise<BlogPostSummary[]> => {
         category: data.category,
         tags: parseTags(data.tags),
         excerpt: createExcerpt(content),
-        readingTime: calculateReadingTime(countWords(content)),
-        wordCount: countWords(content),
+        readingTime: calculateReadingTime(words),
+        wordCount: words,
       };
     })
   );

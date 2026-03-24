@@ -22,8 +22,10 @@ export function BlogTableOfContents({ toc }: BlogTableOfContentsProps) {
       entries => {
         const visibleEntries = entries.filter(e => e.isIntersecting);
         if (visibleEntries.length > 0) {
-          const topmost = visibleEntries.reduce((a, b) =>
-            a.boundingClientRect.top < b.boundingClientRect.top ? a : b
+          const topmost = visibleEntries.reduce<IntersectionObserverEntry>(
+            (a, b) =>
+              a.boundingClientRect.top < b.boundingClientRect.top ? a : b,
+            visibleEntries[0]
           );
           setActiveId(topmost.target.id);
         }

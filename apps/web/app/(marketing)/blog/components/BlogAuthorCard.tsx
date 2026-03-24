@@ -38,7 +38,7 @@ export function BlogAuthorCard({
               href={author.profileUrl}
               className='mt-4 text-sm font-medium text-tertiary-token hover:text-primary-token transition-colors duration-200'
             >
-              View Jovie profile →
+              View profile →
             </Link>
           )}
         </div>

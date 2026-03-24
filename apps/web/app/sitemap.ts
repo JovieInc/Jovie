@@ -160,12 +160,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       blogPosts.map(p => p.authorUsername).filter((u): u is string => u != null)
     ),
   ];
-  const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => ({
-    url: `${BASE_URL}/blog/authors/${username}`,
-    lastModified: now,
-    changeFrequency: 'monthly',
-    priority: 0.6,
-  }));
+  const blogAuthorPages: MetadataRoute.Sitemap = blogAuthors.map(username => {
+    const authorPosts = blogPosts.filter(p => p.authorUsername === username);
+    const latestDate =
+      authorPosts.length > 0
+        ? new Date(
+            Math.max(
+              ...authorPosts.map(p =>
+                new Date(p.updatedDate ?? p.date).getTime()
+              )
+            )
+          )
+        : now;
+    return {
+      url: `${BASE_URL}/blog/authors/${username}`,
+      lastModified: latestDate,
+      changeFrequency: 'monthly' as const,
+      priority: 0.6,
+    };
+  });
 
   // Blog category pages
   const blogCategories = [
@@ -174,12 +187,25 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ),
   ];
   const blogCategoryPages: MetadataRoute.Sitemap = blogCategories.map(
-    category => ({
-      url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.6,
-    })
+    category => {
+      const catPosts = blogPosts.filter(p => p.category === category);
+      const latestDate =
+        catPosts.length > 0
+          ? new Date(
+              Math.max(
+                ...catPosts.map(p =>
+                  new Date(p.updatedDate ?? p.date).getTime()
+                )
+              )
+            )
+          : now;
+      return {
+        url: `${BASE_URL}/blog/category/${slugifyCategory(category)}`,
+        lastModified: latestDate,
+        changeFrequency: 'monthly' as const,
+        priority: 0.6,
+      };
+    }
   );
 
   const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
