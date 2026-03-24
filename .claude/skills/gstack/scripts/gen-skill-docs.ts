@@ -464,7 +464,7 @@ This is the **primary mode** for developers verifying their work. When the user 
    # Fast port check (~2s total instead of ~45s with browser navigation)
    DEV_URL=""
    for port in 3000 4000 8080; do
-     if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$port 2>/dev/null | grep -qE '^[23]'; then
+     if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://localhost:$port 2>/dev/null | grep -qE '^[1-5]'; then
        DEV_URL="http://localhost:$port"
        echo "Found dev server on :$port"
        break

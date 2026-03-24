@@ -346,7 +346,8 @@ export class BrowserManager {
       this.wirePageEvents(page);
 
       if (saved.url) {
-        await page.goto(saved.url, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+        const timeout = isLocalhostUrl(saved.url) ? LOCALHOST_PAGE_TIMEOUT : REMOTE_PAGE_TIMEOUT;
+        await page.goto(saved.url, { waitUntil: 'domcontentloaded', timeout }).catch(() => {});
       }
 
       if (saved.storage) {
