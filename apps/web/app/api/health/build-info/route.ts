@@ -10,6 +10,7 @@ let _cachedBuildId: string | undefined;
 export function GET() {
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
   const environment = process.env.VERCEL_ENV;
+  const isDevelopment = process.env.NODE_ENV !== 'production';
 
   if (_cachedBuildId === undefined) {
     try {
@@ -18,10 +19,12 @@ export function GET() {
         'utf-8'
       ).trim();
     } catch {
-      console.warn(
-        '[build-info] BUILD_ID not found — expected in dev, using fallback'
-      );
-      _cachedBuildId = 'unknown';
+      if (isDevelopment) {
+        _cachedBuildId = 'development';
+      } else {
+        console.warn('[build-info] BUILD_ID not found — using fallback');
+        _cachedBuildId = 'unknown';
+      }
     }
   }
 
