@@ -83,4 +83,4 @@ export function ConfidenceBadge({
   );
 }
 
-export { getConfidenceLevel, CONFIDENCE_THRESHOLDS };
+export { CONFIDENCE_THRESHOLDS, getConfidenceLevel };

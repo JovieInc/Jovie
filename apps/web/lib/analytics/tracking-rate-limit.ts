@@ -24,9 +24,9 @@ export type { RateLimitResult } from '@/lib/rate-limit';
 // Re-export individual limiters for direct access
 export {
   trackingClicksLimiter as clickRateLimiter,
-  trackingVisitsLimiter as visitRateLimiter,
   trackingIpClicksLimiter as ipClickRateLimiter,
   trackingIpVisitsLimiter as ipVisitRateLimiter,
+  trackingVisitsLimiter as visitRateLimiter,
 };
 
 /**

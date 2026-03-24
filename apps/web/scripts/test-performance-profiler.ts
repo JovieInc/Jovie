@@ -493,4 +493,4 @@ if (require.main === module) {
   profiler.runPerformanceAnalysis().catch(console.error);
 }
 
-export { TestPerformanceProfiler, type PerformanceMetrics };
+export { type PerformanceMetrics, TestPerformanceProfiler };

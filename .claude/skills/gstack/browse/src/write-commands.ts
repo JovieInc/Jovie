@@ -8,6 +8,7 @@
 import type { BrowserManager } from './browser-manager';
 import { findInstalledBrowsers, importCookies } from './cookie-import-browser';
 import { validateNavigationUrl } from './url-validation';
+import { isLocalhostUrl, LOCALHOST_PAGE_TIMEOUT, REMOTE_PAGE_TIMEOUT } from './config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { TEMP_DIR, isPathWithin } from './platform';
@@ -24,7 +25,8 @@ export async function handleWriteCommand(
       const url = args[0];
       if (!url) throw new Error('Usage: browse goto <url>');
       validateNavigationUrl(url);
-      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 });
+      const timeout = isLocalhostUrl(url) ? LOCALHOST_PAGE_TIMEOUT : REMOTE_PAGE_TIMEOUT;
+      const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout });
       const status = response?.status() || 'unknown';
       return `Navigated to ${url} (${status})`;
     }

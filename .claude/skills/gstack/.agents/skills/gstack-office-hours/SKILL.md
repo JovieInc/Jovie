@@ -241,6 +241,7 @@ never blocks the user.
 ## SETUP (run this check BEFORE any browse command)
 
 ```bash
+export PATH="$HOME/.bun/bin:$PATH"
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.agents/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.agents/skills/gstack/browse/dist/browse"
