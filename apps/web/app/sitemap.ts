@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm';
 import { MetadataRoute } from 'next';
 import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
+import { getAlternativeSlugs } from '@/content/alternatives';
+import { getComparisonSlugs } from '@/content/comparisons';
 import { getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
@@ -152,6 +154,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  const comparisonPages: MetadataRoute.Sitemap = getComparisonSlugs().map(
+    slug => ({
+      url: `${BASE_URL}/compare/${slug}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    })
+  );
+
+  const alternativePages: MetadataRoute.Sitemap = getAlternativeSlugs().map(
+    slug => ({
+      url: `${BASE_URL}/alternatives/${slug}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    })
+  );
+
   const profilePages: MetadataRoute.Sitemap = catalog.profiles.map(profile => ({
     url: `${BASE_URL}/${profile.username}`,
     lastModified: profile.updatedAt ?? now,
@@ -182,6 +202,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staticPages,
     ...blogPages,
+    ...comparisonPages,
+    ...alternativePages,
     ...profilePages,
     ...releasePages,
     ...trackPages,
