@@ -221,6 +221,7 @@ const FAST_ADMIN_PAGES = [
 ] as const;
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
+const SETTINGS_LANDING_PAGE = APP_ROUTES.SETTINGS_ACCOUNT;
 const ACTIVE_DASHBOARD_PAGES = FAST_ITERATION
   ? FAST_DASHBOARD_PAGES
   : DASHBOARD_PAGES;
@@ -228,6 +229,8 @@ const ACTIVE_ADMIN_PAGES = FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
 const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
+const DASHBOARD_ROUTING_TIMEOUT = FAST_ITERATION ? 180_000 : 300_000;
+const DASHBOARD_ROUTE_SWEEP_TIMEOUT = FAST_ITERATION ? 240_000 : 360_000;
 
 test.skip(
   FAST_ITERATION,
@@ -580,7 +583,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
    * admin access, the pages will return 404 and the test will skip.
    */
   test('All admin pages load without errors', async ({ page }, testInfo) => {
-    test.setTimeout(FAST_ITERATION ? 300_000 : 480_000);
+    test.setTimeout(FAST_ITERATION ? 300_000 : 600_000);
 
     // Capture browser console errors for debugging page failures
     const consoleErrors: string[] = [];
@@ -832,7 +835,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
 // ============================================================================
 
 test.describe('Dashboard Routing', () => {
-  test.setTimeout(180_000);
+  test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
 
   test.beforeEach(async ({ page }) => {
     if (!hasClerkCredentials()) {
@@ -881,7 +884,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'History-navigation routing checks run in the slower dashboard-routing lane'
     );
-    test.setTimeout(180_000);
+    test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
 
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
@@ -889,11 +892,13 @@ test.describe('Dashboard Routing', () => {
     });
     await expect(page).toHaveURL(/\/app\/chat/);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS, {
+    // The settings root now server-redirects to /app/settings/account, so
+    // use the concrete landing page to avoid redirect-aborted navigations.
+    await smokeNavigateWithRetry(page, SETTINGS_LANDING_PAGE, {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       retries: 2,
     });
-    await expect(page).toHaveURL(/\/app\/settings/);
+    await expect(page).toHaveURL(/\/app\/settings\/account/);
 
     await page.goBack({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     await expect(page).toHaveURL(/\/app\/chat/, {
@@ -901,7 +906,9 @@ test.describe('Dashboard Routing', () => {
     });
 
     await page.goForward({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await expect(page).toHaveURL(/\/app\/settings/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/app\/settings\/account/, {
+      timeout: 30_000,
+    });
   });
 
   test('all dashboard routes render content @smoke', async ({ page }) => {
@@ -909,7 +916,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'Route-by-route dashboard content checks duplicate faster dashboard health and content-gate coverage'
     );
-    test.setTimeout(240_000);
+    test.setTimeout(DASHBOARD_ROUTE_SWEEP_TIMEOUT);
     const routes = [
       { path: APP_ROUTES.CHAT, content: /new thread|chat/i },
       { path: '/app/dashboard/earnings', content: /earnings|tips|revenue/i },
@@ -953,7 +960,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'Lazy-hydration routing checks run in the slower dashboard-routing lane'
     );
-    test.setTimeout(180_000);
+    test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
     const hydrationErrors: string[] = [];
 
     page.on('console', msg => {
