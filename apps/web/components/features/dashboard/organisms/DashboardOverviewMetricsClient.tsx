@@ -1,10 +1,10 @@
 'use client';
 
-import { useAuth } from '@clerk/nextjs';
 import { FirstFanCelebration } from '@/features/dashboard/molecules/FirstFanCelebration';
 import { DashboardAnalyticsCards as AnalyticsCards } from '@/features/dashboard/organisms/DashboardAnalyticsCards';
 import { useDashboardOverviewControls } from '@/features/dashboard/organisms/DashboardOverviewControlsProvider';
 import { DashboardActivityFeed } from '@/features/dashboard/organisms/dashboard-activity-feed';
+import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 
 export interface DashboardOverviewMetricsClientProps {
@@ -19,7 +19,7 @@ export function DashboardOverviewMetricsClient({
   showActivity = false,
 }: DashboardOverviewMetricsClientProps): React.ReactElement {
   const { range, refreshSignal } = useDashboardOverviewControls();
-  const { userId } = useAuth();
+  const { userId } = useAuthSafe();
   const { data: analytics } = useDashboardAnalyticsQuery({ range: 'all' });
 
   return (

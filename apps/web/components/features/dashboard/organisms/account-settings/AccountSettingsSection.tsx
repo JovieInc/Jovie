@@ -6,12 +6,11 @@
  * Main container for account settings, composing email, session management,
  * appearance, and notification preference cards.
  */
-
-import { useSession, useUser } from '@clerk/nextjs';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { SettingsGroupHeading } from '@/features/dashboard/molecules/SettingsGroupHeading';
 import { SettingsAppearanceSection } from '@/features/dashboard/organisms/SettingsAppearanceSection';
 import { SettingsNotificationsSection } from '@/features/dashboard/organisms/SettingsNotificationsSection';
+import { useSessionSafe, useUserSafe } from '@/hooks/useClerkSafe';
 
 import { ConnectedAccountsCard } from './ConnectedAccountsCard';
 import { EmailManagementCard } from './EmailManagementCard';
@@ -19,8 +18,8 @@ import { SessionManagementCard } from './SessionManagementCard';
 import type { ClerkUserResource } from './types';
 
 function ClerkAccountSections() {
-  const { user, isLoaded } = useUser();
-  const { session: activeSession } = useSession();
+  const { user, isLoaded } = useUserSafe();
+  const { session: activeSession } = useSessionSafe();
 
   const typedUser = user as unknown as ClerkUserResource | null;
 
