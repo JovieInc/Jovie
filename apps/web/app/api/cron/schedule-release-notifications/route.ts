@@ -199,7 +199,7 @@ async function scheduleNotificationsForRelease(
     }
 
     if (page.length < SUBSCRIBER_PAGE_SIZE) break;
-    const lastPageRow = page[page.length - 1];
+    const lastPageRow = page.at(-1);
     if (!lastPageRow) break;
     lastId = lastPageRow.id;
 
