@@ -47,16 +47,16 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
   const navLinks = (
     <ul className='flex flex-col gap-0.5'>
       <NavItem
-        href='/'
+        href='/investor-portal'
         label='Overview'
-        isActive={pathname === '/' || pathname === ''}
+        isActive={pathname === '/investor-portal'}
       />
       {pages.map(page => (
         <NavItem
           key={page.slug}
-          href={`/${page.slug}`}
+          href={`/investor-portal/${page.slug}`}
           label={page.title}
-          isActive={pathname === `/${page.slug}`}
+          isActive={pathname === `/investor-portal/${page.slug}`}
         />
       ))}
     </ul>
@@ -132,6 +132,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
           <nav
             id='mobile-nav'
             role='dialog'
+            aria-modal='true'
             aria-label='Navigation'
             className='absolute bottom-0 left-0 top-0 w-64 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-0)] px-3 py-6'
           >
