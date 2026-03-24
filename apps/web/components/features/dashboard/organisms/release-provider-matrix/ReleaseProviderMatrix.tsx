@@ -753,10 +753,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
               {showReleasesTable && (
                 <QueryErrorBoundary>
                   <div
-                    className={cn(
-                      LINEAR_SURFACE.contentContainer,
-                      'mt-2.5 flex min-h-[420px] flex-1 flex-col overflow-hidden'
-                    )}
+                    className='mt-2.5 flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-[10px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]'
+                    data-testid='release-table-shell'
                   >
                     <ReleaseTableSubheader
                       releases={filteredRows}
