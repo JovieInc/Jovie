@@ -62,11 +62,20 @@ export async function waitForImages(
 
 /** Standard auth guard — skips the test if credentials aren't available */
 export function shouldSkipAuth(testInfo: { skip: () => void }): boolean {
+  const username = process.env.E2E_CLERK_USER_USERNAME;
+  if (!username) {
+    console.warn('⚠ Skipping: E2E_CLERK_USER_USERNAME not configured');
+    testInfo.skip();
+    return true;
+  }
+  // +clerk_test emails use Clerk's testing library (magic OTP 424242) — no password needed
   if (
-    !process.env.E2E_CLERK_USER_USERNAME ||
+    !username.includes('+clerk_test') &&
     !process.env.E2E_CLERK_USER_PASSWORD
   ) {
-    console.warn('⚠ Skipping: E2E credentials not configured');
+    console.warn(
+      '⚠ Skipping: E2E_CLERK_USER_PASSWORD not configured (required for non-test emails)'
+    );
     testInfo.skip();
     return true;
   }
