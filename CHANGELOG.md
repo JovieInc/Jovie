@@ -14,6 +14,24 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.3.49] - 2026-03-23
 
+### Added
+
+- Editorial blog redesign: magazine-style grid index with featured post, reading time, and category pills
+- Blog post page overhaul: sticky table of contents sidebar with scroll-spy, rich author card, related posts section
+- Author pages at `/blog/authors/[username]` with Person JSON-LD, profile linking to Jovie profiles
+- Category pages at `/blog/category/[slug]` with filtered post grids and breadcrumb navigation
+- [internal] Enhanced Article JSON-LD schema with author URL, keywords, word count, and date modified
+- [internal] Added `buildPersonSchema()` for author page structured data
+- [internal] Blog author and category pages included in sitemap with accurate `lastModified` dates
+- Tags support in blog post frontmatter (comma-separated)
+- Reading time calculation (238 WPM) displayed on blog cards and post pages
+
+### Changed
+
+- Blog index replaced timeline layout with editorial magazine grid (featured + 2-column cards)
+- [internal] Blog post priority bumped from 0.6 to 0.7 in sitemap
+- [internal] `BlogMarkdownReader` semantic HTML: moved `<article>` wrapper to page level
+- [internal] Extended `ResolvedAuthor` with `bio` and `username` fields from Jovie profile data
 ### Changed
 
 - Migrated investor portal from subdomain (`investors.jov.ie`) to path-based auth (`/investor-portal`)

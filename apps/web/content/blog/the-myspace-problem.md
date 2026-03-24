@@ -5,6 +5,7 @@ author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
 category: Inbound Marketing
+tags: MySpace, Facebook, platform design, simplicity, artist pages
 ---
 
 # The MySpace Problem

@@ -5,6 +5,7 @@ author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
 category: Artist Management
+tags: contact info, manager changes, booking agents, music industry
 ---
 
 # The Contact Problem

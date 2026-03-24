@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import type { ProfileData } from '@/lib/services/profile';
 import { getProfilesByUsernames } from '@/lib/services/profile';
+import { BlogCard } from './components/BlogCard';
 
 // Fully static - blog posts are read from filesystem at build time
 export const revalidate = false;
@@ -17,15 +17,6 @@ export const metadata = {
     canonical: `${APP_URL}/blog`,
   },
 };
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 export default async function BlogIndexPage() {
   const posts = await getBlogPosts();
@@ -41,6 +32,31 @@ export default async function BlogIndexPage() {
     // Fallback to frontmatter-only author data if profile fetch fails
   }
 
+  const [featured, ...remaining] = posts;
+
+  if (!featured) {
+    return (
+      <div className='min-h-screen'>
+        <MarketingHero variant='left'>
+          <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
+          <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
+            Blog
+          </h1>
+          <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
+            Posts coming soon.
+          </p>
+        </MarketingHero>
+      </div>
+    );
+  }
+
+  const featuredAuthor = resolveAuthor(
+    featured,
+    featured.authorUsername
+      ? profileMap.get(featured.authorUsername.toLowerCase())
+      : null
+  );
+
   return (
     <div className='min-h-screen'>
       {/* Hero Section */}
@@ -49,7 +65,7 @@ export default async function BlogIndexPage() {
           className='marketing-kicker mb-0'
           style={{ color: 'var(--linear-text-tertiary)' }}
         >
-          Updates
+          Blog
         </p>
         <h1
           className='marketing-h1-linear mb-6 mt-6 max-w-[8ch]'
@@ -66,136 +82,33 @@ export default async function BlogIndexPage() {
         </p>
       </MarketingHero>
 
-      {/* Posts Timeline */}
+      {/* Posts Grid */}
       <MarketingContainer width='page' className='pb-20 sm:pb-28'>
         <div className='marketing-divider mb-10' />
-        <div className='max-w-3xl'>
-          <div className='space-y-0'>
-            {posts.map((post, index) => {
+
+        {/* Featured Post */}
+        <div className='mb-10'>
+          <BlogCard
+            post={featured}
+            author={featuredAuthor}
+            variant='featured'
+          />
+        </div>
+
+        {/* Remaining Posts Grid */}
+        {remaining.length > 0 && (
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
+            {remaining.map(post => {
               const author = resolveAuthor(
                 post,
                 post.authorUsername
                   ? profileMap.get(post.authorUsername.toLowerCase())
                   : null
               );
-              return (
-                <article key={post.slug} className='group relative'>
-                  {/* Timeline connector */}
-                  {index < posts.length - 1 && (
-                    <div
-                      className='absolute left-[7px] top-[2.5rem] bottom-0 w-px'
-                      style={{ backgroundColor: 'var(--linear-border-subtle)' }}
-                    />
-                  )}
-
-                  <Link
-                    href={`/blog/${post.slug}`}
-                    className='block py-8 -mx-4 px-4 sm:-mx-6 sm:px-6 rounded-xl transition-all duration-200'
-                  >
-                    <div className='flex gap-6 sm:gap-8'>
-                      {/* Timeline dot */}
-                      <div className='relative flex-shrink-0 pt-1.5'>
-                        <div
-                          className='w-[15px] h-[15px] rounded-full border-2 transition-colors duration-200'
-                          style={{
-                            borderColor: 'var(--linear-border-default)',
-                            backgroundColor: 'var(--linear-bg-page)',
-                          }}
-                        />
-                      </div>
-
-                      {/* Content */}
-                      <div className='flex-1 min-w-0'>
-                        {/* Date and category */}
-                        <div className='flex items-center gap-3 mb-3'>
-                          <time
-                            dateTime={post.date}
-                            className='text-sm font-medium tabular-nums'
-                            style={{ color: 'var(--linear-text-tertiary)' }}
-                          >
-                            {formatDate(post.date)}
-                          </time>
-                          {post.category && (
-                            <>
-                              <span
-                                style={{ color: 'var(--linear-text-tertiary)' }}
-                              >
-                                ·
-                              </span>
-                              <span
-                                style={{ color: 'var(--linear-text-tertiary)' }}
-                              >
-                                {post.category}
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Title */}
-                        <h2
-                          className='text-xl sm:text-2xl font-semibold tracking-tight mb-3 transition-colors'
-                          style={{ color: 'var(--linear-text-primary)' }}
-                        >
-                          {post.title}
-                        </h2>
-
-                        {/* Excerpt */}
-                        <p
-                          className='text-base leading-relaxed line-clamp-2'
-                          style={{ color: 'var(--linear-text-secondary)' }}
-                        >
-                          {post.excerpt}
-                        </p>
-
-                        {/* Author */}
-                        <div className='mt-4 flex items-center gap-2 text-sm'>
-                          <span
-                            className='font-medium'
-                            style={{ color: 'var(--linear-text-primary)' }}
-                          >
-                            {author.name}
-                          </span>
-                          {author.title && (
-                            <>
-                              <span
-                                style={{ color: 'var(--linear-text-tertiary)' }}
-                              >
-                                ·
-                              </span>
-                              <span
-                                style={{ color: 'var(--linear-text-tertiary)' }}
-                              >
-                                {author.title}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Arrow indicator */}
-                      <div className='flex-shrink-0 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200'>
-                        <svg
-                          className='w-5 h-5'
-                          fill='none'
-                          viewBox='0 0 24 24'
-                          stroke='currentColor'
-                          strokeWidth={2}
-                          aria-hidden='true'
-                        >
-                          <path
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                            d='M9 5l7 7-7 7'
-                          />
-                        </svg>
-                      </div>
-                    </div>
-                  </Link>
-                </article>
-              );
+              return <BlogCard key={post.slug} post={post} author={author} />;
             })}
           </div>
-        </div>
+        )}
       </MarketingContainer>
     </div>
   );
