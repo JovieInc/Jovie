@@ -39,5 +39,10 @@ describe('clerkAvailability', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', 'https://clerk.staging.jov.ie');
       expect(getClerkProxyUrl()).toBe('https://clerk.staging.jov.ie');
     });
+
+    it('returns undefined when NEXT_PUBLIC_CLERK_PROXY_DISABLED is "1"', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '1');
+      expect(getClerkProxyUrl()).toBeUndefined();
+    });
   });
 });

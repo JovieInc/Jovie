@@ -203,7 +203,7 @@ Default email: `browse+clerk_test@jov.ie`. The script:
 | Screenshots show login screen | Auth guard skipping tests | Ensure `E2E_CLERK_USER_USERNAME` contains `+clerk_test` |
 | `audience-crm.png` missing | Auth guard skipped `audience.spec.ts` | Same as above — fix the auth guard |
 | `CLERK_SETUP_FAILED` | Real Clerk keys not in env | Run via Doppler, not bare `pnpm` |
-| `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | `getClerkProxyUrl()` returns `undefined` on localhost/HTTP, Clerk loads from its own CDN |
+| `Failed to load Clerk JS` on localhost | Clerk proxy forces HTTPS, localhost has no SSL | Set `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` when starting the dev server (done automatically by the screenshots pipeline). If using `reuseExistingServer`, stop the existing server and re-run via `doppler run -p jovie-web -c dev -- pnpm --filter web screenshots` so the flag is active |
 | OTP input not visible | Testing token not set before navigation | Check `setupClerkTestingToken()` runs in `auth.setup.ts` |
 | `Couldn't find your account` on staging | Staging uses live Clerk instance, test user is in test instance | Always run screenshots against localhost (dev server), not staging |
 
