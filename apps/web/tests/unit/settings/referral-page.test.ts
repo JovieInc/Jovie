@@ -1,22 +1,19 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
-const mockRedirect = vi.fn();
-
-vi.mock('next/navigation', () => ({
-  redirect: (url: string) => {
-    mockRedirect(url);
-    throw new Error(`NEXT_REDIRECT:${url}`);
-  },
-}));
-
-import SettingsReferralPage from '../../../app/app/(shell)/settings/referral/page';
-
-describe('SettingsReferralPage', () => {
-  it(`redirects to ${APP_ROUTES.REFERRALS}`, () => {
-    expect(() => SettingsReferralPage()).toThrow(
-      `NEXT_REDIRECT:${APP_ROUTES.REFERRALS}`
+describe('legacy settings referral redirect', () => {
+  it(`redirects to ${APP_ROUTES.REFERRALS} in next.config.js`, async () => {
+    const nextConfig = require('../../../next.config.js');
+    const redirects = await nextConfig.redirects();
+    const legacyRedirect = redirects.find(
+      (redirect: { source: string }) =>
+        redirect.source === '/app/settings/referral'
     );
-    expect(mockRedirect).toHaveBeenCalledWith(APP_ROUTES.REFERRALS);
+
+    expect(legacyRedirect).toMatchObject({
+      source: '/app/settings/referral',
+      destination: APP_ROUTES.REFERRALS,
+      permanent: false,
+    });
   });
 });

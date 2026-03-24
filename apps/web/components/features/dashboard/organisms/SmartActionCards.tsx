@@ -113,7 +113,7 @@ export const SmartActionCards = memo(function SmartActionCards({
         icon={<BadgeDollarSign className='h-4 w-4' />}
         heading='Accept tips from fans'
         subtext='Connect Venmo to receive tips on your profile'
-        href={APP_ROUTES.DASHBOARD_LINKS}
+        href={APP_ROUTES.CHAT_PROFILE_PANEL}
       />
     );
   }
