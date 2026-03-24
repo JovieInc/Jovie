@@ -29,6 +29,7 @@
   --clerk-border-radius: var(--radius-xl);
   --clerk-font-family: var(--font-sans);
   --clerk-focus-ring: 0 0 0 2px rgba(113, 112, 255, 0.28);
+  font-feature-settings: var(--linear-font-features);
 }
 
 /* --- B. Card container --- */
