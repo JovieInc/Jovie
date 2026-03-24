@@ -217,7 +217,7 @@ function buildProfileCompletion(
       label: 'Add your music platforms',
       description:
         'Help listeners stream you on Spotify, Apple Music, and more.',
-      href: APP_ROUTES.DASHBOARD_LINKS,
+      href: APP_ROUTES.CHAT_PROFILE_PANEL,
     });
   }
 

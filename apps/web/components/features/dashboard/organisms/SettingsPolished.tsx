@@ -63,11 +63,11 @@ interface SettingsSidebarProps {
 function getFocusedSettingsHref(sectionId: string): string {
   switch (sectionId) {
     case 'account':
-      return APP_ROUTES.SETTINGS_APPEARANCE;
+      return APP_ROUTES.SETTINGS_ACCOUNT;
     case 'billing':
       return APP_ROUTES.SETTINGS_BILLING;
     case 'data-privacy':
-      return APP_ROUTES.SETTINGS_DELETE_ACCOUNT;
+      return APP_ROUTES.SETTINGS_DATA_PRIVACY;
     case 'artist-profile':
       return APP_ROUTES.SETTINGS_ARTIST_PROFILE;
     case 'contacts':

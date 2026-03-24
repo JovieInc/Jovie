@@ -13,6 +13,7 @@ import {
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
 import { HOSTNAME } from '@/constants/domains';
+import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
 import {
   type ClerkBypassPathInfo,
   shouldBypassClerkForRequest,
@@ -501,8 +502,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
       if (needsAuth) {
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, req.url);
-        authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
+        const authUrl = new URL(
+          buildProtectedAuthRedirectUrl(
+            authPage,
+            req.nextUrl.pathname,
+            req.nextUrl.search
+          ),
+          req.url
+        );
         return NextResponse.redirect(authUrl);
       }
 

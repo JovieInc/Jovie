@@ -21,3 +21,24 @@ export function buildAuthRouteUrl(
 
   return routeUrl.pathname + routeUrl.search;
 }
+
+/**
+ * Builds an auth route for protected-path redirects while preserving the
+ * current in-app pathname and search params as a sanitized redirect target.
+ */
+export function buildProtectedAuthRedirectUrl(
+  pathname: string,
+  requestedPathname: string,
+  requestedSearch = ''
+): string {
+  const routeUrl = new URL(pathname, 'https://n');
+  const redirectUrl =
+    sanitizeRedirectUrl(`${requestedPathname}${requestedSearch}`) ??
+    sanitizeRedirectUrl(requestedPathname);
+
+  if (redirectUrl) {
+    routeUrl.searchParams.set('redirect_url', redirectUrl);
+  }
+
+  return routeUrl.pathname + routeUrl.search;
+}
