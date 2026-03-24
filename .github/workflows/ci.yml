@@ -2423,7 +2423,7 @@ jobs:
 
       - name: Alias preview to staging.jov.ie
         run: |
-          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
+          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -2466,7 +2466,7 @@ jobs:
           # Use the staging alias directly — GitHub Actions masks job outputs
           # containing secret substrings (org name in Vercel URLs), so we
           # cannot rely on deploy_url passed between jobs.
-          vercel promote https://staging.jov.ie --yes --token ${{ secrets.VERCEL_TOKEN }}
+          vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
