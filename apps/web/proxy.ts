@@ -173,7 +173,7 @@ function analyzeHost(hostname: string): HostInfo {
 }
 
 function getClerkProxyUrl(req: NextRequest): string | undefined {
-  return '/clerk';
+  return process.env.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
 }
 
 /** Dashboard is always at /app in single-domain architecture */

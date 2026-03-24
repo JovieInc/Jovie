@@ -1,3 +1,5 @@
+import { publicEnv } from '@/lib/env-public';
+
 const VALID_CLERK_PUBLISHABLE_KEY_PREFIXES = ['pk_live_', 'pk_test_'] as const;
 
 export function isMockPublishableKey(publishableKey: string): boolean {
@@ -20,6 +22,6 @@ export function shouldBypassClerk(
   );
 }
 
-export function getClerkProxyUrl(): string {
-  return '/clerk';
+export function getClerkProxyUrl(): string | undefined {
+  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || undefined;
 }
