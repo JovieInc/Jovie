@@ -57,17 +57,10 @@ Sentry.init({
     // is not authenticated. These are handled by the client error boundary
     // and are not bugs (JOV-1065).
     /^Unauthorized$/,
-    // Build-info health check: ENOENT on .next/BUILD_ID expected in dev
-    // (graceful fallback to 'unknown' already in place).
-    /Build info health check failed/,
     // FeaturedCreators: table check timeout with graceful fallback already in place.
     /\[FeaturedCreators\].*(?:timed out|failed or timed out)/,
     // OutreachPipeline: hitting configured daily budget limit is expected behavior.
     /Daily query budget exhausted/,
-    // React hooks mismatch: known bug in onboarding/settings — tracked separately.
-    /Rendered more hooks than during the previous render/,
-    // Sentry example page: leftover test page, guarded from prod, generates dev noise.
-    /SentryExampleAPIError/,
   ],
 
   // AI Agent Monitoring: Track Vercel AI SDK calls (LLM requests, token usage)
