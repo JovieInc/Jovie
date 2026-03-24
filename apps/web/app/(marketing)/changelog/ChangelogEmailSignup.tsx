@@ -69,10 +69,13 @@ export function ChangelogEmailSignup() {
 
       {status === 'success' ? (
         <div
-          className='rounded-xl p-4 text-sm text-center font-medium'
+          role='status'
+          aria-live='polite'
+          className='rounded-xl p-4 text-sm text-center font-medium text-green-400'
           style={{
             backgroundColor:
               'color-mix(in srgb, var(--linear-text-primary) 5%, transparent)',
+            border: '1px solid color-mix(in srgb, #4ade80 20%, transparent)',
           }}
         >
           Check your email to confirm your subscription!
