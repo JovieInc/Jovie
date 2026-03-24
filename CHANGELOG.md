@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.51] - 2026-03-24
+
+### Fixed
+
+- Generic "Page not found" message on catch-all 404 (was showing profile-specific "Profile not found")
+- Marketing route 404s no longer render double header/footer (added `(marketing)/not-found.tsx`)
+- Changelog subscribe success message now visually distinct with green accent and `aria-live` for screen readers
+- ProductScreenshot fallback shows clean "Coming soon" instead of a developer-facing placeholder message
+
 ## [26.3.51] - 2026-03-24
 
 ### Fixed
