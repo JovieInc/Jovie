@@ -58,12 +58,16 @@ function ActivityIcon({ action }: { readonly action: ActivityAction }) {
 
 export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
   const safeRows = Math.max(0, rows);
+  const skeletonKeys = Array.from(
+    { length: safeRows },
+    (_, index) => `activity-skeleton-row-${index + 1}`
+  );
 
   return (
     <div className='space-y-0.5' aria-busy='true'>
-      {Array.from({ length: safeRows }, (_, index) => (
+      {skeletonKeys.map(skeletonKey => (
         <div
-          key={`activity-skeleton-${index + 1}`}
+          key={skeletonKey}
           className='relative flex items-start gap-3 rounded-md px-1.5 py-1'
           aria-hidden='true'
         >

@@ -166,13 +166,27 @@ export function MultiLinkPasteDialog({
       </DialogDescription>
 
       <DialogBody className='max-h-[50vh] space-y-2 overflow-y-auto'>
-        {extractedLinks.map((info, index) => (
-          <LinkItem
-            key={`${info.detectedLink.normalizedUrl}-${index}`}
-            info={info}
-            onToggle={() => onToggleSelection(index)}
-          />
-        ))}
+        {(() => {
+          const seenLinkKeys = new Map<string, number>();
+
+          return extractedLinks.map((info, index) => {
+            const linkBaseKey = `${info.detectedLink.platform.name}-${info.detectedLink.normalizedUrl}`;
+            const seenCount = seenLinkKeys.get(linkBaseKey) ?? 0;
+            seenLinkKeys.set(linkBaseKey, seenCount + 1);
+
+            return (
+              <LinkItem
+                key={
+                  seenCount === 0
+                    ? linkBaseKey
+                    : `${linkBaseKey}-${seenCount + 1}`
+                }
+                info={info}
+                onToggle={() => onToggleSelection(index)}
+              />
+            );
+          });
+        })()}
       </DialogBody>
 
       <DialogActions>

@@ -37,20 +37,32 @@ export function AudienceActionsCell({
         className
       )}
     >
-      {actions.slice(0, maxActions).map((action, idx) => {
-        const iconName = resolveAudienceActionIcon(action.label);
-        const actionLabel = action.label?.trim() || 'Unknown action';
-        return (
-          <span
-            key={`${rowId}-${actionLabel}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}-${idx}`}
-            className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'
-            title={actionLabel}
-          >
-            <Icon name={iconName} className='h-3 w-3' aria-hidden='true' />
-            <span className='sr-only'>{actionLabel}</span>
-          </span>
-        );
-      })}
+      {(() => {
+        const seenActionKeys = new Map<string, number>();
+
+        return actions.slice(0, maxActions).map(action => {
+          const iconName = resolveAudienceActionIcon(action.label);
+          const actionLabel = action.label?.trim() || 'Unknown action';
+          const actionBaseKey = `${rowId}-${actionLabel}-${action.platform ?? 'unknown'}-${action.timestamp ?? 'unknown'}`;
+          const seenCount = seenActionKeys.get(actionBaseKey) ?? 0;
+          seenActionKeys.set(actionBaseKey, seenCount + 1);
+
+          return (
+            <span
+              key={
+                seenCount === 0
+                  ? actionBaseKey
+                  : `${actionBaseKey}-${seenCount + 1}`
+              }
+              className='inline-flex h-6 w-6 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'
+              title={actionLabel}
+            >
+              <Icon name={iconName} className='h-3 w-3' aria-hidden='true' />
+              <span className='sr-only'>{actionLabel}</span>
+            </span>
+          );
+        });
+      })()}
     </div>
   );
 }

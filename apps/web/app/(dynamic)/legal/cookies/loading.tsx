@@ -1,6 +1,15 @@
 /**
  * Cookie policy page loading skeleton
  */
+const COOKIE_SECTION_KEYS = [
+  'overview',
+  'types',
+  'usage',
+  'controls',
+  'third-parties',
+  'updates',
+] as const;
+
 export default function CookiesLoading() {
   return (
     <div className='prose prose-neutral dark:prose-invert max-w-none'>
@@ -11,8 +20,8 @@ export default function CookiesLoading() {
 
       {/* Content skeleton */}
       <div className='space-y-6'>
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={`cookies-section-${i + 1}`} className='space-y-2'>
+        {COOKIE_SECTION_KEYS.map(sectionKey => (
+          <div key={sectionKey} className='space-y-2'>
             <div className='h-6 w-44 skeleton rounded-md mb-3' />
             <div className='h-4 w-full skeleton rounded-md' />
             <div className='h-4 w-11/12 skeleton rounded-md' />

@@ -1,5 +1,8 @@
 import { MarketingContainer } from '@/components/marketing';
 
+const SUPPORT_CHANNEL_KEYS = ['email', 'docs', 'response-time'] as const;
+const SUPPORT_FAQ_KEYS = ['faq-1', 'faq-2', 'faq-3', 'faq-4'] as const;
+
 export default function SupportLoading() {
   return (
     <div className='pt-16 pb-20 sm:pt-20 sm:pb-24 lg:pt-24 lg:pb-32'>
@@ -15,8 +18,8 @@ export default function SupportLoading() {
         <div className='mx-auto mt-16 max-w-[720px] px-6 sm:px-8 lg:px-10'>
           <div className='h-7 w-48 skeleton rounded' />
           <div className='mt-6 grid gap-8 sm:grid-cols-3'>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i}>
+            {SUPPORT_CHANNEL_KEYS.map(channelKey => (
+              <div key={channelKey}>
                 <div className='h-5 w-28 skeleton rounded' />
                 <div className='mt-2 h-4 w-full skeleton rounded' />
                 <div className='mt-3 h-4 w-16 skeleton rounded' />
@@ -29,8 +32,8 @@ export default function SupportLoading() {
         <div className='mx-auto mt-16 max-w-[720px] px-6 sm:px-8 lg:px-10'>
           <div className='h-7 w-64 skeleton rounded' />
           <div className='mt-8 space-y-5'>
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className='h-5 w-full skeleton rounded' />
+            {SUPPORT_FAQ_KEYS.map(faqKey => (
+              <div key={faqKey} className='h-5 w-full skeleton rounded' />
             ))}
           </div>
         </div>
