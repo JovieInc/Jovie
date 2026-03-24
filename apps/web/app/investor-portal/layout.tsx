@@ -21,8 +21,8 @@ export const metadata: Metadata = {
  * Dark mode only. No marketing header/footer.
  * Left sidebar nav + bottom sticky action bar.
  *
- * Token is already validated by proxy.ts middleware.
- * We read the cookie here to get investor name for personalization.
+ * Access is enforced by middleware (proxy.ts) which validates the
+ * investor token cookie before the request reaches this layout.
  */
 export default async function InvestorLayout({
   children,
@@ -60,7 +60,7 @@ export default async function InvestorLayout({
         <InvestorNav investorName={investorName} pages={navPages} />
 
         {/* Main content area */}
-        <main className='flex-1 pb-20 lg:pb-24'>{children}</main>
+        <main className='flex-1 pb-20 pt-14 lg:pb-24 lg:pt-0'>{children}</main>
       </div>
 
       {/* Bottom sticky action bar */}
