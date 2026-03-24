@@ -174,6 +174,7 @@ function analyzeHost(hostname: string): HostInfo {
 }
 
 function getClerkProxyUrl(req: NextRequest): string | undefined {
+  if (process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
   return '/clerk';
 }
 
