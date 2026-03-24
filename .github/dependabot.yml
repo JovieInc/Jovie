@@ -29,6 +29,14 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'react-dom'
         update-types: ['version-update:semver-major']
+      # Temporary workaround: these packages do not publish 10.3.2.
+      # Dependabot currently attempts that version and fails the update job.
+      - dependency-name: 'storybook'
+        versions: ['10.3.2']
+      - dependency-name: '@storybook/addon-docs'
+        versions: ['10.3.2']
+      - dependency-name: '@storybook/nextjs-vite'
+        versions: ['10.3.2']
 
   # Enable version updates for GitHub Actions
   - package-ecosystem: 'github-actions'
