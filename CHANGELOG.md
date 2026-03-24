@@ -62,6 +62,31 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
 - Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
 - Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+## [26.4.48] - 2026-03-24
+
+### Changed
+
+- Consolidated Clerk auth styling to CSS-primary architecture (theme.css single source of truth)
+- Improved OTP input UX: larger digits, visual feedback for filled/error/success states, shake animation on wrong code
+- Primary button hover now uses accent-hover color instead of subtle opacity change
+- Social/primary button hover lift only on pointer devices (no fidget on touch)
+- All auth transitions use design system easing (--ease-interactive)
+- Divider "or" text increased to 12px for readability
+- Footer link hover uses accent color instead of barely-visible opacity
+- Softened auth card shadow for less aggressive depth
+
+### Fixed
+
+- Modal backdrop/content styles now correctly target portaled elements outside auth root
+- Input error state uses correct Clerk data attributes (data-feedback, aria-invalid)
+- Focus ring opacity normalized to 0.28 across all interactive elements
+- Warning text uses --linear-warning token instead of hardcoded oklch value
+
+### Added
+
+- Styling for 13 previously unstyled Clerk elements: forgot password link, back button, hint/warning/error text, step headers, alternative methods, verification status, phone input, selectors, badges, modals
+- Disabled and loading states for buttons and inputs
+- Semantic `<output>` element with aria-live for signup handle availability banner
 
 ## [26.4.47] - 2026-03-23
 

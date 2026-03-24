@@ -99,7 +99,10 @@ function SignUpClaimDataPersistence() {
   if (!handle || !availability) return null;
 
   return (
-    <div className='mb-4 rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'>
+    <output
+      className='mb-4 block rounded-(--linear-radius-sm) border border-subtle bg-surface-1 px-4 py-3 text-center'
+      aria-live='polite'
+    >
       {availability === 'checking' && (
         <p className='text-[13px] font-[450] text-secondary-token'>
           Checking if @{normalizedHandle} is available...
@@ -122,7 +125,7 @@ function SignUpClaimDataPersistence() {
           sign up and choose a handle.
         </p>
       )}
-    </div>
+    </output>
   );
 }
 
