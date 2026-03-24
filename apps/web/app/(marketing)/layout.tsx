@@ -9,7 +9,7 @@ export default async function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-surface-page text-primary-token'>
+    <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-black text-primary-token'>
       <SkipToContent />
       <MarketingHeader logoSize='xs' />
       <main
