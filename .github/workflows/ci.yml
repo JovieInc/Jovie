@@ -2383,11 +2383,74 @@ jobs:
           secrets: ${{ toJSON(secrets) }}
       - name: Pull env (production)
         run: vercel pull --yes --environment=production --token ${{ secrets.VERCEL_TOKEN }}
-      - name: Build (production, preview target for staging deploy)
+      - name: Build (production config, deployed as preview for staging verification)
         run: vercel build --token ${{ secrets.VERCEL_TOKEN }}
         env:
           COREPACK_ENABLE_DOWNLOAD_PROMPT: 0
           COREPACK_ENABLE_STRICT: 0
+      - name: Sync runtime env vars to Vercel Preview
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, sys, urllib.request, urllib.error
+
+          token = os.environ["VERCEL_TOKEN"]
+          project_id = os.environ["VERCEL_PROJECT_ID"]
+          org_id = os.environ["VERCEL_ORG_ID"]
+          secrets = json.loads(os.environ["SECRETS_JSON"])
+
+          # CI-only secrets — not needed as app runtime env vars
+          SKIP = {
+              "GITHUB_TOKEN", "GH_DISPATCH_TOKEN",
+              "VERCEL_TOKEN", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID",
+              "TURBO_TOKEN", "TURBO_TEAM",
+              "CODECOV_TOKEN", "GITLEAKS_LICENSE",
+              "SENTRY_AUTH_TOKEN",
+              "DOPPLER_TOKEN_DEV", "DOPPLER_TOKEN_STG", "DOPPLER_TOKEN_PRD",
+              "JOVIE_BOT_PRIVATE_KEY", "CLAUDE_CODE_OAUTH_TOKEN",
+              "NEON_API_KEY",
+          }
+
+          env_vars = []
+          for key, value in secrets.items():
+              if key in SKIP or not value:
+                  continue
+              env_vars.append({
+                  "key": key,
+                  "value": value,
+                  "target": ["preview"],
+                  "type": "encrypted",
+              })
+
+          if not env_vars:
+              print("No env vars to sync")
+              sys.exit(0)
+
+          team_param = f"&teamId={org_id}" if org_id.startswith("team_") else ""
+          url = f"https://api.vercel.com/v10/projects/{project_id}/env?upsert=true{team_param}"
+
+          data = json.dumps(env_vars).encode()
+          req = urllib.request.Request(url, data=data, method="POST")
+          req.add_header("Authorization", f"Bearer {token}")
+          req.add_header("Content-Type", "application/json")
+
+          try:
+              with urllib.request.urlopen(req, timeout=30) as resp:
+                  result = json.load(resp)
+                  created = result.get("created", [])
+                  updated = result.get("updated", [])
+                  print(f"Synced {len(created) + len(updated)} env vars to Vercel Preview ({len(created)} created, {len(updated)} updated)")
+          except urllib.error.HTTPError as e:
+              body = e.read().decode()
+              print(f"Vercel API error {e.code}: {body[:500]}")
+              # Non-fatal for 4xx (vars may already exist); fatal for 5xx
+              if e.code >= 500:
+                  sys.exit(1)
+          PYEOF
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          SECRETS_JSON: ${{ toJSON(secrets) }}
       - name: Deploy (staging preview, prebuilt)
         id: deploy
         run: |
