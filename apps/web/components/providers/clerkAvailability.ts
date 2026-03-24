@@ -23,5 +23,5 @@ export function shouldBypassClerk(
 }
 
 export function getClerkProxyUrl(): string {
-  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/clerk';
+  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/__clerk';
 }

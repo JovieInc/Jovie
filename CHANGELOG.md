@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.52] - 2026-03-24
+
+### Fixed
+
+- Auth broken on both staging and production — migrated Clerk proxy from static `vercel.json` rewrites (hardcoded to `clerk.jov.ie`) to Clerk SDK's built-in `frontendApiProxy` middleware, which auto-derives the FAPI from the publishable key per environment
+- [internal] Removed stale `NEXT_PUBLIC_CLERK_PROXY_URL` from Doppler prd/stg configs
+- [internal] Updated Clerk middleware bypass paths from `/clerk` to `/__clerk` (SDK default)
+- Deduplicated `| Jovie` suffix in page titles (was appearing twice on some pages)
+
 ## [26.4.51] - 2026-03-24
 
 ### Fixed
