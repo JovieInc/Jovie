@@ -19,13 +19,7 @@ export const SCHEMA_FRAGMENTS = {
     priceCurrency: 'USD',
     description: 'Free to start',
   },
-  aggregateRating: {
-    '@type': 'AggregateRating' as const,
-    ratingValue: '5',
-    ratingCount: '1',
-    bestRating: '5',
-    worstRating: '1',
-  },
+  // aggregateRating omitted — Google requires genuine user reviews, not hardcoded values
   author: {
     '@type': 'Organization' as const,
     name: APP_NAME,
@@ -94,7 +88,7 @@ export function buildSoftwareSchema(description: string) {
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     offers: SCHEMA_FRAGMENTS.offers,
-    aggregateRating: SCHEMA_FRAGMENTS.aggregateRating,
+    // aggregateRating intentionally omitted — no verified user reviews yet
     author: { '@id': SCHEMA_IDS.organization },
   });
 }

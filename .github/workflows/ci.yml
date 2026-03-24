@@ -113,7 +113,7 @@ jobs:
           fi
 
           # Drizzle paths
-          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts)|package(-lock)?\.json|pnpm-lock\.yaml)'
+          DRIZZLE_PATTERN='^(apps/web/drizzle/|apps/web/lib/db/|apps/web/drizzle\.config\.ts|drizzle\.kit\.(m?js|ts))'
           if echo "$CHANGED_FILES" | grep -q -E "$DRIZZLE_PATTERN"; then
             echo "run_drizzle=true" >> $GITHUB_OUTPUT
           else
@@ -246,7 +246,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup-node-pnpm
       - name: Cache Turbo
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: .turbo
           # Use content hash for better cache hit rates (not commit SHA which changes every commit)
@@ -254,7 +254,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-turbo-
       - name: Cache TypeScript artifacts
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: |
             .cache/tsbuildinfo
@@ -584,7 +584,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -952,7 +952,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: steps.check-creds.outputs.skip != 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1199,7 +1199,7 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: steps.check_changes.outputs.run_full_ci == 'true' && github.ref == 'refs/heads/main'
-        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
+        uses: codecov/codecov-action@1af58845a975a7985b0beb0cbe6fbbb71a41dbad # v5
         with:
           directory: apps/web/coverage
           flags: unittests
@@ -1253,7 +1253,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1364,7 +1364,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1459,7 +1459,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: steps.check_changes.outputs.run_full_ci == 'true'
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306  # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7  # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -1657,7 +1657,7 @@ jobs:
 
       - name: Cache Playwright Browsers
         if: ${{ (hashFiles('apps/web/tests/e2e/**') != '' || hashFiles('apps/web/tests/smoke/**') != '') }}
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key - chromium only for CI (Firefox runs weekly)
@@ -2159,7 +2159,7 @@ jobs:
           ALLOW_PROD_MIGRATIONS: 'true'
 
       - name: Cache Playwright Browsers
-        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           # Standardized cache key includes playwright config for better invalidation

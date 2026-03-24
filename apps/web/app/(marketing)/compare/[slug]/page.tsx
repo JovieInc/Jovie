@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FaqSection, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
@@ -151,7 +152,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
         </p>
         <div className='mt-8'>
           <Link
-            href='/signup'
+            href={APP_ROUTES.SIGNUP}
             className='inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
           >
             Try {APP_NAME} free
