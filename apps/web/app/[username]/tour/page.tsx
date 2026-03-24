@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect } from 'react';
+import { ProfileRedirectSurface } from '@/components/features/profile/ProfileRedirectSurface';
 import { getProfileModeHref } from '@/features/profile/registry';
 
 interface Props {
@@ -15,19 +16,27 @@ export default function TourPage({ params }: Readonly<Props>) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    let cancelled = false;
+
     params.then(({ username }) => {
+      if (cancelled) {
+        return;
+      }
+
       const source = searchParams?.get('source');
-      const sourceParam = source ? `&source=${encodeURIComponent(source)}` : '';
-      router.replace(getProfileModeHref(username, 'tour', sourceParam));
+      const sourceSuffix = source ? 'source=' + encodeURIComponent(source) : '';
+      router.replace(getProfileModeHref(username, 'tour', sourceSuffix));
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [params, router, searchParams]);
 
   return (
-    <div className='flex min-h-screen items-center justify-center'>
-      <div className='text-center'>
-        <div className='mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 motion-reduce:animate-none dark:border-white' />
-        <p className='text-gray-600 dark:text-gray-400'>Redirecting...</p>
-      </div>
-    </div>
+    <ProfileRedirectSurface
+      title='Opening tour view'
+      description='Loading the tour dates view for this profile.'
+    />
   );
 }

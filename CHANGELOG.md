@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.48] - 2026-03-23
+
+### Added
+
+- Brand disambiguation in llms.txt and new llms-full.txt for AI engine optimization
+- /about page with founder story, feature overview, and FAQ schema
+- FAQ section with FAQPage JSON-LD schema on homepage
+- /compare/linktree and /compare/linkfire comparison pages with feature tables
+- /alternatives/linktree and /alternatives/link-in-bio pages targeting commercial keywords
+- Article and BreadcrumbList JSON-LD schemas on all blog posts
+- FAQ schema builder, Article schema builder, and Breadcrumb schema builder utilities
+- Entity IDs (@id) for consistent knowledge graph across Organization, WebSite, and SoftwareApplication schemas
+- knowsAbout, foundingDate, and additionalType fields on Organization schema
+- /about, /pricing, /support, /tips, /changelog added to sitemap
+
+### Fixed
+
+- Corrected sameAs schema links from non-existent @jovieapp accounts to real @meetjovie Instagram
+
+## [26.3.47] - 2026-03-23
+
+### Fixed
+
+- [internal] Secured audience opt-in endpoint with HMAC-signed tokens to prevent unauthenticated email manipulation
+- Fixed broken opt-in URL in tip thank-you emails (was passing profileId as email parameter)
+- Added rate limiting (30/hour per IP) to tip checkout session creation endpoint
+- [internal] Clamped admin list endpoints (creators, users) to max 100 pageSize to prevent unbounded queries
+
+### Added
+
+- [internal] Added `opt-in-token` module with HMAC token generation, verification, and URL building
+- [internal] Added `tipCheckout` rate limiter (30 sessions/hour per IP) for public checkout endpoint
+- [internal] Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
+### Changed
+
+- Consolidated settings navigation into Linear-style focused pages with persistent sidebar
+- Every settings section now has its own route-based page instead of a single mega-page
+- Extracted settings sidebar component with Lucide icons and mobile horizontal tabs
+- Simplified all settings page components to render sections directly
+
+### Fixed
+
+- Added feature gate to payments settings page (Stripe Connect flag)
+- Added admin guard to admin settings page (isAdmin check)
+- Fixed settings routes to use proper constants (SETTINGS_ACCOUNT, SETTINGS_DATA_PRIVACY, etc.)
+
+### Removed
+
+- [internal] Removed duplicate /account card-grid dashboard entry point (redirects to /app/settings/account)
+- [internal] Removed hash-based navigation in settings (fully route-based now)
+- [internal] Removed referral nav item from settings sidebar
+
+## [26.3.46] - 2026-03-23
+
+### Added
+
+- Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
+- Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
+- Added shared standalone product shells, redirect surfaces, and loading-state primitives to align non-marketing product routes with the Linear-inspired app system
+- Added typed dashboard activity-feed normalization and regression tests so stale emoji payloads safely coerce to supported icons
+
+### Changed
+
+- Aligned auth, billing, HUD, investor admin, public redirect, and utility product surfaces to the Linear-inspired product design system and shared page shells
+- Refreshed retargeting ad preview tooling, billing success celebration, and product-shell rhythm for more consistent product-side layout and feedback
+
+### Fixed
+
+- Theme Clerk's prebuilt auth UI to match Jovie dark mode and bundle the Core 3 UI assets through the auth provider instead of falling back to the stock dark styling
+- Route post-signup users through the canonical waitlist and onboarding gate so waitlist-state users no longer fall into onboarding and see the flow flip underneath them
+- Preserve redirect-aware auth navigation while hardening mock and misconfigured Clerk fallback handling, provider config, and related auth smoke coverage
+- Prevent delayed public-link redirects from firing after unmount and restore standalone billing success scrolling with accessible verification feedback
+- [internal] Fix Vercel preview builds by matching App Router function globs and keep PR smoke runs on the fast E2E iteration path
+- [internal] Normalize CalVer release metadata by syncing `version.json`, workspace package versions, and the changelog head
 
 ## [26.4.45] - 2026-03-23
 

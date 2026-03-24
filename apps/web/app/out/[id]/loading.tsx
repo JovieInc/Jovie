@@ -1,30 +1,32 @@
-/**
- * Interstitial page loading skeleton
- * Matches the confirmation card layout
- */
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+
 export default function InterstitialLoading() {
   return (
-    <div className='min-h-screen bg-gray-50 flex items-center justify-center px-4'>
-      <div className='max-w-md w-full bg-white rounded-lg shadow-lg p-6'>
-        <div className='text-center'>
-          {/* Icon skeleton */}
-          <div className='mb-6'>
-            <div className='mx-auto w-16 h-16 skeleton rounded-full' />
-          </div>
-
-          {/* Title skeleton */}
-          <div className='mx-auto h-7 w-56 skeleton rounded-md mb-3' />
-
-          {/* Description skeleton */}
-          <div className='mx-auto h-5 w-72 skeleton rounded-md mb-6' />
-
-          {/* Button skeleton */}
-          <div className='h-10 w-full skeleton rounded-md mb-4' />
-
-          {/* Footer text skeleton */}
-          <div className='mx-auto h-4 w-64 skeleton rounded-md' />
+    <StandaloneProductPage width='sm' centered>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeaderSkeleton
+          titleWidth='w-48'
+          descriptionWidth='w-64'
+        />
+        <div className='space-y-5 px-5 py-5 sm:px-6'>
+          <LoadingSkeleton
+            className='mx-auto'
+            height='h-14'
+            width='w-14'
+            rounded='full'
+          />
+          <ContentSurfaceCard surface='nested' className='space-y-2 p-4'>
+            <LoadingSkeleton height='h-3' width='w-24' />
+            <LoadingSkeleton height='h-4' width='w-full' />
+            <LoadingSkeleton height='h-3' width='w-40' />
+          </ContentSurfaceCard>
+          <LoadingSkeleton height='h-10' width='w-full' rounded='full' />
+          <LoadingSkeleton className='mx-auto' height='h-3' width='w-56' />
         </div>
-      </div>
-    </div>
+      </ContentSurfaceCard>
+    </StandaloneProductPage>
   );
 }

@@ -1,14 +1,16 @@
 'use client';
 
 import { SignIn } from '@clerk/nextjs';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
+import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
+import { buildAuthRouteUrl } from '@/lib/auth/build-auth-route-url';
 
 /**
  * Sign-in page using Clerk's prebuilt components for reliability.
  */
+// Keep this validation lightweight for prefill only; extraction paths use stricter domain filtering.
 function isValidEmail(value: string): boolean {
   if (value.length === 0 || value.length > 254) return false;
 
@@ -41,22 +43,13 @@ function isValidEmail(value: string): boolean {
   return true;
 }
 
-function AuthRoutePrefetch({ href }: { href: string }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.prefetch(href);
-  }, [href, router]);
-
-  return null;
-}
-
 function SignInPageContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const initialValues = isValidEmail(email)
     ? { emailAddress: email }
     : undefined;
+  const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
 
   return (
     <>
@@ -64,7 +57,7 @@ function SignInPageContent() {
       <SignIn
         routing='hash'
         oauthFlow='redirect'
-        signUpUrl={APP_ROUTES.SIGNUP}
+        signUpUrl={signUpUrl}
         fallbackRedirectUrl={APP_ROUTES.DASHBOARD}
         initialValues={initialValues}
       />

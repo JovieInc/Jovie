@@ -11,6 +11,7 @@ let _cachedBuildId: string | undefined;
 export function GET() {
   const version = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
   const environment = process.env.VERCEL_ENV;
+  const isDevelopment = process.env.NODE_ENV !== 'production';
 
   if (_cachedBuildId === undefined) {
     try {
@@ -19,11 +20,15 @@ export function GET() {
         'utf-8'
       ).trim();
     } catch (error) {
-      void captureWarning('Build info health check failed', error, {
-        service: 'build-info',
-        route: '/api/health/build-info',
-      });
-      _cachedBuildId = 'unknown';
+      if (isDevelopment) {
+        _cachedBuildId = 'development';
+      } else {
+        void captureWarning('Build info health check failed', error, {
+          service: 'build-info',
+          route: '/api/health/build-info',
+        });
+        _cachedBuildId = 'unknown';
+      }
     }
   }
 

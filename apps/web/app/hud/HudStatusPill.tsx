@@ -6,10 +6,11 @@ export interface HudStatusPillProps {
 }
 
 const TONE_CLASSES: Record<HudStatusPillProps['tone'], string> = {
-  good: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
-  warning: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-  bad: 'border-red-500/40 bg-red-500/10 text-red-200',
-  neutral: 'border-white/15 bg-white/5 text-white/80',
+  good: 'border-[color-mix(in_oklab,var(--linear-success)_26%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-success)_10%,var(--linear-app-content-surface))] text-[color-mix(in_oklab,var(--linear-success)_78%,var(--linear-text-primary))]',
+  warning:
+    'border-[color-mix(in_oklab,var(--linear-warning)_30%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-warning)_10%,var(--linear-app-content-surface))] text-[color-mix(in_oklab,var(--linear-warning)_72%,var(--linear-text-primary))]',
+  bad: 'border-[color-mix(in_oklab,var(--linear-error)_28%,var(--linear-app-frame-seam))] bg-[color-mix(in_oklab,var(--linear-error)_10%,var(--linear-app-content-surface))] text-[color-mix(in_oklab,var(--linear-error)_74%,var(--linear-text-primary))]',
+  neutral: 'border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token',
 };
 
 export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
@@ -18,7 +19,7 @@ export function HudStatusPill({ label, tone }: Readonly<HudStatusPillProps>) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-4 py-1 text-sm font-semibold tracking-wide',
+        'inline-flex items-center rounded-full border px-3.5 py-1 text-[11px] font-[560] uppercase tracking-[0.08em]',
         classes
       )}
     >

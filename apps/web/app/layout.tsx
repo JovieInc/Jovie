@@ -298,12 +298,12 @@ export default async function RootLayout({
         <html lang='en' data-scroll-behavior='smooth' suppressHydrationWarning>
           {headContent}
           <body className={bodyClassName}>
-            <div className='flex items-center justify-center min-h-screen'>
-              <div className='text-center'>
-                <h1 className='text-2xl font-bold text-red-600 mb-4'>
-                  Configuration Error
+            <div className='flex min-h-screen items-center justify-center bg-page px-6 text-primary-token'>
+              <div className='max-w-sm rounded-[14px] border border-subtle bg-surface-0 px-6 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+                <h1 className='text-[18px] font-[560] tracking-[-0.018em]'>
+                  Configuration error
                 </h1>
-                <p className='text-gray-600'>
+                <p className='mt-3 text-[13px] leading-5 text-secondary-token'>
                   Clerk publishable key is not configured.
                 </p>
               </div>

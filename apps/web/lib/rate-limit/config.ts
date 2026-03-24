@@ -120,6 +120,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Tip checkout: 30 sessions per hour per IP - public endpoint, higher limit for shared IPs */
+  tipCheckout: {
+    name: 'Tip Checkout',
+    limit: 30,
+    window: '1 h',
+    prefix: 'tip_checkout',
+    analytics: true,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Admin Operations
   // ---------------------------------------------------------------------------
