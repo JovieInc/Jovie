@@ -29,7 +29,7 @@ export function AudienceCRMSection() {
       sectionNumber='3.0'
       sectionTitle='Audience'
       heading='Know every fan by name.'
-      description='See which fans keep showing up, where they came from, and which platforms are actually driving growth before you spend money on the next push.'
+      description='See who returns, where they came from, and what actually drives growth.'
       subItems={SUB_ITEMS}
       className='relative overflow-hidden bg-page'
     >

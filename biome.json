@@ -9,7 +9,13 @@
   "files": {
     "ignoreUnknown": true,
     "maxSize": 3000000,
-    "includes": ["**/*", "!!.claude", "!!storybook-static", "!**/*.html"]
+    "includes": [
+      "**/*",
+      "!!.claude",
+      "!!storybook-static",
+      "!**/*.html",
+      "!**/.next"
+    ]
   },
   "formatter": {
     "enabled": true,

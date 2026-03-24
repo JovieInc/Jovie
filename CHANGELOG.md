@@ -25,9 +25,42 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Blog post priority bumped from 0.6 to 0.7 in sitemap
 - [internal] `BlogMarkdownReader` semantic HTML: moved `<article>` wrapper to page level
 - [internal] Extended `ResolvedAuthor` with `bio` and `username` fields from Jovie profile data
+### Changed
+
+- Migrated investor portal from subdomain (`investors.jov.ie`) to path-based auth (`/investor-portal`)
+- Legacy subdomain now 301 redirects to `/investor-portal`, preserving token params
+- Replaced emoji-based deck navigation with Lucide icons (ChevronLeft/Right, Download, Maximize2)
+- Added touch swipe support and slide dot navigation to pitch deck viewer
+- Implemented mobile hamburger slide-out sheet navigation for investor portal
+- Improved responsive typography and padding across deck viewer and memo content
+- Added loading skeleton for investor memo pages
+- Token display in admin investor table now shows truncated token with copy-to-clipboard
+
+### Removed
+
+- Removed subdomain-based token validation from investor page components (now handled by middleware)
+- Removed duplicate `requireInvestorAccess` from layout (middleware is single source of truth)
+
+### Fixed
+
+- Added top padding on mobile to prevent content hiding behind fixed header
+- Added `dark` class to investor respond page containers for consistent theming
+- Fixed sticky bar button layout for proper mobile stacking
 
 ## [26.4.48] - 2026-03-23
 
+### Fixed
+
+- Fixed cropped PWA icons by separating maskable and any-purpose icons at 192/512px
+- Fixed service worker to only intercept GET navigations with 8s timeout fallback
+- Removed misleading screenshots array from web manifest
+
+### Added
+
+- Offline fallback page matching Jovie's dark theme for installed PWA
+- PWA standalone mode CSS polish: contained overscroll, disabled nav text selection
+- `display_override` in manifest for progressive enhancement
+- `maximumScale: 5` viewport for accessibility (no pinch-zoom lock)
 ### Changed
 
 - Expanded support page with documentation links, FAQ section, and structured data for SEO
@@ -47,6 +80,31 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
 - Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
 - Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+## [26.4.48] - 2026-03-24
+
+### Changed
+
+- Consolidated Clerk auth styling to CSS-primary architecture (theme.css single source of truth)
+- Improved OTP input UX: larger digits, visual feedback for filled/error/success states, shake animation on wrong code
+- Primary button hover now uses accent-hover color instead of subtle opacity change
+- Social/primary button hover lift only on pointer devices (no fidget on touch)
+- All auth transitions use design system easing (--ease-interactive)
+- Divider "or" text increased to 12px for readability
+- Footer link hover uses accent color instead of barely-visible opacity
+- Softened auth card shadow for less aggressive depth
+
+### Fixed
+
+- Modal backdrop/content styles now correctly target portaled elements outside auth root
+- Input error state uses correct Clerk data attributes (data-feedback, aria-invalid)
+- Focus ring opacity normalized to 0.28 across all interactive elements
+- Warning text uses --linear-warning token instead of hardcoded oklch value
+
+### Added
+
+- Styling for 13 previously unstyled Clerk elements: forgot password link, back button, hint/warning/error text, step headers, alternative methods, verification status, phone input, selectors, badges, modals
+- Disabled and loading states for buttons and inputs
+- Semantic `<output>` element with aria-live for signup handle availability banner
 
 ## [26.4.47] - 2026-03-23
 

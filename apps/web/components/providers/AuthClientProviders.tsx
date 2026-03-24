@@ -1,7 +1,6 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
-import { ui } from '@clerk/ui';
 import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
@@ -54,11 +53,13 @@ export function AuthClientProviders({
     return null;
   }
 
+  // Note: ui prop omitted — @clerk/ui has ESM + react-server export conditions
+  // that Turbopack can't resolve through pnpm symlinks. Without the ui prop,
+  // Clerk loads its UI components from the Clerk CDN instead of bundling them.
   return (
     <ClerkProvider
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl()}
-      ui={ui}
       appearance={authClerkAppearance}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
