@@ -2336,7 +2336,6 @@ jobs:
       # so no drift warning fires. This is acceptable — the cancelled deploy didn't ship.
       schema_drift: ${{ steps.verify.outcome == 'failure' }}
       deploy_url: ${{ steps.deploy.outputs.deploy_url }}
-      canary_url: ${{ steps.resolve-canary-url.outputs.canary_url }}
     env:
       # Migrations still run against the production database before staging
       # verification, so they must remain additive.
@@ -2423,26 +2422,11 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
       - name: Alias preview to staging.jov.ie
-        id: alias-staging
         run: |
-          if vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}; then
-            echo "alias_success=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::Could not alias preview to staging.jov.ie; falling back to preview URL for canary checks."
-            echo "alias_success=false" >> "$GITHUB_OUTPUT"
-          fi
+          vercel alias set "${{ steps.deploy.outputs.deploy_url }}" staging.jov.ie --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      - name: Resolve canary URL
-        id: resolve-canary-url
-        run: |
-          if [ "${{ steps.alias-staging.outputs.alias_success }}" = "true" ]; then
-            echo "canary_url=https://staging.jov.ie" >> "$GITHUB_OUTPUT"
-          else
-            echo "canary_url=${{ steps.deploy.outputs.deploy_url }}" >> "$GITHUB_OUTPUT"
-          fi
 
   canary-health-gate:
     name: Canary Health Gate (staging)
@@ -2453,7 +2437,7 @@ jobs:
       cancel-in-progress: true
     uses: ./.github/workflows/canary-health-gate.yml
     with:
-      deployment_url: ${{ needs.deploy-staging.outputs.canary_url }}
+      deployment_url: https://staging.jov.ie
       commit_sha: ${{ github.sha }}
       fallback_health_url: /api/health
     secrets:
@@ -2477,8 +2461,12 @@ jobs:
     steps:
       - name: Install Vercel CLI
         run: npm install -g vercel@50.22.1
-      - name: Promote verified preview to production
-        run: vercel promote "${{ needs.deploy-staging.outputs.deploy_url }}" --yes --token ${{ secrets.VERCEL_TOKEN }}
+      - name: Promote verified staging to production
+        run: |
+          # Use the staging alias directly — GitHub Actions masks job outputs
+          # containing secret substrings (org name in Vercel URLs), so we
+          # cannot rely on deploy_url passed between jobs.
+          vercel promote https://staging.jov.ie --yes --token ${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
