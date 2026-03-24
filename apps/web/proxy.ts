@@ -4,6 +4,7 @@ import {
   type NextRequest,
   NextResponse,
 } from 'next/server';
+import { getClerkProxyUrl } from '@/components/providers/clerkAvailability';
 import {
   AUDIENCE_ANON_COOKIE,
   AUDIENCE_IDENTIFIED_COOKIE,
@@ -171,11 +172,6 @@ function analyzeHost(hostname: string): HostInfo {
   const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
 
   return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
-}
-
-function getClerkProxyUrl(req: NextRequest): string | undefined {
-  if (process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
-  return '/clerk';
 }
 
 /** Dashboard is always at /app in single-domain architecture */
@@ -875,8 +871,8 @@ const clerkWrappedMiddleware = clerkMiddleware(
     const { userId } = await auth();
     return handleRequest(req, userId);
   },
-  req => ({
-    proxyUrl: getClerkProxyUrl(req),
+  () => ({
+    proxyUrl: getClerkProxyUrl(),
   })
 );
 

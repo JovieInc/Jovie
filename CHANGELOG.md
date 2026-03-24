@@ -10,6 +10,28 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - Founder quote from homepage testimonials section (Tim White quote card)
+## [26.4.51] - 2026-03-24
+
+### Fixed
+
+- Generic "Page not found" message on catch-all 404 (was showing profile-specific "Profile not found")
+- Marketing route 404s no longer render double header/footer (added `(marketing)/not-found.tsx`)
+- Changelog subscribe success message now visually distinct with green accent and `aria-live` for screen readers
+- ProductScreenshot fallback shows clean "Coming soon" instead of a developer-facing placeholder message
+
+## [26.3.51] - 2026-03-24
+
+### Fixed
+
+- [internal] Removed `merge=union` strategy from CHANGELOG.md that was silently creating duplicate and malformed entries on merge
+- [internal] Fixed CI deploy pipeline deploying directly to production before canary health checks — staging deploy now creates a preview deployment first
+
+## [26.3.50] - 2026-03-23
+
+### Changed
+
+- [internal] Made Clerk proxy URL environment-driven to support separate staging Clerk instance
+- [internal] Production uses `/clerk` Vercel rewrite; staging uses direct `https://clerk.staging.jov.ie`
 
 ## [26.3.49] - 2026-03-23
 

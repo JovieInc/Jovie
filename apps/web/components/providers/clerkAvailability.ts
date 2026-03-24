@@ -1,3 +1,5 @@
+import { publicEnv } from '@/lib/env-public';
+
 const VALID_CLERK_PUBLISHABLE_KEY_PREFIXES = ['pk_live_', 'pk_test_'] as const;
 
 export function isMockPublishableKey(publishableKey: string): boolean {
@@ -25,5 +27,5 @@ export function getClerkProxyUrl(): string | undefined {
   // instead of proxying through localhost (which requires HTTPS and doesn't
   // work in headless Playwright browsers against dev servers).
   if (process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
-  return '/clerk';
+  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/clerk';
 }
