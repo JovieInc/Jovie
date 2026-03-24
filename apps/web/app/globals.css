@@ -124,7 +124,9 @@ body {
       "ss03",
       "rlig" 1,
       "calt" 1;
-    letter-spacing: -0.011em;
+    /* letter-spacing: removed — Linear applies tracking per-element, not globally.
+       Nav items, buttons, and labels should have normal tracking.
+       Body text classes (.text-linear, .marketing-lead-linear) apply their own. */
     text-rendering: optimizelegibility;
   }
 }
