@@ -137,6 +137,7 @@ function createWhereResolvedChain(result: unknown) {
 describe('sendPendingNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
 
     mockDbUpdate.mockReturnValue({
       set: mockDbUpdateSet,
@@ -189,5 +190,26 @@ describe('sendPendingNotifications', () => {
         creatorCount: 1,
       })
     );
+  });
+
+  it('skips notifications for creators without send entitlement', async () => {
+    // Override the rejected entitlements to return a result with canSendNotifications: false
+    mockGetBatchCreatorEntitlements.mockResolvedValue(
+      new Map([
+        [
+          'creator_1',
+          { canSendNotifications: false, maxNotificationsPerMonth: 0 },
+        ],
+      ])
+    );
+
+    const { sendPendingNotifications } = await import(
+      '@/app/api/cron/send-release-notifications/route'
+    );
+
+    // Should complete without throwing — notifications are skipped, not failed
+    const result = await sendPendingNotifications();
+    expect(result).toBeDefined();
+    expect(mockGetBatchCreatorEntitlements).toHaveBeenCalledWith(['creator_1']);
   });
 });

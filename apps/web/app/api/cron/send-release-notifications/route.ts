@@ -19,8 +19,10 @@ export const maxDuration = 120;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Process up to 500 notifications per run to keep up with larger release-day spikes.
-const MAX_NOTIFICATIONS_PER_RUN = 500;
+// Process up to 200 notifications per run. With CONCURRENCY_BATCH_SIZE=10, this
+// means ~20 sequential batches — safely under the 120s Vercel maxDuration.
+// The cron runs every minute, so throughput is ~12k notifications/hour.
+const MAX_NOTIFICATIONS_PER_RUN = 200;
 
 // Timeout for stuck "sending" rows - if a notification has been in "sending" state
 // for longer than this, reset it to "pending" for retry
