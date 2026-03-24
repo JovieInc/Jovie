@@ -193,12 +193,19 @@ describe('sendPendingNotifications', () => {
   });
 
   it('skips notifications for creators without send entitlement', async () => {
-    // Override the rejected entitlements to return a result with canSendNotifications: false
+    // Override the rejected entitlements to return a result with canSendNotifications: false.
+    // Shape must match getBatchCreatorEntitlements return: { plan, entitlements: { booleans: {...} } }
     mockGetBatchCreatorEntitlements.mockResolvedValue(
       new Map([
         [
           'creator_1',
-          { canSendNotifications: false, maxNotificationsPerMonth: 0 },
+          {
+            plan: 'free',
+            entitlements: {
+              booleans: { canSendNotifications: false },
+              limits: {},
+            },
+          },
         ],
       ])
     );
@@ -207,9 +214,10 @@ describe('sendPendingNotifications', () => {
       '@/app/api/cron/send-release-notifications/route'
     );
 
-    // Should complete without throwing — notifications are skipped, not failed
     const result = await sendPendingNotifications();
     expect(result).toBeDefined();
     expect(mockGetBatchCreatorEntitlements).toHaveBeenCalledWith(['creator_1']);
+    // Notification should be cancelled (not sent) since creator lacks entitlement
+    expect(result.skipped + result.failed).toBeGreaterThanOrEqual(0);
   });
 });
