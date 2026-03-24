@@ -46,7 +46,7 @@ export default async function ComparePage({ params }: ComparePageProps) {
   const faqSchema = buildFaqSchema(data.faq);
   const breadcrumbSchema = buildBreadcrumbSchema([
     { name: APP_NAME, url: APP_URL },
-    { name: 'Compare', url: `${APP_URL}/compare` },
+    { name: 'Blog', url: `${APP_URL}/blog` },
     { name: data.title, url: `${APP_URL}/compare/${data.slug}` },
   ]);
 

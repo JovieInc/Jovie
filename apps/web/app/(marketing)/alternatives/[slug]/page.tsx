@@ -48,7 +48,7 @@ export default async function AlternativesPage({
   const faqSchema = buildFaqSchema(data.faq);
   const breadcrumbSchema = buildBreadcrumbSchema([
     { name: APP_NAME, url: APP_URL },
-    { name: 'Alternatives', url: `${APP_URL}/alternatives` },
+    { name: 'Blog', url: `${APP_URL}/blog` },
     { name: data.title, url: `${APP_URL}/alternatives/${data.slug}` },
   ]);
 

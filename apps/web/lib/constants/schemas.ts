@@ -156,6 +156,7 @@ export function buildArticleSchema(overrides: {
   dateModified?: string;
   authorName: string;
   url: string;
+  image?: string;
 }) {
   return jsonLd({
     '@context': 'https://schema.org',
@@ -173,7 +174,7 @@ export function buildArticleSchema(overrides: {
     publisher: {
       '@id': SCHEMA_IDS.organization,
     },
-    image: `${APP_URL}/og/default.png`,
+    image: overrides.image ?? `${APP_URL}/og/default.png`,
   });
 }
 
