@@ -54,6 +54,7 @@ jobs:
           FALLBACK_HEALTH_URL: ${{ inputs.fallback_health_url }}
           WAIT_SECONDS: ${{ inputs.wait_seconds }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           echo "Running canary health check..."
@@ -70,6 +71,7 @@ jobs:
             import urllib.request
 
             token = os.environ.get("VERCEL_TOKEN", "")
+            org_id = os.environ.get("VERCEL_ORG_ID", "")
             project_id = os.environ.get("VERCEL_PROJECT_ID", "")
             commit_sha = os.environ.get("COMMIT_SHA", "")
 
@@ -78,14 +80,18 @@ jobs:
                 sys.exit(0)
 
             base_url = "https://api.vercel.com/v6/deployments"
-            query = urllib.parse.urlencode(
-                {
-                    "projectId": project_id,
-                    "target": "production",
-                    "state": "READY",
-                    "limit": 20,
-                }
-            )
+            query_params = {
+                "projectId": project_id,
+                "target": "production",
+                "state": "READY",
+                "limit": 20,
+            }
+
+            # Team-owned projects require teamId scoping to list deployments.
+            if org_id.startswith("team_"):
+                query_params["teamId"] = org_id
+
+            query = urllib.parse.urlencode(query_params)
             request = urllib.request.Request(
                 f"{base_url}?{query}",
                 headers={"Authorization": f"Bearer {token}"},
