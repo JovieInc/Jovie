@@ -7,9 +7,11 @@ const NAV_TIMEOUT_MS = 8000;
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.add(OFFLINE_PAGE))
+    caches
+      .open(CACHE_NAME)
+      .then(cache => cache.add(OFFLINE_PAGE))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
@@ -39,7 +41,14 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           clearTimeout(timeoutId);
-          return caches.match(OFFLINE_PAGE);
+          return caches.match(OFFLINE_PAGE).then(
+            cached =>
+              cached ||
+              new Response('You are offline', {
+                status: 503,
+                headers: { 'Content-Type': 'text/plain' },
+              })
+          );
         })
     );
     return;
