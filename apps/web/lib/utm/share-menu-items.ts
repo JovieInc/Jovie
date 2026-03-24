@@ -6,7 +6,7 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Instagram, Link2, Mail, Music2, Share2, Twitter } from 'lucide-react';
+import { AtSign, Camera, Link2, Mail, Music2, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type {
@@ -18,9 +18,9 @@ import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
 
 const UTM_PRESET_ICONS = {
-  Instagram,
+  Instagram: Camera,
   Music2,
-  Twitter,
+  Twitter: AtSign,
   Mail,
 } as const;
 
