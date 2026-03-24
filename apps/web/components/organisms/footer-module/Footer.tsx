@@ -36,7 +36,7 @@ const FOOTER_COLUMNS = [
     id: 'features',
     heading: 'Features',
     links: [
-      { href: '/#release', label: 'Analytics' },
+      { href: '/#release', label: 'Releases & Analytics' },
       { href: '/#profile', label: 'Fan Capture' },
       { href: '/#profile', label: 'Tipping' },
       { href: '/#profile', label: 'Tour Dates' },

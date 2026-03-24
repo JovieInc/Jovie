@@ -159,6 +159,11 @@ const nextConfig = {
     };
 
     return [
+      // Retired routes — noindex via header (metadata.robots is ineffective on redirects)
+      {
+        source: '/ai',
+        headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }],
+      },
       {
         source: '/api/health/build-info',
         headers: [
@@ -225,6 +230,12 @@ const nextConfig = {
     ];
 
     return [
+      // Retired public routes
+      {
+        source: '/ai',
+        destination: '/',
+        permanent: true,
+      },
       // Legal page redirects
       {
         source: '/privacy',
