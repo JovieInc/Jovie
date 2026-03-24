@@ -2404,7 +2404,7 @@ jobs:
             if [ "$deploy_exit" -eq 0 ]; then
               deploy_url="$(printf '%s\n' "$deploy_output" | grep -Eo 'https://[^[:space:]]+\.vercel\.app/?' | tail -1)"
               if [ -z "$deploy_url" ]; then
-                echo "Deploy succeeded but no preview URL was found in Vercel output"
+                echo "Deploy succeeded but no deployment URL was found in Vercel output"
                 exit 1
               fi
               echo "deploy_url=$deploy_url" >> "$GITHUB_OUTPUT"
