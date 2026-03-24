@@ -32,6 +32,8 @@ Scope: #378 (bundle/code splitting) across app/pages/components
 
 - Add `ANALYZE=true pnpm build` docs and CI artifact for analyzer output.
 - Enforce performance budgets in CI via `pnpm test:budgets`, including `/` and `/[username]` routes from `performance-budgets.config.js`.
+- Use `pnpm --filter web perf:loop --mode homepage --threshold <score>` for iterative homepage optimization runs.
+- Use `pnpm --filter web perf:loop --mode dashboard --threshold <ms> --auth-path apps/web/.auth/session.json` to optimize the warm authenticated releases-shell path measured by the budget guard.
 
 ## Targets
 

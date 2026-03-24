@@ -6,6 +6,8 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 
 - `/signin` renders Clerk `<SignIn />` inside the existing `AuthLayout`.
 - `/signup` renders Clerk `<SignUp />` inside the existing `AuthLayout`.
+- Auth pages use the bundled Core 3 Clerk UI via `AuthClientProviders`, rather than relying on the CDN-loaded default auth styling path.
+- Auth pages use an auth-only Clerk appearance config with the Core 3 `simple` theme baseline, while non-auth Clerk surfaces keep the shared base appearance.
 - Both pages use:
   - `routing="hash"`
   - `oauthFlow="redirect"`
@@ -16,10 +18,13 @@ This directory contains the App Router auth pages for Jovie. The primary auth UI
 - `GET /signin`
   - Falls back to [`APP_ROUTES.DASHBOARD`](../../constants/routes.ts) after successful sign-in.
   - Accepts `?email=` and prefills Clerk `initialValues.emailAddress` when the value is a valid email.
+  - Preserves a valid `redirect_url` when linking onward to `/signup`.
 - `GET /signup`
   - Falls back to [`APP_ROUTES.ONBOARDING`](../../constants/routes.ts) after successful sign-up.
   - Preserves signup claim and pricing-plan intent data in session storage before the Clerk flow starts.
   - Shows a compatibility banner for `?oauth_error=` and removes only that query param after render.
+  - Preserves a valid `redirect_url` when linking onward to `/signin`.
+- Missing-key or mock-mode auth environments render an explicit auth-unavailable card instead of trying to mount Clerk UI without `ClerkProvider`.
 - Legacy `/sso-callback` auth routes remain in place as compatibility shims for stale redirects and old bookmarks.
 
 ## Redirects And Onboarding

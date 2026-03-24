@@ -1,19 +1,31 @@
-import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 
-/**
- * Error page loading screen
- * Shows simple logo animation while loading
- */
 export default function ErrorPageLoading() {
   return (
-    <div className='min-h-dvh grid place-items-center bg-base'>
-      <BrandLogo
-        size={32}
-        tone='auto'
-        alt='Loading...'
-        priority
-        className='animate-in fade-in duration-700 ease-out'
-      />
-    </div>
+    <StandaloneProductPage width='sm' centered>
+      <ContentSurfaceCard className='overflow-hidden'>
+        <ContentSectionHeaderSkeleton
+          titleWidth='w-40'
+          descriptionWidth='w-64'
+        />
+        <div className='space-y-5 px-5 py-5 sm:px-6'>
+          <LoadingSkeleton
+            className='mx-auto'
+            height='h-12'
+            width='w-12'
+            rounded='full'
+          />
+          <LoadingSkeleton lines={2} height='h-4' width='w-full' />
+          <div className='flex flex-col gap-2 sm:flex-row'>
+            <LoadingSkeleton height='h-10' width='w-full' rounded='full' />
+            <LoadingSkeleton height='h-10' width='w-full' rounded='full' />
+          </div>
+          <LoadingSkeleton className='mx-auto' height='h-3' width='w-40' />
+        </div>
+      </ContentSurfaceCard>
+    </StandaloneProductPage>
   );
 }

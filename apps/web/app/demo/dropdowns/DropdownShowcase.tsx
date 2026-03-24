@@ -49,7 +49,7 @@ function MenuSection({
 }) {
   return (
     <div className='mb-10'>
-      <p className='mb-3 text-xs font-medium uppercase tracking-wider text-neutral-500'>
+      <p className='mb-3 text-[11px] font-[560] uppercase tracking-[0.16em] text-tertiary-token'>
         {label}
       </p>
       {children}
@@ -59,11 +59,8 @@ function MenuSection({
 
 export function DropdownShowcase() {
   return (
-    <div
-      className='min-h-screen p-12'
-      style={{ backgroundColor: 'var(--linear-bg-page)' }}
-    >
-      <h1 className='mb-10 text-lg font-semibold text-neutral-700 dark:text-neutral-300'>
+    <div className='min-h-screen bg-page p-12 text-primary-token'>
+      <h1 className='mb-10 text-[15px] font-[560] tracking-[-0.016em] text-primary-token'>
         Dropdown Parity — Linear.app Eval
       </h1>
 

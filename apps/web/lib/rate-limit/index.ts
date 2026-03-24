@@ -91,6 +91,7 @@ export {
   spotifyRefreshLimiter,
   spotifySearchApiLimiter,
   spotifySearchLimiter,
+  tipCheckoutLimiter,
   trackingClicksLimiter,
   trackingIpClicksLimiter,
   trackingIpVisitsLimiter,
