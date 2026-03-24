@@ -1,14 +1,7 @@
 'use client';
 
 import { SimpleTooltip } from '@jovie/ui';
-import {
-  Globe,
-  Instagram,
-  Music,
-  Search,
-  Twitter,
-  Youtube,
-} from 'lucide-react';
+import { AtSign, Camera, Globe, Music, Play, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AudienceReferrer, AudienceUtmParams } from '@/types';
 
@@ -38,9 +31,9 @@ const ICON_CLASS = 'h-3.5 w-3.5 shrink-0 text-tertiary-token';
 
 /** Pre-allocated icon elements keyed by source name — avoids creating components during render. */
 const SOURCE_ICON_ELEMENTS: Record<string, React.ReactElement> = {
-  X: <Twitter className={ICON_CLASS} aria-hidden='true' />,
-  Instagram: <Instagram className={ICON_CLASS} aria-hidden='true' />,
-  YouTube: <Youtube className={ICON_CLASS} aria-hidden='true' />,
+  X: <AtSign className={ICON_CLASS} aria-hidden='true' />,
+  Instagram: <Camera className={ICON_CLASS} aria-hidden='true' />,
+  YouTube: <Play className={ICON_CLASS} aria-hidden='true' />,
   Spotify: <Music className={ICON_CLASS} aria-hidden='true' />,
   Google: <Search className={ICON_CLASS} aria-hidden='true' />,
 };

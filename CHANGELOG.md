@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.3.48] - 2026-03-23
+
+### Changed
+
+- Bumped all dependencies to latest compatible versions across monorepo
+- Updated Next.js 16.1.7 → 16.2.1, Sentry 10.39.0 → 10.45.0, Tailwind CSS 4.1.18 → 4.2.2
+- Upgraded Biome 2.3.11 → 2.4.8, Turbo 2.8.9 → 2.8.20, Vitest 4.0.18 → 4.1.1
+- Bumped Storybook 10.2.x → 10.3.3, AI SDK 6.0.116 → 6.0.137, Motion 12.29.0 → 12.38.0
+- Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
+- Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
+- Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+
 ## [26.4.47] - 2026-03-23
 
 ### Changed

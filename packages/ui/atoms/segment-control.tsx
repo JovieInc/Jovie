@@ -152,7 +152,7 @@ export function SegmentControl<T extends string = string>({
   );
 }
 
-// Also export Tabs primitives for advanced use cases
-export { Tabs };
 export * as TabsRoot from '@radix-ui/react-tabs';
 export * as TabsPrimitive from '@radix-ui/react-tabs';
+// Also export Tabs primitives for advanced use cases
+export { Tabs };

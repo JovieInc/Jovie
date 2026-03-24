@@ -1,6 +1,6 @@
 'use client';
 
-import { Disc, Music, Youtube } from 'lucide-react';
+import { Disc, Music, Play } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
 import { PhoneFrame } from './PhoneFrame';
@@ -24,7 +24,7 @@ function ListenContent() {
   const dsps = [
     { name: 'Spotify', icon: Disc, color: '#1DB954' },
     { name: 'Apple Music', icon: Music, color: '#FA243C' },
-    { name: 'YouTube', icon: Youtube, color: '#FF0000' },
+    { name: 'YouTube', icon: Play, color: '#FF0000' },
   ];
   return (
     <div className='flex flex-col gap-2'>
