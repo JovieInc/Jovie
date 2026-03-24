@@ -3,15 +3,9 @@ import { MarketingContainer } from '@/components/marketing';
 const TESTIMONIALS = [
   {
     quote:
-      'I dropped my single and the smart link was already live. Jovie handled the rest — notifications, emails, everything.',
-    name: 'Maya Cole',
-    role: 'Producer / LA',
-  },
-  {
-    quote:
-      'Switched from Linktree and my click-through rate doubled overnight. The smart links just work.',
-    name: 'DJ Luna',
-    role: 'Electronic / NYC',
+      "The internet rewards consistency — but you can't consistently make music if you're consistently marketing it. I built Jovie to automate every system I used to do by hand, so I could spend more time in the studio and less time hunched over a laptop.",
+    name: 'Tim White',
+    role: 'Founder',
   },
 ];
 
@@ -19,7 +13,7 @@ export function TestimonialsSection() {
   return (
     <section className='section-spacing-linear'>
       <MarketingContainer width='landing'>
-        <div className='grid gap-6 md:grid-cols-2'>
+        <div className='mx-auto max-w-[42rem]'>
           {TESTIMONIALS.map(testimonial => (
             <article
               key={testimonial.name}
@@ -38,7 +32,7 @@ export function TestimonialsSection() {
           ))}
         </div>
 
-        <div className='reveal-on-scroll mt-12 text-center'>
+        <div className='reveal-on-scroll mt-12'>
           <p className='text-[17px] leading-relaxed text-secondary-token'>
             Jovie is built for{' '}
             <strong className='text-primary-token'>independent artists</strong>.
