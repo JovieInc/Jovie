@@ -12,7 +12,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Generic "Page not found" message on catch-all 404 (was showing profile-specific "Profile not found")
 - Marketing route 404s no longer render double header/footer (added `(marketing)/not-found.tsx`)
 - Changelog subscribe success message now visually distinct with green accent and `aria-live` for screen readers
-- ProductScreenshot fallback shows clean "Coming soon" instead of dev-facing "Screenshot unavailable in this worktree"
+- ProductScreenshot fallback shows clean "Coming soon" instead of a developer-facing placeholder message
 
 ## [26.3.49] - 2026-03-23
 

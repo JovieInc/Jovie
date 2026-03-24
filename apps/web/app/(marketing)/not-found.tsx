@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Container } from '@/components/site/Container';
 
+export const revalidate = false;
+
 /**
  * Not-found page for all marketing routes.
  * Rendered inside the (marketing) layout which already provides

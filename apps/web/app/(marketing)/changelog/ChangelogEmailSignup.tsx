@@ -67,17 +67,15 @@ export function ChangelogEmailSignup() {
         Get notified when we ship something new. No spam, just product updates.
       </p>
 
+      {/* Always-mounted live region for screen reader announcements */}
+      <div role='status' aria-live='polite' className='sr-only'>
+        {status === 'success'
+          ? 'Check your email to confirm your subscription!'
+          : ''}
+      </div>
+
       {status === 'success' ? (
-        <div
-          role='status'
-          aria-live='polite'
-          className='rounded-xl p-4 text-sm text-center font-medium text-green-400'
-          style={{
-            backgroundColor:
-              'color-mix(in srgb, var(--linear-text-primary) 5%, transparent)',
-            border: '1px solid color-mix(in srgb, #4ade80 20%, transparent)',
-          }}
-        >
+        <div className='rounded-xl border border-subtle bg-surface-1 p-4 text-sm text-center font-medium text-primary-token'>
           Check your email to confirm your subscription!
         </div>
       ) : (
