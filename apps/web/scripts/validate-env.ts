@@ -29,6 +29,26 @@ const CRITICAL_VARS = [
     label: 'Auth Secret',
     validate: (v: string) => v.startsWith('sk_'),
   },
+  {
+    key: 'STRIPE_SECRET_KEY',
+    label: 'Stripe',
+    validate: (v: string) => v.startsWith('sk_'),
+  },
+  {
+    key: 'STRIPE_WEBHOOK_SECRET',
+    label: 'Stripe Webhooks',
+    validate: (v: string) => v.startsWith('whsec_'),
+  },
+  {
+    key: 'CRON_SECRET',
+    label: 'Cron Auth',
+    validate: (v: string) => v.length >= 16,
+  },
+  {
+    key: 'BLOB_READ_WRITE_TOKEN',
+    label: 'Blob Storage',
+    validate: (v: string) => v.length > 0,
+  },
 ] as const;
 
 // Important but not critical for MVP launch

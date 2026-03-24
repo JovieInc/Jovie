@@ -85,7 +85,8 @@ export function MetricsChart({ points }: Readonly<MetricsChartProps>) {
 
   const stats = useMemo(() => {
     if (chartData.length === 0) return null;
-    const latest = chartData.at(-1)!;
+    const latest = chartData[chartData.length - 1];
+    if (!latest) return null;
     const start = chartData[0];
     const delta = latest.users - start.users;
     const deltaPct = start.users > 0 ? (delta / start.users) * 100 : 0;

@@ -163,6 +163,7 @@ async function reconcileUsersWithSubscriptions(
   errors: string[]
 ): Promise<void> {
   let lastUserId: string | null = null;
+  let lastBatchWasFull = false;
   let batchCount = 0;
 
   while (batchCount < MAX_BATCHES) {
@@ -170,9 +171,12 @@ async function reconcileUsersWithSubscriptions(
 
     const batch = await fetchUserBatch(db, lastUserId);
     if (batch.length === 0) break;
+    lastBatchWasFull = batch.length === BATCH_SIZE;
 
     // Update cursor to last user in batch before parallel processing
-    lastUserId = batch.at(-1)!.id;
+    const lastUser = batch[batch.length - 1];
+    if (!lastUser) break;
+    lastUserId = lastUser.id;
 
     // Process users with bounded concurrency to avoid Stripe rate limits
     for (
@@ -190,10 +194,21 @@ async function reconcileUsersWithSubscriptions(
     if (batch.length < BATCH_SIZE) break;
   }
 
-  if (batchCount >= MAX_BATCHES) {
+  if (batchCount >= MAX_BATCHES && lastBatchWasFull && lastUserId) {
+    const [remainingUsersResult] = await db
+      .select({
+        count: drizzleSql<number>`count(*)`,
+      })
+      .from(users)
+      .where(
+        drizzleSql`${users.stripeSubscriptionId} IS NOT NULL AND ${users.id} > ${lastUserId}`
+      );
+    const estimatedRemainingUsers = Number(remainingUsersResult?.count ?? 0);
+
     await captureWarning('Billing reconciliation hit batch limit', undefined, {
       batchCount,
       usersChecked: stats.usersChecked,
+      estimatedRemainingUsers,
     });
   }
 }
