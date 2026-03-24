@@ -871,9 +871,9 @@ const clerkWrappedMiddleware = clerkMiddleware(
     const { userId } = await auth();
     return handleRequest(req, userId);
   },
-  {
+  () => ({
     proxyUrl: getClerkProxyUrl(),
-  }
+  })
 );
 
 export default async function middleware(
