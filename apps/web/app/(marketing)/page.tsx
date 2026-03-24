@@ -109,8 +109,8 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: '@meetjovie',
+      site: '@meetjovie',
     },
     robots: {
       index: true,

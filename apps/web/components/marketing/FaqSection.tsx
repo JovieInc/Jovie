@@ -1,5 +1,3 @@
-'use client';
-
 interface FaqItem {
   question: string;
   answer: string;

@@ -11,6 +11,7 @@ import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 
 // Static generation — no per-request work needed
 export const revalidate = false;
+export const dynamic = 'force-static';
 
 export function GET() {
   const content = `# ${APP_NAME}

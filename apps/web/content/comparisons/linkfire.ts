@@ -87,7 +87,7 @@ export const linkfireComparison: ComparisonData = {
     {
       question: 'How much does Linkfire cost vs Jovie?',
       answer:
-        'Linkfire requires a paid subscription starting at around $10/month with limited features. Jovie has a free tier that includes smart links, artist profiles, and fan collection. Paid plans unlock advanced features.',
+        'Linkfire requires a paid subscription with no free tier. Jovie has a free tier that includes smart links, artist profiles, and fan collection. Paid plans unlock advanced features.',
     },
     {
       question: 'Can I use Jovie if I\u2019m on a label?',

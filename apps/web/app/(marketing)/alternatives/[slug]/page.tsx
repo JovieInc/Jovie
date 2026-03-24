@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FaqSection, MarketingHero } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 
@@ -114,7 +115,7 @@ export default async function AlternativesPage({
             Create your free profile in under a minute.
           </p>
           <Link
-            href='/signup'
+            href={APP_ROUTES.SIGNUP}
             className='mt-6 inline-flex items-center rounded-lg bg-accent-token px-6 py-3 text-sm font-medium text-white transition-colors hover:opacity-90'
           >
             Get started free
