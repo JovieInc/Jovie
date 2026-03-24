@@ -2,9 +2,13 @@ import { expect, Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
+  getAdminCredentials,
+  hasAdminCredentials,
+  hasClerkCredentials,
   isProductionTarget,
   signInUser,
 } from '../helpers/clerk-auth';
+import { DASHBOARD_ROUTE_MATRIX } from './utils/dashboard-route-matrix';
 import {
   isTransientNavigationError,
   SMOKE_TIMEOUTS,
@@ -25,75 +29,6 @@ import {
  * Run with doppler:
  *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium
  */
-
-/**
- * Check if Clerk credentials are available for authenticated tests
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = username.includes('+clerk_test');
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail) &&
-    clerkSetupSuccess
-  );
-}
-
-/**
- * Check if admin Clerk credentials are available.
- * Falls back to regular credentials if admin-specific ones aren't set.
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function hasAdminCredentials(): boolean {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  // Use admin-specific credentials if available, otherwise fall back to regular user
-  // (assuming the regular test user might have admin access)
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return clerkSetupSuccess;
-  }
-
-  // Fall back to regular credentials
-  return hasClerkCredentials();
-}
-
-/**
- * Get admin credentials (admin-specific or fallback to regular)
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function getAdminCredentials(): { username: string; password: string } {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return { username: adminUsername, password: adminPassword };
-  }
-
-  return {
-    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
-    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
-  };
-}
 
 /** Error text patterns that indicate a failed page */
 const ERROR_TEXT_PATTERNS = [
@@ -170,62 +105,14 @@ async function checkForErrorPage(page: Page): Promise<{
   return { hasError: false };
 }
 
-/**
- * Dashboard pages to test
- *
- * Note: Only include pages that render actual content.
- * Redirect-only pages are excluded from this list.
- *
- * Excluded redirect pages:
- * - /app/dashboard -> redirects to / (marketing homepage)
- * - /app/dashboard/overview -> redirects to /app/dashboard -> /
- * - /app/dashboard/links -> redirects to /app/dashboard/profile
- * - /app/dashboard/tipping -> redirects to /app/dashboard/earnings
- */
-const DASHBOARD_PAGES = [
-  { path: '/app/dashboard/audience', name: 'Audience' },
-  { path: APP_ROUTES.CHAT, name: 'Chat' },
-  { path: '/app/dashboard/earnings', name: 'Earnings' },
-  { path: '/app/dashboard/releases', name: 'Releases' },
-  { path: '/app/settings/contacts', name: 'Contacts' },
-  { path: '/app/settings/touring', name: 'Touring' },
-  { path: '/app/settings/billing', name: 'Settings Billing' },
-  { path: '/billing', name: 'Billing' },
-  { path: '/account', name: 'Account' },
-] as const;
-
-const FAST_DASHBOARD_PAGES = [
-  { path: '/app/dashboard/audience', name: 'Audience' },
-  { path: APP_ROUTES.CHAT, name: 'Chat' },
-  { path: '/app/dashboard/releases', name: 'Releases' },
-] as const;
-
-/**
- * Admin pages to test
- *
- * These pages require admin privileges. Tests will be skipped if:
- * - No admin credentials configured (E2E_CLERK_ADMIN_USERNAME/PASSWORD)
- * - Test user doesn't have admin access (404 response)
- */
-const ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-  { path: '/app/admin/creators', name: 'Admin Creators' },
-  { path: '/app/admin/users', name: 'Admin Users' },
-] as const;
-
-const FAST_ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-] as const;
-
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
 const SETTINGS_LANDING_PAGE = APP_ROUTES.SETTINGS_ACCOUNT;
-const ACTIVE_DASHBOARD_PAGES = FAST_ITERATION
-  ? FAST_DASHBOARD_PAGES
-  : DASHBOARD_PAGES;
-const ACTIVE_ADMIN_PAGES = FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
+const ACTIVE_HEALTH_PAGES = FAST_ITERATION
+  ? DASHBOARD_ROUTE_MATRIX.health.fast
+  : DASHBOARD_ROUTE_MATRIX.health.full;
+const ACTIVE_ADMIN_PAGES = FAST_ITERATION
+  ? DASHBOARD_ROUTE_MATRIX.admin.fast
+  : DASHBOARD_ROUTE_MATRIX.admin.full;
 const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
@@ -298,7 +185,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 
     const results: PageHealthResult[] = [];
 
-    for (const pageConfig of ACTIVE_DASHBOARD_PAGES) {
+    for (const pageConfig of ACTIVE_HEALTH_PAGES) {
       const startTime = Date.now();
 
       try {
@@ -449,9 +336,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
     const redirected = results.filter(r => r.status === 'redirect');
 
     console.log('\n📊 Dashboard Health Summary:');
-    console.log(
-      `   ✅ Passed: ${passed.length}/${ACTIVE_DASHBOARD_PAGES.length}`
-    );
+    console.log(`   ✅ Passed: ${passed.length}/${ACTIVE_HEALTH_PAGES.length}`);
     if (failed.length > 0) {
       console.log(`   ❌ Failed: ${failed.length}`);
       failed.forEach(f => console.log(`      - ${f.name}: ${f.error}`));
@@ -483,7 +368,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
    *
    * Run specific page: --grep "Profile"
    */
-  for (const pageConfig of ACTIVE_DASHBOARD_PAGES) {
+  for (const pageConfig of ACTIVE_HEALTH_PAGES) {
     test(`[Debug] ${pageConfig.name} page loads`, async ({
       page,
     }, testInfo) => {

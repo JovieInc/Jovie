@@ -26,6 +26,69 @@ export function isTestingEnvironment(): boolean {
 }
 
 /**
+ * Check if Clerk credentials are available for authenticated tests.
+ * Supports passwordless Clerk test emails (containing +clerk_test).
+ */
+export function hasClerkCredentials(
+  credentials: { username?: string; password?: string } = {}
+): boolean {
+  const username =
+    credentials.username ?? process.env.E2E_CLERK_USER_USERNAME ?? '';
+  const password =
+    credentials.password ?? process.env.E2E_CLERK_USER_PASSWORD ?? '';
+  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
+
+  return (
+    username.length > 0 &&
+    (password.length > 0 || isClerkTestEmail(username)) &&
+    clerkSetupSuccess
+  );
+}
+
+/**
+ * Check if admin Clerk credentials are available.
+ * Falls back to the regular test user when admin-specific credentials are absent.
+ */
+export function hasAdminCredentials(): boolean {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+
+  if (adminUsername.length > 0) {
+    return hasClerkCredentials({
+      username: adminUsername,
+      password: adminPassword,
+    });
+  }
+
+  return hasClerkCredentials();
+}
+
+/**
+ * Resolve the credential pair for admin test flows.
+ * Uses admin-specific credentials when configured, otherwise falls back to the
+ * regular creator test user.
+ */
+export function getAdminCredentials(): {
+  username: string;
+  password: string;
+} {
+  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
+  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
+
+  if (
+    adminUsername.length > 0 &&
+    (adminPassword.length > 0 || isClerkTestEmail(adminUsername))
+  ) {
+    return { username: adminUsername, password: adminPassword };
+  }
+
+  return {
+    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
+    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
+  };
+}
+
+/**
  * Custom error types for better test debugging
  */
 export class ClerkTestError extends Error {

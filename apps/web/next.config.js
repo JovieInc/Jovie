@@ -224,6 +224,70 @@ const nextConfig = {
       { source: '/TIMWHITE', destination: '/tim', permanent: true },
     ];
 
+    const legacyAppRedirects = [
+      { source: '/app/contact', destination: '/app/settings/contacts' },
+      { source: '/app/profile', destination: '/app/chat?panel=profile' },
+      { source: '/app/contacts', destination: '/app/settings/contacts' },
+      { source: '/app/tour-dates', destination: '/app/settings/touring' },
+      { source: '/app/dashboard', destination: '/app' },
+      { source: '/app/dashboard/overview', destination: '/app' },
+      {
+        source: '/app/dashboard/links',
+        destination: '/app/chat?panel=profile',
+      },
+      { source: '/app/dashboard/tipping', destination: '/app/earnings' },
+      {
+        source: '/app/dashboard/profile',
+        destination: '/app/chat?panel=profile',
+      },
+      { source: '/app/dashboard/chat', destination: '/app/chat' },
+      {
+        source: '/app/dashboard/contacts',
+        destination: '/app/settings/contacts',
+      },
+      {
+        source: '/app/dashboard/tour-dates',
+        destination: '/app/settings/touring',
+      },
+      { source: '/app/settings', destination: '/app/settings/account' },
+      {
+        source: '/app/settings/profile',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/appearance',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/notifications',
+        destination: '/app/settings/account',
+      },
+      {
+        source: '/app/settings/delete-account',
+        destination: '/app/settings/data-privacy',
+      },
+      {
+        source: '/app/settings/retargeting-ads',
+        destination: '/app/settings/audience',
+      },
+      { source: '/app/settings/referral', destination: '/app/referrals' },
+      {
+        source: '/app/settings/remove-branding',
+        destination: '/app/settings/artist-profile',
+      },
+      {
+        source: '/app/settings/ad-pixels',
+        destination: '/app/settings/audience',
+      },
+      {
+        source: '/app/settings/branding',
+        destination: '/app/settings/artist-profile',
+      },
+    ].map(route => ({
+      ...route,
+      permanent: false,
+    }));
+
     return [
       // Legal page redirects
       {
@@ -246,6 +310,7 @@ const nextConfig = {
         destination: '/app/dashboard/audience',
         permanent: false,
       },
+      ...legacyAppRedirects,
       // VIP username redirects
       ...vipUsernameRedirects,
     ];
@@ -254,20 +319,8 @@ const nextConfig = {
     return [
       // Rewrite /app/* to /app/dashboard/* for cleaner URLs
       {
-        source: '/app/profile',
-        destination: '/app/dashboard/profile',
-      },
-      {
-        source: '/app/contacts',
-        destination: '/app/dashboard/contacts',
-      },
-      {
         source: '/app/releases',
         destination: '/app/dashboard/releases',
-      },
-      {
-        source: '/app/tour-dates',
-        destination: '/app/dashboard/tour-dates',
       },
       {
         source: '/app/audience',

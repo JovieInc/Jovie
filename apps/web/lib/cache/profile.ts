@@ -44,7 +44,8 @@ export async function invalidateProfileCache(
   }
 
   // Invalidate dashboard pages that display profile data
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
+  revalidatePath(APP_ROUTES.DASHBOARD);
+  revalidatePath(APP_ROUTES.CHAT);
   revalidatePath(APP_ROUTES.SETTINGS);
 }
 
@@ -85,8 +86,8 @@ export async function invalidateSocialLinksCache(
 
   // Also invalidate dashboard where links are managed
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
-  revalidatePath(APP_ROUTES.DASHBOARD_LINKS);
+  revalidatePath(APP_ROUTES.DASHBOARD);
+  revalidatePath(APP_ROUTES.CHAT);
 }
 
 /**
@@ -112,6 +113,7 @@ export async function invalidateAvatarCache(
 
   // Dashboard also shows avatar
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD_OVERVIEW);
+  revalidatePath(APP_ROUTES.DASHBOARD);
+  revalidatePath(APP_ROUTES.CHAT);
   revalidatePath(APP_ROUTES.SETTINGS);
 }

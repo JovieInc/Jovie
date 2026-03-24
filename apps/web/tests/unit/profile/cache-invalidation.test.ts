@@ -80,7 +80,8 @@ describe('Profile Cache Invalidation', () => {
       const { invalidateProfileCache } = await import('@/lib/cache/profile');
       await invalidateProfileCache('testartist');
 
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/chat');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings');
     });
   });
@@ -118,14 +119,14 @@ describe('Profile Cache Invalidation', () => {
       expect(mockRevalidatePath).toHaveBeenCalledWith('/testartist');
     });
 
-    it('invalidates dashboard link pages', async () => {
+    it('invalidates dashboard chat surfaces', async () => {
       const { invalidateSocialLinksCache } = await import(
         '@/lib/cache/profile'
       );
       await invalidateSocialLinksCache('profile-123', 'testartist');
 
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard');
-      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/dashboard/links');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/chat');
     });
   });
 
@@ -144,6 +145,15 @@ describe('Profile Cache Invalidation', () => {
 
       // Should still invalidate avatar tag
       expect(mockRevalidateTag).toHaveBeenCalledWith('avatar:user-123', 'max');
+    });
+
+    it('invalidates the chat shell surfaces', async () => {
+      const { invalidateAvatarCache } = await import('@/lib/cache/profile');
+      await invalidateAvatarCache('user-123', 'testartist');
+
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/chat');
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings');
     });
   });
 });

@@ -27,6 +27,7 @@ export const APP_ROUTES = {
   AUDIENCE: '/app/audience',
   EARNINGS: '/app/earnings',
   CHAT: '/app/chat',
+  CHAT_PROFILE_PANEL: '/app/chat?panel=profile',
   INSIGHTS: '/app/insights',
   PRESENCE: '/app/presence',
 
