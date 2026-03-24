@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getClerkProxyUrl,
   isMockPublishableKey,
@@ -16,7 +16,28 @@ describe('clerkAvailability', () => {
     expect(isMockPublishableKey('pk_test_example')).toBe(false);
   });
 
-  it('always uses the Clerk proxy', () => {
-    expect(getClerkProxyUrl()).toBe('/clerk');
+  describe('getClerkProxyUrl', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it('returns the proxy URL from env when set', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '/clerk');
+      expect(getClerkProxyUrl()).toBe('/clerk');
+    });
+
+    it('falls back to /clerk when env var is empty string', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '');
+      expect(getClerkProxyUrl()).toBe('/clerk');
+    });
+
+    it('falls back to /clerk when env var is not present', () => {
+      expect(getClerkProxyUrl()).toBe('/clerk');
+    });
+
+    it('supports full URL for staging', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', 'https://clerk.staging.jov.ie');
+      expect(getClerkProxyUrl()).toBe('https://clerk.staging.jov.ie');
+    });
   });
 });

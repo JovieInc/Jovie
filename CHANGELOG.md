@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.49] - 2026-03-24
+## [26.4.50] - 2026-03-24
 
 ### Fixed
 
@@ -13,6 +13,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Marketing route 404s no longer render double header/footer (added `(marketing)/not-found.tsx`)
 - Changelog subscribe success message now visually distinct with green accent and `aria-live` for screen readers
 - ProductScreenshot fallback shows clean "Coming soon" instead of a developer-facing placeholder message
+
+## [26.3.50] - 2026-03-23
+
+### Changed
+
+- [internal] Made Clerk proxy URL environment-driven to support separate staging Clerk instance
+- [internal] Production uses `/clerk` Vercel rewrite; staging uses direct `https://clerk.staging.jov.ie`
 
 ## [26.3.49] - 2026-03-23
 
