@@ -4,6 +4,7 @@ import { SignUp } from '@clerk/nextjs';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useMemo, useState } from 'react';
+import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
 import { track } from '@/lib/analytics';
@@ -196,14 +197,14 @@ function SignUpPageContent() {
         By signing up, you agree to our{' '}
         <Link
           href={APP_ROUTES.LEGAL_TERMS}
-          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Terms of Service
         </Link>{' '}
         and{' '}
         <Link
           href={APP_ROUTES.LEGAL_PRIVACY}
-          className='focus-ring-themed rounded-md text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
+          className='focus-ring-themed rounded-md py-1 text-secondary-token underline underline-offset-2 transition-colors hover:text-primary-token'
         >
           Privacy Policy
         </Link>
@@ -223,7 +224,7 @@ export default function SignUpPage() {
       showFormTitle={false}
       showFooterPrompt={false}
     >
-      <Suspense fallback={null}>
+      <Suspense fallback={<AuthFormSkeleton />}>
         <SignUpPageContent />
       </Suspense>
     </AuthLayout>
