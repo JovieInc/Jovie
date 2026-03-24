@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.54] - 2026-03-24
+
+### Fixed
+
+- Broken `&check;` HTML entities on /launch comparison section — replaced with Unicode ✓
+- AI assistant free tier listed as "10 queries/mo" on /launch — corrected to "25 msgs/day" matching entitlement registry
+- Footer "Analytics" link pointed to non-existent `/#analytics` anchor — fixed to `/#release`
+- Missing H1 on /launch/pricing — promoted heading from h2 to h1 for SEO/accessibility
+- ProductScreenshot fallback showed developer-facing "Screenshot unavailable in this worktree" text on production — replaced with user-friendly "Preview coming soon"
+- /ai page exposed internal founder AI workflow publicly — redirected to investor portal with noindex
+
 ## [26.4.53] - 2026-03-24
 
 ### Changed

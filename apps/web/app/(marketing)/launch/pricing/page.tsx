@@ -59,10 +59,10 @@ export default function PricingPage() {
   return (
     <div>
       <MarketingHero variant='centered'>
-        <h2 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
+        <h1 id='pricing-heading' className='marketing-h2-linear max-w-[680px]'>
           Simple pricing.{' '}
           <span className='text-secondary-token'>No surprises.</span>
-        </h2>
+        </h1>
       </MarketingHero>
 
       <MarketingContainer width='page'>

@@ -117,7 +117,10 @@ export function ProductScreenshot({
               {title}
             </div>
             <p className='text-lg font-medium tracking-tight text-primary-token'>
-              Coming soon
+              Preview coming soon
+            </p>
+            <p className='mt-2 text-sm leading-6 text-secondary-token'>
+              See it live when you sign up.
             </p>
           </div>
         </div>
