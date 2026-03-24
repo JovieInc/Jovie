@@ -43,7 +43,7 @@ function SearchDropdownState({
     >
       <DrawerSurfaceCard
         variant='card'
-        className='flex min-h-[56px] items-center rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+        className='flex min-h-[56px] items-center border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
       >
         <p
           className={cn(
@@ -70,7 +70,7 @@ function SearchResultsLoadingSkeleton() {
         <DrawerSurfaceCard
           key={key}
           variant='card'
-          className='flex min-h-[56px] items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
+          className='flex min-h-[56px] items-center gap-2.5 border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_88%,var(--linear-bg-surface-0))] px-2.5'
           aria-hidden='true'
         >
           <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
@@ -425,7 +425,7 @@ export function SpotifyConnectDialog({
       <DialogBody className='space-y-3'>
         <DrawerSurfaceCard
           variant='card'
-          className='overflow-visible rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+          className='overflow-visible border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
         >
           <div className='mb-2.5'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
