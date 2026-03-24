@@ -284,6 +284,7 @@ Auto-shuts down after 30 min idle. State persists between calls (cookies, tabs, 
 ## SETUP (run this check BEFORE any browse command)
 
 ```bash
+command -v bun >/dev/null 2>&1 || export PATH="$HOME/.bun/bin:$PATH"
 _ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 B=""
 [ -n "$_ROOT" ] && [ -x "$_ROOT/.claude/skills/gstack/browse/dist/browse" ] && B="$_ROOT/.claude/skills/gstack/browse/dist/browse"

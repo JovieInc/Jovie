@@ -136,6 +136,22 @@ export function getRemoteSlug(): string {
   }
 }
 
+// ─── Timeout Constants ──────────────────────────────────────────
+// Localhost gets longer timeouts for Turbopack/webpack cold compilation.
+// These three timeouts are coupled: CLI HTTP > page goto > remote goto.
+export const LOCALHOST_PAGE_TIMEOUT = 60000;   // page.goto() for localhost
+export const REMOTE_PAGE_TIMEOUT = 15000;      // page.goto() for remote URLs
+export const LOCALHOST_HTTP_TIMEOUT = 90000;    // CLI fetch() for localhost goto
+export const REMOTE_HTTP_TIMEOUT = 30000;       // CLI fetch() for all other commands
+
+/**
+ * Check if a URL targets localhost (localhost, 127.0.0.1, 0.0.0.0, or [::1]).
+ * Used to apply longer timeouts for local dev servers (e.g. Turbopack cold compile).
+ */
+export function isLocalhostUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/.test(url);
+}
+
 /**
  * Read the binary version (git SHA) from browse/dist/.version.
  * Returns null if the file doesn't exist or can't be read.

@@ -11,11 +11,37 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { resolveConfig, ensureStateDir, readVersionHash } from './config';
+import { resolveConfig, ensureStateDir, readVersionHash, isLocalhostUrl, LOCALHOST_HTTP_TIMEOUT, REMOTE_HTTP_TIMEOUT } from './config';
 
 const config = resolveConfig();
 const IS_WINDOWS = process.platform === 'win32';
 const MAX_START_WAIT = IS_WINDOWS ? 15000 : 8000; // Node+Chromium takes longer on Windows
+
+// ─── Bun Path Resolution ─────────────────────────────────────────
+/**
+ * Resolve the absolute path to the `bun` binary.
+ * Checks PATH first, then common install locations.
+ * This prevents failures when `bun` is installed but not in the shell's PATH
+ * (common with Claude Code and other non-interactive shell contexts).
+ */
+export function resolveBunPath(): string {
+  // Use POSIX 'command -v' instead of 'which' (not available on all systems)
+  const which = Bun.spawnSync(['sh', '-c', 'command -v bun'], { stdout: 'pipe', stderr: 'pipe', timeout: 2000 });
+  if (which.exitCode === 0) {
+    const p = which.stdout.toString().trim();
+    if (p) return p;
+  }
+  const home = process.env.HOME || '';
+  const candidates = [
+    path.join(home, '.bun', 'bin', 'bun'),
+    '/usr/local/bin/bun',
+    '/opt/homebrew/bin/bun',
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  throw new Error('bun not found. Install: curl -fsSL https://bun.sh/install | bash');
+}
 
 export function resolveServerScript(
   env: Record<string, string | undefined> = process.env,
@@ -27,8 +53,6 @@ export function resolveServerScript(
   }
 
   // Dev mode: cli.ts runs directly from browse/src
-  // On macOS/Linux, import.meta.dir starts with /
-  // On Windows, it starts with a drive letter (e.g., C:\...)
   if (!metaDir.includes('$bunfs')) {
     const direct = path.resolve(metaDir, 'server.ts');
     if (fs.existsSync(direct)) {
@@ -168,12 +192,14 @@ async function startServer(): Promise<ServerState> {
   try { fs.unlinkSync(config.stateFile); } catch {}
 
   // Start server as detached background process.
-  // On Windows, Bun can't launch/connect to Playwright's Chromium (oven-sh/bun#4253, #9911).
+  // Uses resolveBunPath() to find bun's absolute path, avoiding PATH issues
+  // in non-interactive shell contexts (Claude Code, etc.).
+  // On Windows, Bun can't launch Playwright's Chromium (oven-sh/bun#4253, #9911).
   // Fall back to running the server under Node.js with Bun API polyfills.
   const useNode = IS_WINDOWS && NODE_SERVER_SCRIPT;
   const serverCmd = useNode
     ? ['node', NODE_SERVER_SCRIPT]
-    : ['bun', 'run', SERVER_SCRIPT];
+    : [resolveBunPath(), 'run', SERVER_SCRIPT];
   const proc = Bun.spawn(serverCmd, {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, BROWSE_STATE_FILE: config.stateFile },
@@ -243,6 +269,9 @@ async function ensureServer(): Promise<ServerState> {
 async function sendCommand(state: ServerState, command: string, args: string[], retries = 0): Promise<void> {
   const body = JSON.stringify({ command, args });
 
+  const isLocalhostGoto = command === 'goto' && args[0] && isLocalhostUrl(args[0]);
+  const httpTimeout = isLocalhostGoto ? LOCALHOST_HTTP_TIMEOUT : REMOTE_HTTP_TIMEOUT;
+
   try {
     const resp = await fetch(`http://127.0.0.1:${state.port}/command`, {
       method: 'POST',
@@ -251,7 +280,7 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
         'Authorization': `Bearer ${state.token}`,
       },
       body,
-      signal: AbortSignal.timeout(30000),
+      signal: AbortSignal.timeout(httpTimeout),
     });
 
     if (resp.status === 401) {
@@ -282,7 +311,7 @@ async function sendCommand(state: ServerState, command: string, args: string[], 
     }
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      console.error('[browse] Command timed out after 30s');
+      console.error(`[browse] Command timed out after ${httpTimeout / 1000}s`);
       process.exit(1);
     }
     // Connection error — server may have crashed
@@ -358,3 +387,4 @@ if (import.meta.main) {
     process.exit(1);
   });
 }
+
