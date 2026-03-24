@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Disabled Sentry client SDK initialization in development — eliminates 20-80KB of unnecessary JS overhead during local dev
 
+### Fixed
+
+- Clerk "Failed to load script" error in local development — `frontendApiProxy` now only enabled in production/preview where the proxy target is reachable
+
 ## [26.4.52] - 2026-03-24
 
 ### Fixed
