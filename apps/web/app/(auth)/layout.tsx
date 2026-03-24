@@ -4,6 +4,7 @@ import {
   AuthLayout as AuthShellLayout,
   AuthUnavailableCard,
 } from '@/features/auth';
+import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 import { publicEnv } from '@/lib/env-public';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
@@ -15,7 +16,7 @@ export default async function AuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = await resolvePublishableKeyFromHeaders();
   const featureFlagsBootstrap = await getFeatureFlagsBootstrap(null);
   const isClerkUnavailable = shouldBypassClerk(
     publishableKey,
