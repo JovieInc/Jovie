@@ -67,9 +67,6 @@ function detectMetaBot(userAgent: string): boolean {
 
 interface PathCategory {
   needsNonce: boolean;
-  isAppPath: boolean;
-  isDashboardPath: boolean;
-  isSettingsPath: boolean;
   isProtectedPath: boolean;
   isAuthPath: boolean;
   isAuthCallbackPath: boolean;
@@ -80,31 +77,6 @@ interface PathCategory {
 function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
-
-/** Check if pathname matches any of the given routes */
-function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
-  return routes.some(route => matchesRoute(pathname, route));
-}
-
-// Route groups for path categorization
-// All routes use /app/* prefix (single-domain architecture)
-const DASHBOARD_ROUTES = [
-  '/app/profile',
-  '/app/contacts',
-  '/app/releases',
-  '/app/tour-dates',
-  '/app/audience',
-  '/app/earnings',
-  '/app/links',
-  '/app/chat',
-] as const;
-
-const SETTINGS_ROUTES = [
-  '/app/settings',
-  '/app/admin',
-  '/app/billing',
-  '/app/account',
-] as const;
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -125,38 +97,19 @@ function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-up/sso-callback' ||
     pathname === '/sign-in/sso-callback';
 
-  // Dashboard paths (used for app subdomain rewrites)
-  const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
-
-  // Settings-like paths
-  const isSettingsPath = matchesAnyRoute(pathname, SETTINGS_ROUTES);
+  const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
 
   // Onboarding/waitlist paths
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
 
   // Protected paths (require auth)
-  const isProtectedPath =
-    isDashboardPath || isSettingsPath || isWaitlistPath || isOnboardingPath;
-
-  // App paths (dashboard and protected routes at /app/*)
-  const isAppPath =
-    pathname === '/' ||
-    isDashboardPath ||
-    isSettingsPath ||
-    isOnboardingPath ||
-    isWaitlistPath ||
-    pathname === '/monitoring' ||
-    pathname.startsWith('/monitoring/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/app/');
+  const isProtectedPath = isAppShellPath || isWaitlistPath || isOnboardingPath;
 
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
-    pathname === '/app' ||
-    pathname.startsWith('/app/') ||
-    isSettingsPath ||
+    isAppShellPath ||
     isOnboardingPath ||
     isWaitlistPath;
 
@@ -165,9 +118,6 @@ function categorizePath(pathname: string): PathCategory {
 
   return {
     needsNonce,
-    isAppPath,
-    isDashboardPath,
-    isSettingsPath,
     isProtectedPath,
     isAuthPath,
     isAuthCallbackPath,
