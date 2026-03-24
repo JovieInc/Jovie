@@ -114,14 +114,10 @@ export function ProductScreenshot({
         >
           <div className='max-w-[22rem]'>
             <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
-              Product preview
+              {title}
             </div>
             <p className='text-lg font-medium tracking-tight text-primary-token'>
-              Screenshot unavailable in this worktree
-            </p>
-            <p className='mt-2 text-sm leading-6 text-secondary-token'>
-              The marketing surface still renders and stays reviewable while the
-              generated product screenshot assets are absent.
+              Coming soon
             </p>
           </div>
         </div>
