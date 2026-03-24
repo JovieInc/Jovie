@@ -103,22 +103,11 @@ export default async function CategoryPage({
       <div className='min-h-screen'>
         {/* Hero */}
         <MarketingHero variant='left'>
-          <p
-            className='marketing-kicker mb-0'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Blog
-          </p>
-          <h1
-            className='marketing-h1-linear mb-6 mt-6'
-            style={{ color: 'var(--linear-text-primary)' }}
-          >
+          <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
+          <h1 className='marketing-h1-linear mb-6 mt-6 text-primary-token'>
             {category.name}
           </h1>
-          <p
-            className='marketing-lead-linear max-w-[34rem]'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
+          <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
             {category.description}
           </p>
         </MarketingHero>

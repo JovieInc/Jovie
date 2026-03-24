@@ -86,19 +86,20 @@ export default async function AuthorPage({
 
   const author = resolveAuthor(authorPosts[0], profile);
 
+  // Normalize profile URL to absolute
+  const absoluteProfileUrl = author.profileUrl
+    ? author.profileUrl.startsWith('http')
+      ? author.profileUrl
+      : `${APP_URL}${author.profileUrl}`
+    : undefined;
+
   // Build schemas
   const personSchema = buildPersonSchema({
     name: author.name,
     url: `${APP_URL}/blog/authors/${username}`,
     image: author.avatarUrl ?? undefined,
     description: author.bio,
-    sameAs: author.profileUrl
-      ? [
-          author.profileUrl.startsWith('http')
-            ? author.profileUrl
-            : `${APP_URL}${author.profileUrl}`,
-        ]
-      : [],
+    sameAs: absoluteProfileUrl ? [absoluteProfileUrl] : [],
   });
 
   const breadcrumbSchema = buildBreadcrumbSchema([

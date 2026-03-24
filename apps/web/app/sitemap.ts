@@ -5,11 +5,7 @@ import { unstable_cache } from 'next/cache';
 import { BASE_URL } from '@/constants/app';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
-import {
-  getBlogPostSlugs,
-  getBlogPosts,
-  slugifyCategory,
-} from '@/lib/blog/getBlogPosts';
+import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { db } from '@/lib/db';
 import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -87,9 +83,8 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogSlugs, blogPosts] = await Promise.all([
+  const [catalog, blogPosts] = await Promise.all([
     getSitemapCatalog(),
-    getBlogPostSlugs(),
     getBlogPosts(),
   ]);
 
@@ -152,14 +147,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Create a date lookup from blog posts for more accurate lastModified
-  const postDateMap = new Map(
-    blogPosts.map(p => [p.slug, new Date(p.updatedDate ?? p.date)])
-  );
-
-  const blogPages: MetadataRoute.Sitemap = blogSlugs.map(slug => ({
-    url: `${BASE_URL}/blog/${slug}`,
-    lastModified: postDateMap.get(slug) ?? now,
+  const blogPages: MetadataRoute.Sitemap = blogPosts.map(post => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.updatedDate ?? post.date),
     changeFrequency: 'monthly',
     priority: 0.7,
   }));

@@ -22,31 +22,31 @@ function formatDate(dateString: string): string {
 export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   if (variant === 'featured') {
     return (
-      <article className='group'>
+      <article className='group rounded-2xl border border-border-subtle p-8 sm:p-10 transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'>
+        {/* Meta — category pill outside the link to avoid nested <a> */}
+        <div className='flex flex-wrap items-center gap-3 mb-4'>
+          <time
+            dateTime={post.date}
+            className='text-sm font-medium text-tertiary-token tabular-nums'
+          >
+            {formatDate(post.date)}
+          </time>
+          <span className='text-quaternary-token'>·</span>
+          <span className='text-sm text-tertiary-token'>
+            {post.readingTime} min read
+          </span>
+          {post.category && (
+            <>
+              <span className='text-quaternary-token'>·</span>
+              <CategoryPill category={post.category} />
+            </>
+          )}
+        </div>
+
         <Link
           href={`/blog/${post.slug}`}
-          className='block rounded-2xl border border-border-subtle p-8 sm:p-10 transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'
+          className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
         >
-          {/* Meta */}
-          <div className='flex flex-wrap items-center gap-3 mb-4'>
-            <time
-              dateTime={post.date}
-              className='text-sm font-medium text-tertiary-token tabular-nums'
-            >
-              {formatDate(post.date)}
-            </time>
-            <span className='text-quaternary-token'>·</span>
-            <span className='text-sm text-tertiary-token'>
-              {post.readingTime} min read
-            </span>
-            {post.category && (
-              <>
-                <span className='text-quaternary-token'>·</span>
-                <CategoryPill category={post.category} />
-              </>
-            )}
-          </div>
-
           {/* Title */}
           <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token mb-4 group-hover:text-primary-token transition-colors'>
             {post.title}
@@ -84,32 +84,32 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
   }
 
   return (
-    <article className='group'>
+    <article className='group rounded-xl border border-border-subtle p-6 h-full transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'>
+      {/* Meta */}
+      <div className='flex flex-wrap items-center gap-2 mb-3'>
+        <time
+          dateTime={post.date}
+          className='text-sm font-medium text-tertiary-token tabular-nums'
+        >
+          {formatDate(post.date)}
+        </time>
+        <span className='text-quaternary-token'>·</span>
+        <span className='text-sm text-tertiary-token'>
+          {post.readingTime} min read
+        </span>
+      </div>
+
+      {/* Category — outside the link to avoid nested <a> */}
+      {post.category && (
+        <div className='mb-3'>
+          <CategoryPill category={post.category} />
+        </div>
+      )}
+
       <Link
         href={`/blog/${post.slug}`}
-        className='block rounded-xl border border-border-subtle p-6 h-full transition-all duration-200 hover:border-border-default hover:-translate-y-0.5'
+        className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
       >
-        {/* Meta */}
-        <div className='flex flex-wrap items-center gap-2 mb-3'>
-          <time
-            dateTime={post.date}
-            className='text-sm font-medium text-tertiary-token tabular-nums'
-          >
-            {formatDate(post.date)}
-          </time>
-          <span className='text-quaternary-token'>·</span>
-          <span className='text-sm text-tertiary-token'>
-            {post.readingTime} min read
-          </span>
-        </div>
-
-        {/* Category */}
-        {post.category && (
-          <div className='mb-3'>
-            <CategoryPill category={post.category} />
-          </div>
-        )}
-
         {/* Title */}
         <h2 className='text-lg sm:text-xl font-semibold tracking-tight text-primary-token mb-3 group-hover:text-primary-token transition-colors'>
           {post.title}

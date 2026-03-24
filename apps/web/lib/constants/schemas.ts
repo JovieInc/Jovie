@@ -156,12 +156,17 @@ export function buildArticleSchema(overrides: {
   keywords?: string[];
   wordCount?: number;
 }) {
-  const author: Record<string, unknown> = {
+  const author: {
+    '@type': 'Person';
+    name: string;
+    url?: string;
+    image?: string;
+  } = {
     '@type': 'Person',
     name: overrides.authorName,
+    ...(overrides.authorUrl && { url: overrides.authorUrl }),
+    ...(overrides.authorImageUrl && { image: overrides.authorImageUrl }),
   };
-  if (overrides.authorUrl) author.url = overrides.authorUrl;
-  if (overrides.authorImageUrl) author.image = overrides.authorImageUrl;
 
   return jsonLd({
     '@context': 'https://schema.org',

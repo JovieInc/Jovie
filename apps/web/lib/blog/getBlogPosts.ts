@@ -38,7 +38,7 @@ function countWords(content: string): number {
   const text = content
     .replaceAll(/^---[\s\S]*?---/g, '') // strip frontmatter
     .replaceAll(/```[\s\S]*?```/g, '') // strip code blocks
-    .replaceAll(/[#*_`>\[\]()!|-]/g, '') // strip markdown syntax
+    .replaceAll(/[#*_`>[\]()!|-]/g, '') // strip markdown syntax
     .trim();
   return text.split(/\s+/).filter(Boolean).length;
 }
@@ -64,7 +64,7 @@ export function slugifyCategory(category: string): string {
     .replaceAll(/[^a-z0-9\s-]/g, '')
     .replaceAll(/\s+/g, '-')
     .replaceAll(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replaceAll(/^-|-$/g, '');
 }
 
 /** Get related posts by category match, then by recency */

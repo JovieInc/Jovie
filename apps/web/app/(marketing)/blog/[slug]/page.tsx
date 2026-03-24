@@ -112,17 +112,20 @@ export default async function BlogPostRoute({
     );
 
     // Build schemas
+    // Normalize author URL to absolute
+    const authorUrl = author.profileUrl
+      ? author.profileUrl.startsWith('http')
+        ? author.profileUrl
+        : `${APP_URL}${author.profileUrl}`
+      : undefined;
+
     const articleSchema = buildArticleSchema({
       headline: post.title,
       description: post.excerpt,
       datePublished: post.date,
       dateModified: post.updatedDate ?? post.date,
       authorName: post.author,
-      authorUrl: author.profileUrl
-        ? author.profileUrl.startsWith('http')
-          ? author.profileUrl
-          : `${APP_URL}${author.profileUrl}`
-        : undefined,
+      authorUrl,
       authorImageUrl: author.avatarUrl ?? undefined,
       url: `${APP_URL}/blog/${post.slug}`,
       keywords: post.tags,

@@ -38,22 +38,11 @@ export default async function BlogIndexPage() {
     return (
       <div className='min-h-screen'>
         <MarketingHero variant='left'>
-          <p
-            className='marketing-kicker mb-0'
-            style={{ color: 'var(--linear-text-tertiary)' }}
-          >
-            Blog
-          </p>
-          <h1
-            className='marketing-h1-linear mb-6 mt-6 max-w-[8ch]'
-            style={{ color: 'var(--linear-text-primary)' }}
-          >
+          <p className='marketing-kicker mb-0 text-tertiary-token'>Blog</p>
+          <h1 className='marketing-h1-linear mb-6 mt-6 max-w-[8ch] text-primary-token'>
             Blog
           </h1>
-          <p
-            className='marketing-lead-linear max-w-[34rem]'
-            style={{ color: 'var(--linear-text-secondary)' }}
-          >
+          <p className='marketing-lead-linear max-w-[34rem] text-secondary-token'>
             Posts coming soon.
           </p>
         </MarketingHero>

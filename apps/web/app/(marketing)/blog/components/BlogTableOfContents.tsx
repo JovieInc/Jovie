@@ -20,10 +20,12 @@ export function BlogTableOfContents({ toc }: BlogTableOfContentsProps) {
 
     const observer = new IntersectionObserver(
       entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            setActiveId(entry.target.id);
-          }
+        const visibleEntries = entries.filter(e => e.isIntersecting);
+        if (visibleEntries.length > 0) {
+          const topmost = visibleEntries.reduce((a, b) =>
+            a.boundingClientRect.top < b.boundingClientRect.top ? a : b
+          );
+          setActiveId(topmost.target.id);
         }
       },
       { rootMargin: '-80px 0px -70% 0px' }
