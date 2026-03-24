@@ -5,12 +5,14 @@ import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 describe('TestimonialsSection', () => {
   it('renders testimonial quotes', () => {
     render(<TestimonialsSection />);
-    expect(screen.getByText('Maya Cole')).toBeInTheDocument();
-    expect(screen.getByText('DJ Luna')).toBeInTheDocument();
+    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(
+      screen.getByText(/internet rewards consistency/i)
+    ).toBeInTheDocument();
   });
 
   it('renders the tagline', () => {
     render(<TestimonialsSection />);
-    expect(screen.getByText(/independent artists/i)).toBeInTheDocument();
+    expect(screen.getByText(/Jovie is built for/i)).toBeInTheDocument();
   });
 });
