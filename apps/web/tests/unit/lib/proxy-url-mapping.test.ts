@@ -21,7 +21,8 @@ function isDevOrPreview(hostname: string): boolean {
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
-    hostname.startsWith('main.')
+    hostname === 'staging.jov.ie' ||
+    hostname === 'main.jov.ie'
   );
 }
 
@@ -29,6 +30,7 @@ function isMainHost(hostname: string): boolean {
   return (
     hostname === 'jov.ie' ||
     hostname === 'www.jov.ie' ||
+    hostname === 'staging.jov.ie' ||
     hostname === 'main.jov.ie' ||
     isDevOrPreview(hostname)
   );
@@ -74,7 +76,11 @@ describe('Proxy URL Mapping', () => {
       expect(isDevOrPreview('my-branch-jovie.vercel.app')).toBe(true);
     });
 
-    it('returns true for main.jov.ie (staging)', () => {
+    it('returns true for staging.jov.ie', () => {
+      expect(isDevOrPreview('staging.jov.ie')).toBe(true);
+    });
+
+    it('returns true for legacy main.jov.ie (staging)', () => {
       expect(isDevOrPreview('main.jov.ie')).toBe(true);
     });
 
@@ -93,7 +99,11 @@ describe('Proxy URL Mapping', () => {
       expect(isMainHost('www.jov.ie')).toBe(true);
     });
 
-    it('returns true for main.jov.ie (staging)', () => {
+    it('returns true for staging.jov.ie', () => {
+      expect(isMainHost('staging.jov.ie')).toBe(true);
+    });
+
+    it('returns true for legacy main.jov.ie (staging)', () => {
       expect(isMainHost('main.jov.ie')).toBe(true);
     });
 
@@ -158,7 +168,8 @@ describe('Proxy URL Mapping', () => {
      * Single domain architecture means dashboard is at /app everywhere:
      * - localhost:3100/app/* (local development)
      * - *.vercel.app/app/* (preview deployments)
-     * - main.jov.ie/app/* (staging)
+     * - staging.jov.ie/app/* (staging)
+     * - main.jov.ie/app/* (legacy staging)
      * - jov.ie/app/* (production)
      */
     it('dashboard path is consistent across all environments', () => {
@@ -174,6 +185,7 @@ describe('Proxy URL Mapping', () => {
         'localhost',
         '127.0.0.1',
         'jovie-abc123.vercel.app',
+        'staging.jov.ie',
         'main.jov.ie',
         'jov.ie',
         'www.jov.ie',
