@@ -1,8 +1,12 @@
 import { notFound } from 'next/navigation';
 import { BlogPostPage } from '@/components/organisms/BlogPostPage';
-import { APP_URL } from '@/constants/app';
+import { APP_NAME, APP_URL } from '@/constants/app';
 import { getBlogPost, getBlogPostSlugs } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
+import {
+  buildArticleSchema,
+  buildBreadcrumbSchema,
+} from '@/lib/constants/schemas';
 import { getProfileByUsername } from '@/lib/services/profile';
 
 interface BlogPostPageProps {
@@ -64,7 +68,28 @@ export default async function BlogPostRoute({
       }
     }
     const author = resolveAuthor(post, profile);
-    return <BlogPostPage post={post} author={author} />;
+
+    const articleSchema = buildArticleSchema({
+      headline: post.title,
+      description: post.excerpt,
+      datePublished: post.date,
+      authorName: post.author,
+      url: `${APP_URL}/blog/${post.slug}`,
+    });
+
+    const breadcrumbSchema = buildBreadcrumbSchema([
+      { name: APP_NAME, url: APP_URL },
+      { name: 'Blog', url: `${APP_URL}/blog` },
+      { name: post.title, url: `${APP_URL}/blog/${post.slug}` },
+    ]);
+
+    return (
+      <>
+        <script type='application/ld+json'>{articleSchema}</script>
+        <script type='application/ld+json'>{breadcrumbSchema}</script>
+        <BlogPostPage post={post} author={author} />
+      </>
+    );
   } catch {
     notFound();
   }
