@@ -1810,7 +1810,7 @@ export default function LaunchPage() {
                 'Adaptive CTA — subscribe or listen, per visitor',
                 'Smart links auto-created for every release',
                 'Fan notifications built in',
-                'AI assistant with 10 queries/mo',
+                'AI assistant (25 msgs/day)',
                 'Your brand, your domain potential',
                 '/tip, /tour, /contact, /listen deeplinks included',
               ].map(item => (
@@ -1819,7 +1819,7 @@ export default function LaunchPage() {
                   className='flex items-start gap-3 py-2.5 text-sm text-secondary-token border-b border-white/[0.04]'
                 >
                   <span className='shrink-0 mt-0.5 text-xs' aria-hidden='true'>
-                    &check;
+                    ✓
                   </span>
                   {item}
                 </li>
