@@ -80,7 +80,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@biomejs/biome": "^2.3.11",
     "@commitlint/cli": "^20.4.2",
-    "@commitlint/config-conventional": "^20.4.3",
+    "@commitlint/config-conventional": "^20.5.0",
     "@playwright/test": "^1.58.2",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
