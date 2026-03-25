@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.69] - 2026-03-25
+
+### Fixed
+
+- [internal] Remove `auth()` call from user-creation-failed error page — page no longer requires authentication, preventing redirect loops when user creation fails
+- [internal] Fix avatar image sizing — add explicit `h-full w-full` to ensure images fill their container correctly
+
 ## [26.4.68] - 2026-03-25
 
 ### Changed
