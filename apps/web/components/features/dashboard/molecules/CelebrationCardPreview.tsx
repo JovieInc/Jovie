@@ -44,7 +44,7 @@ export function CelebrationCardPreview({
       a.download = `jovie-${username}-${selectedSize}.png`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       track('celebration_card_downloaded', { username, size: selectedSize });
     } catch {
