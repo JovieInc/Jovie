@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.63] - 2026-03-24
+
+### Changed
+
+- Redesign homepage from 11 sections to 6 cinematic layout — centered hero with claim form left and phone right, sticky phone product tour with scroll-driven mode transitions, logo bar z-index wipe effect, simplified text-left/screenshot-right feature sections
+- Simplify final CTA to centered claim form with "Claim your handle" headline
+
+### Removed
+
+- Remove ValuePropsSection, PhoneProfileDemo, AiSection, PricingSection, TestimonialsSection, and FaqSection from homepage — pricing moves to nav, FAQ to /support
+
 ## [26.4.62] - 2026-03-24
 
 ### Changed
