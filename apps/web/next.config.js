@@ -12,7 +12,7 @@ const nextConfig = {
     position: 'top-right',
   },
   // Transpile workspace packages for proper module resolution
-  transpilePackages: ['@jovie/ui'],
+  transpilePackages: ['@jovie/ui', '@clerk/ui'],
   turbopack: {
     // Path aliases are automatically resolved from tsconfig.json paths.
     // Do NOT add resolveAlias entries for @/* — that conflicts with
