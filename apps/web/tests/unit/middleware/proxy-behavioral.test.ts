@@ -101,10 +101,7 @@ vi.mock('@/lib/auth/constants', () => ({
   sanitizeRedirectUrl: mocks.sanitizeRedirectUrl,
 }));
 vi.mock('@clerk/nextjs/server', () => ({
-  clerkMiddleware: mocks.clerkMiddleware.mockImplementation(
-    (handler: Function) => async (req: unknown, event: unknown) =>
-      handler(req, event)
-  ),
+  clerkMiddleware: mocks.clerkMiddleware,
 }));
 vi.mock('@/constants/app', () => ({
   AUDIENCE_ANON_COOKIE: 'audience_anon',
@@ -168,6 +165,10 @@ function resetMocks() {
   mocks.isKnownActiveUser.mockReturnValue(false);
   mocks.isStagingHost.mockReturnValue(false);
   mocks.createBotResponse.mockReturnValue(undefined);
+  mocks.clerkMiddleware.mockImplementation(
+    (handler: Function) => async (req: unknown, event: unknown) =>
+      handler(req, event)
+  );
 }
 
 describe('proxy.ts middleware', () => {
@@ -397,6 +398,11 @@ describe('proxy.ts middleware', () => {
         pathname: '/pricing',
       });
       const res = await callMiddleware(req);
+
+      // Verify the rewrite destination is /onboarding
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBeTruthy();
+      expect(new URL(rewriteUrl!).pathname).toBe('/onboarding');
 
       const cookies = getResponseCookies(res);
       expect(cookies.jovie_redirect_count).toBe('1');

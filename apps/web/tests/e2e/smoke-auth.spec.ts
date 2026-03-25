@@ -294,11 +294,11 @@ test.describe('Dashboard Navigation @smoke', () => {
       await page.waitForTimeout(3_000);
 
       const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;
-      const onboardingCount = redirectUrls.filter(
-        u => u === APP_ROUTES.ONBOARDING
+      const signinCount = redirectUrls.filter(
+        u => u === APP_ROUTES.SIGNIN || u === '/sign-in'
       ).length;
       const isLooping =
-        (appCount >= 2 && onboardingCount >= 2) || redirectUrls.length > 10;
+        (appCount >= 2 && signinCount >= 2) || redirectUrls.length > 10;
 
       expect(
         isLooping,
