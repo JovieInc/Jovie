@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.68] - 2026-03-25
+
+### Fixed
+
+- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — `getCachedAuth()` already opts into dynamic rendering via `headers()`, and removing it unblocks future PPR optimization
+- [internal] Add missing `dashboardLoadError` check to insights page — previously silently fell through to client-side errors instead of showing `PageErrorState`
+- [internal] Replace direct `Sentry.captureException` with `captureError()` utility in earnings page for consistency
+- [internal] Fix hardcoded `/app/insights` redirect URL to use `APP_ROUTES.INSIGHTS` constant
+- [internal] Wrap presence page content in Suspense boundary so the skeleton streams instantly instead of blocking until all data resolves
+
 ## [26.4.67] - 2026-03-25
 
 ### Fixed
