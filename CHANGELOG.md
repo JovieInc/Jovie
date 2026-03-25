@@ -13,6 +13,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.61] - 2026-03-24
 
+### Fixed
+
+- Disable waitlist gate so all signups go straight to onboarding — removes the waitlist form trap where users submitted and got stuck in a refresh loop
+- Fix proxy error fallbacks to route to onboarding instead of a dead waitlist page on DB failure or missing Clerk identity
+
 ### Changed
 
 - Profile V2 layout is now the default for all artist profiles (Statsig gate can still override)
