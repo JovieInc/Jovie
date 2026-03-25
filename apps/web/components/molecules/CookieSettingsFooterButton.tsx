@@ -36,7 +36,6 @@ export function CookieSettingsFooterButton({
       )}
       style={style}
       onClick={() => {
-        if (typeof window === 'undefined') return;
         window.dispatchEvent(new CustomEvent('jv:cookie:open'));
       }}
     >

@@ -8,6 +8,7 @@ import { Badge } from '@/components/atoms/Badge';
 import { APP_ROUTES } from '@/constants/routes';
 import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { track } from '@/lib/analytics';
+import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import { Icon } from '../../atoms/Icon';
 import { Avatar } from '../../molecules/Avatar/Avatar';
@@ -153,14 +154,24 @@ function buildDropdownItems({
       label: 'Cookie Policy',
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
-    },
-    {
+    }
+  );
+
+  // Only show Cookie Settings in GDPR-regulated regions, matching footer behavior
+  const ccRequired =
+    typeof document !== 'undefined'
+      ? document.cookie
+          .split(';')
+          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`))
+      : undefined;
+  if (ccRequired && ccRequired.split('=')[1]?.trim() !== '0') {
+    learnMoreItems.push({
       type: 'action',
       id: 'cookie-settings',
       label: 'Cookie Settings',
       onClick: () => window.dispatchEvent(new CustomEvent('jv:cookie:open')),
-    }
-  );
+    });
+  }
 
   const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',

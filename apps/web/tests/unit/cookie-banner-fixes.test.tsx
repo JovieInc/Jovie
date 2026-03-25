@@ -5,6 +5,12 @@ vi.mock('@/lib/cookies/consent', () => ({
   saveConsent: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/tracking/consent', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/tracking/consent')>();
+  return { ...actual, setConsentState: vi.fn() };
+});
+
 vi.mock('@/hooks/useMediaQuery', () => ({
   useMediaQuery: () => false,
 }));
@@ -29,8 +35,6 @@ describe('CookieBannerSection consent sync', () => {
 
   it('calls setConsentState accepted on acceptAll', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
-    vi.spyOn({ setConsentState }, 'setConsentState');
-
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
@@ -38,8 +42,8 @@ describe('CookieBannerSection consent sync', () => {
     const btn = screen.getByRole('button', { name: /accept all/i });
     fireEvent.click(btn);
 
-    // Verify localStorage was set (synced)
     await vi.waitFor(() => {
+      expect(setConsentState).toHaveBeenCalledWith('accepted');
       const saved = localStorage.getItem('jv_cc');
       expect(saved).toBeTruthy();
       const parsed = JSON.parse(saved!);
@@ -48,6 +52,7 @@ describe('CookieBannerSection consent sync', () => {
   });
 
   it('calls setConsentState rejected on reject', async () => {
+    const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');
     setCookie('jv_cc_required=1');
     render(<mod.CookieBannerSection />);
@@ -56,6 +61,7 @@ describe('CookieBannerSection consent sync', () => {
     fireEvent.click(btn);
 
     await vi.waitFor(() => {
+      expect(setConsentState).toHaveBeenCalledWith('rejected');
       const saved = localStorage.getItem('jv_cc');
       expect(saved).toBeTruthy();
       const parsed = JSON.parse(saved!);
