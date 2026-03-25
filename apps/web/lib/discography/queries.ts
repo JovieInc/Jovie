@@ -540,6 +540,34 @@ export async function upsertRelease(
   return result;
 }
 
+function resolveProviderLinkOwner(input: UpsertProviderLinkInput) {
+  if ('releaseTrackId' in input && input.releaseTrackId) {
+    return {
+      ownerType: 'release_track' as const,
+      releaseId: null,
+      trackId: null,
+      releaseTrackId: input.releaseTrackId,
+      conflictTarget: [providerLinks.providerId, providerLinks.releaseTrackId],
+    };
+  }
+  if ('trackId' in input && input.trackId) {
+    return {
+      ownerType: 'track' as const,
+      releaseId: null,
+      trackId: input.trackId,
+      releaseTrackId: null,
+      conflictTarget: [providerLinks.providerId, providerLinks.trackId],
+    };
+  }
+  return {
+    ownerType: 'release' as const,
+    releaseId: (input as UpsertReleaseProviderLinkInput).releaseId,
+    trackId: null,
+    releaseTrackId: null,
+    conflictTarget: [providerLinks.providerId, providerLinks.releaseId],
+  };
+}
+
 /**
  * Upsert a provider link for a release or track
  */
@@ -548,25 +576,14 @@ export async function upsertProviderLink(
 ): Promise<ProviderLink> {
   const now = new Date();
 
-  // Determine owner type based on which ID is provided
-  const isReleaseTrackLink = 'releaseTrackId' in input && input.releaseTrackId;
-  const isTrackLink = 'trackId' in input && input.trackId;
-  const ownerType = isReleaseTrackLink
-    ? 'release_track'
-    : isTrackLink
-      ? 'track'
-      : 'release';
+  const owner = resolveProviderLinkOwner(input);
 
   const insertData: NewProviderLink = {
     providerId: input.providerId,
-    ownerType,
-    releaseId: isReleaseTrackLink
-      ? null
-      : isTrackLink
-        ? null
-        : (input as UpsertReleaseProviderLinkInput).releaseId,
-    trackId: isTrackLink ? input.trackId : null,
-    releaseTrackId: isReleaseTrackLink ? input.releaseTrackId : null,
+    ownerType: owner.ownerType,
+    releaseId: owner.releaseId,
+    trackId: owner.trackId,
+    releaseTrackId: owner.releaseTrackId,
     url: input.url,
     externalId: input.externalId ?? null,
     sourceType: input.sourceType ?? 'ingested',
@@ -576,19 +593,12 @@ export async function upsertProviderLink(
     updatedAt: now,
   };
 
-  // Use the appropriate unique constraint target
-  const conflictTarget = isReleaseTrackLink
-    ? [providerLinks.providerId, providerLinks.releaseTrackId]
-    : isTrackLink
-      ? [providerLinks.providerId, providerLinks.trackId]
-      : [providerLinks.providerId, providerLinks.releaseId];
-
   try {
     const [result] = await db
       .insert(providerLinks)
       .values(insertData)
       .onConflictDoUpdate({
-        target: conflictTarget,
+        target: owner.conflictTarget,
         set: {
           url: input.url,
           externalId: input.externalId ?? null,
@@ -627,7 +637,7 @@ export async function upsertProviderLink(
         metadata: fallbackMetadata,
       })
       .onConflictDoUpdate({
-        target: conflictTarget,
+        target: owner.conflictTarget,
         set: {
           url: input.url,
           externalId: null,

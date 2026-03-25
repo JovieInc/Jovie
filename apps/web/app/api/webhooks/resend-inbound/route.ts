@@ -158,14 +158,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (webhookSecret) {
-    if (!svixSignature || !svixTimestamp) {
-      logger.warn('Inbound webhook missing required signature headers');
-      return NextResponse.json(
-        { error: 'Missing signature headers' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  if (webhookSecret && (!svixSignature || !svixTimestamp)) {
+    logger.warn('Inbound webhook missing required signature headers');
+    return NextResponse.json(
+      { error: 'Missing signature headers' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (webhookSecret && svixSignature && svixTimestamp) {
     const valid = verifySignature(
       rawBody,
       svixSignature,

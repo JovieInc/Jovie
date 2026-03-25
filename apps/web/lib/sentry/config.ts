@@ -314,6 +314,15 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
  * Users can request data deletion via privacy@jov.ie.
  */
 
+function isCspViolation(event: SentryEvent): boolean {
+  const values = [event.message, event.exception?.values?.[0]?.value].filter(
+    (v): v is string => typeof v === 'string'
+  );
+  return values.some(
+    v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
+  );
+}
+
 /**
  * Scrubs PII from Sentry events and filters deployment noise.
  * This is used as the `beforeSend` hook in all Sentry configurations.
@@ -351,14 +360,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
 
   // Drop Content Security Policy violations — typically caused by browser
   // extensions injecting inline scripts that violate our strict CSP. Not actionable.
-  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
-    (v): v is string => typeof v === 'string'
-  );
-  if (
-    cspValues.some(
-      v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
-    )
-  ) {
+  if (isCspViolation(event)) {
     return null;
   }
 

@@ -261,13 +261,12 @@ export async function findRedirectByOldSlug(
       .where(eq(discogReleases.id, redirect.releaseId))
       .limit(1);
 
-    if (release) {
-      return { type: 'release', currentSlug: release.slug };
-    }
-  } else if (
-    redirect.contentType === 'release_track' &&
-    redirect.releaseTrackId
-  ) {
+    return release
+      ? { type: 'release' as const, currentSlug: release.slug }
+      : null;
+  }
+
+  if (redirect.contentType === 'release_track' && redirect.releaseTrackId) {
     // New model: look up recording slug via release_track
     const [rt] = await db
       .select({ recordingId: discogReleaseTracks.recordingId })
@@ -283,19 +282,20 @@ export async function findRedirectByOldSlug(
         .limit(1);
 
       if (recording) {
-        return { type: 'release_track', currentSlug: recording.slug };
+        return { type: 'release_track' as const, currentSlug: recording.slug };
       }
     }
-  } else if (redirect.contentType === 'track' && redirect.trackId) {
+    return null;
+  }
+
+  if (redirect.contentType === 'track' && redirect.trackId) {
     const [track] = await db
       .select({ slug: discogTracks.slug })
       .from(discogTracks)
       .where(eq(discogTracks.id, redirect.trackId))
       .limit(1);
 
-    if (track) {
-      return { type: 'track', currentSlug: track.slug };
-    }
+    return track ? { type: 'track' as const, currentSlug: track.slug } : null;
   }
 
   return null;
