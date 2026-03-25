@@ -94,9 +94,10 @@ export const MusicImportHero = memo(function MusicImportHero({
     );
   }
 
+  const pluralSuffix = releases.length === 1 ? '' : 's';
   const headline = isImporting
     ? "We're importing your music"
-    : `${releases.length} release${releases.length === 1 ? '' : 's'} ready`;
+    : `${releases.length} release${pluralSuffix} ready`;
 
   return (
     <div className='space-y-3'>

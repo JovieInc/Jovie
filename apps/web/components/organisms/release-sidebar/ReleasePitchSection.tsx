@@ -113,11 +113,9 @@ export function ReleasePitchSection({
             'disabled:cursor-not-allowed disabled:opacity-50'
           )}
         >
-          {isPending
-            ? 'Generating…'
-            : pitches
-              ? 'Regenerate'
-              : 'Generate Pitch'}
+          {isPending && 'Generating…'}
+          {!isPending && pitches && 'Regenerate'}
+          {!isPending && !pitches && 'Generate Pitch'}
         </button>
       </div>
 

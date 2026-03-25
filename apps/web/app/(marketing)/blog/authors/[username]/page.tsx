@@ -87,11 +87,12 @@ export default async function AuthorPage({
   const author = resolveAuthor(authorPosts[0], profile);
 
   // Normalize profile URL to absolute
-  const absoluteProfileUrl = author.profileUrl
-    ? author.profileUrl.startsWith('http')
+  let absoluteProfileUrl: string | undefined;
+  if (author.profileUrl) {
+    absoluteProfileUrl = author.profileUrl.startsWith('http')
       ? author.profileUrl
-      : `${APP_URL}${author.profileUrl}`
-    : undefined;
+      : `${APP_URL}${author.profileUrl}`;
+  }
 
   // Build schemas
   const personSchema = buildPersonSchema({

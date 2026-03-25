@@ -107,7 +107,7 @@ export function ProductScreenshot({
       </div>
 
       {/* Screenshot image */}
-      {isAvailable === false ? (
+      {isAvailable === false && (
         <div
           className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
           style={{ aspectRatio }}
@@ -124,7 +124,8 @@ export function ProductScreenshot({
             </p>
           </div>
         </div>
-      ) : isAvailable === true ? (
+      )}
+      {isAvailable === true && (
         <Image
           src={src}
           alt={alt}
@@ -133,7 +134,8 @@ export function ProductScreenshot({
           priority={priority}
           className='w-full'
         />
-      ) : (
+      )}
+      {isAvailable === undefined && (
         <div
           className='w-full animate-pulse bg-surface-1'
           style={{ aspectRatio }}

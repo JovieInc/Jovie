@@ -98,11 +98,12 @@ export function ProfileSwitcher() {
                     </p>
                   )}
                 </div>
-                {isSwitching ? (
+                {isSwitching && (
                   <Loader2 className='size-3.5 shrink-0 animate-spin text-muted-foreground' />
-                ) : isActive ? (
+                )}
+                {!isSwitching && isActive && (
                   <Check className='size-3.5 shrink-0 text-primary' />
-                ) : null}
+                )}
               </DropdownMenuItem>
             );
           })}

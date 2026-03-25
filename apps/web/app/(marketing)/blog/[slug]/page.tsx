@@ -113,11 +113,12 @@ export default async function BlogPostRoute({
 
     // Build schemas
     // Normalize author URL to absolute
-    const authorUrl = author.profileUrl
-      ? author.profileUrl.startsWith('http')
+    let authorUrl: string | undefined;
+    if (author.profileUrl) {
+      authorUrl = author.profileUrl.startsWith('http')
         ? author.profileUrl
-        : `${APP_URL}${author.profileUrl}`
-      : undefined;
+        : `${APP_URL}${author.profileUrl}`;
+    }
 
     const articleSchema = buildArticleSchema({
       headline: post.title,
