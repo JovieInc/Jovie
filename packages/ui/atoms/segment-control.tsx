@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const segmentControlVariants = cva(
-  'inline-flex items-center gap-1 rounded-[9px] border border-subtle bg-surface-1 shadow-none',
+  'inline-flex items-center gap-1 rounded-full border border-subtle bg-surface-1 shadow-none',
   {
     variants: {
       variant: {
@@ -29,7 +29,7 @@ const segmentControlVariants = cva(
 
 const segmentTriggerVariants = cva(
   [
-    'relative rounded-[7px] border border-transparent bg-transparent font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
+    'relative rounded-full border border-transparent bg-transparent font-[510] tracking-[-0.01em] transition-[background-color,color,box-shadow,border-color] duration-fast ease-interactive',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--color-accent)/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--linear-app-content-surface)',
     'disabled:pointer-events-none disabled:opacity-45',
     // Inactive state
