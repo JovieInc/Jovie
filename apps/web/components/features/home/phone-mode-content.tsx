@@ -6,7 +6,6 @@
  */
 
 import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { SmartLinkProviderButton } from '@/features/release/SmartLinkProviderButton';
 
 /* ------------------------------------------------------------------ */
@@ -20,9 +19,6 @@ export const MOCK_ARTIST = {
     'https://egojgbuon2z2yahy.public.blob.vercel-storage.com/avatars/users/user_38SPgR24re2YSaXT2hVoFtvvlVy/tim-white-profie-pic-e2f4672b-3555-4a63-9fe6-f0d5362218f6.avif',
   isVerified: true,
 } as const;
-
-export const PHONE_CTA_CLASS =
-  'inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-[13px] font-semibold text-primary-token';
 
 export const PHONE_CONTENT_HEIGHT = 196;
 export const FALLBACK_CITY = 'Los Angeles';
@@ -146,7 +142,7 @@ function TipContent() {
         Choose amount
       </p>
       <div className='grid grid-cols-3 gap-2'>
-        {([3, 5, 10] as const).map((amount, i) => (
+        {([3, 5, 7] as const).map((amount, i) => (
           <div
             key={amount}
             className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-xl text-center ${
@@ -198,35 +194,30 @@ function TourContent() {
 }
 
 function ProfileContent() {
-  const platforms = ['instagram', 'spotify', 'youtube', 'tiktok'] as const;
   return (
-    <div className='flex h-full flex-col justify-center gap-3'>
-      <button
-        type='button'
-        className={PHONE_CTA_CLASS}
+    <div className='flex h-full flex-col items-center justify-center gap-3'>
+      {/* Mini release artwork */}
+      <div
+        className='h-20 w-20 shrink-0 overflow-hidden rounded-2xl shadow-sm'
         style={{
           background:
-            'linear-gradient(180deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.05) 100%)',
+            'linear-gradient(135deg, rgba(113,112,255,0.3) 0%, rgba(113,112,255,0.08) 100%)',
         }}
-      >
-        Turn on notifications
-      </button>
-      <div
-        className='flex items-center justify-center gap-1.5 rounded-full px-1.5 py-1'
-        style={{
-          backgroundColor: 'rgba(255,255,255,0.025)',
-        }}
-      >
-        {platforms.map(p => (
-          <span
-            key={p}
-            className='inline-flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token'
-            style={{ backgroundColor: 'rgba(255,255,255,0.015)' }}
-          >
-            <SocialIcon platform={p} size={18} aria-hidden />
-          </span>
-        ))}
+      />
+      <div className='text-center space-y-0.5'>
+        <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+          Out now
+        </p>
+        <p className='text-[13px] font-semibold text-primary-token'>
+          New Single
+        </p>
       </div>
+      <button
+        type='button'
+        className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-6 py-2.5 text-[13px] font-semibold text-btn-primary-foreground shadow-sm'
+      >
+        Listen now
+      </button>
     </div>
   );
 }

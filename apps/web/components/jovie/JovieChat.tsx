@@ -540,7 +540,7 @@ export function JovieChat({
                           >
                             {username ? `jov.ie/${username}` : 'jov.ie'}
                           </a>
-                          .
+                          {'.'}
                         </p>
                       ) : (
                         <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
