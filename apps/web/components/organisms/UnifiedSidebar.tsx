@@ -221,9 +221,9 @@ function SidebarHeaderNav({
               )}
             >
               <BrandLogo
-                size={13}
+                size={16}
                 tone='auto'
-                className='rounded-[4px] shrink-0'
+                className='rounded-sm shrink-0'
               />
               <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
                 {isAdmin ? 'Admin' : 'Jovie'}
