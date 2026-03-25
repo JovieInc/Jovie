@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.64] - 2026-03-25
+
+### Fixed
+
+- Add "Cookie Settings" button to site footer for GDPR-regulated regions so users can reopen cookie preferences after dismissing the banner
+- Load saved cookie preferences when reopening the cookie modal instead of always showing defaults
+- Sync tracking consent state (`jv_tracking_consent`) when users accept or reject cookies via the banner or modal
+- Add "Cookie Settings" action to the user profile menu for authenticated users
+- Add accessible dialog description to the cookie preferences modal
+
 ## [26.4.63] - 2026-03-24
 
 ### Changed
