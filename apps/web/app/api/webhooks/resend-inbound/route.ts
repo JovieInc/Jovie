@@ -130,24 +130,12 @@ async function processInboundEmail(
   }
 }
 
-/**
- * POST handler for Resend inbound email webhooks.
- */
-export async function POST(req: NextRequest) {
-  let rawBody: string;
-  try {
-    rawBody = await req.text();
-  } catch {
-    return NextResponse.json(
-      { error: 'Bad request' },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  // Verify webhook signature
+function verifyWebhookSignature(
+  req: NextRequest,
+  rawBody: string
+): NextResponse | null {
   const svixTimestamp = req.headers.get('svix-timestamp');
   const svixSignature = req.headers.get('svix-signature');
-
   const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
 
   if (!webhookSecret && process.env.NODE_ENV === 'production') {
@@ -180,6 +168,27 @@ export async function POST(req: NextRequest) {
       );
     }
   }
+
+  return null;
+}
+
+/**
+ * POST handler for Resend inbound email webhooks.
+ */
+export async function POST(req: NextRequest) {
+  let rawBody: string;
+  try {
+    rawBody = await req.text();
+  } catch {
+    return NextResponse.json(
+      { error: 'Bad request' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  // Verify webhook signature
+  const signatureError = verifyWebhookSignature(req, rawBody);
+  if (signatureError) return signatureError;
 
   let payload: ResendInboundEvent;
   try {

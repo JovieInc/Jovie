@@ -254,48 +254,48 @@ export async function findRedirectByOldSlug(
   if (!redirect) return null;
 
   // Get current slug based on content type
+  return resolveRedirectSlug(redirect);
+}
+
+async function resolveRedirectSlug(redirect: {
+  contentType: string;
+  releaseId: string | null;
+  trackId: string | null;
+  releaseTrackId: string | null;
+}): Promise<{ type: ContentType; currentSlug: string } | null> {
   if (redirect.contentType === 'release' && redirect.releaseId) {
     const [release] = await db
       .select({ slug: discogReleases.slug })
       .from(discogReleases)
       .where(eq(discogReleases.id, redirect.releaseId))
       .limit(1);
+    if (release) return { type: 'release', currentSlug: release.slug };
+  }
 
-    if (release) {
-      return { type: 'release', currentSlug: release.slug };
-    }
-  } else if (
-    redirect.contentType === 'release_track' &&
-    redirect.releaseTrackId
-  ) {
-    // New model: look up recording slug via release_track
+  if (redirect.contentType === 'release_track' && redirect.releaseTrackId) {
     const [rt] = await db
       .select({ recordingId: discogReleaseTracks.recordingId })
       .from(discogReleaseTracks)
       .where(eq(discogReleaseTracks.id, redirect.releaseTrackId))
       .limit(1);
-
     if (rt) {
       const [recording] = await db
         .select({ slug: discogRecordings.slug })
         .from(discogRecordings)
         .where(eq(discogRecordings.id, rt.recordingId))
         .limit(1);
-
-      if (recording) {
+      if (recording)
         return { type: 'release_track', currentSlug: recording.slug };
-      }
     }
-  } else if (redirect.contentType === 'track' && redirect.trackId) {
+  }
+
+  if (redirect.contentType === 'track' && redirect.trackId) {
     const [track] = await db
       .select({ slug: discogTracks.slug })
       .from(discogTracks)
       .where(eq(discogTracks.id, redirect.trackId))
       .limit(1);
-
-    if (track) {
-      return { type: 'track', currentSlug: track.slug };
-    }
+    if (track) return { type: 'track', currentSlug: track.slug };
   }
 
   return null;

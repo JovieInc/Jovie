@@ -32,6 +32,40 @@ import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useQrCodeDownloadMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
+function buildSnapshotTags(data: {
+  bio: string | null;
+  genres: string[] | null;
+  location: string | null;
+  hometown: string | null;
+  activeSinceYear: number | null;
+  dspConnections: {
+    spotify: { connected: boolean };
+    appleMusic: { connected: boolean };
+  };
+}): string[] {
+  const connectedDspCount = [
+    data.dspConnections.spotify.connected,
+    data.dspConnections.appleMusic.connected,
+  ].filter(Boolean).length;
+  const hasBio = (data.bio?.trim().length ?? 0) > 0;
+
+  return [
+    data.location,
+    data.hometown &&
+    data.hometown !== data.location &&
+    data.hometown.trim().length > 0
+      ? `From ${data.hometown}`
+      : null,
+    ...(data.genres?.slice(0, 2) ?? []),
+    data.activeSinceYear ? `Since ${data.activeSinceYear}` : null,
+    hasBio ? 'Bio live' : null,
+    connectedDspCount > 0 ? `${connectedDspCount} connected` : null,
+  ].filter(
+    (value, i, arr): value is string =>
+      Boolean(value) && arr.indexOf(value) === i
+  );
+}
+
 export const PREVIEW_PANEL_WIDTH = 360;
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -257,22 +291,7 @@ export function PreviewPanel() {
     previewData.dspConnections.spotify.connected,
     previewData.dspConnections.appleMusic.connected,
   ].filter(Boolean).length;
-  const hasBio = (previewData.bio?.trim().length ?? 0) > 0;
-  const snapshotTags = [
-    previewData.location,
-    previewData.hometown &&
-    previewData.hometown !== previewData.location &&
-    previewData.hometown.trim().length > 0
-      ? `From ${previewData.hometown}`
-      : null,
-    ...(previewData.genres?.slice(0, 2) ?? []),
-    previewData.activeSinceYear ? `Since ${previewData.activeSinceYear}` : null,
-    hasBio ? 'Bio live' : null,
-    connectedDspCount > 0 ? `${connectedDspCount} connected` : null,
-  ].filter(
-    (value, i, arr): value is string =>
-      Boolean(value) && arr.indexOf(value) === i
-  );
+  const snapshotTags = buildSnapshotTags(previewData);
   const headerTitle: ReactNode = (
     <div className='min-w-0 space-y-0.5'>
       <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>

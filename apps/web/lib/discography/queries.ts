@@ -540,15 +540,7 @@ export async function upsertRelease(
   return result;
 }
 
-/**
- * Upsert a provider link for a release or track
- */
-export async function upsertProviderLink(
-  input: UpsertProviderLinkInput
-): Promise<ProviderLink> {
-  const now = new Date();
-
-  // Determine owner type based on which ID is provided
+function resolveProviderLinkOwner(input: UpsertProviderLinkInput, now: Date) {
   const isReleaseTrackLink = 'releaseTrackId' in input && input.releaseTrackId;
   const isTrackLink = 'trackId' in input && input.trackId;
   const ownerType = isReleaseTrackLink
@@ -576,12 +568,24 @@ export async function upsertProviderLink(
     updatedAt: now,
   };
 
-  // Use the appropriate unique constraint target
   const conflictTarget = isReleaseTrackLink
     ? [providerLinks.providerId, providerLinks.releaseTrackId]
     : isTrackLink
       ? [providerLinks.providerId, providerLinks.trackId]
       : [providerLinks.providerId, providerLinks.releaseId];
+
+  return { ownerType, insertData, conflictTarget } as const;
+}
+
+/**
+ * Upsert a provider link for a release or track
+ */
+export async function upsertProviderLink(
+  input: UpsertProviderLinkInput
+): Promise<ProviderLink> {
+  const now = new Date();
+
+  const { insertData, conflictTarget } = resolveProviderLinkOwner(input, now);
 
   try {
     const [result] = await db
