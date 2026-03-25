@@ -22,20 +22,24 @@ describe('clerkAvailability', () => {
     });
 
     it('returns the proxy URL from env when set', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '/custom-clerk');
       expect(getClerkProxyUrl()).toBe('/custom-clerk');
     });
 
     it('falls back to /__clerk when env var is empty string', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '');
       expect(getClerkProxyUrl()).toBe('/__clerk');
     });
 
     it('falls back to /__clerk when env var is not present', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
       expect(getClerkProxyUrl()).toBe('/__clerk');
     });
 
     it('supports full URL for staging', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', 'https://clerk.staging.jov.ie');
       expect(getClerkProxyUrl()).toBe('https://clerk.staging.jov.ie');
     });

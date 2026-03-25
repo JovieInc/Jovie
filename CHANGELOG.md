@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.72] - 2026-03-25
+
+### Fixed
+
+- [internal] Fix Clerk proxy test failures when Doppler sets `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` — explicitly clear disabled flag in tests that expect proxy active
+
 ## [26.4.71] - 2026-03-25
 
 ### Fixed
@@ -42,6 +48,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - SVG asset fill colors: black icon `#222326` → `#000000`, white icon `#F4F5F8` → `#FFFFFF` for maximum contrast at small sizes
 - AuthLayout logo animation: one-shot pulse with reduced-motion guard (was permanently looping)
 - BrandLogo wrapped in `<span>` to isolate from parent `[&>svg]` selector overrides in CircleIconButton/SidebarMenuButton
+- [internal] Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
+- [internal] Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
+- [internal] Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
+- [internal] Expand nightly E2E config to include dashboard health tests across all 5 browser projects
+- [internal] Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
+- [internal] Add safety guards preventing silent test disablement when route matrices are empty
 
 ### Removed
 
