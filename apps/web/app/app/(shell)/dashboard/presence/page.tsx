@@ -33,22 +33,18 @@ async function PresenceContent() {
       redirect(APP_ROUTES.ONBOARDING);
     }
 
-    let presenceData: Awaited<ReturnType<typeof loadDspPresence>> = {
-      items: [],
-      confirmedCount: 0,
-      suggestedCount: 0,
-    };
-
     try {
-      presenceData = await loadDspPresence();
+      const presenceData = await loadDspPresence();
+      return <DspPresenceView data={presenceData} />;
     } catch (error) {
       throwIfRedirect(error);
       void captureError('loadDspPresence failed', error, {
         route: APP_ROUTES.PRESENCE,
       });
+      return (
+        <PageErrorState message='Failed to load presence data. Please refresh the page.' />
+      );
     }
-
-    return <DspPresenceView data={presenceData} />;
   } catch (error) {
     throwIfRedirect(error);
     void captureError('Presence page failed', error, {
