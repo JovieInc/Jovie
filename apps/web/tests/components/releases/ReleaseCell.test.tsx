@@ -89,7 +89,10 @@ describe('ReleaseCell', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
-    expect(screen.getByText('Single')).toBeInTheDocument();
+    const typeBadge = screen.getByText('Single');
+    expect(typeBadge).toBeInTheDocument();
+    expect(typeBadge.className).toContain('items-center');
+    expect(typeBadge.className).toContain('leading-none');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 

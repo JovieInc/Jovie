@@ -1,19 +1,12 @@
 import type { Metadata } from 'next';
-import { FaqSection, NumberedSection } from '@/components/marketing';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { AiDemo } from '@/features/home/AiDemo';
-import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { FeatureRow } from '@/features/home/FeatureRow';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
-import { HeroScrollSection } from '@/features/home/HeroScrollSection';
+import { HeroCinematic } from '@/features/home/HeroCinematic';
 import { LogoBar } from '@/features/home/LogoBar';
-import { PhoneProfileDemo } from '@/features/home/PhoneProfileDemo';
-import { PricingSection } from '@/features/home/PricingSection';
-import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { TestimonialsSection } from '@/features/home/TestimonialsSection';
-import { ValuePropsSection } from '@/features/home/ValuePropsSection';
+import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
-  buildFaqSchema,
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
@@ -155,81 +148,6 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
-const HOME_FAQ_ITEMS = [
-  {
-    question: 'What is Jovie?',
-    answer:
-      'Jovie is a release platform for independent musicians. It gives you smart links, an artist profile, audience intelligence, release automation, and AI tools — all in one place. Create your profile free at jov.ie.',
-  },
-  {
-    question: 'Is Jovie free?',
-    answer:
-      'Yes. Jovie has a free tier that lets you create a profile, add releases, and start collecting fans. Paid plans unlock advanced analytics, branding removal, contact export, and more.',
-  },
-  {
-    question: 'How do smart links work?',
-    answer:
-      'When you release new music, Jovie automatically generates a smart link and emails it to every fan on release day — no setup required. Want to customize it? Add the release manually beforehand.',
-  },
-  {
-    question: 'How is Jovie different from Linktree?',
-    answer:
-      'Linktree is a general-purpose link-in-bio tool. Jovie is built specifically for musicians — it auto-generates smart links for releases, routes fans to the right streaming platform, collects and manages fan contacts, sends automatic notifications when you drop new music, and includes AI tools that understand your career data.',
-  },
-  {
-    question: 'Can I notify fans when I release music?',
-    answer:
-      'Yes. Jovie automatically notifies your fans via email when you release new music. Fans opt in through your profile page — you build your audience, and Jovie handles the delivery.',
-  },
-];
-
-const HOME_FAQ_SCHEMA = buildFaqSchema(HOME_FAQ_ITEMS);
-
-const AI_SUB_ITEMS = [
-  {
-    number: '4.1',
-    title: 'Press Releases',
-    description:
-      'A press release that says you dropped "Never Say A Word" with The Orchard on March 3rd, it hit 42K streams in the first week, and you\'ve toured 12 cities this year. ChatGPT can\'t write that.',
-  },
-  {
-    number: '4.2',
-    title: 'Career Context',
-    description:
-      "Every release date, every stream count, every collab, every city you've played. The AI has your full history loaded — not a blank prompt.",
-  },
-  {
-    number: '4.3',
-    title: 'Release Strategy',
-    description:
-      'Rollout plans built on your actual numbers — which platforms drive your streams, when your fans are most active, what worked last time.',
-  },
-];
-
-function AiSection() {
-  return (
-    <NumberedSection
-      id='ai'
-      sectionNumber='4.0'
-      sectionTitle='AI'
-      heading='AI that knows every song.'
-      description='Your releases, your stream counts, your tour history, your collabs — all loaded. Ask it to write a press release and it cites real numbers. Ask it to plan a rollout and it pulls from what actually worked.'
-      subItems={AI_SUB_ITEMS}
-      className='relative overflow-hidden bg-page'
-    >
-      <div
-        className='homepage-surface-card overflow-hidden rounded-[1rem]'
-        style={{
-          boxShadow:
-            '0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.25)',
-        }}
-      >
-        <AiDemo />
-      </div>
-    </NumberedSection>
-  );
-}
-
 export default function HomePage() {
   return (
     <div className='relative min-h-screen'>
@@ -249,46 +167,47 @@ export default function HomePage() {
         type='application/ld+json'
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: HOME_FAQ_SCHEMA }}
-      />
 
-      {/* 1. Hero */}
-      <HeroScrollSection />
+      {/* 1. Hero — claim form left, phone right */}
+      <HeroCinematic />
 
-      {/* Logo trust bar */}
+      {/* 2. Sticky phone product tour — scroll-driven mode transitions */}
+      <StickyPhoneTour />
+
+      {/* 3. Logo bar — z-index wipe over sticky phone */}
       <LogoBar />
 
-      {/* Value proposition — FIG cards */}
-      <ValuePropsSection />
-
-      {/* 1.0 Release */}
-      <ReleasesSection />
-
-      {/* 2.0 Profile */}
-      <PhoneProfileDemo />
-
-      {/* 3.0 Audience */}
-      <AudienceCRMSection />
-
-      {/* 4.0 AI */}
-      <AiSection />
-
-      {/* Pricing — must show before CTA for conversion */}
-      <PricingSection />
-
-      {/* Testimonials */}
-      <TestimonialsSection />
-
-      {/* FAQ */}
-      <FaqSection
-        items={HOME_FAQ_ITEMS}
-        className='mx-auto max-w-[720px] px-6 py-20 sm:px-8 lg:px-10'
-        headingClassName='text-3xl font-semibold tracking-tight text-primary-token'
+      {/* 4. Releases — text left, screenshot right */}
+      <FeatureRow
+        heading='Release day, automated.'
+        description='New music goes live with smart links, fan notifications, and pre-save pages — no setup required.'
+        bullets={[
+          'Smart links generated automatically for every release',
+          'Fans notified via email on release day',
+          'Pre-save pages that convert to day-one streams',
+        ]}
+        screenshotSrc='/product-screenshots/releases-dashboard-full.png'
+        screenshotAlt='Jovie release dashboard showing releases table with smart link details'
+        screenshotWidth={2880}
+        screenshotHeight={1800}
       />
 
-      {/* Final CTA */}
+      {/* 5. Audience — text left, screenshot right */}
+      <FeatureRow
+        heading='Know every fan by name.'
+        description="Every fan who subscribes, tips, or clicks becomes a contact you own — not a follower trapped on someone else's platform."
+        bullets={[
+          'Fan intelligence with source tracking',
+          'See which fans came from which release or show',
+          'Export contacts anytime — your audience, your data',
+        ]}
+        screenshotSrc='/product-screenshots/audience-crm.png'
+        screenshotAlt='Jovie audience CRM showing fan contacts with source tracking'
+        screenshotWidth={2880}
+        screenshotHeight={1800}
+      />
+
+      {/* 6. Final CTA */}
       <FinalCTASection />
     </div>
   );

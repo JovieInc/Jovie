@@ -34,12 +34,19 @@ body {
   overscroll-behavior: none;
 }
 
-/* Marketing pages use document scrolling rather than app-shell scroll panes. */
-html:has(.linear-marketing),
-body:has(.linear-marketing) {
+/* Marketing pages use document scrolling rather than app-shell scroll panes.
+   Only override html — setting overflow-y:auto on body promotes overflow-x:clip
+   to overflow-x:hidden, which creates a scroll container that breaks sticky. */
+html:has(.linear-marketing) {
   height: auto;
   min-height: 100%;
   overflow-y: auto;
+  overscroll-behavior: auto;
+}
+body:has(.linear-marketing) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
   overscroll-behavior: auto;
 }
 
@@ -642,6 +649,31 @@ body {
   }
   .hero-stagger > *:nth-child(5) {
     animation-delay: 240ms;
+  }
+}
+
+/* ============================================
+   HERO PHONE FLOAT ANIMATION
+   Subtle float on the phone in HeroCinematic.
+   ============================================ */
+
+@keyframes hero-phone-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-hero-phone-float {
+  animation: hero-phone-float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-phone-float {
+    animation: none;
   }
 }
 

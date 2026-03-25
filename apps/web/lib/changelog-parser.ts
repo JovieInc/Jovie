@@ -9,7 +9,11 @@
  *   is captured as `summary` (plain text, blockquote marker stripped).
  * - **`[internal]` entries**: Bullet entries starting with `[internal]` are
  *   excluded from the parsed output — they're for developer reference only.
+ * - **Auto-filter**: Entries matching vendor names, dev tooling, or infrastructure
+ *   patterns are automatically excluded even without the `[internal]` prefix.
  */
+
+import { isInternalEntry } from '../../../scripts/lib/changelog-filter-rules.mjs';
 
 export interface ChangelogSection {
   added: string[];
@@ -78,7 +82,8 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     if (trimmed.startsWith('- ') && currentSection) {
       const entry = trimmed.slice(2);
       // Skip internal entries — not meant for public display
-      if (!entry.startsWith(INTERNAL_PREFIX)) {
+      // Also auto-filter entries with vendor names, dev tooling, etc.
+      if (!entry.startsWith(INTERNAL_PREFIX) && !isInternalEntry(entry)) {
         current.sections[currentSection].push(entry);
       }
     }

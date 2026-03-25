@@ -356,6 +356,7 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
+      expect(screen.getByTestId('release-table-shell')).toBeInTheDocument();
     });
 
     it('renders table and subheader when releases exist', () => {

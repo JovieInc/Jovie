@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogActions,
   DialogBody,
+  DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { APP_ROUTES } from '@/constants/routes';
@@ -115,10 +116,24 @@ function CookieCategories({
 }
 
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
-  const [settings, setSettings] = useState<Consent>({
-    essential: true,
-    analytics: false,
-    marketing: false,
+  const [settings, setSettings] = useState<Consent>(() => {
+    if (typeof window === 'undefined') {
+      return { essential: true, analytics: false, marketing: false };
+    }
+    try {
+      const saved = localStorage.getItem('jv_cc');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Consent;
+        return {
+          essential: true,
+          analytics: !!parsed.analytics,
+          marketing: !!parsed.marketing,
+        };
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return { essential: true, analytics: false, marketing: false };
   });
   const isMobile = useMediaQuery('(max-width: 639px)');
 
@@ -197,6 +212,9 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       <DialogTitle className='text-[13px] font-semibold text-primary-token'>
         Cookie preferences
       </DialogTitle>
+      <DialogDescription className='sr-only'>
+        Manage your cookie preferences
+      </DialogDescription>
 
       <DialogBody className='mt-2'>
         <CookieCategories

@@ -13,6 +13,36 @@ export const TIMEOUTS = {
 
 export const OUTPUT_DIR = 'public/product-screenshots';
 
+/**
+ * Selectors for dev overlays that must be hidden before capturing screenshots.
+ * Exported so tests can verify this list stays comprehensive.
+ *
+ * Some selectors target library internals (.tsqd-parent-container, #vercel-toolbar)
+ * and may need updating when upgrading TanStack Query DevTools or @vercel/toolbar.
+ */
+export const DEV_OVERLAY_SELECTORS = [
+  // Toasts & notifications
+  '[data-sonner-toaster]',
+  // Cookie consent
+  '[data-testid="cookie-banner"], [data-cookie-banner]',
+  // Tooltips
+  '[role="tooltip"]',
+  // Intercom chat widget
+  '#intercom-container, .intercom-lightweight-app',
+  // Custom DevToolbar (collapsed button + expanded panel)
+  '[data-testid="dev-toolbar"]',
+  // TanStack Query DevTools — internal class, check on @tanstack/react-query-devtools upgrade
+  '.tsqd-parent-container',
+  // TanStack DevTools toggle — aria-label text, check on upgrade
+  'button[aria-label*="query devtools" i]',
+  // Vercel toolbar — internal ID, check on @vercel/toolbar upgrade
+  '#vercel-toolbar',
+  // Next.js dev overlays
+  '[data-nextjs-dialog-overlay]',
+  '[data-nextjs-toast]',
+  'nextjs-portal',
+] as const;
+
 /** Wait for network to settle and animations to finish */
 export async function waitForSettle(page: Page, ms: number = TIMEOUTS.SETTLE) {
   await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -21,17 +51,44 @@ export async function waitForSettle(page: Page, ms: number = TIMEOUTS.SETTLE) {
 
 /** Hide transient UI that shouldn't appear in marketing screenshots */
 export async function hideTransientUI(page: Page) {
-  await page.evaluate(() => {
+  await page.evaluate((selectors: readonly string[]) => {
     const hide = (selector: string) =>
       document
         .querySelectorAll(selector)
         .forEach(el => ((el as HTMLElement).style.display = 'none'));
 
-    hide('[data-sonner-toaster]');
-    hide('[data-testid="cookie-banner"], [data-cookie-banner]');
-    hide('[role="tooltip"]');
-    hide('#intercom-container, .intercom-lightweight-app');
-  });
+    for (const selector of selectors) {
+      hide(selector);
+    }
+  }, DEV_OVERLAY_SELECTORS);
+}
+
+/**
+ * Assert that no dev overlays are visible on the page.
+ * Call after hideTransientUI() and before page.screenshot() to catch regressions.
+ */
+export async function assertNoDevOverlays(page: Page) {
+  const results = await page.evaluate((selectors: readonly string[]) => {
+    const visible: string[] = [];
+    for (const selector of selectors) {
+      const els = document.querySelectorAll(selector);
+      for (const el of els) {
+        const htmlEl = el as HTMLElement;
+        const style = window.getComputedStyle(htmlEl);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
+          visible.push(selector);
+          break;
+        }
+      }
+    }
+    return visible;
+  }, DEV_OVERLAY_SELECTORS);
+
+  if (results.length > 0) {
+    throw new Error(
+      `Dev overlay(s) still visible before screenshot: ${results.join(', ')}`
+    );
+  }
 }
 
 /** Wait for all images within a container to finish loading */

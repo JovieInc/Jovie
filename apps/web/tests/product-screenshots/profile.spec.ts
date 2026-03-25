@@ -15,6 +15,7 @@
 
 import { test } from '@playwright/test';
 import {
+  assertNoDevOverlays,
   hideTransientUI,
   OUTPUT_DIR,
   TIMEOUTS,
@@ -52,6 +53,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-phone.png`,
@@ -80,6 +82,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-desktop.png`,

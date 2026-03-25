@@ -203,7 +203,7 @@ export function PublicProfileTemplateV2({
         data-test='public-profile-root'
       >
         <div className='pointer-events-none absolute inset-0 overflow-hidden'>
-          <div className='absolute left-[-10%] top-10 h-48 w-48 rounded-full bg-surface-2/70 blur-3xl' />
+          <div className='absolute left-[10%] top-20 h-48 w-48 rounded-full bg-surface-2/70 blur-3xl' />
           <div className='absolute bottom-0 right-[-10%] h-56 w-56 rounded-full bg-surface-3/60 blur-3xl' />
         </div>
 

@@ -14,7 +14,7 @@ export const mobileReleaseTokens = {
     subtitle: 'mt-0.5 text-[12px] leading-tight text-secondary-token',
     /** Badge-style type label — pair with getReleaseTypeStyle().bg */
     typeBadge:
-      'shrink-0 rounded-[6px] px-1.5 py-px text-[10px] font-[510] leading-[16px] tracking-normal',
+      'inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[10px] font-[510] leading-none tracking-normal',
     year: 'shrink-0 text-[12px] tabular-nums text-tertiary-token',
     chevron: 'h-3.5 w-3.5 shrink-0 text-quaternary-token',
     /** Dot separator between metadata items */

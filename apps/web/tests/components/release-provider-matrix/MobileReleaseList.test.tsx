@@ -98,4 +98,19 @@ describe('MobileReleaseList', () => {
 
     expect(onEdit).toHaveBeenCalledWith(release);
   });
+
+  it('uses centered badge styling for the release type label', () => {
+    render(
+      <MobileReleaseList
+        releases={[createRelease()]}
+        artistName='Jovie Artist'
+        onEdit={vi.fn()}
+      />
+    );
+
+    const badge = screen.getByText('Single');
+    expect(badge.className).toContain('inline-flex');
+    expect(badge.className).toContain('items-center');
+    expect(badge.className).toContain('leading-none');
+  });
 });

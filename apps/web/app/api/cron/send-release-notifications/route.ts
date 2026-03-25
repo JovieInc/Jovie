@@ -313,7 +313,12 @@ async function batchFetchStreamingLinks(releaseIds: string[]) {
 async function sendEmailNotification(
   ctx: ProcessingContext,
   subscriber: { email: string },
-  emailData: { subject: string; text: string; html: string },
+  emailData: {
+    subject: string;
+    text: string;
+    html: string;
+    headers?: Record<string, string>;
+  },
   senderContext: SenderContext
 ): Promise<ProcessResult> {
   const result = await sendNotification(
@@ -322,6 +327,7 @@ async function sendEmailNotification(
       subject: emailData.subject,
       text: emailData.text,
       html: emailData.html,
+      headers: emailData.headers,
       channels: ['email'],
       category: 'marketing',
       senderContext,

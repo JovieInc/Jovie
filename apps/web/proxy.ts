@@ -873,22 +873,11 @@ function buildFinalResponse(
   return res;
 }
 
-const frontendApiProxyEnabled =
-  process.env.NODE_ENV === 'production' || !!process.env.VERCEL_ENV;
-
 // Production Clerk middleware (default keys from env)
-const clerkProductionMiddleware = clerkMiddleware(
-  async (auth, req) => {
-    const { userId } = await auth();
-    return handleRequest(req, userId);
-  },
-  {
-    // Proxy Clerk JS through /__clerk in production/preview to avoid CORS/CSP
-    // issues with the custom domain. Disabled in dev — the proxy target
-    // (clerk.jov.ie) isn't reachable from localhost.
-    frontendApiProxy: { enabled: frontendApiProxyEnabled },
-  }
-);
+const clerkProductionMiddleware = clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
+  return handleRequest(req, userId);
+});
 
 // Staging Clerk middleware — lazy-initialized with separate instance keys.
 // The same build is promoted staging → production, so staging keys are
@@ -907,7 +896,6 @@ function getClerkStagingMiddleware() {
         {
           publishableKey: stagingPk,
           secretKey: stagingSk,
-          frontendApiProxy: { enabled: true },
         }
       );
     }
@@ -935,9 +923,25 @@ export default async function middleware(
   }
 
   const pathname = req.nextUrl.pathname;
-  const pathInfo = categorizePath(pathname);
 
   const hostname = req.nextUrl.hostname;
+
+  // ========================================================================
+  // Clerk FAPI proxy: rewrite /clerk/* to the correct Clerk Frontend API.
+  // This must be dynamic (not vercel.json) because staging and production
+  // use separate Clerk instances and the same build is promoted between them.
+  // ========================================================================
+  if (pathname.startsWith('/clerk/') || pathname === '/clerk') {
+    const fapiHost = isStagingHost(hostname)
+      ? 'clerk.staging.jov.ie'
+      : 'clerk.jov.ie';
+    const subpath = pathname.replace(/^\/clerk\/?/, '');
+    return NextResponse.rewrite(
+      new URL(`https://${fapiHost}/${subpath}${req.nextUrl.search}`)
+    );
+  }
+
+  const pathInfo = categorizePath(pathname);
 
   // Check if Clerk config is missing or mocked (staging-aware)
   const clerkConfigMissing = isMockOrMissingClerkConfig(hostname);
@@ -997,7 +1001,7 @@ export const config = {
   matcher: [
     // Skip Next.js internals, all static files, and .well-known directory
     '/((?!_next|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes and the Clerk FAPI proxy
-    '/(api|trpc|__clerk)(.*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
   ],
 };
