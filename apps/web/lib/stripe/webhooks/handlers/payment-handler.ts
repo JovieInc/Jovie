@@ -216,13 +216,16 @@ export class PaymentHandler extends BaseSubscriptionHandler {
 
     try {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      const userId = subscription.metadata?.clerk_user_id;
+      const userId = await this.extractUserId(
+        subscription,
+        'invoice.payment_succeeded'
+      );
 
       if (!userId) {
         return {
           success: true,
           skipped: true,
-          reason: 'no_user_id_in_subscription_metadata',
+          reason: 'cannot_identify_user_for_payment_success',
         };
       }
 
@@ -249,12 +252,9 @@ export class PaymentHandler extends BaseSubscriptionHandler {
           event: 'invoice.payment_succeeded',
         }
       );
-      return {
-        success: true,
-        skipped: true,
-        reason: 'error_processing_payment_success',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
+      throw error instanceof Error
+        ? error
+        : new Error('Unknown error processing payment success');
     }
   }
 
@@ -306,7 +306,10 @@ export class PaymentHandler extends BaseSubscriptionHandler {
 
     // Retrieve full subscription from Stripe API
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    const userId = await this.extractUserId(subscription);
+    const userId = await this.extractUserId(
+      subscription,
+      'invoice.payment_failed'
+    );
 
     // Skip if we can't identify the user
     if (!userId) {
@@ -437,20 +440,18 @@ export class PaymentHandler extends BaseSubscriptionHandler {
    * @private
    */
   private async extractUserId(
-    subscription: Stripe.Subscription
+    subscription: Stripe.Subscription,
+    eventType: 'invoice.payment_failed' | 'invoice.payment_succeeded'
   ): Promise<string | null> {
     let userId: string | undefined = subscription.metadata?.clerk_user_id;
+    const customerId = getCustomerId(subscription.customer);
 
     // Fallback: Look up user by Stripe customer ID if metadata is missing
-    if (!userId && typeof subscription.customer === 'string') {
-      await logFallback(
-        'No user ID in subscription metadata for payment failure',
-        {
-          event: 'invoice.payment_failed',
-        }
-      );
-      userId =
-        (await getUserIdFromStripeCustomer(subscription.customer)) ?? undefined;
+    if (!userId && customerId) {
+      await logFallback('No user ID in subscription metadata', {
+        event: eventType,
+      });
+      userId = (await getUserIdFromStripeCustomer(customerId)) ?? undefined;
     }
 
     return userId ?? null;

@@ -239,9 +239,10 @@ async function main() {
     console.error(`Sign-in failed: ${signInResult.error}`);
     await page.screenshot({ path: '/tmp/browse-auth-debug.png' });
     console.log('Debug screenshot: /tmp/browse-auth-debug.png');
-  } else {
-    console.log(`Sign-in successful, session: ${signInResult.sessionId}`);
+    await browser.close();
+    process.exit(1);
   }
+  console.log(`Sign-in successful, session: ${signInResult.sessionId}`);
 
   // Navigate to app to ensure cookies are set
   console.log('Navigating to app...');
@@ -249,7 +250,9 @@ async function main() {
     waitUntil: 'domcontentloaded',
     timeout: 60000,
   });
-  await page.waitForTimeout(2000);
+  await page.waitForURL(url => !url.toString().includes('/signin'), {
+    timeout: 30000,
+  });
   console.log(`Current URL: ${page.url()}`);
 
   // Export cookies
