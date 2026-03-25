@@ -13,7 +13,6 @@ import type Stripe from 'stripe';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
-import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
 const BILLING_STATUS_CACHE_KEY_PREFIX = 'billing:status:v1:';
@@ -131,25 +130,15 @@ export function getCustomerId(
 export async function getUserIdFromStripeCustomer(
   stripeCustomerId: string
 ): Promise<string | null> {
-  try {
-    const [user] = await db
-      .select({ clerkId: users.clerkId })
-      .from(users)
-      .where(eq(users.stripeCustomerId, stripeCustomerId))
-      .limit(1);
+  // Let DB errors propagate so the webhook returns 5xx and Stripe retries.
+  // Only return null for a genuine "user not found" (no matching row).
+  const [user] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(users.stripeCustomerId, stripeCustomerId))
+    .limit(1);
 
-    return user?.clerkId || null;
-  } catch (error) {
-    await captureWarning(
-      'Failed to lookup user by Stripe customer ID in fallback',
-      error,
-      {
-        function: 'getUserIdFromStripeCustomer',
-        route: '/api/stripe/webhooks',
-      }
-    );
-    return null;
-  }
+  return user?.clerkId || null;
 }
 
 /**

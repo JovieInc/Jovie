@@ -1,20 +1,12 @@
-import { auth } from '@clerk/nextjs/server';
 import { Button } from '@jovie/ui';
 import { XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 
 export const runtime = 'nodejs';
 
-export default async function UserCreationFailedPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect(APP_ROUTES.SIGNIN);
-  }
-
+export default function UserCreationFailedPage() {
   return (
     <div className='fixed inset-0 isolate flex flex-col items-center bg-page text-primary-token overflow-y-auto overflow-x-clip [color-scheme:dark] px-4 sm:px-6 pt-10 pb-10 sm:pt-14 sm:pb-12'>
       {/* Background effects — matches AuthLayout */}

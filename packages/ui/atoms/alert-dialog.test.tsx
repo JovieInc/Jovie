@@ -299,13 +299,10 @@ describe('AlertDialog', () => {
       const onOpenChange = vi.fn();
       render(<TestAlertDialog open={true} onOpenChange={onOpenChange} />);
 
-      // AlertDialog should not close on overlay click like regular Dialog
-      // This is intentional to prevent accidental dismissal of important alerts
       const overlay = screen.getByTestId('alert-dialog-overlay');
       fireEvent.click(overlay);
 
-      // AlertDialog by default should not close on overlay click
-      // (though Radix implementation may vary)
+      expect(onOpenChange).not.toHaveBeenCalled();
     });
   });
 });
