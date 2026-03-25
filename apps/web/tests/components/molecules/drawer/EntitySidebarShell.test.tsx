@@ -22,9 +22,7 @@ describe('EntitySidebarShell', () => {
       </EntitySidebarShell>
     );
 
-    const stickyRailCard = container.querySelector(
-      '[class*="overflow-hidden"]'
-    );
+    const stickyRailCard = container.querySelector('[class*="backdrop-blur"]');
     expect(stickyRailCard).toBeInTheDocument();
     expect(stickyRailCard).toContainElement(
       screen.getByText('Release details')

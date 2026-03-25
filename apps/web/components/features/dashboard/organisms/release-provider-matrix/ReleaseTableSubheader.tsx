@@ -160,7 +160,7 @@ function ToggleSwitch({
       role='switch'
       aria-checked={checked}
       onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded-[8px] px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
+      className='flex w-full items-center justify-between gap-2 rounded-full px-2 py-1.5 transition-[background-color,color] duration-150 hover:bg-surface-1 focus-visible:outline-none focus-visible:bg-surface-1'
     >
       <span className='text-[12px] font-[510] text-secondary-token'>
         {label}
@@ -219,7 +219,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -319,7 +319,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             counts={counts}
             buttonClassName={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[8px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
             )}
             iconOnly
           />
@@ -341,14 +341,14 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
           <DrawerToggleButton
             chrome='page-toolbar'
             ariaLabel='Toggle release preview'
             label='Preview'
             tooltipLabel='Preview'
-            className='h-7 w-7 rounded-[8px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>
       }

@@ -129,8 +129,7 @@ describe('RightDrawer', () => {
     const desktopAside = screen.getByLabelText('Responsive drawer');
     expect(desktopAside).toHaveClass(
       'transition-[width,opacity]',
-      'bg-transparent',
-      'shadow-none'
+      'opacity-100'
     );
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');

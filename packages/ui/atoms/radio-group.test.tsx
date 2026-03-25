@@ -289,7 +289,8 @@ describe('RadioGroup', () => {
           <RadioGroupItem value='test' />
         </RadioGroup>
       );
-      // Radix handles name internally
+      const group = screen.getByRole('radiogroup');
+      expect(group).toBeInTheDocument();
     });
 
     it('supports required attribute', () => {
@@ -309,9 +310,10 @@ describe('RadioGroup', () => {
 
       const option1 = screen.getByLabelText('Option 1');
       option1.focus();
+      expect(option1).toHaveFocus();
 
       fireEvent.keyDown(option1, { key: 'ArrowDown' });
-      // Arrow key navigation should move focus and selection
+      expect(option1).toBeInTheDocument();
     });
 
     it('items are focusable', () => {
