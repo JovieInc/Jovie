@@ -169,7 +169,8 @@ function buildDropdownItems({
       type: 'action',
       id: 'cookie-settings',
       label: 'Cookie Settings',
-      onClick: () => window.dispatchEvent(new CustomEvent('jv:cookie:open')),
+      onClick: () =>
+        globalThis.dispatchEvent(new CustomEvent('jv:cookie:open')),
     });
   }
 
