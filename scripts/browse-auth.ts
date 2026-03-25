@@ -228,8 +228,8 @@ async function main() {
           return { success: true, sessionId: result.createdSessionId };
         }
         return { error: `Sign-in status: ${result.status}` };
-      } catch (err: any) {
-        return { error: err?.message || String(err) };
+      } catch (err: unknown) {
+        return { error: err instanceof Error ? err.message : String(err) };
       }
     },
     { email: TEST_EMAIL, code: MAGIC_CODE }
