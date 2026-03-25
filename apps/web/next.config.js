@@ -301,6 +301,11 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: '/cookies',
+        destination: '/legal/cookies',
+        permanent: true,
+      },
+      {
         source: '/app/analytics',
         destination: '/app/dashboard/audience',
         permanent: false,
