@@ -105,7 +105,7 @@ export const Sidebar = React.forwardRef<
             >
               <div
                 data-sidebar='sidebar'
-                className='pointer-events-auto flex h-full w-full flex-col overflow-hidden border border-transparent bg-sidebar transition-[transform,border-color,background-color] duration-normal ease-interactive group-data-[variant=sidebar]:rounded-[16px] group-data-[variant=sidebar]:border group-data-[variant=sidebar]:border-(--linear-app-frame-seam) group-data-[variant=sidebar]:bg-sidebar group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
+                className='pointer-events-auto flex h-full w-full flex-col overflow-hidden bg-sidebar transition-[background-color] duration-normal ease-interactive group-data-[variant=floating]:rounded-[14px] group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow group-data-[variant=inset]:border-r group-data-[variant=inset]:border-sidebar-border'
               >
                 {children}
               </div>
