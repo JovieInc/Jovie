@@ -73,11 +73,11 @@ function useHoverCapable() {
   const [isHoverCapable, setIsHoverCapable] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) {
+    if (typeof globalThis.window === 'undefined' || !globalThis.matchMedia) {
       return;
     }
 
-    const mediaQueryList = window.matchMedia(HOVER_MEDIA_QUERY);
+    const mediaQueryList = globalThis.matchMedia(HOVER_MEDIA_QUERY);
     const update = (event?: MediaQueryListEvent) => {
       setIsHoverCapable(event?.matches ?? mediaQueryList.matches);
     };
