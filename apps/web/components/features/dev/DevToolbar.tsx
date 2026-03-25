@@ -388,6 +388,7 @@ export function DevToolbar({
       <button
         type='button'
         onClick={show}
+        data-testid='dev-toolbar'
         className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)] shadow-md font-mono text-[10px] transition-colors'
         aria-label='Show dev toolbar'
         title='Show dev toolbar (⌘⇧D)'
@@ -401,6 +402,7 @@ export function DevToolbar({
   return (
     <div
       ref={toolbarRef}
+      data-testid='dev-toolbar'
       className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
     >
       {/* Expanded panel */}

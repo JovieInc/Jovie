@@ -14,6 +14,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Sync tracking consent state (`jv_tracking_consent`) when users accept or reject cookies via the banner or modal
 - Add "Cookie Settings" action to the user profile menu for authenticated users
 - Add accessible dialog description to the cookie preferences modal
+- Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24
 
@@ -21,6 +22,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Redesign homepage from 11 sections to 6 cinematic layout — centered hero with claim form left and phone right, sticky phone product tour with scroll-driven mode transitions, logo bar z-index wipe effect, simplified text-left/screenshot-right feature sections
 - Simplify final CTA to centered claim form with "Claim your handle" headline
+
+### Fixed
+
+- Fix product screenshots capturing dev toolbars (DevToolbar, TanStack Query DevTools, Vercel toolbar, Next.js overlays) by expanding `hideTransientUI()` to cover all known dev overlays
+- Add `assertNoDevOverlays()` assertion to all screenshot specs to catch future overlay regressions before capture
 
 ### Removed
 
