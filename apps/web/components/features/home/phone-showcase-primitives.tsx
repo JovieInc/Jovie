@@ -5,10 +5,12 @@
  * and StickyPhoneTour (scroll-driven phone with mode transitions).
  */
 
-import { Bell } from 'lucide-react';
+import { Bell, Calendar, DollarSign, Mail } from 'lucide-react';
 import { Children, isValidElement } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { PhoneFrame } from './PhoneFrame';
 import {
@@ -57,6 +59,35 @@ export const MODES: ModeData[] = [
     description:
       'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.',
     outcome: 'Boost streams',
+  },
+] as const;
+
+/** Icons shown in the phone's social/action bar, matching the real profile. */
+const SOCIAL_BAR_ICONS = [
+  {
+    key: 'mail',
+    activeMode: null,
+    render: () => <Mail className='h-3.5 w-3.5' />,
+  },
+  {
+    key: 'instagram',
+    activeMode: null,
+    render: () => <SocialIcon platform='instagram' size={14} aria-hidden />,
+  },
+  {
+    key: 'spotify',
+    activeMode: null,
+    render: () => <SocialIcon platform='spotify' size={14} aria-hidden />,
+  },
+  {
+    key: 'tour',
+    activeMode: 'tour' as const,
+    render: () => <Calendar className='h-3.5 w-3.5' />,
+  },
+  {
+    key: 'tip',
+    activeMode: 'tip' as const,
+    render: () => <DollarSign className='h-3.5 w-3.5' />,
   },
 ] as const;
 
@@ -126,7 +157,10 @@ interface PhoneShowcaseProps {
 export function PhoneShowcase({ activeIndex, modes }: PhoneShowcaseProps) {
   return (
     <PhoneFrame>
-      <div className='flex items-center justify-end px-4 pt-10 pb-1'>
+      <div className='flex items-center justify-between px-4 pt-10 pb-1'>
+        <CircleIconButton size='xs' variant='surface' ariaLabel='Jovie'>
+          <BrandLogo size={14} tone='auto' rounded={false} aria-hidden />
+        </CircleIconButton>
         <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
           <Bell className='h-4 w-4' />
         </CircleIconButton>
@@ -159,24 +193,33 @@ export function PhoneShowcase({ activeIndex, modes }: PhoneShowcaseProps) {
 
       <div
         className='flex items-center justify-center gap-1.5 py-2.5'
-        role='img'
-        aria-label={`Current mode: ${modes[activeIndex]?.outcome ?? 'profile'}`}
+        aria-hidden='true'
       >
-        {modes.map((mode, i) => (
-          <div
-            key={mode.id}
-            aria-hidden='true'
-            className='rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
-            style={{
-              width: i === activeIndex ? 16 : 6,
-              height: 6,
-              backgroundColor:
-                i === activeIndex
+        {SOCIAL_BAR_ICONS.map(icon => {
+          const isActive =
+            icon.activeMode !== null &&
+            modes[activeIndex]?.id === icon.activeMode;
+          return (
+            <span
+              key={icon.key}
+              aria-hidden='true'
+              className='inline-flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-300'
+              style={{
+                borderColor: isActive
+                  ? 'var(--linear-border-default)'
+                  : 'rgba(255,255,255,0.06)',
+                backgroundColor: isActive
+                  ? 'var(--linear-bg-surface-1)'
+                  : 'transparent',
+                color: isActive
                   ? 'var(--linear-text-primary)'
-                  : 'var(--linear-border-default)',
-            }}
-          />
-        ))}
+                  : 'var(--linear-text-tertiary)',
+              }}
+            >
+              {icon.render()}
+            </span>
+          );
+        })}
       </div>
 
       <div

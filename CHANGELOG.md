@@ -7,11 +7,23 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.69] - 2026-03-25
 
+### Changed
+
+- Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
+
 ### Fixed
 
 - [internal] Clear stale Turbopack cache during setup to prevent `@clerk/ui` module resolution failures in dev mode
 
 ## [26.4.68] - 2026-03-25
+
+### Added
+
+- [internal] Add AI chat eval framework with 16 golden cases testing music industry knowledge accuracy, voice compliance, and prompt injection guards
+- [internal] Add 30+ unit tests for chat components (ChatInput, ChatMessage, ChatMarkdown, SuggestedPrompts, intent classification, knowledge retrieval, etc.)
+- [internal] Extract tool schemas into shared `tool-schemas.ts` for eval runner reuse without importing execute functions
+- [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
+- [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
 
 ### Changed
 
