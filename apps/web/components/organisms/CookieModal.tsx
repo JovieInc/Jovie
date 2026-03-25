@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogActions,
   DialogBody,
+  DialogDescription,
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import { APP_ROUTES } from '@/constants/routes';
@@ -211,6 +212,9 @@ export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
       <DialogTitle className='text-[13px] font-semibold text-primary-token'>
         Cookie preferences
       </DialogTitle>
+      <DialogDescription className='sr-only'>
+        Manage your cookie preferences
+      </DialogDescription>
 
       <DialogBody className='mt-2'>
         <CookieCategories
