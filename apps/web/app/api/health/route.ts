@@ -65,6 +65,8 @@ export async function GET(request: Request) {
     // Pure connectivity check — SELECT 1 proves DB is reachable, no table dependency
     await db.execute(drizzleSql`SELECT 1`);
 
+    // Success: return canonical {"status":"ok"} only (no timestamp/database).
+    // 503 responses include extra diagnostic fields — the asymmetry is intentional.
     return NextResponse.json(
       { status: 'ok' },
       {
