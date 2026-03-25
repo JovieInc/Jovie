@@ -47,7 +47,10 @@ const FEATURES: FeatureCard[] = [
   },
 ];
 
-function BentoCard({ card, delay }: { card: FeatureCard; delay: number }) {
+function BentoCard({
+  card,
+  delay,
+}: Readonly<{ card: FeatureCard; delay: number }>) {
   return (
     <div
       className='bento-card reveal-on-scroll'

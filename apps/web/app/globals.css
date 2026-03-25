@@ -1068,7 +1068,20 @@ body {
         rgba(255, 255, 255, 0.04) 0%,
         rgba(255, 255, 255, 0) 100%
       ),
-      color-mix(in oklab, var(--linear-bg-surface-0) 88%, var(--linear-bg-page));
+      var(--linear-bg-surface-0);
+    @supports (background: color-mix(in oklab, red 1%, blue)) {
+      background:
+        linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0) 100%
+        ),
+        color-mix(
+          in oklab,
+          var(--linear-bg-surface-0) 88%,
+          var(--linear-bg-page)
+        );
+    }
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     box-shadow:
