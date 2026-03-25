@@ -345,20 +345,12 @@ export default async function ContentSmartLinkPage({
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: JSON-LD structured data, safe-serialized
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(musicSchema)}
+      </script>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(breadcrumbSchema)}
+      </script>
 
       {/* Client-side auto-redirect to preferred DSP (preserves ISR caching) */}
       {!isUnreleased && noredirect !== '1' && (

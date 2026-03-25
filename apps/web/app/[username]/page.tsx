@@ -636,18 +636,12 @@ export default async function ArtistPage({
     );
     return (
       <>
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: safeJsonLdStringify(schemas.musicGroupSchema),
-          }}
-        />
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: safeJsonLdStringify(schemas.breadcrumbSchema),
-          }}
-        />
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.musicGroupSchema)}
+        </script>
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.breadcrumbSchema)}
+        </script>
         {body}
       </>
     );
@@ -744,18 +738,12 @@ export default async function ArtistPage({
   return (
     <>
       {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicGroupSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(musicGroupSchema)}
+      </script>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(breadcrumbSchema)}
+      </script>
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />

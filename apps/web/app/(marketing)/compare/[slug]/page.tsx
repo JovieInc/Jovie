@@ -53,14 +53,8 @@ export default async function ComparePage({ params }: ComparePageProps) {
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: faqSchema }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: breadcrumbSchema }}
-      />
+      <script type='application/ld+json'>{faqSchema}</script>
+      <script type='application/ld+json'>{breadcrumbSchema}</script>
 
       <MarketingHero variant='left'>
         <p className='marketing-kicker'>Compare</p>

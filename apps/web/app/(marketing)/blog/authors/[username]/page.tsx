@@ -110,14 +110,8 @@ export default async function AuthorPage({
 
   return (
     <>
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: personSchema }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: breadcrumbSchema }}
-      />
+      <script type='application/ld+json'>{personSchema}</script>
+      <script type='application/ld+json'>{breadcrumbSchema}</script>
 
       <div className='min-h-screen'>
         {/* Author Hero */}
