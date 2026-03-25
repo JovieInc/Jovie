@@ -384,12 +384,16 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           const viewportSize = page.viewportSize();
           const isDesktopViewport = viewportSize && viewportSize.width >= 1024;
           if (isDesktopViewport) {
-            const userButtonLoaded = await page
-              .locator('[data-testid="user-button-loaded"]')
-              .first()
-              .waitFor({ state: 'attached', timeout: 10_000 })
-              .then(() => true)
-              .catch(() => false);
+            let userButtonLoaded = false;
+            try {
+              await page
+                .locator('[data-testid="user-button-loaded"]')
+                .first()
+                .waitFor({ state: 'attached', timeout: 10_000 });
+              userButtonLoaded = true;
+            } catch {
+              userButtonLoaded = false;
+            }
             if (!userButtonLoaded) {
               const screenshot = await page.screenshot().catch(() => null);
               if (screenshot) {
@@ -419,12 +423,39 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             await assertFastPageLoad(loadTimeMs, budget, testInfo);
           }
 
-          results.push({
-            path: pageConfig.path,
-            name: pageConfig.name,
-            status: 'pass',
-            loadTimeMs,
-          });
+          // Re-read context to catch errors emitted during redirect/content/Clerk checks
+          const finalContext = getContext();
+          if (
+            finalContext.criticalErrors.length > 0 ||
+            finalContext.uncaughtExceptions.length > 0
+          ) {
+            await testInfo.attach(`console-errors-late-${pageConfig.name}`, {
+              body: JSON.stringify(
+                {
+                  criticalErrors: finalContext.criticalErrors,
+                  uncaughtExceptions: finalContext.uncaughtExceptions,
+                  networkDiagnostics: finalContext.networkDiagnostics,
+                },
+                null,
+                2
+              ),
+              contentType: 'application/json',
+            });
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'fail',
+              loadTimeMs,
+              error: `Late console errors: ${[...finalContext.criticalErrors, ...finalContext.uncaughtExceptions].join('; ')}`,
+            });
+          } else {
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'pass',
+              loadTimeMs,
+            });
+          }
         }
       } catch (error) {
         const isTransient = isTransientNavigationError(error);
@@ -754,12 +785,39 @@ test.describe('Admin Pages Health Check @smoke', () => {
             error: errorText,
           });
         } else {
-          results.push({
-            path: pageConfig.path,
-            name: pageConfig.name,
-            status: 'pass',
-            loadTimeMs,
-          });
+          // Re-read context to catch errors emitted during content/error page checks
+          const finalContext = getContext();
+          if (
+            finalContext.criticalErrors.length > 0 ||
+            finalContext.uncaughtExceptions.length > 0
+          ) {
+            await testInfo.attach(`console-errors-late-${pageConfig.name}`, {
+              body: JSON.stringify(
+                {
+                  criticalErrors: finalContext.criticalErrors,
+                  uncaughtExceptions: finalContext.uncaughtExceptions,
+                  networkDiagnostics: finalContext.networkDiagnostics,
+                },
+                null,
+                2
+              ),
+              contentType: 'application/json',
+            });
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'fail',
+              loadTimeMs,
+              error: `Late console errors: ${[...finalContext.criticalErrors, ...finalContext.uncaughtExceptions].join('; ')}`,
+            });
+          } else {
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'pass',
+              loadTimeMs,
+            });
+          }
         }
       } catch (error) {
         results.push({

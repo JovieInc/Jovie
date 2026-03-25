@@ -72,8 +72,7 @@ export const EXPECTED_ERROR_PATTERNS = [
   'chunkloaderror', // dynamic import fails during hot reload
   'failed to load chunk', // same, different phrasing
 
-  // Resource loading failures from known third-party CDNs (not app bugs)
-  'failed to load resource: the server responded with a status of', // generic browser phrasing for 4xx/5xx on external resources
+  // Third-party CDN resource failures (not app bugs)
   'i.scdn.co', // Spotify CDN image 403/404s
 
   // CSP and security headers (expected in test/dev)
