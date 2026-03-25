@@ -122,7 +122,7 @@ export function RightDrawer({
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
+          ? 'opacity-100 visible border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[-1px_0_8px_rgba(0,0,0,0.04)]'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}

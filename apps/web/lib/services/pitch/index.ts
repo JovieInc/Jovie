@@ -5,4 +5,5 @@ export {
   type PitchGenerationResult,
   type PitchInput,
   PLATFORM_LIMITS,
+  type PlatformKey,
 } from './types';

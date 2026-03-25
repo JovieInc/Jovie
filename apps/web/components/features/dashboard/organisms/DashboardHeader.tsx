@@ -37,7 +37,7 @@ export function DashboardHeader({
     <header
       data-testid='dashboard-header'
       className={cn(
-        'z-20 border-b border-subtle bg-surface-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] backdrop-blur-[12px]',
+        'z-20 border-b border-subtle bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] backdrop-blur-[12px]',
         className
       )}
     >

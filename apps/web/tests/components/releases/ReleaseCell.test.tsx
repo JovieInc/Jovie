@@ -92,7 +92,6 @@ describe('ReleaseCell', () => {
     const typeBadge = screen.getByText('Single');
     expect(typeBadge).toBeInTheDocument();
     expect(typeBadge.className).toContain('items-center');
-    expect(typeBadge.className).toContain('leading-none');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 

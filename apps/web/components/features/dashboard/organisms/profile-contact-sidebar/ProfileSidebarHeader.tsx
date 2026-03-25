@@ -143,27 +143,10 @@ export function useProfileHeaderParts({
     },
   ];
 
-  let primaryLabel = 'Profile';
-  if (displayName && displayName !== username) {
-    primaryLabel = displayName;
-  } else if (username) {
-    primaryLabel = `@${username}`;
-  }
-
-  const secondaryLabel =
-    username && displayName && displayName !== username ? `@${username}` : null;
-
   const title: ReactNode = (
-    <div className='flex min-w-0 items-center gap-1.5'>
-      <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
-        {primaryLabel}
-      </span>
-      {secondaryLabel && (
-        <span className='truncate text-[11px] text-secondary-token'>
-          {secondaryLabel}
-        </span>
-      )}
-    </div>
+    <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+      Profile
+    </span>
   );
 
   const actions = (

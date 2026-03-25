@@ -138,9 +138,9 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               className='flex w-full'
             >
               <Button
-                variant='secondary'
+                variant='ghost'
                 size='sm'
-                className='h-8 w-full justify-start rounded-md border-subtle bg-surface-0 px-2.5 text-[12px] font-[510]'
+                className='h-8 w-full justify-start rounded-md px-2.5 text-[12px] font-[510] text-tertiary-token hover:text-primary-token'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
                 View on {label}

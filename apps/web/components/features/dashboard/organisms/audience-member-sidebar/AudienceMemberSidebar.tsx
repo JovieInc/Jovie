@@ -57,7 +57,7 @@ export function AudienceMemberSidebar({
     >
       {member && (
         <>
-          <DrawerSection title='Properties' className='space-y-1.5'>
+          <DrawerSection className='space-y-1.5'>
             <AudienceMemberDetails member={member} />
           </DrawerSection>
 

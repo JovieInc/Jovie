@@ -23,7 +23,6 @@ import {
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
 } from '@/components/organisms/table';
-import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
@@ -107,7 +106,7 @@ function ReleaseViewButtons({
         ),
       }))}
       size='sm'
-      surface='ghost'
+      surface='muted'
       className={cn('w-full md:w-auto', className)}
       triggerClassName='min-w-[88px] px-2.5'
       aria-label='Choose releases view'
@@ -341,13 +340,6 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
-          />
-          <DrawerToggleButton
-            chrome='page-toolbar'
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
             className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>

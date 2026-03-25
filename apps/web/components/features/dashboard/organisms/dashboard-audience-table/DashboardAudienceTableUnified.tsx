@@ -469,7 +469,7 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          'h-8',
+          'h-10',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'

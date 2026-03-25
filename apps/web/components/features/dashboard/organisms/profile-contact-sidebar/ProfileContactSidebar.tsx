@@ -12,7 +12,6 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
-import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -520,10 +519,11 @@ export function ProfileContactSidebar() {
       headerActions={headerActions}
       entityHeader={
         <div className='space-y-3'>
+          {/* Name card with profile link */}
           <div
             className={cn(
               LINEAR_SURFACE.sidebarCard,
-              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              'space-y-3 px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             )}
           >
             <ProfileContactHeader
@@ -534,60 +534,46 @@ export function ProfileContactSidebar() {
               onDisplayNameChange={handleDisplayNameChange}
               onAvatarUpload={handleAvatarUpload}
             />
-          </div>
-
-          <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <ProfileAnalyticsSummary />
-            </div>
-
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <DrawerPropertyRow
-                label='Profile link'
-                value={
-                  <div className='flex items-center gap-1.5'>
-                    <CopyLinkInput
-                      url={profileUrl}
-                      size='md'
-                      className='flex-1'
-                      inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
-                    />
-                    <button
-                      type='button'
-                      className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                      onClick={() =>
-                        globalThis.open(
-                          profileUrl,
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                      aria-label='Open public profile'
-                    >
-                      <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                    </button>
-                    <CommonDropdown
-                      variant='dropdown'
-                      size='compact'
-                      align='end'
-                      side='bottom'
-                      items={profileShareItems}
-                      trigger={
-                        <button
-                          type='button'
-                          className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                          aria-label='Open profile share options'
-                        >
-                          <MoreHorizontal
-                            className='h-3 w-3'
-                            aria-hidden='true'
-                          />
-                        </button>
-                      }
-                    />
-                  </div>
+            <div className='flex items-center gap-1.5'>
+              <CopyLinkInput
+                url={profileUrl}
+                size='md'
+                className='flex-1'
+                inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+              />
+              <button
+                type='button'
+                className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                onClick={() =>
+                  globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
+                }
+                aria-label='Open public profile'
+              >
+                <ExternalLink className='h-3 w-3' aria-hidden='true' />
+              </button>
+              <CommonDropdown
+                variant='dropdown'
+                size='compact'
+                align='end'
+                side='bottom'
+                items={profileShareItems}
+                trigger={
+                  <button
+                    type='button'
+                    className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                    aria-label='Open profile share options'
+                  >
+                    <MoreHorizontal className='h-3 w-3' aria-hidden='true' />
+                  </button>
                 }
               />
+            </div>
+          </div>
+
+          {/* Analytics card */}
+          <div className={cn(LINEAR_SURFACE.drawerCard, 'p-2.5')}>
+            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
+              <ProfileAnalyticsSummary />
             </div>
           </div>
         </div>

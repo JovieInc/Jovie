@@ -3,6 +3,7 @@
 import { Badge } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
+import { DotBadge } from '@/components/atoms/DotBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
@@ -93,19 +94,21 @@ export const ReleaseCell = memo(function ReleaseCell({
         <div className='flex min-w-0 items-center gap-1.5 leading-none'>
           <TruncatedText
             lines={1}
-            className='min-w-0 flex-1 text-[12.5px] font-[510] leading-[1.1] tracking-[-0.012em] text-primary-token'
+            className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.1] tracking-[-0.012em] text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >
             {release.title}
           </TruncatedText>
           {showType && typeStyle && (
-            <Badge
+            <DotBadge
+              label={typeStyle.label}
               size='sm'
-              className={`inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[9px] font-[510] leading-none tracking-normal ${typeStyle.bg} ${typeStyle.text}`}
-            >
-              {typeStyle.label}
-            </Badge>
+              variant={{
+                className: `${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`,
+                dotClassName: typeStyle.dot,
+              }}
+            />
           )}
           {manualOverrideCount > 0 && (
             <Badge
@@ -119,7 +122,7 @@ export const ReleaseCell = memo(function ReleaseCell({
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-tertiary-token'
+            className='text-[11.5px] font-[400] leading-[1.2] tracking-[-0.005em] text-tertiary-token'
           >
             {artistLine}
           </TruncatedText>

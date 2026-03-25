@@ -156,9 +156,9 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex min-h-[36px] items-center justify-between rounded-[10px] border border-(--linear-app-frame-seam)',
-          'bg-surface-0 px-2.5 py-1.5 lg:px-2.5 lg:py-1.5',
-          'active:border-default active:bg-surface-1 lg:hover:border-default lg:hover:bg-surface-1',
+          'group flex min-h-[36px] items-center justify-between rounded-lg',
+          'bg-transparent px-2.5 py-1.5 lg:px-2.5 lg:py-1.5',
+          'active:bg-surface-1 lg:hover:bg-surface-1',
           'transition-[background-color,box-shadow,border-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
           className
@@ -167,7 +167,7 @@ export function SidebarLinkRow({
       >
         {/* Left: Icon + Label */}
         <div className='flex min-w-0 flex-1 items-center gap-2.25'>
-          <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]'>
+          <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]'>
             {icon}
           </span>
           <span className='text-[12px] font-[510] text-secondary-token'>
