@@ -134,9 +134,9 @@ export async function fetchArtistBySpotifyUrl(
         span.setStatus({ code: 1, message: 'ok' });
         return data.result;
       } catch (error) {
-        if (error instanceof MusicfetchRequestError) {
-          span.setStatus({ code: 2, message: 'error' });
+        span.setStatus({ code: 2, message: 'error' });
 
+        if (error instanceof MusicfetchRequestError) {
           logger.warn('MusicFetch request failed', {
             spotifyUrl,
             statusCode: error.statusCode,
@@ -153,18 +153,16 @@ export async function fetchArtistBySpotifyUrl(
           }
 
           throw error;
-        } else {
-          span.setStatus({ code: 2, message: 'error' });
-
-          logger.warn('MusicFetch request failed', {
-            spotifyUrl,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          });
-
-          throw error instanceof Error
-            ? error
-            : new Error('MusicFetch request failed');
         }
+
+        logger.warn('MusicFetch request failed', {
+          spotifyUrl,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+
+        throw error instanceof Error
+          ? error
+          : new Error('MusicFetch request failed');
       }
     }
   );

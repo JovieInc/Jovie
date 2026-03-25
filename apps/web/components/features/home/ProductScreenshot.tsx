@@ -107,38 +107,46 @@ export function ProductScreenshot({
       </div>
 
       {/* Screenshot image */}
-      {isAvailable === false ? (
-        <div
-          className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
-          style={{ aspectRatio }}
-        >
-          <div className='max-w-[22rem]'>
-            <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
-              {title}
+      {(() => {
+        if (isAvailable === false) {
+          return (
+            <div
+              className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
+              style={{ aspectRatio }}
+            >
+              <div className='max-w-[22rem]'>
+                <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
+                  {title}
+                </div>
+                <p className='text-lg font-medium tracking-tight text-primary-token'>
+                  Preview coming soon
+                </p>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
+                  See it live when you sign up.
+                </p>
+              </div>
             </div>
-            <p className='text-lg font-medium tracking-tight text-primary-token'>
-              Preview coming soon
-            </p>
-            <p className='mt-2 text-sm leading-6 text-secondary-token'>
-              See it live when you sign up.
-            </p>
-          </div>
-        </div>
-      ) : isAvailable === true ? (
-        <Image
-          src={src}
-          alt={alt}
-          width={width}
-          height={height}
-          priority={priority}
-          className='w-full'
-        />
-      ) : (
-        <div
-          className='w-full animate-pulse bg-surface-1'
-          style={{ aspectRatio }}
-        />
-      )}
+          );
+        }
+        if (isAvailable === true) {
+          return (
+            <Image
+              src={src}
+              alt={alt}
+              width={width}
+              height={height}
+              priority={priority}
+              className='w-full'
+            />
+          );
+        }
+        return (
+          <div
+            className='w-full animate-pulse bg-surface-1'
+            style={{ aspectRatio }}
+          />
+        );
+      })()}
     </figure>
   );
 }

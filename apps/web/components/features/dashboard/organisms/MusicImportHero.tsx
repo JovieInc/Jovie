@@ -94,9 +94,11 @@ export const MusicImportHero = memo(function MusicImportHero({
     );
   }
 
-  const headline = isImporting
-    ? "We're importing your music"
-    : `${releases.length} release${releases.length === 1 ? '' : 's'} ready`;
+  const headline = (() => {
+    if (isImporting) return "We're importing your music";
+    const plural = releases.length === 1 ? '' : 's';
+    return `${releases.length} release${plural} ready`;
+  })();
 
   return (
     <div className='space-y-3'>

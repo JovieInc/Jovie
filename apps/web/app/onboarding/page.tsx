@@ -60,29 +60,8 @@ export default async function OnboardingPage({
   }
 
   // Defensive check: ensure we have a valid Clerk user ID
-  // This can happen legitimately in certain scenarios:
-  // - Clerk bypass/mock mode is enabled
-  // - Session expired between proxy.ts and page render
-  // - Clerk context propagation race condition
   if (!authResult.clerkUserId) {
-    const isClerkBypassed =
-      publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-    // Only report to Sentry if this is truly unexpected (not bypass mode)
-    if (!isClerkBypassed) {
-      Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
-        level: 'warning', // Changed from 'error' - this is handled gracefully
-        tags: {
-          context: 'onboarding_defensive_check',
-          vercel_env: env.VERCEL_ENV || 'unknown',
-        },
-        extra: {
-          userState: authResult.state,
-          hasDbUser: !!authResult.dbUserId,
-        },
-      });
-    }
+    reportMissingClerkUserId(authResult);
     redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
   }
 
@@ -176,4 +155,27 @@ export default async function OnboardingPage({
       </div>
     </AuthLayout>
   );
+}
+
+function reportMissingClerkUserId(authResult: {
+  state: CanonicalUserState;
+  dbUserId: string | null;
+}) {
+  const isClerkBypassed =
+    publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+    !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
+  if (!isClerkBypassed) {
+    Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
+      level: 'warning',
+      tags: {
+        context: 'onboarding_defensive_check',
+        vercel_env: env.VERCEL_ENV || 'unknown',
+      },
+      extra: {
+        userState: authResult.state,
+        hasDbUser: !!authResult.dbUserId,
+      },
+    });
+  }
 }

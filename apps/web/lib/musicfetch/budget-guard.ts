@@ -124,12 +124,14 @@ export async function reserveMusicfetchBudget(now = new Date()): Promise<void> {
   const [success, blockedScope] = result;
   if (success === 1) return;
 
-  const scope =
-    blockedScope === 'monthly'
-      ? 'monthly'
-      : blockedScope === 'daily'
-        ? 'daily'
-        : 'backend_unavailable';
+  let scope: 'monthly' | 'daily' | 'backend_unavailable';
+  if (blockedScope === 'monthly') {
+    scope = 'monthly';
+  } else if (blockedScope === 'daily') {
+    scope = 'daily';
+  } else {
+    scope = 'backend_unavailable';
+  }
 
   throw buildBudgetError(scope, now);
 }
