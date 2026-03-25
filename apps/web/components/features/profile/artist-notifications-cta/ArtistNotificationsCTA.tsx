@@ -231,6 +231,46 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+function renderEarlyState(opts: {
+  hydrationStatus: string;
+  notificationsEnabled: boolean;
+  notificationsState: string;
+  autoOpen: boolean;
+  isSubscribed: boolean;
+  variant: 'link' | 'button';
+  artist: ArtistNotificationsCTAProps['artist'];
+  subscribedChannels: Partial<Record<string, boolean>>;
+  channel: string;
+  emailInput: string;
+}): React.ReactNode | null {
+  if (opts.hydrationStatus === 'checking') {
+    return <SubscriptionFormSkeleton />;
+  }
+  if (
+    !opts.notificationsEnabled ||
+    (opts.notificationsState === 'idle' && !opts.autoOpen)
+  ) {
+    return <ListenNowCTA variant={opts.variant} handle={opts.artist.handle} />;
+  }
+  if (opts.notificationsState === 'pending_confirmation') {
+    return <SubscriptionPendingConfirmation />;
+  }
+  if (opts.isSubscribed) {
+    return (
+      <SubscriptionSuccess
+        artistName={opts.artist.name}
+        handle={opts.artist.handle}
+        subscribedChannels={opts.subscribedChannels}
+        artistId={opts.artist.id}
+        subscriberEmail={
+          opts.channel === 'email' ? opts.emailInput.trim() : undefined
+        }
+      />
+    );
+  }
+  return null;
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -296,30 +336,20 @@ export function ArtistNotificationsCTA({
   const shouldShowCountrySelector =
     otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
 
-  // Show loading skeleton while checking subscription status
-  if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
-  }
-
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
-    return <ListenNowCTA variant={variant} handle={artist.handle} />;
-  }
-
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
-  }
-
-  if (isSubscribed) {
-    return (
-      <SubscriptionSuccess
-        artistName={artist.name}
-        handle={artist.handle}
-        subscribedChannels={subscribedChannels}
-        artistId={artist.id}
-        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
-      />
-    );
-  }
+  // Render non-form states (loading, idle, pending, success)
+  const earlyState = renderEarlyState({
+    hydrationStatus,
+    notificationsEnabled,
+    notificationsState,
+    autoOpen,
+    isSubscribed,
+    variant,
+    artist,
+    subscribedChannels,
+    channel,
+    emailInput,
+  });
+  if (earlyState) return earlyState;
 
   const inputConfig = getInputConfig(channel);
   const inputValue = getInputDisplayValue(

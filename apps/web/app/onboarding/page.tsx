@@ -14,6 +14,46 @@ import { env } from '@/lib/env-server';
 import { reserveOnboardingHandle } from '@/lib/onboarding/reserved-handle';
 import { extractErrorMessage } from '@/lib/utils/errors';
 
+function enforceOnboardingGates(
+  authResult: Awaited<ReturnType<typeof resolveUserState>>
+): asserts authResult is typeof authResult & { clerkUserId: string } {
+  if (authResult.state === CanonicalUserState.BANNED) {
+    redirect('/banned');
+  }
+  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
+    redirect('/error/user-creation-failed');
+  }
+  if (
+    authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
+    authResult.state === CanonicalUserState.WAITLIST_PENDING
+  ) {
+    redirect(APP_ROUTES.WAITLIST);
+  }
+  if (authResult.state === CanonicalUserState.ACTIVE) {
+    redirect('/app');
+  }
+
+  if (!authResult.clerkUserId) {
+    const isClerkBypassed =
+      publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
+      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+    if (!isClerkBypassed) {
+      Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
+        level: 'warning',
+        tags: {
+          context: 'onboarding_defensive_check',
+          vercel_env: env.VERCEL_ENV || 'unknown',
+        },
+        extra: {
+          userState: authResult.state,
+          hasDbUser: !!authResult.dbUserId,
+        },
+      });
+    }
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
+  }
+}
+
 interface OnboardingPageProps {
   readonly searchParams?: Promise<{
     readonly handle?: string;
@@ -37,54 +77,7 @@ export default async function OnboardingPage({
     Boolean(resolvedSearchParams?.handle);
 
   const authResult = await resolveUserState();
-
-  // Gate blocked states — proxy normally prevents these from reaching here,
-  // but the page must not render for banned/failed users regardless.
-  if (authResult.state === CanonicalUserState.BANNED) {
-    redirect('/banned');
-  }
-  if (authResult.state === CanonicalUserState.USER_CREATION_FAILED) {
-    redirect('/error/user-creation-failed');
-  }
-  if (
-    authResult.state === CanonicalUserState.NEEDS_WAITLIST_SUBMISSION ||
-    authResult.state === CanonicalUserState.WAITLIST_PENDING
-  ) {
-    redirect(APP_ROUTES.WAITLIST);
-  }
-
-  // ACTIVE guard: break redirect loops caused by stale proxy cache or
-  // direct navigation. If the user is already active, send them to /app.
-  if (authResult.state === CanonicalUserState.ACTIVE) {
-    redirect('/app');
-  }
-
-  // Defensive check: ensure we have a valid Clerk user ID
-  // This can happen legitimately in certain scenarios:
-  // - Clerk bypass/mock mode is enabled
-  // - Session expired between proxy.ts and page render
-  // - Clerk context propagation race condition
-  if (!authResult.clerkUserId) {
-    const isClerkBypassed =
-      publicEnv.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-      !publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
-    // Only report to Sentry if this is truly unexpected (not bypass mode)
-    if (!isClerkBypassed) {
-      Sentry.captureMessage('Missing clerkUserId despite proxy routing', {
-        level: 'warning', // Changed from 'error' - this is handled gracefully
-        tags: {
-          context: 'onboarding_defensive_check',
-          vercel_env: env.VERCEL_ENV || 'unknown',
-        },
-        extra: {
-          userState: authResult.state,
-          hasDbUser: !!authResult.dbUserId,
-        },
-      });
-    }
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.ONBOARDING}`);
-  }
+  enforceOnboardingGates(authResult);
 
   const user = await getCachedCurrentUser();
   const clerkIdentity = resolveClerkIdentity(user);
