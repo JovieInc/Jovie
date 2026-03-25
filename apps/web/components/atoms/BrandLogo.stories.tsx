@@ -9,7 +9,7 @@ const meta: Meta<typeof BrandLogo> = {
     docs: {
       description: {
         component:
-          'The Jovie brand logo with support for different tones and sizes.',
+          'The Jovie brand icon — inline SVG with currentColor. Supports auto, white, color, and muted tones.',
       },
     },
   },
@@ -20,7 +20,7 @@ const meta: Meta<typeof BrandLogo> = {
     },
     tone: {
       control: 'select',
-      options: ['auto', 'black', 'white', 'color'],
+      options: ['auto', 'white', 'color', 'muted'],
       description: 'Color tone of the logo',
     },
     rounded: {
@@ -54,23 +54,10 @@ export const Large: Story = {
   },
 };
 
-export const Black: Story = {
-  args: {
-    size: 48,
-    tone: 'black',
-  },
-  parameters: {
-    backgrounds: { default: 'light' },
-  },
-};
-
 export const White: Story = {
   args: {
     size: 48,
     tone: 'white',
-  },
-  parameters: {
-    backgrounds: { default: 'dark' },
   },
   decorators: [
     Story => (
@@ -85,6 +72,13 @@ export const Color: Story = {
   args: {
     size: 48,
     tone: 'color',
+  },
+};
+
+export const Muted: Story = {
+  args: {
+    size: 48,
+    tone: 'muted',
   },
 };
 
@@ -112,9 +106,9 @@ export const AllSizes: Story = {
 export const AllTones: Story = {
   render: () => (
     <div className='flex gap-8'>
-      <div className='flex flex-col items-center gap-2 rounded-lg bg-white p-4'>
-        <BrandLogo size={48} tone='black' />
-        <span className='text-xs text-black'>Black</span>
+      <div className='flex flex-col items-center gap-2 rounded-lg bg-surface-2 p-4'>
+        <BrandLogo size={48} tone='auto' />
+        <span className='text-xs text-secondary-token'>Auto</span>
       </div>
       <div className='flex flex-col items-center gap-2 rounded-lg bg-black p-4'>
         <BrandLogo size={48} tone='white' />
@@ -125,8 +119,8 @@ export const AllTones: Story = {
         <span className='text-xs text-secondary-token'>Color</span>
       </div>
       <div className='flex flex-col items-center gap-2 rounded-lg bg-surface-2 p-4'>
-        <BrandLogo size={48} tone='auto' />
-        <span className='text-xs text-secondary-token'>Auto</span>
+        <BrandLogo size={48} tone='muted' />
+        <span className='text-xs text-secondary-token'>Muted</span>
       </div>
     </div>
   ),
