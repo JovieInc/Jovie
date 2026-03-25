@@ -6,6 +6,7 @@ import { CookieActions } from '@/components/molecules/CookieActions';
 import { CookieModal } from '@/components/organisms/CookieModal';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { setConsentState } from '@/lib/tracking/consent';
 
 declare global {
   var JVConsent:
@@ -95,6 +96,7 @@ export function CookieBannerSection() {
   const acceptAll = async () => {
     const consent = { essential: true, analytics: true, marketing: true };
     await saveConsent(consent);
+    setConsentState('accepted');
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
@@ -107,6 +109,7 @@ export function CookieBannerSection() {
   const reject = async () => {
     const consent = { essential: true, analytics: false, marketing: false };
     await saveConsent(consent);
+    setConsentState('rejected');
     try {
       localStorage.setItem('jv_cc', JSON.stringify(consent));
     } catch {
@@ -178,6 +181,9 @@ export function CookieBannerSection() {
           open={customize}
           onClose={() => setCustomize(false)}
           onSave={c => {
+            setConsentState(
+              c.analytics || c.marketing ? 'accepted' : 'rejected'
+            );
             try {
               localStorage.setItem('jv_cc', JSON.stringify(c));
             } catch {
