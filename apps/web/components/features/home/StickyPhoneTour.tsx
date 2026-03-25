@@ -111,6 +111,8 @@ export function StickyPhoneTour() {
                 <div className='relative min-h-[320px]'>
                   {/* Hero content — slide 0 */}
                   <div
+                    aria-hidden={inTourMode}
+                    inert={inTourMode ? true : undefined}
                     className='transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
                     style={{
                       opacity: inTourMode ? 0 : 1,
@@ -145,6 +147,8 @@ export function StickyPhoneTour() {
 
                   {/* Tour mode content — slides 1-4 */}
                   <div
+                    aria-hidden={!inTourMode}
+                    inert={!inTourMode ? true : undefined}
                     className='absolute inset-0 flex flex-col gap-5 justify-center transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
                     style={{
                       opacity: inTourMode ? 1 : 0,
@@ -162,11 +166,11 @@ export function StickyPhoneTour() {
                       The right action for every fan.
                     </h2>
 
-                    <CrossfadeBlock activeIndex={Math.max(0, activeSlide - 1)}>
+                    <CrossfadeBlock activeIndex={phoneIndex}>
                       {headlines}
                     </CrossfadeBlock>
 
-                    <CrossfadeBlock activeIndex={Math.max(0, activeSlide - 1)}>
+                    <CrossfadeBlock activeIndex={phoneIndex}>
                       {descriptions}
                     </CrossfadeBlock>
                   </div>
