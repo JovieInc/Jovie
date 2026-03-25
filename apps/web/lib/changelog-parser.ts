@@ -45,7 +45,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   let currentSection: keyof ChangelogSection | null = null;
 
   for (const line of lines) {
-    const vMatch = line.match(VERSION_HEADING_RE);
+    const vMatch = VERSION_HEADING_RE.exec(line);
     if (vMatch) {
       const [, version, date] = vMatch;
       if (version.toLowerCase() === 'unreleased') {
@@ -72,7 +72,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       continue;
     }
 
-    const sMatch = line.match(SECTION_HEADING_RE);
+    const sMatch = SECTION_HEADING_RE.exec(line);
     if (sMatch) {
       currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
       continue;

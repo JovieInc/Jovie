@@ -55,8 +55,6 @@ export async function POST(req: NextRequest) {
         pi as Stripe.PaymentIntent & { charges?: { data: Stripe.Charge[] } }
       ).charges?.data?.[0];
 
-      // Resolve creator profile: prefer immutable profile_id from metadata,
-      // fall back to handle lookup for backward compatibility with older intents
       const metadataProfileId =
         typeof pi.metadata?.profile_id === 'string'
           ? pi.metadata.profile_id
@@ -64,29 +62,10 @@ export async function POST(req: NextRequest) {
       const handle =
         typeof pi.metadata?.handle === 'string' ? pi.metadata.handle : null;
 
-      let creatorProfileId: string | null = null;
-
-      // Validate profile_id from metadata still exists (creator may have been deleted)
-      if (metadataProfileId) {
-        const [profile] = await db
-          .select({ id: creatorProfiles.id })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.id, metadataProfileId))
-          .limit(1);
-
-        creatorProfileId = profile?.id ?? null;
-      }
-
-      // Fallback: try handle lookup for backward compatibility with older intents
-      if (!creatorProfileId && handle) {
-        const [profile] = await db
-          .select({ id: creatorProfiles.id })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
-          .limit(1);
-
-        creatorProfileId = profile?.id ?? null;
-      }
+      const creatorProfileId = await resolveCreatorProfileId(
+        metadataProfileId,
+        handle
+      );
 
       if (!creatorProfileId) {
         // Creator profile not found for this tip. Return 200 to acknowledge receipt
@@ -156,4 +135,31 @@ export async function POST(req: NextRequest) {
       { status: 500, headers: NO_STORE_HEADERS }
     );
   }
+}
+
+async function resolveCreatorProfileId(
+  metadataProfileId: string | null,
+  handle: string | null
+): Promise<string | null> {
+  // Prefer immutable profile_id from metadata
+  if (metadataProfileId) {
+    const [profile] = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, metadataProfileId))
+      .limit(1);
+    if (profile) return profile.id;
+  }
+
+  // Fallback: handle lookup for backward compatibility with older intents
+  if (handle) {
+    const [profile] = await db
+      .select({ id: creatorProfiles.id })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.usernameNormalized, handle.toLowerCase()))
+      .limit(1);
+    if (profile) return profile.id;
+  }
+
+  return null;
 }

@@ -219,7 +219,7 @@ export function DashboardMockup({
       })}
 
       {/* Footer punchline */}
-      {!isHero ? (
+      {isHero ? null : (
         <div
           ref={footerRef}
           className='flex items-center justify-center px-5 py-2.5'
@@ -229,7 +229,7 @@ export function DashboardMockup({
             link
           </p>
         </div>
-      ) : null}
+      )}
     </div>
   );
 }

@@ -178,65 +178,71 @@ function SidebarHeaderNav({
 }>) {
   return (
     <div className='flex w-full items-center'>
-      {isInSettings ? (
-        <div className='flex w-full items-center gap-2'>
-          <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
-            <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
-              Workspace
-            </p>
-            <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
-              Settings
-            </p>
-          </div>
-          <Link
-            href={APP_ROUTES.DASHBOARD}
-            aria-label='Exit settings and return to app'
-            className={cn(
-              'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
-              'rounded-full group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
-            )}
-          >
-            <ArrowLeft
-              className='size-3 text-sidebar-item-icon/70'
-              aria-hidden='true'
-            />
-            <span className='truncate group-data-[collapsible=icon]:hidden'>
-              Exit
-            </span>
-          </Link>
-        </div>
-      ) : hasMultipleProfiles && !isAdmin ? (
-        <ProfileSwitcher />
-      ) : (
-        <UserButton
-          profileHref={profileHref}
-          settingsHref={APP_ROUTES.SETTINGS}
-          trigger={
-            <button
-              type='button'
-              aria-label='Open workspace menu'
-              className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
-                'group-data-[collapsible=icon]:justify-center'
-              )}
-            >
-              <BrandLogo
-                size={16}
-                tone='auto'
-                rounded={false}
-                className='rounded-sm shrink-0'
-              />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                {isAdmin ? 'Admin' : 'Jovie'}
-              </span>
-              <ChevronDown
-                className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
-                aria-hidden='true'
-              />
-            </button>
-          }
-        />
-      )}
+      {(() => {
+        if (isInSettings) {
+          return (
+            <div className='flex w-full items-center gap-2'>
+              <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
+                <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
+                  Workspace
+                </p>
+                <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
+                  Settings
+                </p>
+              </div>
+              <Link
+                href={APP_ROUTES.DASHBOARD}
+                aria-label='Exit settings and return to app'
+                className={cn(
+                  'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+                  'rounded-full group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                )}
+              >
+                <ArrowLeft
+                  className='size-3 text-sidebar-item-icon/70'
+                  aria-hidden='true'
+                />
+                <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  Exit
+                </span>
+              </Link>
+            </div>
+          );
+        }
+        if (hasMultipleProfiles && !isAdmin) {
+          return <ProfileSwitcher />;
+        }
+        return (
+          <UserButton
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            trigger={
+              <button
+                type='button'
+                aria-label='Open workspace menu'
+                className={cn(
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                  'group-data-[collapsible=icon]:justify-center'
+                )}
+              >
+                <BrandLogo
+                  size={16}
+                  tone='auto'
+                  rounded={false}
+                  className='rounded-sm shrink-0'
+                />
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  {isAdmin ? 'Admin' : 'Jovie'}
+                </span>
+                <ChevronDown
+                  className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
+                  aria-hidden='true'
+                />
+              </button>
+            }
+          />
+        );
+      })()}
 
       {!isInSettings && isDashboardOrAdmin && (
         <Link

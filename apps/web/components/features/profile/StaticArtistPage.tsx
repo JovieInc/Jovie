@@ -230,8 +230,6 @@ export function StaticArtistPage({
         genres={genres}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
-        photoDownloadSizes={photoDownloadSizes}
-        allowPhotoDownloads={allowPhotoDownloads}
       />
     );
   }

@@ -49,14 +49,15 @@ export function buildUserPrompt(input: PitchInput): string {
 
   // Artist-provided context (streaming milestones, press, radio, etc.)
   if (artist.pitchContext) {
-    sections.push(`\n## Artist-Provided Context`);
-    sections.push(artist.pitchContext);
+    sections.push(`\n## Artist-Provided Context`, artist.pitchContext);
   }
 
   // Release info
-  sections.push('\n## Release');
-  sections.push(`Title: ${release.title}`);
-  sections.push(`Type: ${release.releaseType}`);
+  sections.push(
+    '\n## Release',
+    `Title: ${release.title}`,
+    `Type: ${release.releaseType}`
+  );
   if (release.releaseDate)
     sections.push(
       `Release date: ${release.releaseDate.toISOString().split('T')[0]}`
