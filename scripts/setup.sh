@@ -119,6 +119,18 @@ else
   MISSING+=("pnpm install")
 fi
 
+# ─── 4.5. Clear stale Turbopack cache ──────────────────────────────────────
+echo ""
+echo "── Turbopack cache ─────────────────────────────────────────────────"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+NEXT_CACHE="$REPO_ROOT/apps/web/.next/cache"
+if [ -d "$NEXT_CACHE" ]; then
+  rm -rf "$NEXT_CACHE/pack" "$NEXT_CACHE/turbopack"
+  success "Cleared stale Turbopack cache"
+else
+  info "No Turbopack cache to clear"
+fi
+
 # ─── 5. Doppler auth / config check ─────────────────────────────────────────
 echo ""
 echo "── Doppler auth ────────────────────────────────────────────────────────"

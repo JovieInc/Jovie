@@ -1,4 +1,3 @@
-import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardTippingGate } from '@/features/dashboard/DashboardTippingGate';
@@ -8,8 +7,6 @@ import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 export default async function EarningsPage() {
@@ -47,7 +44,9 @@ export default async function EarningsPage() {
     return <DashboardTippingGate />;
   } catch (error) {
     throwIfRedirect(error);
-    Sentry.captureException(error);
+    void captureError('Earnings page failed', error, {
+      route: APP_ROUTES.DASHBOARD_EARNINGS,
+    });
 
     return (
       <PageErrorState message='Failed to load earnings data. Please refresh the page.' />
