@@ -1,67 +1,8 @@
 'use client';
 
-import { Bell } from 'lucide-react';
-import { ArtistName } from '@/components/atoms/ArtistName';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { Avatar } from '@/components/molecules/Avatar';
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
-import { PhoneFrame } from './PhoneFrame';
-import {
-  MOCK_ARTIST,
-  MODE_CONTENT,
-  PHONE_CONTENT_HEIGHT,
-} from './phone-mode-content';
-
-function HeroPhone() {
-  return (
-    <PhoneFrame>
-      <div className='flex items-center justify-end px-4 pt-10 pb-1'>
-        <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
-          <Bell className='h-4 w-4' />
-        </CircleIconButton>
-      </div>
-
-      <div className='flex flex-col items-center px-5 pb-2'>
-        <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
-          <Avatar
-            src={MOCK_ARTIST.image}
-            alt={MOCK_ARTIST.name}
-            name={MOCK_ARTIST.name}
-            size='display-md'
-            verified={false}
-          />
-        </div>
-        <div className='mt-2.5 text-center'>
-          <ArtistName
-            name={MOCK_ARTIST.name}
-            handle={MOCK_ARTIST.handle}
-            isVerified={MOCK_ARTIST.isVerified}
-            size='md'
-            showLink={false}
-            as='p'
-          />
-          <p className='mt-0.5 text-xs text-tertiary-token tracking-[0.2em] uppercase'>
-            Artist
-          </p>
-        </div>
-      </div>
-
-      <div
-        className='relative overflow-hidden px-5'
-        style={{ height: PHONE_CONTENT_HEIGHT }}
-      >
-        {MODE_CONTENT.profile}
-      </div>
-
-      <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
-          Powered by Jovie
-        </p>
-      </div>
-    </PhoneFrame>
-  );
-}
+import { MODES, PhoneShowcase } from './phone-showcase-primitives';
 
 export function HeroCinematic() {
   return (
@@ -110,7 +51,7 @@ export function HeroCinematic() {
                     filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
                   }}
                 >
-                  <HeroPhone />
+                  <PhoneShowcase activeIndex={0} modes={MODES} />
                 </div>
               </div>
             </div>
