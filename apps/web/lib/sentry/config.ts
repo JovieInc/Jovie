@@ -230,6 +230,15 @@ function isAbortError(event: SentryEvent): boolean {
  * (mounted guards, theme handling) and remaining occurrences are transient.
  * Downgrade to warning instead of dropping entirely for monitoring.
  */
+function isCspViolation(event: SentryEvent): boolean {
+  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
+    (v): v is string => typeof v === 'string'
+  );
+  return cspValues.some(
+    v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
+  );
+}
+
 function isHydrationMismatch(event: SentryEvent): boolean {
   const message = [
     event.message,
@@ -351,14 +360,7 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
 
   // Drop Content Security Policy violations — typically caused by browser
   // extensions injecting inline scripts that violate our strict CSP. Not actionable.
-  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
-    (v): v is string => typeof v === 'string'
-  );
-  if (
-    cspValues.some(
-      v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
-    )
-  ) {
+  if (isCspViolation(event)) {
     return null;
   }
 

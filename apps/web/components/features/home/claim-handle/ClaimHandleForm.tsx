@@ -19,38 +19,20 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
+function getInputRowBorderColor(
+  size: 'default' | 'hero' | 'display',
+  isAvailable: boolean
+): string {
+  if (isAvailable) return 'rgba(74,222,128,0.25)';
+  if (size !== 'default') return 'rgba(255,255,255,0.1)';
+  return 'rgba(255,255,255,0.06)';
+}
+
 function getInputRowStyle(
   size: 'default' | 'hero' | 'display',
   isAvailable: boolean
 ) {
-  const isHeroLike = size !== 'default';
-  const isDisplay = size === 'display';
-  const isHero = size === 'hero';
-  let borderColor: string;
-  if (isAvailable) {
-    borderColor = 'rgba(74,222,128,0.25)';
-  } else if (isHeroLike) {
-    borderColor = 'rgba(255,255,255,0.1)';
-  } else {
-    borderColor = 'rgba(255,255,255,0.06)';
-  }
-
-  const heroShadow = [
-    '0 14px 38px rgba(0,0,0,0.18)',
-    'inset 0 1px 0 rgba(255,255,255,0.04)',
-    isAvailable
-      ? '0 0 18px rgba(74,222,128,0.06)'
-      : '0 1px 4px rgba(0,0,0,0.18)',
-  ].join(', ');
-
-  const defaultShadow = [
-    'inset 0 1px 2px rgba(0,0,0,0.2)',
-    isAvailable
-      ? '0 0 20px rgba(74,222,128,0.06)'
-      : '0 1px 2px rgba(0,0,0,0.1)',
-  ].join(', ');
-
-  if (isHero) {
+  if (size === 'hero') {
     return {
       minHeight: 56,
       background:
@@ -64,13 +46,32 @@ function getInputRowStyle(
     };
   }
 
+  const isHeroLike = size !== 'default';
+  const isDisplay = size === 'display';
+  const borderColor = getInputRowBorderColor(size, isAvailable);
+
+  const shadow = isHeroLike
+    ? [
+        '0 14px 38px rgba(0,0,0,0.18)',
+        'inset 0 1px 0 rgba(255,255,255,0.04)',
+        isAvailable
+          ? '0 0 18px rgba(74,222,128,0.06)'
+          : '0 1px 4px rgba(0,0,0,0.18)',
+      ].join(', ')
+    : [
+        'inset 0 1px 2px rgba(0,0,0,0.2)',
+        isAvailable
+          ? '0 0 20px rgba(74,222,128,0.06)'
+          : '0 1px 2px rgba(0,0,0,0.1)',
+      ].join(', ');
+
   return {
     minHeight: isDisplay ? 88 : isHeroLike ? 58 : 52,
     background: isHeroLike
       ? 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.024) 100%)'
       : 'rgba(255,255,255,0.03)',
     border: `${isDisplay ? 1.5 : 1}px solid ${borderColor}`,
-    boxShadow: isHeroLike ? heroShadow : defaultShadow,
+    boxShadow: shadow,
   };
 }
 

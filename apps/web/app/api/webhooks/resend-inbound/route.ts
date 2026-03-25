@@ -145,40 +145,9 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify webhook signature
-  const svixTimestamp = req.headers.get('svix-timestamp');
-  const svixSignature = req.headers.get('svix-signature');
-
-  const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
-
-  if (!webhookSecret && process.env.NODE_ENV === 'production') {
-    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured in production');
-    return NextResponse.json(
-      { error: 'Webhook not configured' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (webhookSecret) {
-    if (!svixSignature || !svixTimestamp) {
-      logger.warn('Inbound webhook missing required signature headers');
-      return NextResponse.json(
-        { error: 'Missing signature headers' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-    const valid = verifySignature(
-      rawBody,
-      svixSignature,
-      svixTimestamp,
-      webhookSecret
-    );
-    if (!valid) {
-      logger.warn('Inbound webhook signature verification failed');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
+  const signatureError = verifyWebhookSignature(req, rawBody);
+  if (signatureError) {
+    return signatureError;
   }
 
   let payload: ResendInboundEvent;
@@ -260,6 +229,49 @@ export async function POST(req: NextRequest) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+function verifyWebhookSignature(
+  req: NextRequest,
+  rawBody: string
+): NextResponse | null {
+  const svixTimestamp = req.headers.get('svix-timestamp');
+  const svixSignature = req.headers.get('svix-signature');
+  const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
+
+  if (!webhookSecret && process.env.NODE_ENV === 'production') {
+    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured in production');
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (!webhookSecret) return null;
+
+  if (!svixSignature || !svixTimestamp) {
+    logger.warn('Inbound webhook missing required signature headers');
+    return NextResponse.json(
+      { error: 'Missing signature headers' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  const valid = verifySignature(
+    rawBody,
+    svixSignature,
+    svixTimestamp,
+    webhookSecret
+  );
+  if (!valid) {
+    logger.warn('Inbound webhook signature verification failed');
+    return NextResponse.json(
+      { error: 'Invalid signature' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  return null;
+}
 
 interface ResendInboundEvent {
   type: string;
