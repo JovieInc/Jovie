@@ -44,7 +44,7 @@ jobs:
       NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: ./.github/actions/setup-node-pnpm
 
@@ -65,7 +65,8 @@ jobs:
             --config=playwright.config.screenshots.ts \
             --project=screenshots \
             tests/product-screenshots/audience.spec.ts \
-            tests/product-screenshots/releases.spec.ts
+            tests/product-screenshots/releases.spec.ts \
+            tests/product-screenshots/profile.spec.ts
         env:
           BASE_URL: http://localhost:3000
           E2E_SKIP_SEED: '1'
@@ -92,13 +93,13 @@ jobs:
         id: diff
         working-directory: .
         run: |
-          if git diff --quiet apps/web/public/product-screenshots/; then
+          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/)" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No screenshot changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Screenshots changed:"
-            git diff --stat apps/web/public/product-screenshots/
+            git status --short apps/web/public/product-screenshots/
           fi
 
       - name: Create or update screenshot PR
@@ -114,14 +115,15 @@ jobs:
           git checkout -b "$BRANCH"
           git add apps/web/public/product-screenshots/
           git commit -m "chore: update product screenshots [auto]"
-          git push --force-with-lease origin "$BRANCH" 2>/dev/null \
-            || git push origin "$BRANCH"
+          git fetch origin "$BRANCH" 2>/dev/null || true
+          git push --force-with-lease origin "$BRANCH"
 
           EXISTING_PR=$(gh pr list --head "$BRANCH" --json number \
             -q '.[0].number' 2>/dev/null || true)
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR"
+            gh pr merge --auto --squash "$EXISTING_PR" 2>/dev/null || true
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
