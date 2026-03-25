@@ -6,10 +6,6 @@ const meta: Meta<typeof LogoLoader> = {
   component: LogoLoader,
   tags: ['autodocs'],
   argTypes: {
-    variant: {
-      control: 'radio',
-      options: ['color', 'mono'],
-    },
     size: { control: 'number' },
   },
   parameters: {
@@ -20,10 +16,10 @@ const meta: Meta<typeof LogoLoader> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Color: Story = {};
+export const Default: Story = {};
 
-export const Mono: Story = {
+export const CustomSize: Story = {
   args: {
-    variant: 'mono',
+    size: 48,
   },
 };
