@@ -217,6 +217,20 @@ export function getReleaseDayNotificationHtml(
 }
 
 /**
+ * Build List-Unsubscribe headers for release day notification emails.
+ * Improves deliverability — Gmail/Outlook show an unsubscribe button in the UI.
+ */
+export function getReleaseDayUnsubscribeHeaders(
+  username: string
+): Record<string, string> {
+  const unsubscribeUrl = buildManageNotificationsUrl(username);
+  return {
+    'List-Unsubscribe': `<${unsubscribeUrl}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+}
+
+/**
  * Get complete email content for a release day notification
  */
 export function getReleaseDayNotificationEmail(
@@ -226,5 +240,6 @@ export function getReleaseDayNotificationEmail(
     subject: getReleaseDayNotificationSubject(data),
     text: getReleaseDayNotificationText(data),
     html: getReleaseDayNotificationHtml(data),
+    headers: getReleaseDayUnsubscribeHeaders(data.username),
   };
 }
