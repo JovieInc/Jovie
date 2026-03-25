@@ -304,7 +304,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0'>
         <div className='px-2 pb-1'>
           <NowPlayingCard />
         </div>

@@ -154,20 +154,15 @@ export function useProfileHeaderParts({
     username && displayName && displayName !== username ? `@${username}` : null;
 
   const title: ReactNode = (
-    <div className='min-w-0 space-y-0.5'>
-      <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-        Profile workspace
-      </p>
-      <div className='flex min-w-0 items-center gap-1.5'>
-        <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
-          {primaryLabel}
+    <div className='flex min-w-0 items-center gap-1.5'>
+      <span className='truncate text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+        {primaryLabel}
+      </span>
+      {secondaryLabel && (
+        <span className='truncate text-[11px] text-secondary-token'>
+          {secondaryLabel}
         </span>
-        {secondaryLabel && (
-          <span className='truncate text-[11px] text-secondary-token'>
-            {secondaryLabel}
-          </span>
-        )}
-      </div>
+      )}
     </div>
   );
 
