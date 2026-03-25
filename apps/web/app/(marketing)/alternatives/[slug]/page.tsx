@@ -55,8 +55,14 @@ export default async function AlternativesPage({
 
   return (
     <>
-      <script type='application/ld+json'>{faqSchema}</script>
-      <script type='application/ld+json'>{breadcrumbSchema}</script>
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: faqSchema }}
+      />
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: breadcrumbSchema }}
+      />
 
       <MarketingHero variant='left'>
         <p className='marketing-kicker'>Alternative</p>

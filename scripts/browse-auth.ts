@@ -9,7 +9,7 @@
  * Then import: $B cookie-import /tmp/browse-clerk-cookies.json
  */
 import { writeFileSync } from 'fs';
-import { type BrowserContext, chromium, type Page } from 'playwright';
+import { type BrowserContext, chromium } from 'playwright';
 
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY!;
 const CLERK_PK = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY!;
@@ -140,37 +140,6 @@ async function setupClerkTestingToken(
   });
 }
 
-async function enterOtp(page: Page): Promise<void> {
-  await page.waitForTimeout(2000);
-
-  const codeInput = page.locator('input[autocomplete="one-time-code"]').first();
-  if (await codeInput.isVisible({ timeout: 5000 })) {
-    console.log(`Entering magic code: ${MAGIC_CODE}`);
-    await codeInput.fill(MAGIC_CODE);
-    return;
-  }
-
-  // Fallback: individual digit inputs
-  const digitInputs = page.locator('input[inputmode="numeric"]');
-  const count = await digitInputs.count();
-  if (count > 0) {
-    console.log(`Found ${count} digit inputs, entering code...`);
-    for (let i = 0; i < Math.min(count, MAGIC_CODE.length); i++) {
-      await digitInputs.nth(i).fill(MAGIC_CODE[i]);
-    }
-    // Trigger submission after filling all digits
-    await digitInputs
-      .nth(Math.min(count, MAGIC_CODE.length) - 1)
-      .press('Enter');
-    return;
-  }
-
-  await page.screenshot({ path: '/tmp/browse-auth-otp-debug.png' });
-  console.log(
-    'Could not find OTP input. Debug screenshot: /tmp/browse-auth-otp-debug.png'
-  );
-}
-
 async function main() {
   console.log(`Site: ${SITE_URL}`);
   console.log(`Email: ${TEST_EMAIL}`);
@@ -190,45 +159,98 @@ async function main() {
 
   const page = await context.newPage();
 
+  // Debug: log console messages and network errors
+  page.on('console', msg => {
+    if (msg.type() === 'error') console.log(`[CONSOLE ERROR] ${msg.text()}`);
+  });
+  page.on('pageerror', err => console.log(`[PAGE ERROR] ${err.message}`));
+  page.on('requestfailed', req =>
+    console.log(`[REQUEST FAILED] ${req.url()} - ${req.failure()?.errorText}`)
+  );
+
   // Navigate to sign-in
   console.log('Navigating to sign-in...');
-  await page.goto(`${SITE_URL}/signin`, { waitUntil: 'networkidle' });
+  await page.goto(`${SITE_URL}/signin`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
 
-  // Click "Continue with email"
-  console.log('Clicking "Continue with email"...');
-  await page.getByRole('button', { name: 'Continue with email' }).click();
-  await page
-    .getByLabel('Email Address')
-    .waitFor({ state: 'visible', timeout: 5000 });
-
-  // Fill email and submit
-  console.log(`Entering email: ${TEST_EMAIL}`);
-  await page.getByLabel('Email Address').fill(TEST_EMAIL);
-  await page.getByRole('button', { name: 'Continue with email' }).click();
-
-  // Enter OTP
-  console.log('Waiting for OTP input...');
+  // Wait for Clerk JS to load
+  console.log('Waiting for Clerk to load...');
   try {
-    await enterOtp(page);
-  } catch (err) {
-    await page.screenshot({ path: '/tmp/browse-auth-otp-debug.png' });
-    console.log(
-      `OTP step error: ${err}. Debug screenshot: /tmp/browse-auth-otp-debug.png`
-    );
+    await page.waitForFunction(() => !!(window as any).Clerk?.loaded, {
+      timeout: 30000,
+    });
+  } catch {
+    // Debug: check what state Clerk is in
+    const clerkState = await page.evaluate(() => ({
+      hasClerk: !!(window as any).Clerk,
+      loaded: (window as any).Clerk?.loaded,
+      version: (window as any).Clerk?.version,
+      url: window.location.href,
+      title: document.title,
+    }));
+    console.log('Clerk state:', JSON.stringify(clerkState));
+    await page.screenshot({ path: '/tmp/browse-auth-clerk-debug.png' });
+    console.log('Debug screenshot: /tmp/browse-auth-clerk-debug.png');
+
+    // Try a reload and wait again
+    console.log('Reloading page...');
+    await page.reload({ waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForFunction(() => !!(window as any).Clerk?.loaded, {
+      timeout: 30000,
+    });
   }
 
-  // Wait for auth redirect
-  console.log('Waiting for auth redirect...');
-  try {
-    await page.waitForURL(url => !url.toString().includes('/signin'), {
-      timeout: 15000,
-    });
-    console.log(`Redirected to: ${page.url()}`);
-  } catch {
-    console.log(`Still on: ${page.url()}`);
+  // Use Clerk's client-side signIn API via the testing token
+  console.log(`Signing in as: ${TEST_EMAIL}`);
+  const signInResult = await page.evaluate(
+    async ({ email, code }) => {
+      const clerk = (window as any).Clerk;
+      if (!clerk) return { error: 'Clerk not loaded' };
+
+      try {
+        // Start sign-in with email_code strategy
+        const signIn = await clerk.client.signIn.create({
+          identifier: email,
+          strategy: 'email_code',
+        });
+
+        // Attempt first factor with the magic OTP code
+        const result = await signIn.attemptFirstFactor({
+          strategy: 'email_code',
+          code,
+        });
+
+        if (result.status === 'complete') {
+          // Set the active session
+          await clerk.setActive({ session: result.createdSessionId });
+          return { success: true, sessionId: result.createdSessionId };
+        }
+        return { error: `Sign-in status: ${result.status}` };
+      } catch (err: unknown) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    },
+    { email: TEST_EMAIL, code: MAGIC_CODE }
+  );
+
+  if ('error' in signInResult && signInResult.error) {
+    console.error(`Sign-in failed: ${signInResult.error}`);
     await page.screenshot({ path: '/tmp/browse-auth-debug.png' });
     console.log('Debug screenshot: /tmp/browse-auth-debug.png');
+  } else {
+    console.log(`Sign-in successful, session: ${signInResult.sessionId}`);
   }
+
+  // Navigate to app to ensure cookies are set
+  console.log('Navigating to app...');
+  await page.goto(`${SITE_URL}/app/dashboard/releases`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 60000,
+  });
+  await page.waitForTimeout(2000);
+  console.log(`Current URL: ${page.url()}`);
 
   // Export cookies
   const cookies = await context.cookies();
