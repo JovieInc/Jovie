@@ -9,7 +9,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Redesigned audience table with sortable columns for easier fan management
 - Redesigned profile hero with larger artist image and cleaner layout
+- [internal] Revamp audience table to Linear layout — break composite cells into individual columns (User, Type, Location, Intent, Visits, LTV, Last Action), show sortable column headers, inline touring badge into user cell
 - [internal] Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
 - [internal] Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
 - [internal] Lighten sticky header border opacity for a more minimal navigation feel
@@ -25,6 +27,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix Clerk proxy URL mismatch — align code to use `/__clerk` path matching Clerk Dashboard proxy configuration, restoring Google OAuth callbacks and Clerk JS loading on production
 - Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24

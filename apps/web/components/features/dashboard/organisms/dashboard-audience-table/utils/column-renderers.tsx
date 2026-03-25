@@ -22,7 +22,7 @@ import {
   AudienceVisitsCell,
   convertContextMenuItems,
 } from '@/components/organisms/table';
-import type { AudienceMember } from '@/types';
+import type { AudienceMember, AudienceMemberType } from '@/types';
 import {
   useAudienceTableStableContext,
   useAudienceTableVolatileContext,
@@ -271,6 +271,66 @@ export function TouringCityCell({ row }: CellContext<AudienceMember, unknown>) {
       showDate={info?.showDate ?? null}
     />
   );
+}
+
+/**
+ * Renders the user cell with an inline touring badge when the member is in a touring city.
+ */
+export function UserCellWithTouring({
+  row,
+}: CellContext<AudienceMember, string | null>) {
+  const { getTouringCity } = useAudienceTableStableContext();
+  const touringInfo = getTouringCity(row.original);
+  return (
+    <div className='flex items-center gap-2 min-w-0'>
+      <AudienceUserCell
+        displayName={row.original.displayName}
+        type={row.original.type}
+        deviceType={row.original.deviceType}
+        geoCity={row.original.geoCity}
+        geoCountry={row.original.geoCountry}
+        className='flex-1 min-w-0'
+      />
+      {touringInfo && (
+        <AudienceTouringBadge
+          touringCity={touringInfo.city}
+          showDate={touringInfo.showDate}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Renders the location cell from the row's locationLabel field.
+ */
+export function renderLocationCellFromRow({
+  row,
+}: CellContext<AudienceMember, string | null>) {
+  return <AudienceLocationCell locationLabel={row.original.locationLabel} />;
+}
+
+/**
+ * Renders a plain numeric visits cell without intent decoration.
+ */
+export function renderVisitsNumberCell({
+  getValue,
+}: CellContext<AudienceMember, number>) {
+  const visits = getValue();
+  return (
+    <span className='tabular-nums text-[13px] text-secondary-token font-[510]'>
+      {visits}
+    </span>
+  );
+}
+
+/**
+ * Renders the type badge cell (standalone column version).
+ */
+export function renderTypeBadgeCell({
+  getValue,
+}: CellContext<AudienceMember, AudienceMemberType>) {
+  return <AudienceTypeBadge type={getValue()} />;
 }
 
 /**

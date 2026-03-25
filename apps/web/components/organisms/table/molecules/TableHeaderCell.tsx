@@ -54,7 +54,10 @@ export function TableHeaderCell<TData>({
       aria-sort={ariaSort}
       className={cn(stickyHeaderClass, metaClassName)}
       style={{
-        width: header.getSize() === 150 ? undefined : header.getSize(),
+        width:
+          header.getSize() >= 9999 || header.getSize() === 150
+            ? undefined
+            : header.getSize(),
       }}
     >
       {(() => {
