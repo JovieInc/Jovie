@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.62] - 2026-03-24
+
+### Fixed
+
+- Center logo relative to Clerk sign-in card by moving it inside the form wrapper container
+
 ## [26.4.61] - 2026-03-24
 
 ### Changed
