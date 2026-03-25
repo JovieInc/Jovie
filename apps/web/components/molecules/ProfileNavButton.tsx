@@ -65,23 +65,14 @@ export function ProfileNavButton({
               className
             )}
           >
-            <div className='relative opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100'>
-              <BrandLogo size={24} tone='auto' className='h-6 w-6' priority />
-              <BrandLogo
-                size={24}
-                tone='auto'
-                alt=''
-                aria-hidden
-                className={cn(
-                  'absolute inset-0 h-6 w-6',
-                  'transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
-                  loading
-                    ? 'opacity-100 scale-100 animate-spin-slow'
-                    : 'opacity-0 scale-0 pointer-events-none'
-                )}
-                priority
-              />
-            </div>
+            <BrandLogo
+              size={24}
+              tone='auto'
+              className={cn(
+                'opacity-60 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100',
+                loading && 'animate-pulse'
+              )}
+            />
           </CircleIconButton>
         </DropdownMenuTrigger>
 

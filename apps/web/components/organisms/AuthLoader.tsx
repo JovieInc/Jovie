@@ -28,7 +28,7 @@ export function AuthLoader() {
       <div className='flex flex-col items-center gap-3'>
         <BrandLogo
           size={32}
-          tone='auto'
+          tone='muted'
           className='animate-pulse'
           aria-hidden
         />

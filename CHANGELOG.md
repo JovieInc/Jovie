@@ -27,9 +27,26 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Convert BrandLogo from image-based rendering to inline SVG with `currentColor` — eliminates double HTTP requests for dark mode, enables CSS-controlled visual hierarchy
+- Standardize logo icon sizes: sidebar icons 13/18px → 16px, remove conflicting Tailwind size overrides
+- Standardize loading states: all use `tone='muted'` + `animate-pulse` + `animate-in fade-in` for consistent visual weight
+- Simplify ProfileNavButton from dual stacked logos to single element with conditional pulse
+- LogoLoader: size 64→32px, animation spin→pulse, always muted tone
 - [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
 - [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
 - [internal] Add `typecheck:tests` script to `apps/web/package.json`
+
+### Fixed
+
+- FooterBranding: wordmark variant now correctly passes `tone='white'` when `isLinear=true` (was defaulting to `auto`)
+- SVG asset fill colors: black icon `#222326` → `#000000`, white icon `#F4F5F8` → `#FFFFFF` for maximum contrast at small sizes
+- AuthLayout logo animation: one-shot pulse with reduced-motion guard (was permanently looping)
+- BrandLogo wrapped in `<span>` to isolate from parent `[&>svg]` selector overrides in CircleIconButton/SidebarMenuButton
+
+### Removed
+
+- Dead components: JovieLogo, LogoIcon (zero production imports)
+- `animate-logo-spin` CSS keyframe (replaced by standard `animate-pulse`)
 
 ## [26.4.69] - 2026-03-25
 
