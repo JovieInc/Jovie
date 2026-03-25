@@ -171,59 +171,57 @@ export function AuthLayout({
         </div>
       ) : null}
 
-      {/* Logo container - fixed dimensions to prevent layout shift between screens */}
-      <div
-        className={cn(
-          'relative z-10 mb-6 h-8 w-8 flex items-center justify-center sm:mb-8',
-          'transition-opacity duration-200 ease-out',
-          // Hide visually when keyboard visible or showLogo=false, but preserve space
-          (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
-        )}
-        aria-hidden={isKeyboardVisible || !showLogo}
-      >
-        <Link
-          href='/'
-          className={`block ${LINK_FOCUS_CLASSES}`}
-          aria-label='Go to homepage'
-          tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
-        >
-          <span
-            className={
-              shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
-            }
-          >
-            <BrandLogo size={32} tone='auto' priority />
-          </span>
-        </Link>
-      </div>
-
-      {/* Title - hide when keyboard is visible on mobile */}
-      {showFormTitle && formTitle && (
-        <h1
-          className={cn(
-            formTitleClassName,
-            'transition-all duration-200 ease-out',
-            isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
-          )}
-          aria-hidden={isKeyboardVisible}
-        >
-          {formTitle}
-        </h1>
-      )}
-
       {/* Form content - centered with mobile-optimized width */}
       <div
-        ref={formRef}
-        id='auth-form'
         className={cn(
-          `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10`,
-          // Smooth scroll target
-          'scroll-mt-4',
+          `w-full ${AUTH_FORM_MAX_WIDTH_CLASS} relative z-10 flex flex-col items-center`,
           // Allow step indicator to render without clipping
           'overflow-visible'
         )}
       >
-        {children}
+        {/* Logo container - inside form wrapper so it centers relative to the Clerk card */}
+        <div
+          className={cn(
+            'mb-6 h-8 w-8 flex items-center justify-center sm:mb-8',
+            'transition-opacity duration-200 ease-out',
+            // Hide visually when keyboard visible or showLogo=false, but preserve space
+            (isKeyboardVisible || !showLogo) && 'opacity-0 pointer-events-none'
+          )}
+          aria-hidden={isKeyboardVisible || !showLogo}
+        >
+          <Link
+            href='/'
+            className={`block ${LINK_FOCUS_CLASSES}`}
+            aria-label='Go to homepage'
+            tabIndex={isKeyboardVisible || !showLogo ? -1 : undefined}
+          >
+            <span
+              className={
+                shouldSpinLogo ? 'inline-flex animate-logo-spin' : 'inline-flex'
+              }
+            >
+              <BrandLogo size={32} tone='auto' priority />
+            </span>
+          </Link>
+        </div>
+
+        {/* Title - hide when keyboard is visible on mobile */}
+        {showFormTitle && formTitle && (
+          <h1
+            className={cn(
+              formTitleClassName,
+              'transition-all duration-200 ease-out',
+              isKeyboardVisible && 'opacity-0 h-0 mb-0 overflow-hidden'
+            )}
+            aria-hidden={isKeyboardVisible}
+          >
+            {formTitle}
+          </h1>
+        )}
+
+        <div ref={formRef} id='auth-form' className='w-full scroll-mt-4'>
+          {children}
+        </div>
       </div>
 
       {/* Footer - hide when keyboard is visible, mt-auto pushes to bottom */}
