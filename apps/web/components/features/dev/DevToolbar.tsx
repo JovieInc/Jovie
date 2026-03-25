@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Copy,
   ExternalLink,
+  Globe,
   Loader2,
   Monitor,
   Moon,
@@ -30,6 +31,11 @@ import {
   FEATURE_FLAGS,
   FF_OVERRIDES_KEY,
 } from '@/lib/feature-flags/shared';
+import {
+  registerServiceWorker,
+  SW_ENABLED_KEY,
+  unregisterServiceWorker,
+} from '@/lib/service-worker/control';
 
 function useLocalOverrides() {
   const [overrides, setOverridesState] = useState<Record<string, boolean>>(
@@ -145,6 +151,7 @@ export function DevToolbar({
   const [clearSessionState, setClearSessionState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
+  const [swEnabled, setSwEnabled] = useState(false);
   const [promoteState, setPromoteState] = useState<
     'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
   >('idle');
@@ -163,6 +170,7 @@ export function DevToolbar({
     setMounted(true);
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
     setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
+    setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
   }, []);
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
@@ -671,6 +679,39 @@ export function DevToolbar({
                       ? 'Failed'
                       : 'Unwaitlist'}
               </span>
+            </button>
+          )}
+
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={async () => {
+                const next = !swEnabled;
+                setSwEnabled(next);
+                localStorage.setItem(SW_ENABLED_KEY, next ? '1' : '0');
+                if (next) {
+                  await registerServiceWorker();
+                } else {
+                  await unregisterServiceWorker();
+                }
+                window.location.reload();
+              }}
+              title={
+                swEnabled
+                  ? 'Service worker active — click to disable'
+                  : 'Service worker disabled — click to enable'
+              }
+              className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+                swEnabled
+                  ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+                  : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+              }`}
+              aria-label={
+                swEnabled ? 'Disable service worker' : 'Enable service worker'
+              }
+            >
+              <Globe size={11} />
+              <span className='hidden sm:inline text-[10px]'>SW</span>
             </button>
           )}
 

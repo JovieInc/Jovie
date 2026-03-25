@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.58] - 2026-03-24
+
+### Fixed
+
+- Waitlist approval was auto-completing onboarding, skipping handle selection, avatar upload, and Spotify connect — approval now requires users to complete onboarding
+- Profile completion redirect was enforcing avatar as a hard requirement, causing infinite redirect loops between /app and /onboarding — avatar is now a soft requirement handled by onboarding step-resume logic
+- Signup redirect sent new users to waitlist page instead of onboarding — corrected to route to onboarding (waitlist guards still enforce approval)
+- Service worker toggle broken on Vercel preview deploys due to NODE_ENV always being 'production' — now uses NEXT_PUBLIC_VERCEL_ENV for accurate environment detection
+- Unhandled promise rejection when unregistering stale service workers at module scope
+
+### Changed
+
+- Removed `inviteToken` from waitlist API response — token-based claim flow replaced by direct approval
+- Service worker disabled by default in development with dev toolbar toggle to re-enable for PWA testing
+
+### Added
+
+- Service worker control utilities (`lib/service-worker/control.ts`) for shared SW registration/unregistration logic
+- Dev toolbar SW toggle button for explicit service worker opt-in during development
+
 ## [26.4.57] - 2026-03-24
 
 ### Fixed

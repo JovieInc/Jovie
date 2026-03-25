@@ -563,7 +563,7 @@ export async function GET() {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json(
-      { hasEntry: false, status: null, inviteToken: null },
+      { hasEntry: false, status: null },
       { status: 401, headers: NO_STORE_HEADERS }
     );
   }
@@ -572,7 +572,7 @@ export async function GET() {
   const emailRaw = user?.emailAddresses?.[0]?.emailAddress ?? null;
   if (!emailRaw) {
     return NextResponse.json(
-      { hasEntry: false, status: null, inviteToken: null },
+      { hasEntry: false, status: null },
       { status: 400, headers: NO_STORE_HEADERS }
     );
   }
@@ -606,8 +606,6 @@ export async function GET() {
     {
       hasEntry: Boolean(entry),
       status: entry?.status ?? null,
-      // claim token hash is never exposed via API — raw tokens are only sent via email
-      inviteToken: null,
       inviteUsername: invite?.username ?? null,
     },
     { headers: NO_STORE_HEADERS }
