@@ -122,9 +122,10 @@ fi
 # ─── 4.5. Clear stale Turbopack cache ──────────────────────────────────────
 echo ""
 echo "── Turbopack cache ─────────────────────────────────────────────────"
-NEXT_CACHE="apps/web/.next/cache"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+NEXT_CACHE="$REPO_ROOT/apps/web/.next/cache"
 if [ -d "$NEXT_CACHE" ]; then
-  rm -rf "$NEXT_CACHE"
+  rm -rf "$NEXT_CACHE/pack" "$NEXT_CACHE/turbopack"
   success "Cleared stale Turbopack cache"
 else
   info "No Turbopack cache to clear"

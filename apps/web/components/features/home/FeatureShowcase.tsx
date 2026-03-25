@@ -102,6 +102,7 @@ function BentoCard({ card, delay }: { card: FeatureCard; delay: number }) {
           width={card.screenshotWidth}
           height={card.screenshotHeight}
           className='w-full'
+          sizes='(min-width: 768px) 50vw, 100vw'
         />
       </div>
     </div>
