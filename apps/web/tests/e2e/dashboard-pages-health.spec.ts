@@ -9,6 +9,7 @@ import {
   signInUser,
 } from '../helpers/clerk-auth';
 import { DASHBOARD_ROUTE_MATRIX } from './utils/dashboard-route-matrix';
+import { assertFastPageLoad } from './utils/performance-assertions';
 import {
   isTransientNavigationError,
   SMOKE_TIMEOUTS,
@@ -305,6 +306,52 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             error: errorText,
           });
         } else {
+          // Content-positive assertion: verify the right content loaded
+          if ('contentSelector' in pageConfig && pageConfig.contentSelector) {
+            const content = page.locator(pageConfig.contentSelector).first();
+            const hasContent = await content
+              .isVisible({ timeout: 10_000 })
+              .catch(() => false);
+
+            const hasFallback =
+              'contentFallbackSelector' in pageConfig &&
+              pageConfig.contentFallbackSelector
+                ? await page
+                    .locator(pageConfig.contentFallbackSelector)
+                    .first()
+                    .isVisible({ timeout: 2_000 })
+                    .catch(() => false)
+                : false;
+
+            if (!hasContent && !hasFallback) {
+              const screenshot = await page.screenshot().catch(() => null);
+              if (screenshot) {
+                await testInfo.attach(`no-content-${pageConfig.name}`, {
+                  body: screenshot,
+                  contentType: 'image/png',
+                });
+              }
+              results.push({
+                path: pageConfig.path,
+                name: pageConfig.name,
+                status: 'fail',
+                loadTimeMs,
+                error: `Content not visible: ${pageConfig.contentSelector}`,
+              });
+              continue;
+            }
+          }
+
+          // CI-only performance budget (dev/Turbopack timing is unreliable)
+          if (process.env.CI && loadTimeMs) {
+            const budget =
+              'performanceBudgetMs' in pageConfig &&
+              pageConfig.performanceBudgetMs
+                ? pageConfig.performanceBudgetMs
+                : 12_000;
+            await assertFastPageLoad(loadTimeMs, budget, testInfo);
+          }
+
           results.push({
             path: pageConfig.path,
             name: pageConfig.name,
