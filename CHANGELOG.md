@@ -14,7 +14,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Mobile comparison table uses native plan selector dropdown instead of horizontal scroll
 - Added accessibility labels to pricing comparison icons and controls
 
+### Fixed
+
+- Center logo relative to Clerk sign-in card by moving it inside the form wrapper container
+
 ## [26.4.61] - 2026-03-24
+
+### Fixed
+
+- Disable waitlist gate so all signups go straight to onboarding — removes the waitlist form trap where users submitted and got stuck in a refresh loop
+- Fix proxy error fallbacks to route to onboarding instead of a dead waitlist page on DB failure or missing Clerk identity
 
 ### Changed
 
