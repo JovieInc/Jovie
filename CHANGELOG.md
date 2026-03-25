@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Remove duplicate "Recent actions" section from audience member sidebar — was showing the same data as "Activity" with a different layout
+- Cap activity feed to 10 most recent items to keep sidebar concise
 - [internal] Fix Clerk proxy test failures when Doppler sets `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` — explicitly clear disabled flag in tests that expect proxy active
 
 ## [26.4.71] - 2026-03-25
