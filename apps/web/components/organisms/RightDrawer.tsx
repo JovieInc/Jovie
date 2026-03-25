@@ -96,7 +96,7 @@ export function RightDrawer({
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
           'overflow-hidden border-l border-(--linear-app-frame-seam)',
-          'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
+          'bg-(--linear-app-content-surface)',
           'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
@@ -122,7 +122,7 @@ export function RightDrawer({
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible rounded-l-[12px] border border-r-0 border-(--linear-app-shell-border) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] shadow-[var(--linear-app-shell-shadow)]'
+          ? 'opacity-100 visible rounded-l-[12px] border border-r-0 border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-[var(--linear-app-shell-shadow)]'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}
