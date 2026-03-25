@@ -13,7 +13,7 @@
  *
  * @see apps/web/proxy.ts
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 
@@ -519,6 +519,53 @@ describe('proxy.ts middleware', () => {
       const res = await callMiddleware(req);
 
       expect(res.status).toBeLessThan(300);
+    });
+  });
+
+  // ==========================================================================
+  // Clerk FAPI Proxy Rewrites
+  // ==========================================================================
+  describe('Clerk FAPI proxy rewrites', () => {
+    // FAPI proxy tests must NOT use the test-auth-bypass header because the
+    // test bypass returns from handleRequest before reaching the FAPI block.
+    function createFapiRequest(pathname: string, hostname: string) {
+      const url = new URL(pathname, `https://${hostname}`);
+      return new NextRequest(url.toString(), {
+        method: 'GET',
+        headers: new Headers({}),
+      });
+    }
+
+    it('rewrites /__clerk to production Clerk on production host', async () => {
+      mocks.isStagingHost.mockReturnValue(false);
+      const req = createFapiRequest('/__clerk/v1/client', 'jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.jov.ie/v1/client');
+    });
+
+    it('rewrites /__clerk to staging Clerk on staging host', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      const req = createFapiRequest('/__clerk/v1/client', 'staging.jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.staging.jov.ie/v1/client');
+    });
+
+    it('rewrites /clerk to production Clerk on production host', async () => {
+      mocks.isStagingHost.mockReturnValue(false);
+      const req = createFapiRequest('/clerk/v1/client', 'jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.jov.ie/v1/client');
+    });
+
+    it('rewrites /clerk to staging Clerk on staging host', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      const req = createFapiRequest('/clerk/v1/client', 'staging.jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.staging.jov.ie/v1/client');
     });
   });
 
