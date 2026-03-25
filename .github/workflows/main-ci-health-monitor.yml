@@ -25,7 +25,7 @@ jobs:
         id: evaluate
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
         env:
-          STUCK_THRESHOLD_MINUTES: '30'
+          STUCK_THRESHOLD_MINUTES: '45'
           NO_SUCCESS_THRESHOLD_HOURS: '3'
         with:
           script: |
