@@ -48,6 +48,7 @@ function renderLogoMark(
     <Logo
       size={size === 'sm' ? 'xs' : 'sm'}
       variant='wordAlt'
+      tone={isLinear ? 'white' : 'auto'}
       className={logoClass}
     />
   );

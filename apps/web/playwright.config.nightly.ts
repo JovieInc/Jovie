@@ -22,7 +22,8 @@ const isCI = !!process.env.CI;
  * Run with: pnpm exec playwright test --config=playwright.config.nightly.ts
  */
 export default defineConfig({
-  testDir: './tests/e2e/nightly',
+  testDir: './tests/e2e',
+  testMatch: ['**/nightly/**/*.spec.ts', '**/dashboard-pages-health.spec.ts'],
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
