@@ -314,6 +314,42 @@ describe('@critical PaymentHandler - payment succeeded', () => {
     );
   });
 
+  it('rethrows customer lookup errors so Stripe retries', async () => {
+    const mockSubscription = {
+      id: 'sub_lookup_error',
+      status: 'active',
+      customer: 'cus_lookup_error',
+      metadata: {},
+      items: { data: [{ price: { id: 'price_pro' } }] },
+    } as unknown as Stripe.Subscription;
+
+    mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
+    mockGetUserIdFromStripeCustomer.mockRejectedValue(
+      new Error('DB unavailable')
+    );
+
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_lookup_error',
+        type: 'invoice.payment_succeeded',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'in_lookup_error',
+            customer: 'cus_lookup_error',
+            subscription: 'sub_lookup_error',
+            amount_due: 2000,
+            attempt_count: 1,
+          } as unknown as Stripe.Invoice,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_lookup_error',
+      stripeEventTimestamp: new Date(),
+    };
+
+    await expect(handler.handle(context)).rejects.toThrow('DB unavailable');
+  });
+
   it('processes trialing subscription status', async () => {
     const mockSubscription = {
       id: 'sub_trial',
