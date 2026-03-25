@@ -7,6 +7,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.70] - 2026-03-25
 
+### Added
+
+- [internal] Automated product screenshot generation CI workflow — regenerates homepage screenshots when UI code changes on main, opens auto-merge PR with updated images
+- [internal] Orphan screenshot cleanup — CI removes screenshots no longer referenced in source code
+- [internal] Exclude screenshot-only changes from triggering main CI pipeline
+
 ### Changed
 
 - [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
