@@ -121,6 +121,7 @@ export const creatorProfiles = pgTable(
     displayName: text('display_name'),
     bio: text('bio'),
     pitchContext: text('pitch_context'),
+    targetPlaylists: text('target_playlists').array(),
     venmoHandle: text('venmo_handle'),
     avatarUrl: text('avatar_url'),
     spotifyUrl: text('spotify_url'),

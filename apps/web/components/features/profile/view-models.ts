@@ -102,6 +102,7 @@ export function buildProfileIdentityFields(
     location: artist.location ?? '',
     hometown: artist.hometown ?? '',
     pitchContext: artist.pitch_context ?? '',
+    targetPlaylists: artist.target_playlists?.join(', ') ?? '',
     profilePath: `/${artist.handle}`,
   };
 }
