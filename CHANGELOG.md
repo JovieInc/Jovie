@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.70] - 2026-03-25
+
+### Added
+
+- [internal] Automated product screenshot generation CI workflow — regenerates homepage screenshots when UI code changes on main, opens auto-merge PR with updated images
+- [internal] Orphan screenshot cleanup — CI removes screenshots no longer referenced in source code
+- [internal] Exclude screenshot-only changes from triggering main CI pipeline
+
 ## [26.4.69] - 2026-03-25
 
 ### Changed
