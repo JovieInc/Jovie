@@ -21,6 +21,9 @@ let statsigInitialized = false;
 // Resets on cold start; intentional — prevents 48+ duplicate warnings per page render.
 let statsigWarnedNoSecret = false;
 const isE2ERuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
+// Skip Statsig entirely in dev — env vars return defaults anyway when no secret is
+// configured, and this eliminates the init network call + gate evaluation overhead.
+const isDev = process.env.NODE_ENV === 'development';
 
 /**
  * Initialize Statsig server SDK
@@ -65,7 +68,7 @@ export async function checkGate(
   gateKey: FeatureFlagKey,
   defaultValue = false
 ): Promise<boolean> {
-  if (isE2ERuntime) {
+  if (isE2ERuntime || isDev) {
     return defaultValue;
   }
 
@@ -99,7 +102,7 @@ export async function getExperiment(
   userId: string | null,
   experimentKey: string
 ): Promise<Record<string, unknown>> {
-  if (isE2ERuntime) {
+  if (isE2ERuntime || isDev) {
     return {};
   }
 
@@ -143,7 +146,7 @@ export async function getSubscribeCTAVariant(
 export async function getFeatureFlagsBootstrap(
   userId: string | null
 ): Promise<FeatureFlagsBootstrap> {
-  if (isE2ERuntime) {
+  if (isE2ERuntime || isDev) {
     return { gates: {} };
   }
 
