@@ -15,8 +15,8 @@ export function EngagementEngineLanding() {
           </p>
 
           <h1 className='marketing-h1-linear mt-6 max-w-[11ch] text-primary-token'>
-            Attention is the bottleneck.
-            <span className='text-secondary-token'> Keep it.</span>
+            Attention is the bottleneck.{' '}
+            <span className='text-secondary-token'>Keep it.</span>
           </h1>
 
           <p className='marketing-lead-linear mt-6 max-w-[34rem] text-secondary-token'>

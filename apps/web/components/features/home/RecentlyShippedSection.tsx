@@ -25,7 +25,7 @@ function parseRecentReleases(markdown: string, count = 3): CompactRelease[] {
   for (const line of lines) {
     if (releases.length >= count) break;
 
-    const vMatch = line.match(VERSION_HEADING_RE);
+    const vMatch = VERSION_HEADING_RE.exec(line);
     if (vMatch) {
       const [, version, date] = vMatch;
       if (version.toLowerCase() === 'unreleased') {
