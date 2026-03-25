@@ -41,9 +41,9 @@ export function deriveAggregateStatus(
   const values = Object.values(statusMap);
   if (values.length === 0) return 'idle';
 
-  const hasEnriching = values.some(s => s === 'enriching');
-  const hasComplete = values.some(s => s === 'complete');
-  const hasFailed = values.some(s => s === 'failed');
+  const hasEnriching = values.includes('enriching');
+  const hasComplete = values.includes('complete');
+  const hasFailed = values.includes('failed');
   const allIdle = values.every(s => s === 'idle' || s === undefined);
 
   if (allIdle) return 'idle';
