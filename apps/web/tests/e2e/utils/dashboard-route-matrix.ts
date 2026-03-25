@@ -3,6 +3,10 @@ import { APP_ROUTES } from '@/constants/routes';
 export interface DashboardRouteDescriptor {
   readonly name: string;
   readonly path: string;
+  /** Primary content selector — must be visible for health check to pass */
+  readonly contentSelector?: string;
+  /** Fallback selector — empty/alternate state that's also acceptable */
+  readonly contentFallbackSelector?: string;
 }
 
 interface DashboardRouteGroup {
@@ -13,11 +17,36 @@ interface DashboardRouteGroup {
 const ACCOUNT_ROUTE = '/account';
 
 const creatorDashboardRoutes = [
-  { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
-  { path: APP_ROUTES.CHAT, name: 'Chat' },
-  { path: APP_ROUTES.EARNINGS, name: 'Earnings' },
-  { path: APP_ROUTES.PRESENCE, name: 'Presence' },
-  { path: APP_ROUTES.RELEASES, name: 'Releases' },
+  {
+    path: APP_ROUTES.AUDIENCE,
+    name: 'Audience',
+    contentSelector: '[data-testid="dashboard-audience-client"]',
+  },
+  {
+    path: APP_ROUTES.CHAT,
+    name: 'Chat',
+    contentSelector:
+      '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i]',
+  },
+  {
+    path: APP_ROUTES.EARNINGS,
+    name: 'Earnings',
+    contentSelector:
+      'button:has-text("Connect Venmo"), :text-matches("connect venmo|share this link anywhere", "i")',
+  },
+  {
+    path: APP_ROUTES.PRESENCE,
+    name: 'Presence',
+    contentSelector: '[data-testid^="presence-card-"]',
+    contentFallbackSelector: ':text-matches("no dsp profiles found", "i")',
+  },
+  {
+    path: APP_ROUTES.RELEASES,
+    name: 'Releases',
+    contentSelector: '[data-testid="releases-matrix"] h1',
+    contentFallbackSelector:
+      '[data-testid="releases-empty-state-enriching"], :text-matches("connect spotify|finding your music|no releases", "i")',
+  },
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
 const creatorSettingsRoutes = [
