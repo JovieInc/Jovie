@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.62] - 2026-03-24
+
+### Fixed
+
+- Fix auth not loading on production and staging by reverting Clerk proxy from SDK `frontendApiProxy` back to Vercel rewrite
+- Add locally bundled Clerk UI to dashboard provider for consistent auth rendering
+
 ## [26.4.61] - 2026-03-24
 
 ### Changed
