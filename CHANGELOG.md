@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.70] - 2026-03-25
+
+### Changed
+
+- [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
+- [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
+- [internal] Add `typecheck:tests` script to `apps/web/package.json`
+
 ## [26.4.69] - 2026-03-25
 
 ### Changed
