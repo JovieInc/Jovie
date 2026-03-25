@@ -115,10 +115,24 @@ function CookieCategories({
 }
 
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
-  const [settings, setSettings] = useState<Consent>({
-    essential: true,
-    analytics: false,
-    marketing: false,
+  const [settings, setSettings] = useState<Consent>(() => {
+    if (typeof window === 'undefined') {
+      return { essential: true, analytics: false, marketing: false };
+    }
+    try {
+      const saved = localStorage.getItem('jv_cc');
+      if (saved) {
+        const parsed = JSON.parse(saved) as Consent;
+        return {
+          essential: true,
+          analytics: !!parsed.analytics,
+          marketing: !!parsed.marketing,
+        };
+      }
+    } catch {
+      // ignore parse errors
+    }
+    return { essential: true, analytics: false, marketing: false };
   });
   const isMobile = useMediaQuery('(max-width: 639px)');
 
