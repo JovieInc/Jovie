@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.59] - 2026-03-24
+
+### Added
+
+- `/demo/audience` route — auth-free audience CRM demo page for screenshots and marketing
+
+### Changed
+
+- Product screenshots now captured from `/demo` pages instead of authenticated dashboard routes — eliminates login screen screenshots
+- Releases screenshot spec uses `/demo` route with graceful image loading fallbacks
+- Audience screenshot spec uses `/demo/audience` route
+
+### Removed
+
+- Insights screenshot spec — insights feature not currently shipping
+
 ## [26.4.58] - 2026-03-24
 
 ### Fixed
