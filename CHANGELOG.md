@@ -27,8 +27,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Fix Clerk proxy URL mismatch — align code to use `/__clerk` path matching Clerk Dashboard proxy configuration, restoring Google OAuth callbacks and Clerk JS loading on production
-- Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
+- Fixed Google sign-in not working on some environments
+- Cleaner releases table layout
 
 ## [26.4.63] - 2026-03-24
 
@@ -174,12 +174,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Homepage product screenshots: audience CRM dashboard, artist profile (phone + desktop)
+- Added product screenshots to homepage
 - [internal] E2E authentication documentation in TESTING.md and CLAUDE.md
 
 ### Removed
 
-- Founder quote from homepage testimonials section (Tim White quote card)
+- [internal] Removed founder quote from homepage testimonials section
 
 ## [26.4.51] - 2026-03-24
 
@@ -220,6 +220,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Blog post priority bumped from 0.6 to 0.7 in sitemap
 - [internal] `BlogMarkdownReader` semantic HTML: moved `<article>` wrapper to page level
 - [internal] Extended `ResolvedAuthor` with `bio` and `username` fields from Jovie profile data
+
 ### Changed
 
 - [internal] Migrated investor portal from subdomain (`investors.jov.ie`) to path-based auth (`/investor-portal`)
@@ -253,6 +254,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Offline fallback page for installed PWA
 - Pinch-to-zoom now works on all pages
+
 ### Changed
 
 - Expanded support page with documentation links and FAQ
@@ -260,6 +262,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - Fixed duplicate "Jovie" in support page title
+
 ## [26.3.48] - 2026-03-23
 
 ### Changed
@@ -271,6 +274,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
 - [internal] Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
 - [internal] Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+
 ## [26.4.48] - 2026-03-24
 
 ### Changed
@@ -302,7 +306,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Updated design system and color tokens to match Linear's March 2026 refresh
+- Refreshed color palette and design tokens
 - [internal] Rewrote DESIGN.md as complete design system spec (typography, colors, spacing, motion, component patterns)
 - [internal] Updated theme base hue 272→282, font weight book 400→450, light sidebar color corrected
 - [internal] Normalized all OKLCH hue references from 260/272 to 282 across token files
@@ -327,6 +331,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] Removed Sentry example page and API route (dev-only test scaffolding)
+
 ### Added
 
 - New /about page with founder story and FAQ
@@ -358,6 +363,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Added `opt-in-token` module with HMAC token generation, verification, and URL building
 - [internal] Added `tipCheckout` rate limiter (30 sessions/hour per IP) for public checkout endpoint
 - [internal] Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
+
 ### Changed
 
 - Redesigned settings with cleaner navigation and dedicated pages for each section
@@ -414,8 +420,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
 - [internal] Invited people on the waitlist can now be fully approved from the admin board
 - Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
-- Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
-- Bulk approve action now includes invited entries, matching individual approval behavior
+- [internal] Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
+- [internal] Bulk approve action now includes invited entries, matching individual approval behavior
 
 ## [26.4.43] - 2026-03-22
 
@@ -423,6 +429,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Document all 11 custom ESLint rules, 12 Claude hooks, canonical import paths, and file creation templates in AGENTS.md so agents stop failing on preventable mistakes
 - [internal] Fix duplicate guardrail numbering (#10/#11/#12 → #13/#14/#15) and incorrect cache preset references (`DYNAMIC_CACHE` → actual presets from `cache-strategies.ts`)
+
 ### Added
 
 - Improved security for contact link protection
@@ -453,7 +460,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] Delete the obsolete custom Clerk auth hooks, multi-step auth form components, and their unused tests after the prebuilt auth cutover
-- Fix duplicate "Jovie" in public profile page title — browser tab showed "Tim White | Jovie | Jovie" instead of "Tim White | Jovie"
+- Fixed duplicate "Jovie" in profile page title
+
 ### Added
 
 - [internal] Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
@@ -464,9 +472,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Blog author sections now pull display name, avatar, and verified badge from the author's Jovie profile instead of hardcoded frontmatter
+- Blog author sections now show live profile data
 - [internal] Batch profile query `getProfilesByUsernames` for efficient blog index rendering
 - [internal] `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
+
 ### Fixed
 
 - [internal] Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
@@ -478,6 +487,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
 - [internal] Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+
 ### Added
 
 - [internal] `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
@@ -501,7 +511,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Use the canonical `BASE_URL` for signup metadata so `/signup` Open Graph URLs and images resolve to `jov.ie` instead of the deprecated app domain
+- [internal] Use the canonical `BASE_URL` for signup metadata so `/signup` Open Graph URLs and images resolve to `jov.ie` instead of the deprecated app domain
+
 ### Added
 
 - [internal] Centered Jovie brand logo in the dev toolbar bottom bar (theme-aware, auto dark/light)
@@ -511,7 +522,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Update hero copy: "The link your music deserves." with subhead "Share every release. Reach every fan. Automatically."
+- [internal] Update hero copy: "The link your music deserves." with subhead "Share every release. Reach every fan. Automatically."
 - [internal] Standardize all documentation, snippets, and AI rules to reference Lucide React as the first-choice icon library (replacing stale Heroicons references)
 - [internal] Replace dead CSS icon classes in phone mockup preview with working SocialIcon and Lucide React components
 - [internal] Replace inline SVG icons in phone mockup preview with Lucide React components (ChevronRight, Link2)
@@ -533,8 +544,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Preview panel with live mobile profile preview, profile snapshot metrics, and share actions
-- Profile sidebar header with copy URL, download QR code, and download vCard actions
+- Live mobile preview panel with profile metrics and share actions
+- Profile sidebar with copy URL, QR code, and vCard download
 
 ### Changed
 
@@ -548,6 +559,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Fix timeout stacking in error display copy button with ref-based cleanup
 - Fix image remove button not visible on touch devices
 - [internal] Fix test state mutation in `useSignInFlow` tests with proper `beforeEach`/`afterEach` scoping
+
 ### Fixed
 
 - [internal] Make CI schema verify step block deploys when database columns are missing — prevents shipping code that references columns not yet in production
@@ -567,13 +579,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - [internal] Dev toolbar "Unwaitlist" button now invalidates proxy user state cache on repeat clicks, fixing stale waitlist redirects after approval
+
 ### Added
 
-- AI-powered playlist pitch generator: auto-generates per-platform pitches (Spotify, Apple Music, Amazon, Generic) from artist and release data
-- New "Pitch context" field in Settings > Artist Profile for artists to provide streaming milestones, press coverage, radio play, and other context the AI can't auto-detect
+- AI-powered playlist pitch generator — auto-generates tailored pitches for Spotify, Apple Music, and Amazon
+- New "Pitch context" field in Settings for adding streaming milestones, press, and other context for better pitches
 - [internal] Pitch generation service using Claude via Vercel AI SDK with structured output and Zod validation
 - [internal] Per-platform character limit enforcement (Spotify 500, Apple Music 300, Amazon 500, Generic 1000) with smart truncation fallback
-- Release sidebar "Playlist Pitches" section in the Details tab with generate, regenerate, and copy-to-clipboard per platform
+- Playlist pitches available in the release sidebar with one-click copy
 - [internal] Rate limiting: 10 pitch generations per hour per user
 - [internal] 28 new tests covering prompt builders, Zod schema validation, truncation logic, and profile validation
 
@@ -601,6 +614,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Demo-specific Playwright config (`playwright.config.demo.ts`) with video recording always on, 1280x720 viewport, single worker
 - [internal] Shared E2E helper module (`helpers/e2e-helpers.ts`) extracted from golden-path spec for reuse across test specs
 - [internal] `demo:record` script in package.json for one-command demo video recording
+
 ## [26.4.31] - 2026-03-21
 
 ### Added
@@ -626,6 +640,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] `verificationReason` field exposed from sign-in hook for context-aware UI copy (MFA vs device trust)
 - [internal] `abandoned` status handling in sign-up flow with specific "interrupted" message
 - [internal] Unit tests for all new sign-in status branches (7 tests) and sign-up status branches (2 tests)
+
 ### Changed
 
 - [internal] Removed "Primary goal" step from waitlist onboarding — form now starts directly with social platform selection (2 steps instead of 3)
@@ -637,6 +652,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Removed
 
 - [internal] `WaitlistPrimaryGoalStep` component and `PrimaryGoal` type — no longer part of onboarding flow
+
 ### Fixed
 
 - [internal] CSP `connect-src` now allows Sentry regional ingest URLs (`*.ingest.us.sentry.io`) — fixes silent error reporting failure
@@ -654,14 +670,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Public changelog page, RSS feed, and subscriber emails now show plain-language summaries and hide developer-facing details
-- Each release has a short summary at the top describing what changed in simple terms
+- Changelog now shows plain-language summaries
 - [internal] Consolidated changelog parsing into a shared module used by the page and RSS feed
 
 ### Added
 
 - [internal] Shared changelog parser (`apps/web/lib/changelog-parser.ts`) used by both the page and RSS feed
-- 12 unit tests for the shared changelog parser
+- [internal] 12 unit tests for the shared changelog parser
 
 ## [26.4.29] - 2026-03-20
 
@@ -691,7 +706,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Store immutable profile_id in Stripe payment intent metadata so capture-tip webhook can resolve creators without relying on mutable handle lookups
 - [internal] Validate profile_id still exists before tip insert to prevent FK violation causing 500 retry loops
 - [internal] Check isPublic flag on creator profile in create-tip-intent to match checkout flow behavior
-- Dashboard pages show a friendly error message instead of redirecting to sign-in during temporary outages
+- Dashboard now handles temporary outages gracefully instead of signing you out
 - [internal] Add auth-first guards (getCachedAuth before getDashboardData) on dashboard pages to prevent unauthenticated access during DB outages
 - [internal] Escalate stripe-tips webhook from logger.warn to captureCriticalError with redacted email context
 - [internal] Dashboard pages (earnings, audience, releases, presence) show PageErrorState with consistent captureError telemetry instead of redirecting to signin on DB failure
@@ -704,14 +719,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Fixed an issue where some new users would see a "no active profile" error after signing up
+- Fixed "no active profile" error for some new users after signing up
 - [internal] Add missing `active_profile_id` column to production database — migration was lost during migration squash, causing 6 Sentry errors across auth, session, and dashboard queries
 - [internal] Backfill `active_profile_id` for existing users with claimed profiles — prevents "no active profile" state after column is added
 - [internal] Update `create_profile_with_user()` stored function to set `active_profile_id` during onboarding
 - [internal] Deterministic backfill query uses correlated subquery with `ORDER BY created_at ASC LIMIT 1` to handle multi-profile users
 - [internal] Stored function prefers claimed profiles over unclaimed ones when selecting existing profile
 - [internal] Fix migration journal timestamp ordering so new migration runs after existing ones on all environments
-- Returning to the waitlist page after being approved no longer accidentally locks you out
+- Fixed a rare issue where returning to the waitlist page could lock you out
 - [internal] Waitlist re-submission no longer silently downgrades approved users — `upsertUserAsPending` is now guarded behind `existing.status === 'new'`, preventing approved users from being locked out if they re-hit the waitlist endpoint via stale bookmark or direct API call
 - [internal] Added regression test for waitlist status downgrade protection
 
@@ -726,8 +741,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Google sign-up now shows a clear error message when your account already exists, with a link to sign in instead
-- Sign-up page now shows an error message if something goes wrong while checking handle availability
+- Better error messages during sign-up (duplicate accounts, handle availability)
 - [internal] Hardened redirect URL sanitization against backslash and encoded bypass attacks (e.g., `%5C`, `%2F`)
 - [internal] Click count increment on `/go/:id` redirects now uses `after()` to survive serverless teardown
 - [internal] Email open/click tracking events now use `after()` to prevent lost analytics in serverless environments

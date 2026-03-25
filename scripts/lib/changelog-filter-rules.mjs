@@ -47,7 +47,7 @@ const INTERNAL_PATTERNS = [
   /\bdev overlay/i,
 
   // CI/CD
-  /\bCI[\s/]/,
+  /\bCI\b/,
   /\bCI guard\b/i,
   /\bCI pipeline\b/i,
 
@@ -72,8 +72,7 @@ const INTERNAL_PATTERNS = [
   /\bClerk SDK\b/i,
   /\bVercel SDK\b/i,
   /\bSentry SDK\b/i,
-  /\bAI SDK\b/i,
-  /\bmiddleware\b/i,
+  /\bVercel AI SDK\b/i,
   /\bCSP\b/,
   /\bNODE_ENV\b/,
   /\bNEXT_PUBLIC_/,
