@@ -126,7 +126,7 @@ export function StickyPhoneTour() {
                       Built for independent artists
                     </p>
 
-                    <h1 className='marketing-h1-linear mt-5 text-primary-token'>
+                    <h1 className='marketing-h1-linear hero-gradient-text mt-5'>
                       The link your music deserves.
                     </h1>
 
@@ -180,7 +180,8 @@ export function StickyPhoneTour() {
                 <div className='flex flex-col items-center gap-4'>
                   <div
                     style={{
-                      filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
+                      filter:
+                        'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))',
                     }}
                   >
                     <PhoneShowcase activeIndex={phoneIndex} modes={MODES} />

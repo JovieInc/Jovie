@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { APP_NAME, APP_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { FeatureRow } from '@/features/home/FeatureRow';
+import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
 import { LogoBar } from '@/features/home/LogoBar';
@@ -177,35 +177,11 @@ export default function HomePage() {
       {/* 3. Logo bar — z-index wipe over sticky phone */}
       <LogoBar />
 
-      {/* 4. Releases — text left, screenshot right */}
-      <FeatureRow
-        heading='Release day, automated.'
-        description='New music goes live with smart links, fan notifications, and pre-save pages — no setup required.'
-        bullets={[
-          'Smart links generated automatically for every release',
-          'Fans notified via email on release day',
-          'Pre-save pages that convert to day-one streams',
-        ]}
-        screenshotSrc='/product-screenshots/releases-dashboard-full.png'
-        screenshotAlt='Jovie release dashboard showing releases table with smart link details'
-        screenshotWidth={2880}
-        screenshotHeight={1800}
-      />
+      {/* 4. Feature showcase — bento grid */}
+      <FeatureShowcase />
 
-      {/* 5. Audience — text left, screenshot right */}
-      <FeatureRow
-        heading='Know every fan by name.'
-        description="Every fan who subscribes, tips, or clicks becomes a contact you own — not a follower trapped on someone else's platform."
-        bullets={[
-          'Fan intelligence with source tracking',
-          'See which fans came from which release or show',
-          'Export contacts anytime — your audience, your data',
-        ]}
-        screenshotSrc='/product-screenshots/audience-crm.png'
-        screenshotAlt='Jovie audience CRM showing fan contacts with source tracking'
-        screenshotWidth={2880}
-        screenshotHeight={1800}
-      />
+      {/* 5. Divider before CTA */}
+      <div aria-hidden='true' className='section-gradient-divider' />
 
       {/* 6. Final CTA */}
       <FinalCTASection />

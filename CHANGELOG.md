@@ -5,7 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.70] - 2026-03-25
+
+### Changed
+
+- [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
+- [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
+- [internal] Add `typecheck:tests` script to `apps/web/package.json`
+
+## [26.4.69] - 2026-03-25
+
+### Changed
+
+- Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
+
+### Fixed
+
+- [internal] Clear stale Turbopack cache during setup to prevent `@clerk/ui` module resolution failures in dev mode
+
 ## [26.4.68] - 2026-03-25
+
+### Added
+
+- [internal] Add AI chat eval framework with 16 golden cases testing music industry knowledge accuracy, voice compliance, and prompt injection guards
+- [internal] Add 30+ unit tests for chat components (ChatInput, ChatMessage, ChatMarkdown, SuggestedPrompts, intent classification, knowledge retrieval, etc.)
+- [internal] Extract tool schemas into shared `tool-schemas.ts` for eval runner reuse without importing execute functions
+- [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
+- [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
 
 ### Changed
 
