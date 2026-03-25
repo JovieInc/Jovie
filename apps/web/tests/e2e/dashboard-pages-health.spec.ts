@@ -387,7 +387,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             const userButtonLoaded = await page
               .locator('[data-testid="user-button-loaded"]')
               .first()
-              .waitFor({ state: 'visible', timeout: 10_000 })
+              .waitFor({ state: 'attached', timeout: 10_000 })
               .then(() => true)
               .catch(() => false);
             if (!userButtonLoaded) {

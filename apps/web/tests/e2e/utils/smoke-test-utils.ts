@@ -72,16 +72,18 @@ export const EXPECTED_ERROR_PATTERNS = [
   'chunkloaderror', // dynamic import fails during hot reload
   'failed to load chunk', // same, different phrasing
 
-  // Resource loading failures from third-party scripts (not app bugs)
-  'failed to load resource', // browser-level resource fetch failure (images, fonts, 3rd-party)
+  // Resource loading failures from known third-party CDNs (not app bugs)
+  'failed to load resource: the server responded with a status of', // generic browser phrasing for 4xx/5xx on external resources
+  'i.scdn.co', // Spotify CDN image 403/404s
 
   // CSP and security headers (expected in test/dev)
   'content security policy', // CSP violations from dev tooling
   'blocked by cors', // CORS blocks on third-party scripts in dev
   'cross-origin', // cross-origin warnings on third-party resources
 
-  // Framework development warnings (console.warn, not errors)
-  'warning:', // React/Next.js dev warnings (printed via console.warn)
+  // NOTE: console.warn is NOT captured by the error listener (msg.type() === 'error' only).
+  // This pattern catches the rare case where something calls console.error("Warning: ...")
+  'warning:', // defensive: suppress console.error starting with "Warning:" (e.g. React internals)
 
   // WebSocket/HMR noise in dev environment (scoped to dev server, not product WebSockets)
   'ws://localhost', // Turbopack/webpack HMR WebSocket connection failures in dev
