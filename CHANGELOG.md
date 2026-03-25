@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.64] - 2026-03-25
+## [26.4.66] - 2026-03-25
 
 ### Added
 
@@ -18,6 +18,25 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
 - Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
 - Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
+
+## [26.4.65] - 2026-03-25
+
+### Changed
+
+- Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
+- Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
+- Lighten sticky header border opacity for a more minimal navigation feel
+
+### Removed
+
+- Remove redundant calendar date badge from profile hero card (eyebrow text already communicates timing)
+- Remove card container chrome (border, background, shadow, divider) from profile hero
+
+## [26.4.64] - 2026-03-25
+
+### Fixed
+
+- Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24
 
