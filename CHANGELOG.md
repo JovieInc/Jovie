@@ -5,7 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.71] - 2026-03-25
+
+### Fixed
+
+- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — unblocks future PPR optimization
+- [internal] Add missing `dashboardLoadError` check to insights page
+- [internal] Replace direct `Sentry.captureException` with `captureError()` in earnings page
+- [internal] Fix hardcoded `/app/insights` and `/onboarding` redirect URLs to use route constants
+- [internal] Wrap presence page in Suspense boundary for instant skeleton streaming
+- [internal] Replace `logger.error` with `captureError` in audience and insights catch blocks
+- [internal] Show error state instead of fake empty state when DSP presence data fails to load
+
 ## [26.4.70] - 2026-03-25
+
+### Added
+
+- [internal] Automated product screenshot generation CI workflow — regenerates homepage screenshots when UI code changes on main, opens auto-merge PR with updated images
+- [internal] Orphan screenshot cleanup — CI removes screenshots no longer referenced in source code
+- [internal] Exclude screenshot-only changes from triggering main CI pipeline
 
 ### Changed
 
