@@ -1,6 +1,7 @@
 'use client';
 
 import { ClerkProvider } from '@clerk/nextjs';
+import { ui } from '@clerk/ui';
 import React, { useEffect, useState } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
@@ -46,9 +47,6 @@ function wrapWithCoreProviders({
 
   return content;
 }
-// Custom domain is configured via CNAME (clerk.jov.ie → frontend-api.clerk.services)
-// No proxyUrl needed - Clerk SDK uses the domain from publishable key configuration
-
 // Main export - wraps children with ClerkProvider (client-side only)
 // Uses hydration guard to prevent SSR of ClerkProvider which accesses window
 export function ClientProviders({
@@ -91,6 +89,7 @@ export function ClientProviders({
       publishableKey={publishableKey}
       proxyUrl={getClerkProxyUrl()}
       appearance={clerkAppearanceBase}
+      ui={ui}
       signInUrl={APP_ROUTES.SIGNIN}
       signUpUrl={APP_ROUTES.SIGNUP}
       signInFallbackRedirectUrl={APP_ROUTES.DASHBOARD}

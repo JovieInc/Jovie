@@ -9,6 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix auth not loading on production and staging by reverting Clerk proxy from SDK `frontendApiProxy` back to Vercel rewrite
+- Add locally bundled Clerk UI to dashboard provider for consistent auth rendering
 - Center logo relative to Clerk sign-in card by moving it inside the form wrapper container
 
 ## [26.4.61] - 2026-03-24

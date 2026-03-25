@@ -27,5 +27,5 @@ export function getClerkProxyUrl(): string | undefined {
   // instead of proxying through localhost (which requires HTTPS and doesn't
   // work in headless Playwright browsers against dev servers).
   if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
-  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/__clerk';
+  return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/clerk';
 }
