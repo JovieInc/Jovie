@@ -9,7 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Fix Clerk FAPI proxy routing for staging — `/__clerk/*` requests now dynamically route to `clerk.staging.jov.ie` on staging hosts instead of always hitting production `clerk.jov.ie` via hardcoded Vercel rewrite
+- Fixed sign-in reliability on staging environments so authentication requests stay in the correct environment
+- [internal] Route `/__clerk/*` and `/clerk/*` to the environment-specific Clerk FAPI host
 
 ## [26.4.72] - 2026-03-25
 

@@ -567,6 +567,37 @@ describe('proxy.ts middleware', () => {
       const rewriteUrl = res.headers.get('x-middleware-rewrite');
       expect(rewriteUrl).toBe('https://clerk.staging.jov.ie/v1/client');
     });
+
+    it('rewrites exact /__clerk root on staging', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      const req = createFapiRequest('/__clerk', 'staging.jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.staging.jov.ie/');
+    });
+
+    it('rewrites exact /clerk root on production', async () => {
+      mocks.isStagingHost.mockReturnValue(false);
+      const req = createFapiRequest('/clerk', 'jov.ie');
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.jov.ie/');
+    });
+
+    it('preserves query string on /__clerk rewrite', async () => {
+      mocks.isStagingHost.mockReturnValue(true);
+      const url = new URL(
+        '/__clerk/v1/client?foo=bar',
+        'https://staging.jov.ie'
+      );
+      const req = new NextRequest(url.toString(), {
+        method: 'GET',
+        headers: new Headers({}),
+      });
+      const res = await callMiddleware(req);
+      const rewriteUrl = res.headers.get('x-middleware-rewrite');
+      expect(rewriteUrl).toBe('https://clerk.staging.jov.ie/v1/client?foo=bar');
+    });
   });
 
   // ==========================================================================
