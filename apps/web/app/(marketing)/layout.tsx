@@ -22,6 +22,7 @@ export default async function MarketingLayout({
         <ScrollRevealInit />
       </main>
       <MarketingFooter />
+      <div aria-hidden='true' className='marketing-noise' />
     </div>
   );
 }
