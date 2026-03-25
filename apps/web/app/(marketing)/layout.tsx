@@ -1,6 +1,7 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
+import { MarketingScrollUnlock } from '@/features/home/MarketingScrollUnlock';
 import { ScrollRevealInit } from '@/features/home/ScrollRevealInit';
 
 export default async function MarketingLayout({
@@ -17,6 +18,7 @@ export default async function MarketingLayout({
         className='flex flex-1 flex-col pt-[var(--linear-header-height)]'
       >
         {children}
+        <MarketingScrollUnlock />
         <ScrollRevealInit />
       </main>
       <MarketingFooter />

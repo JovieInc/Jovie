@@ -13,11 +13,20 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Add content-positive assertions for top 5 dashboard routes (Chat, Audience, Releases, Earnings, Presence) — health checks now verify the right content loaded, not just absence of errors
 - [internal] Wire existing `assertFastPageLoad` performance budgets into dashboard health checks (CI-only)
 
+### Changed
+
+- Unified hero and sticky phone tour into one continuous scroll experience — phone persists from hero through all 4 mode transitions, then logo bar wipes it away
+- Hero content (headline, claim form) is now the first "slide" that crossfades into tour mode panels as you scroll
+- HeroCinematic is now mobile-only; desktop uses the unified sticky section
+
 ### Fixed
 
 - [internal] Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
 - [internal] Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
 - [internal] Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
+- Fix scroll infrastructure: split body/html overflow rules so `overflow-x:clip` isn't promoted to `hidden` (which broke `position:sticky`)
+- Fix scroll-reveal system: `reveal-js` class was never added to document root, so entrance animations never activated
+- Fix MobileNav scroll lock cleanup: use `removeProperty` instead of empty string to prevent ghost inline styles
 
 ## [26.4.65] - 2026-03-25
 
