@@ -116,9 +116,13 @@ export function MobileNav({
 
   // Prevent body scroll when menu is open
   useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : '';
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.removeProperty('overflow');
+    }
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.removeProperty('overflow');
     };
   }, [isOpen]);
 
