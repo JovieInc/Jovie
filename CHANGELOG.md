@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.67] - 2026-03-25
+
+### Fixed
+
+- [internal] Fix scroll-reveal cleanup leak — `reveal-js` class now removed on unmount even when no scroll elements exist
+- [internal] Add `aria-hidden` and `inert` to crossfaded homepage panels so screen readers only see the active panel
+- [internal] Use computed `phoneIndex` instead of duplicating the expression in CrossfadeBlock calls
+
 ## [26.4.66] - 2026-03-25
 
 ### Added
