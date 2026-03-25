@@ -3,6 +3,13 @@
   "compilerOptions": {
     "tsBuildInfoFile": ".cache/tsbuildinfo-tests"
   },
-  "include": ["tests/**/*.ts", "tests/**/*.tsx", "scripts/**/*.ts"],
+  "include": [
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "scripts/**/*.ts",
+    "playwright.config*.ts",
+    "drizzle.config.ts",
+    "dangerfile.ts"
+  ],
   "exclude": ["node_modules"]
 }

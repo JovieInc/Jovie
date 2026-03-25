@@ -61,7 +61,8 @@
     "instrumentation.ts",
     "instrumentation-client.ts",
     "sentry.server.config.ts",
-    "sentry.edge.config.ts"
+    "sentry.edge.config.ts",
+    "proxy.ts"
   ],
   "exclude": [
     "node_modules",
