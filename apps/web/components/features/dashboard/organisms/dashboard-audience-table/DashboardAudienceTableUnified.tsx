@@ -1,7 +1,12 @@
 'use client';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type ColumnDef,
+  createColumnHelper,
+  type OnChangeFn,
+  type SortingState,
+} from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Users } from 'lucide-react';
 import * as React from 'react';
@@ -42,12 +47,14 @@ import { useDashboardAudienceTable } from './useDashboardAudienceTable';
 import { copyTextToClipboard, downloadVCard } from './utils';
 import {
   QuickActionsCell,
+  renderIntentScoreCell,
   renderLastActionCell,
+  renderLocationCellFromRow,
   renderLtvCell,
-  renderPlatformsCell,
-  renderUserCell,
+  renderTypeBadgeCell,
+  renderVisitsNumberCell,
   SelectCell,
-  TouringCityCell,
+  UserCellWithTouring,
 } from './utils/column-renderers';
 
 const memberColumnHelper = createColumnHelper<AudienceMember>();
@@ -59,13 +66,28 @@ function getSrDescription(isEmpty: boolean): string {
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
 
+/** Map column ID → server sort field for URL state bridge. */
+const COLUMN_SORT_MAP: Record<string, string> = {
+  type: 'type',
+  intent: 'intent',
+  visits: 'visits',
+  ltv: 'engagement',
+  lastAction: 'lastSeen',
+};
+
+/** Reverse map: server sort field → column ID. */
+const SORT_FIELD_TO_COLUMN: Record<string, string> = {
+  type: 'type',
+  intent: 'intent',
+  visits: 'visits',
+  engagement: 'ltv',
+  lastSeen: 'lastAction',
+};
+
 /**
- * Compact Linear-style column definitions for members mode.
+ * Linear-style column definitions — one concept per column with visible sortable headers.
  *
- * Layout: Select | User (primary label) | LTV ($) | Platforms (icon cluster) | Touring badge | Last Action | Quick Actions
- *
- * Headers are hidden via `hideHeader` on the table. Icon columns use fixed widths
- * so layout never shifts when content appears/disappears.
+ * Layout: Select | User (flex) | Type | Location | Intent | Visits | LTV | Last Action | Quick Actions
  */
 const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
   memberColumnHelper.display({
@@ -73,45 +95,64 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     header: () => null,
     cell: SelectCell,
     size: 40,
+    enableSorting: false,
   }),
   memberColumnHelper.accessor('displayName', {
     id: 'user',
     header: 'User',
-    cell: renderUserCell,
-    size: 260,
+    cell: UserCellWithTouring,
+    size: 9999,
+    minSize: 180,
+    enableSorting: false,
+  }),
+  memberColumnHelper.accessor('type', {
+    id: 'type',
+    header: 'Type',
+    cell: renderTypeBadgeCell,
+    size: 90,
+    enableSorting: true,
+  }),
+  memberColumnHelper.accessor('locationLabel', {
+    id: 'location',
+    header: 'Location',
+    cell: renderLocationCellFromRow,
+    size: 130,
+    enableSorting: false,
+  }),
+  memberColumnHelper.accessor('intentLevel', {
+    id: 'intent',
+    header: 'Intent',
+    cell: renderIntentScoreCell,
+    size: 70,
+    enableSorting: true,
+  }),
+  memberColumnHelper.accessor('visits', {
+    id: 'visits',
+    header: 'Visits',
+    cell: renderVisitsNumberCell,
+    size: 70,
+    enableSorting: true,
   }),
   memberColumnHelper.accessor('tipAmountTotalCents', {
     id: 'ltv',
     header: 'LTV',
     cell: renderLtvCell,
-    size: 40,
-    meta: {
-      className: 'px-2',
-    },
-  }),
-  memberColumnHelper.display({
-    id: 'platforms',
-    header: 'Platforms',
-    cell: renderPlatformsCell,
-    size: 44,
-  }),
-  memberColumnHelper.display({
-    id: 'touringCity',
-    header: 'Touring',
-    cell: TouringCityCell,
-    size: 110,
+    size: 80,
+    enableSorting: true,
   }),
   memberColumnHelper.accessor('latestActions', {
     id: 'lastAction',
     header: 'Last Action',
     cell: renderLastActionCell,
     size: 160,
+    enableSorting: true,
   }),
   memberColumnHelper.display({
     id: 'quickActions',
     header: '',
     cell: QuickActionsCell,
     size: 80,
+    enableSorting: false,
   }),
 ];
 
@@ -210,6 +251,24 @@ export const DashboardAudienceTableUnified = memo(
       direction,
       profileUrl,
     });
+
+    // Bridge URL sort state ↔ TanStack SortingState
+    const sorting: SortingState = useMemo(() => {
+      const columnId = SORT_FIELD_TO_COLUMN[sort];
+      if (!columnId) return [];
+      return [{ id: columnId, desc: direction === 'desc' }];
+    }, [sort, direction]);
+
+    const handleSortingChange: OnChangeFn<SortingState> = React.useCallback(
+      updater => {
+        const next = typeof updater === 'function' ? updater(sorting) : updater;
+        if (next.length > 0) {
+          const sortField = COLUMN_SORT_MAP[next[0].id];
+          if (sortField) onSortChange(sortField);
+        }
+      },
+      [sorting, onSortChange]
+    );
 
     const handleRemoveMember = React.useCallback(
       async (member: AudienceMember) => {
@@ -577,9 +636,10 @@ export const DashboardAudienceTableUnified = memo(
                         getRowId={row => row.id}
                         enableVirtualization={true}
                         enableKeyboardNavigation={true}
-                        hideHeader={true}
+                        sorting={sorting}
+                        onSortingChange={handleSortingChange}
                         minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
-                        className='text-[12.5px]'
+                        className='text-[13px]'
                         getRowClassName={getRowClassName}
                         onRowClick={row => handleViewProfile(row)}
                         onFocusedRowChange={handleFocusedRowChange}
