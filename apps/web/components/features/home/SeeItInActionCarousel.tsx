@@ -257,7 +257,7 @@ export function SeeItInActionCarousel({
   useEffect(() => {
     return () => {
       if (closeTimeoutRef.current !== null) {
-        window.clearTimeout(closeTimeoutRef.current);
+        globalThis.clearTimeout(closeTimeoutRef.current);
       }
     };
   }, []);
@@ -265,7 +265,7 @@ export function SeeItInActionCarousel({
   const handleReleaseOpenChange = useCallback(
     (releaseId: string, nextOpen: boolean) => {
       if (closeTimeoutRef.current !== null) {
-        window.clearTimeout(closeTimeoutRef.current);
+        globalThis.clearTimeout(closeTimeoutRef.current);
         closeTimeoutRef.current = null;
       }
 
@@ -280,7 +280,7 @@ export function SeeItInActionCarousel({
 
   const handleReleaseHoverStart = useCallback((releaseId: string) => {
     if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
+      globalThis.clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
     }
 
@@ -289,15 +289,15 @@ export function SeeItInActionCarousel({
 
   const handleReleaseHoverEnd = useCallback((releaseId: string) => {
     if (closeTimeoutRef.current !== null) {
-      window.clearTimeout(closeTimeoutRef.current);
+      globalThis.clearTimeout(closeTimeoutRef.current);
     }
 
-    closeTimeoutRef.current = window.setTimeout(() => {
+    closeTimeoutRef.current = globalThis.setTimeout(() => {
       setOpenReleaseId(currentOpenReleaseId =>
         currentOpenReleaseId === releaseId ? null : currentOpenReleaseId
       );
       closeTimeoutRef.current = null;
-    }, 120);
+    }, 120) as unknown as number;
   }, []);
 
   return (
