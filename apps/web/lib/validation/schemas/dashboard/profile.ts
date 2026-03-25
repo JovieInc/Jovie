@@ -184,6 +184,16 @@ export const profileUpdateSchema = z
       .trim()
       .max(2000, 'Pitch context must be 2000 characters or fewer')
       .optional(),
+    /** Target Spotify playlists for pitch generation */
+    targetPlaylists: z
+      .array(
+        z
+          .string()
+          .trim()
+          .max(60, 'Playlist name must be 60 characters or fewer')
+      )
+      .max(5, 'Maximum 5 target playlists')
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (

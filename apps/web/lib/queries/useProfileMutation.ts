@@ -48,6 +48,8 @@ export interface ProfileUpdateInput {
     genres?: string[];
     // Pitch context for AI-generated playlist pitches
     pitchContext?: string;
+    // Target Spotify playlists for pitch generation
+    targetPlaylists?: string[];
     // Settings object for feature flags
     settings?: ProfileSettingsUpdate;
   };

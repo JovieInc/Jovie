@@ -24,4 +24,5 @@ export const ALLOWED_PROFILE_FIELDS = new Set([
   'venmo_handle',
   'genres',
   'pitchContext',
+  'targetPlaylists',
 ]);

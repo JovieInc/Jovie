@@ -46,7 +46,8 @@ export function SettingsProfileSection({
       | 'displayName'
       | 'location'
       | 'hometown'
-      | 'pitchContext',
+      | 'pitchContext'
+      | 'targetPlaylists',
     value: string
   ) => {
     setFormData(prev => {
@@ -58,6 +59,7 @@ export function SettingsProfileSection({
         location: next.location,
         hometown: next.hometown,
         pitchContext: next.pitchContext,
+        targetPlaylists: next.targetPlaylists,
       });
       return next;
     });
@@ -220,6 +222,32 @@ export function SettingsProfileSection({
               {formData.pitchContext.length}/2000
             </span>
           </div>
+        </div>
+
+        <div className='flex flex-col gap-2 py-2 sm:flex-row sm:items-center sm:justify-between'>
+          <div className='shrink-0'>
+            <label
+              htmlFor='targetPlaylists'
+              className='text-[13px] text-primary-token'
+            >
+              Target playlists
+            </label>
+            <p className='mt-0.5 text-[13px] text-secondary-token'>
+              Name specific Spotify playlists you&apos;re targeting. Leave blank
+              and we&apos;ll suggest based on your genre.
+            </p>
+          </div>
+          <Input
+            type='text'
+            name='targetPlaylists'
+            id='targetPlaylists'
+            value={formData.targetPlaylists}
+            onChange={e => handleFieldChange('targetPlaylists', e.target.value)}
+            onBlur={() => flushSave()}
+            placeholder='e.g. Pollen, Butter, Lorem'
+            maxLength={200}
+            className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
+          />
         </div>
       </div>
     </div>

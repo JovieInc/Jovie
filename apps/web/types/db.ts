@@ -171,6 +171,7 @@ export interface Artist {
   active_since_year?: number | null;
   genres?: string[] | null;
   pitch_context?: string | null;
+  target_playlists?: string[] | null;
   published: boolean; // maps to is_public
   is_verified: boolean;
   is_featured: boolean;
