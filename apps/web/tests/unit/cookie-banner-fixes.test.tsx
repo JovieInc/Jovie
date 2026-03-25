@@ -106,13 +106,13 @@ describe('CookieModal loads saved preferences', () => {
     expect(marketingSwitch).not.toBeChecked();
   });
 
-  it('has accessible dialog description', async () => {
+  it('exposes an accessible dialog description', async () => {
     const { CookieModal } = await import('@/components/organisms/CookieModal');
     render(<CookieModal open onClose={vi.fn()} />);
 
-    expect(
-      screen.getByText('Manage your cookie preferences')
-    ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
+      'Manage your cookie preferences'
+    );
   });
 });
 
