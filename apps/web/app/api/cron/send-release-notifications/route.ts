@@ -19,8 +19,10 @@ export const maxDuration = 120;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-// Process up to 100 notifications per run to avoid timeouts
-const MAX_NOTIFICATIONS_PER_RUN = 100;
+// Process up to 200 notifications per run. With CONCURRENCY_BATCH_SIZE=10, this
+// means ~20 sequential batches — safely under the 120s Vercel maxDuration.
+// Called every 15 minutes via /api/cron/frequent, so throughput is ~800/hour.
+const MAX_NOTIFICATIONS_PER_RUN = 200;
 
 // Timeout for stuck "sending" rows - if a notification has been in "sending" state
 // for longer than this, reset it to "pending" for retry
@@ -48,6 +50,33 @@ interface ProcessingContext {
 }
 
 type ProcessResult = 'sent' | 'failed' | 'skipped';
+
+async function getEligibleCreatorIds(
+  creatorProfileIds: string[]
+): Promise<Set<string> | null> {
+  const eligibleCreatorIds = new Set<string>();
+
+  try {
+    const entitlementsMap =
+      await getBatchCreatorEntitlements(creatorProfileIds);
+    for (const [profileId, { entitlements }] of entitlementsMap) {
+      if (entitlements.booleans.canSendNotifications) {
+        eligibleCreatorIds.add(profileId);
+      }
+    }
+
+    return eligibleCreatorIds;
+  } catch (error) {
+    logger.warn(
+      '[send-release-notifications] Batch entitlements lookup failed, preserving pending notifications for retry',
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        creatorCount: creatorProfileIds.length,
+      }
+    );
+    return null;
+  }
+}
 
 /** Count settled promise results by outcome category. */
 function countSettledResults(results: PromiseSettledResult<ProcessResult>[]): {
@@ -579,18 +608,10 @@ export async function sendPendingNotifications(): Promise<{
     ]);
 
   // Check which creators can send notifications based on their plan (single batch query)
-  const eligibleCreatorIds = new Set<string>();
-  try {
-    const entitlementsMap =
-      await getBatchCreatorEntitlements(creatorProfileIds);
-    for (const [profileId, { entitlements }] of entitlementsMap) {
-      if (entitlements.booleans.canSendNotifications) {
-        eligibleCreatorIds.add(profileId);
-      }
-    }
-  } catch {
-    logger.warn(
-      '[send-release-notifications] Batch entitlements lookup failed, skipping all creators'
+  const eligibleCreatorIds = await getEligibleCreatorIds(creatorProfileIds);
+  if (!eligibleCreatorIds) {
+    throw new Error(
+      'Creator entitlements lookup failed while sending release notifications'
     );
   }
 
@@ -654,7 +675,7 @@ export async function sendPendingNotifications(): Promise<{
 /**
  * Cron job to send pending release day notifications.
  *
- * Schedule: Every hour (configured in vercel.json)
+ * Schedule: Every 15 minutes via /api/cron/frequent
  */
 export async function GET(request: Request) {
   const authHeader = request.headers.get('authorization');

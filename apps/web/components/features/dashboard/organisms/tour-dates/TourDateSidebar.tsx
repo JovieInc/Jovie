@@ -59,7 +59,7 @@ function MiniRankedList({
     <ul className='space-y-1'>
       {items.map((item, index) => (
         <li
-          key={`${item.key}-${index}`}
+          key={item.key}
           className='flex h-7 items-center justify-between rounded-md px-1.5'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>

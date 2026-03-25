@@ -1,6 +1,15 @@
 /**
  * Engagement engine page loading skeleton
  */
+const ENGAGEMENT_FEATURE_KEYS = [
+  'capture',
+  'nurture',
+  'convert',
+  'monetize',
+  'retain',
+  'analyze',
+] as const;
+
 export default function EngagementEngineLoading() {
   return (
     <div className='min-h-screen bg-white dark:bg-[#0D0E12]'>
@@ -17,9 +26,9 @@ export default function EngagementEngineLoading() {
       <section className='py-24 px-4'>
         <div className='mx-auto max-w-7xl'>
           <div className='grid md:grid-cols-2 lg:grid-cols-3 gap-8'>
-            {Array.from({ length: 6 }, (_, i) => (
+            {ENGAGEMENT_FEATURE_KEYS.map(featureKey => (
               <div
-                key={`engagement-feature-${i + 1}`}
+                key={featureKey}
                 className='p-6 rounded-xl border border-gray-200 dark:border-white/10'
               >
                 <div className='h-10 w-10 skeleton rounded-lg mb-4' />

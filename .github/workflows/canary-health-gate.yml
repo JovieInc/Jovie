@@ -60,52 +60,52 @@ jobs:
           echo "Running canary health check..."
           deployment_url="${DEPLOYMENT_URL}"
           health_url_fallback="${FALLBACK_HEALTH_URL}"
+          resolved_commit_deployment_url="$(python3 - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.parse
+          import urllib.request
+
+          token = os.environ.get("VERCEL_TOKEN", "")
+          org_id = os.environ.get("VERCEL_ORG_ID", "")
+          project_id = os.environ.get("VERCEL_PROJECT_ID", "")
+          commit_sha = os.environ.get("COMMIT_SHA", "")
+
+          if not token or not project_id or not commit_sha:
+              print("", end="")
+              sys.exit(0)
+
+          base_url = "https://api.vercel.com/v6/deployments"
+          query_params = {
+              "projectId": project_id,
+              "state": "READY",
+              "limit": 50,
+          }
+
+          # Team-owned projects require teamId scoping to list deployments.
+          if org_id.startswith("team_"):
+              query_params["teamId"] = org_id
+
+          query = urllib.parse.urlencode(query_params)
+          request = urllib.request.Request(
+              f"{base_url}?{query}",
+              headers={"Authorization": f"Bearer {token}"},
+          )
+          with urllib.request.urlopen(request, timeout=15) as response:
+              payload = json.load(response)
+
+          for deployment in payload.get("deployments", []):
+              meta = deployment.get("meta") or {}
+              if meta.get("githubCommitSha") == commit_sha:
+                  print(f"https://{deployment['url']}")
+                  break
+          PY
+          )"
 
           if [ -z "$deployment_url" ]; then
             echo "⚠ deployment_url missing from upstream outputs; resolving from Vercel API..."
-            deployment_url="$(python - <<'PY'
-            import json
-            import os
-            import sys
-            import urllib.parse
-            import urllib.request
-
-            token = os.environ.get("VERCEL_TOKEN", "")
-            org_id = os.environ.get("VERCEL_ORG_ID", "")
-            project_id = os.environ.get("VERCEL_PROJECT_ID", "")
-            commit_sha = os.environ.get("COMMIT_SHA", "")
-
-            if not token or not project_id or not commit_sha:
-                print("", end="")
-                sys.exit(0)
-
-            base_url = "https://api.vercel.com/v6/deployments"
-            query_params = {
-                "projectId": project_id,
-                "target": "production",
-                "state": "READY",
-                "limit": 20,
-            }
-
-            # Team-owned projects require teamId scoping to list deployments.
-            if org_id.startswith("team_"):
-                query_params["teamId"] = org_id
-
-            query = urllib.parse.urlencode(query_params)
-            request = urllib.request.Request(
-                f"{base_url}?{query}",
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            with urllib.request.urlopen(request, timeout=15) as response:
-                payload = json.load(response)
-
-            for deployment in payload.get("deployments", []):
-                meta = deployment.get("meta") or {}
-                if meta.get("githubCommitSha") == commit_sha:
-                    print(f"https://{deployment['url']}")
-                    break
-            PY
-            )"
+            deployment_url="$resolved_commit_deployment_url"
           fi
 
           if [ -z "$deployment_url" ]; then
@@ -162,10 +162,64 @@ jobs:
               continue
             fi
 
+            if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
+              sleep_seconds=$((attempt * 10))
+              echo "⚠ Canary got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+              sleep "$sleep_seconds"
+              attempt=$((attempt + 1))
+              continue
+            fi
+
             echo "❌ Canary failed: HTTP $response_code"
             echo "canary_status=failed" >> "$GITHUB_OUTPUT"
             exit 1
           done
+
+          if [ "$response_code" != "200" ] && [ -n "$resolved_commit_deployment_url" ] && [ "${deployment_url%/}" != "${resolved_commit_deployment_url%/}" ]; then
+            echo "⚠ Canary primary URL failed with HTTP $response_code. Retrying commit deployment URL ${resolved_commit_deployment_url}..."
+            deployment_url="$resolved_commit_deployment_url"
+
+            if [[ "$FALLBACK_HEALTH_URL" = /* ]]; then
+              health_url_fallback="${deployment_url%/}${FALLBACK_HEALTH_URL}"
+            else
+              health_url_fallback="${FALLBACK_HEALTH_URL}"
+            fi
+
+            health_url_primary="${deployment_url%/}/api/health"
+            health_url="$health_url_primary"
+
+            attempt=1
+            max_attempts=5
+            response_code="000"
+            while [ $attempt -le $max_attempts ]; do
+              response=$(curl -s -L -A "$USER_AGENT" -H "Accept: application/json" -H "Cache-Control: no-cache, no-store, must-revalidate" -H "Pragma: no-cache" "${BYPASS_ARGS[@]}" -w "\n%{http_code}" "${health_url}$( [[ "$health_url" == *"?"* ]] && echo '&' || echo '?' )_cb=$(date +%s%N)" || echo "\n000")
+              response_code="${response##*$'\n'}"
+
+              if [ "$response_code" = "200" ]; then
+                break
+              fi
+
+              if [ "$response_code" = "429" ]; then
+                sleep_seconds=$((attempt * 5))
+                echo "⚠ Canary commit URL got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+                sleep "$sleep_seconds"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
+                sleep_seconds=$((attempt * 10))
+                echo "⚠ Canary commit URL got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
+                sleep "$sleep_seconds"
+                attempt=$((attempt + 1))
+                continue
+              fi
+
+              echo "❌ Canary commit URL failed: HTTP $response_code"
+              echo "canary_status=failed" >> "$GITHUB_OUTPUT"
+              exit 1
+            done
+          fi
 
           if [ "$response_code" != "200" ]; then
             if [ "$response_code" = "429" ]; then
@@ -189,6 +243,14 @@ jobs:
                   sleep_seconds=$((attempt * 15))
                   echo "⚠ Canary fallback got HTTP 429 (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
                   echo "429 response preview: ${body_preview}"
+                  sleep "$sleep_seconds"
+                  attempt=$((attempt + 1))
+                  continue
+                fi
+
+                if [ "$response_code" = "500" ] || [ "$response_code" = "502" ] || [ "$response_code" = "503" ] || [ "$response_code" = "504" ]; then
+                  sleep_seconds=$((attempt * 15))
+                  echo "⚠ Canary fallback got transient HTTP $response_code (attempt $attempt/$max_attempts). Retrying in ${sleep_seconds}s..."
                   sleep "$sleep_seconds"
                   attempt=$((attempt + 1))
                   continue

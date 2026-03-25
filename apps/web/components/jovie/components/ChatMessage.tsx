@@ -74,20 +74,33 @@ export function ChatMessage({
         <div className='max-w-[78%] rounded-2xl bg-accent/95 px-4 py-3.5 text-accent-foreground'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
-              {fileParts.map((file, index) => (
-                <div
-                  key={`${file.url}-${index}`}
-                  className='relative h-32 w-32 overflow-hidden rounded-lg'
-                >
-                  <Image
-                    src={file.url}
-                    alt='Attached image'
-                    fill
-                    className='object-cover'
-                    unoptimized
-                  />
-                </div>
-              ))}
+              {(() => {
+                const seenFileKeys = new Map<string, number>();
+
+                return fileParts.map(file => {
+                  const seenCount = seenFileKeys.get(file.url) ?? 0;
+                  seenFileKeys.set(file.url, seenCount + 1);
+
+                  return (
+                    <div
+                      key={
+                        seenCount === 0
+                          ? file.url
+                          : `${file.url}-${seenCount + 1}`
+                      }
+                      className='relative h-32 w-32 overflow-hidden rounded-lg'
+                    >
+                      <Image
+                        src={file.url}
+                        alt='Attached image'
+                        fill
+                        className='object-cover'
+                        unoptimized
+                      />
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
           {messageText && (
