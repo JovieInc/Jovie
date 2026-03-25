@@ -4,7 +4,7 @@ import { MODES, PhoneShowcase } from './phone-showcase-primitives';
 
 export function HeroCinematic() {
   return (
-    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:pt-[6.6rem] xl:pt-[6.9rem]'>
+    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:hidden'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
