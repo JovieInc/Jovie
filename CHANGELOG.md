@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.65] - 2026-03-25
+
+### Changed
+
+- [internal] Automated keyword filtering for public changelog — vendor names, dev tooling, staging URLs, and infrastructure patterns are now auto-filtered even without the `[internal]` prefix
+- [internal] Cleaned up ~80 existing changelog entries: tagged internals, rewrote verbose entries to be benefit-led and concise
+
 ## [26.4.64] - 2026-03-25
 
 ### Fixed
