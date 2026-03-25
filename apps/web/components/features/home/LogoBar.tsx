@@ -7,7 +7,13 @@ import {
 
 export function LogoBar() {
   return (
-    <section className='px-5 pb-4 pt-1.5 sm:px-6 md:pb-5 md:pt-2'>
+    <section
+      className='relative z-20 px-5 pb-4 pt-1.5 sm:px-6 md:pb-5 md:pt-2'
+      style={{
+        backgroundColor: 'var(--linear-bg-page)',
+        boxShadow: '0 -30px 60px rgba(0,0,0,0.4)',
+      }}
+    >
       <div className='homepage-section-shell'>
         <div
           aria-hidden='true'

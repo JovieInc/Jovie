@@ -646,6 +646,31 @@ body {
 }
 
 /* ============================================
+   HERO PHONE FLOAT ANIMATION
+   Subtle float on the phone in HeroCinematic.
+   ============================================ */
+
+@keyframes hero-phone-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-hero-phone-float {
+  animation: hero-phone-float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-phone-float {
+    animation: none;
+  }
+}
+
+/* ============================================
    SCROLL-REVEAL ANIMATION
    Triggered by IntersectionObserver (ScrollRevealInit client component).
    .reveal-on-scroll starts hidden; .revealed plays the entrance.
