@@ -27,8 +27,8 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const baseClassName = cn(rounded ? 'rounded-full' : undefined, className);
   const resolvedStyle = {
-    width: 'auto',
-    height: 'auto',
+    width: size,
+    height: size,
     ...style,
   } satisfies CSSProperties;
 
