@@ -269,13 +269,11 @@ export function SeeItInActionCarousel({
         closeTimeoutRef.current = null;
       }
 
-      setOpenReleaseId(currentOpenReleaseId =>
-        nextOpen
-          ? releaseId
-          : currentOpenReleaseId === releaseId
-            ? null
-            : currentOpenReleaseId
-      );
+      setOpenReleaseId(currentOpenReleaseId => {
+        if (nextOpen) return releaseId;
+        if (currentOpenReleaseId === releaseId) return null;
+        return currentOpenReleaseId;
+      });
     },
     []
   );
