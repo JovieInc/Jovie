@@ -383,7 +383,7 @@ const getCachedLatestReleaseGate = unstable_cache(
 
 const getCachedProfileV2Gate = unstable_cache(
   async () => {
-    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, false);
+    return checkGate(null, FEATURE_FLAG_KEYS.PROFILE_V2, true);
   },
   ['public-profile-v2-gate'],
   {

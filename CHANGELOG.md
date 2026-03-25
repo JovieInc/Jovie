@@ -9,6 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Profile V2 layout is now the default for all artist profiles (Statsig gate can still override)
 - [internal] Skip Statsig feature flag evaluation in dev mode to reduce request overhead — all flags return defaults, matching existing behavior when no server secret is configured
 
 ## [26.4.60] - 2026-03-24
