@@ -15,7 +15,7 @@ describe('CopyableUrlRow', () => {
   it('keeps the flat surface borderless', () => {
     render(
       <CopyableUrlRow
-        url='https://jov.ie/timwhite/example'
+        url='https://jov.ie/tim/example'
         surface='flat'
         testId='flat-row'
       />
@@ -30,7 +30,7 @@ describe('CopyableUrlRow', () => {
   it('keeps the boxed surface bordered', () => {
     render(
       <CopyableUrlRow
-        url='https://jov.ie/timwhite/example'
+        url='https://jov.ie/tim/example'
         surface='boxed'
         testId='boxed-row'
       />

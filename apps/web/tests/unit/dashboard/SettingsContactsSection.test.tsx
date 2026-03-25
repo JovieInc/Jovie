@@ -60,7 +60,7 @@ function RightPanelRenderer() {
 const mockArtist: Artist = {
   id: 'profile-1',
   owner_user_id: 'user-1',
-  handle: 'timwhite',
+  handle: 'tim',
   spotify_id: 'spotify-1',
   name: 'Tim White',
   published: true,
