@@ -146,7 +146,6 @@ describe('parseChangelog', () => {
     expect(result.releases[0].version).toBe('1.0.0');
     expect(result.releases[0].date).toBe('');
   });
-});
 
   it('auto-filters entries with vendor names into internalSections', () => {
     const md = `## [1.0.0] - 2026-03-20
