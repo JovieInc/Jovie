@@ -63,7 +63,8 @@ function buildModeHref(mode: SwipeableProfileMode): string {
   }
 
   const search = url.searchParams.toString();
-  return `${url.pathname}${search ? `?${search}` : ''}`;
+  const suffix = search ? `?${search}` : '';
+  return `${url.pathname}${suffix}`;
 }
 
 function getModeFromLocation(): SwipeableProfileMode {

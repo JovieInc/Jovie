@@ -99,7 +99,7 @@ export function AdminSidebar({ className }: Readonly<AdminSidebarProps>) {
             aria-label='Go to admin dashboard'
             className='flex size-9 items-center justify-center rounded-md transition-all duration-150 ease-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
           >
-            <BrandLogo size={18} tone='auto' className='size-4' />
+            <BrandLogo size={16} tone='auto' />
           </Link>
           <div className='grid flex-1 text-left leading-tight'>
             <span className='truncate text-sm font-semibold text-sidebar-foreground'>

@@ -1,97 +1,74 @@
-import Image from 'next/image';
 import type { CSSProperties } from 'react';
 import { cn } from '@/lib/utils';
 
-export type BrandLogoTone = 'auto' | 'black' | 'white' | 'color';
+export type BrandLogoTone = 'auto' | 'white' | 'color' | 'muted';
 
 export interface BrandLogoProps {
   readonly size?: number;
   readonly className?: string;
   readonly tone?: BrandLogoTone;
   readonly alt?: string;
+  /** @deprecated No-op — kept for backward compatibility. Will be removed. */
   readonly priority?: boolean;
   readonly rounded?: boolean;
   readonly style?: CSSProperties;
   readonly 'aria-hidden'?: boolean;
 }
 
+/** Jovie icon mark — inline SVG, single element, uses currentColor. */
+const ICON_PATH =
+  'm176.84,0l3.08.05c8.92,1.73,16.9,6.45,23.05,13.18,7.95,8.7,12.87,20.77,12.87,34.14s-4.92,25.44-12.87,34.14c-6.7,7.34-15.59,12.28-25.49,13.57h-.64s0,.01,0,.01h0c-22.2,0-42.3,8.84-56.83,23.13-14.5,14.27-23.49,33.99-23.49,55.77h0v.02c0,21.78,8.98,41.5,23.49,55.77,14.54,14.3,34.64,23.15,56.83,23.15v-.02h.01c22.2,0,42.3-8.84,56.83-23.13,14.51-14.27,23.49-33.99,23.49-55.77h0c0-17.55-5.81-33.75-15.63-46.82-10.08-13.43-24.42-23.61-41.05-28.62l-2.11-.64c4.36-2.65,8.34-5.96,11.84-9.78,9.57-10.47,15.5-24.89,15.5-40.77s-5.93-30.3-15.5-40.77c-1.44-1.57-2.95-3.06-4.55-4.44l7.67,1.58c40.44,8.35,75.81,30.3,100.91,60.75,24.66,29.91,39.44,68.02,39.44,109.5h0c0,48.05-19.81,91.55-51.83,123.05-31.99,31.46-76.19,50.92-125,50.92v.02h-.01c-48.79,0-93-19.47-125-50.94C19.81,265.54,0,222.04,0,173.99h0c0-48.05,19.81-91.56,51.83-123.05C83.84,19.47,128.04,0,176.84,0Z';
+
+const TONE_STYLES: Record<BrandLogoTone, CSSProperties | undefined> = {
+  auto: undefined,
+  white: { color: '#fff' },
+  color: { color: '#635aff' },
+  muted: undefined,
+};
+
+const TONE_CLASSES: Record<BrandLogoTone, string | undefined> = {
+  auto: undefined,
+  white: undefined,
+  color: undefined,
+  muted: 'text-muted-foreground/50',
+};
+
 export function BrandLogo({
   size = 48,
   className,
   tone = 'auto',
   alt = 'Jovie',
-  priority = false,
   rounded = true,
   style,
   'aria-hidden': ariaHidden,
 }: BrandLogoProps) {
-  const baseClassName = cn(rounded ? 'rounded-full' : undefined, className);
-  const resolvedStyle = {
-    width: 'auto',
-    height: 'auto',
-    ...style,
-  } satisfies CSSProperties;
-
-  if (tone === 'auto') {
-    // When both theme variants are rendered, avoid using `priority` (which adds
-    // <link rel="preload">) because only one variant is visible at a time and
-    // the hidden one triggers a browser warning about unused preloaded resources.
-    // Instead, use loading="eager" + fetchPriority="high" for the same effect.
-    const loadingProp = priority ? ('eager' as const) : ('lazy' as const);
-    const fetchPriorityProp = priority ? ('high' as const) : undefined;
-
-    return (
-      <>
-        <Image
-          src='/brand/Jovie-Logo-Icon-Black.svg'
-          alt={alt}
-          width={size}
-          height={size}
-          sizes={`${size}px`}
-          loading={loadingProp}
-          fetchPriority={fetchPriorityProp}
-          aria-hidden={ariaHidden}
-          style={resolvedStyle}
-          className={cn(baseClassName, 'dark:hidden')}
-          unoptimized
-        />
-        <Image
-          src='/brand/Jovie-Logo-Icon-White.svg'
-          alt={alt}
-          width={size}
-          height={size}
-          sizes={`${size}px`}
-          loading={loadingProp}
-          fetchPriority={fetchPriorityProp}
-          aria-hidden={ariaHidden}
-          style={resolvedStyle}
-          className={cn(baseClassName, 'hidden dark:block')}
-          unoptimized
-        />
-      </>
-    );
-  }
-
-  const TONE_SRC_MAP: Record<BrandLogoTone, string> = {
-    white: '/brand/Jovie-Logo-Icon-White.svg',
-    black: '/brand/Jovie-Logo-Icon-Black.svg',
-    color: '/brand/Jovie-Logo-Icon.svg',
-    auto: '/brand/Jovie-Logo-Icon.svg',
-  };
-  const src = TONE_SRC_MAP[tone];
+  const toneStyle = TONE_STYLES[tone];
+  const resolvedStyle =
+    toneStyle || style ? { ...toneStyle, ...style } : undefined;
 
   return (
-    <Image
-      src={src}
-      alt={alt}
-      width={size}
-      height={size}
-      sizes={`${size}px`}
-      priority={priority}
-      aria-hidden={ariaHidden}
+    <span
+      className={cn(
+        'inline-flex shrink-0 overflow-hidden',
+        rounded ? 'rounded-full' : undefined,
+        TONE_CLASSES[tone],
+        className
+      )}
       style={resolvedStyle}
-      className={baseClassName}
-      unoptimized
-    />
+      aria-hidden={ariaHidden}
+    >
+      <svg
+        xmlns='http://www.w3.org/2000/svg'
+        viewBox='0 0 353.68 347.97'
+        width={size}
+        height={size}
+        fill='currentColor'
+        role={ariaHidden ? undefined : 'img'}
+        aria-label={ariaHidden ? undefined : alt}
+      >
+        {!ariaHidden && <title>{alt}</title>}
+        <path d={ICON_PATH} />
+      </svg>
+    </span>
   );
 }

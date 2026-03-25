@@ -5,7 +5,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.72] - 2026-03-25
+
+### Fixed
+
+- Remove duplicate "Recent actions" section from audience member sidebar — was showing the same data as "Activity" with a different layout
+- Cap activity feed to 10 most recent items to keep sidebar concise
+- [internal] Fix Clerk proxy test failures when Doppler sets `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` — explicitly clear disabled flag in tests that expect proxy active
+
+## [26.4.71] - 2026-03-25
+
+### Fixed
+
+- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — unblocks future PPR optimization
+- [internal] Add missing `dashboardLoadError` check to insights page
+- [internal] Replace direct `Sentry.captureException` with `captureError()` in earnings page
+- [internal] Fix hardcoded `/app/insights` and `/onboarding` redirect URLs to use route constants
+- [internal] Wrap presence page in Suspense boundary for instant skeleton streaming
+- [internal] Replace `logger.error` with `captureError` in audience and insights catch blocks
+- [internal] Show error state instead of fake empty state when DSP presence data fails to load
+
+## [26.4.70] - 2026-03-25
+
+### Added
+
+- [internal] Automated product screenshot generation CI workflow — regenerates homepage screenshots when UI code changes on main, opens auto-merge PR with updated images
+- [internal] Orphan screenshot cleanup — CI removes screenshots no longer referenced in source code
+- [internal] Exclude screenshot-only changes from triggering main CI pipeline
+
+### Changed
+
+- Convert BrandLogo from image-based rendering to inline SVG with `currentColor` — eliminates double HTTP requests for dark mode, enables CSS-controlled visual hierarchy
+- Standardize logo icon sizes: sidebar icons 13/18px → 16px, remove conflicting Tailwind size overrides
+- Standardize loading states: all use `tone='muted'` + `animate-pulse` + `animate-in fade-in` for consistent visual weight
+- Simplify ProfileNavButton from dual stacked logos to single element with conditional pulse
+- LogoLoader: size 64→32px, animation spin→pulse, always muted tone
+- [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
+- [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
+- [internal] Add `typecheck:tests` script to `apps/web/package.json`
+
+### Fixed
+
+- FooterBranding: wordmark variant now correctly passes `tone='white'` when `isLinear=true` (was defaulting to `auto`)
+- SVG asset fill colors: black icon `#222326` → `#000000`, white icon `#F4F5F8` → `#FFFFFF` for maximum contrast at small sizes
+- AuthLayout logo animation: one-shot pulse with reduced-motion guard (was permanently looping)
+- BrandLogo wrapped in `<span>` to isolate from parent `[&>svg]` selector overrides in CircleIconButton/SidebarMenuButton
+- [internal] Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
+- [internal] Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
+- [internal] Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
+- [internal] Expand nightly E2E config to include dashboard health tests across all 5 browser projects
+- [internal] Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
+- [internal] Add safety guards preventing silent test disablement when route matrices are empty
+
+### Removed
+
+- Dead components: JovieLogo, LogoIcon (zero production imports)
+- `animate-logo-spin` CSS keyframe (replaced by standard `animate-pulse`)
+
+## [26.4.69] - 2026-03-25
+
+### Changed
+
+- Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
+
+### Fixed
+
+- [internal] Clear stale Turbopack cache during setup to prevent `@clerk/ui` module resolution failures in dev mode
+
 ## [26.4.68] - 2026-03-25
+
+### Added
+
+- [internal] Add AI chat eval framework with 16 golden cases testing music industry knowledge accuracy, voice compliance, and prompt injection guards
+- [internal] Add 30+ unit tests for chat components (ChatInput, ChatMessage, ChatMarkdown, SuggestedPrompts, intent classification, knowledge retrieval, etc.)
+- [internal] Extract tool schemas into shared `tool-schemas.ts` for eval runner reuse without importing execute functions
+- [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
+- [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
 
 ### Changed
 
