@@ -74,7 +74,7 @@ export const ProfileCompletionCard = memo(
       : 'Complete these essentials so fans can find you.';
 
     return (
-      <ContentSurfaceCard className='mb-2 rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:mb-3 sm:p-4.5'>
+      <ContentSurfaceCard className='mb-2 rounded-(--linear-radius-lg) border border-subtle p-4 sm:mb-3 sm:p-4.5'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
             <div className='flex items-center gap-2 text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>

@@ -30,7 +30,7 @@ const deckButtonClass = cn(
 /**
  * Pitch deck viewer — 16:9 aspect ratio cards with slide navigation.
  * Arrow keys, touch swipe, buttons, slide dots. Fullscreen toggle.
- * Print-optimized CSS for PDF download via window.print().
+ * Print-optimized CSS for PDF download via globalThis.print().
  *
  * Slides are loaded server-side and passed as props from page.tsx.
  */
@@ -67,8 +67,8 @@ export function DeckViewer({ slides }: DeckViewerProps) {
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    globalThis.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.removeEventListener('keydown', handleKeyDown);
   }, [goNext, goPrev, isFullscreen, toggleFullscreen]);
 
   // Touch swipe handlers
@@ -190,7 +190,7 @@ export function DeckViewer({ slides }: DeckViewerProps) {
         <div className='flex items-center gap-1'>
           <button
             type='button'
-            onClick={() => window.print()}
+            onClick={() => globalThis.print()}
             aria-label='Download as PDF'
             className={deckButtonClass}
           >

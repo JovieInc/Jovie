@@ -40,60 +40,54 @@ PLATFORM STYLES:
 - Generic (${PLATFORM_LIMITS.generic} chars max): Fuller version of the 3-beat structure with more room for story. For blogs, PR, and independent curators who may not have dashboard access — may include the artist's strongest data point when notable stats exist.`;
 }
 
-export function buildUserPrompt(input: PitchInput): string {
-  const { artist, release, tracks } = input;
-
-  const sections: string[] = [];
-
-  // Artist info
-  sections.push('## Artist');
-  if (artist.displayName) sections.push(`Name: ${artist.displayName}`);
-  if (artist.bio) sections.push(`Bio: ${artist.bio}`);
-  if (artist.genres?.length)
-    sections.push(`Genres: ${artist.genres.join(', ')}`);
-  if (artist.location) sections.push(`Location: ${artist.location}`);
+function buildArtistSection(artist: PitchInput['artist']): string[] {
+  const lines: string[] = ['## Artist'];
+  if (artist.displayName) lines.push(`Name: ${artist.displayName}`);
+  if (artist.bio) lines.push(`Bio: ${artist.bio}`);
+  if (artist.genres?.length) lines.push(`Genres: ${artist.genres.join(', ')}`);
+  if (artist.location) lines.push(`Location: ${artist.location}`);
   if (artist.activeSinceYear)
-    sections.push(`Active since: ${artist.activeSinceYear}`);
+    lines.push(`Active since: ${artist.activeSinceYear}`);
   if (artist.spotifyFollowers != null)
-    sections.push(
+    lines.push(
       `Spotify followers: ${artist.spotifyFollowers.toLocaleString()}`
     );
   if (artist.spotifyPopularity != null)
-    sections.push(`Spotify popularity score: ${artist.spotifyPopularity}/100`);
-
-  // Artist-provided context (streaming milestones, press, radio, etc.)
+    lines.push(`Spotify popularity score: ${artist.spotifyPopularity}/100`);
   if (artist.pitchContext) {
-    sections.push(`\n## Artist-Provided Context`);
-    sections.push(artist.pitchContext);
+    lines.push(`\n## Artist-Provided Context`);
+    lines.push(artist.pitchContext);
   }
-
-  // Target playlists
   if (artist.targetPlaylists?.length) {
-    sections.push(`\n## Target Playlists`);
-    sections.push(artist.targetPlaylists.join(', '));
+    lines.push(`\n## Target Playlists`);
+    lines.push(artist.targetPlaylists.join(', '));
   } else {
-    sections.push(
+    lines.push(
       `\n## Target Playlists\nNone specified — suggest 1-2 specific editorial playlists based on genre and mood.`
     );
   }
+  return lines;
+}
 
-  // Release info
-  sections.push('\n## Release');
-  sections.push(`Title: ${release.title}`);
-  sections.push(`Type: ${release.releaseType}`);
+function buildReleaseSection(
+  release: PitchInput['release'],
+  tracks: PitchInput['tracks']
+): string[] {
+  const lines: string[] = ['\n## Release'];
+  lines.push(`Title: ${release.title}`);
+  lines.push(`Type: ${release.releaseType}`);
   if (release.releaseDate)
-    sections.push(
+    lines.push(
       `Release date: ${release.releaseDate.toISOString().split('T')[0]}`
     );
   if (release.genres?.length)
-    sections.push(`Genres: ${release.genres.join(', ')}`);
-  sections.push(`Total tracks: ${release.totalTracks}`);
-  if (release.label) sections.push(`Label: ${release.label}`);
-  if (release.distributor) sections.push(`Distributor: ${release.distributor}`);
+    lines.push(`Genres: ${release.genres.join(', ')}`);
+  lines.push(`Total tracks: ${release.totalTracks}`);
+  if (release.label) lines.push(`Label: ${release.label}`);
+  if (release.distributor) lines.push(`Distributor: ${release.distributor}`);
 
-  // Track listing with credits
   if (tracks.length > 0) {
-    sections.push('\n## Tracks');
+    lines.push('\n## Tracks');
     for (const track of tracks) {
       const credits =
         track.creditNames.length > 0
@@ -102,13 +96,17 @@ export function buildUserPrompt(input: PitchInput): string {
       const duration = track.durationMs
         ? ` [${Math.floor(track.durationMs / 60000)}:${String(Math.floor((track.durationMs % 60000) / 1000)).padStart(2, '0')}]`
         : '';
-      sections.push(`- ${track.title}${credits}${duration}`);
+      lines.push(`- ${track.title}${credits}${duration}`);
     }
   }
+  return lines;
+}
 
-  sections.push(
-    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits.`
-  );
-
+export function buildUserPrompt(input: PitchInput): string {
+  const sections = [
+    ...buildArtistSection(input.artist),
+    ...buildReleaseSection(input.release, input.tracks),
+    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits.`,
+  ];
   return sections.join('\n');
 }

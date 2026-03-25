@@ -23,6 +23,35 @@ const testEventSchema = z.object({
 
 type TestEventInput = z.infer<typeof testEventSchema>;
 
+function extractPlatformConfig(
+  pixelConfig: typeof creatorPixels.$inferSelect,
+  platform: TestEventInput['platform']
+): PlatformConfig | null {
+  const platformMap = {
+    facebook: {
+      pixelId: pixelConfig.facebookPixelId,
+      accessToken: decryptPII(pixelConfig.facebookAccessToken),
+      enabled: pixelConfig.facebookEnabled,
+    },
+    google: {
+      pixelId: pixelConfig.googleMeasurementId,
+      accessToken: decryptPII(pixelConfig.googleApiSecret),
+      enabled: pixelConfig.googleEnabled,
+    },
+    tiktok: {
+      pixelId: pixelConfig.tiktokPixelId,
+      accessToken: decryptPII(pixelConfig.tiktokAccessToken),
+      enabled: pixelConfig.tiktokEnabled,
+    },
+  } as const;
+
+  const { pixelId, accessToken, enabled } = platformMap[platform];
+  if (pixelId && accessToken && enabled) {
+    return { pixelId, accessToken, enabled: true };
+  }
+  return null;
+}
+
 /**
  * POST /api/dashboard/pixels/test-event
  *
@@ -83,27 +112,7 @@ export async function POST(req: Request) {
       }
 
       // Extract and decrypt credentials for the specified platform
-      let config: PlatformConfig | null = null;
-
-      if (platform === 'facebook') {
-        const pixelId = pixelConfig.facebookPixelId;
-        const accessToken = decryptPII(pixelConfig.facebookAccessToken);
-        if (pixelId && accessToken && pixelConfig.facebookEnabled) {
-          config = { pixelId, accessToken, enabled: true };
-        }
-      } else if (platform === 'google') {
-        const pixelId = pixelConfig.googleMeasurementId;
-        const accessToken = decryptPII(pixelConfig.googleApiSecret);
-        if (pixelId && accessToken && pixelConfig.googleEnabled) {
-          config = { pixelId, accessToken, enabled: true };
-        }
-      } else if (platform === 'tiktok') {
-        const pixelId = pixelConfig.tiktokPixelId;
-        const accessToken = decryptPII(pixelConfig.tiktokAccessToken);
-        if (pixelId && accessToken && pixelConfig.tiktokEnabled) {
-          config = { pixelId, accessToken, enabled: true };
-        }
-      }
+      const config = extractPlatformConfig(pixelConfig, platform);
 
       if (!config) {
         return NextResponse.json(
@@ -124,14 +133,12 @@ export async function POST(req: Request) {
       };
 
       // Forward to the specified platform
-      let result;
-      if (platform === 'facebook') {
-        result = await forwardToFacebook(testEvent, config);
-      } else if (platform === 'google') {
-        result = await forwardToGoogle(testEvent, config);
-      } else {
-        result = await forwardToTikTok(testEvent, config);
-      }
+      const forwarders = {
+        facebook: forwardToFacebook,
+        google: forwardToGoogle,
+        tiktok: forwardToTikTok,
+      } as const;
+      const result = await forwarders[platform](testEvent, config);
 
       logger.info('[Pixels Test] Test event sent', {
         profileId,

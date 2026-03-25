@@ -230,6 +230,15 @@ function isAbortError(event: SentryEvent): boolean {
  * (mounted guards, theme handling) and remaining occurrences are transient.
  * Downgrade to warning instead of dropping entirely for monitoring.
  */
+function isCspViolation(event: SentryEvent): boolean {
+  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
+    (v): v is string => typeof v === 'string'
+  );
+  return cspValues.some(
+    v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
+  );
+}
+
 function isHydrationMismatch(event: SentryEvent): boolean {
   const message = [
     event.message,
@@ -314,6 +323,26 @@ function isFrameworkInternalError(event: SentryEvent): boolean {
  * Users can request data deletion via privacy@jov.ie.
  */
 
+/** Replace known-sensitive headers with a placeholder. */
+function scrubSensitiveHeaders(headers: Record<string, string>): void {
+  for (const header of SENSITIVE_HEADERS) {
+    if (headers[header]) {
+      headers[header] = '[Filtered]';
+    }
+  }
+}
+
+/** Scrub user-level PII (IP addresses and emails). */
+function scrubUserPii(user: SentryEvent['user']): void {
+  if (!user) return;
+  if (user.ip_address) {
+    user.ip_address = '{{auto}}';
+  }
+  if (user.email) {
+    delete user.email;
+  }
+}
+
 /**
  * Scrubs PII from Sentry events and filters deployment noise.
  * This is used as the `beforeSend` hook in all Sentry configurations.
@@ -351,34 +380,16 @@ export function scrubPii(event: SentryEvent): SentryEvent | null {
 
   // Drop Content Security Policy violations — typically caused by browser
   // extensions injecting inline scripts that violate our strict CSP. Not actionable.
-  const cspValues = [event.message, event.exception?.values?.[0]?.value].filter(
-    (v): v is string => typeof v === 'string'
-  );
-  if (
-    cspValues.some(
-      v => v.includes("Blocked 'script'") || v.includes("Blocked 'eval'")
-    )
-  ) {
+  if (isCspViolation(event)) {
     return null;
   }
 
-  // Anonymize IP addresses if present
-  if (event.user?.ip_address) {
-    event.user.ip_address = '{{auto}}';
-  }
-
-  // Remove email addresses if present (we use Clerk user IDs instead)
-  if (event.user?.email) {
-    delete event.user.email;
-  }
+  // Anonymize IP addresses and remove emails
+  scrubUserPii(event.user);
 
   // Scrub sensitive headers from request data
   if (event.request?.headers) {
-    for (const header of SENSITIVE_HEADERS) {
-      if (event.request.headers[header]) {
-        event.request.headers[header] = '[Filtered]';
-      }
-    }
+    scrubSensitiveHeaders(event.request.headers);
   }
 
   // Scrub sensitive query parameters from request URLs
