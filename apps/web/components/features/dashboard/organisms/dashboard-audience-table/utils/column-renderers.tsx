@@ -22,7 +22,7 @@ import {
   AudienceVisitsCell,
   convertContextMenuItems,
 } from '@/components/organisms/table';
-import type { AudienceMember, AudienceMemberType } from '@/types';
+import type { AudienceMember } from '@/types';
 import {
   useAudienceTableStableContext,
   useAudienceTableVolatileContext,
@@ -302,15 +302,6 @@ export function UserCellWithTouring({
 }
 
 /**
- * Renders the location cell from the row's locationLabel field.
- */
-export function renderLocationCellFromRow({
-  row,
-}: CellContext<AudienceMember, string | null>) {
-  return <AudienceLocationCell locationLabel={row.original.locationLabel} />;
-}
-
-/**
  * Renders a plain numeric visits cell without intent decoration.
  */
 export function renderVisitsNumberCell({
@@ -322,15 +313,6 @@ export function renderVisitsNumberCell({
       {visits}
     </span>
   );
-}
-
-/**
- * Renders the type badge cell (standalone column version).
- */
-export function renderTypeBadgeCell({
-  getValue,
-}: CellContext<AudienceMember, AudienceMemberType>) {
-  return <AudienceTypeBadge type={getValue()} />;
 }
 
 /**

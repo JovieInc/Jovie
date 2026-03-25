@@ -49,9 +49,9 @@ import {
   QuickActionsCell,
   renderIntentScoreCell,
   renderLastActionCell,
-  renderLocationCellFromRow,
+  renderLocationCell,
   renderLtvCell,
-  renderTypeBadgeCell,
+  renderTypeCell,
   renderVisitsNumberCell,
   SelectCell,
   UserCellWithTouring,
@@ -101,21 +101,21 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'user',
     header: 'User',
     cell: UserCellWithTouring,
-    size: 9999,
     minSize: 180,
     enableSorting: false,
+    meta: { flex: true },
   }),
   memberColumnHelper.accessor('type', {
     id: 'type',
     header: 'Type',
-    cell: renderTypeBadgeCell,
+    cell: renderTypeCell,
     size: 90,
     enableSorting: true,
   }),
   memberColumnHelper.accessor('locationLabel', {
     id: 'location',
     header: 'Location',
-    cell: renderLocationCellFromRow,
+    cell: renderLocationCell,
     size: 130,
     enableSorting: false,
   }),
@@ -264,6 +264,11 @@ export const DashboardAudienceTableUnified = memo(
         const next = typeof updater === 'function' ? updater(sorting) : updater;
         if (next.length > 0) {
           const sortField = COLUMN_SORT_MAP[next[0].id];
+          if (sortField) onSortChange(sortField);
+        } else if (sorting.length > 0) {
+          // TanStack 3-state cycle cleared the sort — re-toggle the same column
+          // so the parent flips direction (table always needs an active sort)
+          const sortField = COLUMN_SORT_MAP[sorting[0].id];
           if (sortField) onSortChange(sortField);
         }
       },

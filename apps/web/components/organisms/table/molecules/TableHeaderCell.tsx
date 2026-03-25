@@ -43,9 +43,11 @@ export function TableHeaderCell<TData>({
     ariaSort = 'none';
   }
 
-  const metaClassName = (
-    header.column.columnDef.meta as { className?: string } | undefined
-  )?.className;
+  const meta = header.column.columnDef.meta as
+    | { className?: string; flex?: boolean }
+    | undefined;
+  const metaClassName = meta?.className;
+  const isFlex = meta?.flex;
 
   return (
     <th
@@ -55,9 +57,7 @@ export function TableHeaderCell<TData>({
       className={cn(stickyHeaderClass, metaClassName)}
       style={{
         width:
-          header.getSize() >= 9999 || header.getSize() === 150
-            ? undefined
-            : header.getSize(),
+          isFlex || header.getSize() === 150 ? undefined : header.getSize(),
       }}
     >
       {(() => {
