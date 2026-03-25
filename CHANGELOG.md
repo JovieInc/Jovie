@@ -15,6 +15,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
 - [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
 
+### Changed
+
+- [internal] Extract right drawer from content container into standalone card — drawer now sits beside main content as a sibling element with its own border, radius, and shadow
+- [internal] Apply `rounded-full` pill shape to SegmentControl, CloseButton, and all drawer interactive elements per DESIGN.md spec
+- [internal] Normalize drawer internal spacing from `gap-2` to `gap-1.5`
+
 ## [26.4.67] - 2026-03-25
 
 ### Fixed

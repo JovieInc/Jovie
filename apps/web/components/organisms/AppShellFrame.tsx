@@ -47,24 +47,27 @@ export const AppShellFrame = memo(function AppShellFrame({
         id='main-content'
         className='flex flex-1 min-h-0 overflow-hidden bg-surface-0 lg:m-[8px] lg:ml-px lg:rounded-[12px] lg:border lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-l-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-l-[12px]'
       >
-        <div className='flex flex-1 min-h-0 overflow-hidden'>
-          <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
-            {header}
-            <div
-              className={cn(
-                'flex-1 min-h-0 min-w-0',
-                isTableRoute
-                  ? 'overflow-hidden overflow-x-auto overscroll-contain'
-                  : 'overflow-y-auto overflow-x-hidden overscroll-contain p-1 sm:p-1.5 lg:p-1.5',
-                contentClassName
-              )}
-            >
-              {main}
-            </div>
+        <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
+          {header}
+          <div
+            className={cn(
+              'flex-1 min-h-0 min-w-0',
+              isTableRoute
+                ? 'overflow-hidden overflow-x-auto overscroll-contain'
+                : 'overflow-y-auto overflow-x-hidden overscroll-contain p-1 sm:p-1.5 lg:p-1.5',
+              contentClassName
+            )}
+          >
+            {main}
           </div>
-          {rightPanel}
         </div>
       </main>
+
+      {rightPanel != null && (
+        <div className='shrink-0 overflow-hidden flex items-stretch py-[8px]'>
+          {rightPanel}
+        </div>
+      )}
 
       {mobileBottomNav}
     </div>

@@ -71,7 +71,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className='w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
+          className='w-full rounded-full border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
         />
         {value && (
           <DrawerInlineIconButton
@@ -123,7 +123,7 @@ function SubmenuCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full justify-between rounded-[8px] border border-transparent',
+        'w-full justify-between rounded-full border border-transparent',
         checked &&
           'border-(--linear-app-frame-seam) bg-surface-1 text-primary-token'
       )}
@@ -232,7 +232,7 @@ export function FilterSubmenu<T extends string = string>({
 
   return (
     <DropdownMenuSub onOpenChange={handleOpenChange}>
-      <DropdownMenuSubTrigger className='justify-between rounded-[8px]'>
+      <DropdownMenuSubTrigger className='justify-between rounded-full'>
         <div className='flex items-center gap-2'>
           <Icon
             name={iconName as 'Disc3'}
