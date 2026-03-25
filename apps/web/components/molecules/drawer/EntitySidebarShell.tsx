@@ -101,9 +101,12 @@ export function EntitySidebarShell({
       contextMenuItems={contextMenuItems}
       data-testid={testId}
     >
-      <div className='flex h-full min-h-0 flex-col gap-2 px-1.5 py-1.5'>
+      <div className='flex h-full min-h-0 flex-col gap-1.5 px-1.5 py-1.5 lg:px-0 lg:py-0'>
         <div className='shrink-0'>
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <DrawerSurfaceCard
+            variant='card'
+            className='overflow-hidden lg:rounded-none lg:border-0 lg:bg-transparent lg:shadow-none'
+          >
             <div
               className={cn(
                 LINEAR_SURFACE.stickyHeader,
@@ -145,14 +148,14 @@ export function EntitySidebarShell({
         </div>
 
         {isEmpty ? (
-          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5'>
+          <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
             <DrawerSurfaceCard variant='card' className='p-4'>
               <DrawerEmptyState message={emptyMessage} />
             </DrawerSurfaceCard>
           </div>
         ) : (
           <>
-            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain pr-0.5'>
+            <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
               <div className='space-y-3'>{children}</div>
             </div>
 
