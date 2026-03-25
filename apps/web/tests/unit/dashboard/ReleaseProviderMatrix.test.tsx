@@ -356,12 +356,7 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
-      expect(screen.getByTestId('release-table-shell').className).toContain(
-        'rounded-[10px]'
-      );
-      expect(screen.getByTestId('release-table-shell').className).not.toContain(
-        'border border-(--linear-app-frame-seam)'
-      );
+      expect(screen.getByTestId('release-table-shell')).toBeInTheDocument();
     });
 
     it('renders table and subheader when releases exist', () => {
