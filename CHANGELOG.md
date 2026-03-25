@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.70] - 2026-03-25
+
+### Changed
+
+- Convert BrandLogo from image-based rendering to inline SVG with `currentColor` — eliminates double HTTP requests for dark mode, enables CSS-controlled visual hierarchy
+- Standardize logo icon sizes: sidebar icons 13/18px → 16px, remove conflicting Tailwind size overrides
+- Standardize loading states: all use `tone='muted'` + `animate-pulse` + `animate-in fade-in` for consistent visual weight
+- Simplify ProfileNavButton from dual stacked logos to single element with conditional pulse
+- LogoLoader: size 64→32px, animation spin→pulse, always muted tone
+
+### Fixed
+
+- FooterBranding: wordmark variant now correctly passes `tone='white'` when `isLinear=true` (was defaulting to `auto`)
+- SVG asset fill colors: black icon `#222326` → `#000000`, white icon `#F4F5F8` → `#FFFFFF` for maximum contrast at small sizes
+- AuthLayout logo animation: one-shot pulse with reduced-motion guard (was permanently looping)
+- BrandLogo wrapped in `<span>` to isolate from parent `[&>svg]` selector overrides in CircleIconButton/SidebarMenuButton
+
+### Removed
+
+- Dead components: JovieLogo, LogoIcon (zero production imports)
+- `animate-logo-spin` CSS keyframe (replaced by standard `animate-pulse`)
+
 ## [26.4.69] - 2026-03-25
 
 ### Changed
