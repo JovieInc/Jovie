@@ -23,6 +23,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Revamp audience table to Linear layout — break composite cells into individual columns (User, Type, Location, Intent, Visits, LTV, Last Action), show sortable column headers, inline touring badge into user cell
 - Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
 - Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
 - Lighten sticky header border opacity for a more minimal navigation feel
@@ -36,6 +37,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Add "Cookie Settings" button to site footer for GDPR-regulated regions so users can reopen cookie preferences after dismissing the banner
+- Load saved cookie preferences when reopening the cookie modal instead of always showing defaults
+- Sync tracking consent state (`jv_tracking_consent`) when users accept or reject cookies via the banner or modal
+- Add "Cookie Settings" action to the user profile menu for authenticated users
+- Add accessible dialog description to the cookie preferences modal
+- Fix Clerk proxy URL mismatch — align code to use `/__clerk` path matching Clerk Dashboard proxy configuration, restoring Google OAuth callbacks and Clerk JS loading on production
 - Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24
