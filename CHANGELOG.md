@@ -7,6 +7,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.62] - 2026-03-24
 
+### Changed
+
+- Redesign pricing page to match Linear's minimal aesthetic — centered hero, simplified pricing cards, mobile plan comparison dropdown, centered bottom CTA
+- Pricing comparison table now defaults to annual billing toggle
+- Mobile comparison table uses native plan selector dropdown instead of horizontal scroll
+- Added accessibility labels to pricing comparison icons and controls
+
 ### Fixed
 
 - Fix auth not loading on production and staging by reverting Clerk proxy from SDK `frontendApiProxy` back to Vercel rewrite
