@@ -27,7 +27,7 @@ async function InsightsOnboardingGuard() {
   try {
     const dashboardData = await getDashboardData();
     if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-      redirect('/onboarding');
+      redirect(APP_ROUTES.ONBOARDING);
     }
   } catch (error) {
     throwIfRedirect(error);

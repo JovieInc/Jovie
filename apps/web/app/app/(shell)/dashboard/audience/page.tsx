@@ -10,7 +10,6 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
-import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -132,7 +131,9 @@ async function AudienceContent({
     );
   } catch (error) {
     throwIfRedirect(error);
-    logger.error('[AudiencePage] Failed to load audience data', { error });
+    void captureError('Audience page failed', error, {
+      route: APP_ROUTES.DASHBOARD_AUDIENCE,
+    });
 
     return (
       <PageErrorState message='Failed to load audience data. Please refresh the page.' />
