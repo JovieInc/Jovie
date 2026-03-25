@@ -9,7 +9,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Bundle `@clerk/ui` locally to fix blank signin/signup pages — Clerk JS failed to load its UI through the `frontendApiProxy` middleware proxy (`getClerkJsEntryChunk` error), now bundled via the `ui` prop instead of CDN
+- Fixed blank signin/signup pages that could occur after recent proxy migration
 
 ## [26.4.59] - 2026-03-24
 
