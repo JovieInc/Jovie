@@ -1,6 +1,6 @@
 export const runtime = 'nodejs';
 
-import { count, eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -63,16 +63,15 @@ export async function GET(request: Request) {
       });
     }
 
-    // Count public creator profiles (seed invariant: should be >= 3)
+    // Lightweight DB connectivity check — SELECT 1 is O(1), no table scan
     const result = await db
-      .select({ count: count() })
+      .select({ ok: drizzleSql<number>`1` })
       .from(creatorProfiles)
-      .where(eq(creatorProfiles.isPublic, true));
-
-    const profileCount = result[0]?.count ?? 0;
+      .where(eq(creatorProfiles.isPublic, true))
+      .limit(1);
 
     summary.status = 'ok';
-    summary.database = profileCount >= 3 ? 'ok' : 'degraded';
+    summary.database = result.length > 0 ? 'ok' : 'degraded';
     return NextResponse.json(summary, {
       status: 200,
       headers: {

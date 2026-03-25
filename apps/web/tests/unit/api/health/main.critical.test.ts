@@ -64,7 +64,9 @@ describe('@critical GET /api/health', () => {
   it('returns ok status when database is healthy', async () => {
     mockDbSelect.mockReturnValue({
       from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ count: 5 }]),
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ ok: 1 }]),
+        }),
       }),
     });
 

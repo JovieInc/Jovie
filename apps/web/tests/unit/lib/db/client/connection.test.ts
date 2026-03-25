@@ -59,7 +59,7 @@ describe('db proxy', () => {
 
     const config = resolvePoolConfig('postgres://localhost:5432/dev');
 
-    expect(config.max).toBe(10);
+    expect(config.max).toBe(20);
   });
   it('returns non-function properties unchanged', () => {
     const mockDb = {

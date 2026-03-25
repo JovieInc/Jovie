@@ -34,7 +34,7 @@ declare global {
 let _db: DbType | undefined;
 let _pool: Pool | undefined;
 
-const DEFAULT_POOL_MAX = 10;
+const DEFAULT_POOL_MAX = 20;
 const TEST_POOL_MAX = 1;
 
 export function resolvePoolConfig(connectionString: string) {
@@ -85,8 +85,8 @@ export function initializeDb(): DbType {
   //
   // Pool settings tuned for Neon serverless to prevent
   // "Connection terminated unexpectedly" errors:
-  //   - max: 10 — conservative limit; Neon serverless has its own concurrency
-  //     limits and excessive pooled connections get killed server-side
+  //   - max: 20 — tuned for launch burst traffic; each Vercel container gets
+  //     its own pool, so this handles 20 concurrent queries per container
   //   - idleTimeoutMillis: 20s — close idle connections before Neon's server-side
   //     timeout (typically 30-60s) can terminate them unexpectedly
   //   - connectionTimeoutMillis: 15s — allow time for Neon cold starts (up to ~10s)
