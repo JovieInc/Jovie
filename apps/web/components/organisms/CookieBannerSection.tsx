@@ -181,7 +181,9 @@ export function CookieBannerSection() {
           open={customize}
           onClose={() => setCustomize(false)}
           onSave={c => {
-            setConsentState(c.marketing ? 'accepted' : 'rejected');
+            setConsentState(
+              c.analytics || c.marketing ? 'accepted' : 'rejected'
+            );
             try {
               localStorage.setItem('jv_cc', JSON.stringify(c));
             } catch {
