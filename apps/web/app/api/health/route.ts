@@ -1,9 +1,8 @@
 export const runtime = 'nodejs';
 
-import { sql as drizzleSql, eq } from 'drizzle-orm';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS, RETRY_AFTER_HEALTH } from '@/lib/http/headers';
@@ -63,15 +62,11 @@ export async function GET(request: Request) {
       });
     }
 
-    // Lightweight DB connectivity check — SELECT 1 is O(1), no table scan
-    const result = await db
-      .select({ ok: drizzleSql<number>`1` })
-      .from(creatorProfiles)
-      .where(eq(creatorProfiles.isPublic, true))
-      .limit(1);
+    // Pure connectivity check — SELECT 1 proves DB is reachable, no table dependency
+    await db.execute(drizzleSql`SELECT 1`);
 
     summary.status = 'ok';
-    summary.database = result.length > 0 ? 'ok' : 'degraded';
+    summary.database = 'ok';
     return NextResponse.json(summary, {
       status: 200,
       headers: {

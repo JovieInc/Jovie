@@ -219,6 +219,10 @@ export function getReleaseDayNotificationHtml(
 /**
  * Build List-Unsubscribe headers for release day notification emails.
  * Improves deliverability — Gmail/Outlook show an unsubscribe button in the UI.
+ *
+ * Note: List-Unsubscribe-Post (RFC 8058 one-click) is intentionally omitted
+ * because the unsubscribe URL is a profile page, not a POST endpoint.
+ * Add it back when a dedicated POST /api/notifications/unsubscribe endpoint exists.
  */
 export function getReleaseDayUnsubscribeHeaders(
   username: string
@@ -226,7 +230,6 @@ export function getReleaseDayUnsubscribeHeaders(
   const unsubscribeUrl = buildManageNotificationsUrl(username);
   return {
     'List-Unsubscribe': `<${unsubscribeUrl}>`,
-    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
   };
 }
 
