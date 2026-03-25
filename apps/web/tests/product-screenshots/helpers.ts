@@ -16,6 +16,9 @@ export const OUTPUT_DIR = 'public/product-screenshots';
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.
  * Exported so tests can verify this list stays comprehensive.
+ *
+ * Some selectors target library internals (.tsqd-parent-container, #vercel-toolbar)
+ * and may need updating when upgrading TanStack Query DevTools or @vercel/toolbar.
  */
 export const DEV_OVERLAY_SELECTORS = [
   // Toasts & notifications
@@ -28,10 +31,11 @@ export const DEV_OVERLAY_SELECTORS = [
   '#intercom-container, .intercom-lightweight-app',
   // Custom DevToolbar (collapsed button + expanded panel)
   '[data-testid="dev-toolbar"]',
-  // TanStack Query DevTools (toggle button + panel)
+  // TanStack Query DevTools — internal class, check on @tanstack/react-query-devtools upgrade
   '.tsqd-parent-container',
+  // TanStack DevTools toggle — aria-label text, check on upgrade
   'button[aria-label*="query devtools" i]',
-  // Vercel toolbar (preview deploys)
+  // Vercel toolbar — internal ID, check on @vercel/toolbar upgrade
   '#vercel-toolbar',
   // Next.js dev overlays
   '[data-nextjs-dialog-overlay]',
@@ -70,7 +74,8 @@ export async function assertNoDevOverlays(page: Page) {
       const els = document.querySelectorAll(selector);
       for (const el of els) {
         const htmlEl = el as HTMLElement;
-        if (htmlEl.offsetParent !== null || htmlEl.style.display !== 'none') {
+        const style = window.getComputedStyle(htmlEl);
+        if (style.display !== 'none' && style.visibility !== 'hidden') {
           visible.push(selector);
           break;
         }

@@ -16,8 +16,12 @@ describe('Product Screenshot Overlay Selectors', () => {
       '#vercel-toolbar',
     ];
 
+    const selectors: readonly string[] = DEV_OVERLAY_SELECTORS;
     for (const selector of required) {
-      const found = DEV_OVERLAY_SELECTORS.some(s => s.includes(selector));
+      // Exact match or match within compound selectors (e.g. "a, b")
+      const found =
+        selectors.includes(selector) ||
+        selectors.some(s => s.split(', ').some(part => part === selector));
       expect(found, `Missing required selector: ${selector}`).toBe(true);
     }
   });
