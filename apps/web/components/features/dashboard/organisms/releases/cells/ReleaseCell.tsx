@@ -102,7 +102,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {showType && typeStyle && (
             <Badge
               size='sm'
-              className={`h-[16px] shrink-0 rounded-[6px] px-1.5 text-[9px] font-[510] tracking-normal ${typeStyle.bg} ${typeStyle.text}`}
+              className={`inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[9px] font-[510] leading-none tracking-normal ${typeStyle.bg} ${typeStyle.text}`}
             >
               {typeStyle.label}
             </Badge>
@@ -110,7 +110,7 @@ export const ReleaseCell = memo(function ReleaseCell({
           {manualOverrideCount > 0 && (
             <Badge
               variant='secondary'
-              className='hidden h-[16px] shrink-0 rounded-[6px] bg-amber-500/10 px-1.5 text-[9px] font-[510] tracking-normal text-amber-700 xl:inline-flex dark:text-amber-300'
+              className='hidden h-[16px] shrink-0 items-center justify-center rounded-[6px] bg-amber-500/10 px-1.5 py-0 text-[9px] font-[510] leading-none tracking-normal text-amber-700 xl:inline-flex dark:text-amber-300'
             >
               {manualOverrideCount} edited
             </Badge>
