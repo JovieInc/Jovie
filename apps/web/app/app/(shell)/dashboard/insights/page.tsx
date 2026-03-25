@@ -4,12 +4,11 @@ import { APP_ROUTES } from '@/constants/routes';
 import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 /* -------------------------------------------------------------------------- */
@@ -48,6 +47,18 @@ async function InsightsOnboardingGuard() {
 async function InsightsContentSection() {
   try {
     const dashboardData = await getDashboardData();
+
+    if (dashboardData.dashboardLoadError) {
+      void captureError(
+        'Dashboard data load failed on insights page',
+        dashboardData.dashboardLoadError,
+        { route: APP_ROUTES.INSIGHTS }
+      );
+      return (
+        <PageErrorState message='Failed to load insights. Please refresh the page.' />
+      );
+    }
+
     if (dashboardData.needsOnboarding) return null;
     return <InsightsPanel />;
   } catch (error) {
@@ -112,7 +123,7 @@ export default async function InsightsPage() {
   const { userId } = await getCachedAuth();
 
   if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/insights`);
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.INSIGHTS}`);
   }
 
   return (

@@ -21,8 +21,6 @@ import { getDashboardData } from '../actions';
 import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function AudienceContent({

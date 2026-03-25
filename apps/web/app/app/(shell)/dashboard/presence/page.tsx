@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { DspPresenceView } from '@/features/dashboard/organisms/dsp-presence/DspPresenceView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
@@ -7,15 +8,11 @@ import { captureError } from '@/lib/error-tracking';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 import { loadDspPresence } from './actions';
+import PresenceLoading from './loading';
 
 export const runtime = 'nodejs';
 
-export default async function PresencePage() {
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
-  }
-
+async function PresenceContent() {
   const dashboardData = await getDashboardData();
 
   if (dashboardData.dashboardLoadError) {
@@ -51,4 +48,17 @@ export default async function PresencePage() {
   }
 
   return <DspPresenceView data={presenceData} />;
+}
+
+export default async function PresencePage() {
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=${APP_ROUTES.PRESENCE}`);
+  }
+
+  return (
+    <Suspense fallback={<PresenceLoading />}>
+      <PresenceContent />
+    </Suspense>
+  );
 }
