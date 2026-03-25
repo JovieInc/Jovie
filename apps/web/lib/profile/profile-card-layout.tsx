@@ -37,17 +37,17 @@ const GRADIENT =
  *  - Feed (1080x1080): centered square layout
  *  - Story (1080x1920): centered tall layout with more spacing
  */
-function resolveLayoutMetrics(size: ProfileCardSize) {
+function resolveLayoutConfig(size: ProfileCardSize) {
   const isSquareOrTall = size.width === size.height || size.height > size.width;
   return {
     isSquareOrTall,
     avatarSize: isSquareOrTall ? 220 : 164,
     nameFontSize: isSquareOrTall ? 72 : 60,
     tagFontSize: isSquareOrTall ? 24 : 20,
-    align: (isSquareOrTall ? 'center' : 'flex-start') as
-      | 'center'
-      | 'flex-start',
+    align: isSquareOrTall ? ('center' as const) : ('flex-start' as const),
     padding: isSquareOrTall ? 64 : 48,
+    cardGap: isSquareOrTall ? 32 : 28,
+    cardPadding: isSquareOrTall ? 48 : 36,
     maxTextWidth: isSquareOrTall ? 900 : 820,
   };
 }
@@ -57,7 +57,7 @@ export function profileCardLayout(
   size: ProfileCardSize
 ) {
   const { artistName, username, avatarUrl, genreTags, isPublic } = data;
-  const layout = resolveLayoutMetrics(size);
+  const layout = resolveLayoutConfig(size);
   const { avatarSize, nameFontSize, tagFontSize } = layout;
 
   const tags = genreTags.length > 0 ? genreTags : ['Artist profile'];
@@ -100,12 +100,12 @@ export function profileCardLayout(
           display: 'flex',
           flexDirection: layout.isSquareOrTall ? 'column' : 'row',
           alignItems: 'center',
-          gap: layout.isSquareOrTall ? 32 : 28,
+          gap: layout.cardGap,
           width: '100%',
           borderRadius: 28,
           border: '1px solid rgba(255,255,255,0.14)',
           background: 'rgba(8, 8, 18, 0.44)',
-          padding: layout.isSquareOrTall ? 48 : 36,
+          padding: layout.cardPadding,
           textAlign: layout.isSquareOrTall ? 'center' : 'left',
         }}
       >

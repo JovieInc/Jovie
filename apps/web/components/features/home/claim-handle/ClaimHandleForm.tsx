@@ -19,21 +19,33 @@ import type { ClaimHandleFormProps } from './types';
 import { useHandleValidation } from './useHandleValidation';
 import { HELPER_TONE_CLASSES, useHelperState } from './useHelperState';
 
+function getInputRowStyleHero(isAvailable: boolean) {
+  return {
+    minHeight: 56,
+    background:
+      'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.018) 100%)',
+    border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.22)' : 'rgba(255,255,255,0.08)'}`,
+    boxShadow: isAvailable
+      ? '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 16px rgba(74,222,128,0.05)'
+      : '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+  };
+}
+
 function getInputRowStyle(
   size: 'default' | 'hero' | 'display',
   isAvailable: boolean
 ) {
-  const isHeroLike = size !== 'default';
+  if (size === 'hero') return getInputRowStyleHero(isAvailable);
+
   const isDisplay = size === 'display';
-  const isHero = size === 'hero';
-  let borderColor: string;
-  if (isAvailable) {
-    borderColor = 'rgba(74,222,128,0.25)';
-  } else if (isHeroLike) {
-    borderColor = 'rgba(255,255,255,0.1)';
-  } else {
-    borderColor = 'rgba(255,255,255,0.06)';
-  }
+  const isHeroLike = size !== 'default';
+  const borderColor = isAvailable
+    ? 'rgba(74,222,128,0.25)'
+    : isHeroLike
+      ? 'rgba(255,255,255,0.1)'
+      : 'rgba(255,255,255,0.06)';
 
   const heroShadow = [
     '0 14px 38px rgba(0,0,0,0.18)',
@@ -50,20 +62,6 @@ function getInputRowStyle(
       : '0 1px 2px rgba(0,0,0,0.1)',
   ].join(', ');
 
-  if (isHero) {
-    return {
-      minHeight: 56,
-      background:
-        'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.018) 100%)',
-      border: `1px solid ${isAvailable ? 'rgba(74,222,128,0.22)' : 'rgba(255,255,255,0.08)'}`,
-      boxShadow: isAvailable
-        ? '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 16px rgba(74,222,128,0.05)'
-        : '0 12px 30px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.04)',
-      backdropFilter: 'blur(14px)',
-      WebkitBackdropFilter: 'blur(14px)',
-    };
-  }
-
   return {
     minHeight: isDisplay ? 88 : isHeroLike ? 58 : 52,
     background: isHeroLike
@@ -74,6 +72,34 @@ function getInputRowStyle(
   };
 }
 
+function getDomainPrefixStyle(size: 'default' | 'hero' | 'display') {
+  if (size === 'display') {
+    return {
+      fontSize: '28px',
+      fontWeight: 510,
+      letterSpacing: '-0.04em',
+      color: 'var(--linear-text-quaternary)',
+      fontFamily: 'inherit',
+    } as const;
+  }
+  if (size === 'hero') {
+    return {
+      fontSize: '15px',
+      fontWeight: 460,
+      letterSpacing: '-0.016em',
+      color: 'var(--linear-text-tertiary)',
+      fontFamily: 'inherit',
+    } as const;
+  }
+  return {
+    fontSize: '13px',
+    fontWeight: 400,
+    color: 'var(--linear-text-tertiary)',
+    letterSpacing: '-0.02em',
+    fontFamily: 'monospace',
+  } as const;
+}
+
 function getInputStyle(
   size: 'default' | 'hero' | 'display',
   isAvailable: boolean
@@ -81,16 +107,23 @@ function getInputStyle(
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
   const color = isAvailable ? 'rgb(74,222,128)' : 'var(--linear-text-primary)';
-  return isDisplay
-    ? {
-        fontSize: '28px',
-        fontWeight: 510,
-        letterSpacing: '-0.04em',
-        color,
-      }
-    : isHero
-      ? { fontSize: '16px', fontWeight: 500, letterSpacing: '-0.022em', color }
-      : { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
+  if (isDisplay) {
+    return {
+      fontSize: '28px',
+      fontWeight: 510,
+      letterSpacing: '-0.04em',
+      color,
+    };
+  }
+  if (isHero) {
+    return {
+      fontSize: '16px',
+      fontWeight: 500,
+      letterSpacing: '-0.022em',
+      color,
+    };
+  }
+  return { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
 }
 
 function getButtonStyle(
@@ -280,31 +313,7 @@ export function ClaimHandleForm({
           {/* Domain prefix — etched, permanent feel */}
           <span
             className='shrink-0 select-none'
-            style={
-              isDisplay
-                ? {
-                    fontSize: '28px',
-                    fontWeight: 510,
-                    letterSpacing: '-0.04em',
-                    color: 'var(--linear-text-quaternary)',
-                    fontFamily: 'inherit',
-                  }
-                : isHero
-                  ? {
-                      fontSize: '15px',
-                      fontWeight: 460,
-                      letterSpacing: '-0.016em',
-                      color: 'var(--linear-text-tertiary)',
-                      fontFamily: 'inherit',
-                    }
-                  : {
-                      fontSize: '13px',
-                      fontWeight: 400,
-                      color: 'var(--linear-text-tertiary)',
-                      letterSpacing: '-0.02em',
-                      fontFamily: 'monospace',
-                    }
-            }
+            style={getDomainPrefixStyle(size)}
           >
             {displayDomain}/
           </span>

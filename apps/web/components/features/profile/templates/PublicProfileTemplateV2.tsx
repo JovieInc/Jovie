@@ -103,7 +103,7 @@ export function PublicProfileTemplateV2({
     [artist, socialLinks]
   );
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (typeof globalThis.window === 'undefined') {
       return null;
     }
 
@@ -139,7 +139,7 @@ export function PublicProfileTemplateV2({
   }, [mode, setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
 
     const handlePopState = () => {
       const nextMode = getModeFromLocation();
@@ -153,7 +153,7 @@ export function PublicProfileTemplateV2({
   }, [setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
 
     const href = buildModeHref(activeMode);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
