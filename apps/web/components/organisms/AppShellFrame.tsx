@@ -64,7 +64,9 @@ export const AppShellFrame = memo(function AppShellFrame({
       </main>
 
       {rightPanel != null && (
-        <div className='shrink-0 overflow-hidden'>{rightPanel}</div>
+        <div className='shrink-0 overflow-hidden flex items-stretch py-[8px]'>
+          {rightPanel}
+        </div>
       )}
 
       {mobileBottomNav}
