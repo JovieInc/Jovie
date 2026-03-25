@@ -47,23 +47,28 @@ export function BrandLogo({
     toneStyle || style ? { ...toneStyle, ...style } : undefined;
 
   return (
-    <svg
-      xmlns='http://www.w3.org/2000/svg'
-      viewBox='0 0 353.68 347.97'
-      width={size}
-      height={size}
-      fill='currentColor'
-      role={ariaHidden ? undefined : 'img'}
-      aria-hidden={ariaHidden}
-      aria-label={ariaHidden ? undefined : alt}
+    <span
       className={cn(
+        'inline-flex shrink-0',
         rounded ? 'rounded-full' : undefined,
         TONE_CLASSES[tone],
         className
       )}
       style={resolvedStyle}
+      aria-hidden={ariaHidden}
     >
-      <path d={ICON_PATH} />
-    </svg>
+      <svg
+        xmlns='http://www.w3.org/2000/svg'
+        viewBox='0 0 353.68 347.97'
+        width={size}
+        height={size}
+        fill='currentColor'
+        role={ariaHidden ? undefined : 'img'}
+        aria-label={ariaHidden ? undefined : alt}
+      >
+        {!ariaHidden && <title>{alt}</title>}
+        <path d={ICON_PATH} />
+      </svg>
+    </span>
   );
 }

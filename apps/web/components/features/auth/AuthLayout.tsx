@@ -197,7 +197,9 @@ export function AuthLayout({
           >
             <span
               className={
-                shouldSpinLogo ? 'inline-flex animate-pulse' : 'inline-flex'
+                shouldSpinLogo
+                  ? 'inline-flex animate-[pulse_1.5s_ease-in-out_1] motion-reduce:animate-none'
+                  : 'inline-flex'
               }
             >
               <BrandLogo size={32} tone='auto' priority />

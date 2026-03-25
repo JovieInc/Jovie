@@ -4,13 +4,16 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 describe('BrandLogo', () => {
-  it('renders a single svg element (not an image)', () => {
+  it('renders a single svg element inside a span wrapper', () => {
     const { container } = render(<BrandLogo />);
     const svgs = container.querySelectorAll('svg');
     expect(svgs).toHaveLength(1);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toBeInTheDocument();
+    expect(wrapper?.querySelector('svg')).toBe(svgs[0]);
   });
 
-  it('renders with default aria-label "Jovie"', () => {
+  it('renders with default aria-label "Jovie" on svg', () => {
     render(<BrandLogo />);
     expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
   });
@@ -20,32 +23,47 @@ describe('BrandLogo', () => {
     expect(screen.getByLabelText('Custom Logo')).toBeInTheDocument();
   });
 
-  it('renders auto tone with no inline color style', () => {
+  it('renders a title element inside svg for accessibility', () => {
+    const { container } = render(<BrandLogo />);
+    const title = container.querySelector('svg title');
+    expect(title).toBeInTheDocument();
+    expect(title?.textContent).toBe('Jovie');
+  });
+
+  it('omits title element when aria-hidden', () => {
+    const { container } = render(<BrandLogo aria-hidden />);
+    const title = container.querySelector('svg title');
+    expect(title).not.toBeInTheDocument();
+  });
+
+  it('renders auto tone with no inline color style on wrapper', () => {
     const { container } = render(<BrandLogo tone='auto' />);
-    const svg = container.querySelector('svg');
-    expect(svg).not.toHaveStyle({ color: '#fff' });
-    expect(svg).not.toHaveStyle({ color: '#635aff' });
+    const wrapper = container.querySelector('span');
+    expect(wrapper).not.toHaveStyle({ color: '#fff' });
+    expect(wrapper).not.toHaveStyle({ color: '#635aff' });
   });
 
-  it('renders white tone with white color', () => {
+  it('renders white tone with white color on wrapper', () => {
     const { container } = render(<BrandLogo tone='white' />);
-    const svg = container.querySelector('svg');
-    expect(svg).toHaveStyle({ color: '#fff' });
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveStyle({ color: '#fff' });
   });
 
-  it('renders color tone with brand purple', () => {
+  it('renders color tone with brand purple on wrapper', () => {
     const { container } = render(<BrandLogo tone='color' />);
-    const svg = container.querySelector('svg');
-    expect(svg).toHaveStyle({ color: '#635aff' });
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveStyle({ color: '#635aff' });
   });
 
-  it('renders muted tone with muted class', () => {
+  it('renders muted tone with muted class on wrapper', () => {
     const { container } = render(<BrandLogo tone='muted' />);
-    const svg = container.querySelector('svg');
-    expect(svg?.getAttribute('class')).toContain('text-muted-foreground/50');
+    const wrapper = container.querySelector('span');
+    expect(wrapper?.getAttribute('class')).toContain(
+      'text-muted-foreground/50'
+    );
   });
 
-  it('applies size to width and height attributes', () => {
+  it('applies size to width and height attributes on svg', () => {
     const { container } = render(<BrandLogo size={64} />);
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('width', '64');
@@ -59,34 +77,40 @@ describe('BrandLogo', () => {
     expect(svg).toHaveAttribute('height', '48');
   });
 
-  it('applies rounded-full class when rounded=true (default)', () => {
+  it('applies rounded-full class on wrapper when rounded=true (default)', () => {
     const { container } = render(<BrandLogo />);
-    const svg = container.querySelector('svg');
-    expect(svg).toHaveClass('rounded-full');
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('rounded-full');
   });
 
   it('does not apply rounded-full class when rounded=false', () => {
     const { container } = render(<BrandLogo rounded={false} />);
-    const svg = container.querySelector('svg');
-    expect(svg).not.toHaveClass('rounded-full');
+    const wrapper = container.querySelector('span');
+    expect(wrapper).not.toHaveClass('rounded-full');
   });
 
-  it('applies custom className', () => {
+  it('applies custom className to wrapper', () => {
     const { container } = render(<BrandLogo className='my-logo' />);
-    const svg = container.querySelector('svg');
-    expect(svg).toHaveClass('my-logo');
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('my-logo');
   });
 
-  it('applies aria-hidden attribute', () => {
+  it('applies aria-hidden attribute on wrapper', () => {
     const { container } = render(<BrandLogo aria-hidden />);
-    const svg = container.querySelector('svg');
-    expect(svg).toHaveAttribute('aria-hidden', 'true');
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveAttribute('aria-hidden', 'true');
   });
 
-  it('has fill="currentColor" for CSS color inheritance', () => {
+  it('has fill="currentColor" on svg for CSS color inheritance', () => {
     const { container } = render(<BrandLogo />);
     const svg = container.querySelector('svg');
     expect(svg).toHaveAttribute('fill', 'currentColor');
+  });
+
+  it('wraps svg in span to isolate from parent [&>svg] selectors', () => {
+    const { container } = render(<BrandLogo />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('inline-flex', 'shrink-0');
   });
 
   it('passes a11y checks', async () => {
