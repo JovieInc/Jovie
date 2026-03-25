@@ -14,6 +14,9 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Standardize loading states: all use `tone='muted'` + `animate-pulse` + `animate-in fade-in` for consistent visual weight
 - Simplify ProfileNavButton from dual stacked logos to single element with conditional pulse
 - LogoLoader: size 64→32px, animation spin→pulse, always muted tone
+- [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
+- [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
+- [internal] Add `typecheck:tests` script to `apps/web/package.json`
 
 ### Fixed
 
