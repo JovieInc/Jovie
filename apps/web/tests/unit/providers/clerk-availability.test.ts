@@ -26,13 +26,13 @@ describe('clerkAvailability', () => {
       expect(getClerkProxyUrl()).toBe('/custom-clerk');
     });
 
-    it('falls back to /clerk when env var is empty string', () => {
+    it('falls back to /__clerk when env var is empty string', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '');
-      expect(getClerkProxyUrl()).toBe('/clerk');
+      expect(getClerkProxyUrl()).toBe('/__clerk');
     });
 
-    it('falls back to /clerk when env var is not present', () => {
-      expect(getClerkProxyUrl()).toBe('/clerk');
+    it('falls back to /__clerk when env var is not present', () => {
+      expect(getClerkProxyUrl()).toBe('/__clerk');
     });
 
     it('supports full URL for staging', () => {
