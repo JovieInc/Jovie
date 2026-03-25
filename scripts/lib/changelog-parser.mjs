@@ -5,6 +5,8 @@
  * Used by: send-changelog-email.mjs and the /changelog page (server component).
  */
 
+import { isInternalEntry } from './changelog-filter-rules.mjs';
+
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
 const INTERNAL_PREFIX = '[internal]';
@@ -91,6 +93,9 @@ export function parseChangelog(markdown) {
         target.internalSections[currentSection].push(
           entry.slice(INTERNAL_PREFIX.length).trim()
         );
+      } else if (isInternalEntry(entry)) {
+        // Auto-filtered: vendor names, dev tooling, infrastructure patterns
+        target.internalSections[currentSection].push(entry);
       } else {
         target.sections[currentSection].push(entry);
       }

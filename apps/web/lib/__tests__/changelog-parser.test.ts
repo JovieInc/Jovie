@@ -187,4 +187,90 @@ describe('parseChangelog', () => {
       'Public feature B',
     ]);
   });
+
+  it('auto-filters entries with vendor names', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Fixed
+
+- Fixed sign-in page loading
+- Fix auth not loading by reverting Clerk proxy from SDK
+- Reduced Sentry error noise by filtering non-actionable errors
+- Upgraded Biome 2.3.11 → 2.4.8
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.fixed).toEqual(['Fixed sign-in page loading']);
+  });
+
+  it('auto-filters entries with dev tooling keywords', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Added
+
+- New dashboard feature
+- Golden path E2E test coverage for onboarding
+- Screenshot spec uses demo route
+- Dev toolbar toggle for service worker
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.added).toEqual(['New dashboard feature']);
+  });
+
+  it('auto-filters entries with infrastructure patterns', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Fixed
+
+- Improved page load speed
+- OAuth login on staging redirecting to staging.jov.ie/__clerk
+- Bump connection pool from 10 to 20
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.fixed).toEqual(['Improved page load speed']);
+  });
+
+  it('does not auto-filter legitimate user-facing entries', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Added
+
+- New dashboard widget
+- Spotify import shows real progress
+- Your profile now shows your top 3 genres
+
+### Fixed
+
+- Tips now process correctly
+- Sign-in page loads faster
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.added).toEqual([
+      'New dashboard widget',
+      'Spotify import shows real progress',
+      'Your profile now shows your top 3 genres',
+    ]);
+    expect(releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+      'Sign-in page loads faster',
+    ]);
+  });
+
+  it('hides releases where all entries are auto-filtered', () => {
+    const md = `## [2.0.0] - 2026-03-20
+
+### Fixed
+
+- Upgraded Biome 2.3.11 → 2.4.8
+- Fix Clerk proxy on staging
+
+## [1.0.0] - 2026-03-17
+
+### Added
+
+- User profiles
+`;
+    const releases = parseChangelog(md);
+    expect(releases).toHaveLength(1);
+    expect(releases[0].version).toBe('1.0.0');
+  });
 });
