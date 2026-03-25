@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.64] - 2026-03-25
+
+### Added
+
+- Add 27 middleware behavioral tests for proxy.ts covering cookie banner geo-detection, auth redirects, circuit breaker, bot detection, banned user handling, and domain redirect
+- Add content-positive assertions for top 5 dashboard routes (Chat, Audience, Releases, Earnings, Presence) — health checks now verify the right content loaded, not just absence of errors
+- Wire existing `assertFastPageLoad` performance budgets into dashboard health checks (CI-only)
+
+### Fixed
+
+- Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
+- Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
+- Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
+
 ## [26.4.63] - 2026-03-24
 
 ### Changed
