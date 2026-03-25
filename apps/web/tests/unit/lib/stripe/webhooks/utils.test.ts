@@ -272,7 +272,7 @@ describe('Stripe webhook utils', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null and captures warning on database error', async () => {
+    it('throws on database error so webhook retries', async () => {
       const dbError = new Error('Database connection failed');
 
       mockDb.select.mockReturnValue({
@@ -283,16 +283,8 @@ describe('Stripe webhook utils', () => {
         }),
       });
 
-      const result = await getUserIdFromStripeCustomer('cus_error');
-
-      expect(result).toBeNull();
-      expect(mockCaptureWarning).toHaveBeenCalledWith(
-        'Failed to lookup user by Stripe customer ID in fallback',
-        dbError,
-        {
-          function: 'getUserIdFromStripeCustomer',
-          route: '/api/stripe/webhooks',
-        }
+      await expect(getUserIdFromStripeCustomer('cus_error')).rejects.toThrow(
+        'Database connection failed'
       );
     });
   });

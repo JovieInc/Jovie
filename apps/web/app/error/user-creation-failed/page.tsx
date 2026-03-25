@@ -1,8 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
 import { Button } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { redirect } from 'next/navigation';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -10,13 +8,7 @@ import { APP_ROUTES } from '@/constants/routes';
 
 export const runtime = 'nodejs';
 
-export default async function UserCreationFailedPage() {
-  const { userId } = await auth();
-
-  if (!userId) {
-    redirect(APP_ROUTES.SIGNIN);
-  }
-
+export default function UserCreationFailedPage() {
   return (
     <StandaloneProductPage width='sm' centered>
       <ContentSurfaceCard className='overflow-hidden'>

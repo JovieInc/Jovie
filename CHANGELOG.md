@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.68] - 2026-03-25
+## [26.4.69] - 2026-03-25
 
 ### Fixed
 
@@ -14,6 +14,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - [internal] Replace direct `Sentry.captureException` with `captureError()` utility in earnings page for consistency
 - [internal] Fix hardcoded `/app/insights` redirect URL to use `APP_ROUTES.INSIGHTS` constant
 - [internal] Wrap presence page content in Suspense boundary so the skeleton streams instantly instead of blocking until all data resolves
+
+## [26.4.68] - 2026-03-25
+
+### Changed
+
+- [internal] Extract right drawer from content container into standalone card — drawer now sits beside main content as a sibling element with its own border, radius, and shadow
+- [internal] Apply `rounded-full` pill shape to SegmentControl, CloseButton, and all drawer interactive elements per DESIGN.md spec
+- [internal] Normalize drawer internal spacing from `gap-2` to `gap-1.5`
 
 ## [26.4.67] - 2026-03-25
 
