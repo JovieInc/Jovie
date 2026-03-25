@@ -13,7 +13,6 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
-import { AudienceMemberActions } from './AudienceMemberActions';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -63,10 +62,6 @@ export function AudienceMemberSidebar({
 
           <DrawerSection title='Activity' className='space-y-1.5'>
             <AudienceMemberActivityFeed member={member} />
-          </DrawerSection>
-
-          <DrawerSection title='Recent actions' className='space-y-1.5'>
-            <AudienceMemberActions member={member} />
           </DrawerSection>
 
           <DrawerSection title='Referrers' className='space-y-1.5'>

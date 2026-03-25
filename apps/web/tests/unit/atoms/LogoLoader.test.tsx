@@ -39,14 +39,19 @@ describe('LogoLoader', () => {
     expect(output).toHaveAttribute('aria-label', 'Processing');
   });
 
-  it('renders color variant by default', () => {
+  it('uses muted tone for loading context', () => {
     render(<LogoLoader />);
-    expect(screen.getByRole('img')).toHaveAttribute('data-tone', 'color');
+    expect(screen.getByRole('img')).toHaveAttribute('data-tone', 'muted');
   });
 
-  it('passes mono variant through', () => {
-    render(<LogoLoader variant='mono' />);
-    expect(screen.getByRole('img')).toHaveAttribute('data-tone', 'auto');
+  it('uses size 32 by default', () => {
+    render(<LogoLoader />);
+    expect(screen.getByRole('img')).toHaveAttribute('data-size', '32');
+  });
+
+  it('applies animate-pulse class', () => {
+    render(<LogoLoader />);
+    expect(screen.getByRole('img').className).toContain('animate-pulse');
   });
 
   it('has no a11y violations', async () => {

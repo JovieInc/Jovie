@@ -1,109 +1,120 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
-vi.mock('next/image', () => ({
-  // eslint-disable-next-line jsx-a11y/alt-text -- test mock, props passed through
-  default: (props: any) => <img {...props} />,
-}));
-
 describe('BrandLogo', () => {
-  it('renders with default alt text', () => {
-    render(<BrandLogo tone='white' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toBeInTheDocument();
+  it('renders a single svg element inside a span wrapper', () => {
+    const { container } = render(<BrandLogo />);
+    const svgs = container.querySelectorAll('svg');
+    expect(svgs).toHaveLength(1);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toBeInTheDocument();
+    expect(wrapper?.querySelector('svg')).toBe(svgs[0]);
   });
 
-  it('renders with custom alt text', () => {
-    render(<BrandLogo tone='white' alt='Custom Logo' />);
-    expect(screen.getByAltText('Custom Logo')).toBeInTheDocument();
-  });
-
-  it('renders white tone with correct src', () => {
-    render(<BrandLogo tone='white' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('src', '/brand/Jovie-Logo-Icon-White.svg');
-  });
-
-  it('renders black tone with correct src', () => {
-    render(<BrandLogo tone='black' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('src', '/brand/Jovie-Logo-Icon-Black.svg');
-  });
-
-  it('renders color tone with correct src', () => {
-    render(<BrandLogo tone='color' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('src', '/brand/Jovie-Logo-Icon.svg');
-  });
-
-  it('renders two images for auto tone (dark/light variants)', () => {
-    render(<BrandLogo tone='auto' />);
-    const images = screen.getAllByAltText('Jovie');
-    expect(images).toHaveLength(2);
-    expect(images[0]).toHaveAttribute(
-      'src',
-      '/brand/Jovie-Logo-Icon-Black.svg'
-    );
-    expect(images[1]).toHaveAttribute(
-      'src',
-      '/brand/Jovie-Logo-Icon-White.svg'
-    );
-  });
-
-  it('renders two images by default (auto is the default tone)', () => {
+  it('renders with default aria-label "Jovie" on svg', () => {
     render(<BrandLogo />);
-    const images = screen.getAllByAltText('Jovie');
-    expect(images).toHaveLength(2);
+    expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
   });
 
-  it('applies size to width and height', () => {
-    render(<BrandLogo tone='white' size={64} />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('width', '64');
-    expect(img).toHaveAttribute('height', '64');
+  it('renders with custom alt text as aria-label', () => {
+    render(<BrandLogo alt='Custom Logo' />);
+    expect(screen.getByLabelText('Custom Logo')).toBeInTheDocument();
+  });
+
+  it('renders a title element inside svg for accessibility', () => {
+    const { container } = render(<BrandLogo />);
+    const title = container.querySelector('svg title');
+    expect(title).toBeInTheDocument();
+    expect(title?.textContent).toBe('Jovie');
+  });
+
+  it('omits title element when aria-hidden', () => {
+    const { container } = render(<BrandLogo aria-hidden />);
+    const title = container.querySelector('svg title');
+    expect(title).not.toBeInTheDocument();
+  });
+
+  it('renders auto tone with no inline color style on wrapper', () => {
+    const { container } = render(<BrandLogo tone='auto' />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).not.toHaveStyle({ color: '#fff' });
+    expect(wrapper).not.toHaveStyle({ color: '#635aff' });
+  });
+
+  it('renders white tone with white color on wrapper', () => {
+    const { container } = render(<BrandLogo tone='white' />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveStyle({ color: '#fff' });
+  });
+
+  it('renders color tone with brand purple on wrapper', () => {
+    const { container } = render(<BrandLogo tone='color' />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveStyle({ color: '#635aff' });
+  });
+
+  it('renders muted tone with muted class on wrapper', () => {
+    const { container } = render(<BrandLogo tone='muted' />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper?.getAttribute('class')).toContain(
+      'text-muted-foreground/50'
+    );
+  });
+
+  it('applies size to width and height attributes on svg', () => {
+    const { container } = render(<BrandLogo size={64} />);
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveAttribute('width', '64');
+    expect(svg).toHaveAttribute('height', '64');
   });
 
   it('uses default size of 48', () => {
-    render(<BrandLogo tone='white' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('width', '48');
-    expect(img).toHaveAttribute('height', '48');
+    const { container } = render(<BrandLogo />);
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveAttribute('width', '48');
+    expect(svg).toHaveAttribute('height', '48');
   });
 
-  it('defaults the inline style to width and height matching size prop', () => {
-    render(<BrandLogo tone='white' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveStyle({ width: '48px', height: '48px' });
-  });
-
-  it('applies rounded-full class when rounded=true (default)', () => {
-    render(<BrandLogo tone='white' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveClass('rounded-full');
+  it('applies rounded-full class on wrapper when rounded=true (default)', () => {
+    const { container } = render(<BrandLogo />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('rounded-full');
   });
 
   it('does not apply rounded-full class when rounded=false', () => {
-    render(<BrandLogo tone='white' rounded={false} />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).not.toHaveClass('rounded-full');
+    const { container } = render(<BrandLogo rounded={false} />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).not.toHaveClass('rounded-full');
   });
 
-  it('applies custom className', () => {
-    render(<BrandLogo tone='white' className='my-logo' />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveClass('my-logo');
+  it('applies custom className to wrapper', () => {
+    const { container } = render(<BrandLogo className='my-logo' />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('my-logo');
   });
 
-  it('applies aria-hidden attribute', () => {
-    render(<BrandLogo tone='white' aria-hidden />);
-    const img = screen.getByAltText('Jovie');
-    expect(img).toHaveAttribute('aria-hidden', 'true');
+  it('applies aria-hidden attribute on wrapper', () => {
+    const { container } = render(<BrandLogo aria-hidden />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('has fill="currentColor" on svg for CSS color inheritance', () => {
+    const { container } = render(<BrandLogo />);
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveAttribute('fill', 'currentColor');
+  });
+
+  it('wraps svg in span to isolate from parent [&>svg] selectors', () => {
+    const { container } = render(<BrandLogo />);
+    const wrapper = container.querySelector('span');
+    expect(wrapper).toHaveClass('inline-flex', 'shrink-0');
   });
 
   it('passes a11y checks', async () => {
-    const { container } = render(<BrandLogo tone='white' />);
+    const { container } = render(<BrandLogo />);
     await expectNoA11yViolations(container);
   });
 });
