@@ -297,8 +297,22 @@ jobs:
             exit 1
           fi
 
-          # /api/health returns {"status":"ok"} on success (no database field).
-          # The status check above already validates this — no separate database check needed.
+          # NOTE: If a regression silently drops the database field from /api/health,
+          # this gate will not catch it; the "status":"ok" check above remains the last gate.
+          # Some environments expose only {"status":"ok"} on /api/health.
+          # Validate database state only when the response includes a database field.
+          if [[ "$health_content" == *'"database":'* ]]; then
+            # /api/health returns "database":"ok" (string), while /api/health/deploy
+            # returns "database":{"ok":true,...} (object). Accept both formats.
+            if [[ "$health_content" != *'"database":"ok"'* ]] && [[ "$health_content" != *'"database":{"ok":true'* ]]; then
+              echo "❌ Canary failed: Database health not ok"
+              echo "Health response: $health_content"
+              echo "canary_status=failed_database" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          else
+            echo "ℹ️ Health response has no database field; skipping database-specific validation."
+          fi
 
           echo "✅ Health endpoint passed"
 
