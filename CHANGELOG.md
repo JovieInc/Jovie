@@ -9,8 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Bump database connection pool from 10 to 20 for launch burst traffic capacity
-- Health check endpoint now uses `SELECT 1 LIMIT 1` instead of `COUNT(*)` to avoid O(n) table scans under load
+- [internal] Bump database connection pool from 10 to 20 for launch burst traffic capacity
+- [internal] Health check endpoint now uses lightweight query to reduce load
 - Add `List-Unsubscribe` headers to release day notification emails for improved deliverability (Gmail/Outlook native unsubscribe button)
 
 ## [26.4.59] - 2026-03-24

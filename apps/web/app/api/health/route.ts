@@ -65,15 +65,16 @@ export async function GET(request: Request) {
     // Pure connectivity check — SELECT 1 proves DB is reachable, no table dependency
     await db.execute(drizzleSql`SELECT 1`);
 
-    summary.status = 'ok';
-    summary.database = 'ok';
-    return NextResponse.json(summary, {
-      status: 200,
-      headers: {
-        ...NO_STORE_HEADERS,
-        ...createRateLimitHeaders(rateLimitResult),
-      },
-    });
+    return NextResponse.json(
+      { status: 'ok' },
+      {
+        status: 200,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+        },
+      }
+    );
   } catch (error) {
     void captureWarning('Health check degraded', error, {
       service: 'health',

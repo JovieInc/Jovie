@@ -86,7 +86,9 @@ export function initializeDb(): DbType {
   // Pool settings tuned for Neon serverless to prevent
   // "Connection terminated unexpectedly" errors:
   //   - max: 20 — tuned for launch burst traffic; each Vercel container gets
-  //     its own pool, so this handles 20 concurrent queries per container
+  //     its own pool, so this handles 20 concurrent queries per container.
+  //     Note: Neon enforces a project-wide connection ceiling (~100 on launch
+  //     tier), so revisit if container concurrency grows beyond 5.
   //   - idleTimeoutMillis: 20s — close idle connections before Neon's server-side
   //     timeout (typically 30-60s) can terminate them unexpectedly
   //   - connectionTimeoutMillis: 15s — allow time for Neon cold starts (up to ~10s)

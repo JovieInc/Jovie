@@ -58,15 +58,14 @@ describe('@critical GET /api/health', () => {
   });
 
   it('returns ok status when database is healthy', async () => {
-    mockDbExecute.mockResolvedValue([{ '?column?': 1 }]);
+    mockDbExecute.mockResolvedValue(undefined);
 
     const { GET } = await import('@/app/api/health/route');
     const response = await GET(new Request('http://localhost/api/health'));
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data.status).toBe('ok');
-    expect(data.database).toBe('ok');
+    expect(data).toEqual({ status: 'ok' });
     expect(mockCaptureWarning).not.toHaveBeenCalled();
   });
 
