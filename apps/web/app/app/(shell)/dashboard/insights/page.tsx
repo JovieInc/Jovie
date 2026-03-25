@@ -5,7 +5,6 @@ import { InsightsPanel } from '@/features/dashboard/insights/InsightsPanel';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
-import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 
@@ -63,7 +62,9 @@ async function InsightsContentSection() {
     return <InsightsPanel />;
   } catch (error) {
     throwIfRedirect(error);
-    logger.error('[InsightsPage] Failed to load insights', { error });
+    void captureError('Insights page failed', error, {
+      route: APP_ROUTES.INSIGHTS,
+    });
     return (
       <PageErrorState message='Failed to load insights. Please refresh the page.' />
     );

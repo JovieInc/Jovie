@@ -13,41 +13,51 @@ import PresenceLoading from './loading';
 export const runtime = 'nodejs';
 
 async function PresenceContent() {
-  const dashboardData = await getDashboardData();
+  try {
+    const dashboardData = await getDashboardData();
 
-  if (dashboardData.dashboardLoadError) {
-    void captureError(
-      'Dashboard data load failed on presence page',
-      dashboardData.dashboardLoadError,
-      {
+    if (dashboardData.dashboardLoadError) {
+      void captureError(
+        'Dashboard data load failed on presence page',
+        dashboardData.dashboardLoadError,
+        {
+          route: APP_ROUTES.PRESENCE,
+        }
+      );
+      return (
+        <PageErrorState message='Failed to load presence data. Please refresh the page.' />
+      );
+    }
+
+    if (dashboardData.needsOnboarding) {
+      redirect(APP_ROUTES.ONBOARDING);
+    }
+
+    let presenceData: Awaited<ReturnType<typeof loadDspPresence>> = {
+      items: [],
+      confirmedCount: 0,
+      suggestedCount: 0,
+    };
+
+    try {
+      presenceData = await loadDspPresence();
+    } catch (error) {
+      throwIfRedirect(error);
+      void captureError('loadDspPresence failed', error, {
         route: APP_ROUTES.PRESENCE,
-      }
-    );
+      });
+    }
+
+    return <DspPresenceView data={presenceData} />;
+  } catch (error) {
+    throwIfRedirect(error);
+    void captureError('Presence page failed', error, {
+      route: APP_ROUTES.PRESENCE,
+    });
     return (
       <PageErrorState message='Failed to load presence data. Please refresh the page.' />
     );
   }
-
-  if (dashboardData.needsOnboarding) {
-    redirect(APP_ROUTES.ONBOARDING);
-  }
-
-  let presenceData: Awaited<ReturnType<typeof loadDspPresence>> = {
-    items: [],
-    confirmedCount: 0,
-    suggestedCount: 0,
-  };
-
-  try {
-    presenceData = await loadDspPresence();
-  } catch (error) {
-    throwIfRedirect(error);
-    void captureError('loadDspPresence failed', error, {
-      route: APP_ROUTES.PRESENCE,
-    });
-  }
-
-  return <DspPresenceView data={presenceData} />;
 }
 
 export default async function PresencePage() {
