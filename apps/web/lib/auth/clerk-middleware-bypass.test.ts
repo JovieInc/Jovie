@@ -88,18 +88,18 @@ describe('shouldBypassClerkForRequest', () => {
       expected: false,
     },
     {
-      name: 'does not bypass Clerk on the FAPI proxy path',
+      name: 'bypasses Clerk on /clerk paths (handled by FAPI rewrite in middleware)',
       pathname: '/clerk',
       pathInfo: publicPathInfo,
       cookies: [],
-      expected: false,
+      expected: true,
     },
     {
-      name: 'does not bypass Clerk on FAPI proxy sub-paths',
+      name: 'bypasses Clerk on /clerk sub-paths (handled by FAPI rewrite in middleware)',
       pathname: '/clerk/v1/client',
       pathInfo: publicPathInfo,
       cookies: [],
-      expected: false,
+      expected: true,
     },
     {
       name: 'treats blank session cookies as anonymous',
