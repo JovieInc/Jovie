@@ -198,7 +198,7 @@ function ProfileContent() {
     <div className='flex h-full flex-col items-center justify-center gap-3'>
       {/* Mini release artwork */}
       <div
-        className='h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-surface-2 shadow-sm'
+        className='h-20 w-20 shrink-0 overflow-hidden rounded-2xl shadow-sm'
         style={{
           background:
             'linear-gradient(135deg, rgba(113,112,255,0.3) 0%, rgba(113,112,255,0.08) 100%)',

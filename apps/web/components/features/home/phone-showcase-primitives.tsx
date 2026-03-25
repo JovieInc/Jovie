@@ -67,35 +67,27 @@ const SOCIAL_BAR_ICONS = [
   {
     key: 'mail',
     activeMode: null,
-    render: (size: number) => <Mail style={{ width: size, height: size }} />,
+    render: () => <Mail className='h-3.5 w-3.5' />,
   },
   {
     key: 'instagram',
     activeMode: null,
-    render: (size: number) => (
-      <SocialIcon platform='instagram' size={size} aria-hidden />
-    ),
+    render: () => <SocialIcon platform='instagram' size={14} aria-hidden />,
   },
   {
     key: 'spotify',
     activeMode: null,
-    render: (size: number) => (
-      <SocialIcon platform='spotify' size={size} aria-hidden />
-    ),
+    render: () => <SocialIcon platform='spotify' size={14} aria-hidden />,
   },
   {
     key: 'tour',
     activeMode: 'tour' as const,
-    render: (size: number) => (
-      <Calendar style={{ width: size, height: size }} />
-    ),
+    render: () => <Calendar className='h-3.5 w-3.5' />,
   },
   {
     key: 'tip',
     activeMode: 'tip' as const,
-    render: (size: number) => (
-      <DollarSign style={{ width: size, height: size }} />
-    ),
+    render: () => <DollarSign className='h-3.5 w-3.5' />,
   },
 ] as const;
 
@@ -224,7 +216,7 @@ export function PhoneShowcase({ activeIndex, modes }: PhoneShowcaseProps) {
                   : 'var(--linear-text-tertiary)',
               }}
             >
-              {icon.render(14)}
+              {icon.render()}
             </span>
           );
         })}
