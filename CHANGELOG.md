@@ -7,6 +7,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.72] - 2026-03-25
 
+### Changed
+
+- Align sidebar tokens with Linear's exact color values — dark mode background elevated from `8 9 10` to `15 16 17`, light mode refined across all sidebar token channels
+- Remove `color-mix()` backgrounds from content surfaces, right drawer, and page shell — use flat `var(--linear-app-content-surface)` for cleaner rendering
+- Move right panel inside `<main>` content card so sidebar and content share one unified card (matches Linear layout)
+- Remove sidebar card chrome — no border, rounded corners, inset shadow, or backdrop-blur on `variant=sidebar`
+- Revert BrandLogo from inline SVG back to `next/image` with dark/light theme-aware variants
+- Restore JovieLogo and LogoIcon components (previously removed)
+- Simplify ChatWorkspaceSurface — strip ContentSurfaceCard wrapper with gradients/shadows
+- ProfileCompletionCard: use `border-subtle` token instead of custom color-mix border
+- ProfileSidebarHeader: remove "Profile workspace" sub-label
+- Empty state in JovieChat: position content near chat input instead of vertical center
+
 ### Fixed
 
 - Remove duplicate "Recent actions" section from audience member sidebar — was showing the same data as "Activity" with a different layout

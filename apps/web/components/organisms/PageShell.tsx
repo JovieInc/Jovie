@@ -46,7 +46,7 @@ export function PageShell({ children, className }: PageShellProps) {
   return (
     <div
       className={cn(
-        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-primary-token',
+        'flex h-full min-h-0 flex-col overflow-hidden overflow-x-hidden bg-(--linear-app-content-surface) text-primary-token',
         className
       )}
     >

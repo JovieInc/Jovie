@@ -331,10 +331,10 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 
 | Token | Light | Dark |
 |-------|-------|------|
-| Background | `color-mix(oklab, content-surface 97%, surface-0)` | same token |
-| Border | `frame-seam token` | same token |
+| Background | `var(--linear-app-content-surface)` (flat — no `color-mix()`) | same token |
+| Border | `frame-seam token` (thin left-border divider) | same token |
 | Radius | 10px | 10px |
-| Layout | Stacked cards with `space-y-3` gap, no outer container | same |
+| Layout | Right panel lives inside `<main>` content card — sidebar and panel share one unified card | same |
 | Pattern | `EntitySidebarShell` + `DrawerSurfaceCard variant='card'` | same |
 
 ### Button Tabs
@@ -422,3 +422,7 @@ Height: sm=32px, md=40px. Radius: pill (9999px) for app, 6px for marketing. Padd
 | 2026-03-23 | Font weight book: 450 | Linear's default UI weight (was incorrectly set to 400) |
 | 2026-03-23 | Two accent colors: #7170ff (app) + #5E6AD2 (marketing CTA) | Linear uses different accent colors for app vs marketing surfaces |
 | 2026-03-23 | Marketing always dark | Linear's marketing pages are dark-only; System A follows this |
+| 2026-03-25 | Remove `color-mix()` from content surfaces | Flat `var(--linear-app-content-surface)` renders more cleanly and avoids compositing artifacts |
+| 2026-03-25 | Right panel inside `<main>` content card | Matches Linear's unified card layout — sidebar and panel share one card with a thin left-border divider |
+| 2026-03-25 | Sidebar: no border, radius, shadow, or backdrop-blur | Flat sidebar sits flush against page background — matches Linear's design (v26.4.72) |
+| 2026-03-25 | BrandLogo: `next/image` with dark/light variants | Reverted from inline SVG — `next/image` handles theme-aware loading with proper optimization |
