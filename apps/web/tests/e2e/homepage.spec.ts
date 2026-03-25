@@ -82,11 +82,13 @@ test.describe('Homepage', () => {
     page,
   }) => {
     const finalHeadline = page.getByTestId('final-cta-headline');
-    await expect(finalHeadline).toHaveText('Available today.');
+    await expect(finalHeadline).toHaveText('Claim your handle.');
 
-    const finalDock = page.getByTestId('final-cta-dock');
-    await expect(finalDock).toBeVisible();
-    await expect(finalDock.locator('input').first()).toBeVisible();
+    await expect(finalHeadline).toBeVisible();
+    // Claim form is present in the final CTA section
+    await expect(
+      page.locator('section').last().locator('input').first()
+    ).toBeVisible();
   });
 
   test('is responsive on mobile', async ({ page }) => {

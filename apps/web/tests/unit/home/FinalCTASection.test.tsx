@@ -38,6 +38,8 @@ describe('FinalCTASection', () => {
 
   it('renders claim handle form', () => {
     renderWithQueryClient(<FinalCTASection />);
-    expect(screen.getByTestId('final-cta-dock')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
+      'Claim your handle.'
+    );
   });
 });
