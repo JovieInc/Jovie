@@ -148,6 +148,65 @@ describe('parseChangelog', () => {
   });
 });
 
+  it('auto-filters entries with vendor names into internalSections', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Fixed
+
+- Fixed sign-in page loading
+- Fix auth not loading by reverting Clerk proxy
+- Reduced Sentry error noise
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Fixed sign-in page loading',
+    ]);
+    expect(result.releases[0].internalSections.fixed).toEqual([
+      'Fix auth not loading by reverting Clerk proxy',
+      'Reduced Sentry error noise',
+    ]);
+  });
+
+  it('auto-filters entries with dev tooling and infrastructure keywords', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Added
+
+- New feature for users
+- E2E test coverage for onboarding
+- Dev toolbar toggle button
+- Screenshot spec uses demo route
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.added).toEqual([
+      'New feature for users',
+    ]);
+    expect(result.releases[0].internalSections.added).toHaveLength(3);
+  });
+
+  it('does not auto-filter legitimate user-facing entries', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Added
+
+- Spotify import shows real progress
+- Your profile now shows your top 3 genres
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.added).toEqual([
+      'Spotify import shows real progress',
+      'Your profile now shows your top 3 genres',
+    ]);
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+    ]);
+  });
+});
+
 describe('getLatestRelease', () => {
   it('returns the first release after unreleased', () => {
     const release = getLatestRelease(SAMPLE_CHANGELOG);
