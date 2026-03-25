@@ -13,7 +13,7 @@ interface ClerkCookieLike {
 
 const CLERK_REQUIRED_EXACT_PATHS = [
   APP_ROUTES.DASHBOARD,
-  '/__clerk',
+  '/clerk',
   '/monitoring',
 ] as const;
 
@@ -21,7 +21,7 @@ const CLERK_REQUIRED_PREFIXES = [
   `${APP_ROUTES.DASHBOARD}/`,
   '/api/',
   '/trpc',
-  '/__clerk/',
+  '/clerk/',
   '/monitoring/',
 ] as const;
 
