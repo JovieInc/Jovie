@@ -1,6 +1,5 @@
 'use client';
 
-import { CalendarDays } from 'lucide-react';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import type { AvailableDSP } from '@/lib/dsp';
@@ -86,55 +85,47 @@ export function ProfileHeroCard({
 }: ProfileHeroCardProps) {
   const copy = getHeroCopy(latestRelease);
 
+  const hasRelease = !!latestRelease;
+
   return (
-    <section className='px-3 py-3'>
-      <div className='overflow-hidden rounded-3xl border border-subtle bg-surface-1 shadow-sm'>
-        <div className='flex items-start gap-4 p-4'>
-          <div className='relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-surface-2'>
-            <ImageWithFallback
-              src={latestRelease?.artworkUrl ?? artist.image_url}
-              alt={
-                latestRelease ? `${latestRelease.title} artwork` : artist.name
-              }
-              fill
-              sizes='96px'
-              className='object-cover'
-              fallbackVariant={latestRelease ? 'release' : 'avatar'}
-            />
-          </div>
+    <section className='flex flex-col items-center px-4 py-6 text-center sm:py-8'>
+      <div
+        className={`relative h-40 w-40 shrink-0 overflow-hidden bg-surface-2 shadow-sm sm:h-48 sm:w-48 ${
+          hasRelease ? 'rounded-2xl' : 'rounded-full'
+        }`}
+      >
+        <ImageWithFallback
+          src={latestRelease?.artworkUrl ?? artist.image_url}
+          alt={latestRelease ? `${latestRelease.title} artwork` : artist.name}
+          fill
+          sizes='(min-width: 640px) 192px, 160px'
+          className='object-cover'
+          fallbackVariant={hasRelease ? 'release' : 'avatar'}
+        />
+      </div>
 
-          <div className='min-w-0 flex-1'>
-            <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
-              {copy.eyebrow}
-            </p>
-            <h1 className='mt-2 text-base font-semibold text-primary-token'>
-              {copy.title}
-            </h1>
-            <p className='mt-2 text-sm leading-6 text-secondary-token'>
-              {copy.description}
-            </p>
-            {latestRelease?.releaseDate ? (
-              <div className='mt-3 inline-flex items-center gap-2 rounded-full bg-surface-2 px-3 py-1 text-xs text-secondary-token'>
-                <CalendarDays className='h-3.5 w-3.5' aria-hidden='true' />
-                <span>
-                  {dateFormatter.format(new Date(latestRelease.releaseDate))}
-                </span>
-              </div>
-            ) : null}
-          </div>
-        </div>
+      <div className='mt-4 max-w-sm space-y-1.5'>
+        <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+          {copy.eyebrow}
+        </p>
+        <h1 className='text-lg font-semibold text-primary-token'>
+          {copy.title}
+        </h1>
+        <p className='text-sm leading-6 text-secondary-token'>
+          {copy.description}
+        </p>
+      </div>
 
-        <div className='border-t border-subtle/70 px-4 py-4'>
-          <ProfilePrimaryCTA
-            artist={artist}
-            socialLinks={socialLinks}
-            mergedDSPs={mergedDSPs}
-            enableDynamicEngagement={enableDynamicEngagement}
-            showCapture
-            autoOpenCapture={autoOpenCapture}
-            subscribeTwoStep={subscribeTwoStep}
-          />
-        </div>
+      <div className='mt-5 w-full max-w-xs'>
+        <ProfilePrimaryCTA
+          artist={artist}
+          socialLinks={socialLinks}
+          mergedDSPs={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+          showCapture
+          autoOpenCapture={autoOpenCapture}
+          subscribeTwoStep={subscribeTwoStep}
+        />
       </div>
     </section>
   );

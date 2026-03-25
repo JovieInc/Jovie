@@ -10,6 +10,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Changed
 
 - Revamp audience table to Linear layout — break composite cells into individual columns (User, Type, Location, Intent, Visits, LTV, Last Action), show sortable column headers, inline touring badge into user cell
+- Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
+- Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
+- Lighten sticky header border opacity for a more minimal navigation feel
+
+### Removed
+
+- Remove redundant calendar date badge from profile hero card (eyebrow text already communicates timing)
+- Remove card container chrome (border, background, shadow, divider) from profile hero
 
 ## [26.4.64] - 2026-03-25
 
