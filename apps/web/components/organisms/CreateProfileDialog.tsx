@@ -111,7 +111,9 @@ export function CreateProfileDialog({
               type='text'
               value={username}
               onChange={e => {
-                setUsername(e.target.value.toLowerCase().replace(/\s/g, '-'));
+                setUsername(
+                  e.target.value.toLowerCase().replaceAll(/\s/g, '-')
+                );
                 setError(null);
               }}
               placeholder='username'
