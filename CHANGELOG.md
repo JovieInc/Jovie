@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.72] - 2026-03-25
+
+### Fixed
+
+- Remove duplicate "Recent actions" section from audience member sidebar — was showing the same data as "Activity" with a different layout
+- Cap activity feed to 10 most recent items to keep sidebar concise
+
 ## [26.4.71] - 2026-03-25
 
 ### Fixed
