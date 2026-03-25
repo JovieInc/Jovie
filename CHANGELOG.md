@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.70] - 2026-03-25
+
+### Fixed
+
+- Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
+- Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
+- Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
+- Expand nightly E2E config to include dashboard health tests across all 5 browser projects
+- Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
+- Add safety guards preventing silent test disablement when route matrices are empty
+
 ## [26.4.69] - 2026-03-25
 
 ### Changed
