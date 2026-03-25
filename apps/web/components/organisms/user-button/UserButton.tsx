@@ -296,7 +296,7 @@ export function UserButton({
   if (!isLoaded || !user) {
     if (trigger) {
       return (
-        <div data-testid='user-button-loading'>
+        <div data-testid='user-button-loading' className='contents'>
           <CommonDropdown
             variant='dropdown'
             items={[]}
@@ -390,7 +390,7 @@ export function UserButton({
     ));
 
   return (
-    <div data-testid='user-button-loaded'>
+    <div data-testid='user-button-loaded' className='contents'>
       <CommonDropdown
         variant='dropdown'
         items={dropdownItems}

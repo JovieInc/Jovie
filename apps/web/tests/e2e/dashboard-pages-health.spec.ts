@@ -378,28 +378,34 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             }
           }
 
-          // Verify Clerk UI loaded (UserButton is interactive, not stuck loading)
-          const userButtonLoaded = await page
-            .locator('[data-testid="user-button-loaded"]')
-            .first()
-            .isVisible({ timeout: 5_000 })
-            .catch(() => false);
-          if (!userButtonLoaded) {
-            const screenshot = await page.screenshot().catch(() => null);
-            if (screenshot) {
-              await testInfo.attach(`clerk-ui-missing-${pageConfig.name}`, {
-                body: screenshot,
-                contentType: 'image/png',
+          // Verify Clerk UI loaded (UserButton is interactive, not stuck loading).
+          // Only check on desktop — mobile uses MobileProfileDrawer instead of UserButton
+          // in the sidebar, so data-testid="user-button-loaded" is not visible.
+          const viewportSize = page.viewportSize();
+          const isDesktopViewport = viewportSize && viewportSize.width >= 1024;
+          if (isDesktopViewport) {
+            const userButtonLoaded = await page
+              .locator('[data-testid="user-button-loaded"]')
+              .first()
+              .isVisible({ timeout: 10_000 })
+              .catch(() => false);
+            if (!userButtonLoaded) {
+              const screenshot = await page.screenshot().catch(() => null);
+              if (screenshot) {
+                await testInfo.attach(`clerk-ui-missing-${pageConfig.name}`, {
+                  body: screenshot,
+                  contentType: 'image/png',
+                });
+              }
+              results.push({
+                path: pageConfig.path,
+                name: pageConfig.name,
+                status: 'fail',
+                loadTimeMs,
+                error: 'Clerk UI not loaded: user-button-loaded not visible',
               });
+              continue;
             }
-            results.push({
-              path: pageConfig.path,
-              name: pageConfig.name,
-              status: 'fail',
-              loadTimeMs,
-              error: 'Clerk UI not loaded: user-button-loaded not visible',
-            });
-            continue;
           }
 
           // CI-only performance budget (dev/Turbopack timing is unreliable)

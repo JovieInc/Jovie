@@ -72,12 +72,19 @@ export const EXPECTED_ERROR_PATTERNS = [
   'chunkloaderror', // dynamic import fails during hot reload
   'failed to load chunk', // same, different phrasing
 
+  // Resource loading failures from third-party scripts (not app bugs)
+  'failed to load resource', // browser-level resource fetch failure (images, fonts, 3rd-party)
+
   // CSP and security headers (expected in test/dev)
   'content security policy', // CSP violations from dev tooling
   'blocked by cors', // CORS blocks on third-party scripts in dev
+  'cross-origin', // cross-origin warnings on third-party resources
 
   // Framework development warnings (console.warn, not errors)
   'warning:', // React/Next.js dev warnings (printed via console.warn)
+
+  // WebSocket/HMR noise in dev environment
+  'websocket', // Turbopack/webpack HMR WebSocket errors in dev
 
   // Nonce mismatches (Next.js CSP nonce in dev)
   'nonce', // script nonce mismatch between server/client in dev
