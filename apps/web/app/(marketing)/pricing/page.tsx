@@ -278,9 +278,9 @@ export default function PricingPage() {
                 <PricingTier
                   name={ENTITLEMENT_REGISTRY.pro.marketing.displayName}
                   billingLabel='Billed monthly'
-                  price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price!.monthly}`}
+                  price={`$${ENTITLEMENT_REGISTRY.pro.marketing.price?.monthly ?? 0}`}
                   priceSuffix='/month'
-                  foundingNote={`${founding.marketing.displayName}: $${founding.marketing.price!.monthly}/mo locked in`}
+                  foundingNote={`${founding.marketing.displayName}: $${founding.marketing.price?.monthly ?? 0}/mo locked in`}
                   buttonLabel='Get started'
                   buttonHref='/signup?plan=pro'
                   buttonVariant='primary'
@@ -294,7 +294,7 @@ export default function PricingPage() {
                   <PricingTier
                     name={ENTITLEMENT_REGISTRY.growth.marketing.displayName}
                     billingLabel='Early Access · Billed monthly'
-                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price!.monthly}`}
+                    price={`$${ENTITLEMENT_REGISTRY.growth.marketing.price?.monthly ?? 0}`}
                     priceSuffix='/month'
                     buttonLabel='Request Early Access'
                     buttonHref='/signup?plan=growth'
@@ -369,7 +369,7 @@ export default function PricingPage() {
                   padding: '0 20px',
                 }}
               >
-                See how it works
+                Learn more
               </Link>
             </div>
           </div>

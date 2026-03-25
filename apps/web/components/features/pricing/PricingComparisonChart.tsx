@@ -160,7 +160,7 @@ function DesktopFeatureRow({
 }
 
 export function PricingComparisonChart() {
-  const [isAnnual, setIsAnnual] = useState(true);
+  const [isAnnual, setIsAnnual] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
   const free = ENTITLEMENT_REGISTRY.free;
