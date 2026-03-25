@@ -59,7 +59,7 @@ function anonymizeIp(ip: string): string {
     const missing = 8 - leftParts.length - rightParts.length;
     const full = [
       ...leftParts,
-      ...Array(Math.max(0, missing)).fill('0000'),
+      ...new Array(Math.max(0, missing)).fill('0000'),
       ...rightParts,
     ];
     return full.slice(0, 3).concat(['0', '0', '0', '0', '0']).join(':');
