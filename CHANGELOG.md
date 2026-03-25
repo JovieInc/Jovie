@@ -22,6 +22,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fix Clerk proxy URL mismatch — align code to use `/__clerk` path matching Clerk Dashboard proxy configuration, restoring Google OAuth callbacks and Clerk JS loading on production
 - Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24
