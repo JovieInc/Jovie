@@ -236,9 +236,7 @@ async function getMagicMomentMetrics(): Promise<{
       string,
       string
     >;
-    const hasFailure = Object.values(enrichmentStatus).some(
-      s => s === 'failed'
-    );
+    const hasFailure = Object.values(enrichmentStatus).includes('failed');
     if (hasFailure) {
       enrichmentFailureCount++;
     }
