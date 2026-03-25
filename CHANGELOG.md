@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.63] - 2026-03-24
+
+### Fixed
+
+- Fix product screenshots capturing dev toolbars (DevToolbar, TanStack Query DevTools, Vercel toolbar, Next.js overlays) by expanding `hideTransientUI()` to cover all known dev overlays
+- Add `assertNoDevOverlays()` assertion to all screenshot specs to catch future overlay regressions before capture
+
 ## [26.4.62] - 2026-03-24
 
 ### Changed
