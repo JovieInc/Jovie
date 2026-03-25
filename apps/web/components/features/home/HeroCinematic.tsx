@@ -1,5 +1,3 @@
-'use client';
-
 import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
 import { MODES, PhoneShowcase } from './phone-showcase-primitives';

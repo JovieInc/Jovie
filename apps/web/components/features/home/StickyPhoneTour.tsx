@@ -183,7 +183,7 @@ export function StickyPhoneTour() {
                           >
                             {mode.outcome}
                           </span>
-                          jov.ie/tim
+                          jov.ie/timwhite
                           {slug && (
                             <span
                               style={{
