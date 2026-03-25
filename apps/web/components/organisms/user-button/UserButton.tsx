@@ -153,6 +153,12 @@ function buildDropdownItems({
       label: 'Cookie Policy',
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
+    },
+    {
+      type: 'action',
+      id: 'cookie-settings',
+      label: 'Cookie Settings',
+      onClick: () => window.dispatchEvent(new CustomEvent('jv:cookie:open')),
     }
   );
 
