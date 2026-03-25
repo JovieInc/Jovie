@@ -86,7 +86,7 @@ export function CrossfadeBlock({
   children,
 }: {
   readonly activeIndex: number;
-  readonly children: React.ReactNode[];
+  readonly children: React.ReactNode;
 }) {
   const childNodes = Children.toArray(children);
   return (
@@ -121,15 +121,9 @@ export function CrossfadeBlock({
 interface PhoneShowcaseProps {
   readonly activeIndex: number;
   readonly modes: readonly ModeData[];
-  /** Show keyboard-accessible tablist on dot indicators */
-  readonly accessibleTabs?: boolean;
 }
 
-export function PhoneShowcase({
-  activeIndex,
-  modes,
-  accessibleTabs = false,
-}: PhoneShowcaseProps) {
+export function PhoneShowcase({ activeIndex, modes }: PhoneShowcaseProps) {
   return (
     <PhoneFrame>
       <div className='flex items-center justify-end px-4 pt-10 pb-1'>
@@ -145,7 +139,7 @@ export function PhoneShowcase({
             alt={MOCK_ARTIST.name}
             name={MOCK_ARTIST.name}
             size='display-md'
-            verified={false}
+            verified={MOCK_ARTIST.isVerified}
           />
         </div>
         <div className='mt-2.5 text-center'>
@@ -165,21 +159,13 @@ export function PhoneShowcase({
 
       <div
         className='flex items-center justify-center gap-1.5 py-2.5'
-        {...(accessibleTabs
-          ? { role: 'tablist' as const, 'aria-label': 'Profile modes' }
-          : {})}
+        role='img'
+        aria-label={`Current mode: ${modes[activeIndex]?.outcome ?? 'profile'}`}
       >
         {modes.map((mode, i) => (
           <div
             key={mode.id}
-            {...(accessibleTabs
-              ? {
-                  role: 'tab' as const,
-                  'aria-selected': i === activeIndex,
-                  'aria-label': mode.outcome,
-                  tabIndex: i === activeIndex ? 0 : -1,
-                }
-              : {})}
+            aria-hidden='true'
             className='rounded-full transition-all duration-[var(--linear-duration-slow)] ease-[var(--linear-ease)]'
             style={{
               width: i === activeIndex ? 16 : 6,

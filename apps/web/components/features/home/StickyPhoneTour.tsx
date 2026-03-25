@@ -141,11 +141,7 @@ export function StickyPhoneTour() {
 
                 {/* Center: phone */}
                 <div className='flex flex-col items-center gap-4'>
-                  <PhoneShowcase
-                    activeIndex={activeIndex}
-                    modes={MODES}
-                    accessibleTabs
-                  />
+                  <PhoneShowcase activeIndex={activeIndex} modes={MODES} />
                 </div>
 
                 {/* Right: mode URLs */}

@@ -26,7 +26,10 @@ export function FinalCTASection() {
             Your next release does the rest.
           </p>
 
-          <div className='mx-auto mt-7 w-full max-w-[27rem]'>
+          <div
+            data-testid='final-cta-form'
+            className='mx-auto mt-7 w-full max-w-[27rem]'
+          >
             <ClaimHandleForm />
           </div>
         </div>

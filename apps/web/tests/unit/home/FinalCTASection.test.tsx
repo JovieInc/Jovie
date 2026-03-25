@@ -41,5 +41,7 @@ describe('FinalCTASection', () => {
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
       'Claim your handle.'
     );
+    expect(screen.getByTestId('final-cta-form')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 });

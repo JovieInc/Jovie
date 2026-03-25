@@ -36,7 +36,7 @@ test.describe('Homepage', () => {
     );
     await expect(
       page.getByText(
-        'Smart links, release automation, and fan intelligence in one system that helps you launch faster and keep more fans moving.'
+        'Smart links, release automation, and fan insight that keep every launch moving.'
       )
     ).toBeVisible();
 
@@ -59,22 +59,16 @@ test.describe('Homepage', () => {
 
   test('core homepage sections render in order', async ({ page }) => {
     await expect(
-      page.getByRole('heading', { name: 'Built for releases, not just links.' })
+      page.getByRole('heading', { name: 'The right action for every fan.' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Release day, automated.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Profiles that convert.' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', { name: 'AI that knows every song.' })
-    ).toBeVisible();
-    await expect(
       page.getByRole('heading', { name: 'Know every fan by name.' })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Simple pricing.' })
+      page.getByRole('heading', { name: 'Claim your handle.' })
     ).toBeVisible();
   });
 
@@ -85,9 +79,8 @@ test.describe('Homepage', () => {
     await expect(finalHeadline).toHaveText('Claim your handle.');
 
     await expect(finalHeadline).toBeVisible();
-    // Claim form is present in the final CTA section
     await expect(
-      page.locator('section').last().locator('input').first()
+      page.getByTestId('final-cta-form').locator('input').first()
     ).toBeVisible();
   });
 

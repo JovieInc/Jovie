@@ -186,7 +186,7 @@ export default function HomePage() {
       {/* 5. Audience — text left, screenshot right */}
       <FeatureRow
         heading='Know every fan by name.'
-        description='Every fan who subscribes, tips, or clicks becomes a contact you own — not a follower trapped on someone else&apos;s platform.'
+        description="Every fan who subscribes, tips, or clicks becomes a contact you own — not a follower trapped on someone else's platform."
         bullets={[
           'Fan intelligence with source tracking',
           'See which fans came from which release or show',
