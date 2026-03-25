@@ -45,3 +45,54 @@ describe('Statsig server initialization', () => {
     expect(statsigWarnings).toHaveLength(1);
   });
 });
+
+describe('Statsig dev mode bypass', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.restoreAllMocks();
+  });
+
+  it('getFeatureFlagsBootstrap returns empty gates in development', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+
+    const { getFeatureFlagsBootstrap } = await import(
+      '@/lib/feature-flags/server'
+    );
+
+    const result = await getFeatureFlagsBootstrap('user-123');
+    expect(result).toEqual({ gates: {} });
+
+    vi.unstubAllEnvs();
+  });
+
+  it('checkGate returns defaultValue in development without calling Statsig', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+
+    const Statsig = await import('statsig-node');
+    const { checkGate } = await import('@/lib/feature-flags/server');
+
+    const result = await checkGate(
+      'user-123',
+      'feature_profile_v2' as any,
+      false
+    );
+    expect(result).toBe(false);
+
+    // Statsig should never be called in dev
+    expect(Statsig.default.initialize).not.toHaveBeenCalled();
+    expect(Statsig.default.getFeatureGateSync).not.toHaveBeenCalled();
+
+    vi.unstubAllEnvs();
+  });
+
+  it('getExperiment returns empty object in development', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+
+    const { getExperiment } = await import('@/lib/feature-flags/server');
+
+    const result = await getExperiment('user-123', 'experiment_key');
+    expect(result).toEqual({});
+
+    vi.unstubAllEnvs();
+  });
+});
