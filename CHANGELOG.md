@@ -9,8 +9,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- Redesigned profile hero with larger artist image and cleaner layout
+- [internal] Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
+- [internal] Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
+- [internal] Lighten sticky header border opacity for a more minimal navigation feel
 - [internal] Automated keyword filtering for public changelog — vendor names, dev tooling, staging URLs, and infrastructure patterns are now auto-filtered even without the `[internal]` prefix
 - [internal] Cleaned up ~80 existing changelog entries: tagged internals, rewrote verbose entries to be benefit-led and concise
+
+### Removed
+
+- [internal] Remove redundant calendar date badge from profile hero card (eyebrow text already communicates timing)
+- [internal] Remove card container chrome (border, background, shadow, divider) from profile hero
 
 ## [26.4.64] - 2026-03-25
 
