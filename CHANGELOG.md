@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.64] - 2026-03-25
+## [26.4.65] - 2026-03-25
 
 ### Changed
 
@@ -17,6 +17,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Remove redundant calendar date badge from profile hero card (eyebrow text already communicates timing)
 - Remove card container chrome (border, background, shadow, divider) from profile hero
+
+## [26.4.64] - 2026-03-25
+
+### Fixed
+
+- Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
 
 ## [26.4.63] - 2026-03-24
 
