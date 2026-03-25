@@ -17,7 +17,6 @@ import { ProfileHeroCard } from '@/features/profile/ProfileHeroCard';
 import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
 import { useSwipeMode } from '@/hooks/useSwipeMode';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
-import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   detectSourcePlatform,
   getHeaderSocialLinks,
@@ -42,8 +41,6 @@ interface PublicProfileTemplateV2Props {
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
-  readonly photoDownloadSizes?: AvatarSize[];
-  readonly allowPhotoDownloads?: boolean;
 }
 
 function normalizeInitialMode(mode: ProfileMode): SwipeableProfileMode {
