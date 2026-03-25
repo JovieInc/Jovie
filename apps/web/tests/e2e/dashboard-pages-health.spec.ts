@@ -344,7 +344,11 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 
           // CI-only performance budget (dev/Turbopack timing is unreliable)
           if (process.env.CI && loadTimeMs) {
-            const budget = pageConfig.name === 'Chat' ? 8000 : 12000;
+            const budget =
+              'performanceBudgetMs' in pageConfig &&
+              pageConfig.performanceBudgetMs
+                ? pageConfig.performanceBudgetMs
+                : 12_000;
             await assertFastPageLoad(loadTimeMs, budget, testInfo);
           }
 

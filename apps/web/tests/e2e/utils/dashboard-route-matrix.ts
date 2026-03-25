@@ -7,6 +7,8 @@ export interface DashboardRouteDescriptor {
   readonly contentSelector?: string;
   /** Fallback selector — empty/alternate state that's also acceptable */
   readonly contentFallbackSelector?: string;
+  /** CI performance budget in ms (default: 12000) */
+  readonly performanceBudgetMs?: number;
 }
 
 interface DashboardRouteGroup {
@@ -27,6 +29,7 @@ const creatorDashboardRoutes = [
     name: 'Chat',
     contentSelector:
       '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i]',
+    performanceBudgetMs: 8_000,
   },
   {
     path: APP_ROUTES.EARNINGS,

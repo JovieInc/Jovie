@@ -267,12 +267,13 @@ test.describe('Dashboard Navigation @smoke', () => {
     ).toHaveLength(0);
   });
 
-  test('dashboard does not redirect-loop when data fails to load', async ({
+  test('dashboard does not redirect-loop for unauthenticated access', async ({
     browser,
   }) => {
-    // This test intentionally runs unauthenticated — it checks that hitting
-    // /app/dashboard without auth doesn't produce a redirect loop.
-    // No credentials needed; the test verifies the unauthenticated redirect chain.
+    // This test runs unauthenticated — it checks that hitting /app/dashboard
+    // without auth doesn't produce a redirect loop between /app and /signin.
+    // The authenticated data-failure redirect loop is covered by middleware
+    // circuit breaker tests and onboarding-completion.spec.ts.
 
     const context = await browser.newContext();
     const page = await context.newPage();

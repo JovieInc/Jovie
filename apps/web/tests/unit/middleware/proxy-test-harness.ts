@@ -77,7 +77,7 @@ export function isRedirectTo(
   if (!location) return false;
   try {
     const url = new URL(location, 'https://localhost');
-    return url.pathname === path || url.pathname.startsWith(path);
+    return url.pathname === path || url.pathname.startsWith(`${path}/`);
   } catch {
     return location.startsWith(path);
   }

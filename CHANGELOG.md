@@ -9,15 +9,15 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Added
 
-- Add 27 middleware behavioral tests for proxy.ts covering cookie banner geo-detection, auth redirects, circuit breaker, bot detection, banned user handling, and domain redirect
-- Add content-positive assertions for top 5 dashboard routes (Chat, Audience, Releases, Earnings, Presence) — health checks now verify the right content loaded, not just absence of errors
-- Wire existing `assertFastPageLoad` performance budgets into dashboard health checks (CI-only)
+- [internal] Add 27 middleware behavioral tests for proxy.ts covering cookie banner geo-detection, auth redirects, circuit breaker, bot detection, banned user handling, and domain redirect
+- [internal] Add content-positive assertions for top 5 dashboard routes (Chat, Audience, Releases, Earnings, Presence) — health checks now verify the right content loaded, not just absence of errors
+- [internal] Wire existing `assertFastPageLoad` performance budgets into dashboard health checks (CI-only)
 
 ### Fixed
 
-- Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
-- Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
-- Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
+- [internal] Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
+- [internal] Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
+- [internal] Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
 
 ## [26.4.65] - 2026-03-25
 

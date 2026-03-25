@@ -167,6 +167,7 @@ function resetMocks() {
   mocks.getUserState.mockResolvedValue(null);
   mocks.isKnownActiveUser.mockReturnValue(false);
   mocks.isStagingHost.mockReturnValue(false);
+  mocks.createBotResponse.mockReturnValue(undefined);
 }
 
 describe('proxy.ts middleware', () => {
@@ -235,10 +236,13 @@ describe('proxy.ts middleware', () => {
         headers: { 'x-vercel-ip-country': 'DE' },
         cookies: { jv_cc_required: '1' },
       });
-      const _res = await callMiddleware(req);
+      const res = await callMiddleware(req);
 
       // isCookieBannerRequired should still be called
       expect(mocks.isCookieBannerRequired).toHaveBeenCalled();
+      // Cookie should NOT be re-set when the existing value already matches
+      const cookies = getResponseCookies(res);
+      expect(cookies.jv_cc_required).toBeUndefined();
     });
   });
 
