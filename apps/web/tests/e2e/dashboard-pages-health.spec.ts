@@ -13,6 +13,7 @@ import { assertFastPageLoad } from './utils/performance-assertions';
 import {
   isTransientNavigationError,
   SMOKE_TIMEOUTS,
+  setupPageMonitoring,
   smokeNavigateWithRetry,
   waitForHydration,
   waitForNetworkIdle,
@@ -186,8 +187,13 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 
     const results: PageHealthResult[] = [];
 
+    // Safety guard: prevent silent test disablement if route matrix is emptied
+    expect(ACTIVE_HEALTH_PAGES.length).toBeGreaterThan(0);
+
     for (const pageConfig of ACTIVE_HEALTH_PAGES) {
       const startTime = Date.now();
+      // Per-page monitoring: fresh listeners per page for clean error isolation
+      const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {
         // Navigate to the page
@@ -206,6 +212,36 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         }
 
         const loadTimeMs = Date.now() - startTime;
+
+        // Check console errors + uncaught exceptions BEFORE redirect logic.
+        // Even redirected pages can generate real errors during navigation.
+        const monitorContext = getContext();
+        if (
+          monitorContext.criticalErrors.length > 0 ||
+          monitorContext.uncaughtExceptions.length > 0
+        ) {
+          // Attach diagnostics but don't fail yet — collect for summary
+          await testInfo.attach(`console-errors-${pageConfig.name}`, {
+            body: JSON.stringify(
+              {
+                criticalErrors: monitorContext.criticalErrors,
+                uncaughtExceptions: monitorContext.uncaughtExceptions,
+                networkDiagnostics: monitorContext.networkDiagnostics,
+              },
+              null,
+              2
+            ),
+            contentType: 'application/json',
+          });
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Console errors: ${[...monitorContext.criticalErrors, ...monitorContext.uncaughtExceptions].join('; ')}`,
+          });
+          continue;
+        }
 
         // Check if we were redirected
         const currentUrl = page.url();
@@ -342,6 +378,30 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             }
           }
 
+          // Verify Clerk UI loaded (UserButton is interactive, not stuck loading)
+          const userButtonLoaded = await page
+            .locator('[data-testid="user-button-loaded"]')
+            .first()
+            .isVisible({ timeout: 5_000 })
+            .catch(() => false);
+          if (!userButtonLoaded) {
+            const screenshot = await page.screenshot().catch(() => null);
+            if (screenshot) {
+              await testInfo.attach(`clerk-ui-missing-${pageConfig.name}`, {
+                body: screenshot,
+                contentType: 'image/png',
+              });
+            }
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'fail',
+              loadTimeMs,
+              error: 'Clerk UI not loaded: user-button-loaded not visible',
+            });
+            continue;
+          }
+
           // CI-only performance budget (dev/Turbopack timing is unreliable)
           if (process.env.CI && loadTimeMs) {
             const budget =
@@ -368,6 +428,9 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
+      } finally {
+        // Always clean up listeners before next page to prevent cross-contamination
+        cleanup();
       }
     }
 
@@ -517,22 +580,16 @@ test.describe('Admin Pages Health Check @smoke', () => {
   test('All admin pages load without errors', async ({ page }, testInfo) => {
     test.setTimeout(FAST_ITERATION ? 300_000 : 600_000);
 
-    // Capture browser console errors for debugging page failures
-    const consoleErrors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(`[console.error] ${msg.text()}`);
-      }
-    });
-    page.on('pageerror', err => {
-      consoleErrors.push(`[pageerror] ${err.message}\n${err.stack ?? ''}`);
-    });
-
     const results: PageHealthResult[] = [];
     let hasAdminAccess = true;
 
+    // Safety guard: prevent silent test disablement if route matrix is emptied
+    expect(ACTIVE_ADMIN_PAGES.length).toBeGreaterThan(0);
+
     for (const pageConfig of ACTIVE_ADMIN_PAGES) {
       const startTime = Date.now();
+      // Per-page monitoring: fresh listeners per page for clean error isolation
+      const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {
         // Navigate to the page with increased timeout for admin pages
@@ -558,6 +615,34 @@ test.describe('Admin Pages Health Check @smoke', () => {
           );
           hasAdminAccess = false;
           break;
+        }
+
+        // Check console errors + uncaught exceptions BEFORE redirect logic
+        const monitorContext = getContext();
+        if (
+          monitorContext.criticalErrors.length > 0 ||
+          monitorContext.uncaughtExceptions.length > 0
+        ) {
+          await testInfo.attach(`console-errors-${pageConfig.name}`, {
+            body: JSON.stringify(
+              {
+                criticalErrors: monitorContext.criticalErrors,
+                uncaughtExceptions: monitorContext.uncaughtExceptions,
+                networkDiagnostics: monitorContext.networkDiagnostics,
+              },
+              null,
+              2
+            ),
+            contentType: 'application/json',
+          });
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Console errors: ${[...monitorContext.criticalErrors, ...monitorContext.uncaughtExceptions].join('; ')}`,
+          });
+          continue;
         }
 
         // Check for auth redirect (session expired)
@@ -654,17 +739,6 @@ test.describe('Admin Pages Health Check @smoke', () => {
             });
           }
 
-          // Log captured console errors for this page
-          if (consoleErrors.length > 0) {
-            console.log(
-              `\n🔍 Console errors on ${pageConfig.name}:\n${consoleErrors.join('\n')}`
-            );
-            await testInfo.attach(`console-errors-${pageConfig.name}`, {
-              body: consoleErrors.join('\n'),
-              contentType: 'text/plain',
-            });
-          }
-
           results.push({
             path: pageConfig.path,
             name: pageConfig.name,
@@ -680,8 +754,6 @@ test.describe('Admin Pages Health Check @smoke', () => {
             loadTimeMs,
           });
         }
-        // Clear console errors for next page
-        consoleErrors.length = 0;
       } catch (error) {
         results.push({
           path: pageConfig.path,
@@ -690,7 +762,8 @@ test.describe('Admin Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
-        consoleErrors.length = 0;
+      } finally {
+        cleanup();
       }
     }
 

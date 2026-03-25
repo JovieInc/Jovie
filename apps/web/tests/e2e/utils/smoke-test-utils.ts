@@ -48,86 +48,55 @@ export const RETRY_CONFIG = {
 
 /**
  * Patterns for console errors that are expected in test environments
- * and should not fail tests
+ * and should not fail tests.
  *
- * These patterns cover:
- * - Authentication/auth provider issues (expected without real config)
- * - Network/resource loading (non-critical)
- * - Security headers (normal in test)
- * - Framework development warnings
- * - Third-party service errors (analytics, etc.)
+ * REVIEW CRITERIA — to add a new pattern:
+ *   1. Must be vendor-specific or framework noise, NOT app code
+ *   2. Use the exact error text, not a broad substring
+ *   3. Add a comment explaining why it's expected
+ *
+ * If you're tempted to add a broad word like 'clerk' or '404', stop —
+ * that swallows real errors. Be specific.
  */
 export const EXPECTED_ERROR_PATTERNS = [
-  // Auth/Clerk related
-  'clerk',
-  'handshake',
-  'authentication',
-  'test-pass-',
-  'publishable key',
-  'unauthorized',
-  // Network/resource loading (non-critical)
-  'failed to load resource',
-  'net::err_',
-  'net::err_failed',
-  'net::err_connection_refused',
-  'net::err_name_not_resolved',
-  'fetch failed',
-  '404',
-  // Chunk loading errors (Turbopack dev environment)
-  'chunkloaderror',
-  'failed to load chunk',
-  'web vitals',
-  // CSP and security headers (expected in test)
-  'content security policy',
-  'csp',
-  'blocked by cors',
-  'cross-origin',
-  // React/Next.js development warnings
-  'warning:',
-  'hydration',
-  'text content does not match',
-  'server rendered html',
-  'did not match',
-  'extra attributes from the server',
-  // Nonce mismatches in test environment
-  'nonce',
-  // Test environment indicators
-  'test environment',
-  'mock data',
-  'dummy',
-  'placeholder',
-  // Analytics (not critical for smoke)
-  'analytics',
-  'tracking',
-  'posthog',
-  'mixpanel',
-  'segment',
-  // Vercel-specific
-  'vercel',
-  '__vercel',
-  // Image/media loading errors
-  'i.scdn.co', // Spotify CDN
-  'image',
-  'loading image',
-  // Sentry/monitoring
-  'sentry',
-  'dsn',
-  // Database/API errors in CI (expected without DB)
-  'database',
-  'connection',
-  'prisma',
-  'drizzle',
-  // WebSocket/realtime
-  'websocket',
-  'socket',
-  // Third-party scripts
-  'google',
-  'facebook',
-  'twitter',
-  'stripe',
-  // Browser-specific
-  'deprecated',
-  'passive event listener',
+  // Clerk dev-mode specific messages (safe to ignore in test)
+  'clerk: clerk has been loaded with development keys', // dev publishable key warning
+  'clerk: the request to /v1/client/handshake', // handshake 400 in dev-browser-missing mode
+  'publishable key', // Clerk publishable key mismatch warning
+  'test-pass-', // Clerk test-mode password prefix
+
+  // Network errors from browser-level failures (not app bugs)
+  'net::err_', // Chrome network-level failures (ERR_FAILED, ERR_CONNECTION_REFUSED, etc.)
+
+  // Chunk loading (Turbopack/webpack dev environment hot reload)
+  'chunkloaderror', // dynamic import fails during hot reload
+  'failed to load chunk', // same, different phrasing
+
+  // CSP and security headers (expected in test/dev)
+  'content security policy', // CSP violations from dev tooling
+  'blocked by cors', // CORS blocks on third-party scripts in dev
+
+  // Framework development warnings (console.warn, not errors)
+  'warning:', // React/Next.js dev warnings (printed via console.warn)
+
+  // Nonce mismatches (Next.js CSP nonce in dev)
+  'nonce', // script nonce mismatch between server/client in dev
+
+  // Analytics SDK noise (not critical for smoke tests)
+  'posthog', // PostHog SDK init/config messages
+
+  // Vercel dev/preview environment
+  '__vercel', // Vercel toolbar/analytics dev scripts
+
+  // Sentry SDK noise
+  'sentry', // Sentry SDK init warnings, DSN config messages
+
+  // Spotify CDN image loading (external CDN, flaky in CI)
+  'i.scdn.co', // Spotify image CDN 403/404s
+
+  // Browser-specific noise
+  'passive event listener', // Chrome passive event listener warnings
+
   // Next.js internals — redirect() causes negative performance marks
   'negative time stamp',
 ] as const;

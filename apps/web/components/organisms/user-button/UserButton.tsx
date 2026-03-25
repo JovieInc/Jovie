@@ -296,28 +296,36 @@ export function UserButton({
   if (!isLoaded || !user) {
     if (trigger) {
       return (
-        <CommonDropdown
-          variant='dropdown'
-          items={[]}
-          trigger={trigger}
-          align='start'
-          open={isMenuOpen}
-          onOpenChange={setIsMenuOpen}
-          disabled
-          contentClassName='w-[220px]'
-        />
+        <div data-testid='user-button-loading'>
+          <CommonDropdown
+            variant='dropdown'
+            items={[]}
+            trigger={trigger}
+            align='start'
+            open={isMenuOpen}
+            onOpenChange={setIsMenuOpen}
+            disabled
+            contentClassName='w-[220px]'
+          />
+        </div>
       );
     }
 
     return showUserInfo ? (
-      <div className='flex w-full items-center gap-2 rounded-md px-2 py-1'>
+      <div
+        data-testid='user-button-loading'
+        className='flex w-full items-center gap-2 rounded-md px-2 py-1'
+      >
         <div className='h-6 w-6 shrink-0 rounded-full bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         <div className='flex-1'>
           <div className='h-3 w-20 rounded-sm bg-sidebar-accent animate-pulse motion-reduce:animate-none' />
         </div>
       </div>
     ) : (
-      <div className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none' />
+      <div
+        data-testid='user-button-loading'
+        className='h-10 w-10 shrink-0 rounded-full bg-surface-2 animate-pulse motion-reduce:animate-none'
+      />
     );
   }
 
@@ -382,7 +390,7 @@ export function UserButton({
     ));
 
   return (
-    <>
+    <div data-testid='user-button-loaded'>
       <CommonDropdown
         variant='dropdown'
         items={dropdownItems}
@@ -397,6 +405,6 @@ export function UserButton({
         onClose={() => setIsFeedbackOpen(false)}
         onSubmit={handleFeedbackSubmit}
       />
-    </>
+    </div>
   );
 }
