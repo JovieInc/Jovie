@@ -18,6 +18,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Redesign homepage from 11 sections to 6 cinematic layout — centered hero with claim form left and phone right, sticky phone product tour with scroll-driven mode transitions, logo bar z-index wipe effect, simplified text-left/screenshot-right feature sections
 - Simplify final CTA to centered claim form with "Claim your handle" headline
 
+### Fixed
+
+- Fix product screenshots capturing dev toolbars (DevToolbar, TanStack Query DevTools, Vercel toolbar, Next.js overlays) by expanding `hideTransientUI()` to cover all known dev overlays
+- Add `assertNoDevOverlays()` assertion to all screenshot specs to catch future overlay regressions before capture
+
 ### Removed
 
 - Remove ValuePropsSection, PhoneProfileDemo, AiSection, PricingSection, TestimonialsSection, and FaqSection from homepage — pricing moves to nav, FAQ to /support

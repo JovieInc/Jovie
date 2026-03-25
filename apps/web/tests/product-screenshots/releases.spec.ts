@@ -14,6 +14,7 @@
 
 import { expect, test } from '@playwright/test';
 import {
+  assertNoDevOverlays,
   hideTransientUI,
   OUTPUT_DIR,
   TIMEOUTS,
@@ -38,6 +39,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/releases-dashboard-full.png`,
@@ -72,6 +74,7 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
     });
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/releases-dashboard-sidebar.png`,
