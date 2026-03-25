@@ -35,23 +35,38 @@
       "@jovie/ui/*": ["../../packages/ui/*"]
     }
   },
+  // Add new source directories here — files outside these paths won't be typechecked.
+  // Test/script files are typechecked separately via tsconfig.test.json.
   "include": [
-    "**/*.ts",
-    "**/*.tsx",
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "types/**/*.ts",
+    "types/**/*.d.ts",
+    "constants/**/*.ts",
+    "content/**/*.ts",
+    "contexts/**/*.ts",
+    "contexts/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "styles/**/*.ts",
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    "tests/types/**/*.d.ts",
     ".next/dev/types/**/*.ts",
-    ".next/dev/dev/types/**/*.ts"
+    ".next/dev/dev/types/**/*.ts",
+    "tests/types/**/*.d.ts",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "sentry.server.config.ts",
+    "sentry.edge.config.ts"
   ],
   "exclude": [
     "node_modules",
-    "supabase/functions",
     // Next.js auto-generated validator file is noisy/unstable (unused @ts-expect-error); exclude for consistent typecheck.
     ".next/types/validator.ts",
-    "vitest.config.ts",
-    "vitest.config.fast.ts",
-    "**/*.stories.*",
-    "storybook-static"
+    "**/*.stories.*"
   ]
 }
