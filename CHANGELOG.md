@@ -11,11 +11,18 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Fix auth not loading on production and staging by reverting Clerk proxy from SDK `frontendApiProxy` back to Vercel rewrite
 - Add locally bundled Clerk UI to dashboard provider for consistent auth rendering
+- Center logo relative to Clerk sign-in card by moving it inside the form wrapper container
 
 ## [26.4.61] - 2026-03-24
 
+### Fixed
+
+- Disable waitlist gate so all signups go straight to onboarding — removes the waitlist form trap where users submitted and got stuck in a refresh loop
+- Fix proxy error fallbacks to route to onboarding instead of a dead waitlist page on DB failure or missing Clerk identity
+
 ### Changed
 
+- Profile V2 layout is now the default for all artist profiles (Statsig gate can still override)
 - [internal] Skip Statsig feature flag evaluation in dev mode to reduce request overhead — all flags return defaults, matching existing behavior when no server secret is configured
 
 ## [26.4.60] - 2026-03-24
