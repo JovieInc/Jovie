@@ -223,6 +223,7 @@ function SidebarHeaderNav({
               <BrandLogo
                 size={16}
                 tone='auto'
+                rounded={false}
                 className='rounded-sm shrink-0'
               />
               <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>

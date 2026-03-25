@@ -49,7 +49,7 @@ export function BrandLogo({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0',
+        'inline-flex shrink-0 overflow-hidden',
         rounded ? 'rounded-full' : undefined,
         TONE_CLASSES[tone],
         className
