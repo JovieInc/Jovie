@@ -257,7 +257,10 @@ export default function PricingPage() {
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
-      <script type='application/ld+json'>{PRICING_SCHEMA}</script>
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: PRICING_SCHEMA }}
+      />
 
       <MarketingHero variant='left'>
         <p className='marketing-kicker'>Pricing</p>

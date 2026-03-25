@@ -61,8 +61,14 @@ const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
 export default function SupportPage() {
   return (
     <>
-      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
-      <script type='application/ld+json'>{BREADCRUMB_SCHEMA}</script>
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: FAQ_SCHEMA }}
+      />
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: BREADCRUMB_SCHEMA }}
+      />
 
       <MarketingHero variant='left'>
         <p className='marketing-kicker'>Support</p>

@@ -237,10 +237,22 @@ export default function HomePage() {
       <AuthRedirectHandler />
 
       {/* Structured Data */}
-      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
-      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
-      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      <script type='application/ld+json'>{HOME_FAQ_SCHEMA}</script>
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
+      />
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
+      />
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
+      />
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: HOME_FAQ_SCHEMA }}
+      />
 
       {/* 1. Hero */}
       <HeroScrollSection />

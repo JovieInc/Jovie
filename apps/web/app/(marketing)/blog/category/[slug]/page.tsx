@@ -98,7 +98,10 @@ export default async function CategoryPage({
 
   return (
     <>
-      <script type='application/ld+json'>{breadcrumbSchema}</script>
+      <script
+        type='application/ld+json'
+        dangerouslySetInnerHTML={{ __html: breadcrumbSchema }}
+      />
 
       <div className='min-h-screen'>
         {/* Hero */}
