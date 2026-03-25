@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
-- Conductor workspace archive script
+- Workspace archive script
 
 ### Changed
 
@@ -29,17 +29,17 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
-- Conductor run script no longer double-wraps Doppler secrets
+- Run script no longer double-wraps secrets
 
 ## [26.4.7] - 2026-03-18
 
 ### Added
 
-- Non-interactive cleanup mode for E2E test accounts
+- New cleanup mode for test accounts
 
 ### Changed
 
-- Admin tables now use identical bulk actions toolbar UX
+- Tables now use identical bulk actions toolbar UX
 `;
 
 const EMPTY_UNRELEASED = `# Changelog
@@ -102,7 +102,7 @@ describe('parseChangelog', () => {
     expect(result.releases[0].version).toBe('26.4.8');
     expect(result.releases[0].date).toBe('2026-03-18');
     expect(result.releases[0].sections.added).toEqual([
-      'Conductor workspace archive script',
+      'Workspace archive script',
     ]);
     expect(result.releases[0].sections.changed).toHaveLength(2);
     expect(result.releases[0].sections.fixed).toHaveLength(1);

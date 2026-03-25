@@ -68,8 +68,11 @@ const INTERNAL_PATTERNS = [
   /\bscreenshot spec\b/i,
   /\bscreenshot pipeline\b/i,
 
-  // Technical internals
-  /\bSDK\b/,
+  // Technical internals (SDK only when paired with vendor context)
+  /\bClerk SDK\b/i,
+  /\bVercel SDK\b/i,
+  /\bSentry SDK\b/i,
+  /\bAI SDK\b/i,
   /\bmiddleware\b/i,
   /\bCSP\b/,
   /\bNODE_ENV\b/,
@@ -94,8 +97,9 @@ const INTERNAL_PATTERNS = [
   /\boutreach email\b/i,
   /\blead pipeline\b/i,
 
-  // Dollar amounts
-  /\$\d+/,
+  // Dollar amounts in internal cost/budget contexts (not user-facing pricing)
+  /\bbudget\b.*\$\d+/i,
+  /\$\d+.*\b(budget|cost)\b/i,
 
   // Dependency version bumps (e.g., "10.39.0 → 10.45.0" or "v6.4.1")
   /\d+\.\d+\.\d+\s*→\s*\d+\.\d+\.\d+/,
