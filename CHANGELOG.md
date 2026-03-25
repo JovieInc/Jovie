@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.66] - 2026-03-25
+
+### Changed
+
+- Unified hero and sticky phone tour into one continuous scroll experience — phone persists from hero through all 4 mode transitions, then logo bar wipes it away
+- Hero content (headline, claim form) is now the first "slide" that crossfades into tour mode panels as you scroll
+- HeroCinematic is now mobile-only; desktop uses the unified sticky section
+
+### Fixed
+
+- Fix scroll infrastructure: split body/html overflow rules so `overflow-x:clip` isn't promoted to `hidden` (which broke `position:sticky`)
+- Fix scroll-reveal system: `reveal-js` class was never added to document root, so entrance animations never activated
+- Fix MobileNav scroll lock cleanup: use `removeProperty` instead of empty string to prevent ghost inline styles
+
 ## [26.4.65] - 2026-03-25
 
 ### Changed
