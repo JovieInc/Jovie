@@ -5,17 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.69] - 2026-03-25
+## [26.4.70] - 2026-03-25
 
 ### Fixed
 
-- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — `getCachedAuth()` already opts into dynamic rendering via `headers()`, and removing it unblocks future PPR optimization
-- [internal] Add missing `dashboardLoadError` check to insights page — previously silently fell through to client-side errors instead of showing `PageErrorState`
-- [internal] Replace direct `Sentry.captureException` with `captureError()` utility in earnings page for consistency
-- [internal] Fix hardcoded `/app/insights` redirect URL to use `APP_ROUTES.INSIGHTS` constant
-- [internal] Wrap presence page content in Suspense boundary so the skeleton streams instantly instead of blocking until all data resolves
+- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — unblocks future PPR optimization
+- [internal] Add missing `dashboardLoadError` check to insights page
+- [internal] Replace direct `Sentry.captureException` with `captureError()` in earnings page
+- [internal] Fix hardcoded `/app/insights` and `/onboarding` redirect URLs to use route constants
+- [internal] Wrap presence page in Suspense boundary for instant skeleton streaming
+- [internal] Replace `logger.error` with `captureError` in audience and insights catch blocks
+- [internal] Show error state instead of fake empty state when DSP presence data fails to load
+
+## [26.4.69] - 2026-03-25
+
+### Changed
+
+- Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
 
 ## [26.4.68] - 2026-03-25
+
+### Added
+
+- [internal] Add AI chat eval framework with 16 golden cases testing music industry knowledge accuracy, voice compliance, and prompt injection guards
+- [internal] Add 30+ unit tests for chat components (ChatInput, ChatMessage, ChatMarkdown, SuggestedPrompts, intent classification, knowledge retrieval, etc.)
+- [internal] Extract tool schemas into shared `tool-schemas.ts` for eval runner reuse without importing execute functions
+- [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
+- [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
 
 ### Changed
 
