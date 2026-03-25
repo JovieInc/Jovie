@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.61] - 2026-03-24
+
+### Fixed
+
+- Disable waitlist gate so all signups go straight to onboarding — removes the waitlist form trap where users submitted and got stuck in a refresh loop
+- Fix proxy error fallbacks to route to onboarding instead of a dead waitlist page on DB failure or missing Clerk identity
+
 ## [26.4.60] - 2026-03-24
 
 ### Fixed
