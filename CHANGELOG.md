@@ -11,6 +11,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
 
+### Fixed
+
+- [internal] Clear stale Turbopack cache during setup to prevent `@clerk/ui` module resolution failures in dev mode
+
 ## [26.4.68] - 2026-03-25
 
 ### Added

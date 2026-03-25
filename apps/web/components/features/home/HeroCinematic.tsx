@@ -23,7 +23,7 @@ export function HeroCinematic() {
                   Built for independent artists
                 </p>
 
-                <h1 className='marketing-h1-linear mt-5 text-primary-token lg:text-left'>
+                <h1 className='marketing-h1-linear hero-gradient-text mt-5 lg:text-left'>
                   The link your music deserves.
                 </h1>
 
@@ -46,7 +46,8 @@ export function HeroCinematic() {
                 <div
                   className='animate-hero-phone-float'
                   style={{
-                    filter: 'drop-shadow(0 25px 60px rgba(0,0,0,0.35))',
+                    filter:
+                      'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))',
                   }}
                 >
                   <PhoneShowcase activeIndex={0} modes={MODES} />
