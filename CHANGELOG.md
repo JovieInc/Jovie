@@ -12,6 +12,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Disable waitlist gate so all signups go straight to onboarding — removes the waitlist form trap where users submitted and got stuck in a refresh loop
 - Fix proxy error fallbacks to route to onboarding instead of a dead waitlist page on DB failure or missing Clerk identity
 
+### Changed
+
+- [internal] Skip Statsig feature flag evaluation in dev mode to reduce request overhead — all flags return defaults, matching existing behavior when no server secret is configured
+
 ## [26.4.60] - 2026-03-24
 
 ### Fixed
