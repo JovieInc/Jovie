@@ -33,7 +33,10 @@ import { formatDuration } from '@/lib/utils/formatDuration';
 // ============================================================================
 
 /** Date format options for release date display */
-export const DATE_FORMAT_OPTIONS = { year: 'numeric' } as const;
+export const DATE_FORMAT_OPTIONS = {
+  month: 'short',
+  year: 'numeric',
+} as const;
 export const DATE_TOOLTIP_FORMAT_OPTIONS = {
   year: 'numeric',
   month: 'long',
@@ -258,15 +261,22 @@ export function createRightMetaCellRenderer(
     row,
   }: CellContext<ReleaseViewModel, unknown>) {
     const release = row.original;
-    const rawYear = release.releaseDate
-      ? new Date(release.releaseDate).getFullYear()
-      : null;
-    const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
-    const yearLabel = year === null ? '—' : String(year);
-    const yearTitle = year === null ? 'Unknown release year' : String(year);
+    const dateLabel = release.releaseDate
+      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        })
+      : '—';
+    const yearTitle = release.releaseDate
+      ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+      : 'Unknown release date';
 
     return (
-      <div className='grid min-w-[188px] grid-cols-[minmax(124px,1fr)_10px_28px] items-center justify-end gap-x-1.5 text-[11.5px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[206px] lg:grid-cols-[minmax(140px,1fr)_12px_30px] lg:gap-x-2'>
+      <div className='grid min-w-[208px] grid-cols-[minmax(124px,1fr)_10px_54px] items-center justify-end gap-x-1.5 text-[11.5px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[226px] lg:grid-cols-[minmax(140px,1fr)_12px_54px] lg:gap-x-2'>
         <div className='min-w-0'>
           <SmartLinkCell
             release={release}
@@ -280,10 +290,10 @@ export function createRightMetaCellRenderer(
         </div>
 
         <span
-          className='w-[28px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-tertiary-token lg:w-[30px]'
+          className='w-[54px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-tertiary-token'
           title={yearTitle}
         >
-          {yearLabel}
+          {dateLabel}
         </span>
       </div>
     );
@@ -487,10 +497,12 @@ export function renderStatsCell({
   row,
 }: CellContext<ReleaseViewModel, unknown>) {
   const release = row.original;
-  const rawYear = release.releaseDate
-    ? new Date(release.releaseDate).getFullYear()
+  const dateStr = release.releaseDate
+    ? new Date(release.releaseDate).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric',
+      })
     : null;
-  const year = rawYear !== null && !Number.isNaN(rawYear) ? rawYear : null;
 
   return (
     <div className='flex items-center gap-2 text-[13px] tabular-nums text-secondary-token'>
@@ -499,8 +511,8 @@ export function renderStatsCell({
         <PopularityIcon popularity={release.spotifyPopularity} />
       </div>
 
-      {/* Year - fixed width, right aligned */}
-      <span className='w-10 text-right'>{year ?? 'Unknown'}</span>
+      {/* Date - fixed width, right aligned */}
+      <span className='w-[54px] text-right text-[9.5px]'>{dateStr ?? '—'}</span>
     </div>
   );
 }

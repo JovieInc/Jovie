@@ -300,7 +300,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
-      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px] border-b')}
+      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px]')}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons
