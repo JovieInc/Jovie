@@ -255,7 +255,12 @@ export function PricingComparisonChart() {
         <select
           aria-label='Select plan to compare'
           value={selectedPlan}
-          onChange={e => setSelectedPlan(e.target.value as PlanColumn)}
+          onChange={e => {
+            const val = e.target.value;
+            if (planOptions.some(o => o.id === val)) {
+              setSelectedPlan(val as PlanColumn);
+            }
+          }}
           className='w-full rounded-lg px-4 py-2.5 text-[14px] font-medium appearance-none cursor-pointer'
           style={{
             backgroundColor: 'var(--linear-bg-surface-1)',
