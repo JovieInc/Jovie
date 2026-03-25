@@ -83,8 +83,9 @@ export const EXPECTED_ERROR_PATTERNS = [
   // Framework development warnings (console.warn, not errors)
   'warning:', // React/Next.js dev warnings (printed via console.warn)
 
-  // WebSocket/HMR noise in dev environment
-  'websocket', // Turbopack/webpack HMR WebSocket errors in dev
+  // WebSocket/HMR noise in dev environment (scoped to dev server, not product WebSockets)
+  'ws://localhost', // Turbopack/webpack HMR WebSocket connection failures in dev
+  'webpack-hmr', // Webpack HMR WebSocket protocol errors
 
   // Nonce mismatches (Next.js CSP nonce in dev)
   'nonce', // script nonce mismatch between server/client in dev

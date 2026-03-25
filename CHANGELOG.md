@@ -9,12 +9,12 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
-- Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
-- Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
-- Expand nightly E2E config to include dashboard health tests across all 5 browser projects
-- Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
-- Add safety guards preventing silent test disablement when route matrices are empty
+- [internal] Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
+- [internal] Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
+- [internal] Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
+- [internal] Expand nightly E2E config to include dashboard health tests across all 5 browser projects
+- [internal] Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
+- [internal] Add safety guards preventing silent test disablement when route matrices are empty
 
 ## [26.4.69] - 2026-03-25
 
