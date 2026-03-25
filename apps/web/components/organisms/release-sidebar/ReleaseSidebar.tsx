@@ -572,7 +572,7 @@ export function ReleaseSidebar({
                   variant='compact'
                   releaseDate={release.releaseDate}
                   onNavigateToFullPage={() => {
-                    window.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+                    globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
                   }}
                 />
               )}

@@ -9,7 +9,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const CLERK_PREFIXES = ['__clerk', '__session', '__client', '__refresh'];
 
 /** Explicit app cookies to delete */
-const APP_COOKIES = [
+const APP_COOKIES = new Set([
   'jv_cc',
   'jv_cc_required',
   'jv_city',
@@ -22,7 +22,7 @@ const APP_COOKIES = [
   'jovie_impersonate',
   'jovie_dsp',
   '__investor_token',
-];
+]);
 
 /** Cookies to preserve (gates toolbar visibility in production) */
 const PRESERVE_PREFIXES = ['__dev_toolbar'];
@@ -50,7 +50,7 @@ export async function POST() {
     if (PRESERVE_PREFIXES.some(p => name.startsWith(p))) continue;
 
     const isClerkCookie = CLERK_PREFIXES.some(p => name.startsWith(p));
-    const isAppCookie = APP_COOKIES.includes(name);
+    const isAppCookie = APP_COOKIES.has(name);
 
     if (isClerkCookie || isAppCookie) {
       cookieStore.delete(name);
