@@ -37,9 +37,7 @@ test.describe('Pricing Page', () => {
     await expect(page).toHaveTitle(/Pricing|Jovie/);
 
     // Check main heading
-    await expect(page.locator('h1')).toHaveText(
-      'Simple pricing. No surprises.'
-    );
+    await expect(page.locator('h1')).toHaveText('Pricing');
 
     // Check that pricing tiers are visible
     await expect(page.getByText('Free').first()).toBeVisible();
