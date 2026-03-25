@@ -30,7 +30,7 @@ export function verifyUnsubscribeToken(token: string): string | null {
     deriveSecretLegacy(),
     MAC_HEX_LENGTH_LEGACY
   );
-  if (!payload || !payload.includes('@')) return null;
+  if (!payload?.includes('@')) return null;
   return payload;
 }
 

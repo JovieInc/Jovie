@@ -3,6 +3,7 @@
 import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
 import { Avatar } from '@/components/molecules/Avatar';
 import { PhoneFrame } from './PhoneFrame';
@@ -33,7 +34,10 @@ export function HeroProfilePreview() {
     <div className='relative flex flex-col items-center'>
       <PhoneFrame>
         {/* Nav bar */}
-        <div className='flex items-center justify-end px-4 pt-10 pb-1'>
+        <div className='flex items-center justify-between px-4 pt-10 pb-1'>
+          <CircleIconButton size='xs' variant='surface' ariaLabel='Jovie'>
+            <BrandLogo size={14} tone='auto' rounded={false} aria-hidden />
+          </CircleIconButton>
           <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
             <Bell className='h-4 w-4' />
           </CircleIconButton>
@@ -48,7 +52,7 @@ export function HeroProfilePreview() {
               name={MOCK_ARTIST.name}
               size='display-md'
               priority
-              verified={false}
+              verified={MOCK_ARTIST.isVerified}
             />
           </div>
           <div className='mt-2.5 text-center'>

@@ -115,7 +115,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-[8px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
+            'w-full rounded-full border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
@@ -157,7 +157,7 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] text-[11px]'>
       <div className='flex items-center gap-1 py-1 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
@@ -172,7 +172,7 @@ function ActiveFilterPill({
       </div>
       <DrawerInlineIconButton
         onClick={onClear}
-        className='h-full rounded-r-[8px] px-1 py-1 text-tertiary-token'
+        className='h-full rounded-r-full px-1 py-1 text-tertiary-token'
         aria-label={`Clear ${groupLabel} filter`}
       >
         <X className='h-3 w-3' />
@@ -242,7 +242,7 @@ function SubmenuCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full rounded-[8px] border border-transparent',
+        'w-full rounded-full border border-transparent',
         checked && 'text-primary-token'
       )}
     >
@@ -586,7 +586,7 @@ export function ReleaseFilterDropdown({
                       }
                     }}
                   >
-                    <DropdownMenuSubTrigger className='justify-between rounded-[8px]'>
+                    <DropdownMenuSubTrigger className='justify-between rounded-full'>
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
@@ -641,7 +641,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='rounded-[8px] text-tertiary-token hover:text-primary-token'
+                  className='rounded-full text-tertiary-token hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],
