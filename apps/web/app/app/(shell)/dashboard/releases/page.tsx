@@ -5,6 +5,8 @@ import { ReleasesExperience } from '@/features/dashboard/organisms/release-provi
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
+import { HydrateClient, queryKeys } from '@/lib/queries';
+import { getDehydratedState, getQueryClient } from '@/lib/queries/server';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import { getDashboardData } from '../actions';
 import type { DashboardData } from '../actions/dashboard-data';
@@ -51,12 +53,24 @@ export default async function ReleasesPage() {
     redirect(APP_ROUTES.ONBOARDING);
   }
 
+  // Prefetch releases into TanStack Query for SPA navigation cache
+  const profileId = dashboardData.selectedProfile?.id;
+  if (profileId) {
+    const queryClient = getQueryClient();
+    void queryClient.prefetchQuery({
+      queryKey: queryKeys.releases.matrix(profileId),
+      queryFn: () => loadReleaseMatrix(profileId),
+    });
+  }
+
   return (
-    <ReleasesClientBoundary>
-      <Suspense fallback={<ReleaseTableSkeleton />}>
-        <ReleasesContent dashboardData={dashboardData} />
-      </Suspense>
-    </ReleasesClientBoundary>
+    <HydrateClient state={getDehydratedState()}>
+      <ReleasesClientBoundary>
+        <Suspense fallback={<ReleaseTableSkeleton />}>
+          <ReleasesContent dashboardData={dashboardData} />
+        </Suspense>
+      </ReleasesClientBoundary>
+    </HydrateClient>
   );
 }
 
