@@ -54,7 +54,7 @@ describe('getAdminFunnelMetrics outreach query', () => {
     });
   });
 
-  it('casts outreach_status to text before filtering by sent statuses', async () => {
+  it('casts outreach_status to text before filtering by queued email and sent DM statuses', async () => {
     await getAdminFunnelMetrics();
 
     expect(hoisted.whereMock).toHaveBeenCalled();
@@ -65,7 +65,7 @@ describe('getAdminFunnelMetrics outreach query', () => {
     );
 
     expect(
-      whereSql.some(sql => sql.includes("::text IN ('sent', 'dm_sent')"))
+      whereSql.some(sql => sql.includes("::text IN ('queued', 'dm_sent')"))
     ).toBe(true);
     expect(hoisted.captureError).not.toHaveBeenCalledWith(
       'Error fetching outreach sent count',

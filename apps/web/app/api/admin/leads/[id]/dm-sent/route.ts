@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
+import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -39,6 +40,8 @@ export async function PATCH(
       .set({
         dmSentAt: now,
         outreachStatus: 'dm_sent',
+        firstContactedAt: now,
+        lastContactedAt: now,
         updatedAt: now,
       })
       .where(eq(leads.id, id))
@@ -50,6 +53,16 @@ export async function PATCH(
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    await recordLeadFunnelEvent(
+      {
+        leadId: id,
+        eventType: 'dm_sent',
+        channel: 'dm',
+        campaignKey: 'claim_invite',
+      },
+      { idempotent: true }
+    );
 
     return NextResponse.json(updated, {
       status: 200,

@@ -452,6 +452,23 @@ export const leadOutreachStatusEnum = pgEnum('lead_outreach_status', [
   'dismissed',
 ]);
 
+export const leadSourcePlatformEnum = pgEnum('lead_source_platform', [
+  'linktree',
+  'beacons',
+  'laylo',
+]);
+
+export const leadAttributionStatusEnum = pgEnum('lead_attribution_status', [
+  'unattributed',
+  'attributed',
+  'expired',
+]);
+
+export const leadRampModeEnum = pgEnum('lead_ramp_mode', [
+  'manual',
+  'recommend_only',
+]);
+
 // Tip Status Enum
 export const tipStatusEnum = pgEnum('tip_status', [
   'pending',
