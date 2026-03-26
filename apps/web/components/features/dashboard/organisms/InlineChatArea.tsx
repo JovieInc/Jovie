@@ -105,10 +105,10 @@ const InlineChatMessage = memo(function InlineChatMessage({
           )}
           <div
             className={cn(
-              'max-w-[85%] rounded-2xl px-3 py-2',
+              'max-w-[85%] rounded-[12px] px-3 py-2',
               message.role === 'user'
                 ? 'bg-accent text-accent-foreground'
-                : 'bg-surface-2 text-primary-token'
+                : 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
             )}
           >
             <div className='whitespace-pre-wrap text-[13px] leading-relaxed'>
@@ -331,7 +331,7 @@ export const InlineChatArea = forwardRef<
                 <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
                   <BrandLogo size={14} tone='auto' />
                 </div>
-                <div className='rounded-2xl bg-surface-2 px-3 py-2'>
+                <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
                   <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
                 </div>
               </div>
@@ -339,7 +339,7 @@ export const InlineChatArea = forwardRef<
 
             {/* Error display */}
             {chatError && (
-              <div className='flex items-start gap-3 rounded-xl border border-error/20 bg-error-subtle p-3'>
+              <div className='flex items-start gap-3 rounded-[10px] border border-error/20 bg-error-subtle p-3'>
                 {chatError.type === 'network' ? (
                   <WifiOff className='mt-0.5 h-4 w-4 shrink-0 text-error' />
                 ) : (
@@ -356,7 +356,7 @@ export const InlineChatArea = forwardRef<
                       size='sm'
                       onClick={handleRetry}
                       disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 text-[11px]'
+                      className='mt-2 h-7 gap-1.5 rounded-[8px] text-[11px] font-[510] tracking-[-0.01em]'
                     >
                       <RefreshCw className='h-3 w-3' />
                       Try again

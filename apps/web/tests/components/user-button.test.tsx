@@ -19,6 +19,7 @@ vi.mock('@/lib/queries', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
+  usePathname: vi.fn(() => '/app'),
 }));
 
 vi.mock('@clerk/nextjs', () => ({

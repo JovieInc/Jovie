@@ -3,19 +3,16 @@ import type { ComponentPropsWithoutRef, ElementType, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
-  'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+  'border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
   {
     variants: {
       surface: {
-        default: 'rounded-[12px]',
-        details:
-          'rounded-[12px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
+        default: 'rounded-[10px]',
+        details: 'rounded-[10px]',
         marketing: 'rounded-xl',
-        nested:
-          'rounded-[10px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]',
-        settings: 'rounded-[12px] px-4 py-3 sm:px-5',
-        table:
-          'rounded-[12px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
+        nested: 'rounded-[8px]',
+        settings: 'rounded-[10px] px-4 py-3 sm:px-5',
+        table: 'rounded-[10px]',
       },
     },
     defaultVariants: {
@@ -26,7 +23,7 @@ const contentSurfaceCardVariants = cva(
 
 /** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
 export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))]';
+  'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)';
 
 export interface ContentSurfaceCardProps
   extends VariantProps<typeof contentSurfaceCardVariants> {

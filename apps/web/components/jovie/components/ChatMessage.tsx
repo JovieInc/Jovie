@@ -167,7 +167,7 @@ export function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        <div className='max-w-[78%] rounded-2xl bg-accent/95 px-4 py-3.5 text-accent-foreground'>
+        <div className='max-w-[78%] rounded-[14px] bg-accent/95 px-4 py-3 text-accent-foreground'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
               {(() => {
@@ -208,9 +208,9 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-[20px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token'>
               <div className='mb-3 flex items-center gap-2'>
-                <span className='rounded-full border border-subtle bg-surface-2/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+                <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
                 <span className='text-[11px] text-tertiary-token'>
@@ -249,7 +249,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-3 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-7 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

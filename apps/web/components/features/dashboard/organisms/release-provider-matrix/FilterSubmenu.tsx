@@ -58,7 +58,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-2'>
+    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-2'>
       <div className='relative'>
         <Icon
           name='Search'

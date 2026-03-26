@@ -157,10 +157,10 @@ export function DemoShell({
                 </SidebarGroupContent>
               </SidebarGroup>
 
-              {/* Workspace section */}
+              {/* Artist section */}
               <SidebarGroup>
                 <SidebarGroupLabel className='text-2xs tracking-tight text-sidebar-item-icon px-2 [font-weight:var(--font-weight-nav)]'>
-                  Workspace
+                  Artist
                 </SidebarGroupLabel>
                 <SidebarGroupContent>
                   <SidebarMenu className='gap-0.5'>

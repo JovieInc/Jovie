@@ -22,7 +22,7 @@ export function AudienceCountryCell({
     >
       <Icon
         name='MapPin'
-        className='h-4 w-4 text-tertiary-token'
+        className='h-3.5 w-3.5 text-tertiary-token'
         aria-hidden='true'
       />
       <span className='line-clamp-1'>

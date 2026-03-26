@@ -116,7 +116,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'location',
     header: 'Location',
     cell: renderLocationCellFromRow,
-    size: 130,
+    size: 160,
     enableSorting: false,
   }),
   memberColumnHelper.accessor('intentLevel', {
@@ -144,7 +144,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'lastAction',
     header: 'Last Action',
     cell: renderLastActionCell,
-    size: 160,
+    size: 180,
     enableSorting: true,
   }),
   memberColumnHelper.display({
@@ -191,7 +191,7 @@ const MobileCardList = memo(function MobileCardList({
           return (
             <div
               key={member.id}
-              className='absolute left-0 w-full border-b border-subtle/60'
+              className='absolute left-0 w-full border-b border-(--linear-app-frame-seam)'
               style={{
                 height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,
@@ -469,7 +469,7 @@ export const DashboardAudienceTableUnified = memo(
       (row: AudienceMember) => {
         const isSelected = selectedMember?.id === row.id;
         return cn(
-          'h-8',
+          'h-10',
           isSelected
             ? 'bg-(--linear-row-selected)'
             : 'bg-transparent hover:bg-(--linear-row-hover)'
