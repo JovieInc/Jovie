@@ -10,7 +10,6 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
@@ -85,15 +84,12 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const primaryItems = useMemo(() => {
     return primaryNavigation.map(item => {
-      if (item.id === 'profile' && artistName) {
-        return { ...item, name: artistName };
-      }
       if (item.id === 'releases' && releaseCount > 0) {
         return { ...item, badge: releaseCount };
       }
       return item;
     });
-  }, [artistName, releaseCount]);
+  }, [releaseCount]);
 
   const isDemo = pathname === APP_ROUTES.DEMO;
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
@@ -204,16 +200,11 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-0.5'>
-          <SidebarGroupLabel className='h-6 px-2.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/85'>
-            Workspace
-          </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-0.5'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
-                {index > 0 && (
-                  <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                )}
+                {index > 0 && <div className='my-1.5' />}
                 {renderSection(section.items)}
               </div>
             ))}
@@ -233,10 +224,8 @@ export function DashboardNav(_: DashboardNavProps) {
             <div className='space-y-2'>
               {adminNavigationSections.map((section, index) => (
                 <div key={section.label} data-admin-section={section.label}>
-                  {index > 0 ? (
-                    <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                  ) : null}
-                  <p className='px-2.5 pb-0.5 text-[11px] font-[510] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
+                  {index > 0 ? <div className='my-1.5' /> : null}
+                  <p className='px-2.5 pb-0.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>
                   {renderSection(section.items)}

@@ -254,7 +254,7 @@ export function DropdownShowcase() {
               data-testid='menu-label'
               className={MENU_LABEL_BASE}
             >
-              Workspace
+              Artist
             </div>
             <div
               role='menuitem'

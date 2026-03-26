@@ -221,7 +221,7 @@ export function TourDateSidebar({
         variant='ghost'
         onClick={handleDeleteClick}
         disabled={isPending}
-        className='h-8 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive'
+        className='h-8 rounded-full border border-destructive/15 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive'
       >
         <Icon name='Trash2' className='h-4 w-4' />
       </Button>
@@ -448,10 +448,10 @@ export function TourDateSidebar({
                         }
                         disabled={isPending}
                         className={cn(
-                          'flex-1 rounded-full border px-3 py-2 text-[13px] font-[510] transition-colors',
+                          'flex-1 rounded-full border px-3 py-2 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
                           formData.ticketStatus === status
-                            ? 'border-accent bg-accent/10 text-accent'
-                            : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2'
+                            ? 'border-accent/35 bg-accent/10 text-accent'
+                            : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
                         )}
                       >
                         {status === 'available' && 'On Sale'}

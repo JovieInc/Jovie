@@ -29,7 +29,7 @@ export function ChatUsageAlert() {
       <InfoBox
         title="You're out of messages for today"
         variant='error'
-        className='rounded-[16px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]'
+        className='rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
       >
         <div className='flex flex-wrap items-center justify-between gap-3'>
           <p>
@@ -57,7 +57,7 @@ export function ChatUsageAlert() {
     <InfoBox
       title="You're almost out of messages"
       variant='warning'
-      className='rounded-[16px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]'
+      className='rounded-[16px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'
     >
       <div className='flex flex-wrap items-center justify-between gap-3'>
         <p>

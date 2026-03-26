@@ -5,8 +5,8 @@ import Image from 'next/image';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerSurfaceCard } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
@@ -163,7 +163,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               className='flex w-full'
             >
               <Button
-                variant='secondary'
+                variant='ghost'
                 size='sm'
                 className='h-8 w-full justify-start rounded-full border-subtle bg-surface-0 px-3 text-[12px] font-[510]'
               >

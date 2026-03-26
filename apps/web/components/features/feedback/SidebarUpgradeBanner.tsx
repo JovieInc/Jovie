@@ -1,7 +1,9 @@
 'use client';
 
 import { BadgeCheck } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
+import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import {
   formatVerifiedPriceLabel,
@@ -15,10 +17,16 @@ import {
 } from '@/lib/queries';
 
 export function SidebarUpgradeBanner() {
+  const pathname = usePathname();
   const isPassiveRuntime = env.IS_TEST || env.IS_E2E;
+  const isDemoRoute = pathname === APP_ROUTES.DEMO;
 
-  const billingStatus = useBillingStatusQuery({ enabled: !isPassiveRuntime });
-  const pricing = usePricingOptionsQuery({ enabled: !isPassiveRuntime });
+  const billingStatus = useBillingStatusQuery({
+    enabled: !isPassiveRuntime && !isDemoRoute,
+  });
+  const pricing = usePricingOptionsQuery({
+    enabled: !isPassiveRuntime && !isDemoRoute,
+  });
   const checkoutMutation = useCheckoutMutation();
 
   const selectedPrice = useMemo(
@@ -54,6 +62,7 @@ export function SidebarUpgradeBanner() {
 
   if (
     isPassiveRuntime ||
+    isDemoRoute ||
     billingStatus.isLoading ||
     billingStatus.data?.isPro
   ) {

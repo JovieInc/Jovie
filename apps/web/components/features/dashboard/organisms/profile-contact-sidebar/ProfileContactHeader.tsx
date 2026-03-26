@@ -119,7 +119,7 @@ export function ProfileContactHeader({
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
 
   return (
-    <div className='flex items-center gap-4'>
+    <div className='flex items-start gap-2.5'>
       <ProfileAvatar
         editable={editable}
         avatarUrl={avatarUrl}
@@ -128,7 +128,7 @@ export function ProfileContactHeader({
         onAvatarUpload={onAvatarUpload}
       />
 
-      <div className='min-w-0 flex-1 space-y-1'>
+      <div className='min-w-0 flex-1 space-y-px'>
         <EditableDisplayName
           editable={editable}
           isEditing={editingField === 'displayName'}
@@ -228,7 +228,7 @@ function EditableDisplayName({
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-8 rounded-[12px] border-subtle bg-surface-2/80 px-2.5 text-[14px] font-[560]'
+        className='h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-[560]'
       />
     );
   }
@@ -237,9 +237,9 @@ function EditableDisplayName({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-[15px] font-[560] tracking-[-0.016em] text-primary-token',
+        'block w-full truncate text-left text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token',
         editable &&
-          '-mx-1 rounded-[10px] px-1 py-0.5 transition-colors hover:bg-surface-2/80 cursor-text'
+          '-mx-1 rounded-[8px] px-1 py-0.5 transition-colors hover:bg-surface-0 cursor-text'
       )}
       onClick={editable ? onStartEdit : undefined}
       disabled={!editable}
@@ -284,7 +284,7 @@ function EditableUsername({
         }}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-7 rounded-full border-subtle bg-surface-2/80 px-2.5 text-[11px]'
+        className='h-7 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[11px]'
       />
     );
   }
@@ -293,7 +293,7 @@ function EditableUsername({
     <button
       type='button'
       className={cn(
-        'inline-flex max-w-full items-center truncate rounded-full border border-subtle bg-surface-2/70 px-2.5 py-1 text-[11px] font-medium text-secondary-token',
+        'inline-flex max-w-full items-center truncate rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[11px] font-[510] text-secondary-token',
         editable &&
           'transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token cursor-text'
       )}

@@ -3,12 +3,11 @@
 /**
  * Handle Validation Hook
  *
- * Validates handle format client-side and checks availability via
- * useHandleAvailabilityQuery (TanStack Query) with debounced input.
+ * Validates handle format client-side and checks availability with a
+ * debounced fetch to the handle API.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useHandleAvailabilityQuery } from '@/lib/queries';
 
 export interface HandleValidationResult {
   handleError: string | null;
@@ -21,16 +20,77 @@ export interface HandleValidationResult {
 
 /** Debounce before hitting the API */
 const DEBOUNCE_MS = 400;
+const CACHE_TTL_MS = 30 * 1000;
+const REQUEST_TIMEOUT_MS = 5000;
+
+interface HandleAvailabilityResponse {
+  readonly available: boolean;
+  readonly error: string | null;
+}
+
+interface HandleAvailabilityState {
+  readonly data: HandleAvailabilityResponse | null;
+  readonly isError: boolean;
+  readonly isFetching: boolean;
+}
+
+const availabilityCache = new Map<
+  string,
+  {
+    readonly expiresAt: number;
+    readonly value: HandleAvailabilityResponse;
+  }
+>();
+
+async function fetchHandleAvailability(
+  handle: string,
+  signal: AbortSignal
+): Promise<HandleAvailabilityResponse> {
+  const response = await fetch(
+    `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
+    {
+      headers: {
+        Accept: 'application/json',
+      },
+      signal,
+    }
+  );
+
+  const payload = (await response.json().catch(() => null)) as {
+    available?: boolean;
+    error?: string;
+  } | null;
+
+  if (!response.ok) {
+    return {
+      available: false,
+      error: payload?.error ?? 'Network error - try again',
+    };
+  }
+
+  return {
+    available: payload?.available === true,
+    error: typeof payload?.error === 'string' ? payload.error : null,
+  };
+}
 
 /**
  * Hook for validating handle format and availability.
  *
- * Uses TanStack Query (useHandleAvailabilityQuery) for the API call,
- * with a debounced input value to avoid excessive requests while typing.
+ * Uses a debounced fetch with a short in-memory cache to avoid excessive
+ * requests while typing.
  */
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [debouncedHandle, setDebouncedHandle] = useState('');
+  const [availabilityState, setAvailabilityState] =
+    useState<HandleAvailabilityState>({
+      data: null,
+      isError: false,
+      isFetching: false,
+    });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   // Client-side handle validation
   const handleError = useMemo(() => {
@@ -71,28 +131,110 @@ export function useHandleValidation(handle: string): HandleValidationResult {
 
   const isValidHandle = Boolean(handle) && !handleError;
 
-  const { data, isFetching, isError } = useHandleAvailabilityQuery({
-    handle: debouncedHandle || null,
-    enabled: isValidHandle && debouncedHandle.length >= 3,
-  });
+  useEffect(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+
+    if (!isValidHandle || debouncedHandle.length < 3) {
+      setAvailabilityState({
+        data: null,
+        isError: false,
+        isFetching: false,
+      });
+      return;
+    }
+
+    const normalizedHandle = debouncedHandle.toLowerCase();
+    const cached = availabilityCache.get(normalizedHandle);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      setAvailabilityState({
+        data: cached.value,
+        isError: false,
+        isFetching: false,
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    const requestId = requestIdRef.current + 1;
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    requestIdRef.current = requestId;
+    abortRef.current = controller;
+    setAvailabilityState(current => ({
+      data: current.data,
+      isError: false,
+      isFetching: true,
+    }));
+
+    void fetchHandleAvailability(normalizedHandle, controller.signal)
+      .then(result => {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
+          return;
+        }
+
+        availabilityCache.set(normalizedHandle, {
+          expiresAt: Date.now() + CACHE_TTL_MS,
+          value: result,
+        });
+        setAvailabilityState({
+          data: result,
+          isError: false,
+          isFetching: false,
+        });
+      })
+      .catch(() => {
+        if (controller.signal.aborted || requestIdRef.current !== requestId) {
+          return;
+        }
+
+        setAvailabilityState({
+          data: null,
+          isError: true,
+          isFetching: false,
+        });
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        if (abortRef.current === controller) {
+          abortRef.current = null;
+        }
+      });
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+      }
+    };
+  }, [debouncedHandle, isValidHandle]);
 
   const cancel = useCallback(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
+    abortRef.current?.abort();
+    abortRef.current = null;
     setDebouncedHandle('');
+    setAvailabilityState({
+      data: null,
+      isError: false,
+      isFetching: false,
+    });
   }, []);
 
   // Determine checking state: either debounce is pending or query is fetching
   const isDebouncing = isValidHandle && handle !== debouncedHandle;
-  const checkingAvail = isDebouncing || isFetching;
+  const checkingAvail = isDebouncing || availabilityState.isFetching;
 
   // Determine availability and error from query result
-  const available = data?.available ?? null;
-  const availError = isError
-    ? 'Network error \u2014 try again'
-    : (data?.error ?? null);
+  const available = availabilityState.data?.available ?? null;
+  const availError = availabilityState.isError
+    ? 'Network error - try again'
+    : (availabilityState.data?.error ?? null);
 
   return {
     handleError,

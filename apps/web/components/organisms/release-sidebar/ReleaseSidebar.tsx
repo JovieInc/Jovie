@@ -78,7 +78,7 @@ const SIDEBAR_TAB_OPTIONS = [
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)]'
+  'overflow-hidden'
 );
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
@@ -534,11 +534,11 @@ export function ReleaseSidebar({
             analyticsOverride={analyticsOverride}
           />
 
-          <DrawerSurfaceCard
-            className={RELEASE_SIDEBAR_CARD_CLASSNAME}
-            testId='release-tab-panel-card'
+          <div
+            className='space-y-2.5 pt-0.5'
+            data-testid='release-tab-panel-card'
           >
-            <div className='border-b border-(--linear-app-frame-seam) px-2.5 py-1.5'>
+            <div className='px-1.5'>
               <DrawerTabs
                 value={activeTab}
                 onValueChange={value => setActiveTab(value as SidebarTab)}
@@ -547,76 +547,74 @@ export function ReleaseSidebar({
               />
             </div>
 
-            <div className='space-y-2 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_92%,transparent)] p-2'>
-              {activeTab === 'tracklist' && (
-                <ReleaseTrackList
-                  release={release}
-                  onTrackClick={handleTrackClick}
-                  tracksOverride={tracksOverride}
-                />
-              )}
+            {activeTab === 'tracklist' && (
+              <ReleaseTrackList
+                release={release}
+                onTrackClick={handleTrackClick}
+                tracksOverride={tracksOverride}
+              />
+            )}
 
-              {activeTab === 'links' && (
-                <ReleaseDspLinks
-                  release={release}
-                  providerConfig={providerConfig}
-                  isEditable={isEditable}
-                  isAddingLink={isAddingLink}
-                  newLinkUrl={newLinkUrl}
-                  selectedProvider={selectedProvider}
-                  isAddingDspLink={isAddingDspLink}
-                  isRemovingDspLink={isRemovingDspLink}
-                  onSetIsAddingLink={setIsAddingLink}
-                  onSetNewLinkUrl={setNewLinkUrl}
-                  onSetSelectedProvider={setSelectedProvider}
-                  onAddLink={handleAddLink}
-                  onRemoveLink={handleRemoveLink}
-                  onNewLinkKeyDown={handleNewLinkKeyDown}
-                  onRescanIsrc={onRescanIsrc}
-                  isRescanningIsrc={isRescanningIsrc}
-                />
-              )}
+            {activeTab === 'links' && (
+              <ReleaseDspLinks
+                release={release}
+                providerConfig={providerConfig}
+                isEditable={isEditable}
+                isAddingLink={isAddingLink}
+                newLinkUrl={newLinkUrl}
+                selectedProvider={selectedProvider}
+                isAddingDspLink={isAddingDspLink}
+                isRemovingDspLink={isRemovingDspLink}
+                onSetIsAddingLink={setIsAddingLink}
+                onSetNewLinkUrl={setNewLinkUrl}
+                onSetSelectedProvider={setSelectedProvider}
+                onAddLink={handleAddLink}
+                onRemoveLink={handleRemoveLink}
+                onNewLinkKeyDown={handleNewLinkKeyDown}
+                onRescanIsrc={onRescanIsrc}
+                isRescanningIsrc={isRescanningIsrc}
+              />
+            )}
 
-              {activeTab === 'details' && (
-                <>
-                  <ReleaseMetadata
-                    release={release}
-                    onCanvasStatusChange={
-                      canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                    }
+            {activeTab === 'details' && (
+              <>
+                <ReleaseMetadata
+                  release={release}
+                  onCanvasStatusChange={
+                    canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                  }
+                />
+                {!readOnly && (
+                  <ReleasePitchSection
+                    releaseId={release.id}
+                    existingPitches={release.generatedPitches}
                   />
-                  {!readOnly && (
-                    <ReleasePitchSection
-                      releaseId={release.id}
-                      existingPitches={release.generatedPitches}
-                    />
-                  )}
-                </>
-              )}
+                )}
+              </>
+            )}
 
-              {activeTab === 'lyrics' && (
-                <ReleaseLyricsSection
-                  releaseId={release.id}
-                  lyrics={release.lyrics}
-                  isEditable={isEditable}
-                  isSaving={isLyricsSaving}
-                  onSaveLyrics={onSaveLyrics}
-                  onFormatLyrics={onFormatLyrics}
-                />
-              )}
+            {activeTab === 'lyrics' && (
+              <ReleaseLyricsSection
+                releaseId={release.id}
+                lyrics={release.lyrics}
+                isEditable={isEditable}
+                isSaving={isLyricsSaving}
+                onSaveLyrics={onSaveLyrics}
+                onFormatLyrics={onFormatLyrics}
+              />
+            )}
 
-              {activeTab === 'tasks' && (
-                <ReleaseTaskChecklist
-                  releaseId={release.id}
-                  variant='compact'
-                  releaseDate={release.releaseDate}
-                  onNavigateToFullPage={() => {
-                    globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
-                  }}
-                />
-              )}
-            </div>
-          </DrawerSurfaceCard>
+            {activeTab === 'tasks' && (
+              <ReleaseTaskChecklist
+                releaseId={release.id}
+                variant='compact'
+                releaseDate={release.releaseDate}
+                onNavigateToFullPage={() => {
+                  globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+                }}
+              />
+            )}
+          </div>
         </>
       )}
     </EntitySidebarShell>

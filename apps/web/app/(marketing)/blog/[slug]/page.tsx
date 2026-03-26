@@ -142,14 +142,8 @@ export default async function BlogPostRoute({
 
     return (
       <>
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{ __html: articleSchema }}
-        />
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{ __html: breadcrumbSchema }}
-        />
+        <script type='application/ld+json'>{articleSchema}</script>
+        <script type='application/ld+json'>{breadcrumbSchema}</script>
         <BlogPostPage
           post={post}
           author={author}

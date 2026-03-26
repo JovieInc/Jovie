@@ -244,7 +244,7 @@ export const AvailabilityCell = memo(function AvailabilityCell({
 
       <PopoverContent
         align='end'
-        className='w-[320px] rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_10px_24px_rgba(0,0,0,0.06)]'
+        className='w-[320px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_10px_24px_rgba(0,0,0,0.06)]'
       >
         <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
           <p className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>

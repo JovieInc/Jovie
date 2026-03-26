@@ -120,17 +120,17 @@ export function UniversalLinkInputUrlMode({
   return (
     <div className='relative w-full'>
       {isVoiceRecording ? (
-        <div className='flex w-full items-center gap-2 rounded-3xl border border-default bg-surface-1 px-2 py-1 shadow-xs'>
+        <div className='flex w-full items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-1'>
           <button
             type='button'
             onClick={onCancelVoiceRecording}
-            className='flex h-10 w-10 items-center justify-center rounded-full text-tertiary-token transition-colors hover:bg-surface-2 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+            className='flex h-10 w-10 items-center justify-center rounded-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
             aria-label='Cancel voice recording'
           >
             <X className='h-4 w-4' />
           </button>
 
-          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-2xl bg-surface-2 px-3 py-2'>
+          <div className='flex min-w-0 flex-1 items-center justify-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
             <VoiceRecordingWaveform levels={waveformLevels} />
             <span className='text-sm font-medium tabular-nums text-primary-token'>
               {recordingDurationLabel}
@@ -140,7 +140,7 @@ export function UniversalLinkInputUrlMode({
           <button
             type='button'
             onClick={onSendVoiceRecording}
-            className='flex h-10 w-10 items-center justify-center rounded-full bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
+            className='flex h-10 w-10 items-center justify-center rounded-[10px] bg-secondary-token text-primary-inverse transition-all hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-0 active:scale-95'
             aria-label='Send voice recording'
           >
             <Check className='h-4 w-4' />
@@ -149,10 +149,10 @@ export function UniversalLinkInputUrlMode({
       ) : (
         <div
           className={cn(
-            'relative flex w-full items-center gap-2 overflow-hidden bg-surface-1 px-2 py-1 shadow-xs transition-all',
+            'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
             isDropdownOpen
-              ? 'rounded-t-3xl border-2 border-b-0 border-accent'
-              : 'rounded-full border border-default focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+              ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
+              : 'rounded-[12px] border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
             disabled && 'opacity-50'
           )}
         >

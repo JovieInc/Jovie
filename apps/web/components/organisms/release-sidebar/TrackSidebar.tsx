@@ -22,13 +22,14 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { TrackMetaSummary } from './TrackMetaSummary';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 
 type TrackSidebarTab = 'details' | 'platforms';
@@ -195,40 +196,62 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
+  const trackLabel = track
+    ? track.discNumber > 1
+      ? `${track.discNumber}-${track.trackNumber}`
+      : String(track.trackNumber)
+    : '';
+
   const trackHeaderCard = track ? (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Track
-        </p>
-      </div>
-      <div className='p-3.5'>
-        <TrackMetaSummary
-          title={track.title}
-          trackNumber={track.trackNumber}
-          discNumber={track.discNumber}
-          durationMs={track.durationMs}
-          isrc={track.isrc}
-          isExplicit={track.isExplicit}
-          variant='drawer'
-          artwork={
-            <DrawerMediaThumb
-              src={track.releaseArtworkUrl}
-              alt={`${track.releaseTitle} artwork`}
-              sizeClassName='h-[76px] w-[76px] rounded-[11px]'
-              sizes='76px'
-              fallback={
-                <Icon
-                  name='Music'
-                  className='h-7 w-7 text-tertiary-token'
-                  aria-hidden='true'
-                />
-              }
-            />
-          }
-        />
+      <div className='p-2.5'>
+        <div className='flex items-start gap-2.5'>
+          <DrawerMediaThumb
+            src={track.releaseArtworkUrl}
+            alt={`${track.releaseTitle} artwork`}
+            sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+            sizes='68px'
+            fallback={
+              <Icon
+                name='Music'
+                className='h-7 w-7 text-tertiary-token'
+                aria-hidden='true'
+              />
+            }
+          />
+          <EntityHeaderCard
+            title={track.title}
+            subtitle={
+              <span className='flex items-center gap-1.5'>
+                <span className='tabular-nums'>{trackLabel}.</span>
+                {track.releaseTitle}
+                {track.isExplicit && (
+                  <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-[510] text-tertiary-token'>
+                    E
+                  </span>
+                )}
+              </span>
+            }
+            meta={
+              <div className='flex items-center gap-2 text-[10.5px] text-tertiary-token'>
+                {track.durationMs != null && (
+                  <span className='tabular-nums'>
+                    {formatDuration(track.durationMs)}
+                  </span>
+                )}
+                {track.isrc && (
+                  <span className='font-mono text-[9.5px] tracking-[0.02em]'>
+                    {track.isrc}
+                  </span>
+                )}
+              </div>
+            }
+            className='min-w-0 flex-1'
+            bodyClassName='pt-0'
+          />
+        </div>
       </div>
     </DrawerSurfaceCard>
   ) : undefined;
@@ -249,27 +272,64 @@ export function TrackSidebar({
           onClose={onClose}
         />
       }
-      entityHeader={trackHeaderCard}
-      tabs={
-        track ? (
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as TrackSidebarTab)}
-            options={TRACK_SIDEBAR_TAB_OPTIONS}
-            ariaLabel='Track sidebar tabs'
-          />
-        ) : undefined
-      }
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
+      entityHeader={
+        track ? (
+          <div className='space-y-2.5'>
+            {onBackToRelease && (
+              <DrawerBackButton
+                label={track.releaseTitle}
+                onClick={handleBackToRelease}
+              />
+            )}
+            {trackHeaderCard}
+            {smartLinkUrl && (
+              <div className='px-0.5'>
+                <CopyableUrlRow
+                  url={smartLinkUrl}
+                  size='sm'
+                  surface='boxed'
+                  copyButtonTitle='Copy track link'
+                  openButtonTitle='Open track link'
+                  onCopySuccess={() => {
+                    showSmartLinkCopied();
+                  }}
+                  onCopyError={() => {
+                    toast.error('Failed to copy link');
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ) : undefined
+      }
+      tabs={
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as TrackSidebarTab)}
+          options={TRACK_SIDEBAR_TAB_OPTIONS}
+          ariaLabel='Track sidebar tabs'
+        />
+      }
     >
       {track && (
-        <div className='space-y-3'>
-          {onBackToRelease && (
-            <DrawerBackButton
-              label={track.releaseTitle}
-              onClick={handleBackToRelease}
-            />
+        <>
+          {activeTab === 'details' && (
+            <div className='space-y-2'>
+              {track.isrc && (
+                <DrawerActionRow
+                  onClick={handleCopyIsrc}
+                  icon={<Hash className='h-3.5 w-3.5' />}
+                  label='Copy ISRC'
+                  trailing={
+                    <span className='font-mono text-[10px] text-tertiary-token'>
+                      {track.isrc}
+                    </span>
+                  }
+                />
+              )}
+            </div>
           )}
           {activeTab === 'details' && (
             <DrawerSurfaceCard
@@ -333,7 +393,7 @@ export function TrackSidebar({
           {activeTab === 'platforms' && (
             <TrackPlatformLinksSection providers={streamingProviders} />
           )}
-        </div>
+        </>
       )}
     </EntitySidebarShell>
   );

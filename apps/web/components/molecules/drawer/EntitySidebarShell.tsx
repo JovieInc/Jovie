@@ -36,6 +36,8 @@ export interface EntitySidebarShellProps {
 
   /** Entity header slot — image + name area below the header bar */
   readonly entityHeader?: ReactNode;
+  /** When true, header actions render inside the entity header card instead of the title bar */
+  readonly actionsInEntityHeader?: boolean;
   /** Tabs slot — SegmentControl rendered below entity header */
   readonly tabs?: ReactNode;
   /** Optional className override for the tabs wrapper */
@@ -88,6 +90,7 @@ export function EntitySidebarShell({
   headerActions,
   headerMode = 'standard',
   entityHeader,
+  actionsInEntityHeader = false,
   tabs,
   tabsContainerClassName,
   children,
@@ -101,7 +104,24 @@ export function EntitySidebarShell({
   ) : (
     title
   );
-
+  const titleBarActions = actionsInEntityHeader ? (
+    onClose ? (
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[]}
+        onClose={onClose}
+      />
+    ) : undefined
+  ) : (
+    (headerActions ??
+    (onClose ? (
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[]}
+        onClose={onClose}
+      />
+    ) : undefined))
+  );
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -125,16 +145,7 @@ export function EntitySidebarShell({
             >
               <DrawerHeader
                 title={resolvedHeaderTitle}
-                actions={
-                  headerActions ??
-                  (onClose ? (
-                    <DrawerHeaderActions
-                      primaryActions={[]}
-                      overflowActions={[]}
-                      onClose={onClose}
-                    />
-                  ) : undefined)
-                }
+                actions={titleBarActions}
                 className={cn(
                   isMinimalHeader &&
                     'min-h-[34px] px-2.5 py-1 lg:min-h-[36px] lg:px-3'
@@ -143,6 +154,11 @@ export function EntitySidebarShell({
 
               {!isMinimalHeader && entityHeader ? (
                 <div className='overflow-visible px-3 pb-2.5 pt-2.5'>
+                  {actionsInEntityHeader && headerActions ? (
+                    <div className='mb-2 flex items-center justify-end gap-1'>
+                      {headerActions}
+                    </div>
+                  ) : null}
                   {entityHeader}
                 </div>
               ) : null}

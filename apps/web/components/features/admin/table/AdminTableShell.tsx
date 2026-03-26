@@ -127,7 +127,7 @@ export function AdminTableShell({
           <div
             ref={toolbarRef}
             className={cn(
-              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]/96 backdrop-blur-[12px] supports-backdrop-filter:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]/88',
+              'sticky top-0 z-30 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)/96 backdrop-blur-[12px] supports-backdrop-filter:bg-(--linear-app-content-surface)/88',
               headerElevated && 'dark:shadow-inset-highlight'
             )}
           >

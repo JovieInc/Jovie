@@ -16,15 +16,15 @@ export function DspPresenceSummary({
     <div
       className={cn(
         LINEAR_SURFACE.toolbar,
-        'shrink-0 border-b px-3 py-2.5 lg:px-4'
+        'shrink-0 border-b px-3.5 py-2.5 lg:px-4'
       )}
     >
       <div className='flex items-center gap-3'>
-        <h1 className='text-[14px] font-[590] text-primary-token'>
+        <h1 className='text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
           DSP Presence
         </h1>
 
-        <div className='flex items-center gap-2.5 text-[12px] text-tertiary-token'>
+        <div className='flex items-center gap-2.5 text-[11px] text-tertiary-token'>
           <span>
             {confirmedCount} matched platform{confirmedCount === 1 ? '' : 's'}
           </span>

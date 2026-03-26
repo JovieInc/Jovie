@@ -16,7 +16,6 @@ export function PreviewToggleButton() {
         ariaLabel={label}
         pressed={isOpen}
         onClick={toggle}
-        className='bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
         icon={<Icon className='h-3.5 w-3.5' aria-hidden='true' />}
       />
     </TooltipShortcut>

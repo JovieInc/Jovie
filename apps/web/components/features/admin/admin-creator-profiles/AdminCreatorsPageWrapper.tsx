@@ -122,7 +122,7 @@ export function AdminCreatorsPageWrapper(
                   handleSearchClose();
                 }
               }}
-              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3 text-[12px]'
+              className='h-7 w-[210px] rounded-full border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 text-[12px]'
               aria-label='Search creators by handle'
             />
             <AppIconButton

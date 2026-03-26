@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
+import { resolveAppContentPath } from '@/lib/filesystem-paths';
 
 export interface InvestorPage {
   slug: string;
@@ -29,10 +29,7 @@ export async function getInvestorManifest(): Promise<InvestorManifest> {
     return cachedManifest;
   }
 
-  const manifestPath = path.join(
-    process.cwd(),
-    'content/investors/manifest.json'
-  );
+  const manifestPath = resolveAppContentPath('investors/manifest.json');
   const raw = await fs.readFile(manifestPath, 'utf-8');
   cachedManifest = JSON.parse(raw) as InvestorManifest;
   return cachedManifest;

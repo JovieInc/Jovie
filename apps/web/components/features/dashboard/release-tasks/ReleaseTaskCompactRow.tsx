@@ -17,7 +17,7 @@ export function ReleaseTaskCompactRow({
   const isAi = task.assigneeType === 'ai_workflow';
 
   return (
-    <div className='flex items-center gap-2 px-3 py-1.5 min-h-[32px] group hover:bg-surface-1/50 rounded transition-colors'>
+    <div className='flex items-center gap-2 px-3 py-1.5 min-h-[32px] group hover:bg-surface-1 rounded transition-colors'>
       <input
         type='checkbox'
         checked={isDone}
