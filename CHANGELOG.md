@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.77] - 2026-03-25
+
+### Added
+
+- Canonical artist identity layer — stores all platform data from enrichment sources (MusicFetch, MusicBrainz, SERP) in a raw `artist_identity_links` table with full provenance tracking
+- MusicFetch now saves all 30+ platforms it discovers (previously only 7 DSPs were saved, the rest silently dropped)
+- Publish rules promote streaming DSPs to fan-facing pages automatically; video/metadata platforms stored raw for future features
+- Structured enrichment logging shows returned/stored/published counts per MusicFetch call
+
 ## [26.4.76] - 2026-03-25
 
 ### Changed
