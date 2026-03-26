@@ -159,11 +159,11 @@ function buildDropdownItems({
 
   // Only show Cookie Settings in GDPR-regulated regions, matching footer behavior
   const ccRequired =
-    typeof document !== 'undefined'
-      ? document.cookie
+    typeof document === 'undefined'
+      ? undefined
+      : document.cookie
           .split(';')
-          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`))
-      : undefined;
+          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
   if (ccRequired && ccRequired.split('=')[1]?.trim() !== '0') {
     learnMoreItems.push({
       type: 'action',

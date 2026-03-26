@@ -2,8 +2,10 @@
 
 import { Button } from '@jovie/ui';
 import {
+  type CellContext,
   type ColumnDef,
   createColumnHelper,
+  type HeaderContext,
   type SortingState,
 } from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -238,6 +240,32 @@ function ActionsCellRenderer({
   );
 }
 
+interface ActionsColumnMeta {
+  onSync?: () => void;
+  isSyncing?: boolean;
+  getContextMenuItems: (tourDate: TourDateViewModel) => ContextMenuItemType[];
+}
+
+/** Standalone header renderer for Actions column — reads onSync/isSyncing from column meta. */
+function renderActionsHeader(ctx: HeaderContext<TourDateViewModel, unknown>) {
+  const meta = ctx.column.columnDef.meta as ActionsColumnMeta | undefined;
+  return <ActionsHeader onSync={meta?.onSync} isSyncing={meta?.isSyncing} />;
+}
+
+/** Standalone cell renderer for Actions column — reads getContextMenuItems from column meta. */
+function renderActionsCellFromContext(
+  ctx: CellContext<TourDateViewModel, unknown>
+) {
+  const meta = ctx.column.columnDef.meta as ActionsColumnMeta | undefined;
+  if (!meta) return null;
+  return (
+    <ActionsCellRenderer
+      row={ctx.row}
+      getContextMenuItems={meta.getContextMenuItems}
+    />
+  );
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -323,14 +351,10 @@ export function TourDatesTable({
       // Actions column
       columnHelper.display({
         id: 'actions',
-        header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => (
-          <ActionsCellRenderer
-            row={row}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ), // NOSONAR - TanStack Table render prop
+        header: renderActionsHeader, // NOSONAR
+        cell: renderActionsCellFromContext, // NOSONAR - TanStack Table render prop
         size: 80,
+        meta: { onSync, isSyncing, getContextMenuItems },
       }),
     ];
   }, [onSync, isSyncing, getContextMenuItems]);

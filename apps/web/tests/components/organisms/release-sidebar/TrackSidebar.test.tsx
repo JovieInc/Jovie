@@ -50,7 +50,7 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getByText('Track')).toBeInTheDocument();
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
+    expect(screen.getByText('Track link')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
@@ -88,7 +88,7 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getByText('Track')).toBeInTheDocument();
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
+    expect(screen.getByText('Track link')).toBeInTheDocument();
     expect(screen.getByText('Actions')).toBeInTheDocument();
   });
 });

@@ -27,6 +27,7 @@ describe('release-track-loader', () => {
     mockGetReleaseById.mockResolvedValue({
       id: 'release-1',
       creatorProfileId: 'profile-1',
+      slug: 'my-release',
     });
 
     const tracks: TrackWithProviders[] = [
@@ -82,13 +83,14 @@ describe('release-track-loader', () => {
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0]?.smartLinkPath).toBe('/artist/first-track');
+    expect(result[0]?.smartLinkPath).toBe('/artist/my-release/first-track');
+    expect(result[0]?.releaseSlug).toBe('my-release');
     expect(result[0]?.providers).toEqual([
       expect.objectContaining({
         key: 'spotify',
         label: 'Spotify',
         source: 'manual',
-        path: '/artist/first-track?dsp=spotify',
+        path: '/artist/my-release/first-track?dsp=spotify',
         isPrimary: true,
       }),
     ]);

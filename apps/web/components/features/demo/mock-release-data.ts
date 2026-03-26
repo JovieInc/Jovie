@@ -402,6 +402,7 @@ function makeDemoTracks(
     return {
       id: `${release.id}-track-${trackNumber}`,
       releaseId: release.id,
+      releaseSlug: release.slug,
       title: count === 1 ? release.title : `${release.title} ${trackNumber}`,
       slug: `${release.slug}-track-${trackNumber}`,
       smartLinkPath: `${release.smartLinkPath}/tracks/${trackNumber}`,

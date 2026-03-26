@@ -10,6 +10,7 @@ export type ReleaseTrack = Pick<
   TrackViewModel,
   | 'id'
   | 'releaseId'
+  | 'releaseSlug'
   | 'title'
   | 'slug'
   | 'smartLinkPath'

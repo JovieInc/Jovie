@@ -675,6 +675,14 @@ export const MUSICFETCH_LINK_MAPPINGS: Array<{
 }));
 
 /**
+ * MusicFetch service key → DSP registry entry lookup.
+ * Used by the identity layer to map raw MusicFetch services to DSP metadata.
+ */
+export const MUSICFETCH_SERVICE_TO_DSP = new Map(
+  DSP_REGISTRY.map(e => [e.musicfetchService, e] as const)
+);
+
+/**
  * Build a search URL for a DSP using the registry template.
  * Returns null if no template exists for the DSP.
  */
