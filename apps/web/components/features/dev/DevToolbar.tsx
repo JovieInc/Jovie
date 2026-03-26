@@ -40,7 +40,7 @@ import {
 function useLocalOverrides() {
   const [overrides, setOverridesState] = useState<Record<string, boolean>>(
     () => {
-      if (typeof globalThis.window === 'undefined') return {};
+      if (globalThis.window === undefined) return {};
       try {
         return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
       } catch {
@@ -693,7 +693,7 @@ export function DevToolbar({
             onClick={() =>
               copyToClipboard(globalThis.location.pathname, 'route')
             }
-            title={`Copy route: ${typeof globalThis.window !== 'undefined' ? globalThis.location.pathname : ''}`}
+            title={`Copy route: ${globalThis.window !== undefined ? globalThis.location.pathname : ''}`}
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label='Copy route'
           >
