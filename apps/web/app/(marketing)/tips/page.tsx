@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { TipsLanding } from '@/features/tips/TipsLanding';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,15 +10,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
-      canonical: `${APP_URL}/tips`,
+      canonical: `${BASE_URL}/tips`,
     },
     openGraph: {
       type: 'website',
       title,
       description,
-      url: `${APP_URL}/tips`,
+      url: `${BASE_URL}/tips`,
       siteName: APP_NAME,
       images: [
         {
