@@ -139,6 +139,7 @@ export const TOOL_LABELS: Record<string, string> = {
   markCanvasUploaded: 'Updating canvas status...',
   createRelease: 'Creating release...',
   submitFeedback: 'Submitting feedback...',
+  generateReleasePitch: 'Generating pitches...',
 };
 
 /** A chat suggestion card with icon, label, and prompt */
@@ -172,6 +173,17 @@ export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
     accent: 'purple',
   },
 ] as const;
+
+/**
+ * Pitch generation suggestion shown only to paid-plan users.
+ * Personalized with latestReleaseTitle when available.
+ */
+export const PITCH_SUGGESTION: ChatSuggestion = {
+  icon: 'Music',
+  label: 'Generate pitches for my latest release',
+  prompt: 'Generate playlist pitches for my latest release.',
+  accent: 'blue',
+};
 
 /**
  * Special feedback suggestion shown in both suggestion lists.

@@ -51,6 +51,12 @@ export const queryKeys = {
         'social-links',
         ...(profileId === undefined ? [] : [profileId]),
       ] as const,
+    pressPhotos: (profileId?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'press-photos',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
     activityFeed: (profileId?: string, range?: string) =>
       [
         ...queryKeys.dashboard.all,

@@ -358,6 +358,8 @@ export const profilePhotos = pgTable(
     height: integer('height'),
     processedAt: timestamp('processed_at'),
     errorMessage: text('error_message'),
+    photoType: text('photo_type').notNull().default('avatar'),
+    sortOrder: integer('sort_order').notNull().default(0),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -368,6 +370,11 @@ export const profilePhotos = pgTable(
     ),
     ingestionOwnerIdx: index('idx_profile_photos_ingestion_owner').on(
       table.ingestionOwnerUserId
+    ),
+    typeStatusIdx: index('idx_profile_photos_type').on(
+      table.creatorProfileId,
+      table.photoType,
+      table.status
     ),
   })
 );
