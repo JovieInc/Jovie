@@ -1,8 +1,7 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { MarketingScrollUnlock } from '@/features/home/MarketingScrollUnlock';
-import { ScrollRevealInit } from '@/features/home/ScrollRevealInit';
+import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 
 export default async function MarketingLayout({
   children,
@@ -18,8 +17,7 @@ export default async function MarketingLayout({
         className='flex flex-1 flex-col pt-[var(--linear-header-height)]'
       >
         {children}
-        <MarketingScrollUnlock />
-        <ScrollRevealInit />
+        <MarketingEnhancements />
       </main>
       <MarketingFooter />
       <div aria-hidden='true' className='marketing-noise' />

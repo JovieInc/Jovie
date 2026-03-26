@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { APP_ROUTES } from '@/constants/routes';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
@@ -149,10 +149,11 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 });
 
 export default function HomePage() {
+  const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
+
   return (
     <div className='relative min-h-screen'>
-      {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
-      <AuthRedirectHandler />
+      <script suppressHydrationWarning>{authRedirectScript}</script>
 
       {/* Structured Data */}
       <script

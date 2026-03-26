@@ -4,7 +4,10 @@ import { MODES, PhoneShowcase } from './phone-showcase-primitives';
 
 export function HeroCinematic() {
   return (
-    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:hidden'>
+    <section
+      className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:pt-[6.6rem]'
+      data-testid='homepage-shell'
+    >
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -33,7 +36,10 @@ export function HeroCinematic() {
                 </p>
 
                 <div className='mx-auto mt-6 w-full max-w-[27rem] md:mt-7 lg:mx-0'>
-                  <ClaimHandleForm size='hero' />
+                  <ClaimHandleForm
+                    size='hero'
+                    submitButtonTestId='homepage-primary-cta'
+                  />
                 </div>
 
                 <p className='mt-3.5 text-[11px] tracking-[0.01em] text-quaternary-token md:mt-4 lg:text-left'>
