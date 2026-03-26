@@ -1,15 +1,16 @@
 'use client';
 
 import { Globe, Link2, MapPin } from 'lucide-react';
-import { type ComponentType, useCallback, useState } from 'react';
+import { type ComponentType, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
+  DrawerStatGrid,
   DrawerSurfaceCard,
   DrawerTabs,
   EntitySidebarShell,
+  StatTile,
 } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -56,99 +57,101 @@ function formatMetricValue(
   return '--';
 }
 
-function SidebarRangeToggle({
-  value,
-  onChange,
-}: {
-  readonly value: AnalyticsRange;
-  readonly onChange: (v: AnalyticsRange) => void;
-}) {
-  return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onChange}
-      options={RANGE_OPTIONS}
-      size='sm'
-      className='shrink-0'
-      aria-label='Analytics time range'
-    />
-  );
-}
+/** Bar opacity classes that progressively fade to reinforce the narrowing funnel */
+const BAR_OPACITY = ['bg-accent/15', 'bg-accent/10', 'bg-accent/6'] as const;
 
-/** Single column in the funnel metrics card */
-function FunnelColumn({
+const TRACK_BG = 'bg-surface-2';
+
+/** Single stage in the vertical funnel waterfall */
+function FunnelStage({
   label,
   value,
-  description,
+  rate,
+  barPercent,
+  barIndex,
   loading,
 }: {
   readonly label: string;
-  readonly value: string;
-  readonly description: string;
+  readonly value: number;
+  readonly rate: string | null;
+  readonly barPercent: number;
+  readonly barIndex: number;
   readonly loading: boolean;
 }) {
   if (loading) {
     return (
-      <div className='flex flex-1 flex-col items-center justify-center px-2 py-3'>
-        <LoadingSkeleton
-          height='h-3'
-          width='w-16'
-          rounded='sm'
-          className='mb-2'
-        />
-        <LoadingSkeleton height='h-6' width='w-12' rounded='sm' />
+      <div className='space-y-1.5 px-3 py-2'>
+        <div className='flex items-center justify-between'>
+          <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
+          <LoadingSkeleton height='h-3' width='w-12' rounded='sm' />
+        </div>
+        <div className={cn('h-1.5 rounded-full', TRACK_BG, 'animate-pulse')} />
       </div>
     );
   }
 
   return (
-    <div className='flex flex-1 flex-col items-center justify-center px-2 py-3 text-center'>
-      <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
-        {label}
-      </p>
-      <p className='mt-1 tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
-        {value}
-      </p>
-      <p className='mt-1 text-[10px] leading-[13px] text-tertiary-token'>
-        {description}
-      </p>
+    <div className='space-y-1.5 px-3 py-2'>
+      <div className='flex items-baseline justify-between gap-2'>
+        <span className='text-[11.5px] font-[510] text-secondary-token'>
+          {label}
+        </span>
+        <span className='flex items-baseline gap-1.5'>
+          <span className='tabular-nums text-[15px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
+            {numberFormatter.format(value)}
+          </span>
+          {rate && (
+            <span className='tabular-nums text-[10px] font-[510] text-tertiary-token'>
+              {rate}
+            </span>
+          )}
+        </span>
+      </div>
+      <div className={cn('h-1.5 rounded-full', TRACK_BG)}>
+        <div
+          className={cn(
+            'h-full rounded-full transition-[width] duration-300 ease-out',
+            BAR_OPACITY[barIndex] ?? BAR_OPACITY[BAR_OPACITY.length - 1]
+          )}
+          style={{ width: `${Math.max(barPercent, 2)}%` }}
+        />
+      </div>
     </div>
   );
 }
 
-/** Single column in the engagement metrics row */
-function EngagementColumn({
-  label,
-  value,
+/** Vertical waterfall funnel card — Views → Visitors → Followers */
+function FunnelCard({
+  stages,
   loading,
 }: {
-  readonly label: string;
-  readonly value: string;
+  readonly stages: readonly { label: string; value: number }[];
   readonly loading: boolean;
 }) {
-  if (loading) {
-    return (
-      <div className='flex flex-1 flex-col items-center justify-center px-2 py-2.5'>
-        <LoadingSkeleton
-          height='h-5'
-          width='w-10'
-          rounded='sm'
-          className='mb-1'
-        />
-        <LoadingSkeleton height='h-3' width='w-14' rounded='sm' />
-      </div>
-    );
-  }
+  const maxValue = stages[0]?.value ?? 0;
 
   return (
-    <div className='flex flex-1 flex-col items-center justify-center px-2 py-2.5 text-center'>
-      <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
-        {value}
-      </p>
-      <p className='mt-1 text-[10px] leading-[13px] text-tertiary-token'>
-        {label}
-      </p>
-    </div>
+    <DrawerSurfaceCard className='divide-y divide-subtle overflow-hidden py-1'>
+      {stages.map((stage, index) => {
+        const barPercent = maxValue > 0 ? (stage.value / maxValue) * 100 : 0;
+        const rate =
+          index > 0
+            ? calculateConversionRate(stage.value, stages[0].value)
+            : null;
+
+        return (
+          <FunnelStage
+            key={stage.label}
+            label={stage.label}
+            value={stage.value}
+            rate={rate}
+            barPercent={barPercent}
+            barIndex={index}
+            loading={loading}
+          />
+        );
+      })}
+    </DrawerSurfaceCard>
   );
 }
 
@@ -239,32 +242,10 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
   const loading = isLoading;
 
   const stages = [
-    {
-      label: 'Profile Views',
-      value: data?.profile_views ?? 0,
-      description: 'Total page visits',
-    },
-    {
-      label: 'Unique Visitors',
-      value: data?.unique_users ?? 0,
-      description: 'Distinct users',
-    },
-    {
-      label: 'Followers',
-      value: data?.subscribers ?? 0,
-      description: 'Opted-in contacts',
-    },
+    { label: 'Profile Views', value: data?.profile_views ?? 0 },
+    { label: 'Unique Visitors', value: data?.unique_users ?? 0 },
+    { label: 'Followers', value: data?.subscribers ?? 0 },
   ];
-
-  const calculateRate = useCallback(
-    (current: number, previous: number) =>
-      calculateConversionRate(current, previous),
-    []
-  );
-
-  const conversionRates = stages
-    .slice(0, -1)
-    .map((stage, i) => calculateRate(stages[i + 1].value, stage.value));
 
   return (
     <EntitySidebarShell
@@ -273,6 +254,16 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
       data-testid='analytics-sidebar'
       title='Analytics'
       onClose={onClose}
+      headerActions={
+        <AppSegmentControl
+          value={range}
+          onValueChange={setRange}
+          options={RANGE_OPTIONS}
+          size='sm'
+          className='shrink-0'
+          aria-label='Analytics time range'
+        />
+      }
     >
       <div
         className={cn(
@@ -280,61 +271,32 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           isFetching && !loading && 'opacity-70'
         )}
       >
-        {/* Funnel + Engagement — one cohesive card */}
-        <div className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}>
-          {/* Funnel: 3-column horizontal layout */}
-          <div className='flex items-stretch divide-x divide-(--linear-app-frame-seam)'>
-            {stages.map((stage, index) => {
-              const showRate = index < conversionRates.length;
-              return (
-                <div key={stage.label} className='relative flex-1'>
-                  <FunnelColumn
-                    label={stage.label}
-                    value={numberFormatter.format(stage.value)}
-                    description={stage.description}
-                    loading={loading}
-                  />
-                  {showRate && conversionRates[index] && (
-                    <span className='absolute right-0 top-1/2 z-10 -translate-y-1/2 translate-x-1/2 rounded-full bg-surface-0 px-1 text-[9px] font-[510] text-accent tabular-nums'>
-                      {conversionRates[index]}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {/* Funnel waterfall — vertical bars show dropoff at a glance */}
+        <FunnelCard stages={stages} loading={loading} />
 
-          {/* Engagement metrics below divider */}
-          <div className='flex items-stretch divide-x divide-(--linear-app-frame-seam) border-t border-(--linear-app-frame-seam)'>
-            <EngagementColumn
-              label='Total Clicks'
+        {/* Engagement — compact 2-col, secondary to the funnel */}
+        <DrawerStatGrid variant='card'>
+          <div className='px-3 py-2'>
+            <StatTile
+              label='Link Clicks'
               value={formatMetricValue(loading, data?.total_clicks)}
-              loading={loading}
             />
-            <EngagementColumn
+          </div>
+          <div className='px-3 py-2'>
+            <StatTile
               label='Listen Clicks'
               value={formatMetricValue(loading, data?.listen_clicks)}
-              loading={loading}
-            />
-            <EngagementColumn
-              label='Captures'
-              value={formatMetricValue(loading, data?.subscribers)}
-              loading={loading}
             />
           </div>
-        </div>
+        </DrawerStatGrid>
 
-        {/* Tabs + range toggle — inline on same row */}
-        <div className='flex items-center gap-1.5'>
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as AnalyticsTab)}
-            options={ANALYTICS_TAB_OPTIONS}
-            className='flex-1'
-            ariaLabel='Analytics data tabs'
-          />
-          <SidebarRangeToggle value={range} onChange={setRange} />
-        </div>
+        {/* Breakdown tabs */}
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as AnalyticsTab)}
+          options={ANALYTICS_TAB_OPTIONS}
+          ariaLabel='Analytics data tabs'
+        />
 
         {/* Ranked list card */}
         <DrawerSurfaceCard className='min-h-[196px] p-2'>

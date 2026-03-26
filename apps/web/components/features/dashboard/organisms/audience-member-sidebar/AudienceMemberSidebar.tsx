@@ -8,9 +8,10 @@
  * to the table row context menu.
  */
 
+import { useState } from 'react';
 import {
-  DrawerSection,
   DrawerSurfaceCard,
+  DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
@@ -27,12 +28,21 @@ import {
   computeMemberTitle,
 } from './utils';
 
+type AudienceTab = 'details' | 'activity' | 'referrers';
+
+const AUDIENCE_TAB_OPTIONS = [
+  { value: 'details' as const, label: 'Details' },
+  { value: 'activity' as const, label: 'Activity' },
+  { value: 'referrers' as const, label: 'Referrers' },
+];
+
 export function AudienceMemberSidebar({
   member,
   isOpen,
   onClose,
   contextMenuItems,
 }: AudienceMemberSidebarProps) {
+  const [activeTab, setActiveTab] = useState<AudienceTab>('details');
   const title = computeMemberTitle(member);
   const subtitle = computeMemberSubtitle(member);
   const avatarSrc = computeMemberAvatarSrc(member);
@@ -62,20 +72,24 @@ export function AudienceMemberSidebar({
           </div>
         </DrawerSurfaceCard>
       }
+      tabs={
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as AudienceTab)}
+          options={AUDIENCE_TAB_OPTIONS}
+          ariaLabel='Audience member tabs'
+        />
+      }
     >
       {member && (
         <>
-          <DrawerSection className='space-y-1.5'>
-            <AudienceMemberDetails member={member} />
-          </DrawerSection>
-
-          <DrawerSection title='Activity' className='space-y-1.5'>
+          {activeTab === 'details' && <AudienceMemberDetails member={member} />}
+          {activeTab === 'activity' && (
             <AudienceMemberActivityFeed member={member} />
-          </DrawerSection>
-
-          <DrawerSection title='Referrers' className='space-y-1.5'>
+          )}
+          {activeTab === 'referrers' && (
             <AudienceMemberReferrers member={member} />
-          </DrawerSection>
+          )}
         </>
       )}
     </EntitySidebarShell>

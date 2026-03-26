@@ -273,88 +273,68 @@ export function TrackSidebar({
       actionsInEntityHeader
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
+      entityHeader={
+        track ? (
+          <div className='space-y-2.5'>
+            {onBackToRelease && (
+              <DrawerBackButton
+                label={track.releaseTitle}
+                onClick={handleBackToRelease}
+              />
+            )}
+            {trackHeaderCard}
+            {smartLinkUrl && (
+              <div className='px-0.5'>
+                <CopyableUrlRow
+                  url={smartLinkUrl}
+                  size='sm'
+                  surface='boxed'
+                  copyButtonTitle='Copy track link'
+                  openButtonTitle='Open track link'
+                  onCopySuccess={() => {
+                    showSmartLinkCopied();
+                  }}
+                  onCopyError={() => {
+                    toast.error('Failed to copy link');
+                  }}
+                />
+              </div>
+            )}
+          </div>
+        ) : undefined
+      }
+      tabs={
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as TrackSidebarTab)}
+          options={TRACK_SIDEBAR_TAB_OPTIONS}
+          ariaLabel='Track sidebar tabs'
+        />
+      }
     >
       {track && (
-        <div className='space-y-3'>
-          {onBackToRelease && (
-            <DrawerBackButton
-              label={track.releaseTitle}
-              onClick={handleBackToRelease}
-            />
+        <>
+          {activeTab === 'details' && (
+            <div className='space-y-2'>
+              {track.isrc && (
+                <DrawerActionRow
+                  onClick={handleCopyIsrc}
+                  icon={<Hash className='h-3.5 w-3.5' />}
+                  label='Copy ISRC'
+                  trailing={
+                    <span className='font-mono text-[10px] text-tertiary-token'>
+                      {track.isrc}
+                    </span>
+                  }
+                />
+              )}
+            </div>
           )}
 
-          {trackHeaderCard}
-
-          <div className='space-y-2.5 pt-0.5'>
-            <div className='px-1.5'>
-              <DrawerTabs
-                value={activeTab}
-                onValueChange={value => setActiveTab(value as TrackSidebarTab)}
-                options={TRACK_SIDEBAR_TAB_OPTIONS}
-                ariaLabel='Track sidebar tabs'
-              />
-            </div>
-
-            <div className='space-y-2.5 p-2.5'>
-              {activeTab === 'details' && (
-                <DrawerSurfaceCard
-                  className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-                >
-                  <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-                    <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                      Track link
-                    </p>
-                  </div>
-                  <div className='p-2.5'>
-                    <CopyableUrlRow
-                      url={smartLinkUrl}
-                      size='md'
-                      surface='boxed'
-                      copyButtonTitle='Copy track link'
-                      openButtonTitle='Open track link'
-                      onCopySuccess={() => {
-                        showSmartLinkCopied();
-                      }}
-                      onCopyError={() => {
-                        toast.error('Failed to copy link');
-                      }}
-                    />
-                  </div>
-                </DrawerSurfaceCard>
-              )}
-
-              {activeTab === 'details' && (
-                <DrawerSurfaceCard
-                  className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-                >
-                  <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-                    <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                      Actions
-                    </p>
-                  </div>
-                  <div className='space-y-1.5 p-2.5'>
-                    {track.isrc && (
-                      <DrawerActionRow
-                        onClick={handleCopyIsrc}
-                        icon={<Hash className='h-3.5 w-3.5' />}
-                        label='Copy ISRC'
-                        trailing={
-                          <span className='font-mono text-[10px] text-tertiary-token'>
-                            {track.isrc}
-                          </span>
-                        }
-                      />
-                    )}
-                  </div>
-                </DrawerSurfaceCard>
-              )}
-
-              {activeTab === 'platforms' && (
-                <TrackPlatformLinksSection providers={streamingProviders} />
-              )}
-            </div>
-          </div>
-        </div>
+          {activeTab === 'platforms' && (
+            <TrackPlatformLinksSection providers={streamingProviders} />
+          )}
+        </>
       )}
     </EntitySidebarShell>
   );
