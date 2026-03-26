@@ -41,6 +41,8 @@ export const DEV_OVERLAY_SELECTORS = [
   '[data-nextjs-dialog-overlay]',
   '[data-nextjs-toast]',
   'nextjs-portal',
+  // Next.js dev build indicator — explicit selector in case nextjs-portal doesn't catch it
+  '[data-nextjs-build-indicator]',
 ] as const;
 
 /** Wait for network to settle and animations to finish */

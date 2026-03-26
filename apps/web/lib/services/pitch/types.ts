@@ -35,6 +35,7 @@ export interface PitchInput {
     spotifyFollowers: number | null;
     spotifyPopularity: number | null;
     pitchContext: string | null;
+    targetPlaylists: string[] | null;
   };
   release: {
     title: string;

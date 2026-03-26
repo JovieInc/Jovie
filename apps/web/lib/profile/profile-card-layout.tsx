@@ -37,15 +37,28 @@ const GRADIENT =
  *  - Feed (1080x1080): centered square layout
  *  - Story (1080x1920): centered tall layout with more spacing
  */
+function resolveLayoutConfig(size: ProfileCardSize) {
+  const isSquareOrTall = size.width === size.height || size.height > size.width;
+  return {
+    isSquareOrTall,
+    avatarSize: isSquareOrTall ? 220 : 164,
+    nameFontSize: isSquareOrTall ? 72 : 60,
+    tagFontSize: isSquareOrTall ? 24 : 20,
+    align: isSquareOrTall ? ('center' as const) : ('flex-start' as const),
+    padding: isSquareOrTall ? 64 : 48,
+    cardGap: isSquareOrTall ? 32 : 28,
+    cardPadding: isSquareOrTall ? 48 : 36,
+    maxTextWidth: isSquareOrTall ? 900 : 820,
+  };
+}
+
 export function profileCardLayout(
   data: ProfileCardData,
   size: ProfileCardSize
 ) {
   const { artistName, username, avatarUrl, genreTags, isPublic } = data;
-  const isSquareOrTall = size.width === size.height || size.height > size.width;
-  const avatarSize = isSquareOrTall ? 220 : 164;
-  const nameFontSize = isSquareOrTall ? 72 : 60;
-  const tagFontSize = isSquareOrTall ? 24 : 20;
+  const layout = resolveLayoutConfig(size);
+  const { avatarSize, nameFontSize, tagFontSize } = layout;
 
   const tags = genreTags.length > 0 ? genreTags : ['Artist profile'];
 
@@ -56,13 +69,13 @@ export function profileCardLayout(
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: isSquareOrTall ? 'center' : 'flex-start',
+        alignItems: layout.align,
         justifyContent: 'center',
         position: 'relative',
         background: GRADIENT,
         color: '#ffffff',
         fontFamily: 'Inter',
-        padding: isSquareOrTall ? 64 : 48,
+        padding: layout.padding,
       }}
     >
       {/* Jovie wordmark */}
@@ -85,15 +98,15 @@ export function profileCardLayout(
       <div
         style={{
           display: 'flex',
-          flexDirection: isSquareOrTall ? 'column' : 'row',
+          flexDirection: layout.isSquareOrTall ? 'column' : 'row',
           alignItems: 'center',
-          gap: isSquareOrTall ? 32 : 28,
+          gap: layout.cardGap,
           width: '100%',
           borderRadius: 28,
           border: '1px solid rgba(255,255,255,0.14)',
           background: 'rgba(8, 8, 18, 0.44)',
-          padding: isSquareOrTall ? 48 : 36,
-          textAlign: isSquareOrTall ? 'center' : 'left',
+          padding: layout.cardPadding,
+          textAlign: layout.isSquareOrTall ? 'center' : 'left',
         }}
       >
         {/* Avatar */}
@@ -142,7 +155,7 @@ export function profileCardLayout(
             display: 'flex',
             flexDirection: 'column',
             gap: 14,
-            alignItems: isSquareOrTall ? 'center' : 'flex-start',
+            alignItems: layout.align,
           }}
         >
           <div
@@ -152,7 +165,7 @@ export function profileCardLayout(
               fontWeight: 700,
               lineHeight: 1.05,
               letterSpacing: -1.4,
-              maxWidth: isSquareOrTall ? 900 : 820,
+              maxWidth: layout.maxTextWidth,
             }}
           >
             {truncateText(artistName, 32)}
@@ -162,7 +175,7 @@ export function profileCardLayout(
               display: 'flex',
               fontSize: 28,
               color: '#d4cffb',
-              maxWidth: isSquareOrTall ? 900 : 820,
+              maxWidth: layout.maxTextWidth,
             }}
           >
             {isPublic ? `@${username}` : 'Artist profile preview'}
@@ -176,7 +189,7 @@ export function profileCardLayout(
           display: 'flex',
           gap: 12,
           flexWrap: 'wrap',
-          justifyContent: isSquareOrTall ? 'center' : 'flex-start',
+          justifyContent: layout.align,
           marginTop: 24,
         }}
       >
@@ -204,10 +217,10 @@ export function profileCardLayout(
         style={{
           display: 'flex',
           flexDirection: 'column',
-          alignItems: isSquareOrTall ? 'center' : 'flex-end',
+          alignItems: layout.isSquareOrTall ? 'center' : 'flex-end',
           position: 'absolute',
           bottom: 30,
-          right: isSquareOrTall ? undefined : 40,
+          right: layout.isSquareOrTall ? undefined : 40,
           fontSize: 20,
           color: '#c7bfff',
         }}

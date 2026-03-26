@@ -40,14 +40,14 @@ export function ProfileLiveCelebration({
   // Check localStorage to prevent re-firing celebration
   const celebrationKey = profileId ? `celebrated_${profileId}` : null;
   const alreadyCelebrated = celebrationKey
-    ? typeof window !== 'undefined' &&
-      window.localStorage.getItem(celebrationKey) !== null
+    ? typeof globalThis.window !== 'undefined' &&
+      globalThis.localStorage.getItem(celebrationKey) !== null
     : false;
 
   // Mark as celebrated on first render
   useEffect(() => {
     if (celebrationKey && !alreadyCelebrated) {
-      window.localStorage.setItem(celebrationKey, String(Date.now()));
+      globalThis.localStorage.setItem(celebrationKey, String(Date.now()));
     }
   }, [celebrationKey, alreadyCelebrated]);
 
@@ -143,7 +143,7 @@ export function ProfileLiveCelebration({
       }
 
       const first = tabbable[0];
-      const last = tabbable[tabbable.length - 1];
+      const last = tabbable.at(-1);
       if (!last) {
         return;
       }

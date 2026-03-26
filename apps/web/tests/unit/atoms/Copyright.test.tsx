@@ -59,6 +59,7 @@ describe('Copyright', () => {
 
   it('passes a11y checks', async () => {
     const { container } = render(<Copyright />);
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });

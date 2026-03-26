@@ -111,6 +111,7 @@ export async function POST(
         spotifyFollowers: creatorProfiles.spotifyFollowers,
         spotifyPopularity: creatorProfiles.spotifyPopularity,
         pitchContext: creatorProfiles.pitchContext,
+        targetPlaylists: creatorProfiles.targetPlaylists,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profile.id));
@@ -166,6 +167,7 @@ export async function POST(
         spotifyFollowers: artistProfile?.spotifyFollowers ?? null,
         spotifyPopularity: artistProfile?.spotifyPopularity ?? null,
         pitchContext: artistProfile?.pitchContext ?? null,
+        targetPlaylists: artistProfile?.targetPlaylists ?? null,
       },
       release: {
         title: release.title,

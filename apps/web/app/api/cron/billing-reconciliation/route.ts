@@ -174,7 +174,7 @@ async function reconcileUsersWithSubscriptions(
     lastBatchWasFull = batch.length === BATCH_SIZE;
 
     // Update cursor to last user in batch before parallel processing
-    const lastUser = batch[batch.length - 1];
+    const lastUser = batch.at(-1);
     if (!lastUser) break;
     lastUserId = lastUser.id;
 

@@ -10,11 +10,41 @@ The most valuable streams come from engaged listening sessions where fans active
 
 ## Pitching and Timing Strategy
 
-Submit music to Spotify editors at least 7 days before release through the playlist submission tool. This deadline is non-negotiable for algorithmic playlist inclusion like Release Radar and Discover Weekly. Late submissions miss the crucial first-week discovery window when most editorial decisions occur. You can only pitch one unreleased song at a time, and once a track goes live, it becomes ineligible for pitching.
+We recommend pitching 4-6 weeks before your release date for editorial playlist consideration. This window is measured from when your distributor delivers the track to Spotify, not your upload date. Allow 3-5 additional days for distributor processing and approval. This gives editorial curators sufficient time to evaluate your submission, plan playlist updates, and potentially pass your song to curators in other genre categories.
 
-The optimal pitching window is 3-4 weeks before release, giving editors sufficient time to evaluate music and plan playlist updates. Most streaming platforms refresh playlists weekly, with the heaviest activity occurring around new release cycles. The only quiet period for playlist updates is the Christmas and New Year window.
+For Release Radar specifically, submit at least 7 days before release. Release Radar shows your new track to anyone who follows your profile and can feature songs for up to 4 weeks. This is a separate, algorithmic playlist — different from editorial placement.
 
-When completing pitch forms, focus on authentic storytelling rather than streaming statistics. Platform editors already have access to your data. Instead, describe your artistic vision, the story behind the song, lyrical themes, or what makes you distinctive as an artist. Include off-platform momentum like radio play, press coverage, live dates, or sync placements, but avoid generic marketing language.
+You can only pitch one unreleased song at a time through Spotify for Artists, and once a track goes live, it becomes ineligible for pitching. Most streaming platforms refresh playlists weekly, with the heaviest activity occurring around new release cycles. The only quiet period for playlist updates is the Christmas and New Year window.
+
+## Writing an Effective Pitch
+
+Your pitch should follow a story-first formula with three beats:
+
+**Beat 1 — Emotional Core:** Open with what the song is about and who it's for. Tell the specific, personal story that inspired it. Use vivid, concrete details — a particular place, a feeling, a memory. This is what makes your pitch memorable when curators are scanning hundreds of submissions.
+
+**Beat 2 — Sonic Placement:** Describe your sound using specific genre and mood descriptors, plus 1-2 reference artists. These function as searchable metadata tags that curators use to filter through thousands of songs. Be precise: "dream-pop layered over trap hi-hats, somewhere between Toro y Moi and SZA" — not "indie with vibes" or "soulful masterpiece."
+
+**Beat 3 — Context + Playlist Fit:** Ground the song in the real world with one concrete detail — an upcoming show, a tour, press coverage, or a location-specific connection. Then name 1-2 specific editorial playlists where your song would fit naturally.
+
+### What to include in your pitch
+
+- Why you wrote the song and the personal story behind it
+- Who the song is for — the listener you had in mind
+- Your specific musical influences and sonic reference points
+- Your genre described with precise, searchable descriptors
+- A real-world anchor — an upcoming live show, tour date, or press moment
+- 1-2 specific editorial playlists that match your sound and mood
+
+### What to avoid in your pitch
+
+- Streaming statistics — curators already have your dashboard data
+- Hype words and self-proclamation — "banger," "monster hit," "fire," "certified anthem"
+- Links, @handles, or social media references
+- Generic mega-playlists as targets (unless you genuinely fit them)
+- Vague or undefined genre descriptions — "kinda pop, kinda rap, kinda vibes"
+- Copy-pasting your artist bio instead of telling the story of this specific song
+- Mentioning ad spend, paid promotion budgets, or bought followers
+- Marketing language that could apply to any artist or any song
 
 ## Release Strategy and Consistency
 
@@ -66,7 +96,7 @@ Maintain realistic expectations about playlist outcomes. Editorial placement doe
 
 ## Key Takeaways
 
-- Submit music 7+ days before release for algorithmic playlist eligibility and 3-4 weeks for optimal editorial consideration
+- Submit music 7+ days before release for Release Radar eligibility and 4-6 weeks for optimal editorial consideration
 - Prioritize engaged streams over total stream counts by driving saves, follows, and playlist additions
 - Maintain consistent release schedules with next releases prepared before current ones launch
 - Optimize artist profiles and create branded playlists to demonstrate platform engagement

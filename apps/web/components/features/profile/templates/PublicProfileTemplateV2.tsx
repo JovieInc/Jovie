@@ -17,7 +17,6 @@ import { ProfileHeroCard } from '@/features/profile/ProfileHeroCard';
 import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
 import { useSwipeMode } from '@/hooks/useSwipeMode';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
-import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import {
   detectSourcePlatform,
   getHeaderSocialLinks,
@@ -42,8 +41,6 @@ interface PublicProfileTemplateV2Props {
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
-  readonly photoDownloadSizes?: AvatarSize[];
-  readonly allowPhotoDownloads?: boolean;
 }
 
 function normalizeInitialMode(mode: ProfileMode): SwipeableProfileMode {
@@ -103,7 +100,7 @@ export function PublicProfileTemplateV2({
     [artist, socialLinks]
   );
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (typeof globalThis.window === 'undefined') {
       return null;
     }
 
@@ -139,7 +136,7 @@ export function PublicProfileTemplateV2({
   }, [mode, setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
 
     const handlePopState = () => {
       const nextMode = getModeFromLocation();
@@ -153,7 +150,7 @@ export function PublicProfileTemplateV2({
   }, [setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof globalThis.window === 'undefined') return;
 
     const href = buildModeHref(activeMode);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;

@@ -114,6 +114,73 @@ function LeadActionsCell({
   );
 }
 
+function renderNameHandleCell({ row }: { row: { original: AdminLead } }) {
+  const lead = row.original;
+  return (
+    <div className='flex flex-col'>
+      <span className='font-medium text-primary-token'>
+        {lead.displayName || lead.linktreeHandle}
+      </span>
+      <a
+        href={lead.linktreeUrl}
+        target='_blank'
+        rel='noopener noreferrer'
+        className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
+      >
+        @{lead.linktreeHandle}
+        <ExternalLink className='h-3 w-3' />
+      </a>
+    </div>
+  );
+}
+
+function renderStatusBadgeCell({ getValue }: { getValue: () => string }) {
+  const status = getValue();
+  return (
+    <Badge variant={STATUS_VARIANT[status] ?? 'secondary'}>{status}</Badge>
+  );
+}
+
+function renderFitScoreCell({ getValue }: { getValue: () => number | null }) {
+  return <span className='tabular-nums'>{getValue() ?? '-'}</span>;
+}
+
+function renderSignalsCell({ row }: { row: { original: AdminLead } }) {
+  const lead = row.original;
+  return (
+    <div className='flex gap-1'>
+      {lead.hasSpotifyLink && (
+        <Badge variant='secondary' className='text-2xs'>
+          Spotify
+        </Badge>
+      )}
+      {lead.hasPaidTier && (
+        <Badge variant='secondary' className='text-2xs'>
+          Paid
+        </Badge>
+      )}
+      {lead.hasInstagram && (
+        <Badge variant='secondary' className='text-2xs'>
+          IG
+        </Badge>
+      )}
+      {lead.contactEmail && (
+        <Badge variant='secondary' className='text-2xs'>
+          Email
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+function renderToolsCell({ row }: { row: { original: AdminLead } }) {
+  const tools = row.original.musicToolsDetected;
+  if (tools.length === 0) {
+    return <span className='text-tertiary-token'>-</span>;
+  }
+  return <span className='text-secondary-token'>{tools.join(', ')}</span>;
+}
+
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -191,102 +258,35 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       columnHelper.accessor('displayName', {
         header: 'Name / Handle',
         size: 200,
-        cell: ({ row }) => {
-          // NOSONAR — TanStack Table render prop
-          const lead = row.original;
-          return (
-            <div className='flex flex-col'>
-              <span className='font-medium text-primary-token'>
-                {lead.displayName || lead.linktreeHandle}
-              </span>
-              <a
-                href={lead.linktreeUrl}
-                target='_blank'
-                rel='noopener noreferrer'
-                className='flex items-center gap-1 text-secondary-token hover:text-primary-token'
-              >
-                @{lead.linktreeHandle}
-                <ExternalLink className='h-3 w-3' />
-              </a>
-            </div>
-          );
-        },
+        cell: renderNameHandleCell,
       }),
       columnHelper.accessor('status', {
         header: 'Status',
         size: 100,
-        cell: ({ getValue }) => {
-          // NOSONAR — TanStack Table render prop
-          const status = getValue();
-          return (
-            <Badge variant={STATUS_VARIANT[status] ?? 'secondary'}>
-              {status}
-            </Badge>
-          );
-        },
+        cell: renderStatusBadgeCell,
       }),
       columnHelper.accessor('fitScore', {
         header: 'Score',
         size: 70,
-        cell: (
-          { getValue } // NOSONAR — TanStack Table render prop
-        ) => <span className='tabular-nums'>{getValue() ?? '-'}</span>,
+        cell: renderFitScoreCell,
       }),
       columnHelper.display({
         id: 'signals',
         header: 'Signals',
         size: 180,
-        cell: ({ row }) => {
-          // NOSONAR — TanStack Table render prop
-          const lead = row.original;
-          return (
-            <div className='flex gap-1'>
-              {lead.hasSpotifyLink && (
-                <Badge variant='secondary' className='text-2xs'>
-                  Spotify
-                </Badge>
-              )}
-              {lead.hasPaidTier && (
-                <Badge variant='secondary' className='text-2xs'>
-                  Paid
-                </Badge>
-              )}
-              {lead.hasInstagram && (
-                <Badge variant='secondary' className='text-2xs'>
-                  IG
-                </Badge>
-              )}
-              {lead.contactEmail && (
-                <Badge variant='secondary' className='text-2xs'>
-                  Email
-                </Badge>
-              )}
-            </div>
-          );
-        },
+        cell: renderSignalsCell,
       }),
       columnHelper.display({
         id: 'tools',
         header: 'Tools',
         size: 140,
-        cell: ({ row }) => {
-          // NOSONAR — TanStack Table render prop
-          const tools = row.original.musicToolsDetected;
-          if (tools.length === 0) {
-            return <span className='text-tertiary-token'>-</span>;
-          }
-          return (
-            <span className='text-secondary-token'>{tools.join(', ')}</span>
-          );
-        },
+        cell: renderToolsCell,
       }),
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
         size: 80,
-        cell: (
-          { row } // NOSONAR — TanStack Table render prop
-        ) => (
+        cell: ({ row }) => (
           <LeadActionsCell
             lead={row.original}
             onUpdateStatus={updateLeadStatus}
