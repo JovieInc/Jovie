@@ -34,9 +34,10 @@ export function prefetchForRoute(
       // Audience uses cursor-based pagination — prefetch the first page
       queryClient.prefetchQuery({
         queryKey: queryKeys.audience.members(profileId),
-        queryFn: () =>
+        queryFn: ({ signal }) =>
           fetchWithTimeout<unknown>(
-            `/api/dashboard/audience/members?profileId=${encodeURIComponent(profileId)}`
+            `/api/dashboard/audience/members?profileId=${encodeURIComponent(profileId)}`,
+            { signal }
           ),
         staleTime,
       });
@@ -44,9 +45,10 @@ export function prefetchForRoute(
     case 'presence':
       queryClient.prefetchQuery({
         queryKey: queryKeys.dspEnrichment.matches(profileId),
-        queryFn: () =>
+        queryFn: ({ signal }) =>
           fetchWithTimeout<unknown>(
-            `/api/dsp/matches?profileId=${encodeURIComponent(profileId)}`
+            `/api/dsp/matches?profileId=${encodeURIComponent(profileId)}`,
+            { signal }
           ),
         staleTime,
       });
