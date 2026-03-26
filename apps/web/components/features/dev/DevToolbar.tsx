@@ -131,49 +131,25 @@ const ENV_COLORS: Record<string, string> = {
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
 
-export function DevToolbar({
-  env,
-  sha,
-  version,
-}: Readonly<{
-  env: string;
-  sha: string;
-  version: string;
-}>) {
-  const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState(true);
-  const [mounted, setMounted] = useState(false);
-  const [search, setSearch] = useState('');
-  const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
-  const [unwaitlistState, setUnwaitlistState] = useState<
-    'idle' | 'loading' | 'done' | 'error'
-  >('idle');
-  const [clearSessionState, setClearSessionState] = useState<
-    'idle' | 'loading' | 'done' | 'error'
-  >('idle');
-  const [swEnabled, setSwEnabled] = useState(false);
-  const [promoteState, setPromoteState] = useState<
-    'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
-  >('idle');
-  const [promoteSha, setPromoteSha] = useState<{
-    staging: string;
-    prod: string;
-  } | null>(null);
-  const { theme, setTheme } = useTheme();
-  const overridesCtx = useLocalOverrides();
-  const toolbarRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const breakpoint = useBreakpoint();
+// ---------------------------------------------------------------------------
+// Extracted hooks and helpers to reduce DevToolbar cognitive complexity (S3776)
+// ---------------------------------------------------------------------------
 
-  // Restore state from localStorage and mark as mounted
-  useEffect(() => {
-    setMounted(true);
-    setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
-    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
-    setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
-  }, []);
+type PromoteState =
+  | 'idle'
+  | 'checking'
+  | 'ready'
+  | 'promoting'
+  | 'done'
+  | 'error';
+type ActionState = 'idle' | 'loading' | 'done' | 'error';
 
-  // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
+function useToolbarKeyboard(
+  hidden: boolean,
+  open: boolean,
+  setHidden: React.Dispatch<React.SetStateAction<boolean>>,
+  setOpen: React.Dispatch<React.SetStateAction<boolean>>
+): void {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd') {
@@ -194,27 +170,16 @@ export function DevToolbar({
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [hidden, open]);
+  }, [hidden, open, setHidden, setOpen]);
+}
 
-  // Add bottom padding to body so the toolbar doesn't cover content
-  useEffect(() => {
-    if (hidden) {
-      document.body.style.paddingBottom = '';
-      return;
-    }
-    const updatePadding = () => {
-      const h = toolbarRef.current?.offsetHeight ?? 0;
-      document.body.style.paddingBottom = h > 0 ? `${h}px` : '';
-    };
-    updatePadding();
-    const timer = setTimeout(updatePadding, 220);
-    return () => {
-      clearTimeout(timer);
-      document.body.style.paddingBottom = '';
-    };
-  }, [open, hidden]);
+function useDeployStatus(env: string, hidden: boolean) {
+  const [promoteState, setPromoteState] = useState<PromoteState>('idle');
+  const [promoteSha, setPromoteSha] = useState<{
+    staging: string;
+    prod: string;
+  } | null>(null);
 
-  // Poll deploy status for promote button (preview only, when toolbar visible)
   useEffect(() => {
     if (env !== 'preview' || hidden) return;
     let active = true;
@@ -226,10 +191,7 @@ export function DevToolbar({
         if (!res.ok || !active) return;
         const data = await res.json();
         if (!active) return;
-        setPromoteSha({
-          staging: data.stagingSha,
-          prod: data.prodSha,
-        });
+        setPromoteSha({ staging: data.stagingSha, prod: data.prodSha });
         setPromoteState(prev =>
           prev === 'promoting' || prev === 'done'
             ? prev
@@ -250,7 +212,7 @@ export function DevToolbar({
     };
   }, [env, hidden]);
 
-  async function handlePromote() {
+  const handlePromote = useCallback(async () => {
     setPromoteState('promoting');
     try {
       const res = await fetch('/api/deploy/promote', { method: 'POST' });
@@ -267,7 +229,107 @@ export function DevToolbar({
       setPromoteState('error');
       setTimeout(() => setPromoteState('ready'), 3000);
     }
+  }, []);
+
+  return { promoteState, promoteSha, handlePromote };
+}
+
+async function runDevAction(
+  url: string,
+  setState: (s: ActionState) => void,
+  onSuccess?: () => void
+): Promise<void> {
+  setState('loading');
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    const data = await res.json().catch(() => null);
+    if (data?.success) {
+      setState('done');
+      onSuccess?.();
+    } else {
+      setState('error');
+      setTimeout(() => setState('idle'), 3000);
+    }
+  } catch {
+    setState('error');
+    setTimeout(() => setState('idle'), 3000);
   }
+}
+
+function clearClientSessionData(): void {
+  const toolbarOpen = localStorage.getItem(TOOLBAR_STORAGE_KEY);
+  const toolbarHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
+  localStorage.clear();
+  if (toolbarOpen !== null)
+    localStorage.setItem(TOOLBAR_STORAGE_KEY, toolbarOpen);
+  if (toolbarHidden !== null)
+    localStorage.setItem(TOOLBAR_HIDDEN_KEY, toolbarHidden);
+
+  sessionStorage.clear();
+
+  for (const cookie of document.cookie.split(';')) {
+    const name = cookie.split('=')[0].trim();
+    if (!name || name.startsWith('__dev_toolbar')) continue;
+    document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+  }
+}
+
+export function DevToolbar({
+  env,
+  sha,
+  version,
+}: Readonly<{
+  env: string;
+  sha: string;
+  version: string;
+}>) {
+  const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(true);
+  const [mounted, setMounted] = useState(false);
+  const [search, setSearch] = useState('');
+  const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const [unwaitlistState, setUnwaitlistState] = useState<ActionState>('idle');
+  const [clearSessionState, setClearSessionState] =
+    useState<ActionState>('idle');
+  const [swEnabled, setSwEnabled] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const overridesCtx = useLocalOverrides();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const breakpoint = useBreakpoint();
+
+  // Restore state from localStorage and mark as mounted
+  useEffect(() => {
+    setMounted(true);
+    setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
+    setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
+    setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
+  }, []);
+
+  useToolbarKeyboard(hidden, open, setHidden, setOpen);
+
+  // Add bottom padding to body so the toolbar doesn't cover content
+  useEffect(() => {
+    if (hidden) {
+      document.body.style.paddingBottom = '';
+      return;
+    }
+    const updatePadding = () => {
+      const h = toolbarRef.current?.offsetHeight ?? 0;
+      document.body.style.paddingBottom = h > 0 ? `${h}px` : '';
+    };
+    updatePadding();
+    const timer = setTimeout(updatePadding, 220);
+    return () => {
+      clearTimeout(timer);
+      document.body.style.paddingBottom = '';
+    };
+  }, [open, hidden]);
+
+  const { promoteState, promoteSha, handlePromote } = useDeployStatus(
+    env,
+    hidden
+  );
 
   function toggleOpen() {
     setOpen(prev => {
@@ -323,59 +385,17 @@ export function DevToolbar({
     }
   }
 
-  async function handleUnwaitlist() {
-    setUnwaitlistState('loading');
-    try {
-      const res = await fetch('/api/dev/unwaitlist', { method: 'POST' });
-      const data = await res.json().catch(() => null);
-      if (data?.success) {
-        setUnwaitlistState('done');
-        setTimeout(() => globalThis.location.reload(), 500);
-      } else {
-        setUnwaitlistState('error');
-        setTimeout(() => setUnwaitlistState('idle'), 3000);
-      }
-    } catch {
-      setUnwaitlistState('error');
-      setTimeout(() => setUnwaitlistState('idle'), 3000);
-    }
+  function handleUnwaitlist() {
+    runDevAction('/api/dev/unwaitlist', setUnwaitlistState, () => {
+      setTimeout(() => globalThis.location.reload(), 500);
+    });
   }
 
-  async function handleClearSession() {
-    setClearSessionState('loading');
-    try {
-      const res = await fetch('/api/dev/clear-session', { method: 'POST' });
-      const data = await res.json().catch(() => null);
-      if (data?.success) {
-        // Preserve toolbar state, clear everything else from localStorage
-        const toolbarOpen = localStorage.getItem(TOOLBAR_STORAGE_KEY);
-        const toolbarHidden = localStorage.getItem(TOOLBAR_HIDDEN_KEY);
-        localStorage.clear();
-        if (toolbarOpen !== null)
-          localStorage.setItem(TOOLBAR_STORAGE_KEY, toolbarOpen);
-        if (toolbarHidden !== null)
-          localStorage.setItem(TOOLBAR_HIDDEN_KEY, toolbarHidden);
-
-        // Clear sessionStorage entirely
-        sessionStorage.clear();
-
-        // Clear non-HttpOnly cookies client-side (belt + suspenders)
-        for (const cookie of document.cookie.split(';')) {
-          const name = cookie.split('=')[0].trim();
-          if (!name || name.startsWith('__dev_toolbar')) continue;
-          document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
-        }
-
-        setClearSessionState('done');
-        setTimeout(() => globalThis.location.reload(), 500);
-      } else {
-        setClearSessionState('error');
-        setTimeout(() => setClearSessionState('idle'), 3000);
-      }
-    } catch {
-      setClearSessionState('error');
-      setTimeout(() => setClearSessionState('idle'), 3000);
-    }
+  function handleClearSession() {
+    runDevAction('/api/dev/clear-session', setClearSessionState, () => {
+      clearClientSessionData();
+      setTimeout(() => globalThis.location.reload(), 500);
+    });
   }
 
   const envColor =
