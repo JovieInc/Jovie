@@ -38,10 +38,15 @@ describe('clerkAvailability', () => {
       expect(getClerkProxyUrl()).toBe('/__clerk');
     });
 
-    it('supports full URL for staging', () => {
+    it('supports full URL for Clerk FAPI', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
-      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', 'https://clerk.staging.jov.ie');
-      expect(getClerkProxyUrl()).toBe('https://clerk.staging.jov.ie');
+      vi.stubEnv(
+        'NEXT_PUBLIC_CLERK_PROXY_URL',
+        'https://distinct-giraffe-5.clerk.accounts.dev'
+      );
+      expect(getClerkProxyUrl()).toBe(
+        'https://distinct-giraffe-5.clerk.accounts.dev'
+      );
     });
 
     it('returns undefined when NEXT_PUBLIC_CLERK_PROXY_DISABLED is "1"', () => {

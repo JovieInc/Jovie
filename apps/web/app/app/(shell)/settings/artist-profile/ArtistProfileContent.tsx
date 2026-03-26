@@ -6,7 +6,7 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import { SettingsErrorState } from '@/features/dashboard/molecules/SettingsErrorState';
 import { SettingsBrandingSection } from '@/features/dashboard/organisms/SettingsBrandingSection';
 import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
-import { SettingsArtistProfileSection } from '@/features/dashboard/organisms/settings-artist-profile-section';
+import { SettingsProfileSection } from '@/features/dashboard/organisms/settings-profile-section';
 import { useSettingsContext } from '@/features/dashboard/organisms/useSettingsContext';
 
 function MobileProfilePanelTrigger() {
@@ -53,7 +53,7 @@ export function ArtistProfileContent() {
         description='Photo, display name, username, and branding.'
       >
         <div className='space-y-4'>
-          <SettingsArtistProfileSection
+          <SettingsProfileSection
             artist={artist}
             onArtistUpdate={setArtist}
             onRefresh={() => router.refresh()}
