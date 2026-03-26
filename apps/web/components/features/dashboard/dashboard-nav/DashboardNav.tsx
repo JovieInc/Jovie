@@ -1,8 +1,9 @@
 'use client';
 
+import { useQueryClient } from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
@@ -17,6 +18,7 @@ import { env } from '@/lib/env-client';
 import { useCodeFlag } from '@/lib/feature-flags/client';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
 import { useReleasesQuery } from '@/lib/queries';
+import { prefetchForRoute } from '@/lib/queries/prefetch-dashboard';
 import {
   adminNavigationSections,
   artistSettingsNavigation,
@@ -56,6 +58,7 @@ export function DashboardNav(_: DashboardNavProps) {
   const { isAdmin, selectedProfile } = useDashboardData();
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const threadsEnabled = useCodeFlag('THREADS_ENABLED');
   const { isOpen: isPreviewOpen, open: openPreviewPanel } =
     usePreviewPanelState();
@@ -112,6 +115,24 @@ export function DashboardNav(_: DashboardNavProps) {
     }
   }, [pathname, openPreviewPanel, router]);
 
+  // Debounced prefetch: avoid firing on fast mouse sweeps across nav items
+  const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+    },
+    []
+  );
+  const handlePrefetch = useCallback(
+    (itemId: string) => {
+      if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
+      prefetchTimerRef.current = setTimeout(() => {
+        prefetchForRoute(itemId, queryClient, profileId || undefined);
+      }, 150);
+    },
+    [queryClient, profileId]
+  );
+
   // In demo mode, intercept nav clicks for tabs without demo data
   const handleDemoNavClick = useCallback((item: NavItem) => {
     toast.info(`${item.name} is not available in demo mode`);
@@ -141,6 +162,7 @@ export function DashboardNav(_: DashboardNavProps) {
           shortcut={shortcut}
           actions={isProfileItem ? profileActions : null}
           onClick={onClick}
+          onPrefetch={() => handlePrefetch(item.id)}
         />
       );
     },
@@ -149,6 +171,7 @@ export function DashboardNav(_: DashboardNavProps) {
       profileActions,
       handleProfileClick,
       handleDemoNavClick,
+      handlePrefetch,
       isPreviewOpen,
       isDemo,
     ]
