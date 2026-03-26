@@ -1,8 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 
 export interface SettingsSectionProps {
@@ -11,7 +9,6 @@ export interface SettingsSectionProps {
   readonly description?: string;
   readonly children: React.ReactNode;
   readonly className?: string;
-  readonly headerClassName?: string;
   readonly titleClassName?: string;
   readonly descriptionClassName?: string;
 }
@@ -22,7 +19,6 @@ export function SettingsSection({
   description,
   children,
   className,
-  headerClassName,
   titleClassName,
   descriptionClassName,
 }: SettingsSectionProps) {
@@ -30,34 +26,35 @@ export function SettingsSection({
   const descriptionId = description ? `${id}-description` : undefined;
 
   return (
-    <ContentSurfaceCard
-      as='section'
-      surface='details'
+    <section
       id={id}
       aria-labelledby={headingId}
       aria-describedby={descriptionId}
-      className={cn('scroll-mt-4 overflow-hidden', className)}
+      className={cn('scroll-mt-4', className)}
     >
-      <ContentSectionHeader
-        density='compact'
-        className={cn('min-h-0', headerClassName)}
-        bodyClassName='space-y-px'
-        title={<span id={headingId}>{title}</span>}
-        subtitle={
-          description ? (
-            <span id={descriptionId}>{description}</span>
-          ) : undefined
-        }
-        titleClassName={cn(
-          'dashboard-heading text-[14px] font-[560] text-primary-token tracking-[-0.015em]',
-          titleClassName
-        )}
-        subtitleClassName={cn(
-          'dashboard-body text-[12px] leading-[16px] text-secondary-token',
-          descriptionClassName
-        )}
-      />
-      <div className='space-y-3.5 px-4 py-3.5 sm:px-5'>{children}</div>
-    </ContentSurfaceCard>
+      <div className='space-y-0.5 pb-3'>
+        <h2
+          id={headingId}
+          className={cn(
+            'dashboard-heading text-[15px] font-[590] tracking-[-0.02em] text-primary-token',
+            titleClassName
+          )}
+        >
+          {title}
+        </h2>
+        {description ? (
+          <p
+            id={descriptionId}
+            className={cn(
+              'dashboard-body text-[12px] text-secondary-token',
+              descriptionClassName
+            )}
+          >
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <div className='space-y-3'>{children}</div>
+    </section>
   );
 }
