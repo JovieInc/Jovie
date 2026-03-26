@@ -82,6 +82,9 @@ export default defineConfig({
             NODE_ENV: 'test',
             PORT: '3100',
             NEXT_DISABLE_TOOLBAR: '1',
+            // Enable E2E mode so server-side gating disables DevToolbar,
+            // Intercom, structured data scripts, and other non-screenshot UI.
+            NEXT_PUBLIC_E2E_MODE: '1',
             // Disable Clerk proxy for screenshots — Clerk JS loads from its own
             // CDN instead of proxying through localhost (which requires HTTPS).
             NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
