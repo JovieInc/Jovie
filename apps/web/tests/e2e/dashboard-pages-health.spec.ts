@@ -383,7 +383,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           // in the sidebar, so data-testid="user-button-loaded" is not visible.
           const viewportSize = page.viewportSize();
           const isDesktopViewport = viewportSize && viewportSize.width >= 1024;
-          if (isDesktopViewport) {
+          if (isDesktopViewport && pageConfig.requiresUserButton) {
             let userButtonLoaded = false;
             try {
               await page

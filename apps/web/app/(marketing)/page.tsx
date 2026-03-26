@@ -168,27 +168,17 @@ export default function HomePage() {
       <LazyAuthRedirectHandler />
 
       {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
       {/* In hero-only mode, hide footer and prevent scroll (footer is in layout) */}
       {heroOnly && (
-        <style
-          dangerouslySetInnerHTML={{
-            __html:
-              'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}',
-          }}
-        />
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
       )}
 
       {/* 1. Hero — claim form left, phone right */}

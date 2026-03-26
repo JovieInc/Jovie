@@ -7,6 +7,8 @@ export interface DashboardRouteDescriptor {
   readonly contentSelector?: string;
   /** Fallback selector — empty/alternate state that's also acceptable */
   readonly contentFallbackSelector?: string;
+  /** Whether the route renders the unified sidebar user menu shell */
+  readonly requiresUserButton?: boolean;
   /** CI performance budget in ms (default: 12000) */
   readonly performanceBudgetMs?: number;
 }
@@ -23,12 +25,14 @@ const creatorDashboardRoutes = [
     path: APP_ROUTES.AUDIENCE,
     name: 'Audience',
     contentSelector: '[data-testid="dashboard-audience-client"]',
+    requiresUserButton: true,
   },
   {
     path: APP_ROUTES.CHAT,
     name: 'Chat',
     contentSelector:
       '[placeholder*="ask jovie" i], [placeholder*="Ask Jovie" i]',
+    requiresUserButton: true,
     performanceBudgetMs: 8_000,
   },
   {
@@ -36,12 +40,14 @@ const creatorDashboardRoutes = [
     name: 'Earnings',
     contentSelector:
       'button:has-text("Connect Venmo"), :text-matches("connect venmo|share this link anywhere", "i")',
+    requiresUserButton: true,
   },
   {
     path: APP_ROUTES.PRESENCE,
     name: 'Presence',
     contentSelector: '[data-testid^="presence-card-"]',
     contentFallbackSelector: ':text-matches("no dsp profiles found", "i")',
+    requiresUserButton: true,
   },
   {
     path: APP_ROUTES.RELEASES,
@@ -49,7 +55,14 @@ const creatorDashboardRoutes = [
     contentSelector: '[data-testid="releases-matrix"] h1',
     contentFallbackSelector:
       '[data-testid="releases-empty-state-enriching"], :text-matches("connect spotify|finding your music|no releases", "i")',
+    requiresUserButton: true,
   },
+] as const satisfies readonly DashboardRouteDescriptor[];
+
+const creatorHealthFastRoutes = [
+  creatorDashboardRoutes[0],
+  creatorDashboardRoutes[1],
+  creatorDashboardRoutes[4],
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
 const creatorSettingsRoutes = [
@@ -79,11 +92,7 @@ export const DASHBOARD_ROUTE_MATRIX = {
       { path: APP_ROUTES.SETTINGS_CONTACTS, name: 'Contacts' },
       { path: APP_ROUTES.SETTINGS_TOURING, name: 'Touring' },
     ],
-    fast: [
-      { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
-      { path: APP_ROUTES.CHAT, name: 'Chat' },
-      { path: APP_ROUTES.RELEASES, name: 'Releases' },
-    ],
+    fast: creatorHealthFastRoutes,
   },
   dashboard: {
     full: creatorDashboardRoutes,
