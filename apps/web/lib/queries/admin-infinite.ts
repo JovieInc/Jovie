@@ -220,6 +220,62 @@ export function useAdminCreatorsInfiniteQuery({
   });
 }
 
+export type { AdminReleaseRow } from '@/lib/admin/releases';
+
+export type AdminReleasesSort =
+  | 'release_date_desc'
+  | 'release_date_asc'
+  | 'created_desc'
+  | 'created_asc'
+  | 'title_asc'
+  | 'title_desc';
+
+export function useAdminReleasesInfiniteQuery({
+  sort,
+  search,
+  pageSize = DEFAULT_PAGE_SIZE,
+  initialData,
+}: {
+  sort: AdminReleasesSort;
+  search: string;
+  pageSize?: number;
+  initialData?: InfinitePage<import('@/lib/admin/releases').AdminReleaseRow>;
+}) {
+  return useInfiniteQuery<
+    InfinitePage<import('@/lib/admin/releases').AdminReleaseRow>
+  >({
+    queryKey: queryKeys.adminReleases.list({ sort, search, pageSize }),
+    queryFn: async ({ pageParam, signal }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(pageSize),
+        sort,
+        q: search,
+      });
+      const page = await fetchPage<
+        import('@/lib/admin/releases').AdminReleaseRow
+      >(`/api/admin/releases?${params.toString()}`, signal);
+      return {
+        ...page,
+        rows: page.rows.map(row => ({
+          ...row,
+          releaseDate: parseDate(row.releaseDate),
+          createdAt: parseDate(row.createdAt),
+        })),
+      };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((acc, page) => acc + page.rows.length, 0);
+      return loaded < lastPage.total ? allPages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
+    initialData: initialData
+      ? { pages: [initialData], pageParams: [1] }
+      : undefined,
+    ...PAGINATED_CACHE,
+  });
+}
+
 export function useAdminWaitlistInfiniteQuery({
   pageSize = DEFAULT_PAGE_SIZE,
   initialData,
