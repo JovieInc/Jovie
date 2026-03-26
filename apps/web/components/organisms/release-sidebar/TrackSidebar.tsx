@@ -93,7 +93,7 @@ export function TrackSidebar({
   const smartLinkUrl = track ? `${getBaseUrl()}${track.smartLinkPath}` : '';
 
   const showSmartLinkCopied = useCallback(() => {
-    toast.success('Smart link copied');
+    toast.success('Track link copied');
     setIsSmartLinkCopied(true);
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(
@@ -135,7 +135,7 @@ export function TrackSidebar({
     return [
       {
         id: 'refresh-copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy smart link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
         icon: Copy,
         activeIcon: Check,
         isActive: isSmartLinkCopied,
@@ -143,7 +143,7 @@ export function TrackSidebar({
       },
       {
         id: 'open',
-        label: 'Open smart link',
+        label: 'Open track link',
         icon: ExternalLink,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -175,7 +175,7 @@ export function TrackSidebar({
     return [
       {
         id: 'copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy smart link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
         icon: Copy,
         activeIcon: Check,
         isActive: isSmartLinkCopied,
@@ -183,7 +183,7 @@ export function TrackSidebar({
       },
       {
         id: 'open',
-        label: 'Open smart link',
+        label: 'Open track link',
         icon: ExternalLink,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -278,7 +278,7 @@ export function TrackSidebar({
                 >
                   <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
                     <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                      Smart link
+                      Track link
                     </p>
                   </div>
                   <div className='p-2.5'>
@@ -287,8 +287,8 @@ export function TrackSidebar({
                       size='md'
                       className='rounded-[8px]'
                       surface='boxed'
-                      copyButtonTitle='Copy smart link'
-                      openButtonTitle='Open smart link'
+                      copyButtonTitle='Copy track link'
+                      openButtonTitle='Open track link'
                       onCopySuccess={() => {
                         showSmartLinkCopied();
                       }}
