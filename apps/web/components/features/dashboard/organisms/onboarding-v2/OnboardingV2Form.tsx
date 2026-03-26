@@ -1155,7 +1155,7 @@ export function OnboardingV2Form({
       // sessionStorage may be unavailable in restricted contexts
     }
 
-    const nextUrl = `${APP_ROUTES.DASHBOARD}?from=onboarding&panel=profile`;
+    const nextUrl = `${APP_ROUTES.CHAT}?from=onboarding&panel=profile`;
     if (
       'startViewTransition' in document &&
       typeof document.startViewTransition === 'function'
