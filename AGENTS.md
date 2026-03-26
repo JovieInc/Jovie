@@ -754,12 +754,41 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk |
+| Auth | Clerk (single instance, proxy via `/__clerk`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 22 LTS |
+
+### Clerk Auth Proxy Architecture
+
+**CRITICAL — read this before touching anything Clerk-related.**
+
+Each environment has its own Clerk instance with its own publishable key (set in Doppler):
+- **Production** (`prd`): `pk_live_...LmllJA` → FAPI host `clerk.jov.ie`
+- **Staging** (`stg`): `pk_live_...aWUk` → FAPI host `clerk.staging.jov.ie`
+- **Dev** (`dev`): `pk_test_...ZGlzdGluY3Q...` → FAPI host `distinct-giraffe-5.clerk.accounts.dev`
+
+The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin. Dev mode doesn't use the proxy — ClerkProvider talks directly to Clerk.
+
+**How the proxy works:**
+- Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
+- Decodes the FAPI host from `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` at runtime
+- Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
+- Each environment automatically routes to the correct Clerk instance via Doppler
+
+**DO NOT:**
+- Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
+- Use `vercel.json` rewrites as the primary mechanism — same Host header problem
+- Hardcode FAPI hosts — always decode from the publishable key
+- Use `clerk.jov.ie` or `clerk.staging.jov.ie` as public-facing URLs — traffic goes through `/__clerk` path proxy only
+- Add satellite/custom proxy domains — they cost money and are unnecessary with the fetch proxy
+
+**If Clerk auth breaks:**
+1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the publishable key
+2. Check the publishable key in Doppler (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) for each env
+3. Check CSP allows the decoded FAPI host in connect-src, script-src, frame-src
 
 ### API Runtime
 
