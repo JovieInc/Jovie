@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     'See Jovie audience CRM in action. Explore fan intelligence, source tracking, and segments — no sign-up required.',
 };
 
-export const revalidate = false;
+export const dynamic = 'force-dynamic';
 
 export default function DemoAudiencePage() {
   return (

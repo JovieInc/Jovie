@@ -14,8 +14,11 @@ describe('getCoreProviderVariant', () => {
     expect(getCoreProviderVariant('/onboarding')).toBe('full');
   });
 
+  it('returns homepage for the marketing root route', () => {
+    expect(getCoreProviderVariant('/')).toBe('homepage');
+  });
+
   it('returns public for marketing and profile routes', () => {
-    expect(getCoreProviderVariant('/')).toBe('public');
     expect(getCoreProviderVariant('/pricing')).toBe('public');
     expect(getCoreProviderVariant('/blog/some-post')).toBe('public');
     expect(getCoreProviderVariant('/artistname')).toBe('public');
