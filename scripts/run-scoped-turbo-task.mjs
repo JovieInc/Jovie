@@ -21,55 +21,6 @@ function tryExec(command, args) {
   }
 }
 
-function hasPathChanged(targetPath) {
-  const diffChecks = [
-    ['diff', '--name-only', '--relative', '--', targetPath],
-    ['diff', '--name-only', '--relative', '--cached', '--', targetPath],
-  ];
-
-  for (const args of diffChecks) {
-    if (tryExec('git', args)) {
-      return true;
-    }
-  }
-
-  const untracked = tryExec('git', [
-    'ls-files',
-    '--others',
-    '--exclude-standard',
-    targetPath,
-  ]);
-  if (untracked) {
-    return true;
-  }
-
-  const baseCandidates = [
-    'origin/develop',
-    'origin/main',
-    'develop',
-    'main',
-  ].filter(Boolean);
-
-  for (const base of baseCandidates) {
-    const exists = tryExec('git', ['rev-parse', '--verify', base]);
-    if (!exists) continue;
-
-    const branchDiff = tryExec('git', [
-      'diff',
-      '--name-only',
-      '--relative',
-      `${base}...HEAD`,
-      '--',
-      targetPath,
-    ]);
-    if (branchDiff) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 function resolveMergeBase() {
   const baseCandidates = [
     'origin/develop',
@@ -92,27 +43,27 @@ function resolveMergeBase() {
 }
 
 function buildFallbackTurboArgs() {
-  const turboArgs = ['turbo', task, ...extraArgs];
-
-  if (!hasPathChanged('apps/should-i-make')) {
-    turboArgs.push('--filter=!@jovie/should-i-make');
-    console.log(
-      `Skipping @jovie/should-i-make for turbo ${task}; no changes detected.`
-    );
-  }
-
-  return turboArgs;
+  return ['turbo', task, ...extraArgs];
 }
 
 const mergeBase = resolveMergeBase();
+const headSha = tryExec('git', ['rev-parse', 'HEAD']);
 const turboArgs = mergeBase
-  ? ['turbo', task, '--affected', ...extraArgs]
+  ? mergeBase.mergeBase === headSha
+    ? buildFallbackTurboArgs()
+    : ['turbo', task, '--affected', ...extraArgs]
   : buildFallbackTurboArgs();
 
 if (mergeBase) {
-  console.log(
-    `Using turbo --affected for ${task}; merge base found against ${mergeBase.base}.`
-  );
+  if (mergeBase.mergeBase === headSha) {
+    console.log(
+      `Skipping turbo --affected for ${task}; HEAD matches merge base against ${mergeBase.base}.`
+    );
+  } else {
+    console.log(
+      `Using turbo --affected for ${task}; merge base found against ${mergeBase.base}.`
+    );
+  }
 }
 
 const result = spawnSync('pnpm', turboArgs, {

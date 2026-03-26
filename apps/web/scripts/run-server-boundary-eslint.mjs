@@ -64,6 +64,13 @@ const eligiblePaths = [
   ),
 ];
 
+if (passthroughArgs.length > 0 && eligiblePaths.length === 0) {
+  console.log(
+    `[${projectName}] All passed files were filtered; skipping server-boundary lint.`
+  );
+  process.exit(0);
+}
+
 const eslintArgs = [
   'exec',
   'eslint',
