@@ -15,7 +15,10 @@ import { eq } from 'drizzle-orm';
 
 import { type DbOrTransaction } from '@/lib/db';
 import { artistIdentityLinks } from '@/lib/db/schema/identity';
-import { MUSICFETCH_SERVICE_TO_DSP } from '@/lib/dsp-registry';
+import {
+  getRegistryEntry,
+  MUSICFETCH_SERVICE_TO_DSP,
+} from '@/lib/dsp-registry';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import type { ExtractedLink, ExtractionResult } from '@/lib/ingestion/types';
 import { logger } from '@/lib/utils/logger';
@@ -56,9 +59,17 @@ export async function publishIdentityLinks(
       .where(eq(artistIdentityLinks.creatorProfileId, profile.id));
     // Guard against non-iterable results (test mocks, pre-migration)
     rawLinks = Array.isArray(result) ? result : [];
-  } catch {
-    // Table may not exist yet (e.g. in test environments or before migration)
-    return { inserted: 0, updated: 0 };
+  } catch (error) {
+    // Gracefully degrade only for missing table (pre-migration)
+    const message = error instanceof Error ? error.message : '';
+    if (message.includes('does not exist') || message.includes('relation')) {
+      return { inserted: 0, updated: 0 };
+    }
+    logger.error('Identity layer: failed to read identity links', {
+      creatorProfileId: profile.id,
+      error: message,
+    });
+    throw error;
   }
 
   if (rawLinks.length === 0) return { inserted: 0, updated: 0 };
@@ -111,18 +122,21 @@ export async function publishIdentityLinks(
 
 /**
  * Find DSP registry entry by platform key.
- * Checks both direct key match and musicfetchService mapping.
+ *
+ * Identity links store DSP registry keys (snake_case: apple_music, soundcloud).
+ * First tries direct key lookup, then falls back to MusicFetch service name
+ * mapping (camelCase: appleMusic, soundCloud) for backward compat.
  */
 function findDspEntry(
   platform: string
 ): { key: string; category: string } | null {
-  // Try musicfetchService mapping first (most common for identity layer)
+  // Primary: look up by DSP registry key (snake_case — what extractAllMusicFetchServices stores)
+  const byKey = getRegistryEntry(platform);
+  if (byKey) return { key: byKey.key, category: byKey.category };
+
+  // Fallback: look up by MusicFetch service name (camelCase — for legacy/compat)
   const byService = MUSICFETCH_SERVICE_TO_DSP.get(platform);
   if (byService) return { key: byService.key, category: byService.category };
-
-  // Try direct key match (for manually-inserted or non-musicfetch sources)
-  const byKey = MUSICFETCH_SERVICE_TO_DSP.get(platform);
-  if (byKey) return { key: byKey.key, category: byKey.category };
 
   return null;
 }

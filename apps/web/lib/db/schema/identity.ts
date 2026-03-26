@@ -47,7 +47,8 @@ export const artistIdentityLinks = pgTable(
     /** Full service object from the API response — never lose data */
     rawPayload: jsonb('raw_payload')
       .$type<Record<string, unknown>>()
-      .default({}),
+      .default({})
+      .notNull(),
 
     /** When this data was fetched from the source */
     fetchedAt: timestamp('fetched_at').defaultNow().notNull(),

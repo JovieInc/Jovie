@@ -185,6 +185,7 @@ export function extractAllMusicFetchServices(
     links.push({
       platform: 'spotify',
       url: spotifyUrl,
+      externalId: null,
       rawPayload: {},
     });
   }

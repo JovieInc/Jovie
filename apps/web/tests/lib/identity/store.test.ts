@@ -221,34 +221,12 @@ describe('storeRawIdentityLinks', () => {
     expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(1);
   });
 
-  it('handles generic DB errors gracefully — logs warning, continues, returns partial count', async () => {
-    // Error on the second insert only (index 1)
+  it('throws on non-migration DB errors', async () => {
     const mockTx = createMockTx({
       insertError: new Error('unique constraint violation'),
-      insertErrorOnIndex: 1,
-    });
-    const links = makeLinks(3);
-
-    const result = await storeRawIdentityLinks(
-      mockTx as unknown as Parameters<typeof storeRawIdentityLinks>[0],
-      PROFILE_ID,
-      SOURCE,
-      SOURCE_REQUEST_URL,
-      links
-    );
-
-    // 2 successful (index 0 and 2), 1 failed (index 1)
-    expect(result).toBe(2);
-    expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(3);
-  });
-
-  it('does not throw on any DB error', async () => {
-    const mockTx = createMockTx({
-      insertError: new Error('connection refused'),
     });
     const links = makeLinks(1);
 
-    // Should not throw
     await expect(
       storeRawIdentityLinks(
         mockTx as unknown as Parameters<typeof storeRawIdentityLinks>[0],
@@ -257,6 +235,23 @@ describe('storeRawIdentityLinks', () => {
         SOURCE_REQUEST_URL,
         links
       )
-    ).resolves.toBe(0);
+    ).rejects.toThrow('unique constraint violation');
+  });
+
+  it('throws on connection errors instead of swallowing them', async () => {
+    const mockTx = createMockTx({
+      insertError: new Error('connection refused'),
+    });
+    const links = makeLinks(1);
+
+    await expect(
+      storeRawIdentityLinks(
+        mockTx as unknown as Parameters<typeof storeRawIdentityLinks>[0],
+        PROFILE_ID,
+        SOURCE,
+        SOURCE_REQUEST_URL,
+        links
+      )
+    ).rejects.toThrow('connection refused');
   });
 });

@@ -6,7 +6,7 @@ CREATE TABLE "artist_identity_links" (
 	"external_id" text,
 	"source" text NOT NULL,
 	"source_request_url" text,
-	"raw_payload" jsonb DEFAULT '{}'::jsonb,
+	"raw_payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"fetched_at" timestamp DEFAULT now() NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );

@@ -65,18 +65,23 @@ export async function storeRawIdentityLinks(
         });
       stored++;
     } catch (error) {
-      // Gracefully handle missing table (pre-migration) or other DB errors
       const message = error instanceof Error ? error.message : 'Unknown error';
-      if (message.includes('does not exist') || message.includes('relation')) {
-        // Table not migrated yet — skip silently
-        return 0;
+      const isMissingTable =
+        /relation\s+"?artist_identity_links"?\s+does not exist/i.test(
+          message
+        ) || message.includes('does not exist');
+
+      if (isMissingTable) {
+        return 0; // pre-migration graceful degradation
       }
-      logger.warn('Failed to store identity link', {
+
+      logger.error('Failed to store identity link', {
         creatorProfileId,
         source,
         platform: link.platform,
         error: message,
       });
+      throw error;
     }
   }
 

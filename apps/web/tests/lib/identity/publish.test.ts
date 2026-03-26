@@ -138,7 +138,7 @@ describe('publishIdentityLinks', () => {
       }),
       makeIdentityLink({
         id: 'link-2',
-        platform: 'appleMusic',
+        platform: 'apple_music',
         url: 'https://music.apple.com/us/artist/test/123456',
         source: 'musicfetch',
       }),

@@ -168,7 +168,7 @@ describe('extractAllMusicFetchServices', () => {
     );
   });
 
-  it('adds Spotify from spotifyUrl when no spotifyUrl param provided and not in services', () => {
+  it('does not add Spotify when spotifyUrl param is not provided and not in services', () => {
     const artistData = makeFullArtistResult({
       services: {
         appleMusic: { url: 'https://music.apple.com/us/artist/test/123456' },

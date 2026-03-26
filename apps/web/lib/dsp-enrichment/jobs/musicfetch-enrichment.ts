@@ -350,22 +350,37 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Store ALL platform data in the identity layer (raw, multi-source)
-  const rawLinks = extractAllMusicFetchServices(artistData, spotifyUrl);
-  const storedCount = await storeRawIdentityLinks(
-    tx,
-    creatorProfileId,
-    'musicfetch',
-    spotifyUrl,
-    rawLinks
-  );
+  // Store ALL platform data in the identity layer (raw, multi-source).
+  // Non-blocking: if identity layer fails, legacy path still works.
+  let publishResult = { inserted: 0, updated: 0 };
+  try {
+    const rawLinks = extractAllMusicFetchServices(artistData, spotifyUrl);
+    const storedCount = await storeRawIdentityLinks(
+      tx,
+      creatorProfileId,
+      'musicfetch',
+      spotifyUrl,
+      rawLinks
+    );
 
-  logger.info('MusicFetch enrichment: identity layer stored', {
-    creatorProfileId,
-    totalServicesReturned: Object.keys(artistData.services).length,
-    servicesWithValidUrl: rawLinks.length,
-    servicesStored: storedCount,
-  });
+    logger.info('MusicFetch enrichment: identity layer stored', {
+      creatorProfileId,
+      totalServicesReturned: Object.keys(artistData.services).length,
+      servicesWithValidUrl: rawLinks.length,
+      servicesStored: storedCount,
+    });
+
+    // Publish streaming links from identity layer to social_links
+    publishResult = await publishIdentityLinks(tx, profile, {
+      sourceFilter: 'musicfetch',
+    });
+  } catch (error) {
+    // Identity layer is additive — don't fail the enrichment job
+    logger.warn('MusicFetch enrichment: identity layer error (non-blocking)', {
+      creatorProfileId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
 
   // Apply DSP field updates to profile columns (backward compat)
   result.dspFieldsUpdated = await applyDspUpdates(
@@ -375,11 +390,6 @@ export async function processMusicFetchEnrichmentJob(
     spotifyUrl,
     creatorProfileId
   );
-
-  // Publish streaming links from identity layer to social_links
-  const publishResult = await publishIdentityLinks(tx, profile, {
-    sourceFilter: 'musicfetch',
-  });
 
   // Also run legacy merge for backward compatibility (handles social links
   // that may not be in the identity layer yet, e.g. during migration)
