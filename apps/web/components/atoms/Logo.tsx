@@ -137,7 +137,6 @@ export function Logo({
     <BrandLogo
       size={iconSizePx[size]}
       tone={tone}
-      priority={priority}
       alt={ariaHidden ? '' : 'Jovie'}
       aria-hidden={ariaHidden}
       data-testid={dataTestId}
