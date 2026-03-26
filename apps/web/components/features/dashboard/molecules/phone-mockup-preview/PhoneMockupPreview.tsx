@@ -33,17 +33,16 @@ export function PhoneMockupPreview({
       <div
         className={cn(
           'relative w-full max-w-[300px] mx-auto',
-          'aspect-9/19 rounded-4xl',
-          'bg-surface-2 border border-default',
-          'shadow-card-elevated',
+          'aspect-9/19 rounded-[28px]',
+          'bg-(--linear-app-content-surface) border border-(--linear-app-frame-seam)',
           'overflow-hidden'
         )}
       >
         {/* Phone screen */}
         <div
           className={cn(
-            'relative w-full h-full rounded-3xl overflow-hidden',
-            'bg-surface-1',
+            'relative w-full h-full rounded-[24px] overflow-hidden',
+            'border border-(--linear-app-frame-seam) bg-surface-0',
             'transition-colors duration-300'
           )}
         >
@@ -59,7 +58,6 @@ export function PhoneMockupPreview({
                   'border-4 border-white/20',
                   'bg-surface-1',
                   'overflow-hidden',
-                  'shadow-card-elevated',
                   'transition-all duration-300',
                   isLoaded ? 'opacity-100 scale-100' : 'opacity-0 scale-90'
                 )}
@@ -148,10 +146,7 @@ export function PhoneMockupPreview({
                     aria-hidden='true'
                     tabIndex={-1}
                     className={cn(
-                      'relative block p-4 rounded-xl',
-                      'bg-surface-1 hover:bg-surface-2',
-                      'border border-default',
-                      'shadow-card hover:shadow-card-elevated',
+                      'relative block rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-4 hover:bg-surface-1',
                       'transition-all duration-200',
                       'overflow-hidden',
                       activeLink === link.id && 'ring-2 ring-primary-500/20'
@@ -160,10 +155,9 @@ export function PhoneMockupPreview({
                     <div className='flex items-center gap-3'>
                       <div
                         className={cn(
-                          'shrink-0 w-10 h-10 rounded-lg',
+                          'shrink-0 w-10 h-10 rounded-[10px]',
                           'flex items-center justify-center',
                           'bg-surface-0',
-                          'shadow-card',
                           'text-primary-token',
                           'transition-all duration-200'
                         )}
@@ -208,7 +202,7 @@ export function PhoneMockupPreview({
                 ))
               ) : (
                 <div className='h-full flex flex-col items-center justify-center text-center p-6'>
-                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2'>
+                  <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
                     <Link2
                       className='w-6 h-6 text-tertiary-token'
                       aria-hidden='true'

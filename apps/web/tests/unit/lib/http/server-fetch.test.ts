@@ -21,7 +21,10 @@ describe('serverFetch', () => {
     );
 
     await expect(
-      serverFetch('https://example.com/timeout', { timeoutMs: 10 })
+      serverFetch('https://example.com/timeout', {
+        timeoutMs: 10,
+        context: 'Timeout test',
+      })
     ).rejects.toEqual(expect.any(ServerFetchTimeoutError));
   });
 
@@ -38,7 +41,91 @@ describe('serverFetch', () => {
     );
 
     await expect(
-      serverFetch('https://example.com/timeout', { timeoutMs: 25 })
-    ).rejects.toMatchObject({ timeoutMs: 25 });
+      serverFetch('https://example.com/timeout', {
+        timeoutMs: 25,
+        context: 'Timeout metadata test',
+      })
+    ).rejects.toMatchObject({
+      timeoutMs: 25,
+      context: 'Timeout metadata test',
+    });
+  });
+
+  it('retries retryable HTTP responses and returns the eventual success response', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response('retry', { status: 503 }))
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/retry', {
+      context: 'Retryable status test',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries network failures and succeeds on a later attempt', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError('fetch failed'))
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/network', {
+      context: 'Network retry test',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry non-retryable client errors', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('unauthorized', { status: 401 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/auth', {
+      context: 'Client error test',
+      retry: {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the final retryable response after exhausting retries', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response('still failing', { status: 503 }));
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await serverFetch('https://example.com/unavailable', {
+      context: 'Retry exhaustion test',
+      retry: {
+        maxRetries: 2,
+        baseDelayMs: 0,
+      },
+    });
+
+    expect(response.status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

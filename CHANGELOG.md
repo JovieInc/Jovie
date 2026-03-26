@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.81] - 2026-03-26
+
+### Changed
+
+- Public deploy, changelog subscribe, webhook dispatch, and cron control paths now fail closed when durable coordination is unavailable instead of degrading to in-memory behavior [internal]
+- Server-side operational HTTP now uses bounded timeout and retry handling through the shared `serverFetch()` wrapper [internal]
+- Admin reliability now includes unresolved Sentry issues, Redis availability, and deployment state alongside latency and incident metrics [internal]
+
+### Added
+
+- Shared cron auth helper with timing-safe bearer verification and optional trusted-origin enforcement [internal]
+- Redis-backed limiters for changelog subscription and deploy promotion [internal]
+- Route and helper test coverage for deploy control, changelog subscription, cron auth, idempotency, webhook dedupe, and operational webhook/cron entrypoints [internal]
+
 ## [26.4.80] - 2026-03-26
 
 ### Changed

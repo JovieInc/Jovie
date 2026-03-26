@@ -18,6 +18,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import {
   discoveryKeywords,
@@ -25,7 +26,6 @@ import {
   leads,
 } from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
@@ -78,13 +78,10 @@ async function runSubJob(
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/frequent',
+  });
+  if (authError) return authError;
 
   const minute = new Date().getMinutes();
   const results: Record<string, SubJobResult> = {};

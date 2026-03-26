@@ -1,8 +1,8 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { dashboardIdempotencyKeys } from '@/lib/db/schema/links';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -38,13 +38,10 @@ export async function cleanupExpiredKeys(): Promise<number> {
  * Schedule: Daily at 4:00 AM UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/cleanup-idempotency-keys',
+  });
+  if (authError) return authError;
 
   try {
     const deletedCount = await cleanupExpiredKeys();

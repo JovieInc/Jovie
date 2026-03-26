@@ -85,7 +85,7 @@ const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
 );
 
 describe('ReleaseTableSubheader', () => {
-  it('renders the drawer toggle button in page-toolbar chrome', () => {
+  it('does not render drawer toggle in toolbar (moved to header)', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -97,12 +97,8 @@ describe('ReleaseTableSubheader', () => {
       />
     );
 
-    expect(screen.getByTestId('drawer-toggle-button')).toBeInTheDocument();
-    expect(drawerToggleButtonMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chrome: 'page-toolbar',
-        tooltipLabel: 'Preview',
-      })
-    );
+    expect(
+      screen.queryByTestId('drawer-toggle-button')
+    ).not.toBeInTheDocument();
   });
 });

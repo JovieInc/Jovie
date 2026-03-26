@@ -244,12 +244,11 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-[24px] border transition-colors duration-fast',
-            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
-            'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            'rounded-[12px] border transition-colors duration-fast',
+            'bg-(--linear-app-content-surface)',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
+              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:bg-(--linear-app-content-surface) focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
           {hasPendingImages && onRemoveImage && (
@@ -287,7 +286,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                isCompact ? 'py-1.5 max-h-32 text-sm' : 'py-2 max-h-48 text-sm'
+                isCompact
+                  ? 'max-h-32 py-1.5 text-[14px] leading-6'
+                  : 'max-h-48 py-2 text-[14px] leading-6'
               )}
               onKeyDown={handleKeyDown}
               onInput={handleInput}

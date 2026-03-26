@@ -7,10 +7,11 @@
  * Allows users to disconnect providers they no longer want connected.
  */
 
-import { Button } from '@jovie/ui';
+import { Badge, Button } from '@jovie/ui';
 import { Link2, Link2Off } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { ClerkExternalAccountResource, ClerkUserResource } from './types';
@@ -78,19 +79,27 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
 
   if (accounts.length === 0) {
     return (
-      <div>
-        <div className='px-1 py-1'>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <div className='px-4 py-3 sm:px-5'>
           <p className='text-[13px] text-secondary-token'>
             No connected accounts yet.
           </p>
         </div>
-      </div>
+      </DashboardCard>
     );
   }
 
   return (
-    <div>
-      <div className='space-y-1 px-1 py-1'>
+    <>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='divide-y divide-subtle/60 overflow-hidden'
+      >
         {accounts.map(account => {
           const label = getProviderLabel(account.provider);
           const identifier = getProviderIdentifier(account);
@@ -99,21 +108,27 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           return (
             <div
               key={account.id}
-              className='flex items-center justify-between gap-3 py-2'
+              className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
             >
               <div className='flex min-w-0 items-center gap-3'>
-                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-surface-1'>
+                <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0'>
                   <Link2 className='h-4 w-4 text-secondary-token' aria-hidden />
                 </div>
                 <div className='min-w-0'>
-                  <p className='flex items-center gap-2 text-[13px] text-primary-token'>
-                    {label}
+                  <div className='flex flex-wrap items-center gap-1.5'>
+                    <p className='text-[13px] font-[510] text-primary-token'>
+                      {label}
+                    </p>
                     {isVerified ? (
-                      <span className='text-[11px] text-emerald-600'>
+                      <Badge
+                        variant='success'
+                        size='sm'
+                        className='rounded-[6px] border border-emerald-500/20 bg-emerald-500/10 px-1.5 text-[10px] text-emerald-700 dark:text-emerald-300'
+                      >
                         Verified
-                      </span>
+                      </Badge>
                     ) : null}
-                  </p>
+                  </div>
                   <p className='mt-0.5 truncate text-[11px] text-secondary-token'>
                     {identifier}
                   </p>
@@ -121,11 +136,11 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
               </div>
 
               <Button
-                variant='destructive'
+                variant='ghost'
                 size='sm'
                 disabled={disconnectingId === account.id}
                 onClick={() => setAccountToDisconnect(account)}
-                className='shrink-0'
+                className='h-7 shrink-0 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
               >
                 <Link2Off className='mr-1.5 h-4 w-4' aria-hidden />
                 {disconnectingId === account.id
@@ -135,7 +150,7 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
             </div>
           );
         })}
-      </div>
+      </DashboardCard>
 
       <ConfirmDialog
         open={Boolean(accountToDisconnect)}
@@ -150,6 +165,6 @@ export function ConnectedAccountsCard({ user }: ConnectedAccountsCardProps) {
           if (accountToDisconnect) await handleDisconnect(accountToDisconnect);
         }}
       />
-    </div>
+    </>
   );
 }

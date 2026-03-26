@@ -1,5 +1,6 @@
 import { and, sql as drizzleSql, eq, lt, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
@@ -7,7 +8,6 @@ import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getReleaseDayNotificationEmail } from '@/lib/email/templates/release-day-notification';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { sendNotification } from '@/lib/notifications/service';
 import { toISOStringSafe } from '@/lib/utils/date';
@@ -469,13 +469,6 @@ async function processNotificationWithBatchedData(
 // API Route Handler
 // ============================================================================
 
-function createUnauthorizedResponse(): NextResponse {
-  return NextResponse.json(
-    { error: 'Unauthorized' },
-    { status: 401, headers: NO_STORE_HEADERS }
-  );
-}
-
 function createEmptyResponse(now: Date): NextResponse {
   return NextResponse.json(
     {
@@ -684,10 +677,10 @@ export async function sendPendingNotifications(): Promise<{
  * Schedule: Every 15 minutes via /api/cron/frequent
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return createUnauthorizedResponse();
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/send-release-notifications',
+  });
+  if (authError) return authError;
 
   try {
     const result = await sendPendingNotifications();

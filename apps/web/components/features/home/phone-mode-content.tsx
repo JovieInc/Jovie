@@ -195,29 +195,31 @@ function TourContent() {
 
 function ProfileContent() {
   return (
-    <div className='flex h-full flex-col items-center justify-center gap-3'>
-      {/* Mini release artwork */}
-      <div
-        className='h-20 w-20 shrink-0 overflow-hidden rounded-2xl shadow-sm'
-        style={{
-          background:
-            'linear-gradient(135deg, rgba(113,112,255,0.3) 0%, rgba(113,112,255,0.08) 100%)',
-        }}
-      />
-      <div className='text-center space-y-0.5'>
-        <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
-          Out now
-        </p>
-        <p className='text-[13px] font-semibold text-primary-token'>
-          New Single
-        </p>
+    <div className='flex h-full flex-col justify-center gap-3'>
+      {/* Horizontal release card — album art left, action right */}
+      <div className='flex items-center gap-3 rounded-xl bg-surface-1 p-2.5'>
+        <div
+          className='h-14 w-14 shrink-0 overflow-hidden rounded-lg shadow-sm'
+          style={{
+            background:
+              'linear-gradient(135deg, rgba(113,112,255,0.3) 0%, rgba(113,112,255,0.08) 100%)',
+          }}
+        />
+        <div className='min-w-0 flex-1'>
+          <p className='text-[10px] font-medium uppercase tracking-[0.12em] text-tertiary-token'>
+            Out now
+          </p>
+          <p className='text-[13px] font-semibold text-primary-token truncate'>
+            New Single
+          </p>
+        </div>
+        <button
+          type='button'
+          className='shrink-0 rounded-lg bg-btn-primary px-3.5 py-1.5 text-[12px] font-semibold text-btn-primary-foreground shadow-sm'
+        >
+          Listen
+        </button>
       </div>
-      <button
-        type='button'
-        className='inline-flex w-full items-center justify-center gap-2 rounded-xl bg-btn-primary px-6 py-2.5 text-[13px] font-semibold text-btn-primary-foreground shadow-sm'
-      >
-        Listen now
-      </button>
     </div>
   );
 }
