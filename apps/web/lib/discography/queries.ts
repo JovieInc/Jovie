@@ -131,21 +131,23 @@ function isUniqueConstraintViolation(
   return isUniqueViolationUtil(error, constraint);
 }
 
-/** Shared SQL select columns for track summary aggregation. */
-const trackSummarySelectColumns = {
-  releaseId: discogReleaseTracks.releaseId,
-  totalDurationMs: drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
-    'total_duration_ms'
-  ),
-  primaryIsrc:
-    drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
-      'primary_isrc'
+/** Shared SQL select columns for track summary aggregation (lazy to avoid module-scope access). */
+function trackSummarySelectColumns() {
+  return {
+    releaseId: discogReleaseTracks.releaseId,
+    totalDurationMs: drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
+      'total_duration_ms'
     ),
-  primaryPreviewUrl:
-    drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
-      'primary_preview_url'
-    ),
-};
+    primaryIsrc:
+      drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
+        'primary_isrc'
+      ),
+    primaryPreviewUrl:
+      drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
+        'primary_preview_url'
+      ),
+  };
+}
 
 function rowToTrackSummary(row: {
   totalDurationMs: number | null;
@@ -170,7 +172,7 @@ async function getTrackSummariesForReleases(
   }
 
   const summaries = await db
-    .select(trackSummarySelectColumns)
+    .select(trackSummarySelectColumns())
     .from(discogReleaseTracks)
     .innerJoin(
       discogRecordings,
@@ -1406,7 +1408,7 @@ export async function getReleaseTrackSummariesForReleases(
   }
 
   const summaries = await db
-    .select(trackSummarySelectColumns)
+    .select(trackSummarySelectColumns())
     .from(discogReleaseTracks)
     .innerJoin(
       discogRecordings,
