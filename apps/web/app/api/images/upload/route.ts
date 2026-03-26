@@ -1,5 +1,5 @@
 import { auth } from '@clerk/nextjs/server';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache, invalidateProfileCache } from '@/lib/cache';
@@ -160,7 +160,12 @@ export async function POST(request: NextRequest) {
             and(
               eq(profilePhotos.userId, dbUser.id),
               eq(profilePhotos.creatorProfileId, profile.id),
-              eq(profilePhotos.photoType, 'press')
+              eq(profilePhotos.photoType, 'press'),
+              inArray(profilePhotos.status, [
+                'uploading',
+                'processing',
+                'ready',
+              ])
             )
           )
           .limit(MAX_PRESS_PHOTOS);

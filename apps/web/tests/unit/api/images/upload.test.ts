@@ -10,6 +10,7 @@ const {
   mockUpdate,
   mockSelect,
   mockEq,
+  mockInArray,
   mockGetUserByClerkId,
   sharpMock,
   sharpMetadataMock,
@@ -19,6 +20,7 @@ const {
   mockUpdate: vi.fn(),
   mockSelect: vi.fn(),
   mockEq: vi.fn(() => 'eq-result'),
+  mockInArray: vi.fn(() => 'inArray-result'),
   mockGetUserByClerkId: vi.fn(),
   sharpMock: vi.fn(),
   sharpMetadataMock: vi.fn(),
@@ -61,6 +63,7 @@ vi.mock('@/lib/auth/session', () => ({
 vi.mock('drizzle-orm', () => ({
   eq: mockEq,
   and: vi.fn(),
+  inArray: mockInArray,
   sql: vi.fn(),
 }));
 
@@ -89,6 +92,7 @@ vi.mock('@/lib/db/schema/profiles', () => ({
     id: 'id',
     userId: 'user_id',
     usernameNormalized: 'username_normalized',
+    settings: 'settings',
   },
 }));
 
@@ -248,10 +252,30 @@ function createMultipartRequest(formData: FormData): NextRequest {
 }
 
 describe('/api/images/upload', () => {
+  function createSelectChain(result: unknown[]) {
+    return {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue(result),
+        }),
+      }),
+    };
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuth.mockReset();
+    mockInsert.mockReset();
+    mockUpdate.mockReset();
+    mockSelect.mockReset();
+    mockEq.mockReset();
+    mockInArray.mockReset();
+    mockGetUserByClerkId.mockReset();
+    mockValidateMagicBytes.mockReset();
     sharpMetadataMock.mockResolvedValue({ width: 800, height: 800 });
     delete (sharpMock as unknown as { format?: unknown }).format;
+    mockEq.mockReturnValue('eq-result');
+    mockInArray.mockReturnValue('inArray-result');
 
     // Default authenticated user; individual tests override as needed
     mockAuth.mockResolvedValue({ userId: 'test-user-id' });
@@ -287,16 +311,20 @@ describe('/api/images/upload', () => {
       }),
     });
 
-    // Mock select for creatorProfiles query (to get usernameNormalized for cache invalidation)
-    mockSelect.mockReturnValue({
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi
-            .fn()
-            .mockResolvedValue([{ usernameNormalized: 'testuser' }]),
-        }),
-      }),
-    });
+    mockSelect
+      .mockReturnValueOnce(
+        createSelectChain([{ activeProfileId: 'profile-123' }])
+      )
+      .mockReturnValueOnce(
+        createSelectChain([
+          {
+            id: 'profile-123',
+            usernameNormalized: 'testuser',
+            settings: {},
+          },
+        ])
+      )
+      .mockReturnValue(createSelectChain([]));
   });
 
   it('should reject requests without authentication', async () => {
@@ -394,6 +422,41 @@ describe('/api/images/upload', () => {
     expect(data).toHaveProperty('status', 'ready');
     expect(data).toHaveProperty('blobUrl');
     expect(data).toHaveProperty('smallUrl');
+  });
+
+  it('should ignore failed press-photo rows when enforcing the press photo limit', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+
+    mockSelect
+      .mockReturnValueOnce(
+        createSelectChain([{ activeProfileId: 'profile-123' }])
+      )
+      .mockReturnValueOnce(
+        createSelectChain([
+          {
+            id: 'profile-123',
+            usernameNormalized: 'testuser',
+            settings: {},
+          },
+        ])
+      )
+      .mockReturnValueOnce(createSelectChain([]));
+
+    const formData = new FormData();
+    const file = createValidImageFile('press.jpg', 'image/jpeg');
+    formData.append('file', file);
+    formData.append('photoType', 'press');
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(202);
+    expect(mockInArray).toHaveBeenCalledWith('status', [
+      'uploading',
+      'processing',
+      'ready',
+    ]);
   });
 
   it('should accept JPEG images', async () => {
