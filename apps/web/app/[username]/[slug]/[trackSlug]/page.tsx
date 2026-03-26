@@ -21,6 +21,7 @@ import { appendUTMParamsToUrl, extractUTMParams } from '@/lib/utm';
 import {
   getContentBySlug,
   getCreatorByUsername,
+  getCreatorPlan,
   getTrackBySlugInRelease,
 } from '../_lib/data';
 
@@ -74,6 +75,16 @@ export default async function TrackDeepLinkPage({
   const track = await getTrackBySlugInRelease(releaseContent.id, trackSlug);
   if (!track) {
     notFound();
+  }
+
+  // Guard: block access to unreleased content unless creator's plan allows it
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
+  if (isUnreleased) {
+    const creatorPlan = await getCreatorPlan(creator.id);
+    if (!creatorPlan.canAccessFutureReleases) {
+      notFound();
+    }
   }
 
   // If DSP is specified, redirect to the provider URL for this track
