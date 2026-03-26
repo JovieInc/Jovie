@@ -116,6 +116,21 @@ function renderStatusCell({ getValue }: { getValue: () => any }) {
   );
 }
 
+function FeedbackActionsCell({
+  row,
+  getContextMenuItems,
+}: {
+  readonly row: FeedbackRow;
+  readonly getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+}) {
+  const items = convertContextMenuItems(getContextMenuItems(row));
+  return (
+    <div className='flex items-center justify-end'>
+      <TableActionMenu items={items} align='end' />
+    </div>
+  );
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -217,17 +232,12 @@ export function AdminFeedbackTable({
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => {
-          // NOSONAR - TanStack Table render prop
-          const items = convertContextMenuItems(
-            getContextMenuItems(row.original)
-          );
-          return (
-            <div className='flex items-center justify-end'>
-              <TableActionMenu items={items} align='end' />
-            </div>
-          );
-        },
+        cell: ({ row }) => (
+          <FeedbackActionsCell
+            row={row.original}
+            getContextMenuItems={getContextMenuItems}
+          />
+        ),
         size: 48,
       }),
     ],

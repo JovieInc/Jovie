@@ -523,6 +523,17 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
+  // Clerk FAPI Proxy Rewrites
+  // ==========================================================================
+  // ==========================================================================
+  // Clerk FAPI Proxy
+  // ==========================================================================
+  // Clerk FAPI proxy is now handled entirely by vercel.json static rewrites
+  // (/__clerk/* and /clerk/* → distinct-giraffe-5.clerk.accounts.dev).
+  // Both staging and production use the same Clerk instance.
+  // Middleware no longer intercepts these paths — no tests needed.
+
+  // ==========================================================================
   // meetjovie.com Redirect
   // ==========================================================================
   describe('meetjovie.com redirect', () => {

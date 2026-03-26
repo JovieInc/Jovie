@@ -57,6 +57,7 @@ describe('profile view models', () => {
       location: 'Austin, TX',
       hometown: 'Tulsa, OK',
       pitchContext: '',
+      targetPlaylists: '',
       profilePath: '/testartist',
     });
   });

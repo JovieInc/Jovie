@@ -5,7 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.75] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in across all environments — Clerk proxy now targets the actual FAPI endpoint instead of dead `clerk.jov.ie` domain
+- [internal] Updated vercel.json rewrites, CSP, preconnect links to use `distinct-giraffe-5.clerk.accounts.dev`; removed dead middleware clerk proxy; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+- Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
+- [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
+
+## [26.4.74] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in on production — authentication requests no longer fail with "Invalid host"
+- [internal] Only intercept `/__clerk/*` in middleware for staging; production uses vercel.json rewrites which correctly set the Host header for Clerk's proxy domain validation
+
+## [26.4.73] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in reliability on staging environments so authentication requests stay in the correct environment
+- [internal] Route `/__clerk/*` and `/clerk/*` to the environment-specific Clerk FAPI host
+
 ## [26.4.72] - 2026-03-25
+
+### Changed
+
+- Align sidebar tokens with Linear's exact color values — dark mode background elevated from `8 9 10` to `15 16 17`, light mode refined across all sidebar token channels
+- Remove `color-mix()` backgrounds from content surfaces, right drawer, and page shell — use flat `var(--linear-app-content-surface)` for cleaner rendering
+- Move right panel inside `<main>` content card so sidebar and content share one unified card (matches Linear layout)
+- Remove sidebar card chrome — no border, rounded corners, inset shadow, or backdrop-blur on `variant=sidebar`
+- Revert BrandLogo from inline SVG back to `next/image` with dark/light theme-aware variants
+- Restore JovieLogo and LogoIcon components (previously removed)
+- Simplify ChatWorkspaceSurface — strip ContentSurfaceCard wrapper with gradients/shadows
+- ProfileCompletionCard: use `border-subtle` token instead of custom color-mix border
+- ProfileSidebarHeader: remove "Profile workspace" sub-label
+- Empty state in JovieChat: position content near chat input instead of vertical center
 
 ### Fixed
 
