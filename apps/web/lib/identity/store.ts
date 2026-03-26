@@ -69,7 +69,9 @@ export async function storeRawIdentityLinks(
       const isMissingTable =
         /relation\s+"?artist_identity_links"?\s+does not exist/i.test(
           message
-        ) || message.includes('does not exist');
+        ) ||
+        (message.includes('does not exist') &&
+          message.includes('artist_identity_links'));
 
       if (isMissingTable) {
         return 0; // pre-migration graceful degradation

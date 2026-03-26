@@ -62,7 +62,12 @@ export async function publishIdentityLinks(
   } catch (error) {
     // Gracefully degrade only for missing table (pre-migration)
     const message = error instanceof Error ? error.message : '';
-    if (message.includes('does not exist') || message.includes('relation')) {
+    const isMissingTable =
+      /relation\s+"?artist_identity_links"?\s+does not exist/i.test(message) ||
+      (message.includes('does not exist') &&
+        message.includes('artist_identity_links'));
+
+    if (isMissingTable) {
       return { inserted: 0, updated: 0 };
     }
     logger.error('Identity layer: failed to read identity links', {

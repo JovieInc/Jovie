@@ -13,7 +13,7 @@ import 'server-only';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 
-import { type DbOrTransaction } from '@/lib/db';
+import { type DbOrTransaction, db as plainDb } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
@@ -351,12 +351,13 @@ export async function processMusicFetchEnrichmentJob(
   }
 
   // Store ALL platform data in the identity layer (raw, multi-source).
-  // Non-blocking: if identity layer fails, legacy path still works.
+  // Uses plainDb (not tx) so identity layer errors don't abort the
+  // enrichment transaction — identity layer is additive, not critical.
   let publishResult = { inserted: 0, updated: 0 };
   try {
     const rawLinks = extractAllMusicFetchServices(artistData, spotifyUrl);
     const storedCount = await storeRawIdentityLinks(
-      tx,
+      plainDb,
       creatorProfileId,
       'musicfetch',
       spotifyUrl,
@@ -371,7 +372,7 @@ export async function processMusicFetchEnrichmentJob(
     });
 
     // Publish streaming links from identity layer to social_links
-    publishResult = await publishIdentityLinks(tx, profile, {
+    publishResult = await publishIdentityLinks(plainDb, profile, {
       sourceFilter: 'musicfetch',
     });
   } catch (error) {
@@ -399,8 +400,16 @@ export async function processMusicFetchEnrichmentJob(
     profile,
     spotifyUrl
   );
-  result.socialLinksInserted = publishResult.inserted + linkResult.inserted;
-  result.socialLinksUpdated = publishResult.updated + linkResult.updated;
+  // Use max (not sum) — both paths process the same streaming links,
+  // so summing would double-count during the overlap period.
+  result.socialLinksInserted = Math.max(
+    publishResult.inserted,
+    linkResult.inserted
+  );
+  result.socialLinksUpdated = Math.max(
+    publishResult.updated,
+    linkResult.updated
+  );
   await importDiscography(
     spotifyUrl,
     profile.spotifyId,

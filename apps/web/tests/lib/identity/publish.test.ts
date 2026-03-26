@@ -164,9 +164,13 @@ describe('publishIdentityLinks', () => {
     expect(result).toEqual({ inserted: 3, updated: 0 });
     expect(mockNormalizeAndMergeExtraction).toHaveBeenCalledTimes(1);
 
-    // Verify the extraction passed to normalizeAndMergeExtraction
+    // Verify the exact platforms published
     const extractionArg = mockNormalizeAndMergeExtraction.mock.calls[0][2];
-    expect(extractionArg.links.length).toBeGreaterThan(0);
+    expect(
+      extractionArg.links
+        .map((l: { platformId: string }) => l.platformId)
+        .sort()
+    ).toEqual(['apple_music', 'deezer', 'spotify']);
     for (const link of extractionArg.links) {
       expect(link.evidence?.signals).toContain('musicfetch_artist_lookup');
     }
@@ -256,9 +260,13 @@ describe('publishIdentityLinks', () => {
     expect(result).toEqual({ inserted: 1, updated: 0 });
     expect(mockNormalizeAndMergeExtraction).toHaveBeenCalledTimes(1);
 
-    // The extraction should only contain the musicfetch link
+    // The extraction should only contain the musicfetch link (not the serp one)
     const extractionArg = mockNormalizeAndMergeExtraction.mock.calls[0][2];
     expect(extractionArg.sourcePlatform).toBe('musicfetch');
+    expect(extractionArg.links).toHaveLength(1);
+    expect(extractionArg.links[0]).toEqual(
+      expect.objectContaining({ platformId: 'spotify' })
+    );
   });
 
   it('handles non-array DB response gracefully (returns empty result)', async () => {
@@ -283,6 +291,25 @@ describe('publishIdentityLinks', () => {
     );
 
     expect(result).toEqual({ inserted: 0, updated: 0 });
+    expect(mockNormalizeAndMergeExtraction).not.toHaveBeenCalled();
+  });
+
+  it('rethrows DB errors that are NOT table-missing', async () => {
+    const mockWhere = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('permission denied for relation artist_identity_links')
+      );
+    const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
+    const mockSelect = vi.fn().mockReturnValue({ from: mockFrom });
+    const mockTx = { select: mockSelect };
+
+    await expect(
+      publishIdentityLinks(
+        mockTx as unknown as Parameters<typeof publishIdentityLinks>[0],
+        PROFILE
+      )
+    ).rejects.toThrow('permission denied');
     expect(mockNormalizeAndMergeExtraction).not.toHaveBeenCalled();
   });
 
