@@ -21,13 +21,14 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { EntityHeaderCard } from '@/components/molecules/drawer/EntityHeaderCard';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ProviderKey } from '@/lib/discography/types';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/utils/formatDuration';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
-import { TrackMetaSummary } from './TrackMetaSummary';
 import { TrackPlatformLinksSection } from './TrackPlatformLinksSection';
 
 type TrackSidebarTab = 'details' | 'platforms';
@@ -194,35 +195,62 @@ export function TrackSidebar({
     ];
   }, [track, isSmartLinkCopied, handleCopySmartLink, smartLinkUrl]);
 
+  const trackLabel = track
+    ? track.discNumber > 1
+      ? `${track.discNumber}-${track.trackNumber}`
+      : String(track.trackNumber)
+    : '';
+
   const trackHeaderCard = track ? (
     <DrawerSurfaceCard
       className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
     >
       <div className='p-2.5'>
-        <TrackMetaSummary
-          title={track.title}
-          trackNumber={track.trackNumber}
-          discNumber={track.discNumber}
-          durationMs={track.durationMs}
-          isrc={track.isrc}
-          isExplicit={track.isExplicit}
-          variant='drawer'
-          artwork={
-            <DrawerMediaThumb
-              src={track.releaseArtworkUrl}
-              alt={`${track.releaseTitle} artwork`}
-              sizeClassName='h-[76px] w-[76px] rounded-[11px]'
-              sizes='76px'
-              fallback={
-                <Icon
-                  name='Music'
-                  className='h-7 w-7 text-tertiary-token'
-                  aria-hidden='true'
-                />
-              }
-            />
-          }
-        />
+        <div className='flex items-start gap-2.5'>
+          <DrawerMediaThumb
+            src={track.releaseArtworkUrl}
+            alt={`${track.releaseTitle} artwork`}
+            sizeClassName='h-[68px] w-[68px] rounded-[10px]'
+            sizes='68px'
+            fallback={
+              <Icon
+                name='Music'
+                className='h-7 w-7 text-tertiary-token'
+                aria-hidden='true'
+              />
+            }
+          />
+          <EntityHeaderCard
+            title={track.title}
+            subtitle={
+              <span className='flex items-center gap-1.5'>
+                <span className='tabular-nums'>{trackLabel}.</span>
+                {track.releaseTitle}
+                {track.isExplicit && (
+                  <span className='rounded-[4px] bg-surface-1 px-1 text-[9px] font-[510] text-tertiary-token'>
+                    E
+                  </span>
+                )}
+              </span>
+            }
+            meta={
+              <div className='flex items-center gap-2 text-[10.5px] text-tertiary-token'>
+                {track.durationMs != null && (
+                  <span className='tabular-nums'>
+                    {formatDuration(track.durationMs)}
+                  </span>
+                )}
+                {track.isrc && (
+                  <span className='font-mono text-[9.5px] tracking-[0.02em]'>
+                    {track.isrc}
+                  </span>
+                )}
+              </div>
+            }
+            className='min-w-0 flex-1'
+            bodyClassName='pt-0'
+          />
+        </div>
       </div>
     </DrawerSurfaceCard>
   ) : undefined;
