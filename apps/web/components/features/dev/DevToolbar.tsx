@@ -38,19 +38,17 @@ import {
 } from '@/lib/service-worker/control';
 
 function useLocalOverrides() {
-  const [overrides, setOverridesState] = useState<Record<string, boolean>>(
-    () => {
-      if (globalThis.window === undefined) return {};
-      try {
-        return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
-      } catch {
-        return {};
-      }
+  const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
+    if (globalThis.window === undefined) return {};
+    try {
+      return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
+    } catch {
+      return {};
     }
-  );
+  });
 
   const setOverride = useCallback((key: string, value: boolean) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev, [key]: value };
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
       return next;
@@ -58,7 +56,7 @@ function useLocalOverrides() {
   }, []);
 
   const removeOverride = useCallback((key: string) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev };
       delete next[key];
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
@@ -67,7 +65,7 @@ function useLocalOverrides() {
   }, []);
 
   const clearOverrides = useCallback(() => {
-    setOverridesState({});
+    setOverrides({});
     localStorage.removeItem(FF_OVERRIDES_KEY);
   }, []);
 
