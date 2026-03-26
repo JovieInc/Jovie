@@ -70,12 +70,48 @@ function hasPathChanged(targetPath) {
   return false;
 }
 
-const turboArgs = ['turbo', task, ...extraArgs];
+function resolveMergeBase() {
+  const baseCandidates = [
+    'origin/develop',
+    'origin/main',
+    'develop',
+    'main',
+  ].filter(Boolean);
 
-if (!hasPathChanged('apps/should-i-make')) {
-  turboArgs.push('--filter=!@jovie/should-i-make');
+  for (const base of baseCandidates) {
+    const exists = tryExec('git', ['rev-parse', '--verify', base]);
+    if (!exists) continue;
+
+    const mergeBase = tryExec('git', ['merge-base', 'HEAD', base]);
+    if (mergeBase) {
+      return { base, mergeBase };
+    }
+  }
+
+  return null;
+}
+
+function buildFallbackTurboArgs() {
+  const turboArgs = ['turbo', task, ...extraArgs];
+
+  if (!hasPathChanged('apps/should-i-make')) {
+    turboArgs.push('--filter=!@jovie/should-i-make');
+    console.log(
+      `Skipping @jovie/should-i-make for turbo ${task}; no changes detected.`
+    );
+  }
+
+  return turboArgs;
+}
+
+const mergeBase = resolveMergeBase();
+const turboArgs = mergeBase
+  ? ['turbo', task, '--affected', ...extraArgs]
+  : buildFallbackTurboArgs();
+
+if (mergeBase) {
   console.log(
-    `Skipping @jovie/should-i-make for turbo ${task}; no changes detected.`
+    `Using turbo --affected for ${task}; merge base found against ${mergeBase.base}.`
   );
 }
 
