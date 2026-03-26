@@ -8,91 +8,91 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { FetchError, fetchWithTimeout } from '@/lib/queries/fetch';
 
 export interface HandleValidationResult {
   handleError: string | null;
   checkingAvail: boolean;
   available: boolean | null;
   availError: string | null;
-  /** Cancel pending validation */
   cancel: () => void;
 }
 
-/** Debounce before hitting the API */
 const DEBOUNCE_MS = 400;
-const CACHE_TTL_MS = 30 * 1000;
-const REQUEST_TIMEOUT_MS = 5000;
+const HANDLE_CACHE_TTL_MS = 30 * 1000;
 
 interface HandleAvailabilityResponse {
-  readonly available: boolean;
-  readonly error: string | null;
+  available: boolean;
+  error?: string;
 }
 
-interface HandleAvailabilityState {
-  readonly data: HandleAvailabilityResponse | null;
-  readonly isError: boolean;
-  readonly isFetching: boolean;
+interface CachedAvailabilityResult extends HandleAvailabilityResponse {
+  cachedAt: number;
 }
 
-const availabilityCache = new Map<
-  string,
-  {
-    readonly expiresAt: number;
-    readonly value: HandleAvailabilityResponse;
+const handleAvailabilityCache = new Map<string, CachedAvailabilityResult>();
+
+function getCachedAvailability(
+  handle: string
+): HandleAvailabilityResponse | null {
+  const cachedResult = handleAvailabilityCache.get(handle);
+  if (!cachedResult) return null;
+
+  if (Date.now() - cachedResult.cachedAt > HANDLE_CACHE_TTL_MS) {
+    handleAvailabilityCache.delete(handle);
+    return null;
   }
->();
+
+  return cachedResult;
+}
 
 async function fetchHandleAvailability(
   handle: string,
   signal: AbortSignal
 ): Promise<HandleAvailabilityResponse> {
-  const response = await fetch(
-    `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
-    {
-      headers: {
-        Accept: 'application/json',
-      },
-      signal,
-    }
-  );
-
-  const payload = (await response.json().catch(() => null)) as {
-    available?: boolean;
-    error?: string;
-  } | null;
-
-  if (!response.ok) {
-    return {
-      available: false,
-      error: payload?.error ?? 'Network error - try again',
-    };
+  const cachedResult = getCachedAvailability(handle);
+  if (cachedResult) {
+    return cachedResult;
   }
 
-  return {
-    available: payload?.available === true,
-    error: typeof payload?.error === 'string' ? payload.error : null,
-  };
+  try {
+    const response = await fetchWithTimeout<HandleAvailabilityResponse>(
+      `/api/handle/check?handle=${encodeURIComponent(handle.toLowerCase())}`,
+      {
+        signal,
+      }
+    );
+    handleAvailabilityCache.set(handle, {
+      ...response,
+      cachedAt: Date.now(),
+    });
+    return response;
+  } catch (error) {
+    if (error instanceof FetchError) {
+      return {
+        available: false,
+        error: error.message || 'Error checking availability',
+      };
+    }
+    throw error;
+  }
 }
 
-/**
- * Hook for validating handle format and availability.
- *
- * Uses a debounced fetch with a short in-memory cache to avoid excessive
- * requests while typing.
- */
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [debouncedHandle, setDebouncedHandle] = useState('');
-  const [availabilityState, setAvailabilityState] =
-    useState<HandleAvailabilityState>({
-      data: null,
-      isError: false,
-      isFetching: false,
-    });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const latestRequestHandleRef = useRef<string | null>(null);
+  const [availabilityState, setAvailabilityState] = useState<{
+    checkingAvail: boolean;
+    available: boolean | null;
+    availError: string | null;
+  }>({
+    checkingAvail: false,
+    available: null,
+    availError: null,
+  });
 
-  // Client-side handle validation
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
@@ -104,14 +104,12 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // Debounce the handle value before sending to the query
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
 
-    // Reset debounced handle if input is invalid or empty
     if (!handle || handleError) {
       setDebouncedHandle('');
       return;
@@ -132,82 +130,74 @@ export function useHandleValidation(handle: string): HandleValidationResult {
   const isValidHandle = Boolean(handle) && !handleError;
 
   useEffect(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-
     if (!isValidHandle || debouncedHandle.length < 3) {
+      abortControllerRef.current?.abort();
+      latestRequestHandleRef.current = null;
       setAvailabilityState({
-        data: null,
-        isError: false,
-        isFetching: false,
+        checkingAvail: false,
+        available: null,
+        availError: null,
       });
       return;
     }
 
     const normalizedHandle = debouncedHandle.toLowerCase();
-    const cached = availabilityCache.get(normalizedHandle);
-
-    if (cached && cached.expiresAt > Date.now()) {
+    const cachedResult = getCachedAvailability(normalizedHandle);
+    if (cachedResult) {
       setAvailabilityState({
-        data: cached.value,
-        isError: false,
-        isFetching: false,
+        checkingAvail: false,
+        available: cachedResult.available,
+        availError: cachedResult.error ?? null,
       });
       return;
     }
 
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
-    const requestId = requestIdRef.current + 1;
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    abortControllerRef.current = controller;
+    latestRequestHandleRef.current = normalizedHandle;
 
-    requestIdRef.current = requestId;
-    abortRef.current = controller;
-    setAvailabilityState(current => ({
-      data: current.data,
-      isError: false,
-      isFetching: true,
-    }));
+    setAvailabilityState({
+      checkingAvail: true,
+      available: null,
+      availError: null,
+    });
 
     void fetchHandleAvailability(normalizedHandle, controller.signal)
       .then(result => {
-        if (controller.signal.aborted || requestIdRef.current !== requestId) {
-          return;
-        }
-
-        availabilityCache.set(normalizedHandle, {
-          expiresAt: Date.now() + CACHE_TTL_MS,
-          value: result,
-        });
-        setAvailabilityState({
-          data: result,
-          isError: false,
-          isFetching: false,
-        });
-      })
-      .catch(() => {
-        if (controller.signal.aborted || requestIdRef.current !== requestId) {
+        if (
+          controller.signal.aborted ||
+          latestRequestHandleRef.current !== normalizedHandle
+        ) {
           return;
         }
 
         setAvailabilityState({
-          data: null,
-          isError: true,
-          isFetching: false,
+          checkingAvail: false,
+          available: result.available,
+          availError: result.error ?? null,
         });
       })
-      .finally(() => {
-        clearTimeout(timeoutId);
-        if (abortRef.current === controller) {
-          abortRef.current = null;
+      .catch(error => {
+        if (
+          controller.signal.aborted ||
+          latestRequestHandleRef.current !== normalizedHandle
+        ) {
+          return;
         }
+
+        setAvailabilityState({
+          checkingAvail: false,
+          available: false,
+          availError:
+            error instanceof Error
+              ? error.message
+              : 'Network error - try again',
+        });
       });
 
     return () => {
-      clearTimeout(timeoutId);
       controller.abort();
-      if (abortRef.current === controller) {
-        abortRef.current = null;
-      }
     };
   }, [debouncedHandle, isValidHandle]);
 
@@ -216,31 +206,24 @@ export function useHandleValidation(handle: string): HandleValidationResult {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    abortRef.current?.abort();
-    abortRef.current = null;
+    abortControllerRef.current?.abort();
+    latestRequestHandleRef.current = null;
     setDebouncedHandle('');
     setAvailabilityState({
-      data: null,
-      isError: false,
-      isFetching: false,
+      checkingAvail: false,
+      available: null,
+      availError: null,
     });
   }, []);
 
-  // Determine checking state: either debounce is pending or query is fetching
   const isDebouncing = isValidHandle && handle !== debouncedHandle;
-  const checkingAvail = isDebouncing || availabilityState.isFetching;
-
-  // Determine availability and error from query result
-  const available = availabilityState.data?.available ?? null;
-  const availError = availabilityState.isError
-    ? 'Network error - try again'
-    : (availabilityState.data?.error ?? null);
+  const checkingAvail = isDebouncing || availabilityState.checkingAvail;
 
   return {
     handleError,
     checkingAvail,
-    available,
-    availError,
+    available: availabilityState.available,
+    availError: availabilityState.availError,
     cancel,
   };
 }
