@@ -150,7 +150,7 @@ export function DspMatchCard({
 
       {/* Expandable Confidence Breakdown */}
       {confidenceBreakdown && (
-        <div className='mt-3 border-t border-subtle/60 pt-3'>
+        <div className='mt-3 border-t border-(--linear-app-frame-seam) pt-3'>
           <button
             type='button'
             onClick={() => setIsExpanded(!isExpanded)}
@@ -176,7 +176,7 @@ export function DspMatchCard({
 
       {/* Actions */}
       {isActionable && (
-        <div className='mt-3 flex items-center justify-end gap-2 border-t border-subtle/60 pt-3'>
+        <div className='mt-3 flex items-center justify-end gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
           {onReject && (
             <Button
               variant='ghost'

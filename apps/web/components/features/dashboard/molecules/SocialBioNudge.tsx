@@ -46,7 +46,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
   }
 
   return (
-    <div className='flex items-start gap-2 rounded-md border border-subtle px-2 py-1.5'>
+    <div className='flex items-start gap-2 rounded-md border border-(--linear-app-frame-seam) px-2 py-1.5'>
       <div
         className='shrink-0 rounded-md bg-surface-0 p-1.5'
         aria-hidden='true'

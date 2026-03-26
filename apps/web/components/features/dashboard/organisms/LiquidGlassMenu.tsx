@@ -186,7 +186,7 @@ function MenuItemLink({
         'active:scale-[0.98]',
         active
           ? 'bg-bg-surface-2 text-primary-token'
-          : 'text-secondary-token hover:text-primary-token hover:bg-bg-surface-2/50'
+          : 'text-secondary-token hover:text-primary-token hover:bg-surface-1'
       )}
     >
       <Icon
@@ -311,7 +311,7 @@ export function LiquidGlassMenu({
                   <button
                     type='button'
                     onClick={onSignOut}
-                    className='flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:bg-bg-surface-2/50 hover:text-primary-token active:scale-[0.98]'
+                    className='flex w-full items-center gap-3 rounded-[8px] px-3 py-2.5 text-[13px] font-[510] text-secondary-token transition-all duration-150 hover:bg-surface-1 hover:text-primary-token active:scale-[0.98]'
                   >
                     <LogOut
                       className='size-5 shrink-0 text-tertiary-token'

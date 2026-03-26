@@ -92,7 +92,7 @@ describe('ReleaseCell', () => {
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
     const typeBadge = screen.getByText('Single');
     expect(typeBadge).toBeInTheDocument();
-    expect(typeBadge.className).toContain('items-center');
+    expect(typeBadge.className).toContain('shrink-0');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 

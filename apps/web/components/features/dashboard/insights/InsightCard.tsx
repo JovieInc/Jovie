@@ -59,7 +59,7 @@ export function InsightCard({ insight }: InsightCardProps) {
             </div>
           ) : null}
 
-          <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-subtle/60 pt-3'>
+          <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
             <div className='flex items-center gap-2'>
               <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token capitalize'>
                 {insight.category}

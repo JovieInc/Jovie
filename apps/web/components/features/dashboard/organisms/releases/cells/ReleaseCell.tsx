@@ -4,7 +4,6 @@ import { Badge } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
-import { DotBadge } from '@/components/atoms/DotBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
@@ -111,14 +110,11 @@ export const ReleaseCell = memo(function ReleaseCell({
             {release.title}
           </TruncatedText>
           {showType && typeStyle && (
-            <DotBadge
-              label={typeStyle.label}
-              size='sm'
-              variant={{
-                className: `${typeStyle.border} ${typeStyle.bg} ${typeStyle.text}`,
-                dotClassName: typeStyle.dot,
-              }}
-            />
+            <span
+              className={`shrink-0 text-[10.5px] font-[510] leading-none tracking-normal ${typeStyle.text}`}
+            >
+              {typeStyle.label}
+            </span>
           )}
           {manualOverrideCount > 0 && (
             <Badge
