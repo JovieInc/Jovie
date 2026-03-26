@@ -1,8 +1,8 @@
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 /** Safely serialize JSON-LD with XSS protection */
-export const jsonLd = (value: unknown) =>
-  JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
+export const jsonLd = (value: unknown) => safeJsonLdStringify(value);
 
 /** Schema entity IDs for consistent knowledge graph across pages */
 export const SCHEMA_IDS = {
