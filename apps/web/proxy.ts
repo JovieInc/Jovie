@@ -960,58 +960,66 @@ export default async function middleware(
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
     const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
 
-    const headers = new Headers(req.headers);
-    headers.set('host', fapiHost);
-    headers.delete('connection');
-    headers.delete('transfer-encoding');
-    headers.delete('x-forwarded-host');
-    headers.delete('x-forwarded-proto');
-    headers.delete('x-forwarded-for');
-    headers.delete('x-vercel-forwarded-for');
-    headers.delete('x-vercel-ip-country');
-    headers.delete('x-real-ip');
-    headers.set('origin', `https://${fapiHost}`);
-
-    // For POST/PUT/PATCH, clone the body as an ArrayBuffer to avoid
-    // ReadableStream issues in edge runtime
-    let body: ArrayBuffer | undefined;
+    // Read body FIRST (before cloning headers) so content-length stays accurate
+    let body: ArrayBuffer | null = null;
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       try {
         body = await req.arrayBuffer();
       } catch {
-        // empty body is fine for some requests
+        // empty body
       }
     }
 
-    const proxyRes = await fetch(targetUrl, {
-      method: req.method,
-      headers,
-      body,
-      redirect: 'follow',
-    });
-
-    const resHeaders = new Headers(proxyRes.headers);
-    resHeaders.delete('content-encoding');
-
-    // Rewrite redirect Location headers to route back through /__clerk
-    // so the browser never hits the FAPI host directly (e.g. Clerk's
-    // /npm/ 307 redirects to versioned JS bundles).
-    const location = resHeaders.get('location');
-    if (location) {
-      const fapiOrigin = `https://${fapiHost}`;
-      if (location.startsWith(fapiOrigin)) {
-        resHeaders.set(
-          'location',
-          location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
-        );
-      }
+    // Build clean headers — only forward what Clerk needs
+    const headers = new Headers();
+    headers.set('host', fapiHost);
+    headers.set('origin', `https://${fapiHost}`);
+    const ct = req.headers.get('content-type');
+    if (ct) headers.set('content-type', ct);
+    const accept = req.headers.get('accept');
+    if (accept) headers.set('accept', accept);
+    const cookie = req.headers.get('cookie');
+    if (cookie) headers.set('cookie', cookie);
+    const ua = req.headers.get('user-agent');
+    if (ua) headers.set('user-agent', ua);
+    const auth = req.headers.get('authorization');
+    if (auth) headers.set('authorization', auth);
+    if (body && body.byteLength > 0) {
+      headers.set('content-length', String(body.byteLength));
     }
 
-    return new NextResponse(proxyRes.body, {
-      status: proxyRes.status,
-      statusText: proxyRes.statusText,
-      headers: resHeaders,
-    });
+    try {
+      const proxyRes = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: body && body.byteLength > 0 ? body : undefined,
+        redirect: 'follow',
+      });
+
+      const resHeaders = new Headers(proxyRes.headers);
+      resHeaders.delete('content-encoding');
+
+      // Rewrite redirect Location headers to route back through /__clerk
+      const location = resHeaders.get('location');
+      if (location) {
+        const fapiOrigin = `https://${fapiHost}`;
+        if (location.startsWith(fapiOrigin)) {
+          resHeaders.set(
+            'location',
+            location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
+          );
+        }
+      }
+
+      return new NextResponse(proxyRes.body, {
+        status: proxyRes.status,
+        statusText: proxyRes.statusText,
+        headers: resHeaders,
+      });
+    } catch (err) {
+      console.error('[clerk-proxy] fetch failed:', err);
+      return NextResponse.json({ error: 'Clerk proxy error' }, { status: 502 });
+    }
   }
 
   const pathInfo = categorizePath(pathname);
