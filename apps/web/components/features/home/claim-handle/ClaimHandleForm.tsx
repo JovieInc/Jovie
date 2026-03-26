@@ -1,5 +1,7 @@
 'use client';
 
+type ClaimHandleSize = 'default' | 'hero' | 'display';
+
 import { ChevronRight } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -33,10 +35,7 @@ function getInputRowStyleHero(isAvailable: boolean) {
   };
 }
 
-function getInputRowStyle(
-  size: 'default' | 'hero' | 'display',
-  isAvailable: boolean
-) {
+function getInputRowStyle(size: ClaimHandleSize, isAvailable: boolean) {
   if (size === 'hero') return getInputRowStyleHero(isAvailable);
 
   const isDisplay = size === 'display';
@@ -74,7 +73,7 @@ function getInputRowStyle(
   };
 }
 
-function getDomainPrefixStyle(size: 'default' | 'hero' | 'display') {
+function getDomainPrefixStyle(size: ClaimHandleSize) {
   if (size === 'display') {
     return {
       fontSize: '28px',
@@ -102,10 +101,7 @@ function getDomainPrefixStyle(size: 'default' | 'hero' | 'display') {
   } as const;
 }
 
-function getInputStyle(
-  size: 'default' | 'hero' | 'display',
-  isAvailable: boolean
-) {
+function getInputStyle(size: ClaimHandleSize, isAvailable: boolean) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
   const color = isAvailable ? 'rgb(74,222,128)' : 'var(--linear-text-primary)';
@@ -128,10 +124,7 @@ function getInputStyle(
   return { fontSize: '13px', fontWeight: 450, letterSpacing: '-0.01em', color };
 }
 
-function getButtonStyle(
-  size: 'default' | 'hero' | 'display',
-  isDisabled: boolean
-) {
+function getButtonStyle(size: ClaimHandleSize, isDisabled: boolean) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
   if (isHero) {
