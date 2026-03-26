@@ -248,9 +248,9 @@ function FormFooter({
   isInputFocused,
   error,
 }: {
-  disclaimerId: string;
-  isInputFocused: boolean;
-  error: string | null;
+  readonly disclaimerId: string;
+  readonly isInputFocused: boolean;
+  readonly error: string | null;
 }) {
   const showDisclaimer = isInputFocused && !error;
   return (
@@ -289,6 +289,29 @@ function FormFooter({
         </TooltipProvider>
       )}
     </div>
+  );
+}
+
+/** Whether the fallback CTA should be shown instead of the subscribe form. */
+function shouldShowFallbackCTA(
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean
+): boolean {
+  return !notificationsEnabled || (notificationsState === 'idle' && !autoOpen);
+}
+
+/** Whether the subscribe form should trigger impression tracking. */
+function isSubscribeFormVisible(
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean
+): boolean {
+  if (shouldShowFallbackCTA(notificationsEnabled, notificationsState, autoOpen))
+    return false;
+  return (
+    notificationsState !== 'success' &&
+    notificationsState !== 'pending_confirmation'
   );
 }
 
@@ -340,11 +363,11 @@ export function ArtistNotificationsCTA({
     openSubscription
   );
 
-  const showsSubscribeForm =
-    notificationsEnabled &&
-    !(notificationsState === 'idle' && !autoOpen) &&
-    notificationsState !== 'success' &&
-    notificationsState !== 'pending_confirmation';
+  const showsSubscribeForm = isSubscribeFormVisible(
+    notificationsEnabled,
+    notificationsState,
+    autoOpen
+  );
   useImpressionTracking(showsSubscribeForm, artist.handle, variant);
 
   const hasSubscriptions = Boolean(
@@ -362,7 +385,9 @@ export function ArtistNotificationsCTA({
     return <SubscriptionFormSkeleton />;
   }
 
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
+  if (
+    shouldShowFallbackCTA(notificationsEnabled, notificationsState, autoOpen)
+  ) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
   }
 

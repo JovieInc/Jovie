@@ -4,7 +4,7 @@
  * Generates and verifies HMAC-signed tokens for double opt-in email verification.
  */
 
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { buildTokenUrl, createColonTokenFns } from './hmac-token';
 
 const { sign, verify } = createColonTokenFns({
@@ -30,7 +30,7 @@ export function buildSubscribeConfirmUrl(
   subscriptionId: string,
   email: string
 ): string | null {
-  const baseUrl = APP_URL.replace(/\/$/, '');
+  const baseUrl = BASE_URL.replace(/\/$/, '');
   return buildTokenUrl(
     baseUrl,
     '/api/notifications/confirm',

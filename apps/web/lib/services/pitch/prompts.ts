@@ -55,12 +55,10 @@ function buildArtistSection(artist: PitchInput['artist']): string[] {
   if (artist.spotifyPopularity != null)
     lines.push(`Spotify popularity score: ${artist.spotifyPopularity}/100`);
   if (artist.pitchContext) {
-    lines.push(`\n## Artist-Provided Context`);
-    lines.push(artist.pitchContext);
+    lines.push(`\n## Artist-Provided Context`, artist.pitchContext);
   }
   if (artist.targetPlaylists?.length) {
-    lines.push(`\n## Target Playlists`);
-    lines.push(artist.targetPlaylists.join(', '));
+    lines.push(`\n## Target Playlists`, artist.targetPlaylists.join(', '));
   } else {
     lines.push(
       `\n## Target Playlists\nNone specified — suggest 1-2 specific editorial playlists based on genre and mood.`
@@ -74,8 +72,7 @@ function buildReleaseSection(
   tracks: PitchInput['tracks']
 ): string[] {
   const lines: string[] = ['\n## Release'];
-  lines.push(`Title: ${release.title}`);
-  lines.push(`Type: ${release.releaseType}`);
+  lines.push(`Title: ${release.title}`, `Type: ${release.releaseType}`);
   if (release.releaseDate)
     lines.push(
       `Release date: ${release.releaseDate.toISOString().split('T')[0]}`

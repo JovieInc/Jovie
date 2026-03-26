@@ -117,7 +117,7 @@ function CookieCategories({
 
 export function CookieModal({ open, onClose, onSave }: CookieModalProps) {
   const [settings, setSettings] = useState<Consent>(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return { essential: true, analytics: false, marketing: false };
     }
     try {

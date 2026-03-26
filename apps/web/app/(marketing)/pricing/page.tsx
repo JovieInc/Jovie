@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
 import {
   ENTITLEMENT_REGISTRY,
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: `Pricing - ${APP_NAME}`,
     description:
       'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
-    url: `${APP_URL}/pricing`,
+    url: `${BASE_URL}/pricing`,
     type: 'website',
   },
   twitter: {
@@ -50,7 +50,7 @@ const PRICING_SCHEMA = JSON.stringify({
   name: `Pricing - ${APP_NAME}`,
   description:
     'Start free with unlimited smart links. Upgrade for advanced analytics, fan CRM, and more.',
-  url: `${APP_URL}/pricing`,
+  url: `${BASE_URL}/pricing`,
   mainEntity: {
     '@type': 'ItemList',
     itemListElement: getAllPlanIds()
