@@ -12,6 +12,11 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Settings pages now use a cleaner layout — flat section headers replace nested cards, eliminating redundant title bars
 - Arrow keys in admin tables now update the detail panel immediately without requiring a click
 
+### Fixed
+
+- Empty states no longer contradict themselves — removed "No Spotify or Apple Music" messages that appeared alongside connected DSP links
+- Tour dates empty state now says "No upcoming tour dates" instead of the generic "No tour dates found"
+
 ### Removed
 
 - [internal] Removed 1,100+ lines of dead settings code (SettingsPolished, DashboardSettings, passthrough wrappers)
