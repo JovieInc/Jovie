@@ -59,6 +59,12 @@ const creatorDashboardRoutes = [
   },
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
+const creatorHealthFastRoutes = [
+  creatorDashboardRoutes[0],
+  creatorDashboardRoutes[1],
+  creatorDashboardRoutes[4],
+] as const satisfies readonly DashboardRouteDescriptor[];
+
 const creatorSettingsRoutes = [
   { path: APP_ROUTES.SETTINGS_ACCOUNT, name: 'Account Settings' },
   { path: APP_ROUTES.SETTINGS_BILLING, name: 'Settings Billing' },
@@ -86,11 +92,7 @@ export const DASHBOARD_ROUTE_MATRIX = {
       { path: APP_ROUTES.SETTINGS_CONTACTS, name: 'Contacts' },
       { path: APP_ROUTES.SETTINGS_TOURING, name: 'Touring' },
     ],
-    fast: [
-      { path: APP_ROUTES.AUDIENCE, name: 'Audience' },
-      { path: APP_ROUTES.CHAT, name: 'Chat' },
-      { path: APP_ROUTES.RELEASES, name: 'Releases' },
-    ],
+    fast: creatorHealthFastRoutes,
   },
   dashboard: {
     full: creatorDashboardRoutes,

@@ -174,12 +174,11 @@ export default function HomePage() {
 
       {/* In hero-only mode, hide footer and prevent scroll (footer is in layout) */}
       {heroOnly && (
-        <style
-          dangerouslySetInnerHTML={{
-            __html:
-              'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}',
-          }}
-        />
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
       )}
 
       {/* 1. Hero — claim form left, phone right */}

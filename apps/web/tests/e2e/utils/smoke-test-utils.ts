@@ -207,10 +207,11 @@ export function setupPageMonitoring(page: Page): {
   const handleConsole = (msg: ConsoleMessage) => {
     if (msg.type() === 'error') {
       const text = msg.text();
+      const textLower = text.toLowerCase();
       const locationUrl = msg.location().url.toLowerCase();
       if (
         text.includes('Failed to load resource') &&
-        locationUrl.includes('i.scdn.co/')
+        (locationUrl.includes('i.scdn.co/') || textLower.includes('i.scdn.co/'))
       ) {
         return;
       }
