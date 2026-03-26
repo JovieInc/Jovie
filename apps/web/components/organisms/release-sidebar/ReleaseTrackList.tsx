@@ -314,29 +314,25 @@ function TrackItem({
                   <Play className='h-[11px] w-[11px]' />
                 )}
               </button>
-              {/* biome-ignore lint/a11y/useKeyWithClickEvents: seek bar is supplementary to play button */}
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: seek bar is supplementary to play button */}
-              {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: seek bar is supplementary to play button */}
-              <div
-                className={`flex-1 py-[7px] -my-[7px] ${isActiveTrack ? 'cursor-pointer' : ''}`}
-                onClick={event => {
+              <input
+                type='range'
+                min={0}
+                max={progressDuration > 0 ? progressDuration : 1}
+                step='any'
+                value={progressCurrentTime}
+                onChange={event => {
                   event.stopPropagation();
-                  if (progressDuration <= 0) return;
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  const clickX = Math.max(
-                    0,
-                    Math.min(event.clientX - rect.left, rect.width)
-                  );
-                  onSeek((clickX / rect.width) * progressDuration);
+                  onSeek(Number(event.target.value));
                 }}
-              >
-                <div className='h-0.5 rounded-full bg-surface-1/90'>
-                  <div
-                    className='h-full rounded-full bg-(--linear-accent) transition-[width]'
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
+                aria-label='Seek track'
+                disabled={!isActiveTrack}
+                className='seek-range h-0.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-1/90 accent-(--linear-accent) disabled:cursor-default disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+                style={
+                  {
+                    '--seek-pct': `${progressPercent}%`,
+                  } as React.CSSProperties
+                }
+              />
             </div>
             {isActiveTrack && (
               <p className='text-[10px] text-tertiary-token'>

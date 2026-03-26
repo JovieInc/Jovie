@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
-  readonly audioUrl: string;
+  /** Required when loading a new track; omit when resuming the same track. */
+  readonly audioUrl?: string;
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
@@ -85,6 +86,13 @@ function bindAudioEvents(el: HTMLAudioElement): void {
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
+  el.addEventListener('seeked', () => {
+    lastNotifiedSecond = -1; // invalidate throttle so next timeupdate fires
+    setState({
+      currentTime: el.currentTime,
+      duration: Number.isFinite(el.duration) ? el.duration : 0,
+    });
+  });
   el.addEventListener('error', () => {
     setState({
       activeTrackId: null,
@@ -128,6 +136,7 @@ export function useTrackAudioPlayer() {
     }
 
     // New track — cancel any in-flight play() from a prior switch
+    if (!track.audioUrl) return;
     const token = ++_playToken;
     audio.pause();
     audio.src = track.audioUrl;
@@ -140,9 +149,11 @@ export function useTrackAudioPlayer() {
       artistName: track.artistName ?? null,
       artworkUrl: track.artworkUrl ?? null,
     });
-    // If another toggleTrack call happened while we awaited, bail out
-    if (_playToken !== token) return;
     await audio.play();
+    // If another toggleTrack fired while play() was in-flight, pause this stale track
+    if (_playToken !== token) {
+      audio.pause();
+    }
   }, []);
 
   const seek = useCallback((time: number) => {

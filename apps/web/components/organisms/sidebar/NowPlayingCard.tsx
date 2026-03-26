@@ -32,7 +32,6 @@ export function NowPlayingCard() {
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
-      audioUrl: '_resume', // Placeholder — same track ID triggers pause/resume path, never used as src
     }).catch(() => {});
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 
@@ -133,28 +132,23 @@ export function NowPlayingCard() {
       </div>
 
       <div className='space-y-0.5'>
-        {/* biome-ignore lint/a11y/useKeyWithClickEvents: seek bar is supplementary to play button */}
-        {/* biome-ignore lint/a11y/noStaticElementInteractions: seek bar is supplementary to play button */}
-        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: seek bar is supplementary to play button */}
-        <div
-          className='cursor-pointer py-[5px] -my-[5px]'
-          onClick={event => {
-            if (playbackState.duration <= 0) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            const clickX = Math.max(
-              0,
-              Math.min(event.clientX - rect.left, rect.width)
-            );
-            seek((clickX / rect.width) * playbackState.duration);
+        <input
+          type='range'
+          min={0}
+          max={playbackState.duration > 0 ? playbackState.duration : 1}
+          step='any'
+          value={playbackState.currentTime}
+          onChange={event => {
+            seek(Number(event.target.value));
           }}
-        >
-          <div className='h-[3px] w-full overflow-hidden rounded-full bg-surface-1'>
-            <div
-              className='h-full rounded-full bg-(--linear-accent) transition-[width] duration-200'
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
+          aria-label='Seek track'
+          className='seek-range h-[3px] w-full cursor-pointer appearance-none rounded-full bg-surface-1 accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
+          style={
+            {
+              '--seek-pct': `${progressPercent}%`,
+            } as React.CSSProperties
+          }
+        />
         <div className='flex items-center justify-between text-[10px] tabular-nums text-quaternary-token'>
           <span>{currentTimeFormatted}</span>
           <span>

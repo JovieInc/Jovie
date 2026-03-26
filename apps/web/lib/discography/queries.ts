@@ -154,7 +154,7 @@ async function getTrackSummariesForReleases(
           'primary_isrc'
         ),
       primaryPreviewUrl:
-        drizzleSql<string>`(array_agg(${discogRecordings.previewUrl} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.previewUrl} IS NOT NULL))[1]`.as(
+        drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
           'primary_preview_url'
         ),
     })
@@ -1408,7 +1408,7 @@ export async function getReleaseTrackSummariesForReleases(
           'primary_isrc'
         ),
       primaryPreviewUrl:
-        drizzleSql<string>`(array_agg(${discogRecordings.previewUrl} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.previewUrl} IS NOT NULL))[1]`.as(
+        drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
           'primary_preview_url'
         ),
     })
