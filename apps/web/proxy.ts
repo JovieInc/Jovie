@@ -949,6 +949,13 @@ export default async function middleware(
     const headers = new Headers(req.headers);
     headers.set('host', fapiHost);
     headers.delete('connection');
+    headers.delete('x-forwarded-host');
+    headers.delete('x-forwarded-proto');
+    headers.delete('x-forwarded-for');
+    headers.delete('x-vercel-forwarded-for');
+    headers.delete('x-vercel-ip-country');
+    headers.delete('x-real-ip');
+    headers.set('origin', `https://${fapiHost}`);
 
     const proxyRes = await fetch(targetUrl, {
       method: req.method,
