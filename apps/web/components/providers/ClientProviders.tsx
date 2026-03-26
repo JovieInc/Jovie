@@ -74,7 +74,7 @@ export function ClientProviders({
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl(window.location)}
+      proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={clerkAppearanceBase}
       ui={ui}
       signInUrl={APP_ROUTES.SIGNIN}
