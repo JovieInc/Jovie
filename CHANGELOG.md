@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.77] - 2026-03-25
+
+### Fixed
+
+- Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name
+
 ## [26.4.76] - 2026-03-25
 
 ### Changed
