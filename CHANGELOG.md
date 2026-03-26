@@ -11,6 +11,13 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Fixed sign-in across all environments by routing authentication through the correct Clerk endpoint
 - [internal] Replaced dead `clerk.jov.ie` with `distinct-giraffe-5.clerk.accounts.dev` everywhere: fetch() proxy in middleware, root + app vercel.json rewrites, CSP allowlists, preconnect hints; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+
+## [26.4.75] - 2026-03-25
+
+### Fixed
+
+- Empty states no longer contradict themselves — removed "No Spotify or Apple Music" messages that appeared alongside connected DSP links
+- Tour dates empty state now says "No upcoming tour dates" instead of the generic "No tour dates found"
 - Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
 - [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
 
