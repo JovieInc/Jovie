@@ -165,6 +165,7 @@ function getButtonStyle(size: ClaimHandleSize, isDisabled: boolean) {
 export function ClaimHandleForm({
   onHandleChange,
   size = 'default',
+  submitButtonTestId,
 }: Readonly<ClaimHandleFormProps>) {
   const isHero = size === 'hero';
   const isDisplay = size === 'display';
@@ -281,7 +282,12 @@ export function ClaimHandleForm({
   else if (isHero) buttonRoundingClass = 'rounded-[0.8rem] px-4';
 
   return (
-    <form onSubmit={onSubmit} className='w-full' noValidate>
+    <form
+      onSubmit={onSubmit}
+      className='w-full'
+      noValidate
+      aria-busy={checkingAvail || navigating}
+    >
       {/* Input row */}
       <div
         className={cn(
@@ -346,6 +352,8 @@ export function ClaimHandleForm({
         <button
           type='submit'
           disabled={isDisabled}
+          data-testid={submitButtonTestId}
+          aria-busy={checkingAvail || navigating}
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
             buttonRoundingClass,
