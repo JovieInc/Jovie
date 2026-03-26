@@ -247,11 +247,11 @@ function FormFooter({
   disclaimerId,
   isInputFocused,
   error,
-}: {
-  readonly disclaimerId: string;
-  readonly isInputFocused: boolean;
-  readonly error: string | null;
-}) {
+}: Readonly<{
+  disclaimerId: string;
+  isInputFocused: boolean;
+  error: string | null;
+}>) {
   const showDisclaimer = isInputFocused && !error;
   return (
     <div className='flex items-center justify-center gap-2'>
