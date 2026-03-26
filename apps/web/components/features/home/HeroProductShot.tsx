@@ -34,10 +34,11 @@ export function HeroProductShot() {
                   href='/signup'
                   className='btn-linear-signup focus-ring-themed'
                   style={{
-                    height: '2.75rem',
-                    padding: '0 1.75rem',
+                    height: '40px',
+                    padding: '0 16px',
                     fontSize: '15px',
-                    borderRadius: '6px',
+                    fontWeight: 510,
+                    borderRadius: '4px',
                   }}
                 >
                   Get Started — Free

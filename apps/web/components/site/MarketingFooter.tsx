@@ -3,7 +3,7 @@ import { Footer } from '@/components/site/Footer';
 export function MarketingFooter() {
   return (
     <Footer
-      version='regular'
+      version='minimal'
       brandingMark='icon'
       containerSize='homepage'
       showThemeToggle={false}

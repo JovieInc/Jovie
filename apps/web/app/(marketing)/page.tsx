@@ -176,11 +176,11 @@ export default function HomePage() {
       {/* 1. Hero — product shot with Get Started CTA */}
       <HeroProductShot />
 
-      {/* 2. Logo bar — social proof */}
-      <LogoBar />
-
       {SHOW_SECTIONS && (
         <>
+          {/* 2. Logo bar — social proof */}
+          <LogoBar />
+
           {/* 3. Smart links — automatic release links */}
           <SmartLinksSection />
 

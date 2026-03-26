@@ -72,11 +72,11 @@
   /* ============================================
      BUTTON COLORS — LIGHT MODE
      ============================================ */
-  /* Primary button — dark on light */
-  --linear-btn-primary-bg: oklch(15% 0.005 282);
-  --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 282);
-  --linear-btn-primary-border: oklch(15% 0.005 282);
+  /* Primary button — off-white on dark (matches Linear's inverted CTA) */
+  --linear-btn-primary-bg: rgb(230, 230, 230);
+  --linear-btn-primary-fg: rgb(8, 9, 10);
+  --linear-btn-primary-hover: rgb(255, 255, 255);
+  --linear-btn-primary-border: rgb(230, 230, 230);
   /* Secondary button — subtle gray */
   --linear-btn-secondary-bg: oklch(94% 0.005 282);
   --linear-btn-secondary-fg: oklch(20% 0.005 282);
@@ -370,11 +370,11 @@
   --linear-border-default: rgba(255, 255, 255, 0.08);
   --linear-border-strong: rgba(255, 255, 255, 0.14);
   --linear-border-focus: oklch(60% 0.12 282);
-  /* Buttons — CTA accent per DESIGN.md (Linear indigo for sign-up buttons) */
-  --linear-btn-primary-bg: #5e6ad2;
-  --linear-btn-primary-fg: #ffffff;
-  --linear-btn-primary-hover: #6872d6;
-  --linear-btn-primary-border: #5e6ad2;
+  /* Buttons — off-white inverted CTA matching Linear.app exactly */
+  --linear-btn-primary-bg: rgb(230, 230, 230);
+  --linear-btn-primary-fg: rgb(8, 9, 10);
+  --linear-btn-primary-hover: rgb(255, 255, 255);
+  --linear-btn-primary-border: rgb(230, 230, 230);
   --linear-btn-secondary-bg: #232326;
   --linear-btn-secondary-fg: #f7f8f8;
   --linear-btn-secondary-hover: #2a2a2e;
