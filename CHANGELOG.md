@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.78] - 2026-03-25
+
+### Changed
+
+- Spotify import link discovery now runs in background — users see their catalog instantly instead of waiting 15-25s for cross-platform link lookup
+- Link discovery parallelized with concurrency limit of 5 (was sequential), reducing wall-clock time from ~25s to ~5s for large catalogs
+- Pre-save cron processes rows concurrently (grouped by refresh token to prevent OAuth races), reducing 500-row processing from ~50s to ~10s
+- Admin leads batch URL processing parallelized with input deduplication
+- HUD metrics polling no longer triggers redundant refetches on tab focus (staleTime increased from 0 to 15s)
+
+### Added
+
+- `mapConcurrent` utility for concurrent async operations with configurable worker pool limit
+- Unit tests for `mapConcurrent` (7 test cases covering concurrency, ordering, errors, edge cases)
+
 ## [26.4.77] - 2026-03-25
 
 ### Changed
