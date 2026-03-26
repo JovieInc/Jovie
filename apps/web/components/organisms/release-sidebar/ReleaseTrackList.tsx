@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   CollapsibleSectionHeading,
@@ -49,7 +50,7 @@ export function ReleaseTrackList({
   onTrackClick,
   tracksOverride,
 }: ReleaseTrackListProps) {
-  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
   const {
     data: fetchedTracks,
@@ -146,6 +147,7 @@ export function ReleaseTrackList({
               onClick={onTrackClick}
               playbackState={playbackState}
               onToggleTrack={toggleTrack}
+              onSeek={seek}
             />
           ))}
       </div>
@@ -159,6 +161,7 @@ function TrackItem({
   onClick,
   playbackState,
   onToggleTrack,
+  onSeek,
 }: {
   readonly track: ReleaseSidebarTrack;
   readonly release: Release;
@@ -177,6 +180,7 @@ function TrackItem({
     artistName?: string;
     artworkUrl?: string | null;
   }) => Promise<void>;
+  readonly onSeek: (time: number) => void;
 }) {
   const trackLabel =
     track.discNumber > 1
@@ -210,13 +214,6 @@ function TrackItem({
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
   const progressDuration = isActiveTrack ? playbackState.duration : 0;
   const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
-  const progressPercent =
-    progressDuration > 0
-      ? Math.min(
-          100,
-          Math.max(0, (progressCurrentTime / progressDuration) * 100)
-        )
-      : 0;
 
   const handleTogglePlayback = useCallback(() => {
     if (!playableUrl) return;
@@ -311,18 +308,26 @@ function TrackItem({
                   <Play className='h-[11px] w-[11px]' />
                 )}
               </button>
-              <div className='h-0.5 flex-1 rounded-full bg-surface-1/90'>
-                <div
-                  className='h-full rounded-full bg-(--linear-accent) transition-[width]'
-                  style={{ width: `${progressPercent}%` }}
-                />
-              </div>
+              <SeekBar
+                currentTime={progressCurrentTime}
+                duration={progressDuration}
+                onSeek={time => {
+                  onSeek(time);
+                }}
+                disabled={!isActiveTrack}
+                className='h-0.5 flex-1 bg-surface-1/90'
+              />
             </div>
-            <p className='text-[10px] text-tertiary-token'>
-              {track.audioFormat
-                ? `Audio preview · ${track.audioFormat.toUpperCase()}`
-                : 'Audio preview'}
-            </p>
+            {isActiveTrack && (
+              <p className='text-[10px] text-tertiary-token'>
+                {track.audioFormat
+                  ? `Audio preview · ${track.audioFormat.toUpperCase()}`
+                  : 'Audio preview'}
+                {progressDuration > 0 && progressDuration < 45
+                  ? ` (${Math.round(progressDuration)}s)`
+                  : ''}
+              </p>
+            )}
           </div>
         )}
       </div>

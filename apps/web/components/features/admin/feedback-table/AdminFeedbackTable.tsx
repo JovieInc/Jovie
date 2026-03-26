@@ -131,6 +131,50 @@ function FeedbackActionsCell({
   );
 }
 
+/** Build column definitions for feedback table (file-level to satisfy S6478). */
+function buildFeedbackColumns(deps: {
+  getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+}): ColumnDef<FeedbackRow, any>[] {
+  return [
+    columnHelper.accessor('createdAtIso', {
+      id: 'submitted',
+      header: 'Submitted',
+      cell: renderSubmittedCell,
+      size: 180,
+    }),
+    columnHelper.accessor('user', {
+      id: 'user',
+      header: 'User',
+      cell: renderUserCell,
+      size: 200,
+    }),
+    columnHelper.accessor('message', {
+      id: 'message',
+      header: 'Feedback',
+      cell: renderMessageCell,
+      size: 400,
+    }),
+    columnHelper.accessor('status', {
+      id: 'status',
+      header: 'Status',
+      cell: renderStatusCell,
+      size: 120,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <FeedbackActionsCell
+          row={row.original}
+          getContextMenuItems={deps.getContextMenuItems}
+        />
+      ),
+      size: 48,
+    }),
+  ];
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -204,44 +248,18 @@ export function AdminFeedbackTable({
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
-    () => [
-      columnHelper.accessor('createdAtIso', {
-        id: 'submitted',
-        header: 'Submitted',
-        cell: renderSubmittedCell,
-        size: 180,
-      }),
-      columnHelper.accessor('user', {
-        id: 'user',
-        header: 'User',
-        cell: renderUserCell,
-        size: 200,
-      }),
-      columnHelper.accessor('message', {
-        id: 'message',
-        header: 'Feedback',
-        cell: renderMessageCell,
-        size: 400,
-      }),
-      columnHelper.accessor('status', {
-        id: 'status',
-        header: 'Status',
-        cell: renderStatusCell,
-        size: 120,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <FeedbackActionsCell
-            row={row.original}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ),
-        size: 48,
-      }),
-    ],
+    () => buildFeedbackColumns({ getContextMenuItems }),
     [getContextMenuItems]
+  );
+
+  // Arrow keys update the detail pane (always visible in split view)
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (rows[index]) {
+        setSelectedId(rows[index].id);
+      }
+    },
+    [rows]
   );
 
   const getRowClassName = useCallback(
@@ -285,6 +303,7 @@ export function AdminFeedbackTable({
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={row => setSelectedId(row.id)}
+              onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}

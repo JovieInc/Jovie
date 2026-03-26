@@ -29,6 +29,8 @@ interface NavMenuItemProps {
   readonly children?: ReactNode;
   /** When provided, renders a button instead of a link */
   readonly onClick?: () => void;
+  /** Hover/focus prefetch handler — wired by DashboardNav, not this component */
+  readonly onPrefetch?: () => void;
 }
 
 /**
@@ -83,6 +85,7 @@ export function NavMenuItem({
   actions,
   children,
   onClick,
+  onPrefetch,
 }: NavMenuItemProps) {
   // Memoize tooltip to prevent creating new objects on every render,
   // which would cause unnecessary re-renders in SidebarMenuButton
@@ -133,6 +136,8 @@ export function NavMenuItem({
               <button
                 type='button'
                 onClick={onClick}
+                onMouseEnter={onPrefetch}
+                onFocus={onPrefetch}
                 aria-pressed={isActive}
                 className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
               >
@@ -141,6 +146,8 @@ export function NavMenuItem({
             ) : (
               <Link
                 href={item.href}
+                onMouseEnter={onPrefetch}
+                onFocus={onPrefetch}
                 aria-current={isActive ? 'page' : undefined}
                 className='flex w-full min-w-0 items-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:justify-center'
               >

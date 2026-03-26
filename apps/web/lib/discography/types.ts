@@ -138,6 +138,8 @@ export interface TrackViewModel {
   /** Canonical recording ID (new model) — absent for legacy data */
   recordingId?: string;
   releaseId: string;
+  /** Parent release slug for constructing nested deep link paths */
+  releaseSlug: string;
   title: string;
   slug: string;
   smartLinkPath: string;

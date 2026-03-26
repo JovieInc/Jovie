@@ -5,12 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.80] - 2026-03-26
+
+### Changed
+
+- Dashboard core data cache TTL increased from 30s to 5min — tag-based invalidation handles mutations, reducing DB queries on navigation [internal]
+- Release matrix cache TTL increased from 30s to 5min — releases only change on import/sync [internal]
+- Lighthouse performance budgets tightened 2-3x (FCP 4s→1.5s, LCP 5s→2s, TBT 1.5s→500ms, performance score 50%→75%) [internal]
+
+### Added
+
+- Nav hover prefetching — hovering a dashboard nav link preloads page data into TanStack Query cache with 150ms debounce [internal]
+- Per-page TanStack Query hydration — releases and earnings pages prefetch data server-side for instant SPA navigation [internal]
+- Cache tag constant usage in settings action — replaced string literals with CACHE_TAGS.DASHBOARD_DATA [internal]
+
+## [26.4.79] - 2026-03-26
+
+### Added
+
+- Pitch generation via Jovie chat — artists can ask "generate pitches for [release]" and get Spotify, Apple Music, Amazon Music, and General pitches inline
+- "Generate pitches" suggested prompt in chat (paid plans only, personalized with latest release title)
+- ChatPitchCard component with loading skeleton, success state (4 platforms with copy buttons and char counts), and error state
+- Shared `buildPitchInput()` service extracted from pitch API route (DRY)
+- Optional `instructions` parameter for pitch generation (e.g., "mention my tour")
+- Test-only `/api/admin/test-user/set-plan` endpoint for E2E paid-tier testing
+- E2E test suite for chat pitch generation with plan upgrade/downgrade coverage
+
+### Fixed
+
+- Free-tier plan limitations now list "pitch generation" as a blocked tool
+
+## [26.4.78] - 2026-03-25
+
+### Changed
+
+- Spotify import link discovery now runs in background — users see their catalog instantly instead of waiting 15-25s for cross-platform link lookup
+- Link discovery parallelized with concurrency limit of 5 (was sequential), reducing wall-clock time from ~25s to ~5s for large catalogs
+- Pre-save cron processes rows concurrently (grouped by refresh token to prevent OAuth races), reducing 500-row processing from ~50s to ~10s
+- Admin leads batch URL processing parallelized with input deduplication
+- HUD metrics polling no longer triggers redundant refetches on tab focus (staleTime increased from 0 to 15s)
+
+### Added
+
+- Admin releases table at `/app/admin/releases` showing all releases across the platform with server-side pagination, search, and sort
+- Data quality indicators (missing artwork, no providers, no UPC, zero tracks) as inline health pills in the Issues column
+- Non-ASCII-safe search preserving music titles with accented characters
+- Admin sidebar nav entry for Releases with Disc3 icon
+- [internal] `mapConcurrent` utility for concurrent async operations with configurable worker pool limit
+- [internal] Unit tests for `mapConcurrent` (7 test cases covering concurrency, ordering, errors, edge cases)
+
+## [26.4.77] - 2026-03-25
+
+### Changed
+
+- Track URLs are now nested under their parent release (`/{handle}/{release}/{track}`) instead of flat (`/{handle}/{track}`), matching MusicBrainz hierarchy
+- Track sidebar label changed from "Smart link" to "Track link" to distinguish from release-level smart links
+- Track slug "sounds" is now reserved to prevent collision with the "Use This Sound" route
+
+### Added
+
+- New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
+- Flat track URLs now 302-redirect to the nested format when a parent release is known
+- Artist profiles now capture all 30+ platforms discovered during enrichment (previously only 7 were saved)
+- Streaming platforms are automatically promoted to artist pages; other platforms stored for future features
+- [internal] Canonical `artist_identity_links` table with provenance tracking for MusicFetch, MusicBrainz, SERP enrichment sources
+- [internal] Structured enrichment logging shows returned/stored/published counts per MusicFetch call
+
+### Fixed
+
+- Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name
+
 ## [26.4.76] - 2026-03-25
+
+### Changed
+
+- Settings pages now use a cleaner layout — flat section headers replace nested cards, eliminating redundant title bars
+- Arrow keys in admin tables now update the detail panel immediately without requiring a click
 
 ### Fixed
 
 - Fixed sign-in across all environments by routing authentication through the correct Clerk endpoint
 - [internal] Replaced dead `clerk.jov.ie` with `distinct-giraffe-5.clerk.accounts.dev` everywhere: fetch() proxy in middleware, root + app vercel.json rewrites, CSP allowlists, preconnect hints; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+
+### Removed
+
+- [internal] Removed 1,100+ lines of dead settings code (SettingsPolished, DashboardSettings, passthrough wrappers)
 
 ## [26.4.75] - 2026-03-25
 

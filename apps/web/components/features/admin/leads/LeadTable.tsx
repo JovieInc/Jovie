@@ -181,6 +181,54 @@ function renderToolsCell({ row }: { row: { original: AdminLead } }) {
   return <span className='text-secondary-token'>{tools.join(', ')}</span>;
 }
 
+/** Build column definitions for leads table (file-level to satisfy S6478). */
+function buildLeadColumns(deps: {
+  updateLeadStatus: (id: string, status: 'approved' | 'rejected') => void;
+  actioningRef: { current: ActioningState | null };
+}) {
+  return [
+    columnHelper.accessor('displayName', {
+      header: 'Name / Handle',
+      size: 200,
+      cell: renderNameHandleCell,
+    }),
+    columnHelper.accessor('status', {
+      header: 'Status',
+      size: 100,
+      cell: renderStatusBadgeCell,
+    }),
+    columnHelper.accessor('fitScore', {
+      header: 'Score',
+      size: 70,
+      cell: renderFitScoreCell,
+    }),
+    columnHelper.display({
+      id: 'signals',
+      header: 'Signals',
+      size: 180,
+      cell: renderSignalsCell,
+    }),
+    columnHelper.display({
+      id: 'tools',
+      header: 'Tools',
+      size: 140,
+      cell: renderToolsCell,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: 'Actions',
+      size: 80,
+      cell: ({ row }) => (
+        <LeadActionsCell
+          lead={row.original}
+          onUpdateStatus={deps.updateLeadStatus}
+          actioning={deps.actioningRef.current}
+        />
+      ),
+    }),
+  ];
+}
+
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -254,47 +302,11 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   );
 
   const columns = useMemo(
-    () => [
-      columnHelper.accessor('displayName', {
-        header: 'Name / Handle',
-        size: 200,
-        cell: renderNameHandleCell,
+    () =>
+      buildLeadColumns({
+        updateLeadStatus,
+        actioningRef,
       }),
-      columnHelper.accessor('status', {
-        header: 'Status',
-        size: 100,
-        cell: renderStatusBadgeCell,
-      }),
-      columnHelper.accessor('fitScore', {
-        header: 'Score',
-        size: 70,
-        cell: renderFitScoreCell,
-      }),
-      columnHelper.display({
-        id: 'signals',
-        header: 'Signals',
-        size: 180,
-        cell: renderSignalsCell,
-      }),
-      columnHelper.display({
-        id: 'tools',
-        header: 'Tools',
-        size: 140,
-        cell: renderToolsCell,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: 'Actions',
-        size: 80,
-        cell: ({ row }) => (
-          <LeadActionsCell
-            lead={row.original}
-            onUpdateStatus={updateLeadStatus}
-            actioning={actioningRef.current}
-          />
-        ),
-      }),
-    ],
     [updateLeadStatus]
   );
 

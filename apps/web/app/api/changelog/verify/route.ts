@@ -1,6 +1,6 @@
 import { and, eq, gt } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscribers';
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       htmlPage(
         'Invalid link',
         'This verification link is missing or malformed.',
-        { text: 'Go to changelog', href: `${APP_URL}/changelog` }
+        { text: 'Go to changelog', href: `${BASE_URL}/changelog` }
       ),
       { status: 400, headers: { 'Content-Type': 'text/html' } }
     );
@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
           'This verification link has expired or was already used. Please subscribe again.',
           {
             text: 'Resubscribe',
-            href: `${APP_URL}/changelog#changelog-subscribe`,
+            href: `${BASE_URL}/changelog#changelog-subscribe`,
           }
         ),
         { status: 410, headers: { 'Content-Type': 'text/html' } }
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
       htmlPage(
         "You're subscribed!",
         `You'll receive an email whenever we ship something new at ${APP_NAME}. Welcome aboard.`,
-        { text: "See what's new", href: `${APP_URL}/changelog` }
+        { text: "See what's new", href: `${BASE_URL}/changelog` }
       ),
       { status: 200, headers: { 'Content-Type': 'text/html' } }
     );
@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
       htmlPage(
         'Something went wrong',
         'We couldn\u2019t verify your subscription right now. Please try again later.',
-        { text: 'Go to changelog', href: `${APP_URL}/changelog` }
+        { text: 'Go to changelog', href: `${BASE_URL}/changelog` }
       ),
       { status: 500, headers: { 'Content-Type': 'text/html' } }
     );

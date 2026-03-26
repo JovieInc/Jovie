@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { FaqSection, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   buildBreadcrumbSchema,
   buildFaqSchema,
@@ -58,13 +58,13 @@ export const metadata: Metadata = {
     'link in bio for artists',
   ],
   alternates: {
-    canonical: `${APP_URL}/about`,
+    canonical: `${BASE_URL}/about`,
   },
   openGraph: {
     title: `About ${APP_NAME} — The Release Platform for Independent Musicians`,
     description:
       'Jovie is a release platform for independent musicians, combining smart links, artist profiles, audience intelligence, and AI. Founded by Tim White.',
-    url: `${APP_URL}/about`,
+    url: `${BASE_URL}/about`,
     type: 'website',
   },
 };
@@ -79,8 +79,8 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
 const FAQ_SCHEMA = buildFaqSchema(FAQ_ITEMS);
 
 const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
-  { name: APP_NAME, url: APP_URL },
-  { name: 'About', url: `${APP_URL}/about` },
+  { name: APP_NAME, url: BASE_URL },
+  { name: 'About', url: `${BASE_URL}/about` },
 ]);
 
 export default function AboutPage() {

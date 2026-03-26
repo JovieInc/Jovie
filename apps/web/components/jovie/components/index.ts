@@ -4,6 +4,7 @@ export { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 export { ChatMarkdown } from './ChatMarkdown';
 export { ChatMessage } from './ChatMessage';
 export { ChatMessageSkeleton } from './ChatMessageSkeleton';
+export { ChatPitchCard } from './ChatPitchCard';
 export { ErrorDisplay } from './ErrorDisplay';
 export { FeedbackForm } from './FeedbackForm';
 export { ImagePreviewStrip } from './ImagePreviewStrip';

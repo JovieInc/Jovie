@@ -66,7 +66,8 @@ export function unwrapPgError(error: unknown, depth = 0): PgErrorFields {
  */
 export function getDeepErrorMessage(error: unknown): string {
   if (error == null) return '';
-  if (typeof error !== 'object') return String(error);
+  if (typeof error !== 'object')
+    return typeof error === 'string' ? error : String(error);
 
   const messages: string[] = [];
   let current: unknown = error;
@@ -82,7 +83,9 @@ export function getDeepErrorMessage(error: unknown): string {
     depth++;
   }
 
-  return messages.join(' | ');
+  if (messages.length > 0) return messages.join(' | ');
+  if (error instanceof Error) return error.message;
+  return typeof error === 'object' ? JSON.stringify(error) : String(error);
 }
 
 export function isUniqueViolation(

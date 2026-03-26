@@ -968,6 +968,20 @@ export default async function middleware(
     const resHeaders = new Headers(proxyRes.headers);
     resHeaders.delete('content-encoding');
 
+    // Rewrite redirect Location headers to route back through /__clerk
+    // so the browser never hits the FAPI host directly (e.g. Clerk's
+    // /npm/ 307 redirects to versioned JS bundles).
+    const location = resHeaders.get('location');
+    if (location) {
+      const fapiOrigin = `https://${fapiHost}`;
+      if (location.startsWith(fapiOrigin)) {
+        resHeaders.set(
+          'location',
+          location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
+        );
+      }
+    }
+
     return new NextResponse(proxyRes.body, {
       status: proxyRes.status,
       statusText: proxyRes.statusText,

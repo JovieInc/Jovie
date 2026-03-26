@@ -38,19 +38,17 @@ import {
 } from '@/lib/service-worker/control';
 
 function useLocalOverrides() {
-  const [overrides, setOverridesState] = useState<Record<string, boolean>>(
-    () => {
-      if (typeof globalThis.window === 'undefined') return {};
-      try {
-        return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
-      } catch {
-        return {};
-      }
+  const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
+    if (globalThis.window === undefined) return {};
+    try {
+      return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
+    } catch {
+      return {};
     }
-  );
+  });
 
   const setOverride = useCallback((key: string, value: boolean) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev, [key]: value };
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
       return next;
@@ -58,7 +56,7 @@ function useLocalOverrides() {
   }, []);
 
   const removeOverride = useCallback((key: string) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev };
       delete next[key];
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
@@ -67,7 +65,7 @@ function useLocalOverrides() {
   }, []);
 
   const clearOverrides = useCallback(() => {
-    setOverridesState({});
+    setOverrides({});
     localStorage.removeItem(FF_OVERRIDES_KEY);
   }, []);
 
@@ -131,6 +129,103 @@ const ENV_COLORS: Record<string, string> = {
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
 
+type AsyncActionState = 'idle' | 'loading' | 'done' | 'error';
+
+const ASYNC_ACTION_LABELS: Record<string, Record<AsyncActionState, string>> = {
+  clear: {
+    idle: 'Clear',
+    loading: 'Clearing...',
+    done: 'Cleared!',
+    error: 'Failed',
+  },
+  unwaitlist: {
+    idle: 'Unwaitlist',
+    loading: 'Working...',
+    done: 'Done!',
+    error: 'Failed',
+  },
+};
+
+type PromoteState =
+  | 'idle'
+  | 'checking'
+  | 'ready'
+  | 'promoting'
+  | 'done'
+  | 'error';
+
+const PROMOTE_LABELS: Record<PromoteState, string> = {
+  idle: 'Promote',
+  checking: 'Promote',
+  ready: 'Promote',
+  promoting: 'Deploying...',
+  done: 'Deployed!',
+  error: 'Failed',
+};
+
+function getPromoteButtonColor(state: PromoteState): string {
+  if (state === 'done') return 'text-[var(--color-accent)]';
+  if (state === 'error') return 'text-red-400';
+  return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
+}
+
+function AsyncActionIcon({
+  state,
+  idleIcon: IdleIcon,
+}: Readonly<{
+  state: AsyncActionState;
+  idleIcon: typeof Trash2;
+}>) {
+  if (state === 'loading')
+    return <Loader2 size={11} className='animate-spin' />;
+  if (state === 'done')
+    return <Check size={11} className='text-[var(--color-accent)]' />;
+  return <IdleIcon size={11} />;
+}
+
+function PromoteIcon({ state }: Readonly<{ state: PromoteState }>) {
+  if (state === 'promoting')
+    return <Loader2 size={11} className='animate-spin' />;
+  if (state === 'done') return <Check size={11} />;
+  return <ArrowUpCircle size={11} />;
+}
+
+function CopyFieldIcon({
+  copied,
+  icon: Icon,
+}: Readonly<{ copied: boolean; icon: typeof Copy }>) {
+  if (copied) return <Check size={11} className='text-[var(--color-accent)]' />;
+  return <Icon size={11} />;
+}
+
+function ExpandCollapseIcon({ open }: Readonly<{ open: boolean }>) {
+  if (open) return <ChevronDown size={13} />;
+  return <ChevronUp size={13} />;
+}
+
+function getSwButtonProps(enabled: boolean) {
+  return {
+    title: enabled
+      ? 'Service worker active — click to disable'
+      : 'Service worker disabled — click to enable',
+    className: `flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+      enabled
+        ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+        : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+    }`,
+    'aria-label': enabled ? 'Disable service worker' : 'Enable service worker',
+  };
+}
+
+function getPromoteTitle(
+  promoteSha: { staging: string; prod: string } | null
+): string {
+  if (promoteSha) {
+    return `Promote ${promoteSha.staging} → prod (currently ${promoteSha.prod})`;
+  }
+  return 'Promote to production';
+}
+
 export function DevToolbar({
   env,
   sha,
@@ -176,15 +271,14 @@ export function DevToolbar({
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd') {
+      const isToggleShortcut =
+        e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd';
+      if (isToggleShortcut) {
         e.preventDefault();
-        if (hidden) {
-          setHidden(false);
-          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
-        } else {
-          setHidden(true);
-          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-        }
+        const nextHidden = !hidden;
+        setHidden(nextHidden);
+        localStorage.setItem(TOOLBAR_HIDDEN_KEY, nextHidden ? '1' : '0');
+        return;
       }
       if (e.key === 'Escape' && open) {
         e.preventDefault();
@@ -230,13 +324,10 @@ export function DevToolbar({
           staging: data.stagingSha,
           prod: data.prodSha,
         });
-        setPromoteState(prev =>
-          prev === 'promoting' || prev === 'done'
-            ? prev
-            : data.needsPromote
-              ? 'ready'
-              : 'idle'
-        );
+        setPromoteState(prev => {
+          if (prev === 'promoting' || prev === 'done') return prev;
+          return data.needsPromote ? 'ready' : 'idle';
+        });
       } catch {
         // Silent fail — status is best-effort
       }
@@ -590,11 +681,7 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
               aria-label='Copy SHA'
             >
-              {copiedField === 'sha' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Copy size={11} />
-              )}
+              <CopyFieldIcon copied={copiedField === 'sha'} icon={Copy} />
               <span className='hidden sm:inline text-[10px]'>SHA</span>
             </button>
           )}
@@ -604,15 +691,11 @@ export function DevToolbar({
             onClick={() =>
               copyToClipboard(globalThis.location.pathname, 'route')
             }
-            title={`Copy route: ${typeof globalThis.window !== 'undefined' ? globalThis.location.pathname : ''}`}
+            title={`Copy route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label='Copy route'
           >
-            {copiedField === 'route' ? (
-              <Check size={11} className='text-[var(--color-accent)]' />
-            ) : (
-              <Route size={11} />
-            )}
+            <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
             <span className='hidden sm:inline text-[10px]'>Route</span>
           </button>
 
@@ -637,21 +720,9 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear session'
             >
-              {clearSessionState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : clearSessionState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Trash2 size={11} />
-              )}
+              <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='hidden sm:inline text-[10px]'>
-                {clearSessionState === 'loading'
-                  ? 'Clearing...'
-                  : clearSessionState === 'done'
-                    ? 'Cleared!'
-                    : clearSessionState === 'error'
-                      ? 'Failed'
-                      : 'Clear'}
+                {ASYNC_ACTION_LABELS.clear[clearSessionState]}
               </span>
             </button>
           )}
@@ -667,21 +738,9 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
-              {unwaitlistState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : unwaitlistState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <UserCheck size={11} />
-              )}
+              <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='hidden sm:inline text-[10px]'>
-                {unwaitlistState === 'loading'
-                  ? 'Working...'
-                  : unwaitlistState === 'done'
-                    ? 'Done!'
-                    : unwaitlistState === 'error'
-                      ? 'Failed'
-                      : 'Unwaitlist'}
+                {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
               </span>
             </button>
           )}
@@ -700,19 +759,7 @@ export function DevToolbar({
                 }
                 globalThis.location.reload();
               }}
-              title={
-                swEnabled
-                  ? 'Service worker active — click to disable'
-                  : 'Service worker disabled — click to enable'
-              }
-              className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
-                swEnabled
-                  ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
-                  : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
-              }`}
-              aria-label={
-                swEnabled ? 'Disable service worker' : 'Enable service worker'
-              }
+              {...getSwButtonProps(swEnabled)}
             >
               <Globe size={11} />
               <span className='hidden sm:inline text-[10px]'>SW</span>
@@ -731,35 +778,13 @@ export function DevToolbar({
                   disabled={
                     promoteState === 'promoting' || promoteState === 'done'
                   }
-                  title={
-                    promoteSha
-                      ? `Promote ${promoteSha.staging} → prod (currently ${promoteSha.prod})`
-                      : 'Promote to production'
-                  }
-                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    promoteState === 'done'
-                      ? 'text-[var(--color-accent)]'
-                      : promoteState === 'error'
-                        ? 'text-red-400'
-                        : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                  }`}
+                  title={getPromoteTitle(promoteSha)}
+                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
                   aria-label='Promote to production'
                 >
-                  {promoteState === 'promoting' ? (
-                    <Loader2 size={11} className='animate-spin' />
-                  ) : promoteState === 'done' ? (
-                    <Check size={11} />
-                  ) : (
-                    <ArrowUpCircle size={11} />
-                  )}
+                  <PromoteIcon state={promoteState} />
                   <span className='hidden sm:inline text-[10px]'>
-                    {promoteState === 'promoting'
-                      ? 'Deploying...'
-                      : promoteState === 'done'
-                        ? 'Deployed!'
-                        : promoteState === 'error'
-                          ? 'Failed'
-                          : 'Promote'}
+                    {PROMOTE_LABELS[promoteState]}
                   </span>
                   {promoteState === 'ready' && promoteSha && (
                     <span className='hidden md:inline text-[9px] opacity-60'>
@@ -779,7 +804,7 @@ export function DevToolbar({
             className='flex items-center gap-1 px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label={open ? 'Collapse dev toolbar' : 'Expand dev toolbar'}
           >
-            {open ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+            <ExpandCollapseIcon open={open} />
           </button>
           <button
             type='button'

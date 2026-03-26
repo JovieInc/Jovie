@@ -23,6 +23,7 @@ import {
 } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 interface PublicProfileTemplateV2Props {
   readonly mode: ProfileMode;
@@ -39,6 +40,8 @@ interface PublicProfileTemplateV2Props {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: readonly PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
 }
@@ -88,6 +91,8 @@ export function PublicProfileTemplateV2({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
   tourDates,
   visitTrackingToken,
 }: PublicProfileTemplateV2Props) {
@@ -100,7 +105,7 @@ export function PublicProfileTemplateV2({
     [artist, socialLinks]
   );
   const initialSource = useMemo(() => {
-    if (typeof globalThis.window === 'undefined') {
+    if (globalThis.window === undefined) {
       return null;
     }
 
@@ -136,7 +141,7 @@ export function PublicProfileTemplateV2({
   }, [mode, setActiveIndex]);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     const handlePopState = () => {
       const nextMode = getModeFromLocation();
@@ -150,7 +155,7 @@ export function PublicProfileTemplateV2({
   }, [setActiveIndex]);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     const href = buildModeHref(activeMode);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
@@ -233,6 +238,8 @@ export function PublicProfileTemplateV2({
             mergedDSPs={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
             genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
             tourDates={tourDates}
             modes={SWIPEABLE_MODES}
             activeIndex={activeIndex}

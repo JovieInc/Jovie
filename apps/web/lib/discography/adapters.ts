@@ -1,6 +1,6 @@
 import { toISOStringOrFallback } from '@/lib/utils/date';
 import type { ProviderKey, TrackViewModel } from './types';
-import { buildSmartLinkPath } from './utils';
+import { buildTrackDeepLinkPath } from './utils';
 
 export interface ProviderLinkInput {
   providerId: string;
@@ -13,7 +13,8 @@ function mapProviderLinksToViewModel(
   providerLinks: ProviderLinkInput[],
   providerLabels: Record<ProviderKey, string>,
   profileHandle: string,
-  slug: string
+  releaseSlug: string,
+  trackSlug: string
 ): TrackViewModel['providers'] {
   return Object.entries(providerLabels)
     .map(([key, label]) => {
@@ -30,7 +31,14 @@ function mapProviderLinksToViewModel(
         url,
         source,
         updatedAt: toISOStringOrFallback(match?.updatedAt),
-        path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
+        path: url
+          ? buildTrackDeepLinkPath(
+              profileHandle,
+              releaseSlug,
+              trackSlug,
+              providerKey
+            )
+          : '',
         isPrimary: ['spotify', 'apple_music', 'youtube'].includes(providerKey),
       };
     })
@@ -57,17 +65,23 @@ export function mapTrackToViewModel(params: {
   };
   providerLabels: Record<ProviderKey, string>;
   profileHandle: string;
+  releaseSlug: string;
 }): TrackViewModel {
-  const { track, providerLabels, profileHandle } = params;
+  const { track, providerLabels, profileHandle, releaseSlug } = params;
 
   return {
     id: track.id,
     releaseTrackId: track.releaseTrackId,
     recordingId: track.recordingId,
     releaseId: track.releaseId,
+    releaseSlug,
     title: track.title,
     slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
+    smartLinkPath: buildTrackDeepLinkPath(
+      profileHandle,
+      releaseSlug,
+      track.slug
+    ),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -80,6 +94,7 @@ export function mapTrackToViewModel(params: {
       track.providerLinks,
       providerLabels,
       profileHandle,
+      releaseSlug,
       track.slug
     ),
   };

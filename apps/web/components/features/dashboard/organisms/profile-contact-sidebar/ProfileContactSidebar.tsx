@@ -19,6 +19,9 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useAvatarMutation,
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
@@ -68,6 +71,26 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Persist a detected link to the server. Returns the server-assigned linkId. */
+async function confirmLinkOnServer(
+  profileId: string,
+  link: DetectedLink
+): Promise<string> {
+  const response = await fetch('/api/chat/confirm-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profileId,
+      platform: link.platform.id,
+      url: link.originalUrl,
+      normalizedUrl: link.normalizedUrl,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to add link');
+  const { linkId } = (await response.json()) as { linkId: string };
+  return linkId;
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -85,7 +108,16 @@ export function ProfileContactSidebar() {
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
+  const pressPhotoUploadMutation = usePressPhotoUploadMutation(
+    selectedProfile?.id
+  );
+  const deletePressPhotoMutation = useDeletePressPhotoMutation(
+    selectedProfile?.id
+  );
   const removeLinkMutation = useRemoveSocialLinkMutation();
+  const { data: pressPhotos = [] } = usePressPhotosQuery(
+    selectedProfile?.id ?? ''
+  );
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -160,6 +192,23 @@ export function ProfileContactSidebar() {
       return url;
     },
     [avatarMutation, previewData, setPreviewData]
+  );
+
+  const handlePressPhotoUpload = useCallback(
+    async (file: File) => {
+      const uploadedPhoto = await pressPhotoUploadMutation.mutateAsync(file);
+      toast.success('Press photo uploaded');
+      return uploadedPhoto;
+    },
+    [pressPhotoUploadMutation]
+  );
+
+  const handlePressPhotoDelete = useCallback(
+    async (photoId: string) => {
+      await deletePressPhotoMutation.mutateAsync(photoId);
+      toast.success('Press photo deleted');
+    },
+    [deletePressPhotoMutation]
   );
 
   // Handle bio change — save to server and instantly update sidebar
@@ -246,6 +295,59 @@ export function ProfileContactSidebar() {
     [previewData?.links]
   );
 
+  // Reconcile optimistic ID with server ID, or clean up if user deleted while pending
+  const reconcileAfterPersist = useCallback(
+    (
+      linkId: string,
+      optimisticId: string,
+      platformName: string,
+      profileId: string
+    ) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        if (linkId) {
+          removeLinkMutation.mutate(
+            { profileId, linkId },
+            { onError: () => {} }
+          );
+        }
+        return;
+      }
+      if (linkId) {
+        const current = previewDataRef.current;
+        if (current) {
+          setPreviewData({
+            ...current,
+            links: current.links.map(l =>
+              l.id === optimisticId ? { ...l, id: linkId } : l
+            ),
+          });
+        }
+      }
+      toast.success(`${platformName} link added`);
+    },
+    [removeLinkMutation, setPreviewData]
+  );
+
+  // Revert optimistic add on failure
+  const revertOptimisticAdd = useCallback(
+    (optimisticId: string) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        return;
+      }
+      const current = previewDataRef.current;
+      if (current) {
+        setPreviewData({
+          ...current,
+          links: current.links.filter(l => l.id !== optimisticId),
+        });
+      }
+      toast.error('Failed to add link');
+    },
+    [setPreviewData]
+  );
+
   // Handle adding a new link (opens smart input)
   const handleAddLink = useCallback((_category?: string) => {
     setIsAddingLink(true);
@@ -294,65 +396,15 @@ export function ProfileContactSidebar() {
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
       try {
-        const response = await fetch('/api/chat/confirm-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: selectedProfile.id,
-            platform: link.platform.id,
-            url: link.originalUrl,
-            normalizedUrl: link.normalizedUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add link');
-        }
-
-        const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
-          optimisticLink.id
+        const linkId = await confirmLinkOnServer(selectedProfile.id, link);
+        reconcileAfterPersist(
+          linkId,
+          optimisticLink.id,
+          link.platform.name,
+          selectedProfile.id
         );
-
-        if (wasDeletedWhilePending) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
-            removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
-              { onError: () => {} }
-            );
-          }
-          return;
-        }
-
-        if (linkId) {
-          const current = previewDataRef.current;
-          if (current) {
-            setPreviewData({
-              ...current,
-              links: current.links.map(l =>
-                l.id === optimisticLink.id ? { ...l, id: linkId } : l
-              ),
-            });
-          }
-        }
-
-        toast.success(`${link.platform.name} link added`);
       } catch {
-        // If deleted while pending, the UI is already correct (link removed)
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          return;
-        }
-        // Revert on failure
-        const current = previewDataRef.current;
-        if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.filter(l => l.id !== optimisticLink.id),
-          });
-        }
-        toast.error('Failed to add link');
+        revertOptimisticAdd(optimisticLink.id);
       } finally {
         pendingAddsRef.current.delete(optimisticLink.id);
       }
@@ -362,7 +414,8 @@ export function ProfileContactSidebar() {
       previewData,
       setPreviewData,
       resolvedCategory,
-      removeLinkMutation,
+      reconcileAfterPersist,
+      revertOptimisticAdd,
     ]
   );
 
@@ -626,10 +679,13 @@ export function ProfileContactSidebar() {
           hometown={hometown}
           activeSinceYear={activeSinceYear}
           allowPhotoDownloads={allowPhotoDownloads}
+          pressPhotos={pressPhotos}
           onBioChange={handleBioChange}
           onLocationChange={handleLocationChange}
           onHometownChange={handleHometownChange}
           onGenresChange={handleGenresChange}
+          onPressPhotoUpload={handlePressPhotoUpload}
+          onPressPhotoDelete={handlePressPhotoDelete}
         />
       ) : (
         <>

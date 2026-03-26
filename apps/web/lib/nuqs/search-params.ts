@@ -231,6 +231,32 @@ export const adminCreatorsSearchParams = createSearchParamsCache({
   q: searchQueryParser,
 });
 
+// ============================================================================
+// Admin Releases Search Params
+// ============================================================================
+
+export const adminReleasesSortFields = [
+  'release_date_desc',
+  'release_date_asc',
+  'created_desc',
+  'created_asc',
+  'title_asc',
+  'title_desc',
+] as const;
+
+export type AdminReleasesSort = (typeof adminReleasesSortFields)[number];
+
+export const adminReleasesSortParser = parseAsStringLiteral(
+  adminReleasesSortFields
+).withDefault('release_date_desc');
+
+export const adminReleasesSearchParams = createSearchParamsCache({
+  page: pageParser,
+  pageSize: pageSizeParser,
+  sort: adminReleasesSortParser,
+  q: searchQueryParser,
+});
+
 /**
  * Valid sort fields for admin users table.
  */

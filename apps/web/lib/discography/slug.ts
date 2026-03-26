@@ -17,6 +17,19 @@ import {
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
+/**
+ * Reserved slugs that conflict with static route segments at the track level.
+ * Tracks with these slugs would be unreachable because Next.js
+ * resolves static segments (e.g. /sounds/) before dynamic [trackSlug].
+ * Only applies to tracks/release_tracks — releases don't conflict.
+ */
+const RESERVED_TRACK_SLUGS = new Set(['sounds']);
+
+/** Check if a slug is reserved at the track level. */
+export function isReservedTrackSlug(slug: string): boolean {
+  return RESERVED_TRACK_SLUGS.has(generateBaseSlug(slug));
+}
+
 /** Map a content type + ID to the correct slug exclusion option. */
 function buildExcludeOptions(contentType: ContentType, id?: string) {
   switch (contentType) {
@@ -69,8 +82,15 @@ export async function isSlugAvailable(
     excludeReleaseId?: string;
     excludeTrackId?: string;
     excludeRecordingId?: string;
+    contentType?: ContentType;
   }
 ): Promise<boolean> {
+  // Reserved track slugs conflict with static route segments (e.g. /sounds/)
+  // Only block for tracks — releases at /{handle}/{slug} don't collide
+  const ct = options?.contentType;
+  if ((ct === 'track' || ct === 'release_track') && isReservedTrackSlug(slug))
+    return false;
+
   const { excludeReleaseId, excludeTrackId, excludeRecordingId } =
     options ?? {};
 
@@ -155,7 +175,10 @@ export async function generateUniqueSlug(
     return `untitled-${Date.now().toString(36)}`;
   }
 
-  const excludeOptions = buildExcludeOptions(contentType, existingId);
+  const excludeOptions = {
+    ...buildExcludeOptions(contentType, existingId),
+    contentType,
+  };
 
   // Try the base slug first
   if (await isSlugAvailable(creatorProfileId, baseSlug, excludeOptions)) {
@@ -368,7 +391,10 @@ export async function updateSlugWithRedirect(params: {
   }
 
   // Check if the new slug is available
-  const excludeOptions = buildExcludeOptions(contentType, contentId);
+  const excludeOptions = {
+    ...buildExcludeOptions(contentType, contentId),
+    contentType,
+  };
 
   const available = await isSlugAvailable(
     creatorProfileId,

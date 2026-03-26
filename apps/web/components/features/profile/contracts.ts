@@ -3,6 +3,7 @@ import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 export const PROFILE_MODE_KEYS = [
   'profile',
@@ -63,6 +64,7 @@ export interface ProfilePublicViewModel {
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes: AvatarSize[];
   readonly allowPhotoDownloads: boolean;
+  readonly pressPhotos: PressPhoto[];
   readonly subscribeTwoStep: boolean;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];

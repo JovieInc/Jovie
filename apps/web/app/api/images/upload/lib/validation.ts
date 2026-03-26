@@ -17,10 +17,15 @@ import { UPLOAD_ERROR_CODES } from './constants';
 import { errorResponse } from './error-response';
 import { canProcessMimeTypeWithSharp, fileToBuffer } from './image-processing';
 
+const PHOTO_UPLOAD_TYPES = ['avatar', 'press'] as const;
+
+export type ValidatedPhotoType = (typeof PHOTO_UPLOAD_TYPES)[number];
+
 export interface ValidatedFile {
   file: File;
   normalizedType: SupportedImageMimeType;
   buffer: Buffer;
+  photoType: ValidatedPhotoType;
 }
 
 export async function validateUploadedFile(
@@ -37,6 +42,11 @@ export async function validateUploadedFile(
 
   const formData = await request.formData();
   const file = formData.get('file') as File | null;
+  const rawPhotoType = formData.get('photoType');
+  const photoType =
+    typeof rawPhotoType === 'string' && rawPhotoType.length > 0
+      ? rawPhotoType
+      : 'avatar';
   const normalizedType = (file?.type.toLowerCase?.() ?? '') as
     | SupportedImageMimeType
     | '';
@@ -45,6 +55,14 @@ export async function validateUploadedFile(
     return errorResponse(
       'No file provided. Please select an image to upload.',
       UPLOAD_ERROR_CODES.NO_FILE,
+      400
+    );
+  }
+
+  if (!PHOTO_UPLOAD_TYPES.includes(photoType as ValidatedPhotoType)) {
+    return errorResponse(
+      'Invalid photo type.',
+      UPLOAD_ERROR_CODES.INVALID_PHOTO_TYPE,
       400
     );
   }
@@ -102,5 +120,6 @@ export async function validateUploadedFile(
     file,
     normalizedType: normalizedType as SupportedImageMimeType,
     buffer: fileBuffer,
+    photoType: photoType as ValidatedPhotoType,
   };
 }

@@ -8,6 +8,8 @@ import { logger } from '@/lib/utils/logger';
 import { BLOB_RETRY_DELAY_MS, MAX_BLOB_UPLOAD_RETRIES } from './constants';
 import type { BlobPut } from './types';
 
+export type PhotoUploadType = 'avatar' | 'press';
+
 export async function getVercelBlobUploader(): Promise<BlobPut | null> {
   try {
     const blobModule = await import('@vercel/blob');
@@ -18,8 +20,13 @@ export async function getVercelBlobUploader(): Promise<BlobPut | null> {
   }
 }
 
-export function buildBlobPath(seoFileName: string, clerkUserId: string) {
-  return `avatars/users/${clerkUserId}/${seoFileName}.avif`;
+export function buildBlobPath(
+  seoFileName: string,
+  clerkUserId: string,
+  photoType: PhotoUploadType = 'avatar'
+) {
+  const pathPrefix = photoType === 'press' ? 'press-photos' : 'avatars';
+  return `${pathPrefix}/users/${clerkUserId}/${seoFileName}.avif`;
 }
 
 export async function uploadBufferToBlob(

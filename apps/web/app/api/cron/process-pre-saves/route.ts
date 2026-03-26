@@ -9,6 +9,7 @@ import {
   refreshSpotifyAccessToken,
   saveReleaseToSpotifyLibrary,
 } from '@/lib/pre-save/spotify';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
 
 async function resolveAccessToken(row: {
@@ -130,14 +131,31 @@ export async function GET(request: Request) {
   let processed = 0;
   let failed = 0;
 
+  // Group rows by decrypted refresh token to avoid concurrent token refresh
+  // races (Spotify refresh tokens may be single-use). We must decrypt first
+  // because encryptPII uses a random IV — the same plaintext produces different
+  // ciphertexts, so grouping by encrypted value would never coalesce.
+  const groupedByToken = new Map<string, typeof rows>();
   for (const row of rows) {
-    const success = await processPreSaveRow(row);
-    if (success) {
-      processed += 1;
-    } else {
-      failed += 1;
-    }
+    const plainToken = row.encryptedRefreshToken
+      ? decryptPII(row.encryptedRefreshToken)
+      : null;
+    const key = plainToken ?? row.id;
+    const group = groupedByToken.get(key) ?? [];
+    group.push(row);
+    groupedByToken.set(key, group);
   }
+
+  await mapConcurrent(Array.from(groupedByToken.values()), 5, async group => {
+    for (const row of group) {
+      const success = await processPreSaveRow(row);
+      if (success) {
+        processed += 1;
+      } else {
+        failed += 1;
+      }
+    }
+  });
 
   return NextResponse.json({ ok: true, processed, failed, total: rows.length });
 }

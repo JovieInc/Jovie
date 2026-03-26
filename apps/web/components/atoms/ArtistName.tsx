@@ -45,7 +45,7 @@ export function ArtistName({
   as: Tag = 'h1',
 }: ArtistNameProps) {
   const content = (
-    <span className='inline-flex items-start justify-center gap-1.5'>
+    <span className='inline-flex items-center justify-center gap-1'>
       <span
         className={cn(
           'text-primary-token',
@@ -57,9 +57,10 @@ export function ArtistName({
         {name}
       </span>
       {isVerified && (
-        <span className='relative -top-[0.5em] -left-[0.25em]'>
-          <VerifiedBadge size={badgeSizes[size]} className='text-accent' />
-        </span>
+        <VerifiedBadge
+          size={badgeSizes[size]}
+          className='text-accent shrink-0'
+        />
       )}
     </span>
   );
