@@ -73,7 +73,7 @@ function useHoverCapable() {
   const [isHoverCapable, setIsHoverCapable] = useState(false);
 
   useEffect(() => {
-    if (typeof globalThis.window === 'undefined' || !globalThis.matchMedia) {
+    if (globalThis.window === undefined || !globalThis.matchMedia) {
       return;
     }
 
