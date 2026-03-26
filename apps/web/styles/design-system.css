@@ -94,7 +94,7 @@
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: lch(9.894% 0 282);
   --color-text-secondary-token: lch(19.788% 1.25 282);
-  --color-text-tertiary-token: lch(39.576% 1.25 282);
+  --color-text-tertiary-token: lch(34% 1.25 282);
   --color-text-quaternary-token: lch(65.3% 1.25 282);
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
@@ -236,7 +236,7 @@
   /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
   --color-text-secondary-token: lch(90.65% 1.35 282);
   /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(62.6% 1.35 282);
+  --color-text-tertiary-token: lch(68% 1.35 282);
   /* #969799 — Linear exact */
   --color-text-quaternary-token: #62666d;
   /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */

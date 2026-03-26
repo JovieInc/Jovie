@@ -49,7 +49,6 @@ import { ReleaseMetadata } from './ReleaseMetadata';
 import { ReleasePitchSection } from './ReleasePitchSection';
 import { useReleaseHeaderParts } from './ReleaseSidebarHeader';
 import { ReleaseSmartLinkAnalytics } from './ReleaseSmartLinkAnalytics';
-import { ReleaseSmartLinkSection } from './ReleaseSmartLinkSection';
 import { ReleaseTrackList } from './ReleaseTrackList';
 import { TrackDetailPanel, type TrackForDetail } from './TrackDetailPanel';
 import type { Release, ReleaseSidebarProps } from './types';
@@ -196,10 +195,6 @@ function ReleaseEntityHeader({
             bodyClassName='pt-0'
           />
         </div>
-      </div>
-
-      <div className='border-t border-(--linear-app-frame-seam) bg-surface-0/35 px-2.5 py-2'>
-        <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
       </div>
     </DrawerSurfaceCard>
   );

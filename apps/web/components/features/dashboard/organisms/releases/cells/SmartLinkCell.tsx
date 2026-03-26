@@ -46,7 +46,7 @@ export const SmartLinkCell = memo(function SmartLinkCell({
       >
         <Icon
           name={isScheduled ? 'Clock' : 'Lock'}
-          className='h-3 w-3 shrink-0'
+          className='h-3.5 w-3.5 shrink-0'
           aria-hidden='true'
         />
         <span className='truncate'>

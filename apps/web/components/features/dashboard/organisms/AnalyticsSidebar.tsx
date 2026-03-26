@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDown, Globe, Link2, MapPin } from 'lucide-react';
+import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useCallback, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
@@ -9,6 +9,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useDashboardAnalyticsQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { AnalyticsRange } from '@/types/analytics';
@@ -46,7 +47,7 @@ const ANALYTICS_TAB_OPTIONS = [
 
 const numberFormatter = new Intl.NumberFormat();
 
-function formatEngagementValue(
+function formatMetricValue(
   loading: boolean,
   value: number | undefined | null
 ): string {
@@ -74,84 +75,73 @@ function SidebarRangeToggle({
   );
 }
 
-const FUNNEL_WIDTHS = ['100%', '75%', '55%'] as const;
-
-function FunnelStage({
+/** Single column in the funnel metrics card */
+function FunnelColumn({
   label,
   value,
   description,
-  conversionRate,
-  stageIndex,
-  isLast,
   loading,
 }: {
   readonly label: string;
   readonly value: string;
   readonly description: string;
-  readonly conversionRate: string | null;
-  readonly stageIndex: number;
-  readonly isLast: boolean;
   readonly loading: boolean;
 }) {
-  const width = FUNNEL_WIDTHS[stageIndex] ?? '50%';
-
   if (loading) {
     return (
-      <div className='flex w-full flex-col items-center'>
-        <div className='w-full' style={{ maxWidth: width }}>
-          <DrawerSurfaceCard className='px-3 py-2 text-center'>
-            <LoadingSkeleton
-              height='h-3'
-              width='w-20'
-              rounded='sm'
-              className='mx-auto mb-2'
-            />
-            <LoadingSkeleton
-              height='h-7'
-              width='w-16'
-              rounded='sm'
-              className='mx-auto'
-            />
-          </DrawerSurfaceCard>
-        </div>
+      <div className='flex flex-1 flex-col items-center justify-center px-2 py-3'>
+        <LoadingSkeleton
+          height='h-3'
+          width='w-16'
+          rounded='sm'
+          className='mb-2'
+        />
+        <LoadingSkeleton height='h-6' width='w-12' rounded='sm' />
       </div>
     );
   }
 
   return (
-    <div className='flex w-full flex-col items-center'>
-      <div className='w-full' style={{ maxWidth: width }}>
-        <DrawerSurfaceCard
-          className={cn(
-            'relative overflow-hidden px-3 py-2 text-center',
-            isLast ? 'border-default bg-surface-1' : 'bg-surface-1'
-          )}
-        >
-          <p className='mb-1.5 text-[13px] font-[510] tracking-normal text-secondary-token'>
-            {label}
-          </p>
-          <p className='text-2xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
-            {value}
-          </p>
-          <p className='mt-0.5 text-[11px] text-secondary-token'>
-            {description}
-          </p>
-        </DrawerSurfaceCard>
-      </div>
+    <div className='flex flex-1 flex-col items-center justify-center px-2 py-3 text-center'>
+      <p className='text-[11px] font-[510] text-tertiary-token'>{label}</p>
+      <p className='mt-1 text-[20px] font-[590] leading-none tracking-[-0.02em] text-primary-token tabular-nums'>
+        {value}
+      </p>
+      <p className='mt-1 text-[10px] text-tertiary-token'>{description}</p>
+    </div>
+  );
+}
 
-      {!isLast && (
-        <div className='flex min-h-[32px] flex-col items-center py-1.5'>
-          <ArrowDown className='h-3.5 w-3.5 text-tertiary-token/60' />
-          <span
-            className={cn(
-              'mt-0.5 min-h-[16px] text-[11px] font-[510] tabular-nums',
-              conversionRate ? 'text-accent' : 'text-transparent'
-            )}
-          >
-            {conversionRate ?? '—'}
-          </span>
-        </div>
-      )}
+/** Single column in the engagement metrics row */
+function EngagementColumn({
+  label,
+  value,
+  loading,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className='flex flex-1 flex-col items-center justify-center px-2 py-2.5'>
+        <LoadingSkeleton
+          height='h-5'
+          width='w-10'
+          rounded='sm'
+          className='mb-1'
+        />
+        <LoadingSkeleton height='h-3' width='w-14' rounded='sm' />
+      </div>
+    );
+  }
+
+  return (
+    <div className='flex flex-1 flex-col items-center justify-center px-2 py-2.5 text-center'>
+      <p className='text-[16px] font-[590] leading-none tracking-[-0.011em] text-primary-token tabular-nums'>
+        {value}
+      </p>
+      <p className='mt-1 text-[10px] text-tertiary-token'>{label}</p>
     </div>
   );
 }
@@ -201,11 +191,11 @@ function RankedList({
   }
 
   return (
-    <ul className='min-h-[196px] space-y-1.5'>
+    <ul className='min-h-[196px] space-y-0.5'>
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-8 items-center justify-between rounded-full px-2'
+          className='group flex h-8 items-center justify-between rounded-lg px-2 transition-colors hover:bg-surface-1'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
             <span className='w-3 text-[11px] font-[510] text-tertiary-token tabular-nums'>
@@ -216,47 +206,12 @@ function RankedList({
               {item.label}
             </span>
           </div>
-          <span className='ml-2 text-[13px] font-[510] text-primary-token tabular-nums'>
+          <span className='ml-2 text-[13px] font-[590] text-primary-token tabular-nums'>
             {item.value}
           </span>
         </li>
       ))}
     </ul>
-  );
-}
-
-function EngagementMetricCard({
-  label,
-  value,
-  loading,
-}: {
-  readonly label: string;
-  readonly value: string;
-  readonly loading: boolean;
-}) {
-  const showSkeleton = loading || !value;
-
-  return (
-    <DrawerSurfaceCard className='min-h-[68px] p-2.5'>
-      {showSkeleton ? (
-        <>
-          <LoadingSkeleton
-            height='h-7'
-            width='w-14'
-            rounded='sm'
-            className='mb-2'
-          />
-          <LoadingSkeleton height='h-3' width='w-20' rounded='sm' />
-        </>
-      ) : (
-        <>
-          <p className='text-xl font-[590] tracking-[-0.011em] text-primary-token tabular-nums'>
-            {value}
-          </p>
-          <p className='mt-1 text-[11px] text-tertiary-token'>{label}</p>
-        </>
-      )}
-    </DrawerSurfaceCard>
   );
 }
 
@@ -301,6 +256,10 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     []
   );
 
+  const conversionRates = stages
+    .slice(0, -1)
+    .map((stage, i) => calculateRate(stages[i + 1].value, stage.value));
+
   return (
     <EntitySidebarShell
       isOpen={isOpen}
@@ -311,64 +270,72 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
     >
       <div
         className={cn(
-          'space-y-2 transition-opacity duration-150',
+          'space-y-2.5 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
-        <div className='flex min-h-[280px] flex-col items-center gap-0'>
-          {stages.map((stage, index) => {
-            const isLast = index === stages.length - 1;
-            const nextStage = isLast ? null : stages[index + 1];
-            const conversionRate = nextStage
-              ? calculateRate(nextStage.value, stage.value)
-              : null;
+        {/* Funnel + Engagement — one cohesive card */}
+        <div
+          className={cn(
+            LINEAR_SURFACE.sidebarCard,
+            'overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+          )}
+        >
+          {/* Funnel: 3-column horizontal layout */}
+          <div className='flex items-stretch divide-x divide-(--linear-app-frame-seam)'>
+            {stages.map((stage, index) => {
+              const showRate = index < conversionRates.length;
+              return (
+                <div key={stage.label} className='relative flex-1'>
+                  <FunnelColumn
+                    label={stage.label}
+                    value={numberFormatter.format(stage.value)}
+                    description={stage.description}
+                    loading={loading}
+                  />
+                  {showRate && conversionRates[index] && (
+                    <span className='absolute right-0 top-1/2 z-10 -translate-y-1/2 translate-x-1/2 rounded-full bg-surface-0 px-1 text-[9px] font-[510] text-accent tabular-nums'>
+                      {conversionRates[index]}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-            return (
-              <FunnelStage
-                key={stage.label}
-                label={stage.label}
-                value={numberFormatter.format(stage.value)}
-                description={stage.description}
-                conversionRate={conversionRate}
-                stageIndex={index}
-                isLast={isLast}
-                loading={loading}
-              />
-            );
-          })}
+          {/* Engagement metrics below divider */}
+          <div className='flex items-stretch divide-x divide-(--linear-app-frame-seam) border-t border-(--linear-app-frame-seam)'>
+            <EngagementColumn
+              label='Total Clicks'
+              value={formatMetricValue(loading, data?.total_clicks)}
+              loading={loading}
+            />
+            <EngagementColumn
+              label='Listen Clicks'
+              value={formatMetricValue(loading, data?.listen_clicks)}
+              loading={loading}
+            />
+            <EngagementColumn
+              label='Captures'
+              value={formatMetricValue(loading, data?.subscribers)}
+              loading={loading}
+            />
+          </div>
         </div>
 
-        <div className='grid grid-cols-3 gap-1.5'>
-          <EngagementMetricCard
-            label='Total Clicks'
-            value={formatEngagementValue(loading, data?.total_clicks)}
-            loading={loading}
-          />
-          <EngagementMetricCard
-            label='Listen Clicks'
-            value={formatEngagementValue(loading, data?.listen_clicks)}
-            loading={loading}
-          />
-          <EngagementMetricCard
-            label='Captures'
-            value={formatEngagementValue(loading, data?.subscribers)}
-            loading={loading}
-          />
-        </div>
-
-        <div className='space-y-2'>
+        {/* Tabs + range toggle — inline on same row */}
+        <div className='flex items-center gap-1.5'>
           <DrawerTabs
             value={activeTab}
             onValueChange={value => setActiveTab(value as AnalyticsTab)}
             options={ANALYTICS_TAB_OPTIONS}
-            className='w-full'
+            className='flex-1'
             ariaLabel='Analytics data tabs'
           />
-          <div className='flex justify-end'>
-            <SidebarRangeToggle value={range} onChange={setRange} />
-          </div>
+          <SidebarRangeToggle value={range} onChange={setRange} />
         </div>
 
+        {/* Ranked list card */}
         <DrawerSurfaceCard className='min-h-[196px] p-2'>
           {activeTab === 'cities' && (
             <RankedList

@@ -290,7 +290,7 @@ export function createRightMetaCellRenderer(
         </div>
 
         <span
-          className='w-[54px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-tertiary-token'
+          className='w-[54px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-secondary-token'
           title={yearTitle}
         >
           {dateLabel}
