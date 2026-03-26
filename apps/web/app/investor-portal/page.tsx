@@ -9,7 +9,7 @@ import { DeckViewer } from './_components/DeckViewer';
 /**
  * Investor portal landing page.
  * Centered hero with personalized greeting, headline, and pitch deck.
- * Slides loaded server-side from content/investors/deck/slides/*.md.
+ * Slides loaded server-side from investors/deck/slides/*.md.
  */
 export default async function InvestorLandingPage() {
   const cookieStore = await cookies();

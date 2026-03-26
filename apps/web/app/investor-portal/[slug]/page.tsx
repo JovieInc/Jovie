@@ -47,7 +47,7 @@ async function requireInvestorAccess(): Promise<void> {
 
 /**
  * Dynamic memo pages for the investor portal.
- * Reads markdown from content/investors/ based on manifest.json.
+ * Reads markdown from investors/ based on manifest.json.
  * Beautiful prose styling with light/dark toggle and TOC.
  */
 export async function generateMetadata({

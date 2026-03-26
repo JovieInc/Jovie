@@ -220,9 +220,15 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             git fetch origin "${{ github.base_ref }}" --depth=1
-            CHANGED_FILES=$(git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- 'apps/web/**/*.ts' 'apps/web/**/*.tsx' | tr '\n' ' ')
-            if [[ -n "$CHANGED_FILES" ]]; then
-              pnpm --filter=@jovie/web run lint:server-boundaries -- $CHANGED_FILES
+            mapfile -t CHANGED_FILES < <(
+              git diff --diff-filter=d --name-only "origin/${{ github.base_ref }}" HEAD -- \
+                'apps/web/*.ts' \
+                'apps/web/*.tsx' \
+                'apps/web/**/*.ts' \
+                'apps/web/**/*.tsx'
+            )
+            if (( ${#CHANGED_FILES[@]} > 0 )); then
+              pnpm --filter=@jovie/web run lint:server-boundaries -- "${CHANGED_FILES[@]}"
             else
               echo "No server-boundary TypeScript files changed"
             fi

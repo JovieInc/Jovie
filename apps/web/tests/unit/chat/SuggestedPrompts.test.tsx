@@ -11,12 +11,12 @@ describe('SuggestedPrompts', () => {
     );
 
     expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
-
-    // Current default suggestion
+    expect(getByText('Preview my profile')).toBeTruthy();
     expect(getByText('Change profile photo')).toBeTruthy();
+    expect(getByText('Set up a release link')).toBeTruthy();
 
     // First-session suggestions should not appear in default mode
-    expect(queryByText('Preview my profile')).toBeNull();
+    expect(queryByText('How do I get paid?')).toBeNull();
   });
 
   it('renders first-session prompts including all suggestions', () => {
@@ -39,35 +39,28 @@ describe('SuggestedPrompts', () => {
     expect(getByRole('button', { name: 'How do I get paid?' })).toBeTruthy();
   });
 
-  it('renders insight-backed prompts when provided', () => {
+  it('calls onSelect with prompt when clicked', () => {
     const onSelect = vi.fn();
-    const { getByRole, queryByText } = fastRender(
+    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
+    getByText('Preview my profile').closest('button')?.click();
+    expect(onSelect).toHaveBeenCalledWith('Preview my profile.');
+  });
+
+  it('renders pitch and feedback actions for returning users with advanced tools', () => {
+    const onSelect = vi.fn();
+    const { getByRole } = fastRender(
       <SuggestedPrompts
         onSelect={onSelect}
-        suggestions={[
-          {
-            icon: 'MessageSquare',
-            label: 'Which release is getting traction right now?',
-            prompt: 'Which release is getting traction right now?',
-            accent: 'blue',
-          },
-        ]}
+        canUseAdvancedTools
+        latestReleaseTitle='Midnight Drive'
       />
     );
 
     expect(
       getByRole('button', {
-        name: 'Which release is getting traction right now?',
+        name: 'Generate pitches for “Midnight Drive”',
       })
     ).toBeTruthy();
-    // Default prompts should not appear when custom suggestions are provided
-    expect(queryByText('Change profile photo')).toBeNull();
-  });
-
-  it('calls onSelect with prompt when clicked', () => {
-    const onSelect = vi.fn();
-    const { getByText } = fastRender(<SuggestedPrompts onSelect={onSelect} />);
-    getByText('Change profile photo').closest('button')?.click();
-    expect(onSelect).toHaveBeenCalledWith('Help me change my profile photo.');
+    expect(getByRole('button', { name: 'Share feedback' })).toBeTruthy();
   });
 });

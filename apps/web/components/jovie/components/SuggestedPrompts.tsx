@@ -39,7 +39,6 @@ interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
-  readonly suggestions?: readonly ChatSuggestion[];
   readonly canUseAdvancedTools?: boolean;
 }
 
@@ -76,12 +75,8 @@ export function SuggestedPrompts({
   onSelect,
   isFirstSession = false,
   latestReleaseTitle,
-  suggestions,
   canUseAdvancedTools = false,
 }: SuggestedPromptsProps) {
-  const fallbackSuggestions = suggestions?.length
-    ? suggestions
-    : DEFAULT_SUGGESTIONS;
   const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
         if (
@@ -99,7 +94,7 @@ export function SuggestedPrompts({
 
         return suggestion;
       })
-    : fallbackSuggestions;
+    : DEFAULT_SUGGESTIONS;
 
   // Build the pitch suggestion (personalized if release title available)
   const pitchSuggestion =
