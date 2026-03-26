@@ -93,7 +93,7 @@ describe('AuthClientProviders', () => {
     const props = clerkProviderMock.mock.calls[0]?.[0];
     expect(props).toMatchObject({
       publishableKey: 'pk_test_example',
-      proxyUrl: '/__clerk',
+      proxyUrl: undefined,
       signInUrl: APP_ROUTES.SIGNIN,
       signUpUrl: APP_ROUTES.SIGNUP,
       signInFallbackRedirectUrl: APP_ROUTES.DASHBOARD,
