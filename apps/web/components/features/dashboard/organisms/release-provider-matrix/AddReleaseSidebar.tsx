@@ -38,7 +38,7 @@ const RELEASE_TYPE_OPTIONS = [
 
 const ADD_RELEASE_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)]'
+  'overflow-hidden bg-surface-1'
 );
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
