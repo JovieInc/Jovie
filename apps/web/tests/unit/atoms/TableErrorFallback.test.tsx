@@ -80,6 +80,7 @@ describe('TableErrorFallback', () => {
 
   it('passes a11y checks', async () => {
     const { container } = render(<TableErrorFallback {...defaultProps} />);
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });
