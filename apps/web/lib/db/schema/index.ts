@@ -299,6 +299,14 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Identity (Cross-platform artist identity links)
+export {
+  type ArtistIdentityLink,
+  artistIdentityLinks,
+  insertArtistIdentityLinkSchema,
+  type NewArtistIdentityLink,
+  selectArtistIdentityLinkSchema,
+} from './identity';
 // Inbox (Inbound emails, Threads, Outbound routing replies)
 export {
   type EmailThread,
@@ -317,6 +325,7 @@ export {
   selectInboundEmailSchema,
   selectOutboundReplySchema,
 } from './inbox';
+
 // Ingestion
 export {
   type IngestionJob,
