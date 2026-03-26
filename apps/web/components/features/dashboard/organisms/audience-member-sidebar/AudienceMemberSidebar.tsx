@@ -10,9 +10,12 @@
 
 import {
   DrawerSection,
+  DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { cn } from '@/lib/utils';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -46,12 +49,23 @@ export function AudienceMemberSidebar({
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
-        <AudienceMemberHeader
-          title={title}
-          subtitle={subtitle}
-          avatarName={avatarName}
-          avatarSrc={avatarSrc}
-        />
+        <DrawerSurfaceCard
+          className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+        >
+          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+              Audience
+            </p>
+          </div>
+          <div className='p-2.5'>
+            <AudienceMemberHeader
+              title={title}
+              subtitle={subtitle}
+              avatarName={avatarName}
+              avatarSrc={avatarSrc}
+            />
+          </div>
+        </DrawerSurfaceCard>
       }
     >
       {member && (

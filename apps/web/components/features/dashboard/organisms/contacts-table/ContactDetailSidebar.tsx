@@ -15,10 +15,12 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerPropertyRow,
+  DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   CONTACT_ROLE_OPTIONS,
   CONTACT_TERRITORY_PRESETS,
@@ -296,17 +298,31 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       title={headerTitle}
       onClose={handleClose}
       headerActions={headerActions}
+      actionsInEntityHeader
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <div className='space-y-1'>
-            <p className='text-[15px] font-[520] leading-5 text-primary-token'>
-              {contactDisplayName}
-            </p>
-            <p className='mt-1 text-[12px] text-secondary-token'>{roleLabel}</p>
-          </div>
+          <DrawerSurfaceCard
+            className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+          >
+            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                Contact
+              </p>
+            </div>
+            <div className='p-2.5'>
+              <div className='space-y-px'>
+                <p className='truncate text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'>
+                  {contactDisplayName}
+                </p>
+                <p className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>
+                  {roleLabel}
+                </p>
+              </div>
+            </div>
+          </DrawerSurfaceCard>
         ) : undefined
       }
     >
