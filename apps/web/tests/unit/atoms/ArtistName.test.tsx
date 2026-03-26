@@ -86,6 +86,7 @@ describe('ArtistName', () => {
 
   it('passes a11y checks', async () => {
     const { container } = render(<ArtistName {...defaultProps} />);
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });
