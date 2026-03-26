@@ -17,10 +17,13 @@ import { type DbOrTransaction } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { importReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import {
+  extractAllMusicFetchServices,
   extractMusicFetchLinks,
   type MusicFetchProfileFieldState,
   mapMusicFetchProfileFields,
 } from '@/lib/dsp-enrichment/musicfetch-mapping';
+import { publishIdentityLinks } from '@/lib/identity/publish';
+import { storeRawIdentityLinks } from '@/lib/identity/store';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
 import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
 import { isBlacklistedSpotifyId } from '@/lib/spotify/blacklist';
@@ -347,7 +350,24 @@ export async function processMusicFetchEnrichmentJob(
     return result;
   }
 
-  // Apply DSP field updates, merge social links, and import discography
+  // Store ALL platform data in the identity layer (raw, multi-source)
+  const rawLinks = extractAllMusicFetchServices(artistData, spotifyUrl);
+  const storedCount = await storeRawIdentityLinks(
+    tx,
+    creatorProfileId,
+    'musicfetch',
+    spotifyUrl,
+    rawLinks
+  );
+
+  logger.info('MusicFetch enrichment: identity layer stored', {
+    creatorProfileId,
+    totalServicesReturned: Object.keys(artistData.services).length,
+    servicesWithValidUrl: rawLinks.length,
+    servicesStored: storedCount,
+  });
+
+  // Apply DSP field updates to profile columns (backward compat)
   result.dspFieldsUpdated = await applyDspUpdates(
     tx,
     artistData,
@@ -355,14 +375,22 @@ export async function processMusicFetchEnrichmentJob(
     spotifyUrl,
     creatorProfileId
   );
+
+  // Publish streaming links from identity layer to social_links
+  const publishResult = await publishIdentityLinks(tx, profile, {
+    sourceFilter: 'musicfetch',
+  });
+
+  // Also run legacy merge for backward compatibility (handles social links
+  // that may not be in the identity layer yet, e.g. during migration)
   const linkResult = await mergeSocialLinks(
     tx,
     artistData,
     profile,
     spotifyUrl
   );
-  result.socialLinksInserted = linkResult.inserted;
-  result.socialLinksUpdated = linkResult.updated;
+  result.socialLinksInserted = publishResult.inserted + linkResult.inserted;
+  result.socialLinksUpdated = publishResult.updated + linkResult.updated;
   await importDiscography(
     spotifyUrl,
     profile.spotifyId,
