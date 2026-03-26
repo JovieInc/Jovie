@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { BlogPostPage } from '@/components/organisms/BlogPostPage';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   getBlogPost,
   getBlogPostSlugs,
@@ -20,7 +20,7 @@ import {
 /** Normalize a relative URL to absolute, or return undefined if empty. */
 function toAbsoluteUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
-  return url.startsWith('http') ? url : `${APP_URL}${url}`;
+  return url.startsWith('http') ? url : `${BASE_URL}${url}`;
 }
 
 interface BlogPostPageProps {
@@ -45,12 +45,12 @@ export async function generateMetadata({ params }: BlogPostPageProps) {
       title: post.title,
       description: post.excerpt,
       alternates: {
-        canonical: `${APP_URL}/blog/${post.slug}`,
+        canonical: `${BASE_URL}/blog/${post.slug}`,
       },
       openGraph: {
         title: post.title,
         description: post.excerpt,
-        url: `${APP_URL}/blog/${post.slug}`,
+        url: `${BASE_URL}/blog/${post.slug}`,
         type: 'article' as const,
         publishedTime: post.date,
         modifiedTime: post.updatedDate ?? post.date,
@@ -129,15 +129,15 @@ export default async function BlogPostRoute({
       authorName: post.author,
       authorUrl,
       authorImageUrl: author.avatarUrl ?? undefined,
-      url: `${APP_URL}/blog/${post.slug}`,
+      url: `${BASE_URL}/blog/${post.slug}`,
       keywords: post.tags,
       wordCount: post.wordCount,
     });
 
     const breadcrumbSchema = buildBreadcrumbSchema([
-      { name: APP_NAME, url: APP_URL },
-      { name: 'Blog', url: `${APP_URL}/blog` },
-      { name: post.title, url: `${APP_URL}/blog/${post.slug}` },
+      { name: APP_NAME, url: BASE_URL },
+      { name: 'Blog', url: `${BASE_URL}/blog` },
+      { name: post.title, url: `${BASE_URL}/blog/${post.slug}` },
     ]);
 
     return (

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { LegalPage } from '@/components/organisms/LegalPage';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { getLegalDocument } from '@/lib/legal/getLegalDocument';
 
 // Full SSG - markdown content is read at build time, no runtime regeneration needed
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description:
     'We collect only what is essential, guard it with modern controls, and keep you in the loop about every change.',
   alternates: {
-    canonical: `${APP_URL}/legal/privacy`,
+    canonical: `${BASE_URL}/legal/privacy`,
   },
   robots: {
     index: true,

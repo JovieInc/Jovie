@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { MarketingContainer } from '@/components/marketing';
 import { Container } from '@/components/site/Container';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import {
@@ -14,7 +14,7 @@ import { getProfileByUsername } from '@/lib/services/profile';
 /** Normalize a relative URL to absolute, or return undefined if empty. */
 function toAbsoluteUrl(url: string | null | undefined): string | undefined {
   if (!url) return undefined;
-  return url.startsWith('http') ? url : `${APP_URL}${url}`;
+  return url.startsWith('http') ? url : `${BASE_URL}${url}`;
 }
 
 import { BlogAuthorCard } from '../../components/BlogAuthorCard';
@@ -60,12 +60,12 @@ export async function generateMetadata({ params }: AuthorPageProps) {
     title: `${authorName} — Jovie Blog`,
     description: `Articles by ${authorName} on the Jovie blog.`,
     alternates: {
-      canonical: `${APP_URL}/blog/authors/${username}`,
+      canonical: `${BASE_URL}/blog/authors/${username}`,
     },
     openGraph: {
       title: `${authorName} — Jovie Blog`,
       description: `Articles by ${authorName} on the Jovie blog.`,
-      url: `${APP_URL}/blog/authors/${username}`,
+      url: `${BASE_URL}/blog/authors/${username}`,
       type: 'profile' as const,
     },
   };
@@ -99,16 +99,16 @@ export default async function AuthorPage({
   // Build schemas
   const personSchema = buildPersonSchema({
     name: author.name,
-    url: `${APP_URL}/blog/authors/${username}`,
+    url: `${BASE_URL}/blog/authors/${username}`,
     image: author.avatarUrl ?? undefined,
     description: author.bio,
     sameAs: absoluteProfileUrl ? [absoluteProfileUrl] : [],
   });
 
   const breadcrumbSchema = buildBreadcrumbSchema([
-    { name: APP_NAME, url: APP_URL },
-    { name: 'Blog', url: `${APP_URL}/blog` },
-    { name: author.name, url: `${APP_URL}/blog/authors/${username}` },
+    { name: APP_NAME, url: BASE_URL },
+    { name: 'Blog', url: `${BASE_URL}/blog` },
+    { name: author.name, url: `${BASE_URL}/blog/authors/${username}` },
   ]);
 
   return (
