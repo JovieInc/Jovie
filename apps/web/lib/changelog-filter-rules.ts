@@ -1,12 +1,8 @@
 /**
- * Changelog Auto-Filter Rules
+ * Changelog auto-filter rules for the public web app.
  *
- * Safety net that catches internal entries even when developers forget
- * to add the [internal] prefix. Used by both the TypeScript parser
- * (apps/web/lib/changelog-parser.ts) and the JS email script parser
- * (scripts/lib/changelog-parser.mjs).
- *
- * Rules derived from: feedback_changelog_rules.md
+ * This file intentionally lives under apps/web so the Next.js build never
+ * reaches outside the app root when parsing the public changelog.
  */
 
 /** Vendor names that should never appear in public changelog entries. */
@@ -70,7 +66,7 @@ const INTERNAL_PATTERNS = [
   /\bscreenshot spec\b/i,
   /\bscreenshot pipeline\b/i,
 
-  // Technical internals (SDK only when paired with vendor context)
+  // Technical internals
   /\bClerk SDK\b/i,
   /\bVercel SDK\b/i,
   /\bSentry SDK\b/i,
@@ -124,26 +120,22 @@ const INTERNAL_PATTERNS = [
   /\bverification token\b/i,
   /\btrusted origin\b/i,
 
-  // Dollar amounts in internal cost/budget contexts (not user-facing pricing)
+  // Dollar amounts in internal cost/budget contexts
   /\bbudget\b.*\$\d+/i,
   /\$\d+.*\b(budget|cost)\b/i,
 
-  // Dependency version bumps (e.g., "10.39.0 → 10.45.0" or "v6.4.1")
+  // Dependency version bumps
   /\d+\.\d+\.\d+\s*→\s*\d+\.\d+\.\d+/,
 ];
 
-/**
- * Check whether a changelog entry should be auto-filtered from public output.
- *
- * @param {string} entry - The entry text (without the leading "- ")
- * @returns {boolean} true if the entry should be hidden from public changelog
- */
-export function isInternalEntry(entry) {
+export function isInternalEntry(entry: string): boolean {
   for (const pattern of VENDOR_PATTERNS) {
     if (pattern.test(entry)) return true;
   }
+
   for (const pattern of INTERNAL_PATTERNS) {
     if (pattern.test(entry)) return true;
   }
+
   return false;
 }

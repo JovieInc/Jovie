@@ -1,10 +1,19 @@
 import { eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
 import { DeckViewer } from './_components/DeckViewer';
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 /**
  * Investor portal landing page.

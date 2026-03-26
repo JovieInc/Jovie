@@ -273,4 +273,51 @@ describe('parseChangelog', () => {
     expect(releases).toHaveLength(1);
     expect(releases[0].version).toBe('1.0.0');
   });
+
+  it('filters entries tagged internal even when the marker is suffix-cased', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Public improvement
+- Shared cron auth helper with timing-safe bearer verification [INTERNAL]
+- Better pricing copy
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Public improvement',
+      'Better pricing copy',
+    ]);
+  });
+
+  it('filters admin and control-plane route disclosures', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Added
+
+- New pricing comparison page
+- Admin releases table at /app/admin/releases
+- Test-only /api/changelog/subscribe debugging endpoint
+- Public profile analytics are easier to understand
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.added).toEqual([
+      'New pricing comparison page',
+      'Public profile analytics are easier to understand',
+    ]);
+  });
+
+  it('filters internal summaries while preserving public entries', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+
+### Fixed
+
+- Sign-in page loads faster
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].summary).toBe('');
+    expect(releases[0].sections.fixed).toEqual(['Sign-in page loads faster']);
+  });
 });
