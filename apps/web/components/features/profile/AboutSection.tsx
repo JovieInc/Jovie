@@ -20,7 +20,7 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
     return (
       <main
         id='main-content'
-        className='rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-sm p-8 text-center'
+        className='rounded-2xl border border-subtle bg-surface-1 shadow-sm p-8 text-center'
       >
         <p className='text-sm text-tertiary-token'>
           No information available yet.
@@ -35,7 +35,7 @@ export function AboutSection({ artist, genres }: AboutSectionProps) {
         About {artist.name}
       </h1>
 
-      <div className='rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-sm overflow-hidden'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 shadow-sm overflow-hidden'>
         {/* Bio */}
         {hasBio && (
           <div className='px-6 pt-6 pb-5'>

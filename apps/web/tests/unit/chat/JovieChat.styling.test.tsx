@@ -130,7 +130,7 @@ describe('JovieChat styling regressions', () => {
     // Verify the loading bubble still has its expected non-border classes
     expect(loadingBubble!.className).toContain('rounded-[16px]');
     expect(loadingBubble!.className).toContain(
-      'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]'
+      'bg-(--linear-app-content-surface)'
     );
     expect(loadingBubble!.classList.contains('px-4')).toBe(true);
 

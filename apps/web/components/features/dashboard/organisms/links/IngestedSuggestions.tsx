@@ -221,7 +221,7 @@ export const IngestedSuggestions = React.memo(function IngestedSuggestions({
   return (
     // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-label needed for accessibility
     <div
-      className={`rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3 py-2.5 ${className ?? ''}`}
+      className={`rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-3 py-2.5 ${className ?? ''}`}
       aria-label='Ingested link suggestions'
     >
       <div className='flex flex-wrap items-center justify-center gap-2'>

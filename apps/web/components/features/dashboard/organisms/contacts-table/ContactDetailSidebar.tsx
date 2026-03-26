@@ -320,7 +320,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px]'>
                 <SelectValue>{roleLabel}</SelectValue>
               </SelectTrigger>
-              <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-1'>
+              <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
                 {CONTACT_ROLE_OPTIONS.map(option => (
                   <SelectItem
                     key={option.value}
@@ -375,7 +375,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       {getPreferredChannelLabel(contact.preferredChannel)}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-1'>
+                  <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
                     <SelectItem value='email'>Email</SelectItem>
                     <SelectItem value='phone'>Phone</SelectItem>
                   </SelectContent>

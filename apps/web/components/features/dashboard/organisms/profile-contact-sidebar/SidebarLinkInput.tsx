@@ -189,7 +189,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] py-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) py-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >

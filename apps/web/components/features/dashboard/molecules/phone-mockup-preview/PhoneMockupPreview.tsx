@@ -34,7 +34,7 @@ export function PhoneMockupPreview({
         className={cn(
           'relative w-full max-w-[300px] mx-auto',
           'aspect-9/19 rounded-[28px]',
-          'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] border border-(--linear-app-frame-seam)',
+          'bg-(--linear-app-content-surface) border border-(--linear-app-frame-seam)',
           'overflow-hidden'
         )}
       >

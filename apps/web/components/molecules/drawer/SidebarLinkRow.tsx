@@ -167,7 +167,7 @@ export function SidebarLinkRow({
       >
         {/* Left: Icon + Label */}
         <div className='flex min-w-0 flex-1 items-center gap-2.25'>
-          <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]'>
+          <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-(--linear-app-content-surface)'>
             {icon}
           </span>
           <span className='text-[12px] font-[510] text-secondary-token'>

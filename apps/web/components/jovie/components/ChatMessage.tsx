@@ -112,7 +112,7 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3.5 text-primary-token'>
+            <div className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token'>
               <div className='mb-3 flex items-center gap-2'>
                 <span className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1 text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                   Jovie
@@ -225,7 +225,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-7 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-7 items-center gap-1.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

@@ -104,7 +104,7 @@ function SearchInput({
   );
 
   return (
-    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2 py-2'>
+    <div className='sticky top-0 z-10 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-2'>
       <div className='relative'>
         <Search className='absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-tertiary-token' />
         <input
@@ -157,7 +157,7 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) text-[11px]'>
       <div className='flex items-center gap-1 py-1 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>

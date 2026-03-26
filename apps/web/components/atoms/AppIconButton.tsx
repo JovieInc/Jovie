@@ -5,7 +5,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export const APP_CONTROL_BUTTON_CLASS =
-  'inline-flex h-(--linear-app-control-height-sm) items-center justify-center gap-1.5 rounded-(--linear-app-control-radius) border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-control-padding-x) text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 active:border-default active:bg-surface-1 disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex h-(--linear-app-control-height-sm) items-center justify-center gap-1.5 rounded-(--linear-app-control-radius) border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-control-padding-x) text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 active:border-default active:bg-surface-1 disabled:pointer-events-none disabled:opacity-50';
 
 export const APP_ICON_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,

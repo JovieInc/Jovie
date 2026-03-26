@@ -28,7 +28,7 @@ export interface PillClassNameParams {
 const BASE_CLASSES = [
   'group/pill relative min-w-0 border text-[12px] font-[510] tracking-[-0.01em]',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
-  'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] hover:bg-(--pill-bg-hover)',
+  'bg-(--linear-app-content-surface) hover:bg-(--pill-bg-hover)',
   'text-secondary-token hover:text-primary-token',
   'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-180 ease-out',
 ] as const;
@@ -90,7 +90,7 @@ function getStateClasses(state: PlatformPillState): string {
  */
 function getToneClasses(tone: PlatformPillTone): string {
   if (tone === 'faded') {
-    return 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] text-secondary-token/85 hover:text-primary-token';
+    return 'bg-(--linear-app-content-surface) text-secondary-token/85 hover:text-primary-token';
   }
   return '';
 }

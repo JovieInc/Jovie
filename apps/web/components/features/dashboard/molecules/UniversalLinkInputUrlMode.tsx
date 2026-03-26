@@ -120,7 +120,7 @@ export function UniversalLinkInputUrlMode({
   return (
     <div className='relative w-full'>
       {isVoiceRecording ? (
-        <div className='flex w-full items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-2 py-1'>
+        <div className='flex w-full items-center gap-2 rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2 py-1'>
           <button
             type='button'
             onClick={onCancelVoiceRecording}
@@ -149,7 +149,7 @@ export function UniversalLinkInputUrlMode({
       ) : (
         <div
           className={cn(
-            'relative flex w-full items-center gap-2 overflow-hidden bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-2 py-1 transition-all',
+            'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-all',
             isDropdownOpen
               ? 'rounded-t-[12px] border-2 border-b-0 border-accent'
               : 'rounded-[12px] border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',

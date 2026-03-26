@@ -122,7 +122,7 @@ export function RightDrawer({
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible border-l border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-none'
+          ? 'opacity-100 visible border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}

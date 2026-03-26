@@ -81,7 +81,7 @@ export function ReleaseEditDialog({
             {/* Release info header */}
             <DrawerSurfaceCard
               variant='card'
-              className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-3.5'
+              className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3.5'
             >
               <EntityHeaderCard
                 image={
@@ -127,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-2.5'
+                    className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>

@@ -245,10 +245,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         <div
           className={cn(
             'rounded-[12px] border transition-colors duration-fast',
-            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+            'bg-(--linear-app-content-surface)',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] focus-within:ring-2 focus-within:ring-accent/20'
+              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:bg-(--linear-app-content-surface) focus-within:ring-2 focus-within:ring-accent/20'
           )}
         >
           {hasPendingImages && onRemoveImage && (

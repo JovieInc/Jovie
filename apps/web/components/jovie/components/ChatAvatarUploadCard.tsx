@@ -135,7 +135,7 @@ export function ChatAvatarUploadCard() {
         className='hidden'
         tabIndex={-1}
       />
-      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-3'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3'>
         <button
           type='button'
           onClick={handleClick}

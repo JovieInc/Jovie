@@ -36,7 +36,7 @@ export function AppSearchField({
   return (
     <div
       className={cn(
-        'flex h-(--linear-app-control-height-sm) items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/14',
+        'flex h-(--linear-app-control-height-sm) items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/14',
         className
       )}
     >

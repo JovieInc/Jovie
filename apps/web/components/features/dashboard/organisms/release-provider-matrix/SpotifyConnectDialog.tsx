@@ -425,7 +425,7 @@ export function SpotifyConnectDialog({
       <DialogBody className='space-y-3'>
         <DrawerSurfaceCard
           variant='card'
-          className='overflow-visible bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+          className='overflow-visible bg-(--linear-app-content-surface) p-3.5'
         >
           <div className='mb-2.5'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
@@ -505,7 +505,7 @@ export function SpotifyConnectDialog({
             )}
 
             {shouldShowDropdown && (
-              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
+              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
                 <select
                   id='spotify-connect-results'
                   className='sr-only'

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ProfileHeaderV2 } from '@/components/organisms/profile-header-v2/ProfileHeaderV2';
 import {
   ProfileNotificationsContext,
   useProfileShell,
@@ -13,7 +12,7 @@ import {
   type SwipeableProfileMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { ProfileHeroCard } from '@/features/profile/ProfileHeroCard';
+import { ArtistHero } from '@/features/profile/ProfileHeroCard';
 import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
 import { useSwipeMode } from '@/hooks/useSwipeMode';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
@@ -194,36 +193,27 @@ export function PublicProfileTemplateV2({
     setListenDrawerOpen(true);
   };
 
+  const handleBellClick = () => {
+    setActiveIndex(0);
+  };
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
       <div
         className='relative h-[100dvh] overflow-hidden bg-base text-primary-token'
         data-test='public-profile-root'
       >
-        <div className='pointer-events-none absolute inset-0 overflow-hidden'>
-          <div className='absolute left-[10%] top-20 h-48 w-48 rounded-full bg-surface-2/70 blur-3xl' />
-          <div className='absolute bottom-0 right-[-10%] h-56 w-56 rounded-full bg-surface-3/60 blur-3xl' />
-        </div>
-
-        <div className='relative mx-auto grid h-full w-full max-w-2xl grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden px-2 pt-[max(env(safe-area-inset-top),0.75rem)]'>
-          <ProfileHeaderV2
+        <div className='relative grid h-full w-full grid-rows-[auto_minmax(0,1fr)] overflow-hidden'>
+          <ArtistHero
             artist={artist}
+            latestRelease={latestRelease}
             activeMode={activeMode}
             activeIndex={activeIndex}
             modes={SWIPEABLE_MODES}
             headerSocialLinks={headerSocialLinks}
             onModeSelect={handleModeSelect}
             onPlayClick={handlePlayClick}
-          />
-
-          <ProfileHeroCard
-            artist={artist}
-            socialLinks={socialLinks}
-            mergedDSPs={mergedDSPs}
-            latestRelease={latestRelease}
-            enableDynamicEngagement={enableDynamicEngagement}
-            subscribeTwoStep={subscribeTwoStep}
-            autoOpenCapture={mode === 'subscribe'}
+            onBellClick={handleBellClick}
           />
 
           <SwipeableModeContainer

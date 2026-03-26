@@ -18,7 +18,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
 
   return (
     <ContentSurfaceCard
-      className='w-full max-w-xl border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4'
+      className='w-full max-w-xl border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'
       data-testid='chat-analytics-card'
     >
       <div className='flex items-center justify-between gap-3'>

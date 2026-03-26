@@ -50,7 +50,7 @@ export const ContactItem = memo(function ContactItem({
   const hasEmailAndPhone = Boolean(contact.email) && Boolean(contact.phone);
 
   return (
-    <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4'>
+    <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex items-start justify-between gap-3'>
         <div>
           <p className='text-[13px] font-[590] text-primary-token'>

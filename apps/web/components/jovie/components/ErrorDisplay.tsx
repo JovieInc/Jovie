@@ -54,7 +54,7 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4'
+      className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'
     >
       <div className='flex items-start gap-3'>
         <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-error/20 bg-error-subtle text-error'>

@@ -70,7 +70,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-6 transition-colors'>
+            <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox

@@ -31,7 +31,7 @@ const RELEASE_TYPE_OPTIONS = [
 ] as const;
 
 const ADD_RELEASE_CARD_CLASSNAME =
-  'overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]';
+  'overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)';
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 

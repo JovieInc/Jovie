@@ -50,7 +50,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
 
   if (feedbackMutation.isSuccess) {
     return (
-      <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-6 text-center'>
+      <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 text-center'>
         <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[10px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
           <CheckCircle2 className='h-5 w-5' />
         </div>
@@ -79,7 +79,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   }
 
   return (
-    <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-6'>
+    <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6'>
       <div className='space-y-1'>
         <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
           Share feedback

@@ -122,7 +122,7 @@ export const presets = {
   stickyHeader: cn(
     'sticky top-0',
     zIndex.tableHeader,
-    'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] backdrop-blur-[12px]',
+    'bg-(--linear-app-content-surface) backdrop-blur-[12px]',
     'shadow-[inset_0_-1px_0_var(--linear-app-frame-seam)]',
     'align-middle'
   ),

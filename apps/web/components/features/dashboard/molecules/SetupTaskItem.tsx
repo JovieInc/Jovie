@@ -18,7 +18,7 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): React.ReactElement {
   return (
-    <li className='flex h-full flex-col gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4'>
+    <li className='flex h-full flex-col gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex items-center gap-2'>
         <div
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[13px] font-[510] ${

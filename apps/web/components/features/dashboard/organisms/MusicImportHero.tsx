@@ -76,7 +76,7 @@ export const MusicImportHero = memo(function MusicImportHero({
   // Failed state
   if (isFailed && !hasReleases) {
     return (
-      <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4'>
+      <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <AlertCircle className='h-4 w-4 shrink-0' />
           <p className='text-sm'>

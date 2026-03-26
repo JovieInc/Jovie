@@ -27,7 +27,7 @@ export function ContentSectionHeader({
   return (
     <div
       className={cn(
-        'flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-header-padding-x)',
+        'flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-(--linear-app-header-padding-x)',
         density === 'compact'
           ? 'min-h-[34px] py-1'
           : 'min-h-(--linear-app-header-height) py-1.5',
