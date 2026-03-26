@@ -2,10 +2,8 @@
 
 import { Button } from '@jovie/ui';
 import {
-  type CellContext,
   type ColumnDef,
   createColumnHelper,
-  type HeaderContext,
   type SortingState,
 } from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -240,30 +238,75 @@ function ActionsCellRenderer({
   );
 }
 
-interface ActionsColumnMeta {
+/** Build column definitions for tour dates table (file-level to satisfy S6478). */
+function buildTourDateColumns(deps: {
   onSync?: () => void;
   isSyncing?: boolean;
   getContextMenuItems: (tourDate: TourDateViewModel) => ContextMenuItemType[];
-}
-
-/** Standalone header renderer for Actions column — reads onSync/isSyncing from column meta. */
-function renderActionsHeader(ctx: HeaderContext<TourDateViewModel, unknown>) {
-  const meta = ctx.column.columnDef.meta as ActionsColumnMeta | undefined;
-  return <ActionsHeader onSync={meta?.onSync} isSyncing={meta?.isSyncing} />;
-}
-
-/** Standalone cell renderer for Actions column — reads getContextMenuItems from column meta. */
-function renderActionsCellFromContext(
-  ctx: CellContext<TourDateViewModel, unknown>
-) {
-  const meta = ctx.column.columnDef.meta as ActionsColumnMeta | undefined;
-  if (!meta) return null;
-  return (
-    <ActionsCellRenderer
-      row={ctx.row}
-      getContextMenuItems={meta.getContextMenuItems}
-    />
-  );
+}) {
+  return [
+    columnHelper.accessor('startDate', {
+      id: 'startDate',
+      header: 'Date',
+      cell: info => (
+        <DateCell
+          startDate={info.getValue()}
+          startTime={info.row.original.startTime}
+        />
+      ),
+      size: 120,
+      enableSorting: true,
+    }),
+    columnHelper.accessor('venueName', {
+      id: 'venue',
+      header: 'Venue',
+      cell: info => <VenueCell venueName={info.getValue()} />,
+      size: 200,
+      enableSorting: true,
+    }),
+    columnHelper.display({
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) => <LocationCellRenderer row={row} />,
+      size: 180,
+    }),
+    columnHelper.accessor('ticketStatus', {
+      id: 'status',
+      header: 'Status',
+      cell: info => (
+        <StatusCell
+          ticketStatus={info.getValue()}
+          startDate={info.row.original.startDate}
+        />
+      ),
+      size: 100,
+    }),
+    columnHelper.display({
+      id: 'tickets',
+      header: 'Tickets',
+      cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />,
+      size: 80,
+    }),
+    columnHelper.accessor('provider', {
+      id: 'source',
+      header: 'Source',
+      cell: info => <SourceCell provider={info.getValue()} />,
+      size: 100,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: () => (
+        <ActionsHeader onSync={deps.onSync} isSyncing={deps.isSyncing} />
+      ),
+      cell: ({ row }) => (
+        <ActionsCellRenderer
+          row={row}
+          getContextMenuItems={deps.getContextMenuItems}
+        />
+      ),
+      size: 80,
+    }),
+  ];
 }
 
 export function TourDatesTable({
@@ -284,80 +327,10 @@ export function TourDatesTable({
     [onEdit, onDelete]
   );
 
-  // TanStack Table requires render functions in column definitions.
-  // All components are properly extracted and memoized at file level (lines 34-223).
-  const columns = useMemo(() => {
-    return [
-      // Date column
-      columnHelper.accessor('startDate', {
-        id: 'startDate',
-        header: 'Date',
-        cell: info => ( // NOSONAR
-          <DateCell
-            startDate={info.getValue()}
-            startTime={info.row.original.startTime}
-          />
-        ),
-        size: 120,
-        enableSorting: true,
-      }),
-
-      // Venue column
-      columnHelper.accessor('venueName', {
-        id: 'venue',
-        header: 'Venue',
-        cell: info => <VenueCell venueName={info.getValue()} />, // NOSONAR
-        size: 200,
-        enableSorting: true,
-      }),
-
-      // Location column
-      columnHelper.display({
-        id: 'location',
-        header: 'Location',
-        cell: ({ row }) => <LocationCellRenderer row={row} />, // NOSONAR - TanStack Table render prop
-        size: 180,
-      }),
-
-      // Status column
-      columnHelper.accessor('ticketStatus', {
-        id: 'status',
-        header: 'Status',
-        cell: info => ( // NOSONAR
-          <StatusCell
-            ticketStatus={info.getValue()}
-            startDate={info.row.original.startDate}
-          />
-        ),
-        size: 100,
-      }),
-
-      // Tickets column
-      columnHelper.display({
-        id: 'tickets',
-        header: 'Tickets',
-        cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />, // NOSONAR
-        size: 80,
-      }),
-
-      // Source column
-      columnHelper.accessor('provider', {
-        id: 'source',
-        header: 'Source',
-        cell: info => <SourceCell provider={info.getValue()} />, // NOSONAR
-        size: 100,
-      }),
-
-      // Actions column
-      columnHelper.display({
-        id: 'actions',
-        header: renderActionsHeader, // NOSONAR
-        cell: renderActionsCellFromContext, // NOSONAR - TanStack Table render prop
-        size: 80,
-        meta: { onSync, isSyncing, getContextMenuItems },
-      }),
-    ];
-  }, [onSync, isSyncing, getContextMenuItems]);
+  const columns = useMemo(
+    () => buildTourDateColumns({ onSync, isSyncing, getContextMenuItems }),
+    [onSync, isSyncing, getContextMenuItems]
+  );
 
   return (
     <UnifiedTable
