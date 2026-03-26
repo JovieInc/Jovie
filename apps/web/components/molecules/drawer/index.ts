@@ -72,6 +72,11 @@ export {
   DrawerSettingsToggle,
   type DrawerSettingsToggleProps,
 } from './DrawerSettingsToggle';
+export {
+  DrawerSplitButton,
+  type DrawerSplitButtonAction,
+  type DrawerSplitButtonProps,
+} from './DrawerSplitButton';
 export { DrawerStatGrid, type DrawerStatGridProps } from './DrawerStatGrid';
 export {
   DRAWER_SURFACE_CARD_CLASSNAME,

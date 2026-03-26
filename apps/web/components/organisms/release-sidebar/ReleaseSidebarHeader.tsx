@@ -7,7 +7,7 @@
  * Designed for use with EntitySidebarShell's `title` and `headerActions` props.
  */
 
-import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
+import { Check, Hash, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
@@ -22,21 +22,8 @@ interface UseReleaseHeaderResult {
 interface UseReleaseHeaderPartsProps {
   readonly release: Release | null;
   readonly hasRelease: boolean;
-  readonly artistName?: string;
   readonly onRefresh?: () => void;
   readonly isRefreshing?: boolean;
-  readonly onCopySmartLink: () => void;
-  readonly onClose?: () => void;
-}
-
-function buildTitleText(
-  isrcValue: string | null | undefined,
-  hasRelease: boolean,
-  release: Release | null
-): string {
-  if (isrcValue) return isrcValue;
-  if (hasRelease && release?.title) return release.title;
-  return 'No release selected';
 }
 
 /**
@@ -46,35 +33,18 @@ function buildTitleText(
 export function useReleaseHeaderParts({
   release,
   hasRelease,
-  artistName,
   onRefresh,
   isRefreshing = false,
-  onCopySmartLink,
 }: UseReleaseHeaderPartsProps): UseReleaseHeaderResult {
   const showActions = hasRelease && release?.smartLinkPath;
-  const [isCopied, setIsCopied] = useState(false);
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isIdCopied, setIsIdCopied] = useState(false);
   const idCopyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
-      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
       if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
     };
   }, []);
-
-  const handleCopySmartLink = useCallback(() => {
-    onCopySmartLink();
-    setIsCopied(true);
-    if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
-    copyTimeoutRef.current = setTimeout(() => setIsCopied(false), 2000);
-  }, [onCopySmartLink]);
-
-  const handleOpenSmartLink = useCallback(() => {
-    if (!release?.smartLinkPath) return;
-    globalThis.open(release.smartLinkPath, '_blank', 'noopener,noreferrer');
-  }, [release?.smartLinkPath]);
 
   const handleRefreshClick = useCallback(() => {
     if (isRefreshing) return;
@@ -107,30 +77,12 @@ export function useReleaseHeaderParts({
   const overflowActions: DrawerHeaderAction[] = [];
 
   if (showActions) {
-    /* eslint-disable react-hooks/refs -- Lucide icons are forwardRef components, not React refs */
-    primaryActions.push(
-      {
-        id: 'copy',
-        label: isCopied ? 'Copied!' : 'Copy smart link',
-        icon: Copy,
-        activeIcon: Check,
-        isActive: isCopied,
-        onClick: handleCopySmartLink,
-      },
-      {
-        id: 'open',
-        label: 'Open smart link',
-        icon: ExternalLink,
-        onClick: handleOpenSmartLink,
-      }
-    );
     overflowActions.push({
       id: 'refresh',
       label: isRefreshing ? 'Refreshing release…' : 'Refresh release',
       icon: RefreshCw,
       onClick: handleRefreshClick,
     });
-    /* eslint-enable react-hooks/refs */
   }
 
   if (hasRelease && release?.id) {
@@ -145,10 +97,8 @@ export function useReleaseHeaderParts({
     });
   }
 
-  const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
-
   return {
-    headerLabel: buildTitleText(isrcValue, hasRelease, release),
+    headerLabel: '',
     primaryActions,
     overflowActions,
   };

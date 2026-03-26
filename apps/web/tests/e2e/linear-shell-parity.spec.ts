@@ -48,6 +48,21 @@ async function expectFlatPillChrome(locator: Locator) {
   expect(metrics.boxShadow).toBe('none');
 }
 
+async function expectCardChrome(locator: Locator) {
+  const metrics = await locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      radius: Number.parseFloat(style.borderTopLeftRadius),
+      borderTop: Number.parseFloat(style.borderTopWidth),
+      boxShadow: style.boxShadow,
+    };
+  });
+
+  expect(metrics.radius).toBeGreaterThanOrEqual(9.5);
+  expect(metrics.borderTop).toBeGreaterThan(0);
+  expect(metrics.boxShadow).not.toBe('none');
+}
+
 async function livesInsideRoundedCard(locator: Locator) {
   return locator.evaluate(node => {
     let current: HTMLElement | null = node as HTMLElement;
@@ -91,6 +106,17 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(drawer.getByText('Static Skies', { exact: true })).toHaveCount(
       1
     );
+    await expect(drawer.getByTestId('release-tab-panel-card')).toHaveCount(0);
+
+    const detailsTab = drawer.getByRole('tab', { name: 'Details' });
+    const platformsTab = drawer.getByRole('tab', { name: 'Platforms' });
+    const metadataCard = drawer.getByTestId('release-metadata-card');
+    await expect(detailsTab).toBeVisible();
+    await expect(platformsTab).toBeVisible();
+    await expectFlatPillChrome(detailsTab);
+    await expectFlatPillChrome(platformsTab);
+    await expect(metadataCard).toBeVisible();
+    await expectCardChrome(metadataCard);
 
     const copySmartLinkButton = drawer.getByRole('button', {
       name: 'Copy smart link',
@@ -104,7 +130,9 @@ for (const theme of ['light', 'dark'] as const) {
       )
     ).toBeTruthy();
     expect(
-      await livesInsideRoundedCard(drawer.getByText('Analytics').first())
+      await livesInsideRoundedCard(
+        drawer.getByTestId('release-smart-link-analytics')
+      )
     ).toBeTruthy();
   });
 
@@ -126,6 +154,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     const tabbedCard = drawer.getByTestId('demo-analytics-tabbed-card');
     await expect(tabbedCard).toBeVisible();
+    await expectCardChrome(tabbedCard);
     await expect(tabbedCard.getByRole('tab', { name: 'Cities' })).toBeVisible();
     await expect(tabbedCard.getByText('Los Angeles')).toBeVisible();
 

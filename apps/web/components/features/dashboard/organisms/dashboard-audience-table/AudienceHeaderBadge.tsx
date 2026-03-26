@@ -52,7 +52,12 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
 
   return (
     <div className='scrollbar-hide min-w-0 overflow-x-auto pb-px'>
-      <div className={cn(DRAWER_TABS_RAIL_CLASSNAME, 'w-max min-w-full')}>
+      <div
+        className={cn(
+          DRAWER_TABS_RAIL_CLASSNAME,
+          'w-max min-w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'
+        )}
+      >
         {VIEW_OPTIONS.map(({ value, icon }) => (
           <PageToolbarTabButton
             key={value}

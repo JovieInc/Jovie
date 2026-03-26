@@ -29,6 +29,8 @@ describe('DrawerTabbedCard', () => {
     const content = screen.getByText('Details content');
 
     expect(card.className).toContain('rounded-[10px]');
+    expect(card.className).toContain('shadow-[var(--linear-app-card-shadow)]');
+    expect(card.className).toContain('p-3');
     expect(card).toContainElement(tablist);
     expect(card).toContainElement(content);
   });
