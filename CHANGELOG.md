@@ -17,10 +17,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
 - Flat track URLs now 302-redirect to the nested format when a parent release is known
-- Canonical artist identity layer — stores all platform data from enrichment sources (MusicFetch, MusicBrainz, SERP) in a raw `artist_identity_links` table with full provenance tracking
-- MusicFetch now saves all 30+ platforms it discovers (previously only 7 DSPs were saved, the rest silently dropped)
-- Publish rules promote streaming DSPs to fan-facing pages automatically; video/metadata platforms stored raw for future features
-- Structured enrichment logging shows returned/stored/published counts per MusicFetch call
+- Artist profiles now capture all 30+ platforms discovered during enrichment (previously only 7 were saved)
+- Streaming platforms are automatically promoted to artist pages; other platforms stored for future features
+- [internal] Canonical `artist_identity_links` table with provenance tracking for MusicFetch, MusicBrainz, SERP enrichment sources
+- [internal] Structured enrichment logging shows returned/stored/published counts per MusicFetch call
 
 ### Fixed
 

@@ -400,16 +400,11 @@ export async function processMusicFetchEnrichmentJob(
     profile,
     spotifyUrl
   );
-  // Use max (not sum) — both paths process the same streaming links,
-  // so summing would double-count during the overlap period.
-  result.socialLinksInserted = Math.max(
-    publishResult.inserted,
-    linkResult.inserted
-  );
-  result.socialLinksUpdated = Math.max(
-    publishResult.updated,
-    linkResult.updated
-  );
+  // Identity layer publishes streaming DSPs only. Legacy path handles all links
+  // but streaming ones already exist from identity layer (counted as updates, not inserts).
+  // Sum is correct: identity inserts streaming + legacy inserts non-streaming.
+  result.socialLinksInserted = publishResult.inserted + linkResult.inserted;
+  result.socialLinksUpdated = publishResult.updated + linkResult.updated;
   await importDiscography(
     spotifyUrl,
     profile.spotifyId,

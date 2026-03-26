@@ -40,57 +40,57 @@ const AUTO_PUBLISH_CATEGORIES = new Set(['streaming']);
 const PUBLISH_SIGNAL = 'musicfetch_artist_lookup';
 
 /**
- * Publish qualifying identity links to social_links.
- *
- * Reads all raw identity links for a profile, filters to publishable
- * categories (streaming), and delegates to the existing merge pipeline.
+ * Check if an error is a missing-table error (pre-migration graceful degradation).
+ * Shared logic between store and publish layers.
  */
-export async function publishIdentityLinks(
+function isMissingTableError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return (
+    /relation\s+"?artist_identity_links"?\s+does not exist/i.test(message) ||
+    (message.includes('does not exist') &&
+      message.includes('artist_identity_links'))
+  );
+}
+
+/**
+ * Read raw identity links for a profile. Returns empty array if table
+ * doesn't exist yet (pre-migration graceful degradation).
+ */
+async function readIdentityLinks(
   tx: DbOrTransaction,
-  profile: ProfileForPublish,
-  options?: { sourceFilter?: string }
-): Promise<{ inserted: number; updated: number }> {
-  // Read all raw identity links for this profile
-  let rawLinks: (typeof artistIdentityLinks.$inferSelect)[];
+  profileId: string
+): Promise<(typeof artistIdentityLinks.$inferSelect)[]> {
   try {
     const result = await tx
       .select()
       .from(artistIdentityLinks)
-      .where(eq(artistIdentityLinks.creatorProfileId, profile.id));
-    // Guard against non-iterable results (test mocks, pre-migration)
-    rawLinks = Array.isArray(result) ? result : [];
+      .where(eq(artistIdentityLinks.creatorProfileId, profileId));
+    return Array.isArray(result) ? result : [];
   } catch (error) {
-    // Gracefully degrade only for missing table (pre-migration)
-    const message = error instanceof Error ? error.message : '';
-    const isMissingTable =
-      /relation\s+"?artist_identity_links"?\s+does not exist/i.test(message) ||
-      (message.includes('does not exist') &&
-        message.includes('artist_identity_links'));
-
-    if (isMissingTable) {
-      return { inserted: 0, updated: 0 };
-    }
+    if (isMissingTableError(error)) return [];
     logger.error('Identity layer: failed to read identity links', {
-      creatorProfileId: profile.id,
-      error: message,
+      creatorProfileId: profileId,
+      error: error instanceof Error ? error.message : '',
     });
     throw error;
   }
+}
 
-  if (rawLinks.length === 0) return { inserted: 0, updated: 0 };
-
-  // Filter to publishable links
+/**
+ * Project raw identity links into publishable ExtractedLink objects.
+ * Filters by source and category (streaming only).
+ */
+function projectPublishableLinks(
+  rawLinks: (typeof artistIdentityLinks.$inferSelect)[],
+  sourceFilter?: string
+): ExtractedLink[] {
   const publishable: ExtractedLink[] = [];
 
   for (const link of rawLinks) {
-    // Optional source filter (e.g. only publish from 'musicfetch')
-    if (options?.sourceFilter && link.source !== options.sourceFilter) continue;
+    if (sourceFilter && link.source !== sourceFilter) continue;
 
-    // Look up DSP registry entry for this platform
     const dspEntry = findDspEntry(link.platform);
     if (!dspEntry) continue;
-
-    // Only auto-publish streaming DSPs
     if (!AUTO_PUBLISH_CATEGORIES.has(dspEntry.category)) continue;
 
     publishable.push({
@@ -104,6 +104,24 @@ export async function publishIdentityLinks(
     });
   }
 
+  return publishable;
+}
+
+/**
+ * Publish qualifying identity links to social_links.
+ *
+ * Reads all raw identity links for a profile, filters to publishable
+ * categories (streaming), and delegates to the existing merge pipeline.
+ */
+export async function publishIdentityLinks(
+  tx: DbOrTransaction,
+  profile: ProfileForPublish,
+  options?: { sourceFilter?: string }
+): Promise<{ inserted: number; updated: number }> {
+  const rawLinks = await readIdentityLinks(tx, profile.id);
+  if (rawLinks.length === 0) return { inserted: 0, updated: 0 };
+
+  const publishable = projectPublishableLinks(rawLinks, options?.sourceFilter);
   if (publishable.length === 0) return { inserted: 0, updated: 0 };
 
   const extraction: ExtractionResult = {
@@ -135,11 +153,9 @@ export async function publishIdentityLinks(
 function findDspEntry(
   platform: string
 ): { key: string; category: string } | null {
-  // Primary: look up by DSP registry key (snake_case — what extractAllMusicFetchServices stores)
   const byKey = getRegistryEntry(platform);
   if (byKey) return { key: byKey.key, category: byKey.category };
 
-  // Fallback: look up by MusicFetch service name (camelCase — for legacy/compat)
   const byService = MUSICFETCH_SERVICE_TO_DSP.get(platform);
   if (byService) return { key: byService.key, category: byService.category };
 

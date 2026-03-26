@@ -3,10 +3,9 @@
  *
  * Covers:
  * - Returns 0 for empty links array
- * - Stores links and returns correct count
- * - Handles DB errors gracefully (returns 0, does not throw)
+ * - Batch upsert stores all links in one DB call
  * - Handles "table does not exist" errors (pre-migration)
- * - Partial success: counts only successfully stored links
+ * - Throws on non-migration DB errors
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,6 +26,10 @@ vi.mock('@/lib/db/schema/identity', () => ({
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: 'eq', args })),
+  sql: Object.assign(
+    (strings: TemplateStringsArray) => ({ sql: strings.join('') }),
+    { raw: (s: string) => ({ sql: s }) }
+  ),
 }));
 
 import type { RawIdentityLink } from '@/lib/identity/store';
@@ -36,18 +39,9 @@ import { storeRawIdentityLinks } from '@/lib/identity/store';
 // Mock TX builder
 // ─────────────────────────────────────────────────────────────────────────────
 
-function createMockTx(
-  options: { insertError?: Error; insertErrorOnIndex?: number } = {}
-) {
-  let callCount = 0;
-
+function createMockTx(options: { insertError?: Error } = {}) {
   const mockOnConflictDoUpdate = vi.fn().mockImplementation(() => {
-    const currentCall = callCount++;
-    if (
-      options.insertError &&
-      (options.insertErrorOnIndex === undefined ||
-        options.insertErrorOnIndex === currentCall)
-    ) {
+    if (options.insertError) {
       return Promise.reject(options.insertError);
     }
     return Promise.resolve();
@@ -108,34 +102,7 @@ describe('storeRawIdentityLinks', () => {
     expect(mockTx._mocks.mockInsert).not.toHaveBeenCalled();
   });
 
-  it('stores a single link and returns 1', async () => {
-    const mockTx = createMockTx();
-    const links = makeLinks(1);
-
-    const result = await storeRawIdentityLinks(
-      mockTx as unknown as Parameters<typeof storeRawIdentityLinks>[0],
-      PROFILE_ID,
-      SOURCE,
-      SOURCE_REQUEST_URL,
-      links
-    );
-
-    expect(result).toBe(1);
-    expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(1);
-    expect(mockTx._mocks.mockValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        creatorProfileId: PROFILE_ID,
-        platform: 'platform_0',
-        url: 'https://example.com/artist/0',
-        externalId: 'ext-0',
-        source: SOURCE,
-        sourceRequestUrl: SOURCE_REQUEST_URL,
-        rawPayload: { index: 0 },
-      })
-    );
-  });
-
-  it('stores multiple links and returns correct count', async () => {
+  it('batch-inserts all links in a single DB call', async () => {
     const mockTx = createMockTx();
     const links = makeLinks(5);
 
@@ -148,7 +115,22 @@ describe('storeRawIdentityLinks', () => {
     );
 
     expect(result).toBe(5);
-    expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(5);
+    // Single insert call with all rows
+    expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(1);
+    expect(mockTx._mocks.mockValues).toHaveBeenCalledTimes(1);
+
+    // Verify the batch contains all rows
+    const valuesArg = mockTx._mocks.mockValues.mock.calls[0][0];
+    expect(valuesArg).toHaveLength(5);
+    expect(valuesArg[0]).toEqual(
+      expect.objectContaining({
+        creatorProfileId: PROFILE_ID,
+        platform: 'platform_0',
+        url: 'https://example.com/artist/0',
+        externalId: 'ext-0',
+        source: SOURCE,
+      })
+    );
   });
 
   it('sets externalId to null when not provided', async () => {
@@ -168,7 +150,8 @@ describe('storeRawIdentityLinks', () => {
       links
     );
 
-    expect(mockTx._mocks.mockValues).toHaveBeenCalledWith(
+    const valuesArg = mockTx._mocks.mockValues.mock.calls[0][0];
+    expect(valuesArg[0]).toEqual(
       expect.objectContaining({
         externalId: null,
         rawPayload: {},
@@ -191,17 +174,11 @@ describe('storeRawIdentityLinks', () => {
     expect(mockTx._mocks.mockOnConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
         target: ['creatorProfileId', 'source', 'platform'],
-        set: expect.objectContaining({
-          url: 'https://example.com/artist/0',
-          externalId: 'ext-0',
-          sourceRequestUrl: SOURCE_REQUEST_URL,
-          rawPayload: { index: 0 },
-        }),
       })
     );
   });
 
-  it('returns 0 immediately when DB error says table does not exist', async () => {
+  it('returns 0 when DB error says table does not exist', async () => {
     const mockTx = createMockTx({
       insertError: new Error('relation "artist_identity_links" does not exist'),
     });
@@ -215,10 +192,7 @@ describe('storeRawIdentityLinks', () => {
       links
     );
 
-    // Should return 0 and not throw
     expect(result).toBe(0);
-    // Should only attempt the first insert before bailing
-    expect(mockTx._mocks.mockInsert).toHaveBeenCalledTimes(1);
   });
 
   it('throws on non-migration DB errors', async () => {
