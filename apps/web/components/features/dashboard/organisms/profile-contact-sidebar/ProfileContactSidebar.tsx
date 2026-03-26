@@ -68,6 +68,15 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Check if a platform link already exists (YouTube allows multiples). */
+function hasDuplicatePlatform(
+  platformId: string,
+  existingLinks: PreviewPanelLink[]
+): boolean {
+  if (platformId === 'youtube') return false;
+  return existingLinks.some(l => l.platform === platformId);
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -256,16 +265,10 @@ export function ProfileContactSidebar() {
     async (link: DetectedLink) => {
       if (!selectedProfile || !previewData) return;
 
-      // Prevent duplicate platforms (except YouTube which can have multiple channels)
-      if (link.platform.id !== 'youtube') {
-        const existingLink = previewData.links.find(
-          l => l.platform === link.platform.id
-        );
-        if (existingLink) {
-          toast.error(`${link.platform.name} link already exists`);
-          setIsAddingLink(false);
-          return;
-        }
+      if (hasDuplicatePlatform(link.platform.id, previewData.links)) {
+        toast.error(`${link.platform.name} link already exists`);
+        setIsAddingLink(false);
+        return;
       }
 
       // Optimistically add to sidebar
@@ -316,9 +319,9 @@ export function ProfileContactSidebar() {
 
         if (wasDeletedWhilePending) {
           deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
+          if (linkId) {
             removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
+              { profileId: selectedProfile!.id, linkId },
               { onError: () => {} }
             );
           }

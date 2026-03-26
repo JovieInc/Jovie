@@ -231,6 +231,19 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+/**
+ * Whether the notifications form is active (enabled and not idle without autoOpen).
+ * Extracted to reduce cognitive complexity of the main component.
+ */
+function isNotificationsFormActive(
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean
+): boolean {
+  if (!notificationsEnabled) return false;
+  return !(notificationsState === 'idle' && !autoOpen);
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -279,9 +292,13 @@ export function ArtistNotificationsCTA({
     openSubscription
   );
 
+  const formActive = isNotificationsFormActive(
+    notificationsEnabled,
+    notificationsState,
+    autoOpen
+  );
   const showsSubscribeForm =
-    notificationsEnabled &&
-    !(notificationsState === 'idle' && !autoOpen) &&
+    formActive &&
     notificationsState !== 'success' &&
     notificationsState !== 'pending_confirmation';
   useImpressionTracking(showsSubscribeForm, artist.handle, variant);
@@ -301,7 +318,7 @@ export function ArtistNotificationsCTA({
     return <SubscriptionFormSkeleton />;
   }
 
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
+  if (!formActive) {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
   }
 

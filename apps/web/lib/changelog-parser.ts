@@ -59,6 +59,33 @@ function hasPublicEntries(release: ChangelogRelease): boolean {
   return Object.values(release.sections).some(entries => entries.length > 0);
 }
 
+/** Try to capture a summary blockquote for the current release. */
+function tryCaptureSummary(
+  current: ChangelogRelease,
+  currentSection: keyof ChangelogSection | null,
+  line: string
+): boolean {
+  if (currentSection || current.summary) return false;
+  if (!line.startsWith('> ')) return false;
+  current.summary = line.slice(2).trim();
+  return true;
+}
+
+/** Try to add a bullet entry to the current section. */
+function tryAddEntry(
+  current: ChangelogRelease,
+  currentSection: keyof ChangelogSection | null,
+  line: string
+): void {
+  if (!currentSection) return;
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('- ')) return;
+  const entry = trimmed.slice(2);
+  if (isPublicEntry(entry)) {
+    current.sections[currentSection].push(entry);
+  }
+}
+
 /**
  * Parse CHANGELOG.md into structured release data for public display.
  *
@@ -86,11 +113,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
 
     if (!current) continue;
 
-    // Capture summary blockquote (before any section heading)
-    if (!currentSection && line.startsWith('> ') && !current.summary) {
-      current.summary = line.slice(2).trim();
-      continue;
-    }
+    if (tryCaptureSummary(current, currentSection, line)) continue;
 
     const sMatch = SECTION_HEADING_RE.exec(line);
     if (sMatch) {
@@ -98,13 +121,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       continue;
     }
 
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ') && currentSection) {
-      const entry = trimmed.slice(2);
-      if (isPublicEntry(entry)) {
-        current.sections[currentSection].push(entry);
-      }
-    }
+    tryAddEntry(current, currentSection, line);
   }
 
   return releases.filter(hasPublicEntries);
