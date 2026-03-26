@@ -29,3 +29,27 @@ export function getClerkProxyUrl(): string | undefined {
   if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
   return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/__clerk';
 }
+
+/**
+ * Decode the FAPI host from the publishable key and return the Clerk JS
+ * bundle URL. Clerk JS + chunks must load from the FAPI domain directly
+ * (via CNAME) because the /__clerk middleware proxy can't serve webpack
+ * chunks — only the Clerk CDN infrastructure behind the CNAME can.
+ *
+ * Returns undefined in dev (pk_test_) so Clerk loads JS from its default CDN.
+ */
+export function getClerkJSUrl(): string | undefined {
+  if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
+
+  const pk = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+  if (!pk.startsWith('pk_live_')) return undefined;
+
+  try {
+    const b64 = pk.replace(/^pk_live_/, '');
+    const fapiHost = atob(b64).replace(/\$$/, '');
+    if (!fapiHost) return undefined;
+    return `https://${fapiHost}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`;
+  } catch {
+    return undefined;
+  }
+}
