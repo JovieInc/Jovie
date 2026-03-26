@@ -129,7 +129,7 @@ const ROTATION_INTERVAL = 3500;
 const ROTATION_DELAY = 1500;
 
 /** Tab labels shown beneath the phone, using URL-style paths. */
-const MODE_TAB_LABELS: Record<string, string> = {
+export const MODE_TAB_LABELS: Record<string, string> = {
   profile: '/profile',
   tour: '/tour',
   tip: '/tip',
@@ -141,12 +141,18 @@ interface PhoneShowcaseProps {
   readonly modes: readonly ModeData[];
   /** Auto-rotate through modes. Defaults to true. */
   readonly autoRotate?: boolean;
+  /** Called when active index changes (for external tab rendering). */
+  readonly onIndexChange?: (index: number) => void;
+  /** Hide built-in tabs (render them externally instead). */
+  readonly hideTabs?: boolean;
 }
 
 export function PhoneShowcase({
   activeIndex: controlledIndex,
   modes,
   autoRotate = true,
+  onIndexChange,
+  hideTabs = false,
 }: PhoneShowcaseProps) {
   const [internalIndex, setInternalIndex] = useState(0);
   const [direction, setDirection] = useState<'left' | 'right'>('left');
@@ -154,6 +160,11 @@ export function PhoneShowcase({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeIndex = controlledIndex ?? internalIndex;
+
+  // Notify parent of index changes
+  useEffect(() => {
+    onIndexChange?.(internalIndex);
+  }, [internalIndex, onIndexChange]);
 
   const goTo = useCallback(
     (next: number) => {
@@ -277,36 +288,38 @@ export function PhoneShowcase({
         </div>
       </PhoneFrame>
 
-      {/* Tabs beneath the phone */}
-      <nav
-        className='mt-4 flex items-center gap-1'
-        aria-label='Phone mode tabs'
-      >
-        {modes.map((mode, i) => (
-          <button
-            key={mode.id}
-            type='button'
-            onClick={() => handleTabClick(i)}
-            className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
-            style={{
-              backgroundColor:
-                i === activeIndex
-                  ? 'var(--linear-bg-surface-2)'
-                  : 'transparent',
-              color:
-                i === activeIndex
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-text-quaternary)',
-              border:
-                i === activeIndex
-                  ? '1px solid var(--linear-border-default)'
-                  : '1px solid transparent',
-            }}
-          >
-            {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}
-          </button>
-        ))}
-      </nav>
+      {/* Tabs beneath the phone (can be hidden when rendered externally) */}
+      {!hideTabs && (
+        <nav
+          className='mt-4 flex items-center gap-1'
+          aria-label='Phone mode tabs'
+        >
+          {modes.map((mode, i) => (
+            <button
+              key={mode.id}
+              type='button'
+              onClick={() => handleTabClick(i)}
+              className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
+              style={{
+                backgroundColor:
+                  i === activeIndex
+                    ? 'var(--linear-bg-surface-2)'
+                    : 'transparent',
+                color:
+                  i === activeIndex
+                    ? 'var(--linear-text-primary)'
+                    : 'var(--linear-text-quaternary)',
+                border:
+                  i === activeIndex
+                    ? '1px solid var(--linear-border-default)'
+                    : '1px solid transparent',
+              }}
+            >
+              {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }
