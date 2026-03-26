@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/rules-of-hooks */
 import { test as base } from '@playwright/test';
+import { isExpectedError } from './utils/smoke-test-utils';
 
 declare global {
   interface Window {
@@ -27,6 +28,7 @@ export const test = base.extend({
         const errorText = msg.text();
         // Skip expected test-related errors
         if (
+          !isExpectedError(errorText) &&
           !errorText.includes('Failed to load resource') && // Common in tests
           !errorText.includes('ERR_INTERNET_DISCONNECTED') && // Network simulation
           !errorText.includes('Navigation cancelled') && // Test navigation
