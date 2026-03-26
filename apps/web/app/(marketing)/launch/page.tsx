@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -50,13 +50,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     keywords,
-    authors: [{ name: APP_NAME, url: APP_URL }],
+    authors: [{ name: APP_NAME, url: BASE_URL }],
     creator: APP_NAME,
     publisher: APP_NAME,
     category: 'Music',
     classification: 'Business',
     formatDetection: { email: false, address: false, telephone: false },
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: APP_ROUTES.LAUNCH,
       languages: { 'en-US': APP_ROUTES.LAUNCH },
@@ -64,14 +64,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: `${APP_URL}${APP_ROUTES.LAUNCH}`,
+      url: `${BASE_URL}${APP_ROUTES.LAUNCH}`,
       title,
       description,
       siteName: APP_NAME,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
-          secureUrl: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
+          secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
@@ -85,7 +85,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           width: 1200,
           height: 630,

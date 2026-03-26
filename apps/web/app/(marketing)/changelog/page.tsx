@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   type ChangelogRelease,
   type ChangelogSection,
@@ -94,8 +94,8 @@ export const metadata: Metadata = {
   title: "What's New",
   description: `Product updates and improvements to ${APP_NAME}. See what we've been shipping.`,
   alternates: {
-    canonical: `${APP_URL}/changelog`,
-    types: { 'application/atom+xml': `${APP_URL}/changelog/feed.xml` },
+    canonical: `${BASE_URL}/changelog`,
+    types: { 'application/atom+xml': `${BASE_URL}/changelog/feed.xml` },
   },
 };
 
