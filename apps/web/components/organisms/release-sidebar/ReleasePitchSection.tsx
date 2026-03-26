@@ -28,7 +28,10 @@ interface ReleasePitchSectionProps {
   readonly onPitchesGenerated?: (pitches: GeneratedPitches) => void;
 }
 
-function CopyButton({ text, platform }: { text: string; platform: string }) {
+function CopyButton({
+  text,
+  platform,
+}: Readonly<{ text: string; platform: string }>) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
