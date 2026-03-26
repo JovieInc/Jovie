@@ -240,6 +240,131 @@ function addLateArrivalSuffix(
   return order.indexOf(currentStep) > order.indexOf(stage);
 }
 
+function mergeSelectedArtist(
+  current: SelectedArtist | null,
+  selectedSpotifyProfile: SelectedArtist | null
+): SelectedArtist | null {
+  if (!selectedSpotifyProfile) {
+    return current;
+  }
+
+  if (!current) {
+    return selectedSpotifyProfile;
+  }
+
+  if (current.id !== selectedSpotifyProfile.id) {
+    return current;
+  }
+
+  return {
+    ...current,
+    imageUrl: current.imageUrl ?? selectedSpotifyProfile.imageUrl,
+    name: current.name || selectedSpotifyProfile.name,
+  };
+}
+
+function collectLateArrivals(
+  previousSnapshot: DiscoverySnapshot,
+  nextSnapshot: DiscoverySnapshot,
+  currentStep: StepId
+): LateArrival[] {
+  const late: LateArrival[] = [];
+
+  if (addLateArrivalSuffix(currentStep, 'dsp')) {
+    const previousDspIds = new Set(
+      previousSnapshot.dspItems.map(item => item.id)
+    );
+
+    for (const item of nextSnapshot.dspItems) {
+      if (previousDspIds.has(item.id)) {
+        continue;
+      }
+
+      late.push({
+        id: `dsp:${item.id}`,
+        subtitle: item.providerLabel,
+        title: item.externalArtistName || 'New DSP match',
+      });
+    }
+  }
+
+  if (addLateArrivalSuffix(currentStep, 'social')) {
+    const previousSocialIds = new Set(
+      previousSnapshot.socialItems.map(item => `${item.kind}:${item.id}`)
+    );
+
+    for (const item of nextSnapshot.socialItems) {
+      const id = `${item.kind}:${item.id}`;
+      if (previousSocialIds.has(id)) {
+        continue;
+      }
+
+      late.push({
+        id: `social:${id}`,
+        subtitle: item.platformLabel,
+        title: item.username || item.url,
+      });
+    }
+  }
+
+  if (addLateArrivalSuffix(currentStep, 'releases')) {
+    const previousReleaseIds = new Set(
+      previousSnapshot.releases.map(item => item.id)
+    );
+
+    for (const item of nextSnapshot.releases) {
+      if (previousReleaseIds.has(item.id)) {
+        continue;
+      }
+
+      late.push({
+        id: `release:${item.id}`,
+        subtitle: 'Release discovered',
+        title: item.title,
+      });
+    }
+  }
+
+  return late;
+}
+
+function mergeLateArrivals(
+  current: LateArrival[],
+  nextItems: LateArrival[],
+  seenIds: Set<string>
+): LateArrival[] {
+  const next = [...current];
+
+  for (const item of nextItems) {
+    if (seenIds.has(item.id)) {
+      continue;
+    }
+
+    seenIds.add(item.id);
+    next.push(item);
+  }
+
+  return next;
+}
+
+function getDiscoveryErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : 'Failed to load onboarding discovery.';
+}
+
+function getDspStatusLabel(status: DiscoveryDspItem['status']): string {
+  if (status === 'suggested') {
+    return 'Needs your review';
+  }
+
+  if (status === 'auto_confirmed') {
+    return 'Accepted automatically';
+  }
+
+  return 'Confirmed';
+}
+
 async function fetchDiscoverySnapshot(
   profileId: string,
   signal?: AbortSignal
@@ -698,92 +823,23 @@ export function OnboardingV2Form({
         const previousSnapshot = discoverySnapshotRef.current;
         discoverySnapshotRef.current = nextSnapshot;
         setDiscoverySnapshot(nextSnapshot);
-
-        const selectedSpotifyProfile = nextSnapshot.selectedSpotifyProfile;
-
-        if (selectedSpotifyProfile) {
-          setSelectedArtist(current => {
-            if (!current) return selectedSpotifyProfile;
-            if (current.id !== selectedSpotifyProfile.id) {
-              return current;
-            }
-
-            return {
-              ...current,
-              imageUrl: current.imageUrl ?? selectedSpotifyProfile.imageUrl,
-              name: current.name || selectedSpotifyProfile.name,
-            };
-          });
-        }
+        setSelectedArtist(current =>
+          mergeSelectedArtist(current, nextSnapshot.selectedSpotifyProfile)
+        );
 
         if (!previousSnapshot) {
           return;
         }
 
-        const late: LateArrival[] = [];
-
-        const previousDspIds = new Set(
-          previousSnapshot.dspItems.map(item => item.id)
+        const late = collectLateArrivals(
+          previousSnapshot,
+          nextSnapshot,
+          currentStepRef.current
         );
-        for (const item of nextSnapshot.dspItems) {
-          if (
-            !previousDspIds.has(item.id) &&
-            addLateArrivalSuffix(currentStepRef.current, 'dsp')
-          ) {
-            late.push({
-              id: `dsp:${item.id}`,
-              subtitle: item.providerLabel,
-              title: item.externalArtistName || 'New DSP match',
-            });
-          }
-        }
-
-        const previousSocialIds = new Set(
-          previousSnapshot.socialItems.map(item => `${item.kind}:${item.id}`)
-        );
-        for (const item of nextSnapshot.socialItems) {
-          const id = `${item.kind}:${item.id}`;
-          if (
-            !previousSocialIds.has(id) &&
-            addLateArrivalSuffix(currentStepRef.current, 'social')
-          ) {
-            late.push({
-              id: `social:${id}`,
-              subtitle: item.platformLabel,
-              title: item.username || item.url,
-            });
-          }
-        }
-
-        const previousReleaseIds = new Set(
-          previousSnapshot.releases.map(item => item.id)
-        );
-        for (const item of nextSnapshot.releases) {
-          if (
-            !previousReleaseIds.has(item.id) &&
-            addLateArrivalSuffix(currentStepRef.current, 'releases')
-          ) {
-            late.push({
-              id: `release:${item.id}`,
-              subtitle: 'Release discovered',
-              title: item.title,
-            });
-          }
-        }
 
         if (late.length > 0) {
           setLateArrivals(previous => {
-            const next = [...previous];
-
-            for (const item of late) {
-              if (lateArrivalIdsRef.current.has(item.id)) {
-                continue;
-              }
-              lateArrivalIdsRef.current.add(item.id);
-              next.push(item);
-            }
-
-            return next;
+            return mergeLateArrivals(previous, late, lateArrivalIdsRef.current);
           });
         }
       } catch (error) {
@@ -791,11 +847,7 @@ export function OnboardingV2Form({
           return;
         }
 
-        setDiscoveryError(
-          error instanceof Error
-            ? error.message
-            : 'Failed to load onboarding discovery.'
-        );
+        setDiscoveryError(getDiscoveryErrorMessage(error));
       } finally {
         setIsDiscoveryLoading(false);
       }
@@ -817,7 +869,7 @@ export function OnboardingV2Form({
     if (!shouldPoll) return;
 
     const controller = new AbortController();
-    void refreshDiscovery(controller.signal);
+    refreshDiscovery(controller.signal);
 
     const intervalId = globalThis.setInterval(() => {
       if (
@@ -831,7 +883,7 @@ export function OnboardingV2Form({
         }
       }
 
-      void refreshDiscovery(controller.signal);
+      refreshDiscovery(controller.signal);
     }, DISCOVERY_POLL_INTERVAL_MS);
 
     return () => {
@@ -926,7 +978,7 @@ export function OnboardingV2Form({
 
       const directArtistId = extractSpotifyArtistId(value);
       if (directArtistId) {
-        void connectArtist({
+        connectArtist({
           id: directArtistId,
           imageUrl: null,
           name: '',
@@ -1197,14 +1249,14 @@ export function OnboardingV2Form({
           <li key={artist.id}>
             <button
               type='button'
-              onClick={() =>
-                void connectArtist({
+              onClick={() => {
+                connectArtist({
                   id: artist.id,
                   imageUrl: artist.imageUrl ?? null,
                   name: artist.name,
                   url: artist.url,
-                })
-              }
+                });
+              }}
               className='flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors hover:bg-surface-0'
             >
               {artist.imageUrl ? (
@@ -1380,10 +1432,7 @@ export function OnboardingV2Form({
             title='Review DSP matches'
             prompt='Jovie is checking for your presence on other music platforms.'
             actions={
-              <Button
-                onClick={() => void refreshDiscovery()}
-                variant='secondary'
-              >
+              <Button onClick={() => refreshDiscovery()} variant='secondary'>
                 <RefreshCw className='mr-1 h-4 w-4' />
                 Refresh
               </Button>
@@ -1407,11 +1456,7 @@ export function OnboardingV2Form({
                         {item.externalArtistName || 'Suggested artist'}
                       </p>
                       <p className='text-sm text-secondary-token'>
-                        {item.status === 'suggested'
-                          ? 'Needs your review'
-                          : item.status === 'auto_confirmed'
-                            ? 'Accepted automatically'
-                            : 'Confirmed'}
+                        {getDspStatusLabel(item.status)}
                       </p>
                     </div>
 
@@ -1431,14 +1476,18 @@ export function OnboardingV2Form({
                       {item.status === 'suggested' ? (
                         <>
                           <Button
-                            onClick={() => void handleRejectDsp(item.id)}
+                            onClick={() => {
+                              handleRejectDsp(item.id);
+                            }}
                             size='sm'
                             variant='secondary'
                           >
                             Reject
                           </Button>
                           <Button
-                            onClick={() => void handleConfirmDsp(item.id)}
+                            onClick={() => {
+                              handleConfirmDsp(item.id);
+                            }}
                             size='sm'
                           >
                             Accept
@@ -1468,10 +1517,7 @@ export function OnboardingV2Form({
             title='Review social links'
             prompt='We found social profiles and candidate links that may belong on your page.'
             actions={
-              <Button
-                onClick={() => void refreshDiscovery()}
-                variant='secondary'
-              >
+              <Button onClick={() => refreshDiscovery()} variant='secondary'>
                 <RefreshCw className='mr-1 h-4 w-4' />
                 Refresh
               </Button>
@@ -1517,14 +1563,18 @@ export function OnboardingV2Form({
                         {isPending ? (
                           <>
                             <Button
-                              onClick={() => void handleDismissSocial(item)}
+                              onClick={() => {
+                                handleDismissSocial(item);
+                              }}
                               size='sm'
                               variant='secondary'
                             >
                               Dismiss
                             </Button>
                             <Button
-                              onClick={() => void handleAcceptSocial(item)}
+                              onClick={() => {
+                                handleAcceptSocial(item);
+                              }}
                               size='sm'
                             >
                               Add
