@@ -1,6 +1,15 @@
+import type { Metadata } from 'next';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 export default function SpinnerTestPage() {
   return (

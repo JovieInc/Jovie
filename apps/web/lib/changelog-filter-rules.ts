@@ -1,12 +1,8 @@
 /**
- * Changelog Auto-Filter Rules
+ * Changelog auto-filter rules for the public web app.
  *
- * Safety net that catches internal entries even when developers forget
- * to add the [internal] prefix. Used by both the TypeScript parser
- * (apps/web/lib/changelog-parser.ts) and the JS email script parser
- * (scripts/lib/changelog-parser.mjs).
- *
- * Rules derived from: feedback_changelog_rules.md
+ * This file intentionally lives under apps/web so the Next.js build never
+ * reaches outside the app root when parsing the public changelog.
  */
 
 /** Vendor names that should never appear in public changelog entries. */
@@ -67,7 +63,7 @@ const INTERNAL_PATTERNS = [
   /\bscreenshot spec\b/i,
   /\bscreenshot pipeline\b/i,
 
-  // Technical internals (SDK only when paired with vendor context)
+  // Technical internals
   /\bClerk SDK\b/i,
   /\bVercel SDK\b/i,
   /\bSentry SDK\b/i,
@@ -125,13 +121,13 @@ const INTERNAL_PATTERNS = [
 const DOLLAR_AMOUNT_RE = /\$\d+/;
 const SEMVER_TOKEN_RE = /^\d+\.\d+\.\d+$/;
 
-function hasBudgetOrCostLeak(entry) {
+function hasBudgetOrCostLeak(entry: string): boolean {
   if (!DOLLAR_AMOUNT_RE.test(entry)) return false;
   const lower = entry.toLowerCase();
   return lower.includes('budget') || lower.includes('cost');
 }
 
-function hasDependencyVersionBump(entry) {
+function hasDependencyVersionBump(entry: string): boolean {
   const tokens = entry.replaceAll('→', ' → ').split(/\s+/).filter(Boolean);
 
   for (let index = 1; index < tokens.length - 1; index += 1) {
@@ -147,13 +143,7 @@ function hasDependencyVersionBump(entry) {
   return false;
 }
 
-/**
- * Check whether a changelog entry should be auto-filtered from public output.
- *
- * @param {string} entry - The entry text (without the leading "- ")
- * @returns {boolean} true if the entry should be hidden from public changelog
- */
-export function isInternalEntry(entry) {
+export function isInternalEntry(entry: string): boolean {
   const normalizedTokens = entry
     .toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -162,10 +152,13 @@ export function isInternalEntry(entry) {
   for (const token of normalizedTokens) {
     if (VENDOR_TOKENS.has(token)) return true;
   }
+
   for (const pattern of INTERNAL_PATTERNS) {
     if (pattern.test(entry)) return true;
   }
+
   if (hasBudgetOrCostLeak(entry)) return true;
   if (hasDependencyVersionBump(entry)) return true;
+
   return false;
 }

@@ -556,4 +556,18 @@ describe('proxy.ts middleware', () => {
       expect(location).toContain('/some-page');
     });
   });
+
+  describe('support.jov.ie redirect', () => {
+    it('308 redirects support.jov.ie to jov.ie/support', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/articles/649224-jovie-password-reset',
+        hostname: 'support.jov.ie',
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      const location = res.headers.get('location');
+      expect(location).toBe('https://jov.ie/support');
+    });
+  });
 });

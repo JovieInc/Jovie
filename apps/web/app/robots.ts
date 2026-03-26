@@ -20,6 +20,13 @@ const DISALLOW_PATHS = [
   '/api/',
   '/out/',
   '/investors/',
+  '/investor-portal',
+  '/demo',
+  '/sandbox',
+  '/spinner-test',
+  '/sentry-example-page',
+  '/ui',
+  '/hud',
   '/*?ref=*',
   '/*&ref=*',
   '/*?utm_*',
@@ -54,11 +61,11 @@ export default function robots(): MetadataRoute.Robots {
           disallow: DISALLOW_PATHS,
         },
         // Explicitly welcome AI crawlers for better AI search visibility
-        // But block investor portal from ALL crawlers
+        // But block investor and internal utility routes from ALL crawlers
         ...AI_CRAWLERS.map(crawler => ({
           userAgent: crawler,
           allow: ['/', '/llms.txt'],
-          disallow: [...DISALLOW_PATHS, '/investors/'],
+          disallow: DISALLOW_PATHS,
         })),
       ],
       sitemap: `${BASE_URL}/sitemap.xml`,
