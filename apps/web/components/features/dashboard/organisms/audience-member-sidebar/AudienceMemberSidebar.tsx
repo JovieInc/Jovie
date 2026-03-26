@@ -41,8 +41,9 @@ export function AudienceMemberSidebar({
       ariaLabel='Audience member details'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
-      title='Audience'
+      title='Audience member details'
       onClose={onClose}
+      headerMode='minimal'
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
@@ -56,15 +57,27 @@ export function AudienceMemberSidebar({
     >
       {member && (
         <>
-          <DrawerSection title='Properties' className='space-y-1.5'>
+          <DrawerSection
+            title='Properties'
+            className='space-y-1.5'
+            surface='card'
+          >
             <AudienceMemberDetails member={member} />
           </DrawerSection>
 
-          <DrawerSection title='Activity' className='space-y-1.5'>
+          <DrawerSection
+            title='Activity'
+            className='space-y-1.5'
+            surface='card'
+          >
             <AudienceMemberActivityFeed member={member} />
           </DrawerSection>
 
-          <DrawerSection title='Referrers' className='space-y-1.5'>
+          <DrawerSection
+            title='Referrers'
+            className='space-y-1.5'
+            surface='card'
+          >
             <AudienceMemberReferrers member={member} />
           </DrawerSection>
         </>

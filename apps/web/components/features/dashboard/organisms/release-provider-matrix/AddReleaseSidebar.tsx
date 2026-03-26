@@ -21,6 +21,7 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 const RELEASE_TYPE_OPTIONS = [
   { value: 'single', label: 'Single' },
@@ -147,6 +148,14 @@ export function AddReleaseSidebar({
       data-testid='add-release-sidebar'
       title='Add Release'
       onClose={handleClose}
+      headerMode='minimal'
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={[]}
+          onClose={handleClose}
+        />
+      }
       entityHeader={
         <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
           <div className='p-3.5'>
@@ -178,24 +187,24 @@ export function AddReleaseSidebar({
               bodyClassName='pt-0.5'
             />
           </div>
+          <div className='border-t border-(--linear-app-frame-seam) px-3.5 py-2'>
+            <DrawerButton
+              tone='primary'
+              className='h-8 w-full'
+              onClick={handleSubmit}
+              disabled={isSubmitting || !title.trim()}
+            >
+              {isSubmitting ? (
+                <>
+                  <LoadingSpinner size='sm' tone='inverse' className='mr-2' />
+                  Creating...
+                </>
+              ) : (
+                'Create Release'
+              )}
+            </DrawerButton>
+          </div>
         </DrawerSurfaceCard>
-      }
-      footer={
-        <DrawerButton
-          tone='primary'
-          className='h-8 w-full'
-          onClick={handleSubmit}
-          disabled={isSubmitting || !title.trim()}
-        >
-          {isSubmitting ? (
-            <>
-              <LoadingSpinner size='sm' tone='inverse' className='mr-2' />
-              Creating...
-            </>
-          ) : (
-            'Create Release'
-          )}
-        </DrawerButton>
       }
     >
       <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>

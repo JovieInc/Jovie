@@ -11,8 +11,13 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
+import {
+  DrawerCardActionBar,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
 import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -471,12 +476,24 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { title: headerTitle, actions: headerActions } = useProfileHeaderParts({
+  const {
+    title: headerTitle,
+    primaryActions,
+    overflowActions,
+  } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
   });
+
+  const closeOnlyHeaderActions = (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={[]}
+      onClose={close}
+    />
+  );
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
@@ -486,6 +503,8 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Contact'
         title={<div className='h-4 w-24 rounded skeleton' />}
         onClose={close}
+        headerMode='minimal'
+        headerActions={closeOnlyHeaderActions}
         entityHeader={
           <div className='space-y-3'>
             <div
@@ -570,13 +589,14 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       title={headerTitle}
-      headerActions={headerActions}
+      headerActions={closeOnlyHeaderActions}
+      headerMode='minimal'
       entityHeader={
         <div className='space-y-3'>
           <div
             className={cn(
               LINEAR_SURFACE.sidebarCard,
-              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              'overflow-hidden px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             )}
           >
             <ProfileContactHeader
@@ -586,6 +606,11 @@ export function ProfileContactSidebar() {
               editable
               onDisplayNameChange={handleDisplayNameChange}
               onAvatarUpload={handleAvatarUpload}
+            />
+            <DrawerCardActionBar
+              primaryActions={primaryActions}
+              overflowActions={overflowActions}
+              className='mx-[-14px] mt-3'
             />
           </div>
 

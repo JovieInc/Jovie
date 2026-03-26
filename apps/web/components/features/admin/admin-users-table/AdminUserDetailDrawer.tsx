@@ -7,6 +7,7 @@ import { useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   DrawerSection,
+  DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { copyToClipboard } from '@/hooks/useClipboard';
@@ -131,45 +132,51 @@ export function AdminUserDetailDrawer({
       ariaLabel='User details'
       title='User details'
       onClose={onClose}
+      headerMode='minimal'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasUser}
       emptyMessage='Select a user to view details.'
       entityHeader={
         user ? (
-          <div className='space-y-1.5'>
-            <div className='space-y-1'>
-              <p className='text-[15px] font-semibold text-primary-token'>
-                {user.name ?? 'Unnamed user'}
-              </p>
-              {user.email ? (
-                <div className='flex items-center gap-1.5'>
-                  <p className='truncate text-[12px] text-secondary-token'>
-                    {user.email}
-                  </p>
-                  <CopyButton value={user.email} label='Email' />
-                </div>
-              ) : (
-                <p className='text-[12px] text-secondary-token'>No email</p>
-              )}
-            </div>
-            <div className='flex flex-wrap gap-1.5'>
-              <Badge
-                size='sm'
-                variant={user.plan === 'pro' ? 'primary' : 'secondary'}
-              >
-                {user.plan}
-              </Badge>
-              {user.deletedAt ? (
-                <Badge size='sm' variant='warning'>
-                  Deleted
+          <DrawerSurfaceCard variant='card' className='p-3'>
+            <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
+              User
+            </p>
+            <div className='space-y-1.5'>
+              <div className='space-y-1'>
+                <p className='text-[15px] font-semibold text-primary-token'>
+                  {user.name ?? 'Unnamed user'}
+                </p>
+                {user.email ? (
+                  <div className='flex items-center gap-1.5'>
+                    <p className='truncate text-[12px] text-secondary-token'>
+                      {user.email}
+                    </p>
+                    <CopyButton value={user.email} label='Email' />
+                  </div>
+                ) : (
+                  <p className='text-[12px] text-secondary-token'>No email</p>
+                )}
+              </div>
+              <div className='flex flex-wrap gap-1.5'>
+                <Badge
+                  size='sm'
+                  variant={user.plan === 'pro' ? 'primary' : 'secondary'}
+                >
+                  {user.plan}
                 </Badge>
-              ) : (
-                <Badge size='sm' variant='success'>
-                  Active
-                </Badge>
-              )}
+                {user.deletedAt ? (
+                  <Badge size='sm' variant='warning'>
+                    Deleted
+                  </Badge>
+                ) : (
+                  <Badge size='sm' variant='success'>
+                    Active
+                  </Badge>
+                )}
+              </div>
             </div>
-          </div>
+          </DrawerSurfaceCard>
         ) : undefined
       }
     >
@@ -183,12 +190,16 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
 
   return (
     <>
-      <DrawerSection title='Profile' className='space-y-1.5'>
+      <DrawerSection title='Profile' className='space-y-1.5' surface='card'>
         <ProfileCompletenessBar score={score} fields={fields} />
       </DrawerSection>
 
       {user.socialLinks && user.socialLinks.length > 0 ? (
-        <DrawerSection title='Social & music links' className='space-y-1.5'>
+        <DrawerSection
+          title='Social & music links'
+          className='space-y-1.5'
+          surface='card'
+        >
           <div className='space-y-1'>
             {user.socialLinks.slice(0, 8).map(link => (
               <a
@@ -208,7 +219,7 @@ function UserDrawerContent({ user }: { readonly user: AdminUserRow }) {
         </DrawerSection>
       ) : null}
 
-      <DrawerSection title='Details' className='space-y-1.5'>
+      <DrawerSection title='Details' className='space-y-1.5' surface='card'>
         <dl className='space-y-2 text-[12px]'>
           <div className='flex justify-between'>
             <dt className='text-secondary-token'>User ID</dt>

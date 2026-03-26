@@ -8,17 +8,15 @@
  */
 
 import { Check, Copy, ExternalLink, Hash, RefreshCw } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 import type { Release } from './types';
 
 interface UseReleaseHeaderResult {
-  title: ReactNode;
-  actions: ReactNode | undefined;
+  readonly headerLabel: string;
+  readonly primaryActions: DrawerHeaderAction[];
+  readonly overflowActions: DrawerHeaderAction[];
 }
 
 interface UseReleaseHeaderPartsProps {
@@ -52,7 +50,6 @@ export function useReleaseHeaderParts({
   onRefresh,
   isRefreshing = false,
   onCopySmartLink,
-  onClose,
 }: UseReleaseHeaderPartsProps): UseReleaseHeaderResult {
   const showActions = hasRelease && release?.smartLinkPath;
   const [isCopied, setIsCopied] = useState(false);
@@ -149,48 +146,10 @@ export function useReleaseHeaderParts({
   }
 
   const isrcValue = hasRelease ? release?.primaryIsrc : undefined;
-  const titleText = buildTitleText(isrcValue, hasRelease, release);
 
-  const handleCopyIsrc = useCallback(async () => {
-    if (!isrcValue) return;
-    try {
-      await navigator.clipboard?.writeText(isrcValue);
-      setIsIdCopied(true);
-      if (idCopyTimeoutRef.current) clearTimeout(idCopyTimeoutRef.current);
-      idCopyTimeoutRef.current = setTimeout(() => setIsIdCopied(false), 2000);
-    } catch {}
-  }, [isrcValue]);
-
-  const title = (
-    <span className='group/isrc flex min-w-0 items-center gap-1'>
-      <span className='truncate font-mono text-[10.5px] tracking-[0.025em] text-tertiary-token'>
-        {titleText}
-      </span>
-      {isrcValue && (
-        <DrawerInlineIconButton
-          onClick={handleCopyIsrc}
-          title={isIdCopied ? 'Copied!' : 'Copy ISRC'}
-          fadeOnParentHover
-          className='group-hover/isrc:opacity-100 group-focus-within/isrc:opacity-100'
-        >
-          {isIdCopied ? (
-            <Check className='h-3 w-3' />
-          ) : (
-            <Copy className='h-3 w-3' />
-          )}
-        </DrawerInlineIconButton>
-      )}
-    </span>
-  );
-
-  const actions =
-    primaryActions.length > 0 || overflowActions.length > 0 || onClose ? (
-      <DrawerHeaderActions
-        primaryActions={primaryActions}
-        overflowActions={overflowActions}
-        onClose={onClose}
-      />
-    ) : undefined;
-
-  return { title, actions };
+  return {
+    headerLabel: buildTitleText(isrcValue, hasRelease, release),
+    primaryActions,
+    overflowActions,
+  };
 }

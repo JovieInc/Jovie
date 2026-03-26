@@ -8,6 +8,7 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 
 /* ------------------------------------------------------------------ */
 /*  Hardcoded mock analytics data                                       */
@@ -244,6 +245,43 @@ export function DemoAnalyticsSidebar({
       data-testid='demo-analytics-sidebar'
       title='Analytics'
       onClose={onClose}
+      headerMode='minimal'
+      headerActions={
+        <DrawerHeaderActions
+          primaryActions={[]}
+          overflowActions={[]}
+          onClose={onClose}
+        />
+      }
+      entityHeader={
+        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+              Analytics
+            </p>
+          </div>
+          <div className='flex items-start justify-between gap-3 p-3.5'>
+            <div className='space-y-0.5'>
+              <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
+                Audience funnel
+              </p>
+              <p className='text-[12px] leading-[16px] text-secondary-token'>
+                Mock analytics for the linear-style demo shell.
+              </p>
+            </div>
+            <SidebarRangeToggle value={range} onChange={setRange} />
+          </div>
+        </DrawerSurfaceCard>
+      }
+      tabs={
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as AnalyticsTab)}
+          options={ANALYTICS_TAB_OPTIONS}
+          className='w-full'
+          ariaLabel='Analytics data tabs'
+        />
+      }
     >
       <div className='space-y-2'>
         {/* Engagement metrics */}
@@ -268,18 +306,6 @@ export function DemoAnalyticsSidebar({
 
         {/* Funnel */}
         <FunnelSection />
-
-        {/* Tabs + range toggle */}
-        <div className='flex items-center gap-1.5'>
-          <DrawerTabs
-            value={activeTab}
-            onValueChange={value => setActiveTab(value as AnalyticsTab)}
-            options={ANALYTICS_TAB_OPTIONS}
-            className='flex-1'
-            ariaLabel='Analytics data tabs'
-          />
-          <SidebarRangeToggle value={range} onChange={setRange} />
-        </div>
 
         {/* Ranked lists */}
         <DrawerSurfaceCard className='min-h-[212px] border-0 shadow-none p-1.5'>

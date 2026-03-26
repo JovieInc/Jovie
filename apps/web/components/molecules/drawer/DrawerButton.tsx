@@ -28,7 +28,7 @@ export interface DrawerButtonProps
 }
 
 export const DRAWER_BUTTON_CLASSNAME =
-  'border font-[510] tracking-[-0.01em] shadow-none transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'border font-[510] tracking-[-0.01em] shadow-[0_1px_1px_rgba(0,0,0,0.04),0_3px_6px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,border-color,color,box-shadow] duration-150 hover:shadow-[0_1px_1px_rgba(0,0,0,0.05),0_6px_12px_-8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)] focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 active:shadow-[0_1px_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.04)] disabled:shadow-none';
 
 export const DrawerButton = React.forwardRef<
   HTMLButtonElement,

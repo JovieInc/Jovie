@@ -14,10 +14,13 @@ import {
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
+  DrawerCardActionBar,
   DrawerPropertyRow,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
 import {
   CONTACT_ROLE_OPTIONS,
@@ -215,14 +218,25 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
     [contact, onUpdate, debouncedSave]
   );
 
-  const { title: headerTitle, actions: headerActions } =
-    useContactDetailHeaderParts({
-      role: contact?.role ?? 'other',
-      customLabel: contact?.customLabel,
-      email: contact?.email,
-      onDelete,
-      onClose: handleClose,
-    });
+  const {
+    title: headerTitle,
+    primaryActions,
+    overflowActions,
+  } = useContactDetailHeaderParts({
+    role: contact?.role ?? 'other',
+    customLabel: contact?.customLabel,
+    email: contact?.email,
+    onDelete,
+    onClose: handleClose,
+  });
+
+  const closeOnlyHeaderActions = (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={[]}
+      onClose={handleClose}
+    />
+  );
 
   const hasContact = Boolean(contact);
   const roleLabel = contact
@@ -295,24 +309,37 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       ariaLabel='Contact details'
       title={headerTitle}
       onClose={handleClose}
-      headerActions={headerActions}
+      headerActions={closeOnlyHeaderActions}
+      headerMode='minimal'
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
       entityHeader={
         contact ? (
-          <div className='space-y-1'>
-            <p className='text-[15px] font-[520] leading-5 text-primary-token'>
-              {contactDisplayName}
+          <DrawerSurfaceCard variant='card' className='overflow-hidden p-3'>
+            <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
+              Contact
             </p>
-            <p className='mt-1 text-[12px] text-secondary-token'>{roleLabel}</p>
-          </div>
+            <div className='space-y-1'>
+              <p className='text-[15px] font-[520] leading-5 text-primary-token'>
+                {contactDisplayName}
+              </p>
+              <p className='mt-1 text-[12px] text-secondary-token'>
+                {roleLabel}
+              </p>
+            </div>
+            <DrawerCardActionBar
+              primaryActions={primaryActions}
+              overflowActions={overflowActions}
+              className='mx-[-12px] mt-3'
+            />
+          </DrawerSurfaceCard>
         ) : undefined
       }
     >
       {contact && (
         <>
-          <DrawerSection title='Role' className='space-y-2'>
+          <DrawerSection title='Role' className='space-y-2' surface='card'>
             <Label className='text-[13px] text-secondary-token'>
               Contact type
             </Label>
@@ -340,7 +367,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </Select>
           </DrawerSection>
 
-          <DrawerSection title='Contact Info' className='space-y-2'>
+          <DrawerSection
+            title='Contact Info'
+            className='space-y-2'
+            surface='card'
+          >
             <div className='space-y-1'>
               {renderEditableField(
                 'personName',
@@ -361,7 +392,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
 
           {/* Preferred Channel */}
           {hasEmailAndPhone && (
-            <DrawerSection title='Preferred Contact' className='space-y-2'>
+            <DrawerSection
+              title='Preferred Contact'
+              className='space-y-2'
+              surface='card'
+            >
               <div className='space-y-2'>
                 <Label className='text-[13px] text-secondary-token'>
                   Default action
@@ -384,7 +419,11 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
             </DrawerSection>
           )}
 
-          <DrawerSection title='Territories' className='space-y-2'>
+          <DrawerSection
+            title='Territories'
+            className='space-y-2'
+            surface='card'
+          >
             <div className='space-y-2'>
               <DrawerPropertyRow
                 label='Coverage'

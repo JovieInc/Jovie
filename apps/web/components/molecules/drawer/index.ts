@@ -20,6 +20,11 @@ export {
   type DrawerButtonProps,
 } from './DrawerButton';
 export {
+  DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
+  DrawerCardActionBar,
+  type DrawerCardActionBarProps,
+} from './DrawerCardActionBar';
+export {
   DrawerEmptyState,
   type DrawerEmptyStateProps,
 } from './DrawerEmptyState';

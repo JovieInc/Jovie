@@ -16,19 +16,27 @@ import {
   RefreshCw,
   Sparkles,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import { updateAllowArtworkDownloads } from '@/app/app/(shell)/dashboard/releases/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { ReleaseTaskChecklist } from '@/components/features/dashboard/release-tasks';
 import {
   DrawerAsyncToggle,
+  DrawerCardActionBar,
   DrawerMediaThumb,
   DrawerSurfaceCard,
   DrawerTabs,
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { APP_ROUTES } from '@/constants/routes';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
@@ -79,6 +87,7 @@ function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
 }
 
 interface ReleaseEntityHeaderProps {
+  readonly headerLabel: string;
   readonly release: Release;
   readonly artistName: string | null | undefined;
   readonly canUploadArtwork: boolean;
@@ -89,9 +98,12 @@ interface ReleaseEntityHeaderProps {
   readonly previewUrl: string | null | undefined;
   readonly isPlaying: boolean;
   readonly onTogglePreview: () => void;
+  readonly actionBar?: ReactNode;
+  readonly footerControl?: ReactNode;
 }
 
 function ReleaseEntityHeader({
+  headerLabel,
   release,
   artistName,
   canUploadArtwork,
@@ -102,6 +114,8 @@ function ReleaseEntityHeader({
   previewUrl,
   isPlaying,
   onTogglePreview,
+  actionBar,
+  footerControl,
 }: ReleaseEntityHeaderProps) {
   const artworkAlt = release.title
     ? `${release.title} artwork`
@@ -114,8 +128,8 @@ function ReleaseEntityHeader({
       testId='release-header-card'
     >
       <div className='p-2.5'>
-        <p className='mb-1 text-[10.5px] font-[510] leading-none text-tertiary-token'>
-          Release
+        <p className='mb-1 truncate font-mono text-[10.5px] font-[510] leading-none tracking-[0.025em] text-tertiary-token'>
+          {headerLabel}
         </p>
         <div className='flex items-start gap-2.5'>
           <div className='group/artwork relative shrink-0'>
@@ -201,6 +215,13 @@ function ReleaseEntityHeader({
       <div className='border-t border-(--linear-app-frame-seam) bg-surface-0/35 px-2.5 py-2'>
         <ReleaseSmartLinkSection smartLinkPath={release.smartLinkPath} />
       </div>
+
+      {actionBar}
+      {footerControl ? (
+        <div className='border-t border-(--linear-app-frame-seam) px-2.5 py-2'>
+          {footerControl}
+        </div>
+      ) : null}
     </DrawerSurfaceCard>
   );
 }
@@ -426,17 +447,42 @@ export function ReleaseSidebar({
     [release, handleCopySmartLink, onRefresh, isRefreshing, artistName]
   );
 
-  const { title: headerTitle, actions: headerActions } = useReleaseHeaderParts({
-    release,
-    hasRelease,
-    artistName: artistName ?? undefined,
-    onRefresh,
-    isRefreshing,
-    onCopySmartLink: () => {
-      handleCopySmartLink();
-    },
-    onClose,
-  });
+  const { headerLabel, primaryActions, overflowActions } =
+    useReleaseHeaderParts({
+      release,
+      hasRelease,
+      artistName: artistName ?? undefined,
+      onRefresh,
+      isRefreshing,
+      onCopySmartLink: () => {
+        handleCopySmartLink();
+      },
+      onClose,
+    });
+
+  const closeOnlyHeaderActions = onClose ? (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={[]}
+      onClose={onClose}
+    />
+  ) : undefined;
+
+  const artworkDownloadsToggle =
+    release && !selectedTrack && isEditable ? (
+      <DrawerAsyncToggle
+        density='compact'
+        label='Art downloads'
+        ariaLabel='Allow artwork downloads on public pages'
+        checked={allowDownloads}
+        onToggle={onToggleArtworkDownloads ?? updateAllowArtworkDownloads}
+        successMessage={on =>
+          on
+            ? 'Artwork downloads enabled for visitors'
+            : 'Artwork downloads disabled'
+        }
+      />
+    ) : undefined;
 
   return (
     <EntitySidebarShell
@@ -446,27 +492,12 @@ export function ReleaseSidebar({
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
       data-testid='release-sidebar'
-      title={headerTitle}
+      title={headerLabel}
       onClose={onClose}
-      headerActions={headerActions}
+      headerActions={closeOnlyHeaderActions}
+      headerMode='minimal'
       isEmpty={!release}
       emptyMessage='Select a release in the table to view its details.'
-      footer={
-        release && !selectedTrack && isEditable ? (
-          <DrawerAsyncToggle
-            density='compact'
-            label='Art downloads'
-            ariaLabel='Allow artwork downloads on public pages'
-            checked={allowDownloads}
-            onToggle={onToggleArtworkDownloads ?? updateAllowArtworkDownloads}
-            successMessage={on =>
-              on
-                ? 'Artwork downloads enabled for visitors'
-                : 'Artwork downloads disabled'
-            }
-          />
-        ) : undefined
-      }
     >
       {selectedTrack && release && (
         <TrackDetailPanel
@@ -478,6 +509,7 @@ export function ReleaseSidebar({
       {!(selectedTrack && release) && release && (
         <>
           <ReleaseEntityHeader
+            headerLabel={headerLabel}
             release={release}
             artistName={artistName}
             canUploadArtwork={canUploadArtwork}
@@ -488,6 +520,13 @@ export function ReleaseSidebar({
             previewUrl={sidebarPreviewUrl}
             isPlaying={isReleasePlaying}
             onTogglePreview={handleToggleReleasePreview}
+            actionBar={
+              <DrawerCardActionBar
+                primaryActions={primaryActions}
+                overflowActions={overflowActions}
+              />
+            }
+            footerControl={artworkDownloadsToggle}
           />
 
           <ReleaseSmartLinkAnalytics
