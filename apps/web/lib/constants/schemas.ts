@@ -1,4 +1,4 @@
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 
 /** Safely serialize JSON-LD with XSS protection */
 export const jsonLd = (value: unknown) =>
@@ -6,9 +6,9 @@ export const jsonLd = (value: unknown) =>
 
 /** Schema entity IDs for consistent knowledge graph across pages */
 export const SCHEMA_IDS = {
-  organization: `${APP_URL}#organization`,
-  website: `${APP_URL}#website`,
-  software: `${APP_URL}#software`,
+  organization: `${BASE_URL}#organization`,
+  website: `${BASE_URL}#website`,
+  software: `${BASE_URL}#software`,
 } as const;
 
 /** Reusable schema fragments shared across marketing pages */
@@ -23,21 +23,21 @@ export const SCHEMA_FRAGMENTS = {
   author: {
     '@type': 'Organization' as const,
     name: APP_NAME,
-    url: APP_URL,
+    url: BASE_URL,
   },
   logo: {
     '@type': 'ImageObject' as const,
-    url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+    url: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
     width: 512,
     height: 512,
   },
   publisher: {
     '@type': 'Organization' as const,
     name: APP_NAME,
-    url: APP_URL,
+    url: BASE_URL,
     logo: {
       '@type': 'ImageObject' as const,
-      url: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+      url: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
       width: 512,
       height: 512,
     },
@@ -46,14 +46,14 @@ export const SCHEMA_FRAGMENTS = {
     '@type': 'SearchAction' as const,
     target: {
       '@type': 'EntryPoint' as const,
-      urlTemplate: `${APP_URL}/search?q={search_term_string}`,
+      urlTemplate: `${BASE_URL}/search?q={search_term_string}`,
     },
     'query-input': 'required name=search_term_string',
   },
   contactPoint: {
     '@type': 'ContactPoint' as const,
     contactType: 'customer support',
-    url: `${APP_URL}/support`,
+    url: `${BASE_URL}/support`,
   },
 } as const;
 
@@ -69,7 +69,7 @@ export function buildWebsiteSchema(overrides: {
     name: APP_NAME,
     alternateName: overrides.alternateName,
     description: overrides.description,
-    url: APP_URL,
+    url: BASE_URL,
     inLanguage: 'en-US',
     potentialAction: SCHEMA_FRAGMENTS.searchAction,
     publisher: { '@id': SCHEMA_IDS.organization },
@@ -84,7 +84,7 @@ export function buildSoftwareSchema(description: string) {
     '@id': SCHEMA_IDS.software,
     name: APP_NAME,
     description,
-    url: APP_URL,
+    url: BASE_URL,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     offers: SCHEMA_FRAGMENTS.offers,
@@ -105,9 +105,9 @@ export function buildOrganizationSchema(overrides: {
     '@id': SCHEMA_IDS.organization,
     name: APP_NAME,
     legalName: overrides.legalName,
-    url: APP_URL,
+    url: BASE_URL,
     logo: SCHEMA_FRAGMENTS.logo,
-    image: `${APP_URL}/og/default.png`,
+    image: `${BASE_URL}/og/default.png`,
     description: overrides.description,
     sameAs: overrides.sameAs,
     contactPoint: SCHEMA_FRAGMENTS.contactPoint,
@@ -181,7 +181,7 @@ export function buildArticleSchema(overrides: {
     publisher: {
       '@id': SCHEMA_IDS.organization,
     },
-    image: overrides.image ?? `${APP_URL}/og/default.png`,
+    image: overrides.image ?? `${BASE_URL}/og/default.png`,
     ...(overrides.keywords?.length
       ? { keywords: overrides.keywords.join(', ') }
       : {}),
