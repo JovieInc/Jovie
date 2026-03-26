@@ -6,9 +6,11 @@ import { fastRender } from '@/tests/utils/fast-render';
 describe('SuggestedPrompts', () => {
   it('renders default prompts', () => {
     const onSelect = vi.fn();
-    const { getByText, queryByText } = fastRender(
+    const { getByText, getByTestId, queryByText } = fastRender(
       <SuggestedPrompts onSelect={onSelect} />
     );
+
+    expect(getByTestId('suggested-prompts-rail')).toBeTruthy();
 
     // Current default suggestion
     expect(getByText('Change profile photo')).toBeTruthy();
