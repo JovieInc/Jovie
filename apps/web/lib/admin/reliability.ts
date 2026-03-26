@@ -7,7 +7,6 @@ import { sqlTimestamp } from '@/lib/db/sql-helpers';
 import { getHudDeployments } from '@/lib/deployments/github';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
-import { withTimeout } from '@/lib/resilience/primitives';
 import { getAdminSentryMetrics } from './sentry-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -29,16 +28,15 @@ export interface AdminReliabilitySummary {
  * Performs a bounded Redis reachability check for the admin reliability summary.
  */
 async function isRedisReachable(): Promise<boolean> {
-  const redis = getRedis();
+  const redis = getRedis({
+    signal: AbortSignal.timeout(REDIS_REACHABILITY_TIMEOUT_MS),
+  });
   if (!redis) {
     return false;
   }
 
   try {
-    await withTimeout(redis.ping(), {
-      timeoutMs: REDIS_REACHABILITY_TIMEOUT_MS,
-      context: 'Redis ping',
-    });
+    await redis.ping();
     return true;
   } catch {
     return false;

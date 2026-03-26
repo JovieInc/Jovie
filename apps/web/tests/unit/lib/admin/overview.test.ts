@@ -77,9 +77,20 @@ describe('getAdminReliabilitySummary', () => {
 
   it('marks redis unavailable when the ping times out', async () => {
     vi.useFakeTimers();
-    mockGetRedis.mockReturnValue({
-      ping: vi.fn(() => new Promise(() => {})),
-    });
+    mockGetRedis.mockImplementation(({ signal }: { signal?: AbortSignal }) => ({
+      ping: vi.fn(
+        () =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener(
+              'abort',
+              () => {
+                reject(new DOMException('Aborted', 'AbortError'));
+              },
+              { once: true }
+            );
+          })
+      ),
+    }));
 
     const summaryPromise = getAdminReliabilitySummary();
 
