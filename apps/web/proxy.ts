@@ -927,11 +927,12 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: fetch-based proxy to distinct-giraffe-5.clerk.accounts.dev.
-  // Both staging and production use the same Clerk instance.
-  // We use fetch() instead of NextResponse.rewrite() or vercel.json rewrites
-  // because both of those forward the original Host header (jov.ie) instead
-  // of the target host, causing Clerk to return 400 "Invalid host".
+  // Clerk FAPI proxy: fetch-based proxy using the FAPI host decoded from
+  // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Each env (staging/production) has its
+  // own publishable key via Doppler, so the proxy automatically routes to
+  // the correct Clerk instance. We use fetch() because NextResponse.rewrite()
+  // and vercel.json rewrites forward the original Host header, causing Clerk
+  // to return 400 "Invalid host".
   // ========================================================================
   if (
     pathname.startsWith('/__clerk/') ||
@@ -939,12 +940,14 @@ export default async function middleware(
     pathname.startsWith('/clerk/') ||
     pathname === '/clerk'
   ) {
-    const CLERK_FAPI = 'https://distinct-giraffe-5.clerk.accounts.dev';
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+    const b64 = pk.replace(/^pk_(live|test)_/, '');
+    const fapiHost = atob(b64).replace(/\$$/, '');
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
-    const targetUrl = `${CLERK_FAPI}/${subpath}${req.nextUrl.search}`;
+    const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
 
     const headers = new Headers(req.headers);
-    headers.set('host', 'distinct-giraffe-5.clerk.accounts.dev');
+    headers.set('host', fapiHost);
     headers.delete('connection');
 
     const proxyRes = await fetch(targetUrl, {
