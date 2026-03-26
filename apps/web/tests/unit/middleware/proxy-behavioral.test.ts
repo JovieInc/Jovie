@@ -523,10 +523,10 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
-  // Clerk FAPI Proxy (vercel.json config validation)
+  // Clerk FAPI Proxy (vercel.json must NOT have clerk rewrites)
   // ==========================================================================
-  describe('Clerk FAPI proxy rewrites (vercel.json)', () => {
-    it('keeps /__clerk and /clerk mapped to the shared Clerk FAPI host', async () => {
+  describe('Clerk FAPI proxy (vercel.json)', () => {
+    it('does not have clerk rewrites — middleware fetch proxy handles this', async () => {
       const { readFile } = await import('node:fs/promises');
       const { resolve } = await import('node:path');
       const raw = await readFile(resolve(process.cwd(), 'vercel.json'), 'utf8');
@@ -534,19 +534,8 @@ describe('proxy.ts middleware', () => {
         rewrites?: Array<{ source: string; destination: string }>;
       };
       const rewrites = cfg.rewrites ?? [];
-
-      expect(rewrites).toEqual(
-        expect.arrayContaining([
-          {
-            source: '/__clerk/(.*)',
-            destination: 'https://distinct-giraffe-5.clerk.accounts.dev/$1',
-          },
-          {
-            source: '/clerk/(.*)',
-            destination: 'https://distinct-giraffe-5.clerk.accounts.dev/$1',
-          },
-        ])
-      );
+      const clerkRewrites = rewrites.filter(r => r.source.includes('clerk'));
+      expect(clerkRewrites).toEqual([]);
     });
   });
 
