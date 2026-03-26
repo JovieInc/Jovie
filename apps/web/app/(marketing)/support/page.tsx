@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { FaqSection, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { SupportChannels, SupportCta } from './SupportContent';
@@ -39,13 +39,13 @@ export const metadata: Metadata = {
     'Jovie contact',
   ],
   alternates: {
-    canonical: `${APP_URL}/support`,
+    canonical: `${BASE_URL}/support`,
   },
   openGraph: {
     title: `Support - ${APP_NAME}`,
     description:
       'Get help with Jovie. Browse documentation, find answers to common questions, or contact our support team.',
-    url: `${APP_URL}/support`,
+    url: `${BASE_URL}/support`,
     type: 'website',
   },
 };
@@ -54,8 +54,8 @@ export const revalidate = false;
 
 const FAQ_SCHEMA = buildFaqSchema(SUPPORT_FAQ_ITEMS);
 const BREADCRUMB_SCHEMA = buildBreadcrumbSchema([
-  { name: APP_NAME, url: APP_URL },
-  { name: 'Support', url: `${APP_URL}/support` },
+  { name: APP_NAME, url: BASE_URL },
+  { name: 'Support', url: `${BASE_URL}/support` },
 ]);
 
 export default function SupportPage() {
