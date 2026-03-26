@@ -142,7 +142,7 @@ export function ReleaseTable({
           'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,var(--linear-bg-surface-0))]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
       }
 
       const refreshClassName = isRefreshing
