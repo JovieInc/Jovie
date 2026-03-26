@@ -9,8 +9,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Screenshot workflow now properly disables all dev overlays (DevToolbar, TanStack DevTools, Intercom, structured data) via server-side `NEXT_PUBLIC_E2E_MODE` gating
-- Added explicit CSS selector for Next.js dev build indicator to screenshot overlay hiding
+- Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
+- [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
 
 ## [26.4.74] - 2026-03-25
 
