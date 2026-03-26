@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.76] - 2026-03-25
+
+### Fixed
+
+- Empty states no longer contradict themselves — removed "No Spotify or Apple Music" messages that appeared alongside connected DSP links
+- Tour dates empty state now says "No upcoming tour dates" instead of the generic "No tour dates found"
+
 ## [26.4.75] - 2026-03-25
 
 ### Fixed
