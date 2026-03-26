@@ -4,7 +4,7 @@
  * Sent to non-user subscribers to confirm their email address.
  */
 
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { escapeHtml } from '../utils';
 
 export interface ChangelogVerifyTemplateData {
@@ -18,7 +18,7 @@ export function getChangelogVerifySubject(): string {
 export function getChangelogVerifyText(
   data: ChangelogVerifyTemplateData
 ): string {
-  const verifyUrl = `${APP_URL}/api/changelog/verify?token=${data.verificationToken}`;
+  const verifyUrl = `${BASE_URL}/api/changelog/verify?token=${data.verificationToken}`;
   return `Confirm your subscription to ${APP_NAME} product updates
 
 Click the link below to confirm:
@@ -30,7 +30,7 @@ If you didn't subscribe, you can safely ignore this email.`;
 export function getChangelogVerifyHtml(
   data: ChangelogVerifyTemplateData
 ): string {
-  const verifyUrl = `${APP_URL}/api/changelog/verify?token=${escapeHtml(data.verificationToken)}`;
+  const verifyUrl = `${BASE_URL}/api/changelog/verify?token=${escapeHtml(data.verificationToken)}`;
 
   return `
 <!DOCTYPE html>

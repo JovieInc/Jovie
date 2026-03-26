@@ -12,6 +12,7 @@ import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 const TIP_AMOUNTS = [3, 5, 7];
 
@@ -28,6 +29,8 @@ interface SwipeableModeContainerProps {
   readonly mergedDSPs: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: readonly PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
   readonly tourDates: TourDateViewModel[];
   readonly modes: readonly SwipeableProfileMode[];
   readonly activeIndex: number;
@@ -196,6 +199,8 @@ export function SwipeableModeContainer({
   mergedDSPs,
   enableDynamicEngagement = false,
   genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
   tourDates,
   modes,
   activeIndex,
@@ -254,7 +259,12 @@ export function SwipeableModeContainer({
               <TourPane artistName={artist.name} tourDates={tourDates} />
             ) : null}
             {mode === 'about' ? (
-              <AboutSection artist={artist} genres={genres} />
+              <AboutSection
+                artist={artist}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+              />
             ) : null}
             {mode === 'tip' ? <TipPane socialLinks={socialLinks} /> : null}
           </section>

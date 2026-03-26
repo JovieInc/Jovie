@@ -5,7 +5,8 @@ import { useCallback, useEffect, useState } from 'react';
 interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
-  readonly audioUrl: string;
+  /** Required when loading a new track; omit when resuming the same track. */
+  readonly audioUrl?: string;
   readonly releaseTitle?: string;
   readonly artistName?: string;
   readonly artworkUrl?: string | null;
@@ -23,6 +24,8 @@ interface PlaybackState {
 }
 
 let _audio: HTMLAudioElement | null = null;
+/** Monotonically increasing token — guards against stale play() promises from prior track switches. */
+let _playToken = 0;
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
@@ -61,7 +64,12 @@ function setState(partial: Partial<PlaybackState>): void {
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
+  let lastNotifiedSecond = -1;
   el.addEventListener('timeupdate', () => {
+    // Throttle to ~1 update/sec to reduce re-renders across all subscribers
+    const sec = Math.floor(el.currentTime);
+    if (sec === lastNotifiedSecond) return;
+    lastNotifiedSecond = sec;
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -75,6 +83,13 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   );
   el.addEventListener('loadedmetadata', () => {
     setState({
+      duration: Number.isFinite(el.duration) ? el.duration : 0,
+    });
+  });
+  el.addEventListener('seeked', () => {
+    lastNotifiedSecond = -1; // invalidate throttle so next timeupdate fires
+    setState({
+      currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
@@ -110,6 +125,7 @@ export function useTrackAudioPlayer() {
     const audio = getAudio();
     if (!audio) return;
 
+    // Same track — toggle pause/resume
     if (state.activeTrackId === track.id) {
       if (audio.paused) {
         await audio.play();
@@ -119,6 +135,10 @@ export function useTrackAudioPlayer() {
       return;
     }
 
+    // New track — cancel any in-flight play() from a prior switch
+    if (!track.audioUrl) return;
+    const token = ++_playToken;
+    audio.pause();
     audio.src = track.audioUrl;
     setState({
       activeTrackId: track.id,
@@ -130,6 +150,17 @@ export function useTrackAudioPlayer() {
       artworkUrl: track.artworkUrl ?? null,
     });
     await audio.play();
+    // If another toggleTrack fired while play() was in-flight, pause this stale track
+    if (_playToken !== token) {
+      audio.pause();
+    }
+  }, []);
+
+  const seek = useCallback((time: number) => {
+    const audio = getAudio();
+    if (!audio || !Number.isFinite(time)) return;
+    if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
+    audio.currentTime = Math.max(0, Math.min(time, audio.duration));
   }, []);
 
   const onError = useCallback((cb: () => void) => {
@@ -142,6 +173,7 @@ export function useTrackAudioPlayer() {
   return {
     playbackState,
     toggleTrack,
+    seek,
     onError,
   };
 }

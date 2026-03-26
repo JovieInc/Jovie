@@ -12,7 +12,7 @@ type AnalyticsWindow = Window & {
 };
 
 function getAnalyticsWindow(): AnalyticsWindow | null {
-  if (typeof globalThis.window === 'undefined') return null;
+  if (globalThis.window === undefined) return null;
   return globalThis.window as AnalyticsWindow;
 }
 
@@ -90,10 +90,7 @@ export function trackMagicMomentIfReady(params: {
   }
 
   const key = `magic_moment_achieved_${params.profileId}`;
-  if (
-    typeof globalThis.window !== 'undefined' &&
-    globalThis.localStorage.getItem(key)
-  ) {
+  if (globalThis.window !== undefined && globalThis.localStorage.getItem(key)) {
     return false;
   }
 
@@ -106,7 +103,7 @@ export function trackMagicMomentIfReady(params: {
     enrichmentStatus: params.enrichmentStatus,
   });
 
-  if (typeof globalThis.window !== 'undefined') {
+  if (globalThis.window !== undefined) {
     globalThis.localStorage.setItem(key, String(Date.now()));
   }
 

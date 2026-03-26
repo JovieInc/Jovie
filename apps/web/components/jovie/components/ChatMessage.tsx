@@ -19,6 +19,7 @@ import { ChatAnalyticsCard } from './ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
+import { ChatPitchCard } from './ChatPitchCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
@@ -211,6 +212,41 @@ export function ChatMessage({
                   />
                 </div>
               );
+            }
+
+            if (toolInvocation.toolName === 'generateReleasePitch') {
+              if (toolInvocation.state === 'call') {
+                return (
+                  <ChatPitchCard
+                    key={toolInvocation.toolInvocationId}
+                    state='loading'
+                  />
+                );
+              }
+
+              if (toolInvocation.state === 'result') {
+                const result = toolInvocation.result as {
+                  success: boolean;
+                  releaseTitle?: string;
+                  pitches?: {
+                    spotify: string;
+                    appleMusic: string;
+                    amazon: string;
+                    generic: string;
+                  };
+                  error?: string;
+                };
+
+                return (
+                  <ChatPitchCard
+                    key={toolInvocation.toolInvocationId}
+                    state={result.success ? 'success' : 'error'}
+                    releaseTitle={result.releaseTitle}
+                    pitches={result.pitches}
+                    error={result.error}
+                  />
+                );
+              }
             }
 
             return null;

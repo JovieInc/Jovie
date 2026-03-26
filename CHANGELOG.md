@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.79] - 2026-03-26
+
+### Added
+
+- Pitch generation via Jovie chat — artists can ask "generate pitches for [release]" and get Spotify, Apple Music, Amazon Music, and General pitches inline
+- "Generate pitches" suggested prompt in chat (paid plans only, personalized with latest release title)
+- ChatPitchCard component with loading skeleton, success state (4 platforms with copy buttons and char counts), and error state
+- Shared `buildPitchInput()` service extracted from pitch API route (DRY)
+- Optional `instructions` parameter for pitch generation (e.g., "mention my tour")
+- Test-only `/api/admin/test-user/set-plan` endpoint for E2E paid-tier testing
+- E2E test suite for chat pitch generation with plan upgrade/downgrade coverage
+
+### Fixed
+
+- Free-tier plan limitations now list "pitch generation" as a blocked tool
+
+## [26.4.78] - 2026-03-25
+
+### Changed
+
+- Spotify import link discovery now runs in background — users see their catalog instantly instead of waiting 15-25s for cross-platform link lookup
+- Link discovery parallelized with concurrency limit of 5 (was sequential), reducing wall-clock time from ~25s to ~5s for large catalogs
+- Pre-save cron processes rows concurrently (grouped by refresh token to prevent OAuth races), reducing 500-row processing from ~50s to ~10s
+- Admin leads batch URL processing parallelized with input deduplication
+- HUD metrics polling no longer triggers redundant refetches on tab focus (staleTime increased from 0 to 15s)
+
+### Added
+
+- Admin releases table at `/app/admin/releases` showing all releases across the platform with server-side pagination, search, and sort
+- Data quality indicators (missing artwork, no providers, no UPC, zero tracks) as inline health pills in the Issues column
+- Non-ASCII-safe search preserving music titles with accented characters
+- Admin sidebar nav entry for Releases with Disc3 icon
+- [internal] `mapConcurrent` utility for concurrent async operations with configurable worker pool limit
+- [internal] Unit tests for `mapConcurrent` (7 test cases covering concurrency, ordering, errors, edge cases)
+
 ## [26.4.77] - 2026-03-25
 
 ### Changed

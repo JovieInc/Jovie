@@ -17,6 +17,7 @@ import {
   DEFAULT_SUGGESTIONS,
   FEEDBACK_SUGGESTION,
   FIRST_SESSION_SUGGESTIONS,
+  PITCH_SUGGESTION,
 } from '../types';
 
 /** Map icon name strings to lucide components */
@@ -37,6 +38,7 @@ interface SuggestedPromptsProps {
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
   readonly suggestions?: readonly ChatSuggestion[];
+  readonly canUseAdvancedTools?: boolean;
 }
 
 function SuggestionPill({
@@ -80,6 +82,7 @@ export function SuggestedPrompts({
   isFirstSession = false,
   latestReleaseTitle,
   suggestions,
+  canUseAdvancedTools = false,
 }: SuggestedPromptsProps) {
   const fallbackSuggestions = suggestions?.length
     ? suggestions
@@ -103,6 +106,25 @@ export function SuggestedPrompts({
       })
     : fallbackSuggestions;
 
+  // Build the pitch suggestion (personalized if release title available)
+  const pitchSuggestion =
+    canUseAdvancedTools && !isFirstSession
+      ? (() => {
+          if (
+            typeof latestReleaseTitle === 'string' &&
+            latestReleaseTitle.trim().length > 0
+          ) {
+            const cleanTitle = latestReleaseTitle.trim();
+            return {
+              ...PITCH_SUGGESTION,
+              label: `Generate pitches for “${cleanTitle}”`,
+              prompt: `Generate playlist pitches for ${cleanTitle}.`,
+            };
+          }
+          return PITCH_SUGGESTION;
+        })()
+      : null;
+
   return (
     <div className='grid w-full max-w-[46rem] gap-2.5 sm:grid-cols-2'>
       {promptSuggestions.map(suggestion => (
@@ -112,6 +134,9 @@ export function SuggestedPrompts({
           onSelect={onSelect}
         />
       ))}
+      {pitchSuggestion && (
+        <SuggestionPill suggestion={pitchSuggestion} onSelect={onSelect} />
+      )}
       <SuggestionPill suggestion={FEEDBACK_SUGGESTION} onSelect={onSelect} />
     </div>
   );

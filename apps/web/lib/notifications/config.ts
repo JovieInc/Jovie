@@ -1,4 +1,4 @@
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
 
@@ -7,7 +7,7 @@ export {
   SYSTEM_REPLY_TO_EMAIL as EMAIL_REPLY_TO,
 } from '@/lib/notifications/sender-policy';
 
-const appUrl = publicEnv.NEXT_PUBLIC_APP_URL ?? APP_URL;
+const appUrl = publicEnv.NEXT_PUBLIC_APP_URL ?? BASE_URL;
 
 export const NOTIFICATIONS_BRAND_NAME = APP_NAME;
 export const NOTIFICATIONS_APP_URL = appUrl;

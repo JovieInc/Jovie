@@ -44,10 +44,13 @@ export {
   type AdminCreatorProfileRow,
   type AdminCreatorProfilesSort,
   type AdminLeadsSortBy,
+  type AdminReleaseRow,
+  type AdminReleasesSort,
   type AdminUserRow,
   type AdminUserStatus,
   type AdminUsersSort,
   useAdminCreatorsInfiniteQuery,
+  useAdminReleasesInfiniteQuery,
   useAdminUsersInfiniteQuery,
   useAdminWaitlistInfiniteQuery,
   useLeadsInfiniteQuery,
@@ -406,6 +409,11 @@ export {
 export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 // Pre-save mutation
 export { useApplePreSaveMutation } from './usePreSaveMutation';
+export {
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
+} from './usePressPhotoMutation';
 export {
   type PricingOption,
   type PricingOptionsResponse,

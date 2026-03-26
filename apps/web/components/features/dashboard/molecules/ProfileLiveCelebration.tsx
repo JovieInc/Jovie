@@ -40,7 +40,7 @@ export function ProfileLiveCelebration({
   // Check localStorage to prevent re-firing celebration
   const celebrationKey = profileId ? `celebrated_${profileId}` : null;
   const alreadyCelebrated = celebrationKey
-    ? typeof globalThis.window !== 'undefined' &&
+    ? globalThis.window !== undefined &&
       globalThis.localStorage.getItem(celebrationKey) !== null
     : false;
 

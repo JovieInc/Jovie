@@ -3,6 +3,7 @@
 import { Badge } from '@jovie/ui';
 import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
+import { toast } from 'sonner';
 import { DotBadge } from '@/components/atoms/DotBadge';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
@@ -27,6 +28,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   const isActiveTrack = playbackState.activeTrackId === release.id;
   const isPlaying = isActiveTrack && playbackState.isPlaying;
   const hasPreview = Boolean(release.previewUrl);
+  const primaryArtist = release.artistNames?.[0];
 
   const handleTogglePlayback = useCallback(
     (e: React.MouseEvent) => {
@@ -37,16 +39,18 @@ export const ReleaseCell = memo(function ReleaseCell({
         title: release.title,
         audioUrl: release.previewUrl,
         releaseTitle: release.title,
-        artistName: release.artistNames?.[0],
+        artistName: primaryArtist,
         artworkUrl: release.artworkUrl,
-      }).catch(() => {});
+      }).catch(() => {
+        toast.error('Unable to play preview');
+      });
     },
     [
       toggleTrack,
       release.id,
       release.title,
       release.previewUrl,
-      release.artistNames,
+      primaryArtist,
       release.artworkUrl,
     ]
   );
@@ -70,16 +74,20 @@ export const ReleaseCell = memo(function ReleaseCell({
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-[16px] w-[16px] rounded-[4px] p-0 text-quaternary-token opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 aria-[pressed=true]:opacity-100'
+            className={`h-[16px] w-[16px] rounded-[4px] p-0 transition-opacity duration-150 focus-visible:opacity-100 ${
+              isPlaying
+                ? 'text-(--linear-accent) opacity-100'
+                : 'text-quaternary-token opacity-40 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
+            }`}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-[8px] w-[8px]' />
+              <Pause className='h-[10px] w-[10px]' />
             ) : (
-              <Play className='h-[8px] w-[8px]' />
+              <Play className='h-[10px] w-[10px]' />
             )}
           </DrawerInlineIconButton>
         ) : (

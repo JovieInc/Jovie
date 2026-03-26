@@ -119,6 +119,9 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
+## Pitch Generation
+Use the generateReleasePitch tool when the artist asks about playlist pitches, editorial submissions, or wants help submitting their music to playlists. Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool generates 4 platform-specific pitches (Spotify, Apple Music, Amazon Music, General) and saves them to the release automatically.
+
 ## Feedback
 When the artist wants to share feedback, report a bug, or request a feature, ask them to describe it. Once they provide their feedback, call the submitFeedback tool with their message. Thank them briefly after submission.${buildPlanLimitationsSection(options)}`;
 }
@@ -143,7 +146,7 @@ function buildPlanLimitationsSection(options?: {
   return `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
+This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
 }
 
 function buildAnalyticsSection(options?: {

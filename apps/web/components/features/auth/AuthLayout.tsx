@@ -202,7 +202,7 @@ export function AuthLayout({
                   : 'inline-flex'
               }
             >
-              <BrandLogo size={32} tone='auto' priority />
+              <BrandLogo size={32} tone='auto' />
             </span>
           </Link>
         </div>

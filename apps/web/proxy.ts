@@ -962,7 +962,7 @@ export default async function middleware(
       headers,
       body:
         req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
-      redirect: 'manual',
+      redirect: 'follow',
     });
 
     const resHeaders = new Headers(proxyRes.headers);
@@ -1051,5 +1051,8 @@ export const config = {
     '/((?!_next|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes
     '/(api|trpc)(.*)',
+    // Always run for Clerk proxy paths (including .js bundles from /npm/)
+    '/__clerk/(.*)',
+    '/clerk/(.*)',
   ],
 };
