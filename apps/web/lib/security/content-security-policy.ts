@@ -80,7 +80,7 @@ const STATIC_CSP_PARTS = {
     'https://va.vercel-scripts.com',
     'https://vitals.vercel-insights.com',
     'https://vercel.live',
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://clerk.com',
     'https://cdn.clerk.com',
     'https://*.clerk.com',
@@ -96,7 +96,7 @@ const STATIC_CSP_PARTS = {
   // Pre-computed connect-src prefix (excludes dev-only localhost)
   connectSrcBase: [
     "connect-src 'self'",
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://clerk.com',
     'https://cdn.clerk.com',
     'https://*.clerk.com',
@@ -107,7 +107,7 @@ const STATIC_CSP_PARTS = {
     'https://*.ingest.us.sentry.io',
     'https://*.sentry.io',
     'wss://*.clerk.com',
-    'wss://clerk.jov.ie',
+    'wss://distinct-giraffe-5.clerk.accounts.dev',
     'https://jov.ie',
     'https://challenges.cloudflare.com',
     'https://clerk-telemetry.com',
@@ -122,7 +122,7 @@ const STATIC_CSP_PARTS = {
     'https://checkout.stripe.com',
     'https://*.clerk.com',
     'https://*.clerk.accounts.dev',
-    'https://clerk.jov.ie',
+    'https://distinct-giraffe-5.clerk.accounts.dev',
     'https://challenges.cloudflare.com',
   ].join(' '),
 } as const;
