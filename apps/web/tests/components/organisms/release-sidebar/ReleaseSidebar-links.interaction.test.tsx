@@ -336,13 +336,11 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
   });
 
-  it('smart link section renders in header area', async () => {
+  it('smart link analytics card renders when a release is selected', async () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Smart link is always visible in the header when a release is selected
-    expect(screen.getByTestId('smart-link-section')).toHaveTextContent(
-      'Smart Link Content'
-    );
+    // Smart link + analytics are combined in one card
+    expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
   it('renders the release drawer as stacked header, analytics, and tab cards', () => {

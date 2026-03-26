@@ -13,12 +13,14 @@ vi.mock('node:fs', () => ({
   },
 }));
 
-vi.mock('node:path', () => ({
-  default: {
-    join: (...args: string[]) => args.join('/'),
-  },
-  join: (...args: string[]) => args.join('/'),
-}));
+vi.mock('node:path', async () => {
+  const actual = await vi.importActual<typeof import('node:path')>('node:path');
+
+  return {
+    ...actual,
+    default: actual,
+  };
+});
 
 const MOCK_MANIFEST = JSON.stringify({
   pages: [

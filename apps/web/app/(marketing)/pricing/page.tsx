@@ -9,6 +9,7 @@ import {
   getAllPlanIds,
 } from '@/lib/entitlements/registry';
 import { publicEnv } from '@/lib/env-public';
+import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 // SEO Metadata
 export const metadata: Metadata = {
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
 const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
 // Product/Offer JSON-LD Structured Data — derived from ENTITLEMENT_REGISTRY
-const PRICING_SCHEMA = JSON.stringify({
+const PRICING_SCHEMA = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
   name: `Pricing - ${APP_NAME}`,
@@ -80,7 +81,7 @@ const PRICING_SCHEMA = JSON.stringify({
         };
       }),
   },
-});
+};
 
 interface PricingTierProps {
   readonly name: string;
@@ -237,10 +238,9 @@ export default function PricingPage() {
   return (
     <div className='min-h-screen'>
       {/* Structured Data for SEO */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: PRICING_SCHEMA }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(PRICING_SCHEMA)}
+      </script>
 
       <MarketingHero variant='centered'>
         <h1 className='marketing-h1-linear text-primary-token'>Pricing</h1>

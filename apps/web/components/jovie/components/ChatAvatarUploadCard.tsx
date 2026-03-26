@@ -3,6 +3,7 @@
 import { Check, ImagePlus, Loader2, RotateCw, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { validateAvatarFile } from '@/lib/avatar/validation';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
@@ -94,7 +95,7 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'success') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-success/30 bg-success-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
+      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>Profile photo updated</span>
@@ -105,7 +106,7 @@ export function ChatAvatarUploadCard() {
 
   if (state === 'error') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-error/30 bg-error-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
+      <ContentSurfaceCard className='border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))] p-4'>
         <div className='flex items-center justify-between'>
           <div className='flex items-center gap-2 text-error'>
             <X className='h-4 w-4' />
@@ -134,7 +135,7 @@ export function ChatAvatarUploadCard() {
         className='hidden'
         tabIndex={-1}
       />
-      <ContentSurfaceCard className='rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3'>
         <button
           type='button'
           onClick={handleClick}
@@ -143,7 +144,7 @@ export function ChatAvatarUploadCard() {
           onDrop={handleDrop}
           disabled={state === 'uploading'}
           className={cn(
-            'w-full rounded-[14px] border-2 border-dashed p-8 text-center transition-colors',
+            'w-full rounded-[8px] border border-dashed p-8 text-center transition-colors',
             isDragOver
               ? 'border-accent bg-accent/10'
               : 'border-(--linear-app-frame-seam) bg-surface-0 hover:border-accent/50 hover:bg-surface-1',
@@ -160,7 +161,12 @@ export function ChatAvatarUploadCard() {
               </>
             ) : (
               <>
-                <span className='flex h-10 w-10 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]'>
+                <span
+                  className={cn(
+                    LINEAR_SURFACE.drawerCardSm,
+                    'flex h-10 w-10 items-center justify-center rounded-[8px]'
+                  )}
+                >
                   <ImagePlus
                     className={cn(
                       'h-5 w-5',

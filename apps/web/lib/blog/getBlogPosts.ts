@@ -1,12 +1,12 @@
 import { promises as fs } from 'node:fs';
-import path from 'node:path';
 import { cache } from 'react';
 import { createMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { parseMarkdownFrontmatter } from '@/lib/docs/parseMarkdownFrontmatter';
+import { resolveAppContentPath } from '@/lib/filesystem-paths';
 import { validatePathTraversal } from '@/lib/security/path-traversal';
 import type { MarkdownDocument } from '@/types/docs';
 
-const BLOG_DIRECTORY = path.join(process.cwd(), 'content', 'blog');
+const BLOG_DIRECTORY = resolveAppContentPath('blog');
 
 export interface BlogPostMetadata {
   title: string;

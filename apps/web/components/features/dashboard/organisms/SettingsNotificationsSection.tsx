@@ -34,7 +34,7 @@ export function SettingsNotificationsSection({
         subtitle='Control how fan verification works.'
         className='min-h-0 px-4 py-3'
       />
-      <div className='border-t border-subtle/60 px-4 py-3'>
+      <div className='border-t border-(--linear-app-frame-seam) px-4 py-3'>
         <SettingsToggleRow
           title='Double opt-in verification'
           description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'

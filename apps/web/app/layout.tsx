@@ -1,18 +1,14 @@
-import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import Script from 'next/script';
 import React from 'react';
 import { DevToolbarGate } from '@/components/features/dev/DevToolbarGate';
-import { CoreProviders } from '@/components/providers/CoreProviders';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { publicEnv } from '@/lib/env-public';
-import { env } from '@/lib/env-server';
-import { logger } from '@/lib/utils/logger';
 
 // Configure Inter Variable font from local file (no external network requests)
 const inter = localFont({
@@ -158,8 +154,6 @@ export default async function RootLayout({
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
   const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
 
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
   // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
   // response header set by the middleware (proxy.ts). No need to read headers() here,
   // which would force all routes into dynamic rendering.
@@ -274,52 +268,6 @@ export default async function RootLayout({
   );
 
   const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
-
-  // Early return if no publishable key (only in production)
-  if (!publishableKey) {
-    if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
-      logger.debug('Bypassing Clerk authentication (no keys provided)');
-      // In test/dev mode, continue rendering without Clerk
-    } else {
-      // In production, report to Sentry and show configuration error
-      // This helps track intermittent cold start issues where env vars may be unavailable
-      Sentry.captureMessage('Clerk publishableKey missing in production', {
-        level: 'error',
-        tags: {
-          context: 'root_layout_clerk_key_missing',
-          vercel_env: env.VERCEL_ENV || 'unknown',
-          node_env: env.NODE_ENV,
-        },
-        extra: {
-          has_clerk_key_in_public_env:
-            !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-          // VERCEL_REGION is not in the env schema; use process.env for diagnostic
-          vercel_region: process.env.VERCEL_REGION,
-        },
-      });
-
-      return (
-        <html lang='en' data-scroll-behavior='smooth' suppressHydrationWarning>
-          {headContent}
-          <body className={bodyClassName}>
-            <div className='flex min-h-screen items-center justify-center bg-page px-6 text-primary-token'>
-              <div className='max-w-sm rounded-[14px] border border-subtle bg-surface-0 px-6 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-                <h1 className='text-[18px] font-[560] tracking-[-0.018em]'>
-                  Configuration error
-                </h1>
-                <p className='mt-3 text-[13px] leading-5 text-secondary-token'>
-                  Clerk publishable key is not configured.
-                </p>
-              </div>
-            </div>
-          </body>
-        </html>
-      );
-    }
-  }
-
-  // publishableKey may be undefined in test/dev mode
-  // CoreProviders handle base client providers; Clerk is mounted per route.
   return (
     <html
       lang='en'
@@ -329,15 +277,13 @@ export default async function RootLayout({
     >
       {headContent}
       <body className={bodyClassName}>
-        <CoreProviders>
-          {children}
-          <DevToolbarGate
-            disabled={isE2EClientRuntime}
-            env={devEnv}
-            sha={devSha}
-            version={devVersion}
-          />
-        </CoreProviders>
+        {children}
+        <DevToolbarGate
+          disabled={isE2EClientRuntime}
+          env={devEnv}
+          sha={devSha}
+          version={devVersion}
+        />
 
         <CookieBannerSection />
       </body>

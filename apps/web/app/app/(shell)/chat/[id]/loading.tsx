@@ -13,7 +13,7 @@ export default function ChatConversationLoading() {
         <div className='flex-1'>
           <ChatMessageSkeleton />
         </div>
-        <div className='border-t border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
+        <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
           <div className='mx-auto w-full max-w-2xl space-y-2'>
             <LoadingSkeleton height='h-10' width='w-full' rounded='lg' />
           </div>

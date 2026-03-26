@@ -48,11 +48,9 @@ describe('createRightMetaCellRenderer', () => {
     );
 
     const wrapper = container.firstElementChild as HTMLElement;
-    expect(wrapper.className).toContain('min-w-[188px]');
-    expect(wrapper.className).toContain(
-      'grid-cols-[minmax(124px,1fr)_10px_28px]'
-    );
-    expect(screen.getByText('2026')).toBeInTheDocument();
+    expect(wrapper.className).toContain('flex');
+    expect(wrapper.className).toContain('items-center');
+    expect(screen.getByText('Jun 2026')).toBeInTheDocument();
   });
 
   it('gracefully falls back to em dash when the year cannot be parsed', () => {

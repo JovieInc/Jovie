@@ -372,7 +372,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
 
-    it('keeps spotify import banner mounted and hidden when import is idle', () => {
+    it('does not render spotify import banner when import is idle', () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease()]}
@@ -383,9 +383,9 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      const banner = screen.getByTestId('spotify-import-progress-banner');
-      expect(banner).toHaveAttribute('aria-hidden', 'true');
-      expect(banner).toHaveStyle({ visibility: 'hidden', opacity: '0' });
+      expect(
+        screen.queryByTestId('spotify-import-progress-banner')
+      ).not.toBeInTheDocument();
     });
 
     it('shows spotify import banner when import is active', () => {

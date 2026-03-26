@@ -1,7 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { logger } from '@/lib/utils/logger';
@@ -21,13 +21,10 @@ const PURGE_THRESHOLD_HOURS = 48;
  * Schedule: Daily at 03:00 UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/purge-pixel-ips',
+  });
+  if (authError) return authError;
 
   const startTime = Date.now();
 

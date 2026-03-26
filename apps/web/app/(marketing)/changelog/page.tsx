@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
@@ -11,22 +10,16 @@ import {
   type ChangelogSection,
   parseChangelog,
 } from '@/lib/changelog-parser';
+import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { ChangelogEmailSignup } from './ChangelogEmailSignup';
 
 // ---------------------------------------------------------------------------
 // File resolution & caching
 // ---------------------------------------------------------------------------
 
-const CHANGELOG_CANDIDATE_PATHS = [
-  path.join(process.cwd(), 'CHANGELOG.md'),
-  path.join(process.cwd(), '..', '..', 'CHANGELOG.md'),
-];
-
 function resolveChangelogPath(): string | null {
-  for (const candidate of CHANGELOG_CANDIDATE_PATHS) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return null;
+  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
+  return fs.existsSync(changelogPath) ? changelogPath : null;
 }
 
 export const revalidate = false;

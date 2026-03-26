@@ -12,6 +12,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -148,44 +149,51 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
+const heroOnly =
+  !FEATURE_FLAGS.SHOW_PHONE_TOUR &&
+  !FEATURE_FLAGS.SHOW_LOGO_BAR &&
+  !FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE &&
+  !FEATURE_FLAGS.SHOW_FINAL_CTA;
+
 export default function HomePage() {
   const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
 
   return (
-    <div className='relative min-h-screen'>
+    <div
+      className={
+        heroOnly
+          ? 'relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'
+          : 'relative min-h-screen'
+      }
+    >
       <script suppressHydrationWarning>{authRedirectScript}</script>
 
-      {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* 1. Hero — claim form left, phone right */}
-      <HeroCinematic />
+      {heroOnly && (
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
+      )}
 
-      {/* 2. Sticky phone product tour — scroll-driven mode transitions */}
-      <StickyPhoneTour />
+      <HeroCinematic fullScreen={heroOnly} />
 
-      {/* 3. Logo bar — z-index wipe over sticky phone */}
-      <LogoBar />
+      {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
 
-      {/* 4. Feature showcase — bento grid */}
-      <FeatureShowcase />
+      {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
 
-      {/* 5. Divider before CTA */}
-      <div aria-hidden='true' className='section-gradient-divider' />
+      {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
+        <>
+          <FeatureShowcase />
+          <div aria-hidden='true' className='section-gradient-divider' />
+        </>
+      )}
 
-      {/* 6. Final CTA */}
-      <FinalCTASection />
+      {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
     </div>
   );
 }

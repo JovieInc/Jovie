@@ -148,7 +148,7 @@ export function DropdownShowcase() {
             </div>
             <hr className={MENU_SEPARATOR_BASE} />
             <div role='none' className={MENU_LABEL_BASE}>
-              Workspace
+              Artist
             </div>
             <div role='menuitem' tabIndex={0} className={MENU_ITEM_BASE}>
               <Archive />

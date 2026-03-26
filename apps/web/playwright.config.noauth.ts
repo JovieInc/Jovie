@@ -60,6 +60,8 @@ export default defineConfig({
             PORT: '3100',
             NEXT_PUBLIC_E2E_MODE: '1',
             PUBLIC_NOAUTH_SMOKE: '1',
+            NEXT_PUBLIC_CLERK_MOCK: '1',
+            NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
             NEXT_DISABLE_TOOLBAR: '1',
             E2E_FAST_ONBOARDING: '1',
             NODE_OPTIONS:

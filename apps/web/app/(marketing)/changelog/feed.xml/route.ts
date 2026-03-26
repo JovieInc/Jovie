@@ -1,10 +1,12 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { parseChangelog } from '@/lib/changelog-parser';
+import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 
 // Fully static
 export const revalidate = false;
+
+const CHANGELOG_PATH = resolveMonorepoPath('CHANGELOG.md');
 
 function escapeXml(s: string): string {
   return s
@@ -16,17 +18,9 @@ function escapeXml(s: string): string {
 }
 
 export async function GET() {
-  const candidates = [
-    path.join(process.cwd(), 'CHANGELOG.md'),
-    path.join(process.cwd(), '..', '..', 'CHANGELOG.md'),
-  ];
-
   let markdown = '';
-  for (const p of candidates) {
-    if (fs.existsSync(p)) {
-      markdown = fs.readFileSync(p, 'utf8');
-      break;
-    }
+  if (fs.existsSync(CHANGELOG_PATH)) {
+    markdown = fs.readFileSync(CHANGELOG_PATH, 'utf8');
   }
 
   const releases = parseChangelog(markdown);

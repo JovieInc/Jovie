@@ -3,8 +3,8 @@
 /**
  * Handle Validation Hook
  *
- * Validates handle format client-side and checks availability via
- * useHandleAvailabilityQuery (TanStack Query) with debounced input.
+ * Validates handle format client-side and checks availability with a
+ * debounced fetch to the handle API.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -15,11 +15,9 @@ export interface HandleValidationResult {
   checkingAvail: boolean;
   available: boolean | null;
   availError: string | null;
-  /** Cancel pending validation */
   cancel: () => void;
 }
 
-/** Debounce before hitting the API */
 const DEBOUNCE_MS = 400;
 const HANDLE_CACHE_TTL_MS = 30 * 1000;
 
@@ -80,12 +78,6 @@ async function fetchHandleAvailability(
   }
 }
 
-/**
- * Hook for validating handle format and availability.
- *
- * Uses TanStack Query (useHandleAvailabilityQuery) for the API call,
- * with a debounced input value to avoid excessive requests while typing.
- */
 export function useHandleValidation(handle: string): HandleValidationResult {
   const [debouncedHandle, setDebouncedHandle] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,7 +93,6 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     availError: null,
   });
 
-  // Client-side handle validation
   const handleError = useMemo(() => {
     if (!handle) return null;
     if (handle.length < 3) return 'Handle must be at least 3 characters';
@@ -113,14 +104,12 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     return null;
   }, [handle]);
 
-  // Debounce the handle value before sending to the query
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
 
-    // Reset debounced handle if input is invalid or empty
     if (!handle || handleError) {
       setDebouncedHandle('');
       return;
@@ -139,6 +128,7 @@ export function useHandleValidation(handle: string): HandleValidationResult {
   }, [handle, handleError]);
 
   const isValidHandle = Boolean(handle) && !handleError;
+
   useEffect(() => {
     if (!isValidHandle || debouncedHandle.length < 3) {
       abortControllerRef.current?.abort();
@@ -202,7 +192,7 @@ export function useHandleValidation(handle: string): HandleValidationResult {
           availError:
             error instanceof Error
               ? error.message
-              : 'Network error — try again',
+              : 'Network error - try again',
         });
       });
 
@@ -226,7 +216,6 @@ export function useHandleValidation(handle: string): HandleValidationResult {
     });
   }, []);
 
-  // Determine checking state: either debounce is pending or query is fetching
   const isDebouncing = isValidHandle && handle !== debouncedHandle;
   const checkingAvail = isDebouncing || availabilityState.checkingAvail;
 
