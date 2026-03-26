@@ -150,7 +150,7 @@ export function EntitySidebarShell({
               {tabs ? (
                 <div
                   className={cn(
-                    'overflow-visible border-b border-(--linear-app-frame-seam) px-1.5 [&>*]:w-full',
+                    'overflow-visible px-2.5 py-1.5 [&>*]:w-full',
                     tabsContainerClassName
                   )}
                 >

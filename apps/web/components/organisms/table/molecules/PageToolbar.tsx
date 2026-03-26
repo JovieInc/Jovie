@@ -23,11 +23,10 @@ export const PAGE_TOOLBAR_META_TEXT_CLASS =
 
 export const PAGE_TOOLBAR_TAB_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7 rounded-[6px] border border-transparent bg-transparent px-2.5 text-[11.5px] font-[510] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-[6px] border-0 bg-transparent px-2.5 text-[11.5px] font-[510] text-secondary-token hover:bg-surface-0 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
-export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS =
-  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token shadow-none';
+export const PAGE_TOOLBAR_TAB_ACTIVE_CLASS = 'bg-surface-0 text-primary-token';
 
 export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
   ACTION_BAR_BUTTON_CLASS,
@@ -43,7 +42,7 @@ export const PAGE_TOOLBAR_MENU_TRIGGER_CLASS = cn(
 );
 
 export const PAGE_TOOLBAR_ACTION_ACTIVE_CLASS =
-  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
+  'bg-surface-0 text-primary-token';
 
 export const PAGE_TOOLBAR_ICON_CLASS = 'h-3.5 w-3.5';
 export const PAGE_TOOLBAR_ICON_STROKE_WIDTH = 2;
