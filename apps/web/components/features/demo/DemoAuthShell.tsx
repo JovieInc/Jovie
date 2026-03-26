@@ -16,11 +16,13 @@
  *   badge renders correctly
  */
 
+import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { NuqsProvider } from '@/components/providers/NuqsProvider';
 import { ClerkSafeDefaultsProvider } from '@/hooks/useClerkSafe';
 import { queryKeys } from '@/lib/queries';
 import type { BillingStatusData } from '@/lib/queries/useBillingStatusQuery';
@@ -94,14 +96,18 @@ export function DemoAuthShell({ children, dashboardData }: DemoAuthShellProps) {
   return (
     <ClerkSafeDefaultsProvider>
       <QueryClientProvider client={demoQueryClient}>
-        <DashboardDataProvider value={data}>
-          <AuthShellWrapper
-            persistSidebarCollapsed={noopPersist}
-            sidebarDefaultOpen
-          >
-            {children}
-          </AuthShellWrapper>
-        </DashboardDataProvider>
+        <NuqsProvider>
+          <TooltipProvider delayDuration={1200}>
+            <DashboardDataProvider value={data}>
+              <AuthShellWrapper
+                persistSidebarCollapsed={noopPersist}
+                sidebarDefaultOpen
+              >
+                {children}
+              </AuthShellWrapper>
+            </DashboardDataProvider>
+          </TooltipProvider>
+        </NuqsProvider>
       </QueryClientProvider>
     </ClerkSafeDefaultsProvider>
   );
