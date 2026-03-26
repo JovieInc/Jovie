@@ -148,7 +148,7 @@ function buildNextCursor(
   rows: Array<{ id: string; lastSeenAt: Date | string | null }>
 ): string | null {
   if (!hasMore || rows.length === 0) return null;
-  const lastRow = rows[rows.length - 1];
+  const lastRow = rows.at(-1)!;
   const rawSortVal = lastRow.lastSeenAt;
   const sortValStr =
     rawSortVal instanceof Date
