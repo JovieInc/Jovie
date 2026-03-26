@@ -1,6 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { profilePhotos } from '@/lib/db/schema/profiles';
+import { captureWarning } from '@/lib/error-tracking';
 import type { PressPhoto } from '@/types/press-photos';
 
 const pressPhotoSelect = {
@@ -39,16 +40,38 @@ export async function getPressPhotosByUserId(
 export async function getPressPhotosByProfileId(
   profileId: string
 ): Promise<PressPhoto[]> {
-  return db
-    .select(pressPhotoSelect)
-    .from(profilePhotos)
-    .where(
-      and(
-        eq(profilePhotos.creatorProfileId, profileId),
-        eq(profilePhotos.photoType, 'press'),
-        eq(profilePhotos.status, 'ready')
+  try {
+    return await db
+      .select(pressPhotoSelect)
+      .from(profilePhotos)
+      .where(
+        and(
+          eq(profilePhotos.creatorProfileId, profileId),
+          eq(profilePhotos.photoType, 'press'),
+          eq(profilePhotos.status, 'ready')
+        )
       )
-    )
-    .orderBy(asc(profilePhotos.sortOrder), asc(profilePhotos.createdAt))
-    .limit(6);
+      .orderBy(asc(profilePhotos.sortOrder), asc(profilePhotos.createdAt))
+      .limit(6);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const causeMessage =
+      error instanceof Error && error.cause instanceof Error
+        ? error.cause.message
+        : '';
+
+    if (
+      errorMessage.includes('does not exist') ||
+      causeMessage.includes('does not exist')
+    ) {
+      captureWarning(
+        '[press-photos] profile_photos press fields unavailable, returning empty',
+        error,
+        { profileId }
+      );
+      return [];
+    }
+
+    throw error;
+  }
 }
