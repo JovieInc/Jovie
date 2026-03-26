@@ -157,7 +157,6 @@ function VirtualizedTableRowComponent<TData>({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onFocus={handleFocusChange}
-      onMouseEnter={handleFocusChange}
       onContextMenu={handleContextMenu}
       style={
         shouldVirtualize && virtualStart !== undefined
