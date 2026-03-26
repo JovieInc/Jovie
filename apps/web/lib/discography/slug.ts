@@ -17,6 +17,13 @@ import {
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
+/**
+ * Reserved slugs that conflict with static route segments.
+ * Tracks with these slugs would be unreachable because Next.js
+ * resolves static segments (e.g. /sounds/) before dynamic [trackSlug].
+ */
+const RESERVED_SLUGS = new Set(['sounds']);
+
 /** Map a content type + ID to the correct slug exclusion option. */
 function buildExcludeOptions(contentType: ContentType, id?: string) {
   switch (contentType) {
@@ -71,6 +78,9 @@ export async function isSlugAvailable(
     excludeRecordingId?: string;
   }
 ): Promise<boolean> {
+  // Reserved slugs are never available (they conflict with static routes)
+  if (RESERVED_SLUGS.has(slug)) return false;
+
   const { excludeReleaseId, excludeTrackId, excludeRecordingId } =
     options ?? {};
 

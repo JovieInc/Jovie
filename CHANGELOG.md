@@ -7,6 +7,17 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.77] - 2026-03-25
 
+### Changed
+
+- Track URLs are now nested under their parent release (`/{handle}/{release}/{track}`) instead of flat (`/{handle}/{track}`), matching MusicBrainz hierarchy
+- Track sidebar label changed from "Smart link" to "Track link" to distinguish from release-level smart links
+- Track slug "sounds" is now reserved to prevent collision with the "Use This Sound" route
+
+### Added
+
+- New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
+- Flat track URLs now 302-redirect to the nested format when a parent release is known
+
 ### Fixed
 
 - Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name

@@ -64,6 +64,11 @@ interface ReleaseLandingPageProps
     };
     /** UTM params captured from incoming request and passed to outbound links */
     readonly utmParams?: PartialUTMParams;
+    /** Optional parent release info for track deep link pages */
+    readonly parentRelease?: {
+      readonly title: string;
+      readonly url: string;
+    } | null;
     /** Optional profile-claim CTA details for unclaimed creators */
     readonly claimBanner?: {
       readonly profileId: string;
@@ -140,6 +145,7 @@ export function ReleaseLandingPage({
   soundsUrl,
   tracking,
   utmParams = {},
+  parentRelease = null,
   claimBanner = null,
 }: Readonly<ReleaseLandingPageProps>) {
   const formattedDate = release.releaseDate
@@ -200,6 +206,14 @@ export function ReleaseLandingPage({
           <h1 className='text-lg font-semibold leading-snug tracking-tight'>
             {release.title}
           </h1>
+          {parentRelease && (
+            <Link
+              href={parentRelease.url}
+              className='text-muted-foreground hover:text-foreground mt-0.5 block text-xs transition-colors'
+            >
+              from {parentRelease.title}
+            </Link>
+          )}
           <SmartLinkArtistName
             name={artist.name}
             handle={artist.handle}
