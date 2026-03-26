@@ -8,8 +8,6 @@ export interface BrandLogoProps {
   readonly className?: string;
   readonly tone?: BrandLogoTone;
   readonly alt?: string;
-  /** @deprecated No-op — kept for backward compatibility. Will be removed. */
-  readonly priority?: boolean;
   readonly rounded?: boolean;
   readonly style?: CSSProperties;
   readonly 'aria-hidden'?: boolean;

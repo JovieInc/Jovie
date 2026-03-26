@@ -59,5 +59,22 @@ describe('clerkAvailability', () => {
       vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_URL', '/clerk');
       expect(getClerkProxyUrl()).toBeUndefined();
     });
+
+    it('disables the fallback proxy on plain-http localhost', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
+      expect(
+        getClerkProxyUrl({ hostname: 'localhost', protocol: 'http:' })
+      ).toBeUndefined();
+    });
+
+    it('keeps the fallback proxy on secure or non-local origins', () => {
+      vi.stubEnv('NEXT_PUBLIC_CLERK_PROXY_DISABLED', '');
+      expect(
+        getClerkProxyUrl({ hostname: 'localhost', protocol: 'https:' })
+      ).toBe('/__clerk');
+      expect(getClerkProxyUrl({ hostname: 'jov.ie', protocol: 'https:' })).toBe(
+        '/__clerk'
+      );
+    });
   });
 });

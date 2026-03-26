@@ -53,6 +53,7 @@ import {
   convertCreatorProfileToArtist,
   LegacySocialLink,
 } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 /**
  * Generate JSON-LD structured data for artist profile SEO.
@@ -173,6 +174,7 @@ const fetchProfileAndLinks = async (
   creatorClerkId: string | null;
   genres: string[] | null;
   latestRelease: DiscogRelease | null;
+  pressPhotos: PressPhoto[];
   status: 'ok' | 'not_found' | 'error';
 }> => {
   try {
@@ -192,6 +194,7 @@ const fetchProfileAndLinks = async (
         creatorClerkId: null,
         genres: null,
         latestRelease: null,
+        pressPhotos: [],
         status: 'not_found',
       };
     }
@@ -278,6 +281,7 @@ const fetchProfileAndLinks = async (
       creatorClerkId,
       genres: result.genres ?? null,
       latestRelease,
+      pressPhotos: result.pressPhotos ?? [],
       status: 'ok',
     };
   } catch (error) {
@@ -293,6 +297,7 @@ const fetchProfileAndLinks = async (
       creatorClerkId: null,
       genres: null,
       latestRelease: null,
+      pressPhotos: [],
       status: 'error',
     };
   }
@@ -636,18 +641,12 @@ export default async function ArtistPage({
     );
     return (
       <>
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: safeJsonLdStringify(schemas.musicGroupSchema),
-          }}
-        />
-        <script
-          type='application/ld+json'
-          dangerouslySetInnerHTML={{
-            __html: safeJsonLdStringify(schemas.breadcrumbSchema),
-          }}
-        />
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.musicGroupSchema)}
+        </script>
+        <script type='application/ld+json'>
+          {safeJsonLdStringify(schemas.breadcrumbSchema)}
+        </script>
         {body}
       </>
     );
@@ -662,6 +661,7 @@ export default async function ArtistPage({
     status,
     creatorIsPro,
     latestRelease: fetchedLatestRelease,
+    pressPhotos,
   } = profileResult;
 
   if (status === 'error') {
@@ -744,18 +744,12 @@ export default async function ArtistPage({
   return (
     <>
       {/* JSON-LD Structured Data for SEO — rendered inline for crawler visibility */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(musicGroupSchema),
-        }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{
-          __html: safeJsonLdStringify(breadcrumbSchema),
-        }}
-      />
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(musicGroupSchema)}
+      </script>
+      <script type='application/ld+json'>
+        {safeJsonLdStringify(breadcrumbSchema)}
+      </script>
 
       {isPublicNoAuthSmoke ? null : (
         <ProfileViewTracker handle={artist.handle} artistId={artist.id} />
@@ -778,6 +772,7 @@ export default async function ArtistPage({
         latestRelease={latestRelease}
         photoDownloadSizes={photoDownloadSizes}
         allowPhotoDownloads={allowPhotoDownloads}
+        pressPhotos={pressPhotos}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
         tourDates={tourDates}

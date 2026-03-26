@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
@@ -53,7 +53,7 @@ export async function generateMetadata(): Promise<Metadata> {
     authors: [
       {
         name: APP_NAME,
-        url: APP_URL,
+        url: BASE_URL,
       },
     ],
     creator: APP_NAME,
@@ -65,7 +65,7 @@ export async function generateMetadata(): Promise<Metadata> {
       address: false,
       telephone: false,
     },
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: '/',
       languages: {
@@ -75,14 +75,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: APP_URL,
+      url: BASE_URL,
       title,
       description,
       siteName: APP_NAME,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
-          secureUrl: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
+          secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
           alt: `${APP_NAME} - Release More Music.`,
@@ -96,7 +96,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
           alt: `${APP_NAME} - Release More Music.`,
           width: 1200,
           height: 630,

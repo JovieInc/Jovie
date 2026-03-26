@@ -54,11 +54,11 @@ export function FeatureFlagsProvider({
   bootstrap,
   children,
 }: FeatureFlagsProviderProps) {
-  const [overrides, setOverridesState] =
+  const [overrides, setOverrides] =
     useState<Record<string, boolean>>(readOverrides);
 
   const setOverride = useCallback((key: string, value: boolean) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev, [key]: value };
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
       return next;
@@ -66,7 +66,7 @@ export function FeatureFlagsProvider({
   }, []);
 
   const removeOverride = useCallback((key: string) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev };
       delete next[key];
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
@@ -75,7 +75,7 @@ export function FeatureFlagsProvider({
   }, []);
 
   const clearOverrides = useCallback(() => {
-    setOverridesState({});
+    setOverrides({});
     localStorage.removeItem(FF_OVERRIDES_KEY);
   }, []);
 

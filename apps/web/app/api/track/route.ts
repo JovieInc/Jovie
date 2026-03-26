@@ -287,9 +287,7 @@ function buildClickMetadata(
   if (utmParams) {
     metadata.utmParams = utmParams;
   }
-  const rawTipAmount = getRawTipAmount(
-    context as Record<string, unknown> | undefined
-  );
+  const rawTipAmount = getRawTipAmount(context);
   if (
     linkType === 'tip' &&
     typeof rawTipAmount === 'number' &&
