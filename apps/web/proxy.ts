@@ -962,7 +962,7 @@ export default async function middleware(
       headers,
       body:
         req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
-      redirect: 'manual',
+      redirect: 'follow',
     });
 
     const resHeaders = new Headers(proxyRes.headers);
