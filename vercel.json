@@ -36,11 +36,11 @@
   "rewrites": [
     {
       "source": "/__clerk/(.*)",
-      "destination": "https://clerk.jov.ie/$1"
+      "destination": "https://distinct-giraffe-5.clerk.accounts.dev/$1"
     },
     {
       "source": "/clerk/(.*)",
-      "destination": "https://clerk.jov.ie/$1"
+      "destination": "https://distinct-giraffe-5.clerk.accounts.dev/$1"
     },
     {
       "source": "/ingest/static/(.*)",
