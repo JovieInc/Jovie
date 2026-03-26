@@ -87,20 +87,34 @@ function sanitizeReleaseSearch(rawSearch?: string): string | undefined {
 }
 
 function getOrderByExpressions(sort: AdminReleasesSort) {
+  // Every branch includes discogReleases.id as a tiebreaker to ensure
+  // deterministic ordering for offset pagination (prevents row skipping/duplication).
   switch (sort) {
     case 'release_date_asc':
-      return [drizzleSql`${discogReleases.releaseDate} ASC NULLS LAST`];
+      return [
+        drizzleSql`${discogReleases.releaseDate} ASC NULLS LAST`,
+        discogReleases.id,
+      ];
     case 'created_asc':
-      return [drizzleSql`${discogReleases.createdAt} ASC NULLS LAST`];
+      return [
+        drizzleSql`${discogReleases.createdAt} ASC NULLS LAST`,
+        discogReleases.id,
+      ];
     case 'created_desc':
-      return [drizzleSql`${discogReleases.createdAt} DESC NULLS LAST`];
+      return [
+        drizzleSql`${discogReleases.createdAt} DESC NULLS LAST`,
+        discogReleases.id,
+      ];
     case 'title_asc':
-      return [discogReleases.title];
+      return [discogReleases.title, discogReleases.id];
     case 'title_desc':
-      return [desc(discogReleases.title)];
+      return [desc(discogReleases.title), discogReleases.id];
     case 'release_date_desc':
     default:
-      return [drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`];
+      return [
+        drizzleSql`${discogReleases.releaseDate} DESC NULLS LAST`,
+        discogReleases.id,
+      ];
   }
 }
 

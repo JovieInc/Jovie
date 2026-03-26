@@ -43,9 +43,14 @@ export function AdminReleasesPageWrapper(
   const handleSearchClear = useCallback(() => {
     setSearchQuery('');
     if (props.search) {
-      router.push(basePath);
+      const params = new URLSearchParams({
+        sort: props.sort,
+        pageSize: String(props.pageSize),
+        page: '1',
+      });
+      router.push(`${basePath}?${params.toString()}`);
     }
-  }, [basePath, props.search, router]);
+  }, [basePath, props.pageSize, props.search, props.sort, router]);
 
   const { setHeaderActions } = useSetHeaderActions();
 
