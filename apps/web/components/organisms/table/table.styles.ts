@@ -18,9 +18,9 @@ export const typography = {
 export const alignment = {
   checkboxCell: 'flex items-center justify-center', // Center checkbox
   numberCell: 'flex items-center justify-end tabular-nums', // Right-align numbers
-  rowHeight: 'h-[36px]', // Fixed height for consistent alignment (denser authenticated baseline)
-  cellPadding: 'px-3 py-0', // Dense padding for cells (Linear-density)
-  headerPadding: 'px-3 py-1', // Dense padding for headers (Linear-density)
+  rowHeight: 'h-[40px]', // Comfortable density with room for two-line cells
+  cellPadding: 'px-3 py-1', // Balanced padding for cells
+  headerPadding: 'px-3 py-1.5', // Slightly more header breathing room
   checkboxSize: 'h-3.5 w-3.5', // 14px checkbox
 } as const;
 
@@ -69,12 +69,12 @@ export const columnWidths = {
 
 // Layout Stability - Fixed Heights to Prevent Layout Shift
 export const layoutStability = {
-  rowHeight: '36px',
-  headerHeight: '30px', // Dense header (Linear-density)
+  rowHeight: '40px',
+  headerHeight: '32px',
   toolbarHeight: '56px',
   footerHeight: '52px',
   emptyStateMinHeight: '400px',
-  skeletonRowHeight: '36px', // Must match rowHeight
+  skeletonRowHeight: '40px', // Must match rowHeight
 } as const;
 
 // Border Styles
