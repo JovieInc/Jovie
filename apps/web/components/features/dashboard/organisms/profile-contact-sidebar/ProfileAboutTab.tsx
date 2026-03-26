@@ -271,7 +271,7 @@ function PressPhotosSection({
               <button
                 type='button'
                 onClick={() => {
-                  void handleDelete(photo.id);
+                  handleDelete(photo.id);
                 }}
                 disabled={deletingPhotoId === photo.id}
                 className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
@@ -344,7 +344,7 @@ function PressPhotosSection({
         accept='image/*,.heic,.heif'
         className='sr-only'
         onChange={event => {
-          void handleSelectFile(event);
+          handleSelectFile(event);
         }}
       />
     </DrawerSection>
