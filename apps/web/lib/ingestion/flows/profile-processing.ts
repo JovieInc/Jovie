@@ -55,7 +55,25 @@ export interface ExtractionData {
 }
 
 /**
- * Result of profile extraction processing
+ * Run an enrichment step, logging a warning on failure instead of throwing.
+ */
+async function safeEnrich(
+  label: string,
+  profileId: string,
+  fn: () => Promise<void>
+): Promise<void> {
+  try {
+    await fn();
+  } catch (error) {
+    logger.warn(`${label} failed`, {
+      profileId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
+ * Post-merge enrichment: pixels, fit score, contact email.
  */
 async function runPostMergeEnrichment(
   tx: DbOrTransaction,
@@ -63,44 +81,22 @@ async function runPostMergeEnrichment(
   extraction: ExtractionData
 ): Promise<void> {
   if (extraction.discoveredPixels) {
-    try {
-      await storeDiscoveredPixels(tx, profileId, extraction.discoveredPixels);
-    } catch (pixelError) {
-      logger.warn('Discovered pixels storage failed', {
-        profileId,
-        error:
-          pixelError instanceof Error ? pixelError.message : 'Unknown error',
-      });
-    }
+    await safeEnrich('Discovered pixels storage', profileId, () =>
+      storeDiscoveredPixels(tx, profileId, extraction.discoveredPixels!)
+    );
   }
 
-  try {
+  await safeEnrich('Fit score calculation', profileId, async () => {
     if (typeof extraction.hasPaidTier === 'boolean') {
       await updatePaidTierScore(tx, profileId, extraction.hasPaidTier);
     }
     await calculateAndStoreFitScore(tx, profileId);
-  } catch (fitScoreError) {
-    logger.warn('Fit score calculation failed', {
-      profileId,
-      error:
-        fitScoreError instanceof Error
-          ? fitScoreError.message
-          : 'Unknown error',
-    });
-  }
+  });
 
   if (extraction.contactEmail) {
-    try {
-      await storeContactEmail(tx, profileId, extraction.contactEmail);
-    } catch (contactError) {
-      logger.warn('Contact email storage failed', {
-        profileId,
-        error:
-          contactError instanceof Error
-            ? contactError.message
-            : 'Unknown error',
-      });
-    }
+    await safeEnrich('Contact email storage', profileId, () =>
+      storeContactEmail(tx, profileId, extraction.contactEmail!)
+    );
   }
 }
 
