@@ -9,7 +9,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { buildInsightPrompt } from '@/lib/insights/chat-presentation';
 import { useInsightsSummaryQuery, usePlanGate } from '@/lib/queries';
 
 import {
@@ -17,6 +16,7 @@ import {
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
+  JovieGreeting,
   ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
@@ -27,7 +27,7 @@ import {
   useJovieChat,
   useSuggestedProfiles,
 } from './hooks';
-import type { ChatSuggestion, JovieChatProps, MessagePart } from './types';
+import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
@@ -102,7 +102,7 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
-  const { profileCompletion } = useDashboardData();
+  const { profileCompletion, tippingStats } = useDashboardData();
   const { aiCanUseTools } = usePlanGate();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
@@ -134,19 +134,6 @@ export function JovieChat({
   const insightsSummary = useInsightsSummaryQuery({
     enabled: shouldLoadInsightSuggestions,
   });
-  const insightSuggestions = useMemo<readonly ChatSuggestion[]>(() => {
-    const insights = insightsSummary.data?.insights ?? [];
-    if (insights.length === 0) {
-      return [];
-    }
-
-    return insights.map(insight => ({
-      icon: 'MessageSquare',
-      label: insight.title,
-      prompt: buildInsightPrompt(insight),
-      accent: 'blue',
-    }));
-  }, [insightsSummary.data?.insights]);
 
   const {
     input,
@@ -527,40 +514,18 @@ export function JovieChat({
               {!hasCarouselItems &&
                 (profileCompletion?.percentage ?? 0) >= 100 && (
                   <>
-                    <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-center'>
-                      <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
-                        {isFirstSession ? 'Artist ready' : 'Ask Jovie'}
-                      </p>
-                      {isFirstSession ? (
-                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
-                          Welcome, {displayName ?? 'there'}. Your profile is
-                          live at{' '}
-                          <a
-                            href={
-                              username
-                                ? `https://jov.ie/${username}`
-                                : 'https://jov.ie'
-                            }
-                            target='_blank'
-                            rel='noreferrer'
-                            className='font-medium text-primary-token underline-offset-2 hover:underline'
-                          >
-                            {username ? `jov.ie/${username}` : 'jov.ie'}
-                          </a>
-                          {'.'}
-                        </p>
-                      ) : (
-                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
-                          What can I help you with today?
-                        </p>
-                      )}
-                    </div>
+                    <JovieGreeting
+                      displayName={displayName}
+                      username={username}
+                      isFirstSession={isFirstSession}
+                      insights={insightsSummary.data?.insights ?? []}
+                      tippingStats={tippingStats}
+                    />
 
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}
                       isFirstSession={isFirstSession}
                       latestReleaseTitle={latestReleaseTitle}
-                      suggestions={insightSuggestions}
                       canUseAdvancedTools={aiCanUseTools}
                     />
                   </>
