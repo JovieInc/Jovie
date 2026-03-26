@@ -134,7 +134,7 @@ export const presets = {
   ),
   tableRow: cn(
     alignment.rowHeight,
-    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_84%,transparent)]',
+    'border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_60%,transparent)]',
     selection.unchecked,
     'last:border-b-0',
     'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_45%,transparent)]'

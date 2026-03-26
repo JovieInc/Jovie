@@ -288,7 +288,7 @@ export function createRightMetaCellRenderer(
         <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='shrink-0 tabular-nums text-[11px] font-[430] text-tertiary-token'
+          className='shrink-0 tabular-nums text-[11px] font-[400] text-quaternary-token'
           title={yearTitle}
         >
           {dateLabel}
