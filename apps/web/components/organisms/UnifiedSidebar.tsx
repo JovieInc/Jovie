@@ -216,7 +216,7 @@ function SidebarHeaderNav({
             <div className='flex w-full items-center gap-2'>
               <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
                 <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
-                  Workspace
+                  Artist
                 </p>
                 <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
                   Settings

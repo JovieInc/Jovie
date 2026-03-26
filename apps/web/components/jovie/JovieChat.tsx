@@ -522,7 +522,7 @@ export function JovieChat({
                   <>
                     <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3.5 text-center'>
                       <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
-                        {isFirstSession ? 'Workspace ready' : 'Ask Jovie'}
+                        {isFirstSession ? 'Artist ready' : 'Ask Jovie'}
                       </p>
                       {isFirstSession ? (
                         <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
