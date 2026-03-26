@@ -18,6 +18,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
 - Flat track URLs now 302-redirect to the nested format when a parent release is known
 
+### Fixed
+
+- Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name
+
 ## [26.4.76] - 2026-03-25
 
 ### Changed
