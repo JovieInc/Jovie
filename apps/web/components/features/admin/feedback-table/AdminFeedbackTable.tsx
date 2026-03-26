@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  type CellContext,
   type ColumnDef,
   createColumnHelper,
 } from '@tanstack/react-table';
@@ -135,22 +134,48 @@ function FeedbackActionsCell({
   );
 }
 
-interface FeedbackActionsColumnMeta {
+/** Build column definitions for feedback table (file-level to satisfy S6478). */
+function buildFeedbackColumns(deps: {
   getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
-}
-
-/** Standalone cell renderer for Actions column — reads getContextMenuItems from column meta. */
-function renderFeedbackActionsCell(ctx: CellContext<FeedbackRow, unknown>) {
-  const meta = ctx.column.columnDef.meta as
-    | FeedbackActionsColumnMeta
-    | undefined;
-  if (!meta) return null;
-  return (
-    <FeedbackActionsCell
-      row={ctx.row.original}
-      getContextMenuItems={meta.getContextMenuItems}
-    />
-  );
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+}): ColumnDef<FeedbackRow, any>[] {
+  return [
+    columnHelper.accessor('createdAtIso', {
+      id: 'submitted',
+      header: 'Submitted',
+      cell: renderSubmittedCell,
+      size: 180,
+    }),
+    columnHelper.accessor('user', {
+      id: 'user',
+      header: 'User',
+      cell: renderUserCell,
+      size: 200,
+    }),
+    columnHelper.accessor('message', {
+      id: 'message',
+      header: 'Feedback',
+      cell: renderMessageCell,
+      size: 400,
+    }),
+    columnHelper.accessor('status', {
+      id: 'status',
+      header: 'Status',
+      cell: renderStatusCell,
+      size: 120,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <FeedbackActionsCell
+          row={row.original}
+          getContextMenuItems={deps.getContextMenuItems}
+        />
+      ),
+      size: 48,
+    }),
+  ];
 }
 
 export function AdminFeedbackTable({
@@ -226,39 +251,7 @@ export function AdminFeedbackTable({
 
   // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
   const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
-    () => [
-      columnHelper.accessor('createdAtIso', {
-        id: 'submitted',
-        header: 'Submitted',
-        cell: renderSubmittedCell,
-        size: 180,
-      }),
-      columnHelper.accessor('user', {
-        id: 'user',
-        header: 'User',
-        cell: renderUserCell,
-        size: 200,
-      }),
-      columnHelper.accessor('message', {
-        id: 'message',
-        header: 'Feedback',
-        cell: renderMessageCell,
-        size: 400,
-      }),
-      columnHelper.accessor('status', {
-        id: 'status',
-        header: 'Status',
-        cell: renderStatusCell,
-        size: 120,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: renderFeedbackActionsCell,
-        meta: { getContextMenuItems },
-        size: 48,
-      }),
-    ],
+    () => buildFeedbackColumns({ getContextMenuItems }),
     [getContextMenuItems]
   );
 
