@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
-import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -156,6 +156,8 @@ const heroOnly =
   !FEATURE_FLAGS.SHOW_FINAL_CTA;
 
 export default function HomePage() {
+  const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
+
   return (
     <div
       className={
@@ -164,43 +166,26 @@ export default function HomePage() {
           : 'relative min-h-screen'
       }
     >
-      {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
-      <LazyAuthRedirectHandler />
+      <script suppressHydrationWarning>{authRedirectScript}</script>
 
-      {/* Structured Data */}
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: WEBSITE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: SOFTWARE_SCHEMA }}
-      />
-      <script
-        type='application/ld+json'
-        dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
-      />
+      <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
+      <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
+      <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* In hero-only mode, hide footer and prevent scroll (footer is in layout) */}
       {heroOnly && (
-        <style
-          dangerouslySetInnerHTML={{
-            __html:
-              'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}',
-          }}
-        />
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
       )}
 
-      {/* 1. Hero — claim form left, phone right */}
       <HeroCinematic fullScreen={heroOnly} />
 
-      {/* 2. Sticky phone product tour — scroll-driven mode transitions */}
       {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
 
-      {/* 3. Logo bar — z-index wipe over sticky phone */}
       {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
 
-      {/* 4. Feature showcase — bento grid */}
       {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
         <>
           <FeatureShowcase />
@@ -208,7 +193,6 @@ export default function HomePage() {
         </>
       )}
 
-      {/* 5. Final CTA */}
       {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
     </div>
   );
