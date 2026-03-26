@@ -66,7 +66,8 @@ export function unwrapPgError(error: unknown, depth = 0): PgErrorFields {
  */
 export function getDeepErrorMessage(error: unknown): string {
   if (error == null) return '';
-  if (typeof error !== 'object') return String(error);
+  if (typeof error === 'string') return error;
+  if (typeof error !== 'object') return String(error); // NOSONAR — non-objects stringify safely
 
   const messages: string[] = [];
   let current: unknown = error;

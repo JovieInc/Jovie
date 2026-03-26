@@ -16,6 +16,8 @@ import { deleteReleaseArtists, upsertReleaseArtist } from './release-artists';
 import { deleteTrackArtists, upsertTrackArtist } from './track-artists';
 import type { ArtistWithRole } from './types';
 
+type CreditSourceType = 'manual' | 'admin' | 'ingested';
+
 /**
  * Process parsed artist credits for a track
  *
@@ -27,7 +29,7 @@ export async function processTrackArtistCredits(
   credits: ParsedArtistCredit[],
   options?: {
     deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
+    sourceType?: CreditSourceType;
   }
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
@@ -88,7 +90,7 @@ export async function processReleaseArtistCredits(
   credits: ParsedArtistCredit[],
   options?: {
     deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
+    sourceType?: CreditSourceType;
   }
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
@@ -147,7 +149,7 @@ export async function processRecordingArtistCredits(
   credits: ParsedArtistCredit[],
   options?: {
     deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
+    sourceType?: CreditSourceType;
   }
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};

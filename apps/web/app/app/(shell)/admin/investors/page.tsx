@@ -190,7 +190,7 @@ async function InvestorTable() {
   );
 }
 
-function StageBadge({ stage }: { stage: string }) {
+function StageBadge({ stage }: Readonly<{ stage: string }>) {
   const styles: Record<
     string,
     {
@@ -219,7 +219,7 @@ function StageBadge({ stage }: { stage: string }) {
   );
 }
 
-function ScoreBadge({ score }: { score: number }) {
+function ScoreBadge({ score }: Readonly<{ score: number }>) {
   let toneClassName = 'text-secondary-token';
 
   if (score >= 50) {
