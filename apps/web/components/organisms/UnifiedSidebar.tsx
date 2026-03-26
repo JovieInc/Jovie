@@ -245,12 +245,12 @@ function SidebarHeaderNav({
           return (
             <div
               className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2',
+                'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5',
                 'group-data-[collapsible=icon]:justify-center'
               )}
             >
               <BrandLogo
-                size={16}
+                size={14}
                 tone='auto'
                 rounded={false}
                 className='rounded-sm shrink-0'
@@ -273,12 +273,12 @@ function SidebarHeaderNav({
                 type='button'
                 aria-label='Open workspace menu'
                 className={cn(
-                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2.5 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
                   'group-data-[collapsible=icon]:justify-center'
                 )}
               >
                 <BrandLogo
-                  size={16}
+                  size={14}
                   tone='auto'
                   rounded={false}
                   className='rounded-sm shrink-0'

@@ -351,7 +351,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                       <SelectItem
                         key={option.value}
                         value={option.value}
-                        className='rounded-[7px] px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                        className='rounded-[6px] px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
                       >
                         <div className='flex items-center gap-2'>
                           <Icon

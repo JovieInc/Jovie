@@ -64,7 +64,7 @@ export function DspPresenceCard({
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-[13px] font-[520] tracking-[-0.01em] text-primary-token'>
+                <span className='truncate text-[13px] font-[510] tracking-[-0.01em] text-primary-token'>
                   {item.externalArtistName ?? 'Unknown Artist'}
                 </span>
               </div>
