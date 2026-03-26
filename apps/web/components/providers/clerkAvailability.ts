@@ -62,12 +62,17 @@ export function getClerkProxyUrl(
   locationLike:
     | Pick<Location, 'hostname' | 'protocol'>
     | Pick<URL, 'hostname' | 'protocol'>
-    | undefined = globalThis.location
+    | undefined = typeof globalThis.window !== 'undefined'
+    ? globalThis.location
+    : undefined
 ): string | undefined {
   // Disable proxy for screenshot pipeline — Clerk JS loads from its own CDN
   // instead of proxying through localhost (which requires HTTPS and doesn't
   // work in headless Playwright browsers against dev servers).
   if (publicEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1') return undefined;
+  // During SSR, window is unavailable — return undefined so Clerk doesn't
+  // attempt new URL(proxyUrl, window.location.origin) server-side.
+  if (typeof globalThis.window === 'undefined') return undefined;
   if (shouldDisableClerkProxyForLocation(locationLike)) return undefined;
   return publicEnv.NEXT_PUBLIC_CLERK_PROXY_URL || '/__clerk';
 }
