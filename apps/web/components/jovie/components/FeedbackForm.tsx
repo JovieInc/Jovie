@@ -50,12 +50,12 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
 
   if (feedbackMutation.isSuccess) {
     return (
-      <div className='mx-auto max-w-md rounded-[24px] border border-subtle bg-surface-1/95 p-6 text-center shadow-[0_20px_48px_-32px_rgba(15,23,42,0.85)]'>
-        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
+      <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 text-center'>
+        <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-[10px] border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
           <CheckCircle2 className='h-5 w-5' />
         </div>
         <div className='mt-4 space-y-1'>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-token'>
+          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
             Feedback sent
           </p>
           <p className='text-sm font-medium text-primary-token'>
@@ -70,7 +70,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           variant='secondary'
           size='sm'
           onClick={onClose}
-          className='mt-5 rounded-full px-4 text-[11px] font-medium uppercase tracking-[0.12em]'
+          className='mt-5 rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
         >
           Back to chat
         </Button>
@@ -79,9 +79,9 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   }
 
   return (
-    <div className='mx-auto max-w-md rounded-[24px] border border-subtle bg-surface-1/95 p-6 shadow-[0_20px_48px_-32px_rgba(15,23,42,0.85)]'>
+    <div className='mx-auto max-w-md rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6'>
       <div className='space-y-1'>
-        <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-token'>
+        <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
           Share feedback
         </p>
         <h3 className='text-sm font-semibold text-primary-token'>
@@ -101,7 +101,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         maxLength={2000}
         disabled={feedbackMutation.isPending}
         className={cn(
-          'mt-4 w-full resize-none rounded-[18px] border border-subtle bg-surface-2/80 px-3.5 py-3',
+          'mt-4 w-full resize-none rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
           'text-sm text-primary-token placeholder:text-tertiary-token',
           'focus:border-default focus:outline-none',
           'disabled:opacity-50'
@@ -122,7 +122,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           size='sm'
           onClick={onClose}
           disabled={feedbackMutation.isPending}
-          className='rounded-full px-3 text-[11px] font-medium uppercase tracking-[0.12em]'
+          className='rounded-[10px] px-3 text-[11px] font-[510] tracking-[-0.01em]'
         >
           Cancel
         </Button>
@@ -132,7 +132,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
           onClick={handleSubmit}
           loading={feedbackMutation.isPending}
           disabled={trimmedLength < 5}
-          className='rounded-full px-4 text-[11px] font-medium uppercase tracking-[0.12em]'
+          className='rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
         >
           <Send className='mr-1.5 h-3.5 w-3.5' />
           Submit

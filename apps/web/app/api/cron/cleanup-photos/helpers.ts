@@ -6,12 +6,9 @@
 
 import { del } from '@vercel/blob';
 import { and, eq, lt, or, type SQL } from 'drizzle-orm';
-import { NextResponse } from 'next/server';
 import { profilePhotos } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
-
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * Shape of an orphaned record for cleanup operations.
@@ -23,34 +20,6 @@ export interface OrphanedPhotoRecord {
   smallUrl: string | null;
   mediumUrl: string | null;
   largeUrl: string | null;
-}
-
-/**
- * Verify cron job authorization in production.
- */
-export function verifyCronAuth(
-  request: Request,
-  cronSecret: string | undefined
-): NextResponse | null {
-  if (env.NODE_ENV !== 'production') {
-    return null;
-  }
-
-  if (!cronSecret) {
-    logger.error(
-      '[cron] CRON_SECRET is not configured — all cron requests will be rejected'
-    );
-  }
-
-  const authHeader = request.headers.get('authorization');
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  return null;
 }
 
 /**

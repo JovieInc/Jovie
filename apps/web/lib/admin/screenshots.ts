@@ -1,5 +1,7 @@
 import { readdir, stat } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { basename, join } from 'node:path';
+import { captureWarning } from '@/lib/error-tracking';
+import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 
 export interface ScreenshotInfo {
   /** Unique ID derived from source + filename */
@@ -18,20 +20,18 @@ export interface ScreenshotInfo {
   url: string;
 }
 
-const REPO_ROOT = resolve(process.cwd(), '..', '..');
-const WEB_ROOT = resolve(process.cwd());
-
 const SCREENSHOT_SOURCES = [
   {
     key: 'docs',
     label: 'Docs',
-    directoryPath: resolve(REPO_ROOT, 'docs', 'screenshots'),
+    directoryPath: resolveMonorepoPath('docs', 'screenshots'),
   },
   {
     key: 'visual-regression',
     label: 'Visual Regression',
-    directoryPath: resolve(
-      WEB_ROOT,
+    directoryPath: resolveMonorepoPath(
+      'apps',
+      'web',
       'tests',
       'e2e',
       '__snapshots__',
@@ -41,8 +41,9 @@ const SCREENSHOT_SOURCES = [
   {
     key: 'homepage-a11y',
     label: 'Homepage A11y',
-    directoryPath: resolve(
-      WEB_ROOT,
+    directoryPath: resolveMonorepoPath(
+      'apps',
+      'web',
       'tests',
       'e2e',
       '__snapshots__',
@@ -81,8 +82,8 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
       if (err instanceof Error && 'code' in err && err.code === 'ENOENT') {
         continue;
       }
-      console.error(
-        `[screenshots] Unexpected error reading ${source.key} directory:`,
+      void captureWarning(
+        `Unexpected error reading screenshot directory: ${source.key}`,
         err
       );
     }

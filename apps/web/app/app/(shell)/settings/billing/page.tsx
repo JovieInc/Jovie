@@ -7,8 +7,8 @@ export default function SettingsBillingPage() {
   return (
     <SettingsSection
       id='billing'
-      title='Billing & Subscription'
-      description='Subscription, payment methods, and invoices.'
+      title='Billing'
+      description='Manage your plan, payment methods, and invoices.'
     >
       <SettingsBillingSection />
     </SettingsSection>

@@ -34,9 +34,12 @@ function ActionCard({
   onClick,
 }: ActionCardProps) {
   const content = (
-    <ContentSurfaceCard className='group flex items-center justify-between gap-3 p-3.5 transition-[background-color,border-color] duration-150 hover:bg-surface-2'>
+    <ContentSurfaceCard
+      surface='nested'
+      className='group flex items-center justify-between gap-3 p-3.5 transition-[background-color,border-color] duration-150 hover:bg-surface-0'
+    >
       <div className='flex items-center gap-3 min-w-0'>
-        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent'>
+        <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
           {icon}
         </div>
         <div className='min-w-0'>
@@ -45,18 +48,22 @@ function ActionCard({
         </div>
       </div>
       <ArrowRight
-        className='h-4 w-4 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5'
+        className='h-3.5 w-3.5 shrink-0 text-tertiary-token transition-transform group-hover:translate-x-0.5 group-hover:text-secondary-token'
         aria-hidden='true'
       />
     </ContentSurfaceCard>
   );
 
   if (href) {
-    return <Link href={href}>{content}</Link>;
+    return (
+      <Link href={href} className='block'>
+        {content}
+      </Link>
+    );
   }
 
   return (
-    <button type='button' onClick={onClick} className='w-full text-left'>
+    <button type='button' onClick={onClick} className='block w-full text-left'>
       {content}
     </button>
   );

@@ -1,5 +1,3 @@
-'use client';
-
 import { MarketingContainer } from '@/components/marketing';
 import { ClaimHandleForm } from './claim-handle';
 

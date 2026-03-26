@@ -1,16 +1,19 @@
 import { and, eq, isNull, lte } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { preSaveTokens } from '@/lib/db/schema/pre-save';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   refreshSpotifyAccessToken,
   saveReleaseToSpotifyLibrary,
 } from '@/lib/pre-save/spotify';
+import { logger } from '@/lib/utils/logger';
 import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import { decryptPII, encryptPII } from '@/lib/utils/pii-encryption';
+
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 async function resolveAccessToken(row: {
   id: string;
@@ -91,9 +94,9 @@ async function processPreSaveRow(row: {
 
     return true;
   } catch (error) {
-    console.error(`[pre-save] Failed to process row ${row.id}:`, error);
-    captureError('Pre-save processing failed', error, {
-      route: 'cron/process-pre-saves',
+    logger.error(`[pre-save] Failed to process row ${row.id}:`, error);
+    await captureError('Pre-save processing failed', error, {
+      route: '/api/cron/process-pre-saves',
       rowId: row.id,
       releaseId: row.releaseId,
     });
@@ -102,12 +105,10 @@ async function processPreSaveRow(row: {
 }
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  const secret = authHeader?.replace('Bearer ', '');
-
-  if (!secret || secret !== env.CRON_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/process-pre-saves',
+  });
+  if (authError) return authError;
 
   const rows = await db
     .select({
@@ -157,5 +158,8 @@ export async function GET(request: Request) {
     }
   });
 
-  return NextResponse.json({ ok: true, processed, failed, total: rows.length });
+  return NextResponse.json(
+    { ok: true, processed, failed, total: rows.length },
+    { headers: NO_STORE_HEADERS }
+  );
 }

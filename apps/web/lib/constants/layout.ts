@@ -19,8 +19,8 @@ export const SIDEBAR_WIDTH = 360; // px
  * - TALL: 56px - deprecated, kept for backwards compatibility
  */
 export const TABLE_ROW_HEIGHTS = {
-  COMPACT: 36, // Unified standard row height
-  STANDARD: 36, // Same as COMPACT - all tables use 36px
+  COMPACT: 40, // Unified standard row height
+  STANDARD: 40, // Same as COMPACT - all tables use 40px
   TALL: 56, // Deprecated - remove after full migration
 } as const;
 

@@ -63,15 +63,25 @@ export const AudienceUserCell = React.memo(function AudienceUserCell({
   return (
     <div
       className={cn(
-        'min-w-0 text-[13px] text-primary-token flex items-center gap-2',
+        'flex min-w-0 items-center gap-2 text-[13px] text-primary-token',
         className
       )}
     >
       <IconComponent
-        className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
+        className={cn(
+          'h-3.5 w-3.5 shrink-0',
+          isAnonymous ? 'text-quaternary-token' : 'text-tertiary-token'
+        )}
         aria-hidden='true'
       />
-      <span className='truncate font-[510]'>{primaryLabel}</span>
+      <span
+        className={cn(
+          'truncate',
+          isAnonymous ? 'font-[400] text-secondary-token' : 'font-[510]'
+        )}
+      >
+        {primaryLabel}
+      </span>
     </div>
   );
 });

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
+import { captureError } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 
 const VERCEL_API = 'https://api.vercel.com';
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /**
  * GET /api/deploy/status
@@ -22,15 +25,20 @@ export async function GET() {
   if (!token || !projectId || !teamId) {
     return NextResponse.json(
       { error: 'Deploy status not configured' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 
   try {
     const url = `${VERCEL_API}/v6/deployments?projectId=${projectId}&teamId=${teamId}&target=production&limit=1&state=READY`;
-    const response = await fetch(url, {
+    const response = await serverFetch(url, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(10_000),
+      timeoutMs: 10_000,
+      context: 'Vercel production deployment status',
+      retry: {
+        maxRetries: 2,
+        baseDelayMs: 500,
+      },
       next: { revalidate: 0 },
     });
 
@@ -38,10 +46,14 @@ export async function GET() {
       if (response.status === 429) {
         return NextResponse.json(
           { error: 'Vercel API rate limited' },
-          { status: 429 }
+          { status: 429, headers: NO_STORE_HEADERS }
         );
       }
-      throw new Error(`Vercel API returned ${response.status}`);
+
+      return NextResponse.json(
+        { error: 'Vercel API unavailable' },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
     }
 
     const data = await response.json();
@@ -51,24 +63,40 @@ export async function GET() {
       ? new Date(latestProd.created).toISOString()
       : null;
 
-    // Normalize both SHAs to 7 chars before comparing
     const needsPromote =
       stagingSha.length > 0 &&
       prodSha.length > 0 &&
       stagingSha.slice(0, 7) !== prodSha;
 
-    return NextResponse.json({
-      needsPromote,
-      stagingSha: stagingSha.slice(0, 7),
-      prodSha,
-      prodDeployedAt,
-      prodUrl: latestProd?.url ?? null,
-    });
+    return NextResponse.json(
+      {
+        needsPromote,
+        stagingSha: stagingSha.slice(0, 7),
+        prodSha,
+        prodDeployedAt,
+        prodUrl: latestProd?.url ?? null,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      await captureError('Deploy status request timed out', error, {
+        route: '/api/deploy/status',
+        timeoutMs: error.timeoutMs,
+      });
+      return NextResponse.json(
+        { error: 'Deploy status request timed out' },
+        { status: 504, headers: NO_STORE_HEADERS }
+      );
+    }
+
     logger.error('[deploy/status] Failed to fetch production status:', error);
+    await captureError('Deploy status request failed', error, {
+      route: '/api/deploy/status',
+    });
     return NextResponse.json(
       { error: 'Failed to fetch deploy status' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 }

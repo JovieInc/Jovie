@@ -74,7 +74,7 @@ export function AboutSection({
     return (
       <main
         id='main-content'
-        className='rounded-2xl border border-subtle bg-surface-1/80 p-8 text-center backdrop-blur-sm'
+        className='rounded-2xl border border-subtle bg-surface-1 shadow-sm p-8 text-center'
       >
         <p className='text-sm text-tertiary-token'>
           No information available yet.
@@ -89,7 +89,7 @@ export function AboutSection({
         About {artist.name}
       </h1>
 
-      <div className='overflow-hidden rounded-2xl border border-subtle bg-surface-1/80 backdrop-blur-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 shadow-sm overflow-hidden'>
         {hasBio && (
           <div className='px-6 pt-6 pb-5'>
             <p className='text-base leading-relaxed text-secondary-token whitespace-pre-line'>

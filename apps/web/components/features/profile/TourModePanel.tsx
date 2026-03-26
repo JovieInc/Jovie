@@ -10,7 +10,7 @@ import { useBreakpointDown } from '@/hooks/useBreakpoint';
 import { useTourDateTicketClick } from '@/hooks/useTourDateTicketClick';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { calculateDistanceMiles } from '@/lib/geo';
-import { cn } from '@/lib/utils';
+
 import { formatLocationString } from '@/lib/utils/string-utils';
 import type { Artist } from '@/types/db';
 import { DRAWER_OVERLAY_CLASS } from './drawer-overlay-styles';
@@ -243,16 +243,25 @@ export function TourModePanel({
       <Drawer.Portal>
         <Drawer.Overlay className={DRAWER_OVERLAY_CLASS} />
         <Drawer.Content
-          className={cn(
-            'fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-[20px] border-t border-subtle bg-surface-2 shadow-xl'
-          )}
+          className='fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] w-full max-w-full flex-col overflow-x-hidden rounded-t-2xl border-t'
+          style={{
+            backgroundColor: 'var(--liquid-glass-bg)',
+            backdropFilter: 'blur(var(--liquid-glass-blur-intense))',
+            WebkitBackdropFilter: 'blur(var(--liquid-glass-blur-intense))',
+            borderColor: 'var(--liquid-glass-border)',
+            boxShadow: 'var(--liquid-glass-shadow-elevated)',
+          }}
           aria-describedby={undefined}
         >
-          <div className='mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-quaternary-token/40' />
-          <Drawer.Title className='px-6 pb-2 pt-4 text-center text-[15px] font-semibold tracking-tight text-primary-token'>
+          <div
+            className='pointer-events-none absolute inset-x-0 top-0 h-24 rounded-t-2xl'
+            style={{ background: 'var(--liquid-glass-highlight)' }}
+          />
+          <div className='relative z-10 mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-[--liquid-glass-item-selected]' />
+          <Drawer.Title className='relative z-10 px-6 pb-2 pt-4 text-center text-lg font-semibold text-primary-token'>
             {artist.name} tour dates
           </Drawer.Title>
-          <div className='overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
+          <div className='relative z-10 overflow-y-auto overscroll-contain px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]'>
             {content}
           </div>
         </Drawer.Content>

@@ -114,7 +114,7 @@ export function CelebrationCardPreview({
 
       {/* Card preview */}
       <div
-        className={`overflow-hidden rounded-xl border border-subtle shadow-lg ${
+        className={`overflow-hidden rounded-xl border border-subtle ${
           selectedSize === 'story' ? 'max-h-[320px]' : 'max-h-[240px]'
         }`}
       >

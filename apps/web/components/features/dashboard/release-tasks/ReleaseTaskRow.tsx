@@ -24,7 +24,7 @@ export function ReleaseTaskRow({ task, onToggle }: ReleaseTaskRowProps) {
   const priority = PRIORITY_DISPLAY[task.priority] ?? PRIORITY_DISPLAY.medium;
 
   return (
-    <div className='flex items-center gap-3 px-4 py-2 min-h-[44px] group hover:bg-surface-1/50 rounded transition-colors'>
+    <div className='flex items-center gap-3 px-4 py-2 min-h-[44px] group hover:bg-surface-1 rounded transition-colors'>
       {/* Checkbox */}
       <input
         type='checkbox'

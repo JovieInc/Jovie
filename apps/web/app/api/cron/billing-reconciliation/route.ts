@@ -21,6 +21,7 @@ import {
   type ReconciliationStats,
   updateStatsFromResult,
 } from '@/lib/billing/reconciliation/batch-processor';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { billingAuditLog } from '@/lib/db/schema/billing';
@@ -98,13 +99,11 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
  * Daily cron job to reconcile billing status between DB and Stripe
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/billing-reconciliation',
+    cronSecret: CRON_SECRET,
+  });
+  if (authError) return authError;
 
   try {
     const result = await runReconciliation();

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getHudMetrics } from '@/lib/hud/metrics';
 
+const mockGetHudDeployments = vi.hoisted(() => vi.fn());
+
 vi.mock('@/lib/env-server', () => ({
   env: {
     HUD_STARTUP_NAME: 'Jovie',
@@ -48,16 +50,22 @@ vi.mock('@/lib/db', () => ({
   })),
 }));
 
+vi.mock('@/lib/deployments/github', () => ({
+  getHudDeployments: mockGetHudDeployments,
+}));
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
 describe('getHudMetrics', () => {
   it('degrades deployment metrics when GitHub request times out', async () => {
-    const abortError = new Error('The operation was aborted.');
-    abortError.name = 'AbortError';
-
-    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(abortError);
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'error',
+      current: null,
+      recent: [],
+      errorMessage: 'External request timed out after 5000ms',
+    });
 
     const metrics = await getHudMetrics('admin');
 

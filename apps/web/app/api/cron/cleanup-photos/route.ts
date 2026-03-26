@@ -1,15 +1,14 @@
 import { inArray } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { profilePhotos } from '@/lib/db/schema/profiles';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import {
   buildOrphanedRecordsWhereClause,
   collectBlobUrls,
   deleteBlobsIfConfigured,
-  verifyCronAuth,
 } from './helpers';
 
 export const runtime = 'nodejs';
@@ -84,7 +83,10 @@ export async function cleanupOrphanedPhotos(): Promise<{
  * Schedule: Daily at 3:00 AM UTC (configured in vercel.json)
  */
 export async function GET(request: Request) {
-  const authError = verifyCronAuth(request, env.CRON_SECRET);
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/cleanup-photos',
+    allowDevelopmentBypass: true,
+  });
   if (authError) return authError;
 
   try {

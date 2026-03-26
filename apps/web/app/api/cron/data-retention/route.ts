@@ -8,106 +8,22 @@
  * Authorization: Requires CRON_SECRET header
  */
 
-import crypto from 'node:crypto';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
-import { env } from '@/lib/env-server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300; // 5 minutes max for cleanup
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-/**
- * Timing-safe comparison of cron secret to prevent timing attacks
- */
-function verifyCronSecret(provided: string | undefined): boolean {
-  const expected = env.CRON_SECRET;
-  if (!expected || !provided) {
-    return false;
-  }
-
-  // Use timing-safe comparison to prevent timing attacks
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-
-  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-}
-
-/**
- * Extract a bearer token only when the authorization header uses the expected scheme.
- * Avoids partial replacement patterns that can be bypassed with repeated prefixes.
- */
-function extractBearerToken(authHeader: string | null): string | undefined {
-  if (!authHeader) return undefined;
-
-  // RFC 7235: auth-scheme is case-insensitive
-  const spaceIndex = authHeader.indexOf(' ');
-  if (spaceIndex === -1) return undefined;
-
-  const scheme = authHeader.slice(0, spaceIndex);
-  if (scheme.toLowerCase() !== 'bearer') return undefined;
-
-  const token = authHeader.slice(spaceIndex + 1);
-  // Reject empty or whitespace-containing tokens
-  if (token.length === 0 || /\s/.test(token)) return undefined;
-
-  return token;
-}
-
-/**
- * Verify request origin is from trusted sources (Vercel Cron or internal).
- * Defense in depth - verify source before checking secret.
- */
-function verifyOrigin(request: NextRequest): boolean {
-  // Vercel Cron requests include this header
-  const vercelCronHeader = request.headers.get('x-vercel-cron');
-  if (vercelCronHeader === '1') {
-    return true;
-  }
-
-  // Allow requests from Vercel's internal network or our domains
-  const forwardedHost = request.headers.get('x-forwarded-host');
-  if (
-    forwardedHost?.endsWith('.vercel.app') ||
-    forwardedHost?.endsWith('.jov.ie') ||
-    forwardedHost === 'jov.ie'
-  ) {
-    return true;
-  }
-
-  // In development, allow localhost
-  if (env.NODE_ENV === 'development') {
-    return true;
-  }
-
-  return false;
-}
-
-export async function GET(request: NextRequest) {
-  // Verify request origin (defense in depth - verify source before checking secret)
-  if (!verifyOrigin(request)) {
-    logger.warn('[Data Retention Cron] Rejected request from untrusted origin');
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
-  // Verify cron authorization
-  const authHeader = request.headers.get('authorization');
-  const cronSecret = extractBearerToken(authHeader);
-
-  if (!env.CRON_SECRET) {
-    logger.error('[Data Retention Cron] CRON_SECRET not configured');
-    return NextResponse.json({ error: 'Cron not configured' }, { status: 500 });
-  }
-
-  if (!verifyCronSecret(cronSecret)) {
-    logger.warn('[Data Retention Cron] Unauthorized access attempt');
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function GET(request: Request) {
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/data-retention',
+    requireTrustedOrigin: true,
+  });
+  if (authError) return authError;
 
   try {
     logger.info('[Data Retention Cron] Starting scheduled cleanup');
@@ -153,33 +69,36 @@ export async function GET(request: NextRequest) {
       emailSuppressionsDeleted: result.emailSuppressionsDeleted,
     });
 
-    return NextResponse.json({
-      success: true,
-      totalDeleted,
-      result: {
-        clickEventsDeleted: result.clickEventsDeleted,
-        audienceMembersDeleted: result.audienceMembersDeleted,
-        notificationSubscriptionsDeleted:
-          result.notificationSubscriptionsDeleted,
-        pixelEventsDeleted: result.pixelEventsDeleted,
-        stripeWebhookEventsDeleted: result.stripeWebhookEventsDeleted,
-        webhookEventsDeleted: result.webhookEventsDeleted,
-        notificationDeliveryLogDeleted: result.notificationDeliveryLogDeleted,
-        emailEngagementDeleted: result.emailEngagementDeleted,
-        chatMessagesDeleted: result.chatMessagesDeleted,
-        chatAuditLogDeleted: result.chatAuditLogDeleted,
-        billingAuditLogDeleted: result.billingAuditLogDeleted,
-        adminAuditLogDeleted: result.adminAuditLogDeleted,
-        ingestionJobsDeleted: result.ingestionJobsDeleted,
-        unsubscribeTokensDeleted: result.unsubscribeTokensDeleted,
-        emailSendAttributionDeleted: result.emailSendAttributionDeleted,
-        emailSuppressionsDeleted: result.emailSuppressionsDeleted,
-        retentionDays: result.retentionDays,
-        cutoffDate: result.cutoffDate.toISOString(),
-        chatCutoffDate: result.chatCutoffDate.toISOString(),
-        duration: result.duration,
+    return NextResponse.json(
+      {
+        success: true,
+        totalDeleted,
+        result: {
+          clickEventsDeleted: result.clickEventsDeleted,
+          audienceMembersDeleted: result.audienceMembersDeleted,
+          notificationSubscriptionsDeleted:
+            result.notificationSubscriptionsDeleted,
+          pixelEventsDeleted: result.pixelEventsDeleted,
+          stripeWebhookEventsDeleted: result.stripeWebhookEventsDeleted,
+          webhookEventsDeleted: result.webhookEventsDeleted,
+          notificationDeliveryLogDeleted: result.notificationDeliveryLogDeleted,
+          emailEngagementDeleted: result.emailEngagementDeleted,
+          chatMessagesDeleted: result.chatMessagesDeleted,
+          chatAuditLogDeleted: result.chatAuditLogDeleted,
+          billingAuditLogDeleted: result.billingAuditLogDeleted,
+          adminAuditLogDeleted: result.adminAuditLogDeleted,
+          ingestionJobsDeleted: result.ingestionJobsDeleted,
+          unsubscribeTokensDeleted: result.unsubscribeTokensDeleted,
+          emailSendAttributionDeleted: result.emailSendAttributionDeleted,
+          emailSuppressionsDeleted: result.emailSuppressionsDeleted,
+          retentionDays: result.retentionDays,
+          cutoffDate: result.cutoffDate.toISOString(),
+          chatCutoffDate: result.chatCutoffDate.toISOString(),
+          duration: result.duration,
+        },
       },
-    });
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     // Log full error details internally
     logger.error('[Data Retention Cron] Cleanup failed', error);
@@ -188,6 +107,9 @@ export async function GET(request: NextRequest) {
       method: 'GET',
     });
     // Return sanitized error to prevent information disclosure
-    return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Cleanup failed' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

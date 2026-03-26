@@ -112,18 +112,27 @@ function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-in/sso-callback';
 
   const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
+  const isAccountPath = matchesRoute(pathname, '/account');
+  const isBillingPath = matchesRoute(pathname, '/billing');
 
   // Onboarding/waitlist paths
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
 
   // Protected paths (require auth)
-  const isProtectedPath = isAppShellPath || isWaitlistPath || isOnboardingPath;
+  const isProtectedPath =
+    isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
+    isWaitlistPath ||
+    isOnboardingPath;
 
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
     isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
     isOnboardingPath ||
     isWaitlistPath;
 
@@ -941,52 +950,85 @@ export default async function middleware(
     pathname === '/clerk'
   ) {
     const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-    const b64 = pk.replace(/^pk_(live|test)_/, '');
-    const fapiHost = atob(b64).replace(/\$$/, '');
+    let fapiHost = '';
+    try {
+      const b64 = pk.replace(/^pk_(live|test)_/, '');
+      fapiHost = b64 ? atob(b64).replace(/\$$/, '') : '';
+    } catch {
+      // malformed key
+    }
+    if (!fapiHost) {
+      return NextResponse.json(
+        {
+          error: 'Clerk proxy unavailable: missing or invalid publishable key',
+        },
+        { status: 503 }
+      );
+    }
+
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
     const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
 
-    const headers = new Headers(req.headers);
-    headers.set('host', fapiHost);
-    headers.delete('connection');
-    headers.delete('x-forwarded-host');
-    headers.delete('x-forwarded-proto');
-    headers.delete('x-forwarded-for');
-    headers.delete('x-vercel-forwarded-for');
-    headers.delete('x-vercel-ip-country');
-    headers.delete('x-real-ip');
-    headers.set('origin', `https://${fapiHost}`);
-
-    const proxyRes = await fetch(targetUrl, {
-      method: req.method,
-      headers,
-      body:
-        req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
-      redirect: 'follow',
-    });
-
-    const resHeaders = new Headers(proxyRes.headers);
-    resHeaders.delete('content-encoding');
-
-    // Rewrite redirect Location headers to route back through /__clerk
-    // so the browser never hits the FAPI host directly (e.g. Clerk's
-    // /npm/ 307 redirects to versioned JS bundles).
-    const location = resHeaders.get('location');
-    if (location) {
-      const fapiOrigin = `https://${fapiHost}`;
-      if (location.startsWith(fapiOrigin)) {
-        resHeaders.set(
-          'location',
-          location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
-        );
+    // Read body FIRST so content-length stays accurate
+    let body: ArrayBuffer | null = null;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try {
+        body = await req.arrayBuffer();
+      } catch {
+        // empty body
       }
     }
 
-    return new NextResponse(proxyRes.body, {
-      status: proxyRes.status,
-      statusText: proxyRes.statusText,
-      headers: resHeaders,
-    });
+    // Build clean headers — only forward what Clerk needs
+    const headers = new Headers();
+    headers.set('host', fapiHost);
+    headers.set('origin', `https://${fapiHost}`);
+    const ct = req.headers.get('content-type');
+    if (ct) headers.set('content-type', ct);
+    const accept = req.headers.get('accept');
+    if (accept) headers.set('accept', accept);
+    const cookie = req.headers.get('cookie');
+    if (cookie) headers.set('cookie', cookie);
+    const ua = req.headers.get('user-agent');
+    if (ua) headers.set('user-agent', ua);
+    const auth = req.headers.get('authorization');
+    if (auth) headers.set('authorization', auth);
+    if (body && body.byteLength > 0) {
+      headers.set('content-length', String(body.byteLength));
+    }
+
+    try {
+      const proxyRes = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: body && body.byteLength > 0 ? body : undefined,
+        redirect: 'follow',
+      });
+
+      const resHeaders = new Headers(proxyRes.headers);
+      resHeaders.delete('content-encoding');
+
+      // Rewrite redirect Location headers to route back through /__clerk
+      const location = resHeaders.get('location');
+      if (location) {
+        const fapiOrigin = `https://${fapiHost}`;
+        if (location.startsWith(fapiOrigin)) {
+          resHeaders.set(
+            'location',
+            location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
+          );
+        }
+      }
+
+      return new NextResponse(proxyRes.body, {
+        status: proxyRes.status,
+        statusText: proxyRes.statusText,
+        headers: resHeaders,
+      });
+    } catch (err) {
+      console.error('[clerk-proxy] fetch failed:', err);
+      return NextResponse.json({ error: 'Clerk proxy error' }, { status: 502 });
+    }
   }
 
   const pathInfo = categorizePath(pathname);

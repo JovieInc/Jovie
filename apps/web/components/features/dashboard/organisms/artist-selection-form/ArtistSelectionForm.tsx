@@ -70,7 +70,7 @@ export function ArtistSelectionForm() {
             )}
 
             {/* Form Card */}
-            <div className='bg-surface-1 backdrop-blur-sm border border-subtle rounded-xl p-6 shadow-card-elevated transition-colors'>
+            <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 transition-colors'>
               <form onSubmit={handleSubmit} className='space-y-6'>
                 <div>
                   <Combobox
@@ -96,7 +96,7 @@ export function ArtistSelectionForm() {
                 </div>
 
                 {selectedArtist && (
-                  <div className='flex items-center gap-3 rounded-lg border border-green-500/30 bg-green-500/10 p-3'>
+                  <div className='flex items-center gap-3 rounded-[10px] border border-green-500/30 bg-green-500/10 p-3'>
                     {selectedArtist.imageUrl ? (
                       <Image
                         src={selectedArtist.imageUrl}

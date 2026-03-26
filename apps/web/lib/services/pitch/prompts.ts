@@ -109,8 +109,7 @@ export function buildUserPrompt(
   ];
 
   if (instructions?.trim()) {
-    sections.push(`\n## Artist Instructions`);
-    sections.push(instructions.trim());
+    sections.push(`\n## Artist Instructions`, instructions.trim());
   }
 
   sections.push(

@@ -36,7 +36,7 @@ export function AppSearchField({
   return (
     <div
       className={cn(
-        'flex h-(--linear-app-control-height-sm) items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
+        'flex h-(--linear-app-control-height-sm) items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-primary-token transition-[border-color,box-shadow,background-color] duration-150 hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/14',
         className
       )}
     >
@@ -53,7 +53,7 @@ export function AppSearchField({
         placeholder={placeholder}
         aria-label={ariaLabel}
         className={cn(
-          'h-full border-0 bg-transparent px-0 text-[12px] tracking-[-0.012em] shadow-none ring-0 focus-visible:border-0 focus-visible:ring-0',
+          'h-full border-0 bg-transparent px-0 text-[13px] tracking-[-0.01em] text-secondary-token shadow-none ring-0 placeholder:text-tertiary-token focus-visible:border-0 focus-visible:ring-0',
           inputClassName
         )}
       />
