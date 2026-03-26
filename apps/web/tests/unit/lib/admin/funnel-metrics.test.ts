@@ -9,6 +9,9 @@ const hoisted = vi.hoisted(() => {
   const captureError = vi.fn();
   const captureWarning = vi.fn();
   const getAdminStripeOverviewMetrics = vi.fn();
+  const getDeepErrorMessage = vi.fn((error: unknown) =>
+    error instanceof Error ? error.message : String(error)
+  );
 
   return {
     whereMock,
@@ -18,6 +21,7 @@ const hoisted = vi.hoisted(() => {
     captureError,
     captureWarning,
     getAdminStripeOverviewMetrics,
+    getDeepErrorMessage,
   };
 });
 
@@ -31,6 +35,10 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureError: hoisted.captureError,
   captureWarning: hoisted.captureWarning,
+}));
+
+vi.mock('@/lib/db/errors', () => ({
+  getDeepErrorMessage: hoisted.getDeepErrorMessage,
 }));
 
 vi.mock('@/lib/admin/stripe-metrics', () => ({
@@ -83,6 +91,48 @@ describe('getAdminFunnelMetrics outreach query', () => {
     expect(result.outreachSent7d).toBe(0);
     expect(hoisted.captureError).not.toHaveBeenCalledWith(
       'Error fetching outreach sent count',
+      expect.anything()
+    );
+  });
+
+  it('returns zero when signup attribution columns are missing during a schema rollout', async () => {
+    hoisted.whereMock.mockRejectedValue(
+      new Error('column "signup_at" does not exist')
+    );
+
+    const result = await getAdminFunnelMetrics();
+
+    expect(result.signups7d).toBe(0);
+    expect(
+      hoisted.captureWarning.mock.calls.some(
+        ([message]) =>
+          message ===
+          '[admin/funnel-metrics] lead attribution columns missing; returning 0 signups count'
+      )
+    ).toBe(true);
+    expect(hoisted.captureError).not.toHaveBeenCalledWith(
+      'Error fetching signups count',
+      expect.anything()
+    );
+  });
+
+  it('returns zero when paid attribution columns are missing during a schema rollout', async () => {
+    hoisted.whereMock.mockRejectedValue(
+      new Error('column "paid_subscription_id" does not exist')
+    );
+
+    const result = await getAdminFunnelMetrics();
+
+    expect(result.paidConversions7d).toBe(0);
+    expect(
+      hoisted.captureWarning.mock.calls.some(
+        ([message]) =>
+          message ===
+          '[admin/funnel-metrics] lead attribution columns missing; returning 0 paid conversions count'
+      )
+    ).toBe(true);
+    expect(hoisted.captureError).not.toHaveBeenCalledWith(
+      'Error fetching paid conversions count',
       expect.anything()
     );
   });

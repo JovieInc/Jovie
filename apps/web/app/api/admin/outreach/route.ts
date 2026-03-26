@@ -187,7 +187,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   );
 }
 
-function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
+function isMissingLeadSchemaColumnError(error: unknown): boolean {
   // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
   // the actual PG "column X does not exist" lives on .cause, not the outer error.
   const normalized = getDeepErrorMessage(error).toLowerCase();
@@ -199,7 +199,21 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
     normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist')
+    normalized.includes('column "music_tools_detected" does not exist') ||
+    normalized.includes('column "source_platform" does not exist') ||
+    normalized.includes('column "source_handle" does not exist') ||
+    normalized.includes('column "source_url" does not exist') ||
+    normalized.includes('column "has_tracking_pixels" does not exist') ||
+    normalized.includes('column "tracking_pixel_platforms" does not exist') ||
+    normalized.includes('column "signal_snapshot" does not exist') ||
+    normalized.includes('column "first_contacted_at" does not exist') ||
+    normalized.includes('column "last_contacted_at" does not exist') ||
+    normalized.includes('column "signup_user_id" does not exist') ||
+    normalized.includes('column "signup_at" does not exist') ||
+    normalized.includes('column "paid_at" does not exist') ||
+    normalized.includes('column "paid_subscription_id" does not exist') ||
+    normalized.includes('column "attribution_status" does not exist') ||
+    normalized.includes('column "scrape_attempts" does not exist')
   );
 }
 
@@ -258,12 +272,12 @@ export async function GET(request: NextRequest) {
         db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     } catch (error) {
-      if (!isMissingLeadEnrichmentColumnError(error)) {
+      if (!isMissingLeadSchemaColumnError(error)) {
         throw error;
       }
 
       await captureWarning(
-        '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+        '[admin/outreach] leads schema columns missing; falling back to legacy select',
         error,
         { route: '/api/admin/outreach' }
       );

@@ -241,7 +241,7 @@ describe('GET /api/admin/outreach', () => {
     ]);
     expect(data.pendingTotal).toBe(1);
     expect(mockCaptureWarning).toHaveBeenCalledWith(
-      '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+      '[admin/outreach] leads schema columns missing; falling back to legacy select',
       expect.any(Error),
       { route: '/api/admin/outreach' }
     );

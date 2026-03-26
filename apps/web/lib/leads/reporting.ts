@@ -2,11 +2,13 @@ import 'server-only';
 
 import { and, count, eq, gte, inArray, lte } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import {
   leadFunnelEvents,
   leadPipelineSettings,
   leads,
 } from '@/lib/db/schema/leads';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 const CONTACT_EVENT_TYPES = ['email_queued', 'dm_sent'] as const;
 
@@ -78,6 +80,62 @@ function getDefaultDateRange() {
   return { start, end };
 }
 
+function makeEmptyReport(
+  start: Date,
+  end: Date,
+  reason: string
+): LeadFunnelReport {
+  return {
+    filters: {
+      start: start.toISOString(),
+      end: end.toISOString(),
+    },
+    summary: {
+      scraped: 0,
+      qualified: 0,
+      approved: 0,
+      contacted: 0,
+      emailQueued: 0,
+      dmSent: 0,
+      claimClicks: 0,
+      signups: 0,
+      onboardingCompleted: 0,
+      paidConversions: 0,
+    },
+    sourceBreakdown: [],
+    musicToolBreakdown: [],
+    pixelBreakdown: [],
+    verifiedBreakdown: [],
+    paidTierBreakdown: [],
+    keywordBreakdown: [],
+    rampRecommendation: {
+      recommendedAction: 'hold',
+      recommendedNextDailyCap: 10,
+      reasons: [reason],
+      sampleSize: 0,
+      claimClickRate: null,
+      providerFailureRate: null,
+    },
+  };
+}
+
+function isMissingLeadReportingSchemaError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (!message.includes('does not exist')) {
+    return false;
+  }
+
+  return [
+    'lead_funnel_events',
+    'column "source_platform"',
+    'column "has_tracking_pixels"',
+    'column "music_tools_detected"',
+    'column "daily_send_cap"',
+    'column "guardrail_thresholds"',
+    'column "outreach_status"',
+  ].some(pattern => message.includes(pattern));
+}
+
 function makeEmptyBreakdown(cohort: string): LeadFunnelBreakdownRow {
   return {
     cohort,
@@ -140,63 +198,138 @@ function buildGroupedBreakdown(
 }
 
 async function getRampRecommendation(): Promise<RampRecommendation> {
-  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-  const [settings] = await db
-    .select()
-    .from(leadPipelineSettings)
-    .where(eq(leadPipelineSettings.id, 1))
-    .limit(1);
+  try {
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [settings] = await db
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
 
-  const thresholds = settings?.guardrailThresholds ?? {
-    minimumSampleSize: 30,
-    increaseClaimClickRate: 0.06,
-    holdClaimClickRateFloor: 0.03,
-    pauseClaimClickRateFloor: 0.03,
-    maxBounceComplaintRate: 0.03,
-    maxUnsubscribeRate: 0.05,
-    maxProviderFailureRate: 0.1,
-  };
-  const currentDailyCap = settings?.dailySendCap ?? 10;
+    const thresholds = settings?.guardrailThresholds ?? {
+      minimumSampleSize: 30,
+      increaseClaimClickRate: 0.06,
+      holdClaimClickRateFloor: 0.03,
+      pauseClaimClickRateFloor: 0.03,
+      maxBounceComplaintRate: 0.03,
+      maxUnsubscribeRate: 0.05,
+      maxProviderFailureRate: 0.1,
+    };
+    const currentDailyCap = settings?.dailySendCap ?? 10;
 
-  const recentEvents = await db
-    .select({
-      leadId: leadFunnelEvents.leadId,
-      eventType: leadFunnelEvents.eventType,
-    })
-    .from(leadFunnelEvents)
-    .where(gte(leadFunnelEvents.occurredAt, since));
+    const recentEvents = await db
+      .select({
+        leadId: leadFunnelEvents.leadId,
+        eventType: leadFunnelEvents.eventType,
+      })
+      .from(leadFunnelEvents)
+      .where(gte(leadFunnelEvents.occurredAt, since));
 
-  const eventMap = new Map<string, Set<string>>();
-  for (const event of recentEvents) {
-    const existing = eventMap.get(event.leadId) ?? new Set<string>();
-    existing.add(event.eventType);
-    eventMap.set(event.leadId, existing);
-  }
+    const eventMap = new Map<string, Set<string>>();
+    for (const event of recentEvents) {
+      const existing = eventMap.get(event.leadId) ?? new Set<string>();
+      existing.add(event.eventType);
+      eventMap.set(event.leadId, existing);
+    }
 
-  let contacted = 0;
-  let claimClicks = 0;
-  for (const events of eventMap.values()) {
-    if (hasAnyEvent(events, CONTACT_EVENT_TYPES)) contacted++;
-    if (events.has('claim_page_viewed')) claimClicks++;
-  }
+    let contacted = 0;
+    let claimClicks = 0;
+    for (const events of eventMap.values()) {
+      if (hasAnyEvent(events, CONTACT_EVENT_TYPES)) contacted++;
+      if (events.has('claim_page_viewed')) claimClicks++;
+    }
 
-  const [failedRow] = await db
-    .select({ total: count() })
-    .from(leads)
-    .where(
-      and(eq(leads.outreachStatus, 'failed'), gte(leads.updatedAt, since))
-    );
+    const [failedRow] = await db
+      .select({ total: count() })
+      .from(leads)
+      .where(
+        and(eq(leads.outreachStatus, 'failed'), gte(leads.updatedAt, since))
+      );
 
-  const providerFailureRate =
-    contacted > 0 ? Number(failedRow?.total ?? 0) / contacted : null;
-  const claimClickRate = contacted > 0 ? claimClicks / contacted : null;
-  const reasons: string[] = [];
-  const telemetryIncomplete = true;
+    const providerFailureRate =
+      contacted > 0 ? Number(failedRow?.total ?? 0) / contacted : null;
+    const claimClickRate = contacted > 0 ? claimClicks / contacted : null;
+    const reasons: string[] = [];
+    const telemetryIncomplete = true;
 
-  if (contacted < thresholds.minimumSampleSize) {
-    reasons.push(
-      `Sample below threshold (${contacted}/${thresholds.minimumSampleSize}).`
-    );
+    if (contacted < thresholds.minimumSampleSize) {
+      reasons.push(
+        `Sample below threshold (${contacted}/${thresholds.minimumSampleSize}).`
+      );
+      return {
+        recommendedAction: 'hold',
+        recommendedNextDailyCap: currentDailyCap,
+        reasons,
+        sampleSize: contacted,
+        claimClickRate,
+        providerFailureRate,
+      };
+    }
+
+    if (
+      providerFailureRate !== null &&
+      providerFailureRate >= thresholds.maxProviderFailureRate
+    ) {
+      reasons.push(
+        `Provider failure rate ${Math.round(providerFailureRate * 100)}% exceeds threshold.`
+      );
+      return {
+        recommendedAction: 'pause',
+        recommendedNextDailyCap: 0,
+        reasons,
+        sampleSize: contacted,
+        claimClickRate,
+        providerFailureRate,
+      };
+    }
+
+    if (
+      claimClickRate !== null &&
+      claimClickRate < thresholds.pauseClaimClickRateFloor
+    ) {
+      reasons.push(
+        `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is below pause threshold.`
+      );
+      return {
+        recommendedAction: 'pause',
+        recommendedNextDailyCap: 0,
+        reasons,
+        sampleSize: contacted,
+        claimClickRate,
+        providerFailureRate,
+      };
+    }
+
+    if (telemetryIncomplete) {
+      reasons.push(
+        'Bounce, complaint, and unsubscribe telemetry is incomplete, so the system will not auto-ramp.'
+      );
+      return {
+        recommendedAction: 'hold',
+        recommendedNextDailyCap: currentDailyCap,
+        reasons,
+        sampleSize: contacted,
+        claimClickRate,
+        providerFailureRate,
+      };
+    }
+
+    if (
+      claimClickRate !== null &&
+      claimClickRate >= thresholds.increaseClaimClickRate
+    ) {
+      reasons.push('Claim click rate supports a controlled increase.');
+      return {
+        recommendedAction: 'increase',
+        recommendedNextDailyCap: Math.ceil(currentDailyCap * 1.5),
+        reasons,
+        sampleSize: contacted,
+        claimClickRate,
+        providerFailureRate,
+      };
+    }
+
+    reasons.push('Performance is inside the hold band.');
     return {
       recommendedAction: 'hold',
       recommendedNextDailyCap: currentDailyCap,
@@ -205,80 +338,34 @@ async function getRampRecommendation(): Promise<RampRecommendation> {
       claimClickRate,
       providerFailureRate,
     };
-  }
+  } catch (error) {
+    if (isMissingLeadReportingSchemaError(error)) {
+      await captureWarning(
+        '[leads/reporting] GTM reporting schema missing; returning hold recommendation',
+        error
+      );
+      return {
+        recommendedAction: 'hold',
+        recommendedNextDailyCap: 10,
+        reasons: [
+          'GTM reporting schema is not fully available in this environment yet.',
+        ],
+        sampleSize: 0,
+        claimClickRate: null,
+        providerFailureRate: null,
+      };
+    }
 
-  if (
-    providerFailureRate !== null &&
-    providerFailureRate >= thresholds.maxProviderFailureRate
-  ) {
-    reasons.push(
-      `Provider failure rate ${Math.round(providerFailureRate * 100)}% exceeds threshold.`
-    );
-    return {
-      recommendedAction: 'pause',
-      recommendedNextDailyCap: 0,
-      reasons,
-      sampleSize: contacted,
-      claimClickRate,
-      providerFailureRate,
-    };
-  }
-
-  if (
-    claimClickRate !== null &&
-    claimClickRate < thresholds.pauseClaimClickRateFloor
-  ) {
-    reasons.push(
-      `Claim click rate ${Math.round(claimClickRate * 1000) / 10}% is below pause threshold.`
-    );
-    return {
-      recommendedAction: 'pause',
-      recommendedNextDailyCap: 0,
-      reasons,
-      sampleSize: contacted,
-      claimClickRate,
-      providerFailureRate,
-    };
-  }
-
-  if (telemetryIncomplete) {
-    reasons.push(
-      'Bounce, complaint, and unsubscribe telemetry is incomplete, so the system will not auto-ramp.'
-    );
+    captureError('Error building lead ramp recommendation', error);
     return {
       recommendedAction: 'hold',
-      recommendedNextDailyCap: currentDailyCap,
-      reasons,
-      sampleSize: contacted,
-      claimClickRate,
-      providerFailureRate,
+      recommendedNextDailyCap: 10,
+      reasons: ['GTM reporting is temporarily unavailable.'],
+      sampleSize: 0,
+      claimClickRate: null,
+      providerFailureRate: null,
     };
   }
-
-  if (
-    claimClickRate !== null &&
-    claimClickRate >= thresholds.increaseClaimClickRate
-  ) {
-    reasons.push('Claim click rate supports a controlled increase.');
-    return {
-      recommendedAction: 'increase',
-      recommendedNextDailyCap: Math.ceil(currentDailyCap * 1.5),
-      reasons,
-      sampleSize: contacted,
-      claimClickRate,
-      providerFailureRate,
-    };
-  }
-
-  reasons.push('Performance is inside the hold band.');
-  return {
-    recommendedAction: 'hold',
-    recommendedNextDailyCap: currentDailyCap,
-    reasons,
-    sampleSize: contacted,
-    claimClickRate,
-    providerFailureRate,
-  };
 }
 
 export async function getLeadFunnelReport(
@@ -288,164 +375,194 @@ export async function getLeadFunnelReport(
   const start = filters.start ?? defaults.start;
   const end = filters.end ?? defaults.end;
 
-  const whereClauses = [gte(leads.createdAt, start), lte(leads.createdAt, end)];
-  if (filters.sourcePlatform) {
-    whereClauses.push(eq(leads.sourcePlatform, filters.sourcePlatform));
-  }
-  if (filters.discoveryQuery) {
-    whereClauses.push(eq(leads.discoveryQuery, filters.discoveryQuery));
-  }
-  if (typeof filters.verified === 'boolean') {
-    whereClauses.push(eq(leads.isLinktreeVerified, filters.verified));
-  }
-  if (typeof filters.hasPaidTier === 'boolean') {
-    whereClauses.push(eq(leads.hasPaidTier, filters.hasPaidTier));
-  }
-  if (typeof filters.hasTrackingPixels === 'boolean') {
-    whereClauses.push(eq(leads.hasTrackingPixels, filters.hasTrackingPixels));
-  }
-
-  const cohortLeads = await db
-    .select({
-      id: leads.id,
-      sourcePlatform: leads.sourcePlatform,
-      discoveryQuery: leads.discoveryQuery,
-      isLinktreeVerified: leads.isLinktreeVerified,
-      hasPaidTier: leads.hasPaidTier,
-      hasTrackingPixels: leads.hasTrackingPixels,
-      musicToolsDetected: leads.musicToolsDetected,
-    })
-    .from(leads)
-    .where(and(...whereClauses));
-
-  const filteredLeads = cohortLeads.filter(lead => {
-    if (
-      filters.musicTool &&
-      !lead.musicToolsDetected.includes(filters.musicTool)
-    ) {
-      return false;
+  try {
+    const whereClauses = [
+      gte(leads.createdAt, start),
+      lte(leads.createdAt, end),
+    ];
+    if (filters.sourcePlatform) {
+      whereClauses.push(eq(leads.sourcePlatform, filters.sourcePlatform));
     }
-    return true;
-  });
+    if (filters.discoveryQuery) {
+      whereClauses.push(eq(leads.discoveryQuery, filters.discoveryQuery));
+    }
+    if (typeof filters.verified === 'boolean') {
+      whereClauses.push(eq(leads.isLinktreeVerified, filters.verified));
+    }
+    if (typeof filters.hasPaidTier === 'boolean') {
+      whereClauses.push(eq(leads.hasPaidTier, filters.hasPaidTier));
+    }
+    if (typeof filters.hasTrackingPixels === 'boolean') {
+      whereClauses.push(eq(leads.hasTrackingPixels, filters.hasTrackingPixels));
+    }
 
-  const leadIds = filteredLeads.map(lead => lead.id);
-  const events =
-    leadIds.length > 0
-      ? await db
-          .select({
-            leadId: leadFunnelEvents.leadId,
-            eventType: leadFunnelEvents.eventType,
-            channel: leadFunnelEvents.channel,
-            campaignKey: leadFunnelEvents.campaignKey,
-          })
-          .from(leadFunnelEvents)
-          .where(
-            and(
-              inArray(leadFunnelEvents.leadId, leadIds),
-              gte(leadFunnelEvents.occurredAt, start),
-              lte(leadFunnelEvents.occurredAt, end)
+    const cohortLeads = await db
+      .select({
+        id: leads.id,
+        sourcePlatform: leads.sourcePlatform,
+        discoveryQuery: leads.discoveryQuery,
+        isLinktreeVerified: leads.isLinktreeVerified,
+        hasPaidTier: leads.hasPaidTier,
+        hasTrackingPixels: leads.hasTrackingPixels,
+        musicToolsDetected: leads.musicToolsDetected,
+      })
+      .from(leads)
+      .where(and(...whereClauses));
+
+    const filteredLeads = cohortLeads.filter(lead => {
+      if (
+        filters.musicTool &&
+        !lead.musicToolsDetected.includes(filters.musicTool)
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const leadIds = filteredLeads.map(lead => lead.id);
+    const events =
+      leadIds.length > 0
+        ? await db
+            .select({
+              leadId: leadFunnelEvents.leadId,
+              eventType: leadFunnelEvents.eventType,
+              channel: leadFunnelEvents.channel,
+              campaignKey: leadFunnelEvents.campaignKey,
+            })
+            .from(leadFunnelEvents)
+            .where(
+              and(
+                inArray(leadFunnelEvents.leadId, leadIds),
+                gte(leadFunnelEvents.occurredAt, start),
+                lte(leadFunnelEvents.occurredAt, end)
+              )
             )
-          )
-      : [];
+        : [];
 
-  const eventMap = new Map<string, Set<string>>();
-  for (const event of events) {
-    if (filters.channel && event.channel !== filters.channel) continue;
-    if (filters.campaignKey && event.campaignKey !== filters.campaignKey) {
-      continue;
+    const eventMap = new Map<string, Set<string>>();
+    for (const event of events) {
+      if (filters.channel && event.channel !== filters.channel) continue;
+      if (filters.campaignKey && event.campaignKey !== filters.campaignKey) {
+        continue;
+      }
+
+      const existing = eventMap.get(event.leadId) ?? new Set<string>();
+      existing.add(event.eventType);
+      eventMap.set(event.leadId, existing);
     }
 
-    const existing = eventMap.get(event.leadId) ?? new Set<string>();
-    existing.add(event.eventType);
-    eventMap.set(event.leadId, existing);
-  }
+    const summary = buildBreakdown('all', filteredLeads, eventMap);
 
-  const summary = buildBreakdown('all', filteredLeads, eventMap);
+    const sourceGroups = new Map<string, LeadRow[]>();
+    const pixelGroups = new Map<string, LeadRow[]>();
+    const verifiedGroups = new Map<string, LeadRow[]>();
+    const paidTierGroups = new Map<string, LeadRow[]>();
+    const keywordGroups = new Map<string, LeadRow[]>();
+    const toolGroups = new Map<string, LeadRow[]>();
 
-  const sourceGroups = new Map<string, LeadRow[]>();
-  const pixelGroups = new Map<string, LeadRow[]>();
-  const verifiedGroups = new Map<string, LeadRow[]>();
-  const paidTierGroups = new Map<string, LeadRow[]>();
-  const keywordGroups = new Map<string, LeadRow[]>();
-  const toolGroups = new Map<string, LeadRow[]>();
+    for (const lead of filteredLeads) {
+      sourceGroups.set(lead.sourcePlatform, [
+        ...(sourceGroups.get(lead.sourcePlatform) ?? []),
+        lead,
+      ]);
+      pixelGroups.set(
+        lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels',
+        [
+          ...(pixelGroups.get(
+            lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels'
+          ) ?? []),
+          lead,
+        ]
+      );
+      verifiedGroups.set(
+        lead.isLinktreeVerified ? 'verified' : 'not_verified',
+        [
+          ...(verifiedGroups.get(
+            lead.isLinktreeVerified ? 'verified' : 'not_verified'
+          ) ?? []),
+          lead,
+        ]
+      );
+      paidTierGroups.set(lead.hasPaidTier ? 'paid_tier' : 'free_tier', [
+        ...(paidTierGroups.get(lead.hasPaidTier ? 'paid_tier' : 'free_tier') ??
+          []),
+        lead,
+      ]);
+      keywordGroups.set(lead.discoveryQuery ?? 'unknown', [
+        ...(keywordGroups.get(lead.discoveryQuery ?? 'unknown') ?? []),
+        lead,
+      ]);
 
-  for (const lead of filteredLeads) {
-    sourceGroups.set(lead.sourcePlatform, [
-      ...(sourceGroups.get(lead.sourcePlatform) ?? []),
-      lead,
-    ]);
-    pixelGroups.set(lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels', [
-      ...(pixelGroups.get(
-        lead.hasTrackingPixels ? 'tracking_pixels' : 'no_pixels'
-      ) ?? []),
-      lead,
-    ]);
-    verifiedGroups.set(lead.isLinktreeVerified ? 'verified' : 'not_verified', [
-      ...(verifiedGroups.get(
-        lead.isLinktreeVerified ? 'verified' : 'not_verified'
-      ) ?? []),
-      lead,
-    ]);
-    paidTierGroups.set(lead.hasPaidTier ? 'paid_tier' : 'free_tier', [
-      ...(paidTierGroups.get(lead.hasPaidTier ? 'paid_tier' : 'free_tier') ??
-        []),
-      lead,
-    ]);
-    keywordGroups.set(lead.discoveryQuery ?? 'unknown', [
-      ...(keywordGroups.get(lead.discoveryQuery ?? 'unknown') ?? []),
-      lead,
-    ]);
-
-    if (lead.musicToolsDetected.length === 0) {
-      toolGroups.set('none', [...(toolGroups.get('none') ?? []), lead]);
-    } else {
-      for (const tool of lead.musicToolsDetected) {
-        toolGroups.set(tool, [...(toolGroups.get(tool) ?? []), lead]);
+      if (lead.musicToolsDetected.length === 0) {
+        toolGroups.set('none', [...(toolGroups.get('none') ?? []), lead]);
+      } else {
+        for (const tool of lead.musicToolsDetected) {
+          toolGroups.set(tool, [...(toolGroups.get(tool) ?? []), lead]);
+        }
       }
     }
-  }
 
-  return {
-    filters: {
-      start: start.toISOString(),
-      end: end.toISOString(),
-    },
-    summary: {
-      scraped: summary.scraped,
-      qualified: summary.qualified,
-      approved: summary.approved,
-      contacted: summary.contacted,
-      emailQueued: summary.emailQueued,
-      dmSent: summary.dmSent,
-      claimClicks: summary.claimClicks,
-      signups: summary.signups,
-      onboardingCompleted: summary.onboardingCompleted,
-      paidConversions: summary.paidConversions,
-    },
-    sourceBreakdown: buildGroupedBreakdown(
-      Array.from(sourceGroups.entries()),
-      eventMap
-    ),
-    musicToolBreakdown: buildGroupedBreakdown(
-      Array.from(toolGroups.entries()),
-      eventMap
-    ),
-    pixelBreakdown: buildGroupedBreakdown(
-      Array.from(pixelGroups.entries()),
-      eventMap
-    ),
-    verifiedBreakdown: buildGroupedBreakdown(
-      Array.from(verifiedGroups.entries()),
-      eventMap
-    ),
-    paidTierBreakdown: buildGroupedBreakdown(
-      Array.from(paidTierGroups.entries()),
-      eventMap
-    ),
-    keywordBreakdown: buildGroupedBreakdown(
-      Array.from(keywordGroups.entries()),
-      eventMap
-    ),
-    rampRecommendation: await getRampRecommendation(),
-  };
+    return {
+      filters: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+      summary: {
+        scraped: summary.scraped,
+        qualified: summary.qualified,
+        approved: summary.approved,
+        contacted: summary.contacted,
+        emailQueued: summary.emailQueued,
+        dmSent: summary.dmSent,
+        claimClicks: summary.claimClicks,
+        signups: summary.signups,
+        onboardingCompleted: summary.onboardingCompleted,
+        paidConversions: summary.paidConversions,
+      },
+      sourceBreakdown: buildGroupedBreakdown(
+        Array.from(sourceGroups.entries()),
+        eventMap
+      ),
+      musicToolBreakdown: buildGroupedBreakdown(
+        Array.from(toolGroups.entries()),
+        eventMap
+      ),
+      pixelBreakdown: buildGroupedBreakdown(
+        Array.from(pixelGroups.entries()),
+        eventMap
+      ),
+      verifiedBreakdown: buildGroupedBreakdown(
+        Array.from(verifiedGroups.entries()),
+        eventMap
+      ),
+      paidTierBreakdown: buildGroupedBreakdown(
+        Array.from(paidTierGroups.entries()),
+        eventMap
+      ),
+      keywordBreakdown: buildGroupedBreakdown(
+        Array.from(keywordGroups.entries()),
+        eventMap
+      ),
+      rampRecommendation: await getRampRecommendation(),
+    };
+  } catch (error) {
+    if (isMissingLeadReportingSchemaError(error)) {
+      await captureWarning(
+        '[leads/reporting] GTM reporting schema missing; returning empty report',
+        error
+      );
+      return makeEmptyReport(
+        start,
+        end,
+        'GTM reporting schema is not fully available in this environment yet.'
+      );
+    }
+
+    captureError('Error building lead funnel report', error);
+    return makeEmptyReport(
+      start,
+      end,
+      'GTM reporting is temporarily unavailable.'
+    );
+  }
 }
