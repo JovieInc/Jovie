@@ -36,6 +36,66 @@ interface PageProps {
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
+function toURLSearchParams(
+  allSearchParams: Record<string, string | string[] | undefined>
+): URLSearchParams {
+  return new URLSearchParams(
+    Object.entries(allSearchParams).flatMap(([key, value]) => {
+      if (Array.isArray(value)) {
+        return value.map(v => [key, v]);
+      }
+      return typeof value === 'string' ? [[key, value]] : [];
+    })
+  );
+}
+
+async function guardUnreleasedContent(
+  track: { releaseDate: Date | null },
+  creatorId: string
+): Promise<void> {
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
+  if (isUnreleased) {
+    const creatorPlan = await getCreatorPlan(creatorId);
+    if (!creatorPlan.canAccessFutureReleases) {
+      notFound();
+    }
+  }
+}
+
+function handleDspRedirect(
+  dsp: string,
+  track: {
+    id: string;
+    title: string;
+    providerLinks: { providerId: string; url: string }[];
+  },
+  creatorId: string,
+  utmParams: Record<string, string>
+): never {
+  const providerKey = dsp as ProviderKey;
+  if (!PROVIDER_CONFIG[providerKey]) {
+    notFound();
+  }
+  const targetUrl = track.providerLinks.find(
+    link => link.providerId === providerKey
+  )?.url;
+  if (!targetUrl) {
+    notFound();
+  }
+
+  void trackServerEvent('smart_link_clicked', {
+    contentType: 'track',
+    contentId: track.id,
+    profileId: creatorId,
+    provider: providerKey,
+    contentTitle: track.title,
+    utmParams,
+  });
+
+  redirect(appendUTMParamsToUrl(targetUrl, utmParams));
+}
+
 export default async function TrackDeepLinkPage({
   params,
   searchParams,
@@ -44,15 +104,7 @@ export default async function TrackDeepLinkPage({
   const allSearchParams = await searchParams;
   const dspParam = allSearchParams.dsp;
   const dsp = typeof dspParam === 'string' ? dspParam : undefined;
-  const requestSearchParams = new URLSearchParams(
-    Object.entries(allSearchParams).flatMap(([key, value]) => {
-      if (Array.isArray(value)) {
-        return value.map(v => [key, v]);
-      }
-      return typeof value === 'string' ? [[key, value]] : [];
-    })
-  );
-  const utmParams = extractUTMParams(requestSearchParams);
+  const utmParams = extractUTMParams(toURLSearchParams(allSearchParams));
 
   if (!username || !slug || !trackSlug) {
     notFound();
@@ -67,7 +119,7 @@ export default async function TrackDeepLinkPage({
 
   // Resolve the parent release by slug
   const releaseContent = await getContentBySlug(creator.id, slug);
-  if (!releaseContent || releaseContent.type !== 'release') {
+  if (releaseContent?.type !== 'release') {
     notFound();
   }
 
@@ -77,39 +129,11 @@ export default async function TrackDeepLinkPage({
     notFound();
   }
 
-  // Guard: block access to unreleased content unless creator's plan allows it
-  const isUnreleased =
-    track.releaseDate && new Date(track.releaseDate) > new Date();
-  if (isUnreleased) {
-    const creatorPlan = await getCreatorPlan(creator.id);
-    if (!creatorPlan.canAccessFutureReleases) {
-      notFound();
-    }
-  }
+  await guardUnreleasedContent(track, creator.id);
 
   // If DSP is specified, redirect to the provider URL for this track
   if (dsp) {
-    const providerKey = dsp as ProviderKey;
-    if (!PROVIDER_CONFIG[providerKey]) {
-      notFound();
-    }
-    const targetUrl = track.providerLinks.find(
-      link => link.providerId === providerKey
-    )?.url;
-    if (!targetUrl) {
-      notFound();
-    }
-
-    void trackServerEvent('smart_link_clicked', {
-      contentType: 'track',
-      contentId: track.id,
-      profileId: creator.id,
-      provider: providerKey,
-      contentTitle: track.title,
-      utmParams,
-    });
-
-    redirect(appendUTMParamsToUrl(targetUrl, utmParams));
+    handleDspRedirect(dsp, track, creator.id, utmParams);
   }
 
   // Build provider data for the landing page
@@ -254,7 +278,7 @@ export async function generateMetadata({
   }
 
   const releaseContent = await getContentBySlug(creator.id, slug);
-  if (!releaseContent || releaseContent.type !== 'release') {
+  if (releaseContent?.type !== 'release') {
     return { title: 'Not Found' };
   }
 
