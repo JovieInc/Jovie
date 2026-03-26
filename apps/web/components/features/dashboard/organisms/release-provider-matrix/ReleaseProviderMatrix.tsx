@@ -116,6 +116,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSaving,
     isSyncing,
     updateRow,
+    patchRow,
     openEditor,
     closeEditor,
     handleCopy,
@@ -459,6 +460,13 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       updateRow(updated);
     },
     [updateRow]
+  );
+
+  const handleReleaseArtworkUploaded = useCallback(
+    (releaseId: string, artworkUrl: string) => {
+      patchRow(releaseId, { artworkUrl });
+    },
+    [patchRow]
   );
 
   // Show import progress banner when actively importing
@@ -909,7 +917,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
             artistName={artistName}
             onClose={() => setAddReleaseOpen(false)}
             onCreated={handleAddReleaseCreated}
-            onReleaseUpdated={handleReleaseChange}
+            onArtworkUploaded={handleReleaseArtworkUploaded}
           />
         </Suspense>
       )}

@@ -119,6 +119,22 @@ export function useReleaseProviderMatrix({
     );
   }, []);
 
+  const patchRow = useCallback(
+    (releaseId: string, patch: Partial<ReleaseViewModel>) => {
+      setRawRows(prev =>
+        prev.map(row =>
+          row.id === releaseId ? { ...row, ...patch, id: row.id } : row
+        )
+      );
+      setEditingRelease(current =>
+        current?.id === releaseId
+          ? { ...current, ...patch, id: current.id }
+          : current
+      );
+    },
+    []
+  );
+
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
       const absoluteUrl = `${getBaseUrl()}${path}`;
@@ -435,6 +451,7 @@ export function useReleaseProviderMatrix({
     openEditor,
     closeEditor,
     updateRow,
+    patchRow,
     handleCopy,
     handleSave,
     handleReset,

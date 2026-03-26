@@ -48,7 +48,7 @@ export interface AddReleaseSidebarProps {
   readonly artistName?: string | null;
   readonly onClose: () => void;
   readonly onCreated: (release: ReleaseViewModel) => void;
-  readonly onReleaseUpdated?: (release: ReleaseViewModel) => void;
+  readonly onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
 }
 
 export function AddReleaseSidebar({
@@ -56,7 +56,7 @@ export function AddReleaseSidebar({
   artistName,
   onClose,
   onCreated,
-  onReleaseUpdated,
+  onArtworkUploaded,
 }: AddReleaseSidebarProps) {
   const [title, setTitle] = useState('');
   const [releaseType, setReleaseType] = useState<ReleaseType>('single');
@@ -172,10 +172,7 @@ export function AddReleaseSidebar({
             };
 
             if (uploadResult.artworkUrl) {
-              onReleaseUpdated?.({
-                ...createdRelease,
-                artworkUrl: uploadResult.artworkUrl,
-              });
+              onArtworkUploaded?.(createdRelease.id, uploadResult.artworkUrl);
             }
           } catch {
             toast.warning(
@@ -194,7 +191,7 @@ export function AddReleaseSidebar({
     isExplicit,
     onClose,
     onCreated,
-    onReleaseUpdated,
+    onArtworkUploaded,
     releaseDate,
     releaseType,
     resetForm,
@@ -203,9 +200,13 @@ export function AddReleaseSidebar({
   ]);
 
   const handleClose = useCallback(() => {
+    if (isSubmitting) {
+      return;
+    }
+
     resetForm();
     onClose();
-  }, [onClose, resetForm]);
+  }, [isSubmitting, onClose, resetForm]);
 
   return (
     <EntitySidebarShell

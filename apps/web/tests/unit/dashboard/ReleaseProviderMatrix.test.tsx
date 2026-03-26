@@ -285,33 +285,50 @@ vi.mock(
     AddReleaseSidebar: ({
       isOpen,
       onCreated,
+      onArtworkUploaded,
     }: {
       isOpen: boolean;
       onCreated: (
         release: import('@/lib/discography/types').ReleaseViewModel
       ) => void;
-    }) =>
-      isOpen ? (
+      onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
+    }) => (
+      <div>
+        {isOpen ? (
+          <button
+            type='button'
+            data-testid='mock-add-release-sidebar'
+            onClick={() =>
+              onCreated({
+                profileId: 'profile-1',
+                id: 'created-release',
+                title: 'Created Release',
+                slug: 'created-release',
+                smartLinkPath: '/artist/created-release',
+                providers: [],
+                releaseType: 'single',
+                isExplicit: false,
+                totalTracks: 1,
+              })
+            }
+          >
+            finish-create
+          </button>
+        ) : null}
         <button
           type='button'
-          data-testid='mock-add-release-sidebar'
+          data-testid='mock-add-release-artwork-uploaded'
           onClick={() =>
-            onCreated({
-              profileId: 'profile-1',
-              id: 'created-release',
-              title: 'Created Release',
-              slug: 'created-release',
-              smartLinkPath: '/artist/created-release',
-              providers: [],
-              releaseType: 'single',
-              isExplicit: false,
-              totalTracks: 1,
-            })
+            onArtworkUploaded?.(
+              'created-release',
+              'https://cdn.example.com/cover.png'
+            )
           }
         >
-          finish-create
+          finish-artwork-upload
         </button>
-      ) : null,
+      </div>
+    ),
   })
 );
 
@@ -619,6 +636,51 @@ describe('ReleaseProviderMatrix', () => {
       });
 
       fireEvent.click(screen.getByTestId('release-sidebar-update'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
+    });
+
+    it('merges background artwork updates without overwriting newer drawer edits', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create a new release' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Created Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('release-sidebar-update'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-artwork-uploaded'));
 
       await waitFor(() => {
         expect(screen.getByTestId('release-sidebar')).toHaveTextContent(

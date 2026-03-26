@@ -115,16 +115,21 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     footer,
     'data-testid': testId,
+    onClose,
     title,
   }: {
     children: ReactNode;
     entityHeader?: ReactNode;
     footer?: ReactNode;
     'data-testid'?: string;
+    onClose?: () => void;
     title?: ReactNode;
   }) => (
     <div data-testid={testId}>
       <div data-testid='shell-title'>{title}</div>
+      <button type='button' data-testid='shell-close' onClick={onClose}>
+        Close
+      </button>
       <div data-testid='shell-entity-header'>{entityHeader}</div>
       <div data-testid='shell-body'>{children}</div>
       <div data-testid='shell-footer'>{footer}</div>
@@ -261,7 +266,7 @@ const defaultProps = {
   artistName: 'Test Artist',
   onClose: vi.fn(),
   onCreated: vi.fn(),
-  onReleaseUpdated: vi.fn(),
+  onArtworkUploaded: vi.fn(),
 };
 
 describe('AddReleaseSidebar', () => {
@@ -413,10 +418,10 @@ describe('AddReleaseSidebar', () => {
         })
       );
     });
-    expect(defaultProps.onReleaseUpdated).toHaveBeenCalledWith({
-      ...defaultRelease,
-      artworkUrl: 'https://cdn.example.com/cover.png',
-    });
+    expect(defaultProps.onArtworkUploaded).toHaveBeenCalledWith(
+      'release-1',
+      'https://cdn.example.com/cover.png'
+    );
   });
 
   it('continues into the release drawer flow when artwork upload fails after creation', async () => {
@@ -457,9 +462,55 @@ describe('AddReleaseSidebar', () => {
         })
       );
     });
-    expect(defaultProps.onReleaseUpdated).not.toHaveBeenCalled();
+    expect(defaultProps.onArtworkUploaded).not.toHaveBeenCalled();
     expect(mockToast.warning).toHaveBeenCalledWith(
       'Release created, but artwork upload failed. You can retry from the release drawer.'
     );
+  });
+
+  it('ignores close requests while the create request is still pending', async () => {
+    const user = userEvent.setup();
+    let resolveCreate:
+      | ((value: {
+          success: boolean;
+          message: string;
+          releaseId: string;
+          release: ReleaseViewModel;
+        }) => void)
+      | null = null;
+
+    mockCreateRelease.mockReturnValue(
+      new Promise(resolve => {
+        resolveCreate = resolve;
+      })
+    );
+
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Creating/i })).toBeDisabled();
+    });
+
+    await user.click(screen.getByTestId('shell-close'));
+
+    expect(defaultProps.onClose).not.toHaveBeenCalled();
+
+    resolveCreate?.({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+
+    await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
   });
 });

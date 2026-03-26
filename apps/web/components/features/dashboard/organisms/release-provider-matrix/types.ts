@@ -100,6 +100,7 @@ export interface UseReleaseProviderMatrixReturn {
   openEditor: (release: ReleaseViewModel) => void;
   closeEditor: () => void;
   updateRow: (updated: ReleaseViewModel) => void;
+  patchRow: (releaseId: string, patch: Partial<ReleaseViewModel>) => void;
   handleCopy: (path: string, label: string, testId: string) => Promise<string>;
   handleSave: (provider: ProviderKey) => void;
   handleReset: (provider: ProviderKey) => void;
