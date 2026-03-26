@@ -7,10 +7,19 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.76] - 2026-03-25
 
+### Changed
+
+- Settings pages now use a cleaner layout — flat section headers replace nested cards, eliminating redundant title bars
+- Arrow keys in admin tables now update the detail panel immediately without requiring a click
+
 ### Fixed
 
 - Fixed sign-in across all environments by routing authentication through the correct Clerk endpoint
 - [internal] Replaced dead `clerk.jov.ie` with `distinct-giraffe-5.clerk.accounts.dev` everywhere: fetch() proxy in middleware, root + app vercel.json rewrites, CSP allowlists, preconnect hints; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+
+### Removed
+
+- [internal] Removed 1,100+ lines of dead settings code (SettingsPolished, DashboardSettings, passthrough wrappers)
 
 ## [26.4.75] - 2026-03-25
 

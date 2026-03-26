@@ -3,9 +3,9 @@
 import { Input } from '@jovie/ui';
 import { toast } from 'sonner';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -66,15 +66,19 @@ export function SettingsProfileSection({
   };
 
   return (
-    <div>
+    <DashboardCard
+      variant='settings'
+      padding='none'
+      className='overflow-hidden'
+    >
       <ContentSectionHeader
         title='Profile identity'
         subtitle='Control the display name, username, image, and place details fans see.'
-        className='min-h-0 px-1 py-1'
+        className='min-h-0'
         actions={<SettingsStatusPill status={profileSaveStatus} />}
         actionsClassName='w-auto shrink-0'
       />
-      <div className='space-y-1 px-1 py-1'>
+      <div className='space-y-1 px-4 py-3'>
         <div className='flex items-center justify-between gap-4 py-2'>
           <span className='text-[13px] text-primary-token'>
             Profile picture
@@ -250,6 +254,6 @@ export function SettingsProfileSection({
           />
         </div>
       </div>
-    </div>
+    </DashboardCard>
   );
 }
