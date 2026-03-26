@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardAudienceClient } from '@/features/dashboard/organisms/DashboardAudienceClient';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
@@ -71,7 +71,7 @@ async function AudienceContent({
 
     const profileUrl =
       artist?.handle && artist.handle.length > 0
-        ? `${trimTrailingSlashes(APP_URL)}/${trimLeadingSlashes(artist.handle)}`
+        ? `${trimTrailingSlashes(BASE_URL)}/${trimLeadingSlashes(artist.handle)}`
         : undefined;
 
     // Parse search params using nuqs for type-safe URL state
