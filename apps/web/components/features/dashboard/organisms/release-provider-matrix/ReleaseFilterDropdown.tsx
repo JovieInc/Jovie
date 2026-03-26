@@ -115,7 +115,7 @@ function SearchInput({
           onChange={e => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full rounded-full border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
+            'w-full rounded-[6px] border border-transparent bg-surface-0 py-1.5 pl-7 pr-6 text-[13px]',
             'text-primary-token placeholder:text-tertiary-token',
             'transition-[background-color,border-color,box-shadow] duration-150',
             'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20'
@@ -157,7 +157,7 @@ function ActiveFilterPill({
     values.length > 1 ? `${values.length} selected` : values[0];
 
   return (
-    <div className='flex items-center gap-0.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) text-[11px]'>
+    <div className='flex items-center gap-0.5 rounded-[6px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) text-[11px]'>
       <div className='flex items-center gap-1 py-1 pl-2 pr-0.5'>
         {icon && (
           <span className='flex h-3.5 w-3.5 items-center justify-center text-tertiary-token'>
@@ -242,7 +242,7 @@ function SubmenuCheckboxItem({
       onKeyDown={handleKeyDown}
       className={cn(
         MENU_ITEM_BASE,
-        'w-full rounded-full border border-transparent',
+        'w-full rounded-[6px] border border-transparent',
         checked && 'text-primary-token'
       )}
     >
@@ -586,7 +586,7 @@ export function ReleaseFilterDropdown({
                       }
                     }}
                   >
-                    <DropdownMenuSubTrigger className='justify-between rounded-full'>
+                    <DropdownMenuSubTrigger className='justify-between rounded-[6px]'>
                       <div className='flex items-center gap-2'>
                         <Icon
                           name='Building2'
@@ -594,7 +594,7 @@ export function ReleaseFilterDropdown({
                         />
                         <span>Label</span>
                         {labelFilterCount > 0 && (
-                          <span className='rounded-full bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
+                          <span className='rounded-[6px] bg-(--linear-accent-subtle) px-1.5 py-0.5 text-[10px] font-[510] text-(--linear-accent)'>
                             {labelFilterCount}
                           </span>
                         )}
@@ -641,7 +641,7 @@ export function ReleaseFilterDropdown({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
-                  className='rounded-full text-tertiary-token hover:text-primary-token'
+                  className='rounded-[6px] text-tertiary-token hover:text-primary-token'
                   onSelect={() => {
                     onFiltersChange({
                       releaseTypes: [],

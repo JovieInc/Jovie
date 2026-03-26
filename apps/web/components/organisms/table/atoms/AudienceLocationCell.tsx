@@ -25,7 +25,9 @@ export function AudienceLocationCell({
         className='h-3.5 w-3.5 text-tertiary-token'
         aria-hidden='true'
       />
-      <TruncatedText lines={1}>{locationLabel || 'Unknown'}</TruncatedText>
+      <TruncatedText lines={1}>
+        {locationLabel ? decodeURIComponent(locationLabel) : 'Unknown'}
+      </TruncatedText>
     </div>
   );
 }
