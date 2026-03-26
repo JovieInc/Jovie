@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import {
+  type PreviewPanelData,
   type PreviewPanelLink,
   usePreviewPanelData,
   usePreviewPanelState,
@@ -68,6 +69,139 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Check if the platform already has a link (YouTube allows multiples). */
+function checkDuplicatePlatform(
+  previewData: { links: PreviewPanelLink[] },
+  link: DetectedLink
+): boolean {
+  if (link.platform.id === 'youtube') return false;
+  return previewData.links.some(l => l.platform === link.platform.id);
+}
+
+/** After server save, reconcile the optimistic link with the real ID or clean up. */
+function reconcileAfterSave(
+  linkId: string | undefined,
+  optimisticId: string,
+  wasDeletedWhilePending: boolean,
+  deletedWhilePendingRef: { current: Set<string> },
+  selectedProfile: { id: string },
+  removeLinkMutation: {
+    mutate: (
+      args: { profileId: string; linkId: string },
+      opts: { onError: () => void }
+    ) => void;
+  },
+  previewDataRef: { current: PreviewPanelData | null },
+  setPreviewData: (data: PreviewPanelData) => void
+): boolean {
+  if (wasDeletedWhilePending) {
+    deletedWhilePendingRef.current.delete(optimisticId);
+    if (linkId && selectedProfile) {
+      removeLinkMutation.mutate(
+        { profileId: selectedProfile.id, linkId },
+        { onError: () => {} }
+      );
+    }
+    return false; // signal: do not show success toast
+  }
+
+  if (linkId) {
+    const current = previewDataRef.current;
+    if (current) {
+      setPreviewData({
+        ...current,
+        links: current.links.map(l =>
+          l.id === optimisticId ? { ...l, id: linkId } : l
+        ),
+      });
+    }
+  }
+  return true; // signal: show success toast
+}
+
+/** Persist a new link to the server and reconcile the optimistic UI afterward. */
+async function persistNewLink(
+  selectedProfile: { id: string },
+  link: DetectedLink,
+  optimisticLink: PreviewPanelLink,
+  pendingAddsRef: { current: Set<string> },
+  deletedWhilePendingRef: { current: Set<string> },
+  removeLinkMutation: {
+    mutate: (
+      args: { profileId: string; linkId: string },
+      opts: { onError: () => void }
+    ) => void;
+  },
+  previewDataRef: { current: PreviewPanelData | null },
+  setPreviewData: (data: PreviewPanelData) => void
+): Promise<void> {
+  pendingAddsRef.current.add(optimisticLink.id);
+  try {
+    const response = await fetch('/api/chat/confirm-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId: selectedProfile.id,
+        platform: link.platform.id,
+        url: link.originalUrl,
+        normalizedUrl: link.normalizedUrl,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add link');
+    }
+
+    const { linkId } = (await response.json()) as { linkId: string };
+    const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
+      optimisticLink.id
+    );
+
+    const shouldToast = reconcileAfterSave(
+      linkId,
+      optimisticLink.id,
+      wasDeletedWhilePending,
+      deletedWhilePendingRef,
+      selectedProfile,
+      removeLinkMutation,
+      previewDataRef,
+      setPreviewData
+    );
+    if (shouldToast) toast.success(`${link.platform.name} link added`);
+  } catch {
+    const shouldToast = revertOptimisticAdd(
+      optimisticLink.id,
+      deletedWhilePendingRef,
+      previewDataRef,
+      setPreviewData
+    );
+    if (shouldToast) toast.error('Failed to add link');
+  } finally {
+    pendingAddsRef.current.delete(optimisticLink.id);
+  }
+}
+
+/** Revert an optimistic add on failure, unless the link was already deleted by the user. */
+function revertOptimisticAdd(
+  optimisticId: string,
+  deletedWhilePendingRef: { current: Set<string> },
+  previewDataRef: { current: PreviewPanelData | null },
+  setPreviewData: (data: PreviewPanelData) => void
+): boolean {
+  if (deletedWhilePendingRef.current.has(optimisticId)) {
+    deletedWhilePendingRef.current.delete(optimisticId);
+    return false; // already cleaned up
+  }
+  const current = previewDataRef.current;
+  if (current) {
+    setPreviewData({
+      ...current,
+      links: current.links.filter(l => l.id !== optimisticId),
+    });
+  }
+  return true; // signal: show error toast
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -75,7 +209,9 @@ export function ProfileContactSidebar() {
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
   const previewDataRef = useRef(previewData);
-  previewDataRef.current = previewData;
+  useEffect(() => {
+    previewDataRef.current = previewData;
+  }, [previewData]);
 
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
@@ -257,15 +393,10 @@ export function ProfileContactSidebar() {
       if (!selectedProfile || !previewData) return;
 
       // Prevent duplicate platforms (except YouTube which can have multiple channels)
-      if (link.platform.id !== 'youtube') {
-        const existingLink = previewData.links.find(
-          l => l.platform === link.platform.id
-        );
-        if (existingLink) {
-          toast.error(`${link.platform.name} link already exists`);
-          setIsAddingLink(false);
-          return;
-        }
+      if (checkDuplicatePlatform(previewData, link)) {
+        toast.error(`${link.platform.name} link already exists`);
+        setIsAddingLink(false);
+        return;
       }
 
       // Optimistically add to sidebar
@@ -292,70 +423,16 @@ export function ProfileContactSidebar() {
       if (targetCategory) setSelectedCategory(targetCategory);
 
       // Save to server via confirm-link endpoint
-      pendingAddsRef.current.add(optimisticLink.id);
-      try {
-        const response = await fetch('/api/chat/confirm-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: selectedProfile.id,
-            platform: link.platform.id,
-            url: link.originalUrl,
-            normalizedUrl: link.normalizedUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add link');
-        }
-
-        const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
-          optimisticLink.id
-        );
-
-        if (wasDeletedWhilePending) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
-            removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
-              { onError: () => {} }
-            );
-          }
-          return;
-        }
-
-        if (linkId) {
-          const current = previewDataRef.current;
-          if (current) {
-            setPreviewData({
-              ...current,
-              links: current.links.map(l =>
-                l.id === optimisticLink.id ? { ...l, id: linkId } : l
-              ),
-            });
-          }
-        }
-
-        toast.success(`${link.platform.name} link added`);
-      } catch {
-        // If deleted while pending, the UI is already correct (link removed)
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          return;
-        }
-        // Revert on failure
-        const current = previewDataRef.current;
-        if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.filter(l => l.id !== optimisticLink.id),
-          });
-        }
-        toast.error('Failed to add link');
-      } finally {
-        pendingAddsRef.current.delete(optimisticLink.id);
-      }
+      await persistNewLink(
+        selectedProfile,
+        link,
+        optimisticLink,
+        pendingAddsRef,
+        deletedWhilePendingRef,
+        removeLinkMutation,
+        previewDataRef,
+        setPreviewData
+      );
     },
     [
       selectedProfile,
