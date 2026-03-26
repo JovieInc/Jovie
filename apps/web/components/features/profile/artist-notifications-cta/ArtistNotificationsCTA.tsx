@@ -248,9 +248,9 @@ function FormFooter({
   isInputFocused,
   error,
 }: {
-  disclaimerId: string;
-  isInputFocused: boolean;
-  error: string | null;
+  readonly disclaimerId: string;
+  readonly isInputFocused: boolean;
+  readonly error: string | null;
 }) {
   const showDisclaimer = isInputFocused && !error;
   return (
