@@ -252,7 +252,7 @@ export function createSmartLinkCellRenderer(
   };
 }
 
-/** Combined right column: smart link + year (responsive) */
+/** Combined right column: smart link + popularity + date */
 export function createRightMetaCellRenderer(
   isSmartLinkLocked?: (releaseId: string) => boolean,
   getSmartLinkLockReason?: (releaseId: string) => 'scheduled' | 'cap' | null
@@ -276,8 +276,8 @@ export function createRightMetaCellRenderer(
       : 'Unknown release date';
 
     return (
-      <div className='grid min-w-[208px] grid-cols-[minmax(124px,1fr)_10px_54px] items-center justify-end gap-x-1.5 text-[11.5px] font-[440] tracking-[-0.01em] text-secondary-token lg:min-w-[226px] lg:grid-cols-[minmax(140px,1fr)_12px_54px] lg:gap-x-2'>
-        <div className='min-w-0'>
+      <div className='flex items-center gap-2.5'>
+        <div className='hidden min-w-0 flex-1 lg:block'>
           <SmartLinkCell
             release={release}
             locked={isSmartLinkLocked?.(release.id)}
@@ -285,12 +285,10 @@ export function createRightMetaCellRenderer(
           />
         </div>
 
-        <div className='flex w-[10px] items-center justify-center lg:w-[12px]'>
-          <PopularityIcon popularity={release.spotifyPopularity} />
-        </div>
+        <PopularityIcon popularity={release.spotifyPopularity} />
 
         <span
-          className='w-[54px] text-right tabular-nums text-[9.5px] font-[430] tracking-[0.01em] text-secondary-token'
+          className='shrink-0 tabular-nums text-[11px] font-[430] text-tertiary-token'
           title={yearTitle}
         >
           {dateLabel}

@@ -69,8 +69,8 @@ export const ReleaseCell = memo(function ReleaseCell({
   );
 
   return (
-    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2.5'>
-      <div className='flex w-[16px] items-center justify-center pt-0.5'>
+    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-x-2.5'>
+      <div className='flex w-[16px] items-center justify-center'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
