@@ -15,7 +15,7 @@ describe('SettingsSection', () => {
     );
 
     const heading = screen.getByRole('heading', { name: 'Artist Profile' });
-    expect(heading.className).toContain('text-[14px]');
+    expect(heading.className).toContain('text-[15px]');
     expect(heading.className).toContain('dashboard-heading');
 
     const description = screen

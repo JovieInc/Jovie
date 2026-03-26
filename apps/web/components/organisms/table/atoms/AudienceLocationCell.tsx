@@ -26,7 +26,15 @@ export function AudienceLocationCell({
         aria-hidden='true'
       />
       <TruncatedText lines={1}>
-        {locationLabel ? decodeURIComponent(locationLabel) : 'Unknown'}
+        {locationLabel
+          ? (() => {
+              try {
+                return decodeURIComponent(locationLabel);
+              } catch {
+                return locationLabel;
+              }
+            })()
+          : 'Unknown'}
       </TruncatedText>
     </div>
   );

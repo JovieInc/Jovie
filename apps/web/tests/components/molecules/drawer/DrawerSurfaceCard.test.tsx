@@ -30,8 +30,8 @@ describe('DrawerSurfaceCard', () => {
     const className =
       screen.getByTestId('surface-card').getAttribute('class') ?? '';
 
-    expect(className).toContain('rounded-[9px]');
+    expect(className).toContain('rounded-[10px]');
     expect(className).toContain('border-(--linear-app-frame-seam)');
-    expect(className).toContain('bg-[color-mix');
+    expect(className).toContain('bg-(--linear-app-content-surface)');
   });
 });

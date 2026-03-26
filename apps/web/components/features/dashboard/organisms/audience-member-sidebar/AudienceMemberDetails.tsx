@@ -45,7 +45,13 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
                 className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
                 aria-hidden
               />
-              {decodeURIComponent(member.locationLabel)}
+              {(() => {
+                try {
+                  return decodeURIComponent(member.locationLabel);
+                } catch {
+                  return member.locationLabel;
+                }
+              })()}
             </span>
           ) : (
             <span className='text-secondary-token'>Unknown</span>
