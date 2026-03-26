@@ -1,6 +1,7 @@
 'use client';
 
 import * as Switch from '@radix-ui/react-switch';
+import type { LucideIcon } from 'lucide-react';
 import {
   ArrowUpCircle,
   Check,
@@ -36,6 +37,26 @@ import {
   SW_ENABLED_KEY,
   unregisterServiceWorker,
 } from '@/lib/service-worker/control';
+
+function getStateIcon(state: string, DefaultIcon: LucideIcon): React.ReactNode {
+  if (state === 'loading' || state === 'promoting') {
+    return <Loader2 size={11} className='animate-spin' />;
+  }
+  if (state === 'done') {
+    return <Check size={11} className='text-[var(--color-accent)]' />;
+  }
+  return <DefaultIcon size={11} />;
+}
+
+function getStateLabel(
+  state: string,
+  labels: { loading: string; done: string; error: string; idle: string }
+): string {
+  if (state === 'loading' || state === 'promoting') return labels.loading;
+  if (state === 'done') return labels.done;
+  if (state === 'error') return labels.error;
+  return labels.idle;
+}
 
 function useLocalOverrides() {
   const [overrides, setOverridesState] = useState<Record<string, boolean>>(
@@ -230,13 +251,11 @@ export function DevToolbar({
           staging: data.stagingSha,
           prod: data.prodSha,
         });
-        setPromoteState(prev =>
-          prev === 'promoting' || prev === 'done'
-            ? prev
-            : data.needsPromote
-              ? 'ready'
-              : 'idle'
-        );
+        setPromoteState(prev => {
+          if (prev === 'promoting' || prev === 'done') return prev;
+          if (data.needsPromote) return 'ready';
+          return 'idle';
+        });
       } catch {
         // Silent fail — status is best-effort
       }
@@ -637,21 +656,14 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear session'
             >
-              {clearSessionState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : clearSessionState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Trash2 size={11} />
-              )}
+              {getStateIcon(clearSessionState, Trash2)}
               <span className='hidden sm:inline text-[10px]'>
-                {clearSessionState === 'loading'
-                  ? 'Clearing...'
-                  : clearSessionState === 'done'
-                    ? 'Cleared!'
-                    : clearSessionState === 'error'
-                      ? 'Failed'
-                      : 'Clear'}
+                {getStateLabel(clearSessionState, {
+                  loading: 'Clearing...',
+                  done: 'Cleared!',
+                  error: 'Failed',
+                  idle: 'Clear',
+                })}
               </span>
             </button>
           )}
@@ -667,21 +679,14 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
-              {unwaitlistState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : unwaitlistState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <UserCheck size={11} />
-              )}
+              {getStateIcon(unwaitlistState, UserCheck)}
               <span className='hidden sm:inline text-[10px]'>
-                {unwaitlistState === 'loading'
-                  ? 'Working...'
-                  : unwaitlistState === 'done'
-                    ? 'Done!'
-                    : unwaitlistState === 'error'
-                      ? 'Failed'
-                      : 'Unwaitlist'}
+                {getStateLabel(unwaitlistState, {
+                  loading: 'Working...',
+                  done: 'Done!',
+                  error: 'Failed',
+                  idle: 'Unwaitlist',
+                })}
               </span>
             </button>
           )}
@@ -737,29 +742,24 @@ export function DevToolbar({
                       : 'Promote to production'
                   }
                   className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    promoteState === 'done'
-                      ? 'text-[var(--color-accent)]'
-                      : promoteState === 'error'
-                        ? 'text-red-400'
-                        : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
+                    (
+                      {
+                        done: 'text-[var(--color-accent)]',
+                        error: 'text-red-400',
+                      } as Record<string, string>
+                    )[promoteState] ??
+                    'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
                   }`}
                   aria-label='Promote to production'
                 >
-                  {promoteState === 'promoting' ? (
-                    <Loader2 size={11} className='animate-spin' />
-                  ) : promoteState === 'done' ? (
-                    <Check size={11} />
-                  ) : (
-                    <ArrowUpCircle size={11} />
-                  )}
+                  {getStateIcon(promoteState, ArrowUpCircle)}
                   <span className='hidden sm:inline text-[10px]'>
-                    {promoteState === 'promoting'
-                      ? 'Deploying...'
-                      : promoteState === 'done'
-                        ? 'Deployed!'
-                        : promoteState === 'error'
-                          ? 'Failed'
-                          : 'Promote'}
+                    {getStateLabel(promoteState, {
+                      loading: 'Deploying...',
+                      done: 'Deployed!',
+                      error: 'Failed',
+                      idle: 'Promote',
+                    })}
                   </span>
                   {promoteState === 'ready' && promoteSha && (
                     <span className='hidden md:inline text-[9px] opacity-60'>

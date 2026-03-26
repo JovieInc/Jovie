@@ -131,6 +131,19 @@ function FeedbackActionsCell({
   );
 }
 
+/** Standalone cell renderer for Actions column (avoids defining inside parent component). */
+function renderFeedbackActionsCell({
+  row,
+  getContextMenuItems,
+}: {
+  readonly row: FeedbackRow;
+  readonly getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+}) {
+  return (
+    <FeedbackActionsCell row={row} getContextMenuItems={getContextMenuItems} />
+  );
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -232,12 +245,11 @@ export function AdminFeedbackTable({
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <FeedbackActionsCell
-            row={row.original}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ),
+        cell: ({ row }) =>
+          renderFeedbackActionsCell({
+            row: row.original,
+            getContextMenuItems,
+          }),
         size: 48,
       }),
     ],

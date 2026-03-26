@@ -238,6 +238,50 @@ function ActionsCellRenderer({
   );
 }
 
+/** Standalone header renderer for Actions column (avoids defining inside parent component). */
+function renderActionsHeader({
+  onSync,
+  isSyncing,
+}: {
+  readonly onSync?: () => void;
+  readonly isSyncing?: boolean;
+}) {
+  return <ActionsHeader onSync={onSync} isSyncing={isSyncing} />;
+}
+
+/** Standalone cell render function for Actions column (avoids defining inside parent component). */
+function renderActionsCellRenderer({
+  row,
+  getContextMenuItems,
+}: {
+  readonly row: { readonly original: TourDateViewModel };
+  readonly getContextMenuItems: (
+    tourDate: TourDateViewModel
+  ) => ContextMenuItemType[];
+}) {
+  return (
+    <ActionsCellRenderer row={row} getContextMenuItems={getContextMenuItems} />
+  );
+}
+
+/** Standalone cell render function for Status column. */
+function renderStatusCell(
+  ticketStatus: TourDateViewModel['ticketStatus'],
+  startDate: string
+) {
+  return <StatusCell ticketStatus={ticketStatus} startDate={startDate} />;
+}
+
+/** Standalone cell render function for Tickets column. */
+function renderTicketsCell(ticketUrl: string | null) {
+  return <TicketsCell ticketUrl={ticketUrl} />;
+}
+
+/** Standalone cell render function for Source column. */
+function renderSourceCell(provider: TourDateViewModel['provider']) {
+  return <SourceCell provider={provider} />;
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -295,12 +339,8 @@ export function TourDatesTable({
       columnHelper.accessor('ticketStatus', {
         id: 'status',
         header: 'Status',
-        cell: info => ( // NOSONAR
-          <StatusCell
-            ticketStatus={info.getValue()}
-            startDate={info.row.original.startDate}
-          />
-        ),
+        cell: info =>
+          renderStatusCell(info.getValue(), info.row.original.startDate),
         size: 100,
       }),
 
@@ -308,7 +348,7 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'tickets',
         header: 'Tickets',
-        cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />, // NOSONAR
+        cell: ({ row }) => renderTicketsCell(row.original.ticketUrl),
         size: 80,
       }),
 
@@ -316,20 +356,16 @@ export function TourDatesTable({
       columnHelper.accessor('provider', {
         id: 'source',
         header: 'Source',
-        cell: info => <SourceCell provider={info.getValue()} />, // NOSONAR
+        cell: info => renderSourceCell(info.getValue()),
         size: 100,
       }),
 
       // Actions column
       columnHelper.display({
         id: 'actions',
-        header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => (
-          <ActionsCellRenderer
-            row={row}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ), // NOSONAR - TanStack Table render prop
+        header: () => renderActionsHeader({ onSync, isSyncing }),
+        cell: ({ row }) =>
+          renderActionsCellRenderer({ row, getContextMenuItems }),
         size: 80,
       }),
     ];

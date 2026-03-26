@@ -114,6 +114,28 @@ function LeadActionsCell({
   );
 }
 
+/** Standalone cell renderer for Actions column (avoids defining inside parent component). */
+function renderLeadActionsCell({
+  lead,
+  onUpdateStatus,
+  actioning,
+}: {
+  readonly lead: AdminLead;
+  readonly onUpdateStatus: (
+    id: string,
+    status: 'approved' | 'rejected'
+  ) => void;
+  readonly actioning: ActioningState | null;
+}) {
+  return (
+    <LeadActionsCell
+      lead={lead}
+      onUpdateStatus={onUpdateStatus}
+      actioning={actioning}
+    />
+  );
+}
+
 function renderNameHandleCell({ row }: { row: { original: AdminLead } }) {
   const lead = row.original;
   return (
@@ -286,13 +308,12 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         id: 'actions',
         header: 'Actions',
         size: 80,
-        cell: ({ row }) => (
-          <LeadActionsCell
-            lead={row.original}
-            onUpdateStatus={updateLeadStatus}
-            actioning={actioningRef.current}
-          />
-        ),
+        cell: ({ row }) =>
+          renderLeadActionsCell({
+            lead: row.original,
+            onUpdateStatus: updateLeadStatus,
+            actioning: actioningRef.current,
+          }),
       }),
     ],
     [updateLeadStatus]
