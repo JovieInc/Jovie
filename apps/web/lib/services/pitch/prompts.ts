@@ -102,11 +102,22 @@ function buildReleaseSection(
   return lines;
 }
 
-export function buildUserPrompt(input: PitchInput): string {
+export function buildUserPrompt(
+  input: PitchInput,
+  instructions?: string
+): string {
   const sections = [
     ...buildArtistSection(input.artist),
     ...buildReleaseSection(input.release, input.tracks),
-    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits.`,
   ];
+
+  if (instructions?.trim()) {
+    sections.push(`\n## Artist Instructions`);
+    sections.push(instructions.trim());
+  }
+
+  sections.push(
+    `\nGenerate a playlist pitch for each platform. Stay strictly within character limits.`
+  );
   return sections.join('\n');
 }

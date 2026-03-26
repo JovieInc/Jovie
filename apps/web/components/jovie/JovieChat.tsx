@@ -10,7 +10,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
 import { buildInsightPrompt } from '@/lib/insights/chat-presentation';
-import { useInsightsSummaryQuery } from '@/lib/queries';
+import { useInsightsSummaryQuery, usePlanGate } from '@/lib/queries';
 
 import {
   ChatInput,
@@ -103,6 +103,7 @@ export function JovieChat({
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
   const { profileCompletion } = useDashboardData();
+  const { aiCanUseTools } = usePlanGate();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
@@ -554,6 +555,7 @@ export function JovieChat({
                       isFirstSession={isFirstSession}
                       latestReleaseTitle={latestReleaseTitle}
                       suggestions={insightSuggestions}
+                      canUseAdvancedTools={aiCanUseTools}
                     />
                   </>
                 )}

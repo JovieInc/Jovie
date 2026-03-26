@@ -1,3 +1,4 @@
+export { buildPitchInput } from './build-pitch-input';
 export { generatePitches, truncateToLimit } from './pitch-generator';
 export { buildSystemPrompt, buildUserPrompt } from './prompts';
 export {
