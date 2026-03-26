@@ -186,7 +186,7 @@ export function EntitySidebarShell({
         ) : (
           <>
             <div className='flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain lg:px-1.5 lg:pr-0.5'>
-              <div className='space-y-3'>
+              <div className='space-y-2'>
                 {isMinimalHeader && entityHeader ? (
                   <div data-testid='entity-sidebar-entity-header'>
                     {entityHeader}

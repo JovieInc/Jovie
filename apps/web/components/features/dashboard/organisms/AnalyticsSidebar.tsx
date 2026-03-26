@@ -6,6 +6,7 @@ import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerStatGrid,
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
   StatTile,
@@ -290,19 +291,10 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
           </div>
         </DrawerSurfaceCard>
       }
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as AnalyticsTab)}
-          options={ANALYTICS_TAB_OPTIONS}
-          className='w-full'
-          ariaLabel='Analytics data tabs'
-        />
-      }
     >
       <div
         className={cn(
-          'space-y-2.5 transition-opacity duration-150',
+          'space-y-2 transition-opacity duration-150',
           isFetching && !loading && 'opacity-70'
         )}
       >
@@ -324,7 +316,19 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
             />
           </div>
         </DrawerStatGrid>
-        <DrawerSurfaceCard className='min-h-[196px] p-2'>
+        <DrawerTabbedCard
+          testId='analytics-sidebar-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AnalyticsTab)}
+              options={ANALYTICS_TAB_OPTIONS}
+              className='w-full'
+              ariaLabel='Analytics data tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'cities' && (
             <RankedList
               icon={MapPin}
@@ -373,7 +377,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
               emptyMessage='No link data yet'
             />
           )}
-        </DrawerSurfaceCard>
+        </DrawerTabbedCard>
       </div>
     </EntitySidebarShell>
   );

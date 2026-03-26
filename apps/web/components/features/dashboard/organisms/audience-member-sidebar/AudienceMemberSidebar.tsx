@@ -10,14 +10,11 @@
 
 import { useState } from 'react';
 import {
-  DrawerSection,
-  DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -61,58 +58,34 @@ export function AudienceMemberSidebar({
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
-        <DrawerSurfaceCard
-          className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
-        >
-          <div className='p-2.5'>
-            <AudienceMemberHeader
-              title={title}
-              subtitle={subtitle}
-              avatarName={avatarName}
-              avatarSrc={avatarSrc}
-            />
-          </div>
-        </DrawerSurfaceCard>
-      }
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as AudienceTab)}
-          options={AUDIENCE_TAB_OPTIONS}
-          ariaLabel='Audience member tabs'
+        <AudienceMemberHeader
+          title={title}
+          subtitle={subtitle}
+          avatarName={avatarName}
+          avatarSrc={avatarSrc}
         />
       }
     >
       {member && (
-        <>
-          {activeTab === 'details' && (
-            <DrawerSection
-              title='Properties'
-              className='space-y-1.5'
-              surface='card'
-            >
-              <AudienceMemberDetails member={member} />
-            </DrawerSection>
-          )}
+        <DrawerTabbedCard
+          testId='audience-member-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AudienceTab)}
+              options={AUDIENCE_TAB_OPTIONS}
+              ariaLabel='Audience member tabs'
+            />
+          }
+        >
+          {activeTab === 'details' && <AudienceMemberDetails member={member} />}
           {activeTab === 'activity' && (
-            <DrawerSection
-              title='Activity'
-              className='space-y-1.5'
-              surface='card'
-            >
-              <AudienceMemberActivityFeed member={member} />
-            </DrawerSection>
+            <AudienceMemberActivityFeed member={member} />
           )}
           {activeTab === 'referrers' && (
-            <DrawerSection
-              title='Referrers'
-              className='space-y-1.5'
-              surface='card'
-            >
-              <AudienceMemberReferrers member={member} />
-            </DrawerSection>
+            <AudienceMemberReferrers member={member} />
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

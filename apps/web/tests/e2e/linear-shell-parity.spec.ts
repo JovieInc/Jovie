@@ -30,6 +30,24 @@ async function expectPillChrome(locator: Locator) {
   expect(metrics.boxShadow).not.toBe('none');
 }
 
+async function expectFlatPillChrome(locator: Locator) {
+  const metrics = await locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      height: Number.parseFloat(style.height),
+      radius: Number.parseFloat(style.borderTopLeftRadius),
+      borderTop: Number.parseFloat(style.borderTopWidth),
+      boxShadow: style.boxShadow,
+    };
+  });
+
+  expect(metrics.height).toBeGreaterThanOrEqual(27);
+  expect(metrics.height).toBeLessThanOrEqual(29.5);
+  expect(metrics.radius).toBeGreaterThanOrEqual(999);
+  expect(metrics.borderTop).toBeGreaterThan(0);
+  expect(metrics.boxShadow).toBe('none');
+}
+
 async function livesInsideRoundedCard(locator: Locator) {
   return locator.evaluate(node => {
     let current: HTMLElement | null = node as HTMLElement;
@@ -78,7 +96,7 @@ for (const theme of ['light', 'dark'] as const) {
       name: 'Copy smart link',
     });
     await expect(copySmartLinkButton).toBeVisible();
-    await expectPillChrome(copySmartLinkButton);
+    await expectFlatPillChrome(copySmartLinkButton);
 
     expect(
       await livesInsideRoundedCard(
@@ -104,14 +122,19 @@ for (const theme of ['light', 'dark'] as const) {
       .filter({ hasText: '30d' })
       .first();
     await expect(rangeButton).toBeVisible();
-    await expectPillChrome(rangeButton);
+    await expectFlatPillChrome(rangeButton);
 
-    const tabsCard = drawer.getByTestId('entity-sidebar-tabs-card');
-    await expect(tabsCard).toBeVisible();
+    const tabbedCard = drawer.getByTestId('demo-analytics-tabbed-card');
+    await expect(tabbedCard).toBeVisible();
+    await expect(tabbedCard.getByRole('tab', { name: 'Cities' })).toBeVisible();
+    await expect(tabbedCard.getByText('Los Angeles')).toBeVisible();
 
     expect(
       await livesInsideRoundedCard(drawer.getByText('Audience funnel'))
     ).toBeTruthy();
     expect(await livesInsideRoundedCard(rangeButton)).toBeTruthy();
+    expect(
+      await livesInsideRoundedCard(tabbedCard.getByText('Los Angeles'))
+    ).toBeTruthy();
   });
 }

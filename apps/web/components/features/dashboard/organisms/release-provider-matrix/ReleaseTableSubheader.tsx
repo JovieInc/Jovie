@@ -204,7 +204,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -304,7 +304,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             counts={counts}
             buttonClassName={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
             )}
             iconOnly
           />
@@ -326,7 +326,7 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-[6px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
         </div>
       }

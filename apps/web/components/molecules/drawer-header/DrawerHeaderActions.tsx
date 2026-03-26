@@ -9,7 +9,7 @@ import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[0_1px_1px_rgba(0,0,0,0.04),0_3px_6px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.04)] hover:bg-surface-0 hover:shadow-[0_1px_1px_rgba(0,0,0,0.05),0_6px_12px_-8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)] focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 active:shadow-[0_1px_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.04)]';
+  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none hover:bg-surface-0 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 active:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;

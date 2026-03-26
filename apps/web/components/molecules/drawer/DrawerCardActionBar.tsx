@@ -3,10 +3,7 @@
 import { Button } from '@jovie/ui';
 import { MoreHorizontal } from 'lucide-react';
 import Link from 'next/link';
-import {
-  APP_CONTROL_BUTTON_CLASS,
-  AppIconButton,
-} from '@/components/atoms/AppIconButton';
+import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import type { DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
@@ -20,8 +17,7 @@ export interface DrawerCardActionBarProps {
 }
 
 export const DRAWER_CARD_ACTION_BUTTON_CLASSNAME = cn(
-  APP_CONTROL_BUTTON_CLASS,
-  'h-7 rounded-full px-2.5 text-[11.5px] font-[510] text-secondary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-[11.5px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 active:border-default active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 function toMenuItems(

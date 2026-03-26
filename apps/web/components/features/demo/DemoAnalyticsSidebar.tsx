@@ -5,6 +5,7 @@ import { type ComponentType, useState } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
@@ -273,15 +274,6 @@ export function DemoAnalyticsSidebar({
           </div>
         </DrawerSurfaceCard>
       }
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as AnalyticsTab)}
-          options={ANALYTICS_TAB_OPTIONS}
-          className='w-full'
-          ariaLabel='Analytics data tabs'
-        />
-      }
     >
       <div className='space-y-2'>
         {/* Engagement metrics */}
@@ -308,7 +300,19 @@ export function DemoAnalyticsSidebar({
         <FunnelSection />
 
         {/* Ranked lists */}
-        <DrawerSurfaceCard className='min-h-[212px] border-0 shadow-none p-1.5'>
+        <DrawerTabbedCard
+          testId='demo-analytics-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AnalyticsTab)}
+              options={ANALYTICS_TAB_OPTIONS}
+              className='w-full'
+              ariaLabel='Analytics data tabs'
+            />
+          }
+          contentClassName='pt-2'
+        >
           {activeTab === 'cities' && (
             <RankedList icon={MapPin} items={MOCK_ANALYTICS.topCities} />
           )}
@@ -318,7 +322,7 @@ export function DemoAnalyticsSidebar({
           {activeTab === 'links' && (
             <RankedList icon={Link2} items={MOCK_ANALYTICS.topLinks} />
           )}
-        </DrawerSurfaceCard>
+        </DrawerTabbedCard>
 
         {/* Extra engagement stats */}
         <DrawerSurfaceCard className='border-0 shadow-none p-2.5'>

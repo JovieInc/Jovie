@@ -78,6 +78,10 @@ export {
   DrawerSurfaceCard,
   type DrawerSurfaceCardProps,
 } from './DrawerSurfaceCard';
+export {
+  DrawerTabbedCard,
+  type DrawerTabbedCardProps,
+} from './DrawerTabbedCard';
 export { DrawerTabs, type DrawerTabsProps } from './DrawerTabs';
 export {
   EntityHeaderCard,
