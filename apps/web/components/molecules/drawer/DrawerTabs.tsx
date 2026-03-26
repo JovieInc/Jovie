@@ -34,7 +34,7 @@ export function DrawerTabs<T extends string>({
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
           className={cn(
-            'rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3 py-1 text-[11px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token',
+            'rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3.5 py-1 text-[11px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token',
             value === option.value &&
               'bg-surface-0 text-primary-token shadow-sm',
             triggerClassName
