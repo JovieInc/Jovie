@@ -11,6 +11,7 @@ import { getAdminSentryMetrics } from './sentry-metrics';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const REDIS_REACHABILITY_TIMEOUT_MS = 250;
+const BILLING_INCIDENT_EVENT_TYPES = ['invoice.payment_failed'] as const;
 const DISABLED_RELIABILITY_TABLES = new Set<string>();
 
 export interface AdminReliabilitySummary {
@@ -71,9 +72,15 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         ? null
         : (deployments.current?.status ?? null),
   };
-  const hasStripeEvents =
-    !DISABLED_RELIABILITY_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
-    (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
+  let hasStripeEvents = false;
+
+  try {
+    hasStripeEvents =
+      !DISABLED_RELIABILITY_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
+      (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
+  } catch {
+    hasStripeEvents = false;
+  }
 
   if (!hasStripeEvents) {
     return {
@@ -121,11 +128,7 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
         .where(
           and(
             drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`,
-            inArray(stripeWebhookEvents.type, [
-              'checkout.session.completed',
-              'customer.subscription.created',
-              'invoice.payment_failed',
-            ])
+            inArray(stripeWebhookEvents.type, BILLING_INCIDENT_EVENT_TYPES)
           )
         );
 

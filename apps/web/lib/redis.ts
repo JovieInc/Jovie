@@ -8,10 +8,23 @@ import { captureError } from '@/lib/error-tracking';
 let _redis: Redis | null = null;
 let _redisInitAttempted = false;
 let _redisLastAttempt = 0;
+let _redisMissingConfigWarned = false;
 const REDIS_RETRY_INTERVAL_MS = 30000; // 30 seconds between retry attempts
 
 export interface GetRedisOptions {
   signal?: AbortSignal;
+}
+
+function captureMissingRedisConfigWarningOnce(): void {
+  if (env.NODE_ENV !== 'production' || _redis || _redisMissingConfigWarned) {
+    return;
+  }
+
+  Sentry.captureMessage(
+    'Redis not configured in production - rate limiting and caching disabled',
+    'warning'
+  );
+  _redisMissingConfigWarned = true;
 }
 
 /**
@@ -22,12 +35,7 @@ export interface GetRedisOptions {
 export function getRedis(options?: GetRedisOptions): Redis | null {
   if (options?.signal) {
     if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-      if (env.NODE_ENV === 'production' && !_redis) {
-        Sentry.captureMessage(
-          'Redis not configured in production - rate limiting and caching disabled',
-          'warning'
-        );
-      }
+      captureMissingRedisConfigWarningOnce();
       return null;
     }
 
@@ -63,12 +71,7 @@ export function getRedis(options?: GetRedisOptions): Redis | null {
 
   // Check if Redis is configured (both URL and token are required)
   if (!env.UPSTASH_REDIS_REST_URL || !env.UPSTASH_REDIS_REST_TOKEN) {
-    if (env.NODE_ENV === 'production' && !_redis) {
-      Sentry.captureMessage(
-        'Redis not configured in production - rate limiting and caching disabled',
-        'warning'
-      );
-    }
+    captureMissingRedisConfigWarningOnce();
     return null;
   }
 
