@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
+import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import {
   CollapsibleSectionHeading,
@@ -213,13 +214,6 @@ function TrackItem({
   const isTrackPlaying = isActiveTrack && playbackState.isPlaying;
   const progressDuration = isActiveTrack ? playbackState.duration : 0;
   const progressCurrentTime = isActiveTrack ? playbackState.currentTime : 0;
-  const progressPercent =
-    progressDuration > 0
-      ? Math.min(
-          100,
-          Math.max(0, (progressCurrentTime / progressDuration) * 100)
-        )
-      : 0;
 
   const handleTogglePlayback = useCallback(() => {
     if (!playableUrl) return;
@@ -314,24 +308,14 @@ function TrackItem({
                   <Play className='h-[11px] w-[11px]' />
                 )}
               </button>
-              <input
-                type='range'
-                min={0}
-                max={progressDuration > 0 ? progressDuration : 1}
-                step='any'
-                value={progressCurrentTime}
-                onChange={event => {
-                  event.stopPropagation();
-                  onSeek(Number(event.target.value));
+              <SeekBar
+                currentTime={progressCurrentTime}
+                duration={progressDuration}
+                onSeek={time => {
+                  onSeek(time);
                 }}
-                aria-label='Seek track'
                 disabled={!isActiveTrack}
-                className='seek-range h-0.5 flex-1 cursor-pointer appearance-none rounded-full bg-surface-1/90 accent-(--linear-accent) disabled:cursor-default disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-                style={
-                  {
-                    '--seek-pct': `${progressPercent}%`,
-                  } as React.CSSProperties
-                }
+                className='h-0.5 flex-1 bg-surface-1/90'
               />
             </div>
             {isActiveTrack && (

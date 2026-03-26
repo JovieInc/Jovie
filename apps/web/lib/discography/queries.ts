@@ -131,6 +131,34 @@ function isUniqueConstraintViolation(
   return isUniqueViolationUtil(error, constraint);
 }
 
+/** Shared SQL select columns for track summary aggregation. */
+const trackSummarySelectColumns = {
+  releaseId: discogReleaseTracks.releaseId,
+  totalDurationMs: drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
+    'total_duration_ms'
+  ),
+  primaryIsrc:
+    drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
+      'primary_isrc'
+    ),
+  primaryPreviewUrl:
+    drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
+      'primary_preview_url'
+    ),
+};
+
+function rowToTrackSummary(row: {
+  totalDurationMs: number | null;
+  primaryIsrc: string | null;
+  primaryPreviewUrl: string | null;
+}): TrackSummary {
+  return {
+    totalDurationMs: row.totalDurationMs ?? null,
+    primaryIsrc: row.primaryIsrc ?? null,
+    primaryPreviewUrl: row.primaryPreviewUrl ?? null,
+  };
+}
+
 /**
  * Get track summaries (total duration, primary ISRC) for releases
  */
@@ -141,23 +169,8 @@ async function getTrackSummariesForReleases(
     return new Map();
   }
 
-  // Aggregate track data per release via release_tracks → recordings join
   const summaries = await db
-    .select({
-      releaseId: discogReleaseTracks.releaseId,
-      totalDurationMs:
-        drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
-          'total_duration_ms'
-        ),
-      primaryIsrc:
-        drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
-          'primary_isrc'
-        ),
-      primaryPreviewUrl:
-        drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
-          'primary_preview_url'
-        ),
-    })
+    .select(trackSummarySelectColumns)
     .from(discogReleaseTracks)
     .innerJoin(
       discogRecordings,
@@ -168,11 +181,7 @@ async function getTrackSummariesForReleases(
 
   const summaryMap = new Map<string, TrackSummary>();
   for (const row of summaries) {
-    summaryMap.set(row.releaseId, {
-      totalDurationMs: row.totalDurationMs ?? null,
-      primaryIsrc: row.primaryIsrc ?? null,
-      primaryPreviewUrl: row.primaryPreviewUrl ?? null,
-    });
+    summaryMap.set(row.releaseId, rowToTrackSummary(row));
   }
   return summaryMap;
 }
@@ -1397,21 +1406,7 @@ export async function getReleaseTrackSummariesForReleases(
   }
 
   const summaries = await db
-    .select({
-      releaseId: discogReleaseTracks.releaseId,
-      totalDurationMs:
-        drizzleSql<number>`sum(${discogRecordings.durationMs})`.as(
-          'total_duration_ms'
-        ),
-      primaryIsrc:
-        drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
-          'primary_isrc'
-        ),
-      primaryPreviewUrl:
-        drizzleSql<string>`(array_agg(NULLIF(BTRIM(${discogRecordings.previewUrl}), '') ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE NULLIF(BTRIM(${discogRecordings.previewUrl}), '') IS NOT NULL))[1]`.as(
-          'primary_preview_url'
-        ),
-    })
+    .select(trackSummarySelectColumns)
     .from(discogReleaseTracks)
     .innerJoin(
       discogRecordings,
@@ -1422,11 +1417,7 @@ export async function getReleaseTrackSummariesForReleases(
 
   const summaryMap = new Map<string, TrackSummary>();
   for (const row of summaries) {
-    summaryMap.set(row.releaseId, {
-      totalDurationMs: row.totalDurationMs ?? null,
-      primaryIsrc: row.primaryIsrc ?? null,
-      primaryPreviewUrl: row.primaryPreviewUrl ?? null,
-    });
+    summaryMap.set(row.releaseId, rowToTrackSummary(row));
   }
 
   // Fall back to old table for any releases not found in new model

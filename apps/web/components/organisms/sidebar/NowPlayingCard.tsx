@@ -4,6 +4,7 @@ import { Pause, Play } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { SeekBar } from '@/components/atoms/SeekBar';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
 import { formatDuration } from '@/lib/utils/formatDuration';
@@ -36,17 +37,6 @@ export function NowPlayingCard() {
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 
   if (!playbackState.activeTrackId) return null;
-
-  const progressPercent =
-    playbackState.duration > 0
-      ? Math.min(
-          100,
-          Math.max(
-            0,
-            (playbackState.currentTime / playbackState.duration) * 100
-          )
-        )
-      : 0;
 
   const currentTimeFormatted = formatDuration(
     Math.round(playbackState.currentTime) * 1000
@@ -132,22 +122,11 @@ export function NowPlayingCard() {
       </div>
 
       <div className='space-y-0.5'>
-        <input
-          type='range'
-          min={0}
-          max={playbackState.duration > 0 ? playbackState.duration : 1}
-          step='any'
-          value={playbackState.currentTime}
-          onChange={event => {
-            seek(Number(event.target.value));
-          }}
-          aria-label='Seek track'
-          className='seek-range h-[3px] w-full cursor-pointer appearance-none rounded-full bg-surface-1 accent-(--linear-accent) focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
-          style={
-            {
-              '--seek-pct': `${progressPercent}%`,
-            } as React.CSSProperties
-          }
+        <SeekBar
+          currentTime={playbackState.currentTime}
+          duration={playbackState.duration}
+          onSeek={seek}
+          className='h-[3px] w-full bg-surface-1'
         />
         <div className='flex items-center justify-between text-[10px] tabular-nums text-quaternary-token'>
           <span>{currentTimeFormatted}</span>
