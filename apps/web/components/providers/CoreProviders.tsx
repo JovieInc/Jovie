@@ -219,9 +219,13 @@ const THEME_ENABLED_PREFIXES = [
   '/waitlist',
 ] as const;
 
-type CoreProviderVariant = 'full' | 'public';
+type CoreProviderVariant = 'full' | 'homepage' | 'public';
 
 export function getCoreProviderVariant(pathname: string): CoreProviderVariant {
+  if (pathname === '/') {
+    return 'homepage';
+  }
+
   return FULL_PROVIDER_PREFIXES.some(prefix => pathname.startsWith(prefix))
     ? 'full'
     : 'public';
@@ -238,6 +242,7 @@ export function CoreProviders({
   const pathname = usePathname() ?? '';
   const variant = useMemo(() => getCoreProviderVariant(pathname), [pathname]);
   const themeEnabled = useMemo(() => isThemeEnabledRoute(pathname), [pathname]);
+  const isHomepageVariant = variant === 'homepage';
   const isPublicVariant = variant === 'public';
   const isTestRuntime = env.IS_TEST || env.IS_E2E;
   const enableAnalytics = useMemo(
@@ -247,6 +252,10 @@ export function CoreProviders({
       !MARKETING_PREFIXES.some(prefix => pathname.startsWith(prefix)),
     [isTestRuntime, pathname]
   );
+
+  if (isHomepageVariant) {
+    return <>{children}</>;
+  }
 
   const providers = (
     <NuqsProvider>

@@ -27,6 +27,7 @@ type TimingMetricName =
   | 'largest-contentful-paint'
   | 'cumulative-layout-shift'
   | 'first-input-delay'
+  | 'interactive-shell-ready'
   | 'time-to-first-byte'
   | 'skeleton-to-content'
   | 'warm-shell-response';
@@ -117,6 +118,86 @@ const DASHBOARD_RELEASES_LINK_SELECTOR = DASHBOARD_RELEASES_PATHS.map(
 ).join(', ');
 const DASHBOARD_RELEASES_READY_SELECTOR =
   '[data-testid="releases-loading"], [data-testid="releases-matrix"]';
+const HOMEPAGE_SHELL_SELECTOR = '[data-testid="homepage-shell"]';
+const HOMEPAGE_PRIMARY_CTA_SELECTOR = '[data-testid="homepage-primary-cta"]';
+const PERF_BUDGET_INIT_SCRIPT = `
+(() => {
+  const metrics = {
+    lcp: 0,
+    cls: 0,
+    fid: 0,
+    interactiveShellReady: 0,
+  };
+
+  window.__perfBudgetMetrics = metrics;
+
+  const isVisible = element => {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+
+    const style = globalThis.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0;
+  };
+
+  const sampleInteractiveShellReady = () => {
+    if (metrics.interactiveShellReady > 0) {
+      return;
+    }
+
+    const shell =
+      Array.from(document.querySelectorAll(${JSON.stringify(HOMEPAGE_SHELL_SELECTOR)})).find(element =>
+        isVisible(element)
+      ) ?? null;
+    const cta =
+      Array.from(document.querySelectorAll(${JSON.stringify(HOMEPAGE_PRIMARY_CTA_SELECTOR)})).find(element =>
+        isVisible(element)
+      ) ?? null;
+
+    if (
+      shell &&
+      cta &&
+      shell.getAttribute('aria-busy') !== 'true' &&
+      cta.getAttribute('aria-busy') !== 'true'
+    ) {
+      metrics.interactiveShellReady = performance.now();
+      return;
+    }
+
+    globalThis.requestAnimationFrame(sampleInteractiveShellReady);
+  };
+
+  globalThis.requestAnimationFrame(sampleInteractiveShellReady);
+
+  new PerformanceObserver(list => {
+    const entries = list.getEntries();
+    const last = entries[entries.length - 1];
+    if (last && last.startTime) {
+      metrics.lcp = last.startTime;
+    }
+  }).observe({ type: 'largest-contentful-paint', buffered: true });
+
+  new PerformanceObserver(list => {
+    for (const entry of list.getEntries()) {
+      if (!entry.hadRecentInput) {
+        metrics.cls += entry.value ?? 0;
+      }
+    }
+  }).observe({ type: 'layout-shift', buffered: true });
+
+  new PerformanceObserver(list => {
+    const entry = list.getEntries()[0] ?? null;
+    if (entry) {
+      metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
+    }
+  }).observe({ type: 'first-input', buffered: true });
+})();
+`;
 
 const config = require('../performance-budgets.config.js') as BudgetConfig;
 
@@ -203,6 +284,8 @@ const matchesRoute = (pathname: string, route: string) =>
 
 const matchesDashboardReleasesPath = (pathname: string) =>
   DASHBOARD_RELEASES_PATHS.some(route => matchesRoute(pathname, route));
+
+const isHomepagePath = (pathname: string) => pathname === '/';
 
 const calculateOvershootPct = (measured: number, budget: number) => {
   if (measured <= budget || budget === 0) {
@@ -373,6 +456,41 @@ const measureSkeletonToContent = async (
   }
 };
 
+const measureInteractiveShellReady = async (
+  page: Awaited<
+    ReturnType<Awaited<ReturnType<typeof chromium.launch>>['newPage']>
+  >,
+  pathname: string
+): Promise<number> => {
+  if (!isHomepagePath(pathname)) {
+    return 0;
+  }
+
+  try {
+    await page.waitForFunction(
+      'window.__perfBudgetMetrics?.interactiveShellReady > 0',
+      undefined,
+      { timeout: 5000 }
+    );
+    const measured = await page.evaluate(() => {
+      const metrics = (
+        window as Window & {
+          __perfBudgetMetrics?: { interactiveShellReady?: number };
+        }
+      ).__perfBudgetMetrics;
+      return metrics?.interactiveShellReady ?? 0;
+    });
+    return typeof measured === 'number' && measured > 0 ? measured : 60000;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unknown Playwright error';
+    logWarning(
+      `  ⚠ interactive shell measurement failed for ${pathname}: ${message}`
+    );
+    return 60000;
+  }
+};
+
 const collectMetrics = async (
   url: string,
   needsAuth: boolean
@@ -414,56 +532,9 @@ const collectMetrics = async (
 
     page = await context.newPage();
 
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-    await page.addInitScript(() => {
-      type LayoutShiftEntry = PerformanceEntry & {
-        hadRecentInput?: boolean;
-        value?: number;
-      };
-
-      type FirstInputEntry = PerformanceEntry & {
-        processingStart?: number;
-        startTime: number;
-      };
-
-      const metrics = {
-        lcp: 0,
-        cls: 0,
-        fid: 0,
-      };
-
-      new PerformanceObserver(list => {
-        const entries = list.getEntries();
-        const last = entries[entries.length - 1];
-        if (last && last.startTime) {
-          metrics.lcp = last.startTime;
-        }
-      }).observe({ type: 'largest-contentful-paint', buffered: true });
-
-      new PerformanceObserver(list => {
-        for (const entry of list.getEntries() as LayoutShiftEntry[]) {
-          if (!entry.hadRecentInput) {
-            metrics.cls += entry.value ?? 0;
-          }
-        }
-      }).observe({ type: 'layout-shift', buffered: true });
-
-      new PerformanceObserver(list => {
-        const entry =
-          (list.getEntries()[0] as FirstInputEntry | undefined) ?? null;
-        if (entry) {
-          metrics.fid = (entry.processingStart ?? 0) - entry.startTime;
-        }
-      }).observe({ type: 'first-input', buffered: true });
-
-      (
-        window as Window & { __perfBudgetMetrics?: typeof metrics }
-      ).__perfBudgetMetrics = metrics;
-    });
+    await page.addInitScript(PERF_BUDGET_INIT_SCRIPT);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
     const skeletonToContentPromise = measureSkeletonToContent(page);
 
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
@@ -479,6 +550,10 @@ const collectMetrics = async (
     }
 
     const skeletonToContent = await skeletonToContentPromise;
+    const interactiveShellReady = await measureInteractiveShellReady(
+      page,
+      new URL(url).pathname
+    );
 
     await page.waitForTimeout(2000);
 
@@ -534,7 +609,12 @@ const collectMetrics = async (
 
       const metrics = (
         window as Window & {
-          __perfBudgetMetrics?: { lcp: number; cls: number; fid: number };
+          __perfBudgetMetrics?: {
+            lcp: number;
+            cls: number;
+            fid: number;
+            interactiveShellReady: number;
+          };
         }
       ).__perfBudgetMetrics;
 
@@ -556,6 +636,7 @@ const collectMetrics = async (
         'largest-contentful-paint': metrics.timings['largest-contentful-paint'],
         'cumulative-layout-shift': metrics.timings['cumulative-layout-shift'],
         'first-input-delay': metrics.timings['first-input-delay'],
+        'interactive-shell-ready': interactiveShellReady,
         'time-to-first-byte': metrics.timings['time-to-first-byte'],
         'skeleton-to-content': skeletonToContent,
         'warm-shell-response': warmShellResponse,
