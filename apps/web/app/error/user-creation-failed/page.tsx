@@ -27,7 +27,7 @@ export default function UserCreationFailedPage() {
             className='block focus-ring-themed rounded-md'
             aria-label='Go to homepage'
           >
-            <BrandLogo size={32} tone='auto' priority />
+            <BrandLogo size={32} tone='auto' />
           </Link>
         </div>
 

@@ -80,6 +80,17 @@ export const queryKeys = {
       [...queryKeys.creators.all, 'social-links', profileId] as const,
   },
 
+  // Admin releases
+  adminReleases: {
+    all: ['admin-releases'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminReleases.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
+  },
+
   // Admin users
   adminUsers: {
     all: ['admin-users'] as const,

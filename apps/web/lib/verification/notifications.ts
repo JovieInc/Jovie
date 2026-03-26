@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { sendEmail } from '@/lib/email/send';
 import {
@@ -26,7 +26,7 @@ export async function notifyVerificationRequest(
   const profilePath = payload.username
     ? `/${payload.username}`
     : `${APP_ROUTES.ADMIN_CREATORS}?profileId=${payload.profileId}`;
-  const profileUrl = `${APP_URL}${profilePath}`;
+  const profileUrl = `${BASE_URL}${profilePath}`;
 
   return sendSlackMessage({
     text: `${payload.name} requested profile verification`,
