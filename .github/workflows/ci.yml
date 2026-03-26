@@ -2467,7 +2467,23 @@ jobs:
           # Use the staging alias directly — GitHub Actions masks job outputs
           # containing secret substrings (org name in Vercel URLs), so we
           # cannot rely on deploy_url passed between jobs.
-          vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}"
+          set +e
+          promote_output=$(vercel promote https://staging.jov.ie --yes --token "${{ secrets.VERCEL_TOKEN }}" --scope "${{ secrets.VERCEL_ORG_ID }}" 2>&1)
+          promote_exit_code=$?
+          set -e
+
+          printf '%s\n' "$promote_output"
+
+          if [ "$promote_exit_code" -eq 0 ]; then
+            exit 0
+          fi
+
+          if printf '%s' "$promote_output" | rg -q "already the current production deployment"; then
+            echo "Staging deployment is already in production; continuing."
+            exit 0
+          fi
+
+          exit "$promote_exit_code"
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
