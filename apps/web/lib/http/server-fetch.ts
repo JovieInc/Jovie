@@ -44,6 +44,9 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+/**
+ * Limits retries on mutating requests to transport-layer failures only.
+ */
 export function isRetryableTransportError(error: unknown): boolean {
   if (!(error instanceof Error)) {
     return false;

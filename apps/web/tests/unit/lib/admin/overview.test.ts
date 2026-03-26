@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getAdminReliabilitySummary } from '@/lib/admin/overview';
 
 const mockCheckDbHealth = vi.hoisted(() => vi.fn());
 const mockDoesTableExist = vi.hoisted(() => vi.fn());
@@ -36,7 +37,7 @@ vi.mock('@/lib/error-tracking', () => ({
 describe('getAdminReliabilitySummary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
+    vi.useRealTimers();
 
     mockCheckDbHealth.mockResolvedValue({ latency: 42 });
     mockDoesTableExist.mockResolvedValue(false);
@@ -53,7 +54,6 @@ describe('getAdminReliabilitySummary', () => {
       ping: vi.fn().mockResolvedValue('PONG'),
     });
 
-    const { getAdminReliabilitySummary } = await import('@/lib/admin/overview');
     const summary = await getAdminReliabilitySummary();
 
     expect(summary).toMatchObject({
@@ -70,9 +70,23 @@ describe('getAdminReliabilitySummary', () => {
       ping: vi.fn().mockRejectedValue(new Error('Redis unavailable')),
     });
 
-    const { getAdminReliabilitySummary } = await import('@/lib/admin/overview');
     const summary = await getAdminReliabilitySummary();
 
     expect(summary.redisAvailable).toBe(false);
+  });
+
+  it('marks redis unavailable when the ping times out', async () => {
+    vi.useFakeTimers();
+    mockGetRedis.mockReturnValue({
+      ping: vi.fn(() => new Promise(() => {})),
+    });
+
+    const summaryPromise = getAdminReliabilitySummary();
+
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(summaryPromise).resolves.toMatchObject({
+      redisAvailable: false,
+    });
   });
 });

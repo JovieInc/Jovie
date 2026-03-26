@@ -10,6 +10,7 @@ import { getHudDeployments } from '@/lib/deployments/github';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
+import { withTimeout } from '@/lib/resilience/primitives';
 import { getAdminMercuryMetrics } from './mercury-metrics';
 import { getAdminSentryMetrics } from './sentry-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
@@ -168,36 +169,23 @@ export interface AdminActivityItem {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const REDIS_REACHABILITY_TIMEOUT_MS = 250;
 
+/**
+ * Performs a bounded Redis reachability check for the admin reliability summary.
+ */
 async function isRedisReachable(): Promise<boolean> {
   const redis = getRedis();
   if (!redis) {
     return false;
   }
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
   try {
-    await Promise.race([
-      redis.ping(),
-      new Promise<never>((_, reject) => {
-        timeoutId = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Redis ping timed out after ${REDIS_REACHABILITY_TIMEOUT_MS}ms`
-              )
-            ),
-          REDIS_REACHABILITY_TIMEOUT_MS
-        );
-      }),
-    ]);
+    await withTimeout(redis.ping(), {
+      timeoutMs: REDIS_REACHABILITY_TIMEOUT_MS,
+      context: 'Redis ping',
+    });
     return true;
   } catch {
     return false;
-  } finally {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
   }
 }
 
