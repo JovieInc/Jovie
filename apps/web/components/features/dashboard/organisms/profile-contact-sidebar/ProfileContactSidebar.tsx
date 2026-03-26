@@ -19,6 +19,9 @@ import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useAvatarMutation,
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
@@ -105,7 +108,16 @@ export function ProfileContactSidebar() {
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
+  const pressPhotoUploadMutation = usePressPhotoUploadMutation(
+    selectedProfile?.id
+  );
+  const deletePressPhotoMutation = useDeletePressPhotoMutation(
+    selectedProfile?.id
+  );
   const removeLinkMutation = useRemoveSocialLinkMutation();
+  const { data: pressPhotos = [] } = usePressPhotosQuery(
+    selectedProfile?.id ?? ''
+  );
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -180,6 +192,23 @@ export function ProfileContactSidebar() {
       return url;
     },
     [avatarMutation, previewData, setPreviewData]
+  );
+
+  const handlePressPhotoUpload = useCallback(
+    async (file: File) => {
+      const uploadedPhoto = await pressPhotoUploadMutation.mutateAsync(file);
+      toast.success('Press photo uploaded');
+      return uploadedPhoto;
+    },
+    [pressPhotoUploadMutation]
+  );
+
+  const handlePressPhotoDelete = useCallback(
+    async (photoId: string) => {
+      await deletePressPhotoMutation.mutateAsync(photoId);
+      toast.success('Press photo deleted');
+    },
+    [deletePressPhotoMutation]
   );
 
   // Handle bio change — save to server and instantly update sidebar
@@ -650,10 +679,13 @@ export function ProfileContactSidebar() {
           hometown={hometown}
           activeSinceYear={activeSinceYear}
           allowPhotoDownloads={allowPhotoDownloads}
+          pressPhotos={pressPhotos}
           onBioChange={handleBioChange}
           onLocationChange={handleLocationChange}
           onHometownChange={handleHometownChange}
           onGenresChange={handleGenresChange}
+          onPressPhotoUpload={handlePressPhotoUpload}
+          onPressPhotoDelete={handlePressPhotoDelete}
         />
       ) : (
         <>
