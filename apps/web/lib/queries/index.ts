@@ -407,6 +407,11 @@ export { type PlanGateEntitlements, usePlanGate } from './usePlanGate';
 // Pre-save mutation
 export { useApplePreSaveMutation } from './usePreSaveMutation';
 export {
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
+} from './usePressPhotoMutation';
+export {
   type PricingOption,
   type PricingOptionsResponse,
   usePricingOptionsQuery,

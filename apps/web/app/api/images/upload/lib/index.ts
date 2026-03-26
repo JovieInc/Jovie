@@ -7,6 +7,7 @@
 export {
   buildBlobPath,
   getVercelBlobUploader,
+  type PhotoUploadType,
   uploadBufferToBlob,
 } from './blob-upload';
 export type { UploadErrorCode } from './constants';
@@ -20,8 +21,10 @@ export {
 export { errorResponse, extractPgError } from './error-response';
 export {
   fileToBuffer,
+  getImageBufferMetadata,
   optimizeImageToAvif,
   processAvatarToSizes,
+  processPressPhotoToSizes,
   withTimeout,
 } from './image-processing';
 export type {

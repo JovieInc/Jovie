@@ -1,9 +1,10 @@
 import { auth } from '@clerk/nextjs/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { invalidateAvatarCache } from '@/lib/cache';
+import { invalidateAvatarCache, invalidateProfileCache } from '@/lib/cache';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { buildSeoFilename } from '@/lib/images/config';
@@ -14,11 +15,13 @@ import {
   buildBlobPath,
   errorResponse,
   extractPgError,
+  getImageBufferMetadata,
   getVercelBlobUploader,
   NO_STORE_HEADERS,
   optimizeImageToAvif,
   PROCESSING_TIMEOUT_MS,
   processAvatarToSizes,
+  processPressPhotoToSizes,
   UPLOAD_ERROR_CODES,
   uploadBufferToBlob,
   validateUploadedFile,
@@ -29,6 +32,8 @@ import {
 export type { UploadErrorCode } from './lib';
 
 export const runtime = 'nodejs';
+
+const MAX_PRESS_PHOTOS = 6;
 
 export async function POST(request: NextRequest) {
   // Auth check first to avoid wrapping in transaction when unauthorized
@@ -103,7 +108,7 @@ export async function POST(request: NextRequest) {
         return validationResult;
       }
 
-      const { file, normalizedType } = validationResult;
+      const { file, normalizedType, photoType } = validationResult;
 
       // Look up the internal user ID (UUID) for the authenticated Clerk user
       const dbUser = await getUserByClerkId(tx, userIdFromSession);
@@ -116,12 +121,67 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const [activeUser] = await tx
+        .select({ activeProfileId: users.activeProfileId })
+        .from(users)
+        .where(eq(users.id, dbUser.id))
+        .limit(1);
+
+      const [profile] = await tx
+        .select({
+          id: creatorProfiles.id,
+          usernameNormalized: creatorProfiles.usernameNormalized,
+          settings: creatorProfiles.settings,
+        })
+        .from(creatorProfiles)
+        .where(
+          activeUser?.activeProfileId
+            ? and(
+                eq(creatorProfiles.id, activeUser.activeProfileId),
+                eq(creatorProfiles.userId, dbUser.id)
+              )
+            : eq(creatorProfiles.userId, dbUser.id)
+        )
+        .limit(1);
+
+      if (!profile) {
+        return errorResponse(
+          'Profile not found for this account.',
+          UPLOAD_ERROR_CODES.USER_NOT_FOUND,
+          404
+        );
+      }
+
+      if (photoType === 'press') {
+        const existingPressPhotos = await tx
+          .select({ id: profilePhotos.id })
+          .from(profilePhotos)
+          .where(
+            and(
+              eq(profilePhotos.userId, dbUser.id),
+              eq(profilePhotos.creatorProfileId, profile.id),
+              eq(profilePhotos.photoType, 'press')
+            )
+          )
+          .limit(MAX_PRESS_PHOTOS);
+
+        if (existingPressPhotos.length >= MAX_PRESS_PHOTOS) {
+          return errorResponse(
+            `You can upload up to ${MAX_PRESS_PHOTOS} press photos.`,
+            UPLOAD_ERROR_CODES.PRESS_PHOTO_LIMIT_REACHED,
+            400
+          );
+        }
+      }
+
       // Create database record first
       const [photoRecord] = await tx
         .insert(profilePhotos)
         .values({
           userId: dbUser.id,
+          creatorProfileId: profile.id,
           status: 'uploading',
+          photoType,
           originalFilename: file.name,
           mimeType: normalizedType,
           fileSize: file.size,
@@ -137,6 +197,113 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
+        const seoFileName = buildSeoFilename({
+          originalFilename: file.name,
+          photoId: photoRecord.id,
+        });
+        const put = await getVercelBlobUploader();
+        if (photoType === 'press') {
+          const pressSizeBuffers = await withTimeout(
+            processPressPhotoToSizes(file),
+            PROCESSING_TIMEOUT_MS,
+            'Press photo size processing'
+          );
+
+          const originalBuffer = pressSizeBuffers.original;
+          if (!originalBuffer) {
+            throw new TypeError('Missing original press photo buffer');
+          }
+
+          const blobUrl = await withTimeout(
+            uploadBufferToBlob(
+              put,
+              buildBlobPath(seoFileName, clerkUserId, photoType),
+              originalBuffer,
+              AVIF_MIME_TYPE
+            ),
+            PROCESSING_TIMEOUT_MS,
+            'Blob upload'
+          );
+
+          if (!blobUrl?.startsWith('https://')) {
+            throw new TypeError('Invalid blob URL returned from storage');
+          }
+
+          const pressPhotoSizes: Record<string, string> = {};
+          for (const [sizeKey, buffer] of Object.entries(pressSizeBuffers)) {
+            if (sizeKey === 'original') {
+              continue;
+            }
+
+            const sizeUrl = await withTimeout(
+              uploadBufferToBlob(
+                put,
+                buildBlobPath(
+                  `${seoFileName}-${sizeKey}`,
+                  clerkUserId,
+                  photoType
+                ),
+                buffer,
+                AVIF_MIME_TYPE
+              ),
+              PROCESSING_TIMEOUT_MS,
+              `Blob upload (${sizeKey})`
+            );
+
+            if (!sizeUrl?.startsWith('https://')) {
+              throw new TypeError(`Invalid blob URL for size ${sizeKey}`);
+            }
+
+            pressPhotoSizes[sizeKey] = sizeUrl;
+          }
+
+          const metadata = await withTimeout(
+            getImageBufferMetadata(originalBuffer),
+            PROCESSING_TIMEOUT_MS,
+            'Press photo metadata'
+          );
+
+          await tx
+            .update(profilePhotos)
+            .set({
+              blobUrl,
+              smallUrl: pressPhotoSizes['400'] ?? blobUrl,
+              mediumUrl: pressPhotoSizes['800'] ?? blobUrl,
+              largeUrl: pressPhotoSizes['1200'] ?? blobUrl,
+              status: 'ready',
+              mimeType: AVIF_MIME_TYPE,
+              fileSize: originalBuffer.length,
+              width: metadata.width,
+              height: metadata.height,
+              processedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(profilePhotos.id, photoRecord.id));
+
+          try {
+            await invalidateProfileCache(profile.usernameNormalized);
+          } catch (error) {
+            logger.error('[upload] Press photo cache invalidation failed', {
+              photoId: photoRecord.id,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+
+          return NextResponse.json(
+            {
+              jobId: photoRecord.id,
+              photoId: photoRecord.id,
+              photoType,
+              status: 'ready',
+              blobUrl,
+              largeUrl: pressPhotoSizes['1200'] ?? blobUrl,
+              mediumUrl: pressPhotoSizes['800'] ?? blobUrl,
+              smallUrl: pressPhotoSizes['400'] ?? blobUrl,
+            },
+            { status: 202, headers: NO_STORE_HEADERS }
+          );
+        }
+
         // Process image with timeout protection (single canonical AVIF)
         const optimized = await withTimeout(
           optimizeImageToAvif(file),
@@ -151,17 +318,10 @@ export async function POST(request: NextRequest) {
           'Avatar size processing'
         );
 
-        const seoFileName = buildSeoFilename({
-          originalFilename: file.name,
-          photoId: photoRecord.id,
-        });
-        const blobPath = buildBlobPath(seoFileName, clerkUserId);
-        const put = await getVercelBlobUploader();
-
         const avatarUrl = await withTimeout(
           uploadBufferToBlob(
             put,
-            blobPath,
+            buildBlobPath(seoFileName, clerkUserId, photoType),
             optimized.avatar.data,
             AVIF_MIME_TYPE
           ),
@@ -169,22 +329,25 @@ export async function POST(request: NextRequest) {
           'Blob upload'
         );
 
-        // Validate that we got real URLs back
         if (!avatarUrl?.startsWith('https://')) {
           throw new TypeError('Invalid blob URL returned from storage');
         }
 
-        // Upload each download size to blob storage
         const avatarSizes: Record<string, string> = {};
         for (const [sizeKey, buffer] of Object.entries(avatarSizeBuffers)) {
           const sizeSuffix =
             sizeKey === 'original' ? '-original' : `-${sizeKey}`;
-          const sizeBlobPath = buildBlobPath(
-            `${seoFileName}${sizeSuffix}`,
-            clerkUserId
-          );
           const sizeUrl = await withTimeout(
-            uploadBufferToBlob(put, sizeBlobPath, buffer, AVIF_MIME_TYPE),
+            uploadBufferToBlob(
+              put,
+              buildBlobPath(
+                `${seoFileName}${sizeSuffix}`,
+                clerkUserId,
+                photoType
+              ),
+              buffer,
+              AVIF_MIME_TYPE
+            ),
             PROCESSING_TIMEOUT_MS,
             `Blob upload (${sizeKey})`
           );
@@ -194,7 +357,6 @@ export async function POST(request: NextRequest) {
           avatarSizes[sizeKey] = sizeUrl;
         }
 
-        // Update record with optimized URLs
         await tx
           .update(profilePhotos)
           .set({
@@ -213,45 +375,28 @@ export async function POST(request: NextRequest) {
           })
           .where(eq(profilePhotos.id, photoRecord.id));
 
-        // Get the user's profile for cache invalidation and settings update
-        const [profile] = await tx
-          .select({
-            id: creatorProfiles.id,
-            usernameNormalized: creatorProfiles.usernameNormalized,
-            settings: creatorProfiles.settings,
+        const currentSettings = (profile.settings ?? {}) as Record<
+          string,
+          unknown
+        >;
+        await tx
+          .update(creatorProfiles)
+          .set({
+            settings: {
+              ...currentSettings,
+              avatarSizes,
+            },
+            updatedAt: new Date(),
           })
-          .from(creatorProfiles)
-          .where(eq(creatorProfiles.userId, dbUser.id))
-          .limit(1);
+          .where(eq(creatorProfiles.id, profile.id));
 
-        // Store avatar download sizes on the creator profile settings
-        if (profile) {
-          const currentSettings = (profile.settings ?? {}) as Record<
-            string,
-            unknown
-          >;
-          await tx
-            .update(creatorProfiles)
-            .set({
-              settings: {
-                ...currentSettings,
-                avatarSizes,
-              },
-              updatedAt: new Date(),
-            })
-            .where(eq(creatorProfiles.id, profile.id));
-        }
-
-        // Invalidate avatar caches so profile shows updated image
-        await invalidateAvatarCache(
-          dbUser.id,
-          profile?.usernameNormalized ?? null
-        );
+        await invalidateAvatarCache(dbUser.id, profile.usernameNormalized);
 
         return NextResponse.json(
           {
             jobId: photoRecord.id,
             photoId: photoRecord.id,
+            photoType,
             status: 'ready',
             avatarUrl,
             blobUrl: avatarUrl,
@@ -292,8 +437,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.error('Avatar upload error:', error);
-    await captureError('Avatar upload failed', error, {
+    logger.error('Image upload error:', error);
+    await captureError('Image upload failed', error, {
       route: '/api/images/upload',
       method: 'POST',
     });
