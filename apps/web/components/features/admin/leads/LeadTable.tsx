@@ -169,6 +169,11 @@ function renderSignalsCell({ row }: { row: { original: AdminLead } }) {
           Email
         </Badge>
       )}
+      {lead.hasTrackingPixels && (
+        <Badge variant='secondary' className='text-2xs'>
+          Pixel
+        </Badge>
+      )}
     </div>
   );
 }

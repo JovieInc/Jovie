@@ -20,6 +20,7 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
+import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
 import { notifySlackUpgrade } from '@/lib/notifications/providers/slack';
 import {
   expireReferralOnChurn,
@@ -173,6 +174,10 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
 
     await invalidateBillingCache(userId);
 
+    if (result.success && result.isActive) {
+      await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+    }
+
     return result;
   }
 
@@ -232,6 +237,10 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
     });
 
     await invalidateBillingCache(userId);
+
+    if (result.success && result.isActive) {
+      await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+    }
 
     return result;
   }

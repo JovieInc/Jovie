@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { type Lead, leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
+import { recordLeadFunnelEvent } from './funnel-events';
 import { ingestLeadAsCreator } from './ingest-lead';
 import { pushLeadToInstantly } from './instantly';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
@@ -86,9 +87,26 @@ async function pushToInstantlyIfEligible(
         instantlyLeadId,
         outreachStatus: 'queued',
         outreachQueuedAt: queuedNow,
+        firstContactedAt: routedLead.firstContactedAt ?? queuedNow,
+        lastContactedAt: queuedNow,
         updatedAt: queuedNow,
       })
       .where(eq(leads.id, leadId));
+
+    await recordLeadFunnelEvent(
+      {
+        leadId,
+        eventType: 'email_queued',
+        channel: 'email',
+        provider: 'instantly',
+        campaignKey: 'claim_invite',
+        metadata: {
+          instantlyLeadId,
+          claimLink: routeResult.claimUrl,
+        },
+      },
+      { idempotent: true }
+    );
 
     return { instantlyLeadId, outreachStatus: 'queued' };
   } catch (instantlyError) {
@@ -141,11 +159,29 @@ export async function approveLead(lead: Lead): Promise<ApproveLeadResult> {
     return { ingestion: null, routing: null };
   }
 
+  await recordLeadFunnelEvent(
+    {
+      leadId,
+      eventType: 'approved',
+    },
+    { idempotent: true }
+  );
+
   // 2. Ingest as creator profile
   let ingestion: ApproveLeadResult['ingestion'] = null;
   if (lead.linktreeUrl) {
     try {
       ingestion = await ingestLeadAsCreator(lead);
+      if (ingestion?.success && ingestion.profileId) {
+        await recordLeadFunnelEvent(
+          {
+            leadId,
+            eventType: 'profile_ingested',
+            metadata: { creatorProfileId: ingestion.profileId },
+          },
+          { idempotent: true }
+        );
+      }
     } catch (ingestError) {
       await captureError('Lead auto-ingest failed', ingestError, {
         route: 'leads/approve-lead',

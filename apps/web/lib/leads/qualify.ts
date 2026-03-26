@@ -20,6 +20,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 export interface QualificationResult {
   status: 'qualified' | 'disqualified';
+  sourcePlatform: 'linktree' | 'beacons' | 'laylo';
   displayName: string | null;
   bio: string | null;
   avatarUrl: string | null;
@@ -31,6 +32,8 @@ export interface QualificationResult {
   hasInstagram: boolean;
   instagramHandle: string | null;
   musicToolsDetected: string[];
+  hasTrackingPixels: boolean;
+  trackingPixelPlatforms: string[];
   allLinks: ExtractedLink[];
   fitScore: number;
   fitScoreBreakdown: Record<string, unknown>;
@@ -64,6 +67,9 @@ export async function qualifyLead(
   const musicToolsDetected = platforms.filter(p =>
     MUSIC_TOOL_PLATFORMS.has(p!)
   ) as string[];
+  const trackingPixelPlatforms = Object.keys(
+    extraction.discoveredPixels ?? {}
+  ).sort();
 
   const fitResult = calculateFitScore({
     ingestionSourcePlatform: 'linktree',
@@ -71,6 +77,7 @@ export async function qualifyLead(
     socialLinkPlatforms: platforms as string[],
     hasSpotifyId: hasSpotifyLink,
     hasContactEmail: !!extraction.contactEmail,
+    hasTrackingPixels: trackingPixelPlatforms.length > 0,
   });
 
   // Apply qualification rules
@@ -98,6 +105,7 @@ export async function qualifyLead(
 
   return {
     status,
+    sourcePlatform: 'linktree',
     displayName: extraction.displayName ?? null,
     bio: extraction.bio ?? null,
     avatarUrl: extraction.avatarUrl ?? null,
@@ -111,6 +119,8 @@ export async function qualifyLead(
       ? extractInstagramHandle(instagramLink.url)
       : null,
     musicToolsDetected,
+    hasTrackingPixels: trackingPixelPlatforms.length > 0,
+    trackingPixelPlatforms,
     allLinks: extraction.links,
     fitScore: fitResult.score,
     fitScoreBreakdown: toRecord(fitResult.breakdown),

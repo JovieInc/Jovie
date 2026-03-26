@@ -16,7 +16,23 @@ const settingsUpdateSchema = z.object({
   discoveryEnabled: z.boolean().optional(),
   autoIngestEnabled: z.boolean().optional(),
   autoIngestMinFitScore: z.number().int().min(0).max(100).optional(),
+  autoIngestDailyLimit: z.number().int().min(1).max(1000).optional(),
   dailyQueryBudget: z.number().int().min(1).max(10000).optional(),
+  dailySendCap: z.number().int().min(1).max(10000).optional(),
+  maxPerHour: z.number().int().min(1).max(1000).optional(),
+  rampMode: z.enum(['manual', 'recommend_only']).optional(),
+  guardrailsEnabled: z.boolean().optional(),
+  guardrailThresholds: z
+    .object({
+      minimumSampleSize: z.number().int().min(1).max(10_000),
+      increaseClaimClickRate: z.number().min(0).max(1),
+      holdClaimClickRateFloor: z.number().min(0).max(1),
+      pauseClaimClickRateFloor: z.number().min(0).max(1),
+      maxBounceComplaintRate: z.number().min(0).max(1),
+      maxUnsubscribeRate: z.number().min(0).max(1),
+      maxProviderFailureRate: z.number().min(0).max(1),
+    })
+    .optional(),
 });
 
 /**

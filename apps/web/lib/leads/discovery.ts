@@ -5,6 +5,7 @@ import {
   discoveryKeywords,
   type LeadPipelineSettings,
   leadPipelineSettings,
+  leadSearchResults,
   leads,
 } from '@/lib/db/schema/leads';
 import { sqlArray } from '@/lib/db/sql-helpers';
@@ -13,6 +14,7 @@ import {
   extractLinktreeHandle,
   isLinktreeUrl,
 } from '@/lib/ingestion/strategies/linktree';
+import { recordLeadFunnelEvent } from './funnel-events';
 import { searchGoogleCSE } from './google-cse';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 
@@ -21,6 +23,9 @@ interface DiscoveryCandidate {
   linktreeUrl: string;
   discoverySource: 'google_cse';
   discoveryQuery: string;
+  sourcePlatform: 'linktree';
+  sourceHandle: string;
+  sourceUrl: string;
 }
 
 function isMissingLeadInsertColumnError(error: unknown): boolean {
@@ -36,7 +41,7 @@ async function insertCandidatesWithLegacyFallback(
   candidates: DiscoveryCandidate[],
   result: DiscoveryResult
 ): Promise<void> {
-  let insertedCount = 0;
+  const insertedIds: string[] = [];
 
   for (const candidate of candidates) {
     const insertResult = await db.execute<{ id: string }>(drizzleSql`
@@ -58,12 +63,25 @@ async function insertCandidatesWithLegacyFallback(
     `);
 
     if (insertResult.rows[0]?.id) {
-      insertedCount++;
+      insertedIds.push(insertResult.rows[0].id);
     }
   }
 
-  result.newLeadsFound += insertedCount;
-  result.duplicatesSkipped += candidates.length - insertedCount;
+  result.newLeadsFound += insertedIds.length;
+  result.duplicatesSkipped += candidates.length - insertedIds.length;
+
+  await Promise.all(
+    insertedIds.map(leadId =>
+      recordLeadFunnelEvent(
+        {
+          leadId,
+          eventType: 'discovered',
+          metadata: { discoverySource: 'google_cse' },
+        },
+        { idempotent: false }
+      )
+    )
+  );
 }
 
 async function insertCandidates(
@@ -79,6 +97,19 @@ async function insertCandidates(
       .returning({ id: leads.id });
     result.newLeadsFound += insertedRows.length;
     result.duplicatesSkipped += candidates.length - insertedRows.length;
+
+    await Promise.all(
+      insertedRows.map(({ id }) =>
+        recordLeadFunnelEvent(
+          {
+            leadId: id,
+            eventType: 'discovered',
+            metadata: { discoverySource: 'google_cse' },
+          },
+          { idempotent: false }
+        )
+      )
+    );
   } catch (error) {
     if (!isMissingLeadInsertColumnError(error)) {
       throw error;
@@ -160,39 +191,78 @@ export interface DiscoveryResult {
   totalEnabledKeywords: number;
 }
 
-function buildCandidateMap(
-  results: { link: string }[],
-  query: string
-): Map<
-  string,
-  {
-    linktreeHandle: string;
-    linktreeUrl: string;
-    discoverySource: 'google_cse';
-    discoveryQuery: string;
+const SEARCH_RESULT_COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+
+function normalizeSearchResultUrl(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl);
+    parsed.hash = '';
+    parsed.search = '';
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    return parsed.toString();
+  } catch {
+    return null;
   }
-> {
-  const map = new Map<
-    string,
-    {
-      linktreeHandle: string;
-      linktreeUrl: string;
-      discoverySource: 'google_cse';
-      discoveryQuery: string;
+}
+
+async function shouldSkipSeenSearchResult(
+  query: string,
+  rawUrl: string,
+  rank: number
+): Promise<boolean> {
+  if (typeof db.select !== 'function') {
+    return false;
+  }
+
+  const normalizedResultUrl = normalizeSearchResultUrl(rawUrl);
+  if (!normalizedResultUrl) {
+    return true;
+  }
+
+  try {
+    const now = new Date();
+    const recentCutoff = new Date(now.getTime() - SEARCH_RESULT_COOLDOWN_MS);
+    const [existing] = await db
+      .select({
+        id: leadSearchResults.id,
+        lastSeenAt: leadSearchResults.lastSeenAt,
+        timesSeen: leadSearchResults.timesSeen,
+      })
+      .from(leadSearchResults)
+      .where(
+        drizzleSql`${leadSearchResults.query} = ${query} and ${leadSearchResults.normalizedResultUrl} = ${normalizedResultUrl}`
+      )
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(leadSearchResults)
+        .set({
+          lastSeenAt: now,
+          timesSeen: existing.timesSeen + 1,
+          lastRank: rank,
+          updatedAt: now,
+        })
+        .where(eq(leadSearchResults.id, existing.id));
+
+      return existing.lastSeenAt >= recentCutoff;
     }
-  >();
-  for (const item of results) {
-    if (!isLinktreeUrl(item.link)) continue;
-    const handle = extractLinktreeHandle(item.link);
-    if (!handle) continue;
-    map.set(handle, {
-      linktreeHandle: handle,
-      linktreeUrl: `https://linktr.ee/${handle}`,
-      discoverySource: 'google_cse',
-      discoveryQuery: query,
+
+    await db.insert(leadSearchResults).values({
+      query,
+      normalizedResultUrl,
+      sourcePlatform: 'linktree',
+      firstSeenAt: now,
+      lastSeenAt: now,
+      timesSeen: 1,
+      lastRank: rank,
+      updatedAt: now,
     });
+  } catch {
+    return false;
   }
-  return map;
+
+  return false;
 }
 
 /**
@@ -273,7 +343,33 @@ export async function runDiscovery(
       const results = await searchGoogleCSE(keyword.query, currentOffset);
       diagnostic.rawResultCount = results.length;
 
-      const candidatesByHandle = buildCandidateMap(results, keyword.query);
+      const candidatesByHandle = new Map<string, DiscoveryCandidate>();
+      for (const [index, item] of results.entries()) {
+        if (!isLinktreeUrl(item.link)) continue;
+
+        const handle = extractLinktreeHandle(item.link);
+        if (!handle) continue;
+
+        const skipSeen = await shouldSkipSeenSearchResult(
+          keyword.query,
+          item.link,
+          currentOffset + index
+        );
+        if (skipSeen) {
+          result.duplicatesSkipped++;
+          continue;
+        }
+
+        candidatesByHandle.set(handle, {
+          linktreeHandle: handle,
+          linktreeUrl: `https://linktr.ee/${handle}`,
+          discoverySource: 'google_cse',
+          discoveryQuery: keyword.query,
+          sourcePlatform: 'linktree',
+          sourceHandle: handle,
+          sourceUrl: `https://linktr.ee/${handle}`,
+        });
+      }
       const candidates = Array.from(candidatesByHandle.values());
       diagnostic.linktreeUrlsFound = candidates.length;
       result.candidatesProcessed += candidates.length;
