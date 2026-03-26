@@ -5,7 +5,7 @@ import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
@@ -13,6 +13,7 @@ import {
   isToolInvocationPart,
   type MessagePart,
   type SocialLinkToolResult,
+  type ToolInvocationPart,
 } from '../types';
 import { getMessageText } from '../utils';
 import { ChatAnalyticsCard } from './ChatAnalyticsCard';
@@ -25,6 +26,100 @@ const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
+
+function renderToolCard(
+  toolInvocation: ToolInvocationPart,
+  profileId?: string
+): React.ReactNode {
+  if (
+    toolInvocation.toolName === 'proposeAvatarUpload' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success
+  ) {
+    return <ChatAvatarUploadCard />;
+  }
+
+  if (
+    toolInvocation.toolName === 'showTopInsights' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success
+  ) {
+    return (
+      <ChatAnalyticsCard
+        result={toolInvocation.result as unknown as ChatInsightsToolResult}
+      />
+    );
+  }
+
+  if (
+    toolInvocation.toolName === 'proposeSocialLink' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success &&
+    profileId
+  ) {
+    const result = toolInvocation.result as unknown as SocialLinkToolResult;
+    return (
+      <ChatLinkConfirmationCard
+        profileId={profileId}
+        platform={result.platform}
+        normalizedUrl={result.normalizedUrl}
+        originalUrl={result.originalUrl}
+      />
+    );
+  }
+
+  if (
+    toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success &&
+    profileId
+  ) {
+    const result = toolInvocation.result as {
+      linkId: string;
+      platform: string;
+      url: string;
+    };
+    return (
+      <ChatLinkRemovalCard
+        profileId={profileId}
+        linkId={result.linkId}
+        platform={result.platform}
+        url={result.url}
+      />
+    );
+  }
+
+  if (toolInvocation.toolName === 'generateReleasePitch') {
+    if (toolInvocation.state === 'call') {
+      return <ChatPitchCard state='loading' />;
+    }
+
+    if (toolInvocation.state === 'result') {
+      const result = toolInvocation.result as {
+        success: boolean;
+        releaseTitle?: string;
+        pitches?: {
+          spotify: string;
+          appleMusic: string;
+          amazon: string;
+          generic: string;
+        };
+        error?: string;
+      };
+
+      return (
+        <ChatPitchCard
+          state={result.success ? 'success' : 'error'}
+          releaseTitle={result.releaseTitle}
+          pitches={result.pitches}
+          error={result.error}
+        />
+      );
+    }
+  }
+
+  return null;
+}
 
 interface ChatMessageProps {
   readonly id: string;
@@ -131,125 +226,18 @@ export function ChatMessage({
 
           {/* Interactive tool cards */}
           {toolInvocations.map(toolInvocation => {
-            if (
-              toolInvocation.toolName === 'proposeAvatarUpload' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success
-            ) {
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatAvatarUploadCard />
-                </div>
-              );
+            const card = renderToolCard(toolInvocation, profileId);
+            if (!card) {
+              return null;
             }
-
-            if (
-              toolInvocation.toolName === 'showTopInsights' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success
-            ) {
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatAnalyticsCard
-                    result={
-                      toolInvocation.result as unknown as ChatInsightsToolResult
-                    }
-                  />
-                </div>
-              );
-            }
-
-            if (
-              toolInvocation.toolName === 'proposeSocialLink' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success &&
-              profileId
-            ) {
-              const result =
-                toolInvocation.result as unknown as SocialLinkToolResult;
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatLinkConfirmationCard
-                    profileId={profileId}
-                    platform={result.platform}
-                    normalizedUrl={result.normalizedUrl}
-                    originalUrl={result.originalUrl}
-                  />
-                </div>
-              );
-            }
-
-            if (
-              toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success &&
-              profileId
-            ) {
-              const result = toolInvocation.result as {
-                linkId: string;
-                platform: string;
-                url: string;
-              };
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatLinkRemovalCard
-                    profileId={profileId}
-                    linkId={result.linkId}
-                    platform={result.platform}
-                    url={result.url}
-                  />
-                </div>
-              );
-            }
-
-            if (toolInvocation.toolName === 'generateReleasePitch') {
-              if (toolInvocation.state === 'call') {
-                return (
-                  <ChatPitchCard
-                    key={toolInvocation.toolInvocationId}
-                    state='loading'
-                  />
-                );
-              }
-
-              if (toolInvocation.state === 'result') {
-                const result = toolInvocation.result as {
-                  success: boolean;
-                  releaseTitle?: string;
-                  pitches?: {
-                    spotify: string;
-                    appleMusic: string;
-                    amazon: string;
-                    generic: string;
-                  };
-                  error?: string;
-                };
-
-                return (
-                  <ChatPitchCard
-                    key={toolInvocation.toolInvocationId}
-                    state={result.success ? 'success' : 'error'}
-                    releaseTitle={result.releaseTitle}
-                    pitches={result.pitches}
-                    error={result.error}
-                  />
-                );
-              }
-            }
-
-            return null;
+            return (
+              <div
+                key={toolInvocation.toolInvocationId}
+                className={cn(messageText && 'mt-3')}
+              >
+                {card}
+              </div>
+            );
           })}
 
           {!isStreaming && messageText && (
