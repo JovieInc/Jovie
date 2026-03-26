@@ -927,25 +927,45 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: rewrite /__clerk/* and /clerk/* to the staging Clerk
-  // Frontend API when running on staging hosts. Production requests fall
-  // through to the vercel.json static rewrites (which correctly set the Host
-  // header for Clerk's proxy domain validation). Only staging needs dynamic
-  // middleware because the same build is promoted staging → production and
-  // vercel.json can only target one host.
+  // Clerk FAPI proxy: fetch-based proxy using the FAPI host decoded from
+  // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Each env (staging/production) has its
+  // own publishable key via Doppler, so the proxy automatically routes to
+  // the correct Clerk instance. We use fetch() because NextResponse.rewrite()
+  // and vercel.json rewrites forward the original Host header, causing Clerk
+  // to return 400 "Invalid host".
   // ========================================================================
   if (
-    isStagingHost(hostname) &&
-    (pathname.startsWith('/__clerk/') ||
-      pathname === '/__clerk' ||
-      pathname.startsWith('/clerk/') ||
-      pathname === '/clerk')
+    pathname.startsWith('/__clerk/') ||
+    pathname === '/__clerk' ||
+    pathname.startsWith('/clerk/') ||
+    pathname === '/clerk'
   ) {
-    const fapiHost = 'clerk.staging.jov.ie';
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+    const b64 = pk.replace(/^pk_(live|test)_/, '');
+    const fapiHost = atob(b64).replace(/\$$/, '');
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
-    return NextResponse.rewrite(
-      new URL(`https://${fapiHost}/${subpath}${req.nextUrl.search}`)
-    );
+    const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
+
+    const headers = new Headers(req.headers);
+    headers.set('host', fapiHost);
+    headers.delete('connection');
+
+    const proxyRes = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body:
+        req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      redirect: 'manual',
+    });
+
+    const resHeaders = new Headers(proxyRes.headers);
+    resHeaders.delete('content-encoding');
+
+    return new NextResponse(proxyRes.body, {
+      status: proxyRes.status,
+      statusText: proxyRes.statusText,
+      headers: resHeaders,
+    });
   }
 
   const pathInfo = categorizePath(pathname);
