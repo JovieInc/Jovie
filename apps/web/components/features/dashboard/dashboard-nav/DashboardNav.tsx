@@ -9,7 +9,6 @@ import { usePreviewPanelState } from '@/app/app/(shell)/dashboard/PreviewPanelCo
 import {
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
 } from '@/components/organisms/Sidebar';
 import { SidebarCollapsibleGroup } from '@/components/organisms/SidebarCollapsibleGroup';
@@ -82,15 +81,12 @@ export function DashboardNav(_: DashboardNavProps) {
 
   const primaryItems = useMemo(() => {
     return primaryNavigation.map(item => {
-      if (item.id === 'profile' && artistName) {
-        return { ...item, name: artistName };
-      }
       if (item.id === 'releases' && releaseCount > 0) {
         return { ...item, badge: releaseCount };
       }
       return item;
     });
-  }, [artistName, releaseCount]);
+  }, [releaseCount]);
 
   const isDemo = pathname === APP_ROUTES.DEMO;
   const isInSettings = pathname.startsWith(APP_ROUTES.SETTINGS);
@@ -181,9 +177,6 @@ export function DashboardNav(_: DashboardNavProps) {
         </>
       ) : (
         <SidebarGroup className='mb-0.5'>
-          <SidebarGroupLabel className='h-6 px-2.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/85'>
-            Artist
-          </SidebarGroupLabel>
           <SidebarGroupContent className='space-y-0.5'>
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
