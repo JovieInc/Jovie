@@ -59,7 +59,7 @@ export function AuthClientProviders({
   return (
     <ClerkProvider
       publishableKey={publishableKey}
-      proxyUrl={getClerkProxyUrl(window.location)}
+      proxyUrl={getClerkProxyUrl(globalThis.location)}
       appearance={authClerkAppearance}
       ui={ui}
       signInUrl={APP_ROUTES.SIGNIN}
