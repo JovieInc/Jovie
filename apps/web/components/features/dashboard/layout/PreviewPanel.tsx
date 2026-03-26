@@ -274,6 +274,7 @@ export function PreviewPanel() {
   const { username, displayName, avatarUrl, links } = previewData;
   const visibleLinkCount = links.filter(link => link.isVisible).length;
   const hiddenLinkCount = links.length - visibleLinkCount;
+  const hiddenDraftLabel = `${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'}`;
   const connectedDspCount = [
     previewData.dspConnections.spotify.connected,
     previewData.dspConnections.appleMusic.connected,
@@ -494,7 +495,7 @@ export function PreviewPanel() {
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile
                 {hiddenLinkCount > 0
-                  ? `, with ${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'} still hidden from visitors.`
+                  ? `, with ${hiddenDraftLabel} still hidden from visitors.`
                   : '.'}
               </p>
 
