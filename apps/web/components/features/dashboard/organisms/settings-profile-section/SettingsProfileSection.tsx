@@ -245,7 +245,7 @@ export function SettingsProfileSection({
             onChange={e => handleFieldChange('targetPlaylists', e.target.value)}
             onBlur={() => flushSave()}
             placeholder='e.g. Pollen, Butter, Lorem'
-            maxLength={200}
+            maxLength={310}
             className={`w-full sm:max-w-[280px] ${PROFILE_INPUT_CLASS}`}
           />
         </div>

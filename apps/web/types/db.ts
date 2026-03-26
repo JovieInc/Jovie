@@ -121,6 +121,8 @@ export interface CreatorProfile {
   location?: string | null;
   active_since_year?: number | null;
   genres?: string[] | null;
+  pitch_context?: string | null;
+  target_playlists?: string[] | null;
   // Monitoring and analytics
   last_login_at?: string;
   profile_views: number;
@@ -411,6 +413,8 @@ type CanonicalArtistProfileShape = {
   hometown?: string | null;
   activeSinceYear?: number | null;
   genres?: string[] | null;
+  pitchContext?: string | null;
+  targetPlaylists?: string[] | null;
   isPublic: boolean;
   isVerified: boolean;
   isFeatured: boolean;
@@ -464,6 +468,8 @@ function mapCanonicalProfileToArtist(
     hometown,
     active_since_year: profile.activeSinceYear ?? null,
     genres: profile.genres ?? null,
+    pitch_context: profile.pitchContext ?? null,
+    target_playlists: profile.targetPlaylists ?? null,
     published: profile.isPublic,
     is_verified: profile.isVerified,
     is_featured: profile.isFeatured,
@@ -493,6 +499,8 @@ export function convertCreatorProfileToArtist(profile: CreatorProfile): Artist {
     location: profile.location,
     activeSinceYear: profile.active_since_year,
     genres: profile.genres,
+    pitchContext: profile.pitch_context,
+    targetPlaylists: profile.target_playlists,
     isPublic: profile.is_public,
     isVerified: profile.is_verified,
     isFeatured: profile.is_featured,
@@ -560,6 +568,8 @@ export function convertDrizzleCreatorProfileToArtist(
     location: profile.location,
     activeSinceYear: profile.activeSinceYear,
     genres: profile.genres,
+    pitchContext: profile.pitchContext,
+    targetPlaylists: profile.targetPlaylists,
     isPublic: profile.isPublic ?? false,
     isVerified: profile.isVerified ?? false,
     isFeatured: profile.isFeatured ?? false,
