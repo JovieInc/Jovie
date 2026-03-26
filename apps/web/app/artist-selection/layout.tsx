@@ -11,7 +11,7 @@ export default async function ArtistSelectionLayout({
   const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
       {children}
     </ClientProviders>
   );

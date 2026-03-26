@@ -112,18 +112,27 @@ function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-in/sso-callback';
 
   const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
+  const isAccountPath = matchesRoute(pathname, '/account');
+  const isBillingPath = matchesRoute(pathname, '/billing');
 
   // Onboarding/waitlist paths
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
   const isWaitlistPath = matchesRoute(pathname, '/waitlist');
 
   // Protected paths (require auth)
-  const isProtectedPath = isAppShellPath || isWaitlistPath || isOnboardingPath;
+  const isProtectedPath =
+    isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
+    isWaitlistPath ||
+    isOnboardingPath;
 
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
     isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
     isOnboardingPath ||
     isWaitlistPath;
 
