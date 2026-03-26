@@ -307,11 +307,6 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
           <DrawerSurfaceCard
             className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
           >
-            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-              <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                Contact
-              </p>
-            </div>
             <div className='p-2.5'>
               <div className='space-y-px'>
                 <p className='truncate text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'>

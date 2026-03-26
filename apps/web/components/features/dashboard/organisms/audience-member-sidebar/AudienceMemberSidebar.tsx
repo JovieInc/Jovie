@@ -44,7 +44,7 @@ export function AudienceMemberSidebar({
       ariaLabel='Audience member details'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
-      title='Audience'
+      title={title || 'Audience'}
       onClose={onClose}
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
@@ -52,11 +52,6 @@ export function AudienceMemberSidebar({
         <DrawerSurfaceCard
           className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
         >
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-            <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-              Audience
-            </p>
-          </div>
           <div className='p-2.5'>
             <AudienceMemberHeader
               title={title}

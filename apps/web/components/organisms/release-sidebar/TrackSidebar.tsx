@@ -198,11 +198,6 @@ export function TrackSidebar({
     <DrawerSurfaceCard
       className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Track
-        </p>
-      </div>
       <div className='p-2.5'>
         <TrackMetaSummary
           title={track.title}
@@ -272,7 +267,7 @@ export function TrackSidebar({
               />
             </div>
 
-            <div className='space-y-2.5 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_92%,transparent)] p-2.5'>
+            <div className='space-y-2.5 p-2.5'>
               {activeTab === 'details' && (
                 <DrawerSurfaceCard
                   className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
