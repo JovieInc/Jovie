@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
 import { APP_NAME, APP_URL } from '@/constants/app';
-import { AIFeaturesSection } from '@/features/home/AIFeaturesSection';
+import { AudienceSection } from '@/features/home/AudienceSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { BottomCTA } from '@/features/home/BottomCTA';
 import { HeroProductShot } from '@/features/home/HeroProductShot';
+import { HomeFAQSection } from '@/features/home/HomeFAQSection';
+import { HomePricingSection } from '@/features/home/HomePricingSection';
 import { LogoBar } from '@/features/home/LogoBar';
 import { SmartLinksSection } from '@/features/home/SmartLinksSection';
 import { UnifiedProfileSection } from '@/features/home/UnifiedProfileSection';
@@ -13,6 +15,9 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+
+/** Feature flag: show sections below the hero. Off by default until hero is polished. */
+const SHOW_SECTIONS = false;
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -174,20 +179,30 @@ export default function HomePage() {
       {/* 2. Logo bar — social proof */}
       <LogoBar />
 
-      {/* 3. Smart links — automatic release links */}
-      <SmartLinksSection />
+      {SHOW_SECTIONS && (
+        <>
+          {/* 3. Smart links — automatic release links */}
+          <SmartLinksSection />
 
-      {/* 4. Unified profile — everything in one place */}
-      <UnifiedProfileSection />
+          {/* 4. Artist profile — profiles that convert */}
+          <UnifiedProfileSection />
 
-      {/* 5. AI features — pitches, presence, audience */}
-      <AIFeaturesSection />
+          {/* 5. Audience — know every fan by name */}
+          <AudienceSection />
 
-      {/* 6. Divider before CTA */}
-      <div aria-hidden='true' className='section-gradient-divider' />
+          {/* 6. Pricing */}
+          <HomePricingSection />
 
-      {/* 7. Bottom CTA */}
-      <BottomCTA />
+          {/* 7. FAQ */}
+          <HomeFAQSection />
+
+          {/* 8. Divider before CTA */}
+          <div aria-hidden='true' className='section-gradient-divider' />
+
+          {/* 9. Bottom CTA */}
+          <BottomCTA />
+        </>
+      )}
     </div>
   );
 }

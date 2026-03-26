@@ -4,7 +4,7 @@ import { ProductScreenshot } from './ProductScreenshot';
 
 export function HeroProductShot() {
   return (
-    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem]'>
+    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.5rem]'>
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -22,17 +22,14 @@ export function HeroProductShot() {
 
               <h1 className='marketing-h1-linear mt-5 text-primary-token'>
                 Release more music.
-                <br />
-                Find your sound faster.
               </h1>
 
-              <p className='marketing-lead-linear mx-auto mt-5 max-w-[34rem] text-tertiary-token'>
-                Every drop needs smart links, fan notifications, and playlist
-                pitches. Jovie automates all of it — so you stay in the studio
-                and ship more often.
+              <p className='marketing-lead-linear mx-auto mt-5 max-w-[32rem] text-tertiary-token'>
+                Smart links, fan notifications, and release automation — so you
+                stay in the studio and ship more often.
               </p>
 
-              <div className='mt-8 flex justify-center'>
+              <div className='mt-8 flex items-center justify-center gap-4'>
                 <Link
                   href='/signup'
                   className='btn-linear-signup focus-ring-themed'
@@ -43,28 +40,33 @@ export function HeroProductShot() {
                     borderRadius: '6px',
                   }}
                 >
-                  Get Started
+                  Get Started — Free
                 </Link>
               </div>
 
               <p className='mt-4 text-[11px] tracking-[0.01em] text-quaternary-token'>
-                Free to start. No credit card required.
+                No credit card required
               </p>
             </div>
 
-            {/* Hero product screenshot */}
-            <div
-              className='reveal-on-scroll mx-auto mt-12 max-w-[1080px] md:mt-16'
-              data-delay='80'
-            >
+            {/* Hero product screenshot with bottom fade */}
+            <div className='relative mx-auto mt-14 max-w-[1080px] md:mt-20'>
               <ProductScreenshot
                 src='/product-screenshots/releases-dashboard-full.png'
                 alt='Jovie releases dashboard showing smart links, release status, and streaming data'
                 width={2880}
                 height={1800}
-                title='Jovie — Releases'
                 priority
                 skipCheck
+              />
+              {/* Bottom gradient fade — screenshot dissolves into bg */}
+              <div
+                aria-hidden='true'
+                className='pointer-events-none absolute inset-x-0 bottom-0 z-20 h-48'
+                style={{
+                  background:
+                    'linear-gradient(to top, var(--color-bg-base) 0%, transparent 100%)',
+                }}
               />
             </div>
           </div>
