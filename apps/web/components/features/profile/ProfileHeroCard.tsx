@@ -1,6 +1,7 @@
 'use client';
 
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
+import { VerifiedBadge } from '@/components/atoms/VerifiedBadge';
 import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -89,19 +90,26 @@ export function ProfileHeroCard({
 
   return (
     <section className='flex flex-col items-center px-4 py-6 text-center sm:py-8'>
-      <div
-        className={`relative h-40 w-40 shrink-0 overflow-hidden bg-surface-2 shadow-sm sm:h-48 sm:w-48 ${
-          hasRelease ? 'rounded-2xl' : 'rounded-full'
-        }`}
-      >
-        <ImageWithFallback
-          src={latestRelease?.artworkUrl ?? artist.image_url}
-          alt={latestRelease ? `${latestRelease.title} artwork` : artist.name}
-          fill
-          sizes='(min-width: 640px) 192px, 160px'
-          className='object-cover'
-          fallbackVariant={hasRelease ? 'release' : 'avatar'}
-        />
+      <div className='relative'>
+        <div
+          className={`relative h-40 w-40 shrink-0 overflow-hidden bg-surface-2 shadow-sm sm:h-48 sm:w-48 ${
+            hasRelease ? 'rounded-2xl' : 'rounded-full'
+          }`}
+        >
+          <ImageWithFallback
+            src={latestRelease?.artworkUrl ?? artist.image_url}
+            alt={latestRelease ? `${latestRelease.title} artwork` : artist.name}
+            fill
+            sizes='(min-width: 640px) 192px, 160px'
+            className='object-cover'
+            fallbackVariant={hasRelease ? 'release' : 'avatar'}
+          />
+        </div>
+        {artist.is_verified && (
+          <span className='absolute -bottom-0.5 -right-0.5'>
+            <VerifiedBadge size='lg' />
+          </span>
+        )}
       </div>
 
       <div className='mt-4 max-w-sm space-y-1.5'>

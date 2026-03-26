@@ -70,7 +70,7 @@ export function ArtistInfo({
         name={artist.name}
         size={desktopSize}
         priority
-        verified={false}
+        verified={artist.is_verified}
         sizes={avatarResponsiveSizes}
         className={`ring-0 shadow-none ${avatarResponsiveClassName}`}
       />
@@ -104,7 +104,7 @@ export function ArtistInfo({
         <ArtistName
           name={artist.name}
           handle={artist.handle}
-          isVerified={artist.is_verified}
+          isVerified={false}
           size={nameSize}
         />
 
