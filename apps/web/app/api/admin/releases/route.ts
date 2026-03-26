@@ -1,32 +1,19 @@
 import { NextResponse } from 'next/server';
-
+import { requireAdmin } from '@/lib/admin/middleware';
 import {
   type AdminReleasesSort,
   adminReleasesSortFields,
   getAdminReleases,
 } from '@/lib/admin/releases';
-import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
+import { captureError } from '@/lib/error-tracking';
 
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(request: Request) {
-  const entitlements = await getCurrentUserEntitlements();
-
-  if (!entitlements.isAuthenticated) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (!entitlements.isAdmin) {
-    return NextResponse.json(
-      { error: 'Forbidden' },
-      { status: 403, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = await requireAdmin();
+  if (authError) return authError;
 
   const { searchParams } = new URL(request.url);
   const page = Math.min(
@@ -50,22 +37,30 @@ export async function GET(request: Request) {
 
   const sort = rawSort as AdminReleasesSort;
 
-  const result = await getAdminReleases({
-    page,
-    pageSize,
-    sort,
-    search: q,
-  });
+  try {
+    const result = await getAdminReleases({
+      page,
+      pageSize,
+      sort,
+      search: q,
+    });
 
-  return NextResponse.json(
-    {
-      rows: result.releases.map(release => ({
-        ...release,
-        releaseDate: release.releaseDate?.toISOString() ?? null,
-        createdAt: release.createdAt?.toISOString() ?? null,
-      })),
-      total: result.total,
-    },
-    { headers: NO_STORE_HEADERS }
-  );
+    return NextResponse.json(
+      {
+        rows: result.releases.map(release => ({
+          ...release,
+          releaseDate: release.releaseDate?.toISOString() ?? null,
+          createdAt: release.createdAt?.toISOString() ?? null,
+        })),
+        total: result.total,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
+  } catch (error) {
+    captureError('Failed to fetch admin releases', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch releases' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }
