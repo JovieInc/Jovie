@@ -5,10 +5,16 @@ import { db } from '@/lib/db';
 import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscribers';
 import { sendEmail } from '@/lib/email/send';
 import { getChangelogVerifyEmail } from '@/lib/email/templates/changelog-verify';
+import { captureError } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  changelogSubscribeLimiter,
+  createRateLimitHeaders,
+  getClientIP,
+} from '@/lib/rate-limit';
+import { logger } from '@/lib/utils/logger';
 
-// Simple in-memory rate limiter: IP → last request timestamp
-const rateLimitMap = new Map<string, number>();
-const RATE_LIMIT_MS = 10_000; // 10 seconds between requests per IP
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 function isValidEmail(email: string): boolean {
   if (email.length > 254) return false;
@@ -35,58 +41,100 @@ function isValidEmail(email: string): boolean {
   return true;
 }
 
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const last = rateLimitMap.get(ip);
-  if (last && now - last < RATE_LIMIT_MS) return true;
-  rateLimitMap.set(ip, now);
-  // Prevent unbounded growth
-  if (rateLimitMap.size > 10_000) {
-    const cutoff = now - RATE_LIMIT_MS * 2;
-    for (const [key, ts] of rateLimitMap) {
-      if (ts < cutoff) rateLimitMap.delete(key);
-    }
-  }
-  return false;
+function isLimiterUnavailable(reason: string | undefined): boolean {
+  return reason?.includes('temporarily unavailable') ?? false;
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+type TurnstileVerificationResult = 'verified' | 'rejected' | 'unavailable';
+
+async function verifyTurnstile(
+  token: string,
+  ip: string
+): Promise<TurnstileVerificationResult> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) {
-    // If no Turnstile secret configured, skip verification (dev mode)
-    console.warn(
-      'TURNSTILE_SECRET_KEY not set, skipping Turnstile verification'
+    if (process.env.NODE_ENV === 'production') {
+      logger.error('TURNSTILE_SECRET_KEY not configured in production');
+      return 'unavailable';
+    }
+
+    logger.warn(
+      'TURNSTILE_SECRET_KEY not set, skipping verification in non-production'
     );
-    return true;
+    return 'verified';
   }
-  if (!token) return false;
+
+  if (!token) return 'rejected';
 
   try {
-    const res = await fetch(
+    const response = await serverFetch(
       'https://challenges.cloudflare.com/turnstile/v0/siteverify',
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ secret, response: token, remoteip: ip }),
+        timeoutMs: 10_000,
+        context: 'Turnstile verification',
+        retry: {
+          maxRetries: 1,
+          baseDelayMs: 300,
+        },
       }
     );
-    const data = (await res.json()) as { success: boolean };
-    return data.success;
-  } catch {
-    return false;
+
+    if (!response.ok) {
+      logger.warn('Turnstile verification endpoint returned non-2xx', {
+        status: response.status,
+      });
+      return 'unavailable';
+    }
+
+    const data = (await response.json()) as { success: boolean };
+    return data.success ? 'verified' : 'rejected';
+  } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      logger.warn('Turnstile verification timed out', {
+        timeoutMs: error.timeoutMs,
+      });
+    }
+    return 'unavailable';
   }
 }
 
-export async function POST(request: NextRequest) {
-  const ip =
-    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown';
+async function sendVerificationEmail(
+  email: string,
+  verificationToken: string
+): Promise<void> {
+  const emailContent = getChangelogVerifyEmail({ verificationToken });
+  await sendEmail({
+    to: email,
+    subject: emailContent.subject,
+    text: emailContent.text,
+    html: emailContent.html,
+  });
+}
 
-  if (isRateLimited(ip)) {
+export async function POST(request: NextRequest) {
+  const ip = getClientIP(request);
+
+  const rateLimitResult = await changelogSubscribeLimiter.limit(ip);
+  if (!rateLimitResult.success) {
+    const status = isLimiterUnavailable(rateLimitResult.reason) ? 503 : 429;
     return NextResponse.json(
-      { error: 'Too many requests. Please try again in a moment.' },
-      { status: 429 }
+      {
+        error:
+          status === 503
+            ? 'Subscription is temporarily unavailable.'
+            : 'Too many requests. Please try again in a moment.',
+      },
+      {
+        status,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+          ...(status === 503 ? { 'Retry-After': '10' } : {}),
+        },
+      }
     );
   }
 
@@ -96,7 +144,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: 'Invalid request body' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
@@ -104,20 +152,25 @@ export async function POST(request: NextRequest) {
   if (!email || !isValidEmail(email)) {
     return NextResponse.json(
       { error: 'Valid email required' },
-      { status: 400 }
+      { status: 400, headers: NO_STORE_HEADERS }
     );
   }
 
-  // Verify Turnstile
-  const turnstileValid = await verifyTurnstile(body.turnstileToken ?? '', ip);
-  if (!turnstileValid) {
+  const turnstileResult = await verifyTurnstile(body.turnstileToken ?? '', ip);
+  if (turnstileResult === 'rejected') {
     return NextResponse.json(
       { error: 'Bot verification failed. Please try again.' },
-      { status: 403 }
+      { status: 403, headers: NO_STORE_HEADERS }
     );
   }
 
-  // Check for existing subscriber
+  if (turnstileResult === 'unavailable') {
+    return NextResponse.json(
+      { error: 'Bot verification unavailable. Please try again.' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
+
   const [existing] = await db
     .select()
     .from(productUpdateSubscribers)
@@ -128,11 +181,10 @@ export async function POST(request: NextRequest) {
     if (existing.verified && !existing.unsubscribedAt) {
       return NextResponse.json(
         { message: 'Already subscribed!' },
-        { status: 200 }
+        { status: 200, headers: NO_STORE_HEADERS }
       );
     }
 
-    // Resubscribe: clear unsubscribedAt, generate new tokens
     const verificationToken = crypto.randomUUID();
     const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -149,22 +201,25 @@ export async function POST(request: NextRequest) {
       })
       .where(eq(productUpdateSubscribers.id, existing.id));
 
-    // Send verification email
-    const emailContent = getChangelogVerifyEmail({ verificationToken });
-    await sendEmail({
-      to: email,
-      subject: emailContent.subject,
-      text: emailContent.text,
-      html: emailContent.html,
-    }).catch(err => console.error('Failed to send verification email:', err));
+    try {
+      await sendVerificationEmail(email, verificationToken);
+    } catch (error) {
+      await captureError('Failed to send changelog verification email', error, {
+        route: '/api/changelog/subscribe',
+        email,
+      });
+      return NextResponse.json(
+        { error: 'Confirmation email unavailable. Please try again.' },
+        { status: 502, headers: NO_STORE_HEADERS }
+      );
+    }
 
     return NextResponse.json(
       { message: 'Check your email to confirm your subscription!' },
-      { status: 201 }
+      { status: 201, headers: NO_STORE_HEADERS }
     );
   }
 
-  // New subscriber
   const verificationToken = crypto.randomUUID();
   const tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
@@ -175,17 +230,21 @@ export async function POST(request: NextRequest) {
     source: body.source ?? 'changelog_page',
   });
 
-  // Send verification email
-  const emailContent = getChangelogVerifyEmail({ verificationToken });
-  await sendEmail({
-    to: email,
-    subject: emailContent.subject,
-    text: emailContent.text,
-    html: emailContent.html,
-  }).catch(err => console.error('Failed to send verification email:', err));
+  try {
+    await sendVerificationEmail(email, verificationToken);
+  } catch (error) {
+    await captureError('Failed to send changelog verification email', error, {
+      route: '/api/changelog/subscribe',
+      email,
+    });
+    return NextResponse.json(
+      { error: 'Confirmation email unavailable. Please try again.' },
+      { status: 502, headers: NO_STORE_HEADERS }
+    );
+  }
 
   return NextResponse.json(
     { message: 'Check your email to confirm your subscription!' },
-    { status: 201 }
+    { status: 201, headers: NO_STORE_HEADERS }
   );
 }

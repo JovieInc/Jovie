@@ -29,6 +29,7 @@ import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { classifyEmail } from '@/lib/inbox/classifier';
 import { normalizeSubject } from '@/lib/inbox/constants';
 import { findThread } from '@/lib/inbox/threading';
@@ -294,12 +295,28 @@ interface ResendFullEmail {
 async function fetchFullEmail(
   emailId: string
 ): Promise<ResendFullEmail | null> {
-  try {
-    const response = await fetch(`https://api.resend.com/emails/${emailId}`, {
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      },
+  if (!env.RESEND_API_KEY) {
+    logger.warn('RESEND_API_KEY not configured for full email fetch', {
+      emailId,
     });
+    return null;
+  }
+
+  try {
+    const response = await serverFetch(
+      `https://api.resend.com/emails/${emailId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        },
+        timeoutMs: 10_000,
+        context: 'Resend received email fetch',
+        retry: {
+          maxRetries: 1,
+          baseDelayMs: 300,
+        },
+      }
+    );
 
     if (!response.ok) {
       logger.warn('Failed to fetch full email from Resend', {
@@ -311,6 +328,14 @@ async function fetchFullEmail(
 
     return await response.json();
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      logger.warn('Timed out fetching full email from Resend', {
+        emailId,
+        timeoutMs: error.timeoutMs,
+      });
+      return null;
+    }
+
     logger.warn('Error fetching full email from Resend', {
       emailId,
       error: error instanceof Error ? error.message : String(error),
