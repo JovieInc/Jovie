@@ -131,6 +131,50 @@ function FeedbackActionsCell({
   );
 }
 
+// Column factory extracted to module scope to avoid S6478 (component def inside parent)
+function createFeedbackColumns(
+  getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[]
+  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
+): ColumnDef<FeedbackRow, any>[] {
+  return [
+    columnHelper.accessor('createdAtIso', {
+      id: 'submitted',
+      header: 'Submitted',
+      cell: renderSubmittedCell,
+      size: 180,
+    }),
+    columnHelper.accessor('user', {
+      id: 'user',
+      header: 'User',
+      cell: renderUserCell,
+      size: 200,
+    }),
+    columnHelper.accessor('message', {
+      id: 'message',
+      header: 'Feedback',
+      cell: renderMessageCell,
+      size: 400,
+    }),
+    columnHelper.accessor('status', {
+      id: 'status',
+      header: 'Status',
+      cell: renderStatusCell,
+      size: 120,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: '',
+      cell: ({ row }) => (
+        <FeedbackActionsCell
+          row={row.original}
+          getContextMenuItems={getContextMenuItems}
+        />
+      ),
+      size: 48,
+    }),
+  ];
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -202,45 +246,8 @@ export function AdminFeedbackTable({
     toast.success(`Copied ${rows.length} items to clipboard`);
   }, [rows]);
 
-  // biome-ignore lint/suspicious/noExplicitAny: TanStack Table requires any for mixed-value-type column arrays
-  const columns = useMemo<ColumnDef<FeedbackRow, any>[]>(
-    () => [
-      columnHelper.accessor('createdAtIso', {
-        id: 'submitted',
-        header: 'Submitted',
-        cell: renderSubmittedCell,
-        size: 180,
-      }),
-      columnHelper.accessor('user', {
-        id: 'user',
-        header: 'User',
-        cell: renderUserCell,
-        size: 200,
-      }),
-      columnHelper.accessor('message', {
-        id: 'message',
-        header: 'Feedback',
-        cell: renderMessageCell,
-        size: 400,
-      }),
-      columnHelper.accessor('status', {
-        id: 'status',
-        header: 'Status',
-        cell: renderStatusCell,
-        size: 120,
-      }),
-      columnHelper.display({
-        id: 'actions',
-        header: '',
-        cell: ({ row }) => (
-          <FeedbackActionsCell
-            row={row.original}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ),
-        size: 48,
-      }),
-    ],
+  const columns = useMemo(
+    () => createFeedbackColumns(getContextMenuItems),
     [getContextMenuItems]
   );
 

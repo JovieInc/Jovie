@@ -238,6 +238,75 @@ function ActionsCellRenderer({
   );
 }
 
+// Column factory extracted to module scope to avoid S6478 (component def inside parent)
+function createTourDateColumns(
+  onSync: (() => void) | undefined,
+  isSyncing: boolean | undefined,
+  getContextMenuItems: (tourDate: TourDateViewModel) => ContextMenuItemType[]
+) {
+  return [
+    columnHelper.accessor('startDate', {
+      id: 'startDate',
+      header: 'Date',
+      cell: info => ( // NOSONAR
+        <DateCell
+          startDate={info.getValue()}
+          startTime={info.row.original.startTime}
+        />
+      ),
+      size: 120,
+      enableSorting: true,
+    }),
+    columnHelper.accessor('venueName', {
+      id: 'venue',
+      header: 'Venue',
+      cell: info => <VenueCell venueName={info.getValue()} />, // NOSONAR
+      size: 200,
+      enableSorting: true,
+    }),
+    columnHelper.display({
+      id: 'location',
+      header: 'Location',
+      cell: ({ row }) => <LocationCellRenderer row={row} />, // NOSONAR
+      size: 180,
+    }),
+    columnHelper.accessor('ticketStatus', {
+      id: 'status',
+      header: 'Status',
+      cell: info => ( // NOSONAR
+        <StatusCell
+          ticketStatus={info.getValue()}
+          startDate={info.row.original.startDate}
+        />
+      ),
+      size: 100,
+    }),
+    columnHelper.display({
+      id: 'tickets',
+      header: 'Tickets',
+      cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />, // NOSONAR
+      size: 80,
+    }),
+    columnHelper.accessor('provider', {
+      id: 'source',
+      header: 'Source',
+      cell: info => <SourceCell provider={info.getValue()} />, // NOSONAR
+      size: 100,
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
+      cell: ({ row }) => (
+        <ActionsCellRenderer
+          row={row}
+          getContextMenuItems={getContextMenuItems}
+        />
+      ),
+      size: 80,
+    }),
+  ];
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -257,83 +326,10 @@ export function TourDatesTable({
   );
 
   // TanStack Table requires render functions in column definitions.
-  // All components are properly extracted and memoized at file level (lines 34-223).
-  const columns = useMemo(() => {
-    return [
-      // Date column
-      columnHelper.accessor('startDate', {
-        id: 'startDate',
-        header: 'Date',
-        cell: info => ( // NOSONAR
-          <DateCell
-            startDate={info.getValue()}
-            startTime={info.row.original.startTime}
-          />
-        ),
-        size: 120,
-        enableSorting: true,
-      }),
-
-      // Venue column
-      columnHelper.accessor('venueName', {
-        id: 'venue',
-        header: 'Venue',
-        cell: info => <VenueCell venueName={info.getValue()} />, // NOSONAR
-        size: 200,
-        enableSorting: true,
-      }),
-
-      // Location column
-      columnHelper.display({
-        id: 'location',
-        header: 'Location',
-        cell: ({ row }) => <LocationCellRenderer row={row} />, // NOSONAR - TanStack Table render prop
-        size: 180,
-      }),
-
-      // Status column
-      columnHelper.accessor('ticketStatus', {
-        id: 'status',
-        header: 'Status',
-        cell: info => ( // NOSONAR
-          <StatusCell
-            ticketStatus={info.getValue()}
-            startDate={info.row.original.startDate}
-          />
-        ),
-        size: 100,
-      }),
-
-      // Tickets column
-      columnHelper.display({
-        id: 'tickets',
-        header: 'Tickets',
-        cell: ({ row }) => <TicketsCell ticketUrl={row.original.ticketUrl} />, // NOSONAR
-        size: 80,
-      }),
-
-      // Source column
-      columnHelper.accessor('provider', {
-        id: 'source',
-        header: 'Source',
-        cell: info => <SourceCell provider={info.getValue()} />, // NOSONAR
-        size: 100,
-      }),
-
-      // Actions column
-      columnHelper.display({
-        id: 'actions',
-        header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => (
-          <ActionsCellRenderer
-            row={row}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ), // NOSONAR - TanStack Table render prop
-        size: 80,
-      }),
-    ];
-  }, [onSync, isSyncing, getContextMenuItems]);
+  const columns = useMemo(
+    () => createTourDateColumns(onSync, isSyncing, getContextMenuItems),
+    [onSync, isSyncing, getContextMenuItems]
+  );
 
   return (
     <UnifiedTable
