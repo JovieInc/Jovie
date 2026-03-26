@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.78] - 2026-03-25
+
+### Added
+
+- Admin releases table at `/app/admin/releases` showing all releases across the platform with server-side pagination, search, and sort
+- Data quality indicators (missing artwork, no providers, no UPC, zero tracks) as inline health pills in the Issues column
+- Non-ASCII-safe search preserving music titles with accented characters
+- Admin sidebar nav entry for Releases with Disc3 icon
+
 ## [26.4.77] - 2026-03-25
 
 ### Changed
