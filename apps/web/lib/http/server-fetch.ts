@@ -44,6 +44,13 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
+function cancelResponseBody(response: Response): void {
+  const cancelPromise = response.body?.cancel();
+  if (cancelPromise) {
+    void cancelPromise.catch(() => {});
+  }
+}
+
 /**
  * Limits retries on mutating requests to transport-layer failures only.
  */
@@ -106,10 +113,6 @@ export async function serverFetch(
         (retry.retryOn?.({ response }) ?? true);
 
       if (shouldRetry) {
-        const cancelPromise = response.body?.cancel();
-        if (cancelPromise) {
-          void cancelPromise.catch(() => {});
-        }
         throw new ServerFetchRetryableStatusError(response, context);
       }
 
@@ -163,6 +166,11 @@ export async function serverFetch(
       }
 
       return retry.retryOn?.({ error }) ?? true;
+    },
+    onRetry: ({ error }) => {
+      if (error instanceof ServerFetchRetryableStatusError) {
+        cancelResponseBody(error.response);
+      }
     },
   };
 

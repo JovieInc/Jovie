@@ -121,10 +121,25 @@ describe('serverFetch', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('returns the final retryable response after exhausting retries', async () => {
+  it('returns the final retryable response after exhausting retries without cancelling its body', async () => {
+    const firstCancel = vi.fn().mockResolvedValue(undefined);
+    const secondCancel = vi.fn().mockResolvedValue(undefined);
+    const finalResponse = new Response('still failing', { status: 503 });
     const fetchMock = vi
       .fn()
-      .mockResolvedValue(new Response('still failing', { status: 503 }));
+      .mockResolvedValueOnce({
+        status: 503,
+        body: {
+          cancel: firstCancel,
+        },
+      } as Response)
+      .mockResolvedValueOnce({
+        status: 503,
+        body: {
+          cancel: secondCancel,
+        },
+      } as Response)
+      .mockResolvedValueOnce(finalResponse);
 
     vi.stubGlobal('fetch', fetchMock);
 
@@ -138,6 +153,9 @@ describe('serverFetch', () => {
 
     expect(response.status).toBe(503);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(firstCancel).toHaveBeenCalledTimes(1);
+    expect(secondCancel).toHaveBeenCalledTimes(1);
+    await expect(response.text()).resolves.toBe('still failing');
   });
 
   it('identifies timeout and network failures as transport-retryable', () => {
