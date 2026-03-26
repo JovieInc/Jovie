@@ -71,41 +71,93 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   let currentSection: keyof ChangelogSection | null = null;
 
   for (const line of lines) {
-    const versionResult = parseVersionHeading(line);
-    if (versionResult === 'unreleased') {
-      current = null;
-      currentSection = null;
-      continue;
-    }
-    if (versionResult) {
-      current = versionResult;
-      releases.push(current);
-      currentSection = null;
-      continue;
-    }
-
-    if (!current) continue;
-
-    // Capture summary blockquote (before any section heading)
-    if (!currentSection && line.startsWith('> ') && !current.summary) {
-      current.summary = line.slice(2).trim();
-      continue;
-    }
-
-    const sMatch = SECTION_HEADING_RE.exec(line);
-    if (sMatch) {
-      currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
-      continue;
-    }
-
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ') && currentSection) {
-      const entry = trimmed.slice(2);
-      if (isPublicEntry(entry)) {
-        current.sections[currentSection].push(entry);
-      }
-    }
+    const result = processChangelogLine(
+      line,
+      current,
+      currentSection,
+      releases
+    );
+    current = result.current;
+    currentSection = result.currentSection;
   }
 
   return releases.filter(hasPublicEntries);
+}
+
+type LineState = {
+  current: ChangelogRelease | null;
+  currentSection: keyof ChangelogSection | null;
+};
+
+function tryParseVersion(
+  line: string,
+  releases: ChangelogRelease[]
+): LineState | null {
+  const versionResult = parseVersionHeading(line);
+  if (versionResult === 'unreleased') {
+    return { current: null, currentSection: null };
+  }
+  if (versionResult) {
+    releases.push(versionResult);
+    return { current: versionResult, currentSection: null };
+  }
+  return null;
+}
+
+function tryParseSummary(
+  line: string,
+  current: ChangelogRelease,
+  currentSection: keyof ChangelogSection | null
+): LineState | null {
+  if (!currentSection && line.startsWith('> ') && !current.summary) {
+    current.summary = line.slice(2).trim();
+    return { current, currentSection };
+  }
+  return null;
+}
+
+function tryParseSection(
+  line: string,
+  current: ChangelogRelease
+): LineState | null {
+  const sMatch = SECTION_HEADING_RE.exec(line);
+  if (!sMatch) return null;
+  return {
+    current,
+    currentSection: sMatch[1].toLowerCase() as keyof ChangelogSection,
+  };
+}
+
+function tryParseBullet(
+  line: string,
+  current: ChangelogRelease,
+  currentSection: keyof ChangelogSection | null
+): void {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('- ') || !currentSection) return;
+  const entry = trimmed.slice(2);
+  if (isPublicEntry(entry)) {
+    current.sections[currentSection].push(entry);
+  }
+}
+
+function processChangelogLine(
+  line: string,
+  current: ChangelogRelease | null,
+  currentSection: keyof ChangelogSection | null,
+  releases: ChangelogRelease[]
+): LineState {
+  const versionState = tryParseVersion(line, releases);
+  if (versionState) return versionState;
+
+  if (!current) return { current, currentSection };
+
+  const summaryState = tryParseSummary(line, current, currentSection);
+  if (summaryState) return summaryState;
+
+  const sectionState = tryParseSection(line, current);
+  if (sectionState) return sectionState;
+
+  tryParseBullet(line, current, currentSection);
+  return { current, currentSection };
 }

@@ -231,6 +231,67 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+/**
+ * Get the heading text for the subscribe form.
+ */
+function getFormHeading(otpStep: string): string {
+  return otpStep === 'verify'
+    ? 'Check your inbox. Enter your code.'
+    : 'Never miss a release.';
+}
+
+/**
+ * Footer with disclaimer text and error tooltip.
+ */
+function FormFooter({
+  disclaimerId,
+  isInputFocused,
+  error,
+}: {
+  disclaimerId: string;
+  isInputFocused: boolean;
+  error: string | null;
+}) {
+  const showDisclaimer = isInputFocused && !error;
+  return (
+    <div className='flex items-center justify-center gap-2'>
+      <p
+        id={disclaimerId}
+        className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
+          showDisclaimer ? 'opacity-100' : 'opacity-0'
+        }`}
+        style={noFontSynthesisStyle}
+        aria-hidden={!showDisclaimer}
+      >
+        No spam. Opt-out anytime.
+      </p>
+
+      {error && (
+        <TooltipProvider delayDuration={0}>
+          <Tooltip defaultOpen>
+            <TooltipTrigger>
+              <span
+                className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
+                role='alert'
+                aria-live='assertive'
+              >
+                <AlertCircle className='h-4 w-4' aria-hidden='true' />
+                <span className='sr-only'>{error}</span>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent
+              side='bottom'
+              className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
+            >
+              {error}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+    </div>
+  );
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -346,9 +407,7 @@ export function ArtistNotificationsCTA({
         className='text-center text-[13px] font-[550] tracking-[0.01em] text-primary-token/88'
         style={noFontSynthesisStyle}
       >
-        {otpStep === 'verify'
-          ? 'Check your inbox. Enter your code.'
-          : 'Never miss a release.'}
+        {getFormHeading(otpStep)}
       </p>
 
       <div className='overflow-hidden rounded-xl bg-transparent ring-1 ring-(--color-border-subtle) transition-[ring,background-color] focus-within:bg-surface-1/30 focus-within:ring-2 focus-within:ring-[rgb(var(--focus-ring))]'>
@@ -424,42 +483,11 @@ export function ArtistNotificationsCTA({
         {getSubmitButtonLabel(isSubmitting, otpStep)}
       </button>
 
-      <div className='flex items-center justify-center gap-2'>
-        <p
-          id={disclaimerId}
-          className={`text-center text-[11px] leading-4 font-normal tracking-wide text-muted-foreground/80 transition-opacity duration-200 ${
-            isInputFocused && !error ? 'opacity-100' : 'opacity-0'
-          }`}
-          style={noFontSynthesisStyle}
-          aria-hidden={!isInputFocused || Boolean(error)}
-        >
-          No spam. Opt-out anytime.
-        </p>
-
-        {/* Error tooltip - no layout shift, shows inline icon with tooltip */}
-        {error && (
-          <TooltipProvider delayDuration={0}>
-            <Tooltip defaultOpen>
-              <TooltipTrigger>
-                <span
-                  className='inline-flex items-center gap-1.5 text-sm text-red-500 dark:text-red-400'
-                  role='alert'
-                  aria-live='assertive'
-                >
-                  <AlertCircle className='h-4 w-4' aria-hidden='true' />
-                  <span className='sr-only'>{error}</span>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent
-                side='bottom'
-                className='max-w-[280px] border-red-500/20 bg-red-950/90 text-red-200'
-              >
-                {error}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
-      </div>
+      <FormFooter
+        disclaimerId={disclaimerId}
+        isInputFocused={isInputFocused}
+        error={error}
+      />
     </div>
   );
 }
