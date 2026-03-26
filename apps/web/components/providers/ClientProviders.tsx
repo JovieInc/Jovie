@@ -2,7 +2,7 @@
 
 import { ClerkProvider } from '@clerk/nextjs';
 import { ui } from '@clerk/ui';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ClerkSafeDefaultsProvider,
@@ -13,7 +13,6 @@ import type { ThemeMode } from '@/types';
 import { CoreProviders } from './CoreProviders';
 import { clerkAppearanceBase } from './clerkAppearance';
 import { getClerkProxyUrl, shouldBypassClerk } from './clerkAvailability';
-import { NuqsProvider } from './NuqsProvider';
 import { QueryProvider } from './QueryProvider';
 
 interface ClientProvidersProps {
@@ -36,9 +35,7 @@ function wrapWithCoreProviders({
   skipCoreProviders,
 }: WrappedProvidersOptions) {
   const content = skipCoreProviders ? (
-    <NuqsProvider>
-      <QueryProvider>{children}</QueryProvider>
-    </NuqsProvider>
+    <QueryProvider>{children}</QueryProvider>
   ) : (
     <CoreProviders initialThemeMode={initialThemeMode}>
       {children}
@@ -47,23 +44,17 @@ function wrapWithCoreProviders({
 
   return content;
 }
-// Main export - wraps children with ClerkProvider (client-side only)
-// Uses hydration guard to prevent SSR of ClerkProvider which accesses window
+// Main export - wraps children with ClerkProvider
 export function ClientProviders({
   children,
   initialThemeMode = 'dark',
   publishableKey,
   skipCoreProviders = false,
 }: ClientProvidersProps) {
-  const [isClerkReady, setIsClerkReady] = useState(false);
   const shouldSkipClerk = shouldBypassClerk(
     publishableKey,
     publicEnv.NEXT_PUBLIC_CLERK_MOCK
   );
-
-  useEffect(() => {
-    setIsClerkReady(true);
-  }, []);
 
   if (shouldSkipClerk) {
     // When Clerk is bypassed, wrap with ClerkSafeDefaultsProvider
@@ -78,10 +69,6 @@ export function ClientProviders({
         })}
       </ClerkSafeDefaultsProvider>
     );
-  }
-
-  if (!isClerkReady) {
-    return null;
   }
 
   return (

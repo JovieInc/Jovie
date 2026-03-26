@@ -181,6 +181,16 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
 
+      {/* In hero-only mode, hide footer and prevent scroll (footer is in layout) */}
+      {heroOnly && (
+        <style
+          dangerouslySetInnerHTML={{
+            __html:
+              'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}',
+          }}
+        />
+      )}
+
       {/* 1. Hero — claim form left, phone right */}
       <HeroCinematic fullScreen={heroOnly} />
 

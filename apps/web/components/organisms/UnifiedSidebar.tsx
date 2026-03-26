@@ -340,7 +340,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
       <SidebarHeader
         className={cn(
           'relative justify-center gap-0 px-2.5',
-          isInSettings ? 'min-h-12 py-2' : 'h-10 py-0.5'
+          isInSettings ? 'min-h-12 py-2' : 'h-10 pt-[6px] pb-0'
         )}
       >
         <SidebarHeaderNav
