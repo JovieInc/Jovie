@@ -32,7 +32,7 @@ export function NowPlayingCard() {
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
-      audioUrl: '', // Not needed for toggle — same track ID triggers pause/resume
+      audioUrl: '_resume', // Placeholder — same track ID triggers pause/resume path, never used as src
     }).catch(() => {});
   }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
 

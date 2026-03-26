@@ -150,7 +150,7 @@ describe('NowPlayingCard', () => {
     expect(toggleTrack).toHaveBeenCalledWith({
       id: 'track-1',
       title: 'Midnight Drive',
-      audioUrl: '',
+      audioUrl: '_resume',
     });
   });
 

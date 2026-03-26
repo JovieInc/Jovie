@@ -318,7 +318,7 @@ function TrackItem({
               {/* biome-ignore lint/a11y/noStaticElementInteractions: seek bar is supplementary to play button */}
               {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: seek bar is supplementary to play button */}
               <div
-                className='flex-1 cursor-pointer py-[7px] -my-[7px]'
+                className={`flex-1 py-[7px] -my-[7px] ${isActiveTrack ? 'cursor-pointer' : ''}`}
                 onClick={event => {
                   event.stopPropagation();
                   if (progressDuration <= 0) return;

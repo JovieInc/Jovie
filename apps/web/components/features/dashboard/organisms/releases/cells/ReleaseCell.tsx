@@ -3,6 +3,7 @@
 import { Badge } from '@jovie/ui';
 import { Disc3, Pause, Play } from 'lucide-react';
 import { memo, useCallback } from 'react';
+import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
@@ -26,6 +27,7 @@ export const ReleaseCell = memo(function ReleaseCell({
   const isActiveTrack = playbackState.activeTrackId === release.id;
   const isPlaying = isActiveTrack && playbackState.isPlaying;
   const hasPreview = Boolean(release.previewUrl);
+  const primaryArtist = release.artistNames?.[0];
 
   const handleTogglePlayback = useCallback(
     (e: React.MouseEvent) => {
@@ -36,16 +38,18 @@ export const ReleaseCell = memo(function ReleaseCell({
         title: release.title,
         audioUrl: release.previewUrl,
         releaseTitle: release.title,
-        artistName: release.artistNames?.[0],
+        artistName: primaryArtist,
         artworkUrl: release.artworkUrl,
-      }).catch(() => {});
+      }).catch(() => {
+        toast.error('Unable to play preview');
+      });
     },
     [
       toggleTrack,
       release.id,
       release.title,
       release.previewUrl,
-      release.artistNames,
+      primaryArtist,
       release.artworkUrl,
     ]
   );

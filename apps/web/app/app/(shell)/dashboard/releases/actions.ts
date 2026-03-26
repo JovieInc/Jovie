@@ -221,7 +221,7 @@ function mapReleaseToViewModel(
       (
         release.metadata as Record<string, unknown> | null
       )?.lyrics?.toString() || undefined,
-    previewUrl: release.trackSummary?.primaryPreviewUrl ?? null,
+    previewUrl: release.trackSummary?.primaryPreviewUrl || null,
   };
 }
 

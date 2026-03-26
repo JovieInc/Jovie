@@ -23,6 +23,8 @@ interface PlaybackState {
 }
 
 let _audio: HTMLAudioElement | null = null;
+/** Monotonically increasing token — guards against stale play() promises from prior track switches. */
+let _playToken = 0;
 
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
@@ -61,7 +63,12 @@ function setState(partial: Partial<PlaybackState>): void {
 }
 
 function bindAudioEvents(el: HTMLAudioElement): void {
+  let lastNotifiedSecond = -1;
   el.addEventListener('timeupdate', () => {
+    // Throttle to ~1 update/sec to reduce re-renders across all subscribers
+    const sec = Math.floor(el.currentTime);
+    if (sec === lastNotifiedSecond) return;
+    lastNotifiedSecond = sec;
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
@@ -110,6 +117,7 @@ export function useTrackAudioPlayer() {
     const audio = getAudio();
     if (!audio) return;
 
+    // Same track — toggle pause/resume
     if (state.activeTrackId === track.id) {
       if (audio.paused) {
         await audio.play();
@@ -119,6 +127,9 @@ export function useTrackAudioPlayer() {
       return;
     }
 
+    // New track — cancel any in-flight play() from a prior switch
+    const token = ++_playToken;
+    audio.pause();
     audio.src = track.audioUrl;
     setState({
       activeTrackId: track.id,
@@ -129,6 +140,8 @@ export function useTrackAudioPlayer() {
       artistName: track.artistName ?? null,
       artworkUrl: track.artworkUrl ?? null,
     });
+    // If another toggleTrack call happened while we awaited, bail out
+    if (_playToken !== token) return;
     await audio.play();
   }, []);
 
