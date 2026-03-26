@@ -55,7 +55,7 @@ export const SocialBioNudge = memo(function SocialBioNudge({
       </div>
       <div className='min-w-0 flex-1 space-y-1'>
         <div className='space-y-0.5'>
-          <p className='text-[13px] font-[560] tracking-normal text-secondary-token'>
+          <p className='text-[13px] font-[510] tracking-normal text-secondary-token'>
             Grow your audience
           </p>
           <p className='text-[14px] font-[590] leading-5 text-primary-token'>

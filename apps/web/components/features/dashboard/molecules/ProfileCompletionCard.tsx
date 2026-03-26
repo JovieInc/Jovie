@@ -77,7 +77,7 @@ export const ProfileCompletionCard = memo(
       <ContentSurfaceCard className='mb-2 border-(--linear-app-frame-seam) p-3.5 sm:mb-3 sm:p-4'>
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0 flex-1 space-y-2'>
-            <div className='flex items-center gap-1.5 text-[11px] font-[560] tracking-[-0.01em] text-tertiary-token'>
+            <div className='flex items-center gap-1.5 text-[11px] font-[510] tracking-[-0.01em] text-tertiary-token'>
               {profileIsLive ? (
                 <Sparkles className='h-3 w-3' aria-hidden='true' />
               ) : (
@@ -86,7 +86,7 @@ export const ProfileCompletionCard = memo(
               {sectionLabel}
             </div>
             <div className='space-y-0.5'>
-              <p className='text-[15px] font-[590] text-primary-token'>
+              <p className='text-[13px] font-[590] text-primary-token'>
                 {heading}
               </p>
               <p className='text-[13px] text-secondary-token'>{subtext}</p>

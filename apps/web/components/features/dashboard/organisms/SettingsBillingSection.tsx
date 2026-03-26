@@ -32,7 +32,7 @@ function BillingDetailRow({
         tone === 'error' && 'bg-destructive/5'
       )}
     >
-      <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+      <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
         {label}
       </p>
       <p
@@ -192,7 +192,7 @@ export function SettingsBillingSection() {
           <div className='flex items-start gap-2 px-4 py-3 text-amber-700 dark:text-amber-300 sm:px-5'>
             <AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden />
             <div className='min-w-0'>
-              <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+              <p className='text-[11px] font-[510] uppercase tracking-[0.08em] text-tertiary-token'>
                 Billing status
               </p>
               <p className='mt-1 text-[13px] leading-[18px]'>

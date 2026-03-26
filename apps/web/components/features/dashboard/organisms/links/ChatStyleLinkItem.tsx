@@ -220,7 +220,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Content */}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-[15px] font-[510] text-primary-token sm:text-[13px]'>
+            <div className='truncate text-[13px] font-[510] text-primary-token'>
               {link.platform.name || link.platform.id}
             </div>
             {handle && (

@@ -15,7 +15,7 @@ export function SettingsGroupHeading({
   return (
     <h3
       className={cn(
-        'text-[12px] font-[560] tracking-normal text-tertiary-token',
+        'text-[12px] font-[510] tracking-normal text-tertiary-token',
         className
       )}
     >

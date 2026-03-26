@@ -164,7 +164,7 @@ export function GetStartedChecklistCard({
     <ContentSurfaceCard className='overflow-hidden p-0'>
       <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-[12px] font-[560] tracking-[-0.01em] text-primary-token'>
+          <h3 className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>
             Get started
           </h3>
           <span className='text-[11px] text-tertiary-token'>
