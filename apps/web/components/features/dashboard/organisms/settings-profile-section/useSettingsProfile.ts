@@ -196,7 +196,7 @@ export function useSettingsProfile({
                   .split(',')
                   .map(s => s.trim())
                   .filter(Boolean)
-              : undefined,
+              : [],
           },
         });
       } catch (error) {

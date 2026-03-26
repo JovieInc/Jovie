@@ -190,6 +190,7 @@ export const profileUpdateSchema = z
         z
           .string()
           .trim()
+          .min(1, 'Playlist name cannot be empty')
           .max(60, 'Playlist name must be 60 characters or fewer')
       )
       .max(5, 'Maximum 5 target playlists')
