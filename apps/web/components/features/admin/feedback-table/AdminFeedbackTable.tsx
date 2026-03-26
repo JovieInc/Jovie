@@ -244,6 +244,16 @@ export function AdminFeedbackTable({
     [getContextMenuItems]
   );
 
+  // Arrow keys update the detail pane (always visible in split view)
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (rows[index]) {
+        setSelectedId(rows[index].id);
+      }
+    },
+    [rows]
+  );
+
   const getRowClassName = useCallback(
     (row: FeedbackRow) =>
       row.id === selectedId
@@ -285,6 +295,7 @@ export function AdminFeedbackTable({
               getRowId={row => row.id}
               getRowClassName={getRowClassName}
               onRowClick={row => setSelectedId(row.id)}
+              onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
               enableVirtualization={true}
               minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}
