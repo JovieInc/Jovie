@@ -9,7 +9,7 @@
  * - Retry logic for flaky operations
  */
 
-import { expect, Page } from '@playwright/test';
+import { type ConsoleMessage, expect, Page } from '@playwright/test';
 
 // ============================================================================
 // Constants
@@ -204,9 +204,16 @@ export function setupPageMonitoring(page: Page): {
   const failedResponses: NetworkDiagnostics['failedResponses'] = [];
   const failedRequests: NetworkDiagnostics['failedRequests'] = [];
 
-  const handleConsole = (msg: { type: () => string; text: () => string }) => {
+  const handleConsole = (msg: ConsoleMessage) => {
     if (msg.type() === 'error') {
       const text = msg.text();
+      const locationUrl = msg.location().url.toLowerCase();
+      if (
+        text.includes('Failed to load resource') &&
+        locationUrl.includes('i.scdn.co/')
+      ) {
+        return;
+      }
       consoleErrors.push(text);
       if (text.includes('Failed to load resource')) {
         consoleNetworkErrors.push(text);
