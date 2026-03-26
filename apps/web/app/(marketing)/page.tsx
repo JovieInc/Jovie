@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
+import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -152,7 +152,7 @@ export default function HomePage() {
   return (
     <div className='relative min-h-screen'>
       {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
-      <AuthRedirectHandler />
+      <LazyAuthRedirectHandler />
 
       {/* Structured Data */}
       <script
