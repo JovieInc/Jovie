@@ -14,8 +14,6 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { getHometownFromSettings } from '@/types/db';
 
-export const runtime = 'nodejs';
-
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -27,6 +25,15 @@ const PROVIDER_LABELS: Record<string, string> = {
   tidal: 'Tidal',
   youtube_music: 'YouTube Music',
 };
+
+function parseConfidenceScore(
+  value: number | string | null | undefined
+): number {
+  const parsed =
+    typeof value === 'number' ? value : Number.parseFloat(String(value ?? '0'));
+
+  return Number.isFinite(parsed) ? parsed : 0;
+}
 
 export async function GET(request: Request) {
   try {
@@ -203,10 +210,7 @@ export async function GET(request: Request) {
         source: link.sourcePlatform,
         state: link.state ?? 'active',
         version: link.version,
-        confidence:
-          typeof link.confidence === 'number'
-            ? link.confidence
-            : Number.parseFloat(String(link.confidence ?? '0')),
+        confidence: parseConfidenceScore(link.confidence),
       })),
       ...pendingSocialSuggestions.map(link => ({
         id: link.id,
@@ -218,7 +222,7 @@ export async function GET(request: Request) {
         source: link.sourceProvider,
         state: link.status,
         version: null,
-        confidence: Number.parseFloat(link.confidenceScore),
+        confidence: parseConfidenceScore(link.confidenceScore),
       })),
     ];
 
@@ -297,7 +301,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Internal server error',
+        error: 'Internal server error',
       },
       { status: 500, headers: NO_STORE_HEADERS }
     );

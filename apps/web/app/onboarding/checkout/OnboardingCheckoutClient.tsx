@@ -6,11 +6,11 @@ import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -232,8 +232,7 @@ export function OnboardingCheckoutClient({
   const currentAmount =
     isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
-  const returnTo =
-    searchParams.get('returnTo') || `${APP_ROUTES.ONBOARDING}?resume=dsp`;
+  const returnTo = normalizeOnboardingReturnTo(searchParams.get('returnTo'));
   const handleToggleBranding = useCallback(() => {
     setShowBranding(current => !current);
   }, []);

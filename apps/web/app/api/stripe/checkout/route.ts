@@ -6,9 +6,9 @@
 import { auth } from '@clerk/nextjs/server';
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { APP_ROUTES } from '@/constants/routes';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   MAX_REFERRAL_CODE_LENGTH,
   MIN_REFERRAL_CODE_LENGTH,
@@ -36,13 +36,6 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-const DEFAULT_ONBOARDING_RETURN_TO = `${APP_ROUTES.ONBOARDING}?resume=dsp`;
-const ALLOWED_ONBOARDING_RESUME_TARGETS = new Set([
-  'dsp',
-  'social',
-  'releases',
-  'profile-ready',
-]);
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -59,25 +52,6 @@ function normalizeReferralCode(raw: unknown): string | undefined {
     trimmed.length <= MAX_REFERRAL_CODE_LENGTH &&
     REFERRAL_CODE_PATTERN.test(trimmed);
   return isValid ? trimmed.toLowerCase() : undefined;
-}
-
-function normalizeOnboardingReturnTo(raw: unknown): string {
-  if (typeof raw !== 'string') {
-    return DEFAULT_ONBOARDING_RETURN_TO;
-  }
-
-  const trimmed = raw.trim();
-  if (!trimmed.startsWith(APP_ROUTES.ONBOARDING)) {
-    return DEFAULT_ONBOARDING_RETURN_TO;
-  }
-
-  const parsed = new URL(trimmed, 'https://jovie.invalid');
-  const resume = parsed.searchParams.get('resume');
-  if (!resume || !ALLOWED_ONBOARDING_RESUME_TARGETS.has(resume)) {
-    return DEFAULT_ONBOARDING_RETURN_TO;
-  }
-
-  return `${APP_ROUTES.ONBOARDING}?resume=${resume}`;
 }
 
 async function validatePriceId(priceId: string): Promise<NextResponse | null> {

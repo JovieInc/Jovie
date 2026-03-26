@@ -24,6 +24,10 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  ONBOARDING_PREVIEW_SNAPSHOT_KEY,
+  ONBOARDING_WELCOME_REPLY_KEY,
+} from '@/lib/onboarding/session-keys';
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
@@ -34,9 +38,6 @@ interface ChatPageClientProps {
   readonly appleMusicConnected?: boolean;
   readonly appleMusicArtistName?: string | null;
 }
-
-const ONBOARDING_PREVIEW_SNAPSHOT_KEY = 'onboarding-preview-snapshot';
-const ONBOARDING_WELCOME_REPLY_KEY = 'onboarding-welcome-reply';
 
 /**
  * Header badge that displays the conversation title as a subtle breadcrumb suffix.
@@ -287,7 +288,7 @@ export function ChatPageClient({
       return;
     }
 
-    let isCancelled = false;
+    const controller = new AbortController();
 
     const bootstrapWelcomeChat = async () => {
       setHasBootstrappedWelcomeChat(true);
@@ -305,6 +306,7 @@ export function ChatPageClient({
         body: JSON.stringify({ initialReply }),
         headers: { 'Content-Type': 'application/json' },
         method: 'POST',
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -323,15 +325,20 @@ export function ChatPageClient({
         // sessionStorage cleanup is non-critical
       }
 
-      if (!isCancelled && payload.route) {
+      if (!controller.signal.aborted && payload.route) {
         router.replace(payload.route, { scroll: false });
       }
     };
 
-    void bootstrapWelcomeChat();
+    const bootstrapPromise = bootstrapWelcomeChat();
+    bootstrapPromise.catch(() => {
+      if (!controller.signal.aborted) {
+        setHasBootstrappedWelcomeChat(false);
+      }
+    });
 
     return () => {
-      isCancelled = true;
+      controller.abort();
     };
   }, [
     activeProfile,

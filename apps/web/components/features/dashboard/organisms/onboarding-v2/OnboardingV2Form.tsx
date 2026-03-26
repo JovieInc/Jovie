@@ -37,14 +37,16 @@ import {
   useOnboardingSubmit,
 } from '@/features/dashboard/organisms/apple-style-onboarding/useOnboardingSubmit';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
+import {
+  ONBOARDING_PREVIEW_SNAPSHOT_KEY,
+  ONBOARDING_WELCOME_REPLY_KEY,
+} from '@/lib/onboarding/session-keys';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
 const DISCOVERY_POLL_INTERVAL_MS = 2000;
 const DISCOVERY_STAGE_TIMEOUT_MS = 15000;
 const DISCOVERY_AUTO_ADVANCE_MS = 1500;
-const ONBOARDING_PREVIEW_SNAPSHOT_KEY = 'onboarding-preview-snapshot';
-const ONBOARDING_WELCOME_REPLY_KEY = 'onboarding-welcome-reply';
 
 type StepId =
   | 'handle'
@@ -263,6 +265,38 @@ function mergeSelectedArtist(
   };
 }
 
+function appendLateArrivals<T>({
+  buildItem,
+  currentStep,
+  getId,
+  late,
+  nextItems,
+  previousItems,
+  stage,
+}: {
+  buildItem: (item: T, id: string) => LateArrival;
+  currentStep: StepId;
+  getId: (item: T) => string;
+  late: LateArrival[];
+  nextItems: T[];
+  previousItems: T[];
+  stage: 'dsp' | 'social' | 'releases';
+}) {
+  if (!addLateArrivalSuffix(currentStep, stage)) {
+    return;
+  }
+
+  const previousIds = new Set(previousItems.map(getId));
+  for (const item of nextItems) {
+    const id = getId(item);
+    if (previousIds.has(id)) {
+      continue;
+    }
+
+    late.push(buildItem(item, id));
+  }
+}
+
 function collectLateArrivals(
   previousSnapshot: DiscoverySnapshot,
   nextSnapshot: DiscoverySnapshot,
@@ -270,60 +304,47 @@ function collectLateArrivals(
 ): LateArrival[] {
   const late: LateArrival[] = [];
 
-  if (addLateArrivalSuffix(currentStep, 'dsp')) {
-    const previousDspIds = new Set(
-      previousSnapshot.dspItems.map(item => item.id)
-    );
+  appendLateArrivals({
+    buildItem: item => ({
+      id: `dsp:${item.id}`,
+      subtitle: item.providerLabel,
+      title: item.externalArtistName || 'New DSP match',
+    }),
+    currentStep,
+    getId: item => item.id,
+    late,
+    nextItems: nextSnapshot.dspItems,
+    previousItems: previousSnapshot.dspItems,
+    stage: 'dsp',
+  });
 
-    for (const item of nextSnapshot.dspItems) {
-      if (previousDspIds.has(item.id)) {
-        continue;
-      }
+  appendLateArrivals({
+    buildItem: (item, id) => ({
+      id: `social:${id}`,
+      subtitle: item.platformLabel,
+      title: item.username || item.url,
+    }),
+    currentStep,
+    getId: item => `${item.kind}:${item.id}`,
+    late,
+    nextItems: nextSnapshot.socialItems,
+    previousItems: previousSnapshot.socialItems,
+    stage: 'social',
+  });
 
-      late.push({
-        id: `dsp:${item.id}`,
-        subtitle: item.providerLabel,
-        title: item.externalArtistName || 'New DSP match',
-      });
-    }
-  }
-
-  if (addLateArrivalSuffix(currentStep, 'social')) {
-    const previousSocialIds = new Set(
-      previousSnapshot.socialItems.map(item => `${item.kind}:${item.id}`)
-    );
-
-    for (const item of nextSnapshot.socialItems) {
-      const id = `${item.kind}:${item.id}`;
-      if (previousSocialIds.has(id)) {
-        continue;
-      }
-
-      late.push({
-        id: `social:${id}`,
-        subtitle: item.platformLabel,
-        title: item.username || item.url,
-      });
-    }
-  }
-
-  if (addLateArrivalSuffix(currentStep, 'releases')) {
-    const previousReleaseIds = new Set(
-      previousSnapshot.releases.map(item => item.id)
-    );
-
-    for (const item of nextSnapshot.releases) {
-      if (previousReleaseIds.has(item.id)) {
-        continue;
-      }
-
-      late.push({
-        id: `release:${item.id}`,
-        subtitle: 'Release discovered',
-        title: item.title,
-      });
-    }
-  }
+  appendLateArrivals({
+    buildItem: item => ({
+      id: `release:${item.id}`,
+      subtitle: 'Release discovered',
+      title: item.title,
+    }),
+    currentStep,
+    getId: item => item.id,
+    late,
+    nextItems: nextSnapshot.releases,
+    previousItems: previousSnapshot.releases,
+    stage: 'releases',
+  });
 
   return late;
 }
@@ -1051,34 +1072,66 @@ export function OnboardingV2Form({
     return undefined;
   }, [advanceFromStep, currentStep, discoverySnapshot]);
 
+  const runDiscoveryMutation = useCallback(
+    async ({
+      body,
+      errorMessage,
+      method,
+      url,
+    }: {
+      body: Record<string, unknown>;
+      errorMessage: string;
+      method: 'PATCH' | 'POST';
+      url: string;
+    }) => {
+      setDiscoveryError(null);
+
+      try {
+        const response = await fetch(url, {
+          body: JSON.stringify(body),
+          headers: { 'Content-Type': 'application/json' },
+          method,
+        });
+
+        if (!response.ok) {
+          setDiscoveryError(errorMessage);
+          return;
+        }
+
+        await refreshDiscovery();
+      } catch {
+        setDiscoveryError(errorMessage);
+      }
+    },
+    [refreshDiscovery]
+  );
+
   const handleConfirmDsp = useCallback(
     async (matchId: string) => {
       if (!profileId) return;
 
-      await fetch(`/api/dsp/matches/${matchId}/confirm`, {
-        body: JSON.stringify({ profileId }),
-        headers: { 'Content-Type': 'application/json' },
+      await runDiscoveryMutation({
+        body: { profileId },
+        errorMessage: 'Failed to confirm DSP match.',
         method: 'POST',
+        url: `/api/dsp/matches/${matchId}/confirm`,
       });
-
-      await refreshDiscovery();
     },
-    [profileId, refreshDiscovery]
+    [profileId, runDiscoveryMutation]
   );
 
   const handleRejectDsp = useCallback(
     async (matchId: string) => {
       if (!profileId) return;
 
-      await fetch(`/api/dsp/matches/${matchId}/reject`, {
-        body: JSON.stringify({ profileId }),
-        headers: { 'Content-Type': 'application/json' },
+      await runDiscoveryMutation({
+        body: { profileId },
+        errorMessage: 'Failed to reject DSP match.',
         method: 'POST',
+        url: `/api/dsp/matches/${matchId}/reject`,
       });
-
-      await refreshDiscovery();
     },
-    [profileId, refreshDiscovery]
+    [profileId, runDiscoveryMutation]
   );
 
   const handleAcceptSocial = useCallback(
@@ -1086,27 +1139,27 @@ export function OnboardingV2Form({
       if (!profileId) return;
 
       if (item.kind === 'suggestion') {
-        await fetch(`/api/suggestions/social-links/${item.id}/approve`, {
-          body: JSON.stringify({ profileId }),
-          headers: { 'Content-Type': 'application/json' },
+        await runDiscoveryMutation({
+          body: { profileId },
+          errorMessage: 'Failed to add suggested social link.',
           method: 'POST',
+          url: `/api/suggestions/social-links/${item.id}/approve`,
         });
       } else {
-        await fetch('/api/dashboard/social-links', {
-          body: JSON.stringify({
+        await runDiscoveryMutation({
+          body: {
             action: 'accept',
             expectedVersion: item.version ?? 1,
             linkId: item.id,
             profileId,
-          }),
-          headers: { 'Content-Type': 'application/json' },
+          },
+          errorMessage: 'Failed to accept social link.',
           method: 'PATCH',
+          url: '/api/dashboard/social-links',
         });
       }
-
-      await refreshDiscovery();
     },
-    [profileId, refreshDiscovery]
+    [profileId, runDiscoveryMutation]
   );
 
   const handleDismissSocial = useCallback(
@@ -1114,27 +1167,27 @@ export function OnboardingV2Form({
       if (!profileId) return;
 
       if (item.kind === 'suggestion') {
-        await fetch(`/api/suggestions/social-links/${item.id}/reject`, {
-          body: JSON.stringify({ profileId }),
-          headers: { 'Content-Type': 'application/json' },
+        await runDiscoveryMutation({
+          body: { profileId },
+          errorMessage: 'Failed to dismiss suggested social link.',
           method: 'POST',
+          url: `/api/suggestions/social-links/${item.id}/reject`,
         });
       } else {
-        await fetch('/api/dashboard/social-links', {
-          body: JSON.stringify({
+        await runDiscoveryMutation({
+          body: {
             action: 'dismiss',
             expectedVersion: item.version ?? 1,
             linkId: item.id,
             profileId,
-          }),
-          headers: { 'Content-Type': 'application/json' },
+          },
+          errorMessage: 'Failed to dismiss social link.',
           method: 'PATCH',
+          url: '/api/dashboard/social-links',
         });
       }
-
-      await refreshDiscovery();
     },
-    [profileId, refreshDiscovery]
+    [profileId, runDiscoveryMutation]
   );
 
   const previewSnapshot = useMemo(() => {
