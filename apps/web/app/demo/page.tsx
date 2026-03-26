@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
 import { DemoReleasesExperience } from '@/features/demo/DemoReleasesExperience';
 
 export const metadata: Metadata = {
@@ -10,5 +11,9 @@ export const metadata: Metadata = {
 export const revalidate = false;
 
 export default function DemoPage() {
-  return <DemoReleasesExperience />;
+  return (
+    <Suspense fallback={null}>
+      <DemoReleasesExperience />
+    </Suspense>
+  );
 }
