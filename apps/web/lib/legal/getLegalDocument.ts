@@ -5,15 +5,15 @@ import type { TocEntry as DocsTocEntry, MarkdownDocument } from '@/types/docs';
 const LEGAL_DOCS = {
   privacy: {
     title: 'Privacy Policy',
-    file: path.join('content', 'legal', 'privacy.md'),
+    file: path.join('legal', 'privacy.md'),
   },
   terms: {
     title: 'Terms of Service',
-    file: path.join('content', 'legal', 'terms.md'),
+    file: path.join('legal', 'terms.md'),
   },
   cookies: {
     title: 'Cookie Policy',
-    file: path.join('content', 'legal', 'cookies.md'),
+    file: path.join('legal', 'cookies.md'),
   },
 } as const;
 

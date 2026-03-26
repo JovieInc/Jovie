@@ -32,7 +32,7 @@ export default async function InvestorLandingPage() {
     manifest.deck.slides.map(async filename => {
       try {
         const doc = await getMarkdownDocument(
-          `content/investors/deck/slides/${filename}`
+          `investors/deck/slides/${filename}`
         );
         // Extract title from first h1 heading in TOC, fallback to filename
         const h1 = doc.toc.find(entry => entry.level === 1);

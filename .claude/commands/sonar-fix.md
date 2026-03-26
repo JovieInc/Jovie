@@ -4,7 +4,134 @@ Automatically fetch, prioritize, and fix SonarCloud issues — shipping incremen
 
 ## Instructions
 
-You are tasked with fixing SonarCloud issues. Ship each batch as its own PR immediately, then move to the next. Don't wait for CI.
+You are tasked with fixing SonarCloud issues. **Before creating any new PRs, check for and address existing sonar-fix PRs that have unmerged review comments.** Then ship each new batch as its own PR immediately. Don't wait for CI.
+
+### 0. Address Existing Sonar-Fix PRs
+
+Before creating any new fix PRs, check if there are open sonar-fix PRs with unaddressed review comments. This prevents PR sprawl — many open PRs that never merge because feedback goes unanswered.
+
+#### 0a. Discover Open Sonar-Fix PRs
+
+Search for open PRs with sonarcloud-related branch names:
+
+```bash
+gh pr list --state open --json number,title,headRefName,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup,updatedAt \
+  --jq '[.[] | select(.headRefName | startswith("fix/sonarcloud"))]'
+```
+
+If zero results: print "No existing sonar-fix PRs found. Proceeding to create new fixes." and skip to Step 1.
+
+#### 0b. Collect Review State for Each PR
+
+For each open sonar-fix PR, fetch its review comments and status:
+
+```bash
+# Get all review comments (line-level)
+gh api repos/{owner}/{repo}/pulls/<NUMBER>/comments --paginate
+
+# Get reviews (approve/request-changes)
+gh api repos/{owner}/{repo}/pulls/<NUMBER>/reviews --paginate
+
+# Get general PR discussion comments
+gh pr view <NUMBER> --json comments
+
+# Check CI status
+gh pr checks <NUMBER>
+```
+
+Classify each PR:
+- **NO_ACTION_NEEDED** — No unaddressed comments, auto-merge enabled, no conflicts. Skip.
+- **COMMENTS_TO_ADDRESS** — Has unaddressed review comments (human or bot). Process in Step 0c.
+- **CONFLICT** — Has merge conflicts. Attempt branch update first:
+  ```bash
+  gh api repos/{owner}/{repo}/pulls/<NUMBER>/update-branch --method PUT
+  ```
+  If update fails, mark as **NEEDS_HUMAN** and skip.
+- **NEEDS_HUMAN** — Requires architectural changes beyond sonar scope (e.g., human reviewer requested a design change). Skip with a note.
+
+Process COMMENTS_TO_ADDRESS PRs first, then CONFLICT PRs.
+
+#### 0c. Address Comments on Each PR
+
+For each COMMENTS_TO_ADDRESS PR, follow this cycle:
+
+1. **Check out the PR branch:**
+   ```bash
+   git checkout <branch-name> && git pull origin <branch-name>
+   ```
+
+2. **For each unaddressed comment, classify it:**
+   - **ACTIONABLE** — A valid code concern (from a human reviewer or bot like CodeRabbit). Fix the code.
+   - **ALREADY ADDRESSED** — The issue was fixed in a subsequent commit on the branch. Reply with evidence.
+   - **NOT APPLICABLE** — False positive, stylistic disagreement on a sonar fix, or a question. Reply explaining why.
+
+3. **Make the fixes** to the affected files.
+
+4. **Run /verify** to ensure fixes don't break anything:
+   - TypeScript compiles
+   - Biome lint passes
+   - Affected tests pass
+
+5. **Commit and push:**
+   ```bash
+   git add <specific-files>
+   git commit -m "fix: address review comments on sonar-fix PR #<NUMBER>
+
+   - {Brief description of fix 1}
+   - {Brief description of fix 2}
+
+   Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
+   git push
+   ```
+
+6. **Reply to each comment** with evidence of the fix:
+   ```bash
+   # For line-level review comments
+   gh api repos/{owner}/{repo}/pulls/<NUMBER>/comments/<COMMENT_ID>/replies \
+     --method POST -f body="**Fixed** in \`<SHA>\`.
+
+   \`\`\`diff
+   - <old line>
+   + <new line>
+   \`\`\`
+
+   **Why:** <1-sentence explanation>"
+
+   # For top-level PR comments
+   gh api repos/{owner}/{repo}/issues/<NUMBER>/comments \
+     --method POST -f body="**Addressed** in \`<SHA>\`. <explanation>"
+   ```
+
+7. **Return to develop:**
+   ```bash
+   git checkout develop && git pull origin develop
+   ```
+
+#### 0d. Ensure Auto-Merge on All Processed PRs
+
+For every open sonar-fix PR (including ones just fixed):
+
+```bash
+# Enable auto-merge if not already
+gh pr merge <NUMBER> --auto --squash
+
+# Update branch with latest base
+gh api repos/{owner}/{repo}/pulls/<NUMBER>/update-branch --method PUT
+```
+
+#### 0e. Existing PR Summary
+
+Output a summary before proceeding to new fixes:
+
+```text
+Existing Sonar-Fix PR Status:
+  Addressed comments: {N} PRs (#{X}, #{Y}, #{Z})
+  Already clean: {N} PRs (#{A}, #{B})
+  Conflicts (needs human): {N} PRs (#{C})
+  Needs human review: {N} PRs (#{D})
+
+Proceeding to create new fix PRs...
+```
 
 ### 1. Fetch Current SonarCloud Issues
 
@@ -35,10 +162,12 @@ Group issues into small, shippable batches:
 - Never mix security fixes with style fixes
 - Each batch must stay within PR Discipline limits: **max 10 files, max 400 lines diff**
 - If a single rule type would exceed limits, split into sub-batches
+- **PR sprawl cap:** If there are already 3+ open sonar-fix PRs after Step 0, do NOT create new ones. Address existing PRs and wait for them to merge first.
 
 **Stop Conditions:**
 - If no issues remain, report "All SonarCloud issues resolved!"
 - If only INFO-level issues remain, ask user if they want to proceed
+- If 3+ sonar-fix PRs are already open, report the count and stop — do not create new PRs until existing ones merge
 
 ### 3. Fix-Ship Loop
 
@@ -143,7 +272,12 @@ After all batches are shipped:
 ```text
 SonarCloud Fix Run Complete
 
-PRs Created:
+Existing PRs Addressed:
+  1. {PR URL} - addressed {N} review comments
+  2. {PR URL} - no action needed (auto-merge enabled)
+  ...
+
+New PRs Created:
   1. {PR URL} - {category} ({N} issues) - CI: pending
   2. {PR URL} - {category} ({N} issues) - CI: pending
   ...
@@ -164,6 +298,7 @@ Remaining Issues: {count}
 - **Auto-merge requires CI** - Each PR will merge independently when checks pass
 - **Skip flaky tests** - If CI fails on unrelated tests, document and proceed
 - **Ask when uncertain** - If a fix might change behavior, ask the user first
+- **Address existing PRs first** - Never create new sonar-fix PRs while older ones have unaddressed review comments
 
 ## Fallback: Manual Issue Input
 
