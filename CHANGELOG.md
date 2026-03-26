@@ -5,12 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.75] - 2026-03-25
+## [26.4.76] - 2026-03-25
 
 ### Fixed
 
-- Fixed sign-in failures across all environments — Clerk proxy uses fetch() to target actual FAPI endpoint instead of dead `clerk.jov.ie` domain
-- [internal] Updated vercel.json rewrites, CSP, preconnect links to use `distinct-giraffe-5.clerk.accounts.dev`; added fetch() proxy in middleware; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+- Fixed sign-in across all environments by routing authentication through the correct Clerk endpoint
+- [internal] Replaced dead `clerk.jov.ie` with `distinct-giraffe-5.clerk.accounts.dev` everywhere: fetch() proxy in middleware, root + app vercel.json rewrites, CSP allowlists, preconnect hints; added Clerk architecture docs to AGENTS.md and CLAUDE.md
 - Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
 - [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
 
