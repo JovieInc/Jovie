@@ -114,7 +114,7 @@ describe('POST /api/deploy/promote', () => {
     );
   });
 
-  it('returns deployment data when the hook succeeds', async () => {
+  it('returns deployment data when the hook succeeds without retrying the deploy hook POST', async () => {
     mockServerFetch.mockResolvedValue(
       new Response(JSON.stringify({ id: 'job_123' }), {
         status: 200,
@@ -135,25 +135,9 @@ describe('POST /api/deploy/promote', () => {
       'https://example.com/hook',
       expect.objectContaining({
         method: 'POST',
-        retry: expect.objectContaining({
-          maxRetries: 1,
-          baseDelayMs: 500,
-          retryOn: expect.any(Function),
-        }),
+        timeoutMs: 30_000,
       })
     );
-
-    const retryOn = mockServerFetch.mock.calls[0]?.[1]?.retry?.retryOn;
-    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
-
-    expect(
-      retryOn?.({
-        error: new ServerFetchTimeoutError('timed out', 30_000, 'Deploy hook'),
-      })
-    ).toBe(true);
-    expect(retryOn?.({ error: new TypeError('fetch failed') })).toBe(true);
-    expect(
-      retryOn?.({ response: new Response('retry', { status: 503 }) })
-    ).toBe(false);
+    expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
   });
 });

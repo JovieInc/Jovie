@@ -108,6 +108,13 @@ export function isClerkTestEmail(email: string): boolean {
   return email.includes('+clerk_test');
 }
 
+export function isClerkHandshakeUrl(url: string): boolean {
+  return (
+    url.includes('clerk') &&
+    (url.includes('handshake') || url.includes('dev-browser'))
+  );
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -231,6 +238,13 @@ export async function signInUser(
     retries: 2,
   });
 
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
+
   // Wait for Clerk JS to load from CDN before calling clerk.signIn()
   // The @clerk/testing library has a hard 30s timeout for window.Clerk.loaded.
   // Pre-waiting here prevents that timeout from being eaten by Turbopack compilation.
@@ -327,6 +341,13 @@ export async function signInUser(
     timeout: 120_000,
     retries: 2,
   });
+
+  if (isClerkHandshakeUrl(page.url())) {
+    throw new ClerkTestError(
+      'Clerk redirected to a handshake flow after sign-in on the current preview target.',
+      'CLERK_SETUP_FAILED'
+    );
+  }
 
   // Dismiss Next.js dev error overlay and wait for page to stabilize
   // Handles React hydration mismatches (nonce attr) and transient hooks errors

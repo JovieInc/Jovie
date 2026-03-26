@@ -16,11 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
-import {
-  isRetryableTransportError,
-  ServerFetchTimeoutError,
-  serverFetch,
-} from '@/lib/http/server-fetch';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { logger } from '@/lib/utils/logger';
 import {
   acquireRecentDispatch,
@@ -192,11 +188,6 @@ export async function POST(request: NextRequest) {
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
         context: 'GitHub repository dispatch for Sentry webhook',
-        retry: {
-          maxRetries: 2,
-          baseDelayMs: 500,
-          retryOn: ({ error }) => isRetryableTransportError(error),
-        },
       }
     );
 

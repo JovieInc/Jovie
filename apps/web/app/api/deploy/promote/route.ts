@@ -2,11 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import { captureCriticalError } from '@/lib/error-tracking';
-import {
-  isRetryableTransportError,
-  ServerFetchTimeoutError,
-  serverFetch,
-} from '@/lib/http/server-fetch';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { createRateLimitHeaders, deployPromoteLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -68,11 +64,6 @@ export async function POST() {
       method: 'POST',
       timeoutMs: 30_000,
       context: 'Vercel production deploy hook',
-      retry: {
-        maxRetries: 1,
-        baseDelayMs: 500,
-        retryOn: ({ error }) => isRetryableTransportError(error),
-      },
     });
 
     if (!response.ok) {

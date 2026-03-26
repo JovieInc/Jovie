@@ -1,19 +1,20 @@
 import 'server-only';
 
-import { and, desc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
-import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
-import { getHudDeployments } from '@/lib/deployments/github';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
-import { getRedis } from '@/lib/redis';
-import { withTimeout } from '@/lib/resilience/primitives';
 import { getAdminMercuryMetrics } from './mercury-metrics';
-import { getAdminSentryMetrics } from './sentry-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
+
+export {
+  type AdminReliabilitySummary,
+  getAdminReliabilitySummary,
+} from './reliability';
 
 const DISABLED_TABLES = new Set<string>();
 
@@ -145,17 +146,6 @@ export interface AdminUsagePoint {
   value: number;
 }
 
-export interface AdminReliabilitySummary {
-  errorRatePercent: number;
-  p95LatencyMs: number | null;
-  incidents24h: number;
-  lastIncidentAt: Date | null;
-  unresolvedSentryIssues24h: number;
-  redisAvailable: boolean;
-  deploymentAvailability: 'available' | 'error' | 'not_configured';
-  deploymentState: 'success' | 'failure' | 'in_progress' | 'unknown' | null;
-}
-
 export type AdminActivityStatus = 'success' | 'warning' | 'error';
 
 export interface AdminActivityItem {
@@ -167,27 +157,6 @@ export interface AdminActivityItem {
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const REDIS_REACHABILITY_TIMEOUT_MS = 250;
-
-/**
- * Performs a bounded Redis reachability check for the admin reliability summary.
- */
-async function isRedisReachable(): Promise<boolean> {
-  const redis = getRedis();
-  if (!redis) {
-    return false;
-  }
-
-  try {
-    await withTimeout(redis.ping(), {
-      timeoutMs: REDIS_REACHABILITY_TIMEOUT_MS,
-      context: 'Redis ping',
-    });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function getAdminUsageSeries(
   days: number = 14
@@ -237,133 +206,6 @@ export async function getAdminUsageSeries(
   }
 
   return points;
-}
-
-export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
-  const now = new Date();
-  const dayAgo = new Date(now.getTime() - MS_PER_DAY);
-  const [dbHealth, sentryMetrics, deployments, redisAvailable] =
-    await Promise.all([
-      checkDbHealth().catch(() => ({ latency: null })),
-      getAdminSentryMetrics().catch(() => null),
-      getHudDeployments().catch(() => ({
-        availability: 'error' as const,
-        current: null,
-        recent: [],
-      })),
-      isRedisReachable(),
-    ]);
-  const reliabilityBase = {
-    p95LatencyMs: dbHealth.latency ?? null,
-    unresolvedSentryIssues24h: sentryMetrics?.unresolvedIssues24h ?? 0,
-    redisAvailable,
-    deploymentAvailability: deployments.availability,
-    deploymentState:
-      deployments.current?.status === 'not_configured'
-        ? null
-        : (deployments.current?.status ?? null),
-  };
-  const hasStripeEvents =
-    !DISABLED_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
-    (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
-
-  if (!hasStripeEvents) {
-    return {
-      errorRatePercent: 0,
-      incidents24h: 0,
-      lastIncidentAt: null,
-      ...reliabilityBase,
-    };
-  }
-
-  try {
-    let totalEvents = 0;
-    let incidentCount = 0;
-    let lastIncidentAt: Date | null = null;
-
-    try {
-      const rows = await db
-        .select({ count: drizzleSql<number>`count(*)` })
-        .from(stripeWebhookEvents)
-        .where(
-          drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`
-        );
-      totalEvents = Number(rows[0]?.count ?? 0);
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      captureWarning(
-        'Stripe webhook events unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        incidents24h: 0,
-        lastIncidentAt: null,
-        ...reliabilityBase,
-      };
-    }
-
-    try {
-      const rows = await db
-        .select({
-          count: drizzleSql<number>`count(*)`,
-          lastAt: drizzleSql<Date | null>`max(${stripeWebhookEvents.createdAt})`,
-        })
-        .from(stripeWebhookEvents)
-        .where(
-          and(
-            drizzleSql`${stripeWebhookEvents.createdAt} >= ${sqlTimestamp(dayAgo)}`,
-            inArray(stripeWebhookEvents.type, [
-              'checkout.session.completed',
-              'customer.subscription.created',
-              'invoice.payment_failed',
-            ])
-          )
-        );
-
-      const row = rows[0];
-      incidentCount = Number(row?.count ?? 0);
-      const rawLastAt = row?.lastAt;
-      // Extract nested ternary for clarity (S3358)
-      if (rawLastAt instanceof Date) {
-        lastIncidentAt = rawLastAt;
-      } else if (rawLastAt != null) {
-        lastIncidentAt = new Date(String(rawLastAt));
-      }
-      // Note: else case is not needed since lastIncidentAt is already initialized to null
-    } catch {
-      DISABLED_TABLES.add(TABLE_NAMES.stripeWebhookEvents);
-      captureWarning(
-        'Stripe webhook incidents unavailable; skipping reliability summary.'
-      );
-
-      return {
-        errorRatePercent: 0,
-        incidents24h: 0,
-        lastIncidentAt: null,
-        ...reliabilityBase,
-      };
-    }
-
-    const errorRatePercent =
-      totalEvents > 0 ? (Number(incidentCount) / Number(totalEvents)) * 100 : 0;
-
-    return {
-      errorRatePercent,
-      incidents24h: Number(incidentCount),
-      lastIncidentAt,
-      ...reliabilityBase,
-    };
-  } catch (error) {
-    captureError('Error loading admin reliability summary', error);
-
-    return {
-      errorRatePercent: 0,
-      incidents24h: 0,
-      lastIncidentAt: null,
-      ...reliabilityBase,
-    };
-  }
 }
 
 function formatTimestamp(timestamp: Date): string {
