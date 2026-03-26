@@ -23,6 +23,7 @@ import {
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
   leadListQuerySchema,
   manualLeadSubmitSchema,
@@ -353,11 +354,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Deduplicate URLs to prevent TOCTOU race on parallel insert
+    const uniqueUrls = [...new Set(validated.data.urls)];
+    const urlResults = await mapConcurrent(uniqueUrls, 5, async url =>
+      processLeadUrl(url)
+    );
+
     const results: LeadProcessResult[] = [];
     const newLeadIds: string[] = [];
-
-    for (const url of validated.data.urls) {
-      const { result, leadId } = await processLeadUrl(url);
+    for (const { result, leadId } of urlResults) {
       results.push(result);
       if (leadId) newLeadIds.push(leadId);
     }

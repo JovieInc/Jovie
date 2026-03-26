@@ -31,6 +31,6 @@ export function useHudMetricsQuery(
     queryFn: ({ signal }) => fetchHudMetrics(kioskToken, signal),
     initialData,
     refetchInterval: HUD_POLL_INTERVAL_MS,
-    staleTime: 0,
+    staleTime: HUD_POLL_INTERVAL_MS / 2, // 15s — prevent redundant refetches on tab focus
   });
 }
