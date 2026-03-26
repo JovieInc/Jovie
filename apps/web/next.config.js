@@ -351,6 +351,24 @@ const nextConfig = {
       0,
       7
     ),
+    // Clerk JS bundle URL — decoded from the publishable key at build time.
+    // For pk_live_ keys, this points to the FAPI domain (CNAME to Clerk CDN)
+    // so Clerk JS + chunks load directly from Clerk infrastructure instead of
+    // going through the /__clerk middleware proxy which can't serve chunks.
+    ...(() => {
+      const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+      if (!pk.startsWith('pk_live_')) return {};
+      try {
+        const b64 = pk.replace(/^pk_live_/, '');
+        const host = Buffer.from(b64, 'base64').toString().replace(/\$$/, '');
+        if (!host) return {};
+        return {
+          NEXT_PUBLIC_CLERK_JS_URL: `https://${host}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+        };
+      } catch {
+        return {};
+      }
+    })(),
   },
   experimental: {
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
