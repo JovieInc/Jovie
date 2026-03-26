@@ -116,14 +116,32 @@ const INTERNAL_PATTERNS = [
   /\btoken\b/i,
   /\bverification token\b/i,
   /\btrusted origin\b/i,
-
-  // Dollar amounts in internal cost/budget contexts
-  /\bbudget\b.*\$\d+/i,
-  /\$\d+.*\b(budget|cost)\b/i,
-
-  // Dependency version bumps
-  /\d+\.\d+\.\d+\s*→\s*\d+\.\d+\.\d+/,
 ];
+
+const DOLLAR_AMOUNT_RE = /\$\d+/;
+const SEMVER_TOKEN_RE = /^\d+\.\d+\.\d+$/;
+
+function hasBudgetOrCostLeak(entry: string): boolean {
+  if (!DOLLAR_AMOUNT_RE.test(entry)) return false;
+  const lower = entry.toLowerCase();
+  return lower.includes('budget') || lower.includes('cost');
+}
+
+function hasDependencyVersionBump(entry: string): boolean {
+  const tokens = entry.replaceAll('→', ' → ').split(/\s+/).filter(Boolean);
+
+  for (let index = 1; index < tokens.length - 1; index += 1) {
+    if (tokens[index] !== '→') continue;
+    if (
+      SEMVER_TOKEN_RE.test(tokens[index - 1]) &&
+      SEMVER_TOKEN_RE.test(tokens[index + 1])
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 export function isInternalEntry(entry: string): boolean {
   const normalizedTokens = entry
@@ -138,6 +156,9 @@ export function isInternalEntry(entry: string): boolean {
   for (const pattern of INTERNAL_PATTERNS) {
     if (pattern.test(entry)) return true;
   }
+
+  if (hasBudgetOrCostLeak(entry)) return true;
+  if (hasDependencyVersionBump(entry)) return true;
 
   return false;
 }

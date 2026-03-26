@@ -320,4 +320,19 @@ describe('parseChangelog', () => {
     expect(releases[0].summary).toBe('');
     expect(releases[0].sections.fixed).toEqual(['Sign-in page loads faster']);
   });
+
+  it('filters internal cost and budget disclosures', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Lowered checkout friction for fans
+- Reduced outreach cost from $400 to $250 per week
+- Budget cap now enforced at $1000 for internal testing
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Lowered checkout friction for fans',
+    ]);
+  });
 });
