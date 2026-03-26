@@ -17,7 +17,7 @@ import {
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { withDbSessionTx } from '@/lib/auth/session';
-import { CACHE_TAGS } from '@/lib/cache/tags';
+import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
 import { type DbOrTransaction } from '@/lib/db';
 import { dashboardQuery } from '@/lib/db/query-timeout';
 import { clickEvents, tips } from '@/lib/db/schema/analytics';
@@ -713,7 +713,7 @@ const getCachedDashboardCore = unstableCache(
   async (clerkUserId: string) => fetchDashboardCoreWithSession(clerkUserId),
   ['dashboard-core'],
   {
-    revalidate: 30,
+    revalidate: CACHE_TTL.MEDIUM,
     tags: [CACHE_TAGS.DASHBOARD_DATA],
   }
 );

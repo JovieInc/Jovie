@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
@@ -105,12 +106,18 @@ const baseDashboardData: DashboardData = {
 function renderDashboardNav(overrides: Partial<DashboardData> = {}) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
 
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   return render(
-    <DashboardDataProvider value={value}>
-      <SidebarProvider>
-        <DashboardNav />
-      </SidebarProvider>
-    </DashboardDataProvider>
+    <QueryClientProvider client={queryClient}>
+      <DashboardDataProvider value={value}>
+        <SidebarProvider>
+          <DashboardNav />
+        </SidebarProvider>
+      </DashboardDataProvider>
+    </QueryClientProvider>
   );
 }
 

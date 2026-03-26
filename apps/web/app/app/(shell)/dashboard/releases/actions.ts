@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { CACHE_TTL, createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -255,12 +255,13 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
-  // Cache with 30s TTL and tags for invalidation
+  // Cache with 5min TTL and tags for invalidation.
+  // Releases only change on import/sync — tag-based invalidation handles mutations.
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.id, profile.handle),
     ['releases-matrix', userId, profile.id],
     {
-      revalidate: 30,
+      revalidate: CACHE_TTL.MEDIUM,
       tags: [`releases:${userId}:${profile.id}`],
     }
   )();
