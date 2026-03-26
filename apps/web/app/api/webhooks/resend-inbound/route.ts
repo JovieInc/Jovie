@@ -147,23 +147,24 @@ function verifyWebhookSignature(
     );
   }
 
-  if (webhookSecret && (!svixSignature || !svixTimestamp)) {
-    logger.warn('Inbound webhook missing required signature headers');
-    return NextResponse.json(
-      { error: 'Missing signature headers' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  if (webhookSecret) {
+    if (!svixSignature || !svixTimestamp) {
+      logger.warn('Inbound webhook missing required signature headers');
+      return NextResponse.json(
+        { error: 'Missing signature headers' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
 
-  if (
-    webhookSecret &&
-    !verifySignature(rawBody, svixSignature!, svixTimestamp!, webhookSecret)
-  ) {
-    logger.warn('Inbound webhook signature verification failed');
-    return NextResponse.json(
-      { error: 'Invalid signature' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
+    if (
+      !verifySignature(rawBody, svixSignature, svixTimestamp, webhookSecret)
+    ) {
+      logger.warn('Inbound webhook signature verification failed');
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
   }
 
   return null;
