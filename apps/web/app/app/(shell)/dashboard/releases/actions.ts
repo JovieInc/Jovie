@@ -904,7 +904,6 @@ export async function syncFromSpotify(): Promise<{
     void enqueueDspArtistDiscoveryJob({
       creatorProfileId: profile.id,
       spotifyArtistId: profile.spotifyId,
-      targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
     }).catch(error => {
       void captureError('DSP artist discovery enqueue failed on sync', error, {
         action: 'syncFromSpotify',
@@ -1291,7 +1290,6 @@ export async function connectSpotifyArtist(params: {
       void enqueueDspArtistDiscoveryJob({
         creatorProfileId: profile.id,
         spotifyArtistId: params.spotifyArtistId,
-        targetProviders: ['apple_music', 'deezer', 'musicbrainz'],
       }).catch(err => {
         void captureError(
           'DSP artist discovery enqueue failed on connect',

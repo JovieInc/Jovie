@@ -21,7 +21,10 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspTrackEnrichmentJob } from '@/lib/ingestion/jobs';
 import { logger } from '@/lib/utils/logger';
-
+import {
+  DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS,
+  DSP_ARTIST_DISCOVERY_PROVIDERS,
+} from '../discovery-providers';
 import { setEnrichmentJobStatus } from '../enrichment-status';
 import {
   convertAppleMusicToIsrcMatches,
@@ -64,8 +67,8 @@ export const dspArtistDiscoveryPayloadSchema = z.object({
   creatorProfileId: z.string().uuid(),
   spotifyArtistId: z.string(),
   targetProviders: z
-    .array(z.enum(['apple_music', 'deezer', 'musicbrainz']))
-    .default(['apple_music']),
+    .array(z.enum(DSP_ARTIST_DISCOVERY_PROVIDERS))
+    .default(DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS),
   dedupKey: z.string(),
 });
 

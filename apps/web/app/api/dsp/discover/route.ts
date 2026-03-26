@@ -16,6 +16,10 @@ import { z } from 'zod';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import {
+  DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS,
+  DSP_ARTIST_DISCOVERY_PROVIDERS,
+} from '@/lib/dsp-enrichment/discovery-providers';
 import { captureError } from '@/lib/error-tracking';
 import { enqueueDspArtistDiscoveryJob } from '@/lib/ingestion/jobs';
 import {
@@ -30,9 +34,7 @@ import {
 const discoverRequestSchema = z.object({
   profileId: z.string().uuid(),
   spotifyArtistId: z.string().min(1),
-  targetProviders: z
-    .array(z.enum(['apple_music', 'deezer', 'musicbrainz']))
-    .optional(),
+  targetProviders: z.array(z.enum(DSP_ARTIST_DISCOVERY_PROVIDERS)).optional(),
 });
 
 // ============================================================================
@@ -114,11 +116,8 @@ export async function POST(request: Request) {
     const jobId = await enqueueDspArtistDiscoveryJob({
       creatorProfileId: profileId,
       spotifyArtistId,
-      targetProviders: targetProviders ?? [
-        'apple_music',
-        'deezer',
-        'musicbrainz',
-      ],
+      targetProviders:
+        targetProviders ?? DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS,
     });
 
     if (!jobId) {
@@ -131,11 +130,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       jobId,
-      targetProviders: targetProviders ?? [
-        'apple_music',
-        'deezer',
-        'musicbrainz',
-      ],
+      targetProviders:
+        targetProviders ?? DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS,
       message: 'Discovery job enqueued successfully',
     });
   } catch (error) {

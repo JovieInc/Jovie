@@ -34,6 +34,7 @@ export type { NotificationPreferences } from '@/lib/db/schema/profiles';
 export type DspProviderId =
   | 'spotify'
   | 'apple_music'
+  | 'youtube'
   | 'deezer'
   | 'youtube_music'
   | 'tidal'

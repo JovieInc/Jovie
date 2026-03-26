@@ -89,6 +89,7 @@ const DSP_AVATAR_CONFIDENCE: Record<DspProviderId, number> = {
   spotify: 0.95, // Primary DSP, high-quality images
   apple_music: 0.9, // High-quality, professional images
   deezer: 0.85, // Good quality, wide coverage
+  youtube: 0.8, // Official channel art when music profile data is absent
   youtube_music: 0.8, // YouTube artist images
   tidal: 0.75, // High-fidelity focused
   soundcloud: 0.7, // More indie/DIY

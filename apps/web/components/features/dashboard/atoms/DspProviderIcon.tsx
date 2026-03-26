@@ -18,6 +18,7 @@ export interface DspProviderIconProps {
 const PROVIDER_LABELS: Record<DspProviderId, string> = {
   spotify: 'Spotify',
   apple_music: 'Apple Music',
+  youtube: 'YouTube',
   deezer: 'Deezer',
   youtube_music: 'YouTube Music',
   tidal: 'Tidal',
@@ -29,6 +30,7 @@ const PROVIDER_LABELS: Record<DspProviderId, string> = {
 const PROVIDER_COLORS: Record<DspProviderId, string> = {
   spotify: '#1DB954',
   apple_music: '#FA243C',
+  youtube: '#FF0000',
   deezer: '#FEAA2D',
   youtube_music: '#FF0000',
   tidal: '#000000',
@@ -48,6 +50,7 @@ const DSP_PROVIDER_MAP: Partial<
 > = {
   spotify: 'spotify',
   apple_music: 'apple_music',
+  youtube: 'youtube',
   deezer: 'deezer',
   youtube_music: 'youtube_music',
   tidal: 'tidal',

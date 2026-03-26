@@ -23,7 +23,7 @@ export const PROVIDER_DOMAINS: Record<string, string[]> =
 export const PROVIDER_TO_DSP: Record<ProviderKey, DspProviderId | null> = {
   spotify: 'spotify',
   apple_music: 'apple_music',
-  youtube: null,
+  youtube: 'youtube',
   youtube_music: 'youtube_music',
   soundcloud: 'soundcloud',
   deezer: 'deezer',

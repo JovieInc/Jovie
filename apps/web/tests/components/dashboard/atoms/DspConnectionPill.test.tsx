@@ -9,6 +9,7 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   PROVIDER_COLORS: {
     spotify: '#1DB954',
     apple_music: '#FA243C',
+    youtube: '#FF0000',
     youtube_music: '#FF0000',
     soundcloud: '#FF5500',
     tidal: '#000000',
@@ -16,6 +17,7 @@ vi.mock('@/features/dashboard/atoms/DspProviderIcon', () => ({
   PROVIDER_LABELS: {
     spotify: 'Spotify',
     apple_music: 'Apple Music',
+    youtube: 'YouTube',
     youtube_music: 'YouTube Music',
     soundcloud: 'SoundCloud',
     tidal: 'Tidal',
@@ -67,5 +69,20 @@ describe('DspConnectionPill', () => {
         name: 'Spotify connection: Jovie Artist',
       })
     ).toBeInTheDocument();
+  });
+
+  it('supports YouTube as a connected DSP pill provider', () => {
+    render(
+      <DspConnectionPill
+        provider='youtube'
+        connected={false}
+        onClick={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Connect YouTube' })
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('provider-icon-youtube')).toBeInTheDocument();
   });
 });

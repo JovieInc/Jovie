@@ -2,6 +2,7 @@ import { and, sql as drizzleSql, eq, inArray, isNull, or } from 'drizzle-orm';
 import { type DbOrTransaction, db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { ingestionJobs } from '@/lib/db/schema/ingestion';
+import { DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS } from '@/lib/dsp-enrichment/discovery-providers';
 import {
   canonicalIdentity,
   detectPlatform,
@@ -498,9 +499,9 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   spotifyArtistId: string;
   targetProviders?: ('apple_music' | 'deezer' | 'musicbrainz')[];
 }): Promise<string | null> {
-  const providers = (
-    params.targetProviders ?? ['apple_music', 'deezer', 'musicbrainz']
-  )
+  const targetProviders =
+    params.targetProviders ?? DEFAULT_DSP_ARTIST_DISCOVERY_PROVIDERS;
+  const providers = [...targetProviders]
     .sort((a, b) => a.localeCompare(b))
     .join(',');
   const dedupKey = `dsp_discovery:${params.creatorProfileId}:${providers}`;
@@ -508,11 +509,7 @@ export async function enqueueDspArtistDiscoveryJob(params: {
   const payload = {
     creatorProfileId: params.creatorProfileId,
     spotifyArtistId: params.spotifyArtistId,
-    targetProviders: params.targetProviders ?? [
-      'apple_music',
-      'deezer',
-      'musicbrainz',
-    ],
+    targetProviders,
     dedupKey,
   };
 

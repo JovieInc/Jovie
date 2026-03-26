@@ -13,9 +13,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+const {
+  mockLogger,
+  mockStoreRawIdentityLinks,
+  mockPublishIdentityLinks,
+  mockPlainDbOnConflictDoUpdate,
+  mockPlainDbValues,
+  mockPlainDbInsert,
+} = vi.hoisted(() => ({
+  mockLogger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  mockStoreRawIdentityLinks: vi.fn(),
+  mockPublishIdentityLinks: vi.fn(),
+  mockPlainDbOnConflictDoUpdate: vi.fn(),
+  mockPlainDbValues: vi.fn(),
+  mockPlainDbInsert: vi.fn(),
+}));
+
 // Logger
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: mockLogger,
 }));
 
 // Resilient client — expose MusicfetchRequestError for error-handling tests
@@ -100,6 +121,16 @@ vi.mock('@/lib/ingestion/merge', () => ({
     mockNormalizeAndMergeExtraction(...args),
 }));
 
+vi.mock('@/lib/identity/store', () => ({
+  storeRawIdentityLinks: (...args: unknown[]) =>
+    mockStoreRawIdentityLinks(...args),
+}));
+
+vi.mock('@/lib/identity/publish', () => ({
+  publishIdentityLinks: (...args: unknown[]) =>
+    mockPublishIdentityLinks(...args),
+}));
+
 const mockImportReleasesFromSpotify = vi.fn().mockResolvedValue({
   imported: 0,
   failed: 0,
@@ -159,6 +190,12 @@ const mockIsBlacklistedSpotifyId = vi.fn((id: string) => {
 
 vi.mock('@/lib/spotify/blacklist', () => ({
   isBlacklistedSpotifyId: (id: string) => mockIsBlacklistedSpotifyId(id),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    insert: (...args: unknown[]) => mockPlainDbInsert(...args),
+  },
 }));
 
 // Mock DB transaction
@@ -277,6 +314,18 @@ describe('musicfetch-enrichment', () => {
       releases: [],
       errors: [],
     });
+    mockStoreRawIdentityLinks.mockResolvedValue(0);
+    mockPublishIdentityLinks.mockResolvedValue({
+      inserted: 0,
+      updated: 0,
+    });
+    mockPlainDbValues.mockImplementation(() => ({
+      onConflictDoUpdate: mockPlainDbOnConflictDoUpdate,
+    }));
+    mockPlainDbInsert.mockImplementation(() => ({
+      values: mockPlainDbValues,
+    }));
+    mockPlainDbOnConflictDoUpdate.mockResolvedValue(undefined);
     mockTxLimit.mockResolvedValue([makeProfile()]);
   });
 
@@ -545,6 +594,83 @@ describe('musicfetch-enrichment', () => {
             expect.objectContaining({ platformId: 'bandcamp' }),
             // instagram and tiktok are category 'video', not included in streaming link mappings
           ]),
+        })
+      );
+    });
+
+    it('does not double-count Spotify when MusicFetch already returns it', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          spotify: {
+            id: 'spotify-service-id',
+            url: 'https://open.spotify.com/artist/123',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const seededLog = mockLogger.info.mock.calls.find(
+        ([message]) =>
+          message === 'MusicFetch enrichment: seeded DSP presence matches'
+      );
+
+      expect(mockPlainDbInsert).toHaveBeenCalledTimes(7);
+      expect(seededLog?.[1]).toEqual(
+        expect.objectContaining({
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          seeded: 7,
+        })
+      );
+    });
+
+    it('repairs missing external artist ids when MusicFetch returns one', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          appleMusic: {
+            id: '123456',
+            url: 'https://music.apple.com/us/artist/test-artist/123456',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const appleMusicInsertIndex = mockPlainDbValues.mock.calls.findIndex(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'apple_music'
+      );
+
+      expect(appleMusicInsertIndex).toBeGreaterThanOrEqual(0);
+      expect(
+        mockPlainDbOnConflictDoUpdate.mock.calls[appleMusicInsertIndex]?.[0]
+      ).toEqual(
+        expect.objectContaining({
+          set: expect.objectContaining({
+            externalArtistId: '123456',
+          }),
         })
       );
     });

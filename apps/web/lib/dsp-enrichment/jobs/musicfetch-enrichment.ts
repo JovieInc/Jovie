@@ -249,6 +249,84 @@ async function importDiscography(
 
 const streamingDspKeySet = new Set(STREAMING_DSP_KEYS);
 
+function buildMusicFetchConfidenceBreakdown(now: Date) {
+  return {
+    isrcMatchScore: 0,
+    upcMatchScore: 0,
+    nameSimilarityScore: 1,
+    followerRatioScore: 0,
+    genreOverlapScore: 0,
+    meta: {
+      calculatedAt: now.toISOString(),
+      version: 1,
+    },
+  };
+}
+
+async function upsertMusicFetchPresenceMatch(params: {
+  creatorProfileId: string;
+  providerId: string;
+  externalArtistId: string | null;
+  externalArtistName: string | null;
+  externalArtistUrl: string;
+  externalArtistImageUrl: string | null;
+  now: Date;
+}): Promise<boolean> {
+  const {
+    creatorProfileId,
+    providerId,
+    externalArtistId,
+    externalArtistName,
+    externalArtistUrl,
+    externalArtistImageUrl,
+    now,
+  } = params;
+
+  try {
+    await plainDb
+      .insert(dspArtistMatches)
+      .values({
+        creatorProfileId,
+        providerId,
+        externalArtistId,
+        externalArtistName,
+        externalArtistUrl,
+        externalArtistImageUrl,
+        confidenceScore: '1.0000',
+        confidenceBreakdown: buildMusicFetchConfidenceBreakdown(now),
+        matchingIsrcCount: 0,
+        matchingUpcCount: 0,
+        totalTracksChecked: 0,
+        status: 'auto_confirmed',
+        confirmedAt: now,
+        matchSource: 'musicfetch',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .onConflictDoUpdate({
+        target: [
+          dspArtistMatches.creatorProfileId,
+          dspArtistMatches.providerId,
+        ],
+        set: {
+          ...(externalArtistId ? { externalArtistId } : {}),
+          externalArtistUrl,
+          externalArtistName,
+          externalArtistImageUrl,
+          updatedAt: now,
+        },
+      });
+    return true;
+  } catch (error) {
+    logger.warn('MusicFetch presence seed: failed to upsert DSP match', {
+      creatorProfileId,
+      providerId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return false;
+  }
+}
+
 /**
  * Seed dspArtistMatches from MusicFetch discovery results.
  *
@@ -266,6 +344,7 @@ async function seedPresenceFromMusicFetch(
 ): Promise<number> {
   const now = new Date();
   let seeded = 0;
+  const seededProviders = new Set<string>();
 
   for (const [serviceKey, service] of Object.entries(artistData.services)) {
     const url = getMusicFetchServiceUrl(service);
@@ -277,112 +356,35 @@ async function seedPresenceFromMusicFetch(
     // Only seed streaming DSPs (not video, metadata, or social)
     if (!streamingDspKeySet.has(dspEntry.key)) continue;
 
-    try {
-      await plainDb
-        .insert(dspArtistMatches)
-        .values({
-          creatorProfileId,
-          providerId: dspEntry.key,
-          externalArtistId: service.id ?? null,
-          externalArtistName: artistData.name ?? null,
-          externalArtistUrl: url,
-          externalArtistImageUrl: artistData.image?.url ?? null,
-          confidenceScore: '1.0000',
-          confidenceBreakdown: {
-            isrcMatchScore: 0,
-            upcMatchScore: 0,
-            nameSimilarityScore: 1,
-            followerRatioScore: 0,
-            genreOverlapScore: 0,
-            meta: {
-              calculatedAt: now.toISOString(),
-              version: 1,
-            },
-          },
-          matchingIsrcCount: 0,
-          matchingUpcCount: 0,
-          totalTracksChecked: 0,
-          status: 'auto_confirmed',
-          confirmedAt: now,
-          matchSource: 'musicfetch',
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dspArtistMatches.creatorProfileId,
-            dspArtistMatches.providerId,
-          ],
-          set: {
-            externalArtistUrl: url,
-            externalArtistName: artistData.name ?? null,
-            externalArtistImageUrl: artistData.image?.url ?? null,
-            updatedAt: now,
-          },
-        });
+    const inserted = await upsertMusicFetchPresenceMatch({
+      creatorProfileId,
+      providerId: dspEntry.key,
+      externalArtistId: service.id ?? null,
+      externalArtistName: artistData.name ?? null,
+      externalArtistUrl: url,
+      externalArtistImageUrl: artistData.image?.url ?? null,
+      now,
+    });
+    if (inserted) {
+      seededProviders.add(dspEntry.key);
       seeded++;
-    } catch (error) {
-      // Non-blocking — log and continue to next DSP
-      logger.warn('MusicFetch presence seed: failed to upsert DSP match', {
-        creatorProfileId,
-        providerId: dspEntry.key,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
     }
   }
 
-  // Also seed Spotify from the known URL
-  if (spotifyUrl) {
-    try {
-      const spotifyId = extractSpotifyArtistId(spotifyUrl, null);
-      await plainDb
-        .insert(dspArtistMatches)
-        .values({
-          creatorProfileId,
-          providerId: 'spotify',
-          externalArtistId: spotifyId,
-          externalArtistName: artistData.name ?? null,
-          externalArtistUrl: spotifyUrl,
-          externalArtistImageUrl: artistData.image?.url ?? null,
-          confidenceScore: '1.0000',
-          confidenceBreakdown: {
-            isrcMatchScore: 0,
-            upcMatchScore: 0,
-            nameSimilarityScore: 1,
-            followerRatioScore: 0,
-            genreOverlapScore: 0,
-            meta: {
-              calculatedAt: now.toISOString(),
-              version: 1,
-            },
-          },
-          matchingIsrcCount: 0,
-          matchingUpcCount: 0,
-          totalTracksChecked: 0,
-          status: 'auto_confirmed',
-          confirmedAt: now,
-          matchSource: 'musicfetch',
-          createdAt: now,
-          updatedAt: now,
-        })
-        .onConflictDoUpdate({
-          target: [
-            dspArtistMatches.creatorProfileId,
-            dspArtistMatches.providerId,
-          ],
-          set: {
-            externalArtistUrl: spotifyUrl,
-            externalArtistName: artistData.name ?? null,
-            externalArtistImageUrl: artistData.image?.url ?? null,
-            updatedAt: now,
-          },
-        });
+  // Seed Spotify from the known URL if MusicFetch didn't already return it.
+  if (!seededProviders.has('spotify')) {
+    const spotifyId = extractSpotifyArtistId(spotifyUrl, null);
+    const inserted = await upsertMusicFetchPresenceMatch({
+      creatorProfileId,
+      providerId: 'spotify',
+      externalArtistId: spotifyId,
+      externalArtistName: artistData.name ?? null,
+      externalArtistUrl: spotifyUrl,
+      externalArtistImageUrl: artistData.image?.url ?? null,
+      now,
+    });
+    if (inserted) {
       seeded++;
-    } catch (error) {
-      logger.warn('MusicFetch presence seed: failed to upsert Spotify match', {
-        creatorProfileId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
     }
   }
 

@@ -32,6 +32,7 @@ const INTERACTIVE_PILL_CLASSNAME =
 const CONNECTION_PILL_PROVIDERS = [
   'spotify',
   'apple_music',
+  'youtube',
   'youtube_music',
   'soundcloud',
   'tidal',

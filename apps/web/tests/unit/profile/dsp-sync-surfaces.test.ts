@@ -6,6 +6,7 @@ describe('DSP surface sync', () => {
     const profile: Parameters<typeof getCanonicalProfileDSPs>[0] = {
       spotify_id: 'artist-123',
       apple_music_url: 'https://music.apple.com/us/artist/example/123',
+      youtube_url: 'https://www.youtube.com/@exampleartist',
       youtube_music_id: 'UC123',
       tidal_id: '456',
     };
@@ -24,5 +25,7 @@ describe('DSP surface sync', () => {
     expect(releasesTableKeys).toEqual(canonicalKeys);
     expect(publicProfileKeys).toEqual(canonicalKeys);
     expect(notificationMenuKeys).toEqual(canonicalKeys);
+    expect(canonicalKeys).toContain('youtube');
+    expect(canonicalKeys).toContain('youtube_music');
   });
 });
