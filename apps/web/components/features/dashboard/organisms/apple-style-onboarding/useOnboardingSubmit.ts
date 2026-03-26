@@ -16,6 +16,7 @@ import {
   type EnrichedProfileData,
   enrichProfileFromDsp,
 } from '@/app/onboarding/actions/enrich-profile';
+import type { CompletionResult } from '@/app/onboarding/actions/types';
 import {
   getOnboardingCompletionMethod,
   toDurationMs,
@@ -44,6 +45,45 @@ interface SpotifyImportState {
   message: string;
 }
 
+export interface AutoConnectedArtistSelection {
+  id: string;
+  name: string;
+  url: string;
+}
+
+export function extractSignupClaimArtistSelection(): AutoConnectedArtistSelection | null {
+  try {
+    const spotifyExpected =
+      readSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY) === 'true';
+    const spotifyUrl = readSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
+
+    if (!spotifyUrl && spotifyExpected) {
+      return null;
+    }
+
+    if (!spotifyUrl) {
+      return null;
+    }
+
+    const artistName = readSignupClaimValue(SIGNUP_ARTIST_NAME_KEY) ?? '';
+    const artistMatch =
+      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
+
+    if (!artistMatch?.[1]) {
+      return null;
+    }
+
+    const artistId = artistMatch[1];
+    return {
+      id: artistId,
+      name: artistName,
+      url: `https://open.spotify.com/artist/${artistId}`,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * JOV-1340: Auto-connect Spotify from homepage search claim data.
  * Now fully non-blocking — fires connect + enrichment in background,
@@ -55,82 +95,75 @@ function tryAutoConnectSpotify(
   setIsEnriching: Dispatch<SetStateAction<boolean>>,
   setIsConnecting: Dispatch<SetStateAction<boolean>>,
   signal: AbortSignal,
-  userId: string
+  userId: string,
+  onAutoConnectStarted?: (selection: AutoConnectedArtistSelection) => void
 ): void {
   try {
+    const selection = extractSignupClaimArtistSelection();
     const spotifyExpected =
       readSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY) === 'true';
-    const spotifyUrl = readSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
 
-    if (!spotifyUrl && spotifyExpected) {
+    if (!selection && spotifyExpected) {
       track('onboarding_oauth_claim_missing', {
         missing_field: 'spotify_url',
         source: 'oauth_redirect',
       });
     }
-    if (!spotifyUrl) {
+    if (!selection) {
       clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
       return;
     }
 
-    const artistName = readSignupClaimValue(SIGNUP_ARTIST_NAME_KEY) ?? '';
-    const artistMatch =
-      /(?:open\.)?spotify\.com\/artist\/([a-zA-Z0-9]{22})/.exec(spotifyUrl);
+    track('onboarding_spotify_import_started', { user_id: userId });
+    onAutoConnectStarted?.(selection);
 
-    if (artistMatch?.[1]) {
-      const artistId = artistMatch[1];
-      const normalizedUrl = `https://open.spotify.com/artist/${artistId}`;
-
-      track('onboarding_spotify_import_started', { user_id: userId });
-
-      // Set import state to success immediately — actual import is background
-      if (!signal.aborted) {
-        setSpotifyImportState({
-          status: 'success',
-          stage: 2,
-          message: 'Your music is being imported in the background.',
-        });
-      }
-
-      // Connect Spotify artist in background — tracked so dashboard redirect
-      // waits for the DB write to complete (fixes empty sidebar/DSPs).
-      if (!signal.aborted) setIsConnecting(true);
-      void connectSpotifyArtist({
-        spotifyArtistId: artistId,
-        spotifyArtistUrl: normalizedUrl,
-        artistName,
-        includeTracks: false,
-      })
-        .then(result => {
-          if (result.success) {
-            track('onboarding_spotify_import_completed', {
-              user_id: userId,
-              releasesImported: result.importing ? 0 : result.imported,
-            });
-          }
-        })
-        .catch(() => {
-          // Import failure is non-critical during onboarding
-        })
-        .finally(() => {
-          if (!signal.aborted) setIsConnecting(false);
-        });
-
-      // Fire-and-forget: enrich profile data in background
-      if (!signal.aborted) setIsEnriching(true);
-      void enrichProfileFromDsp(artistId, normalizedUrl)
-        .then(enriched => {
-          if (!signal.aborted) {
-            setEnrichedProfile(enriched);
-          }
-        })
-        .catch(() => {
-          // Enrichment failure is non-critical — user can fill in manually
-        })
-        .finally(() => {
-          if (!signal.aborted) setIsEnriching(false);
-        });
+    // Set import state to success immediately — actual import is background
+    if (!signal.aborted) {
+      setSpotifyImportState({
+        status: 'success',
+        stage: 2,
+        message: 'Your music is being imported in the background.',
+      });
     }
+
+    // Connect Spotify artist in background — tracked so dashboard redirect
+    // waits for the DB write to complete (fixes empty sidebar/DSPs).
+    if (!signal.aborted) setIsConnecting(true);
+    void connectSpotifyArtist({
+      spotifyArtistId: selection.id,
+      spotifyArtistUrl: selection.url,
+      artistName: selection.name,
+      includeTracks: false,
+    })
+      .then(result => {
+        if (result.success) {
+          track('onboarding_spotify_import_completed', {
+            user_id: userId,
+            releasesImported: result.importing ? 0 : result.imported,
+          });
+        }
+      })
+      .catch(() => {
+        // Import failure is non-critical during onboarding
+      })
+      .finally(() => {
+        if (!signal.aborted) setIsConnecting(false);
+      });
+
+    // Fire-and-forget: enrich profile data in background
+    if (!signal.aborted) setIsEnriching(true);
+    void enrichProfileFromDsp(selection.id, selection.url)
+      .then(enriched => {
+        if (!signal.aborted) {
+          setEnrichedProfile(enriched);
+        }
+      })
+      .catch(() => {
+        // Enrichment failure is non-critical — user can fill in manually
+      })
+      .finally(() => {
+        if (!signal.aborted) setIsEnriching(false);
+      });
 
     clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
     clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
@@ -152,6 +185,8 @@ interface UseOnboardingSubmitOptions {
   shouldAutoSubmitHandle: boolean;
   isReservedHandle: boolean;
   onboardingStartedAtMs: number;
+  onCompleted?: (result: CompletionResult) => void;
+  onAutoConnectStarted?: (selection: AutoConnectedArtistSelection) => void;
 }
 
 interface UseOnboardingSubmitReturn {
@@ -184,6 +219,8 @@ export function useOnboardingSubmit({
   shouldAutoSubmitHandle,
   isReservedHandle,
   onboardingStartedAtMs,
+  onCompleted,
+  onAutoConnectStarted,
 }: UseOnboardingSubmitOptions): UseOnboardingSubmitReturn {
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>({
@@ -358,12 +395,13 @@ export function useOnboardingSubmit({
         // review step where the user can edit it inline.
         const resolvedDisplayName = fullName.trim() || resolvedHandle;
         validateDisplayName(resolvedDisplayName);
-        await completeOnboarding({
+        const completion = await completeOnboarding({
           username: resolvedHandle,
           displayName: resolvedDisplayName,
           email: userEmail,
           redirectToDashboard: false,
         });
+        onCompleted?.(completion);
 
         setState(prev => ({ ...prev, step: 'complete', progress: 100 }));
         setProfileReadyHandle(resolvedHandle);
@@ -396,7 +434,8 @@ export function useOnboardingSubmit({
           setIsEnriching,
           setIsConnecting,
           controller.signal,
-          userId
+          userId,
+          onAutoConnectStarted
         );
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
@@ -415,6 +454,8 @@ export function useOnboardingSubmit({
       shouldAutoSubmitHandle,
       isReservedHandle,
       onboardingStartedAtMs,
+      onAutoConnectStarted,
+      onCompleted,
     ]
   );
 
