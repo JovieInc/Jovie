@@ -7,12 +7,22 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.78] - 2026-03-25
 
+### Changed
+
+- Spotify import link discovery now runs in background — users see their catalog instantly instead of waiting 15-25s for cross-platform link lookup
+- Link discovery parallelized with concurrency limit of 5 (was sequential), reducing wall-clock time from ~25s to ~5s for large catalogs
+- Pre-save cron processes rows concurrently (grouped by refresh token to prevent OAuth races), reducing 500-row processing from ~50s to ~10s
+- Admin leads batch URL processing parallelized with input deduplication
+- HUD metrics polling no longer triggers redundant refetches on tab focus (staleTime increased from 0 to 15s)
+
 ### Added
 
 - Admin releases table at `/app/admin/releases` showing all releases across the platform with server-side pagination, search, and sort
 - Data quality indicators (missing artwork, no providers, no UPC, zero tracks) as inline health pills in the Issues column
 - Non-ASCII-safe search preserving music titles with accented characters
 - Admin sidebar nav entry for Releases with Disc3 icon
+- [internal] `mapConcurrent` utility for concurrent async operations with configurable worker pool limit
+- [internal] Unit tests for `mapConcurrent` (7 test cases covering concurrency, ordering, errors, edge cases)
 
 ## [26.4.77] - 2026-03-25
 
