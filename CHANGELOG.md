@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.78] - 2026-03-26
+
+### Added
+
+- Pitch generation via Jovie chat — artists can ask "generate pitches for [release]" and get Spotify, Apple Music, Amazon Music, and General pitches inline
+- "Generate pitches" suggested prompt in chat (paid plans only, personalized with latest release title)
+- ChatPitchCard component with loading skeleton, success state (4 platforms with copy buttons and char counts), and error state
+- Shared `buildPitchInput()` service extracted from pitch API route (DRY)
+- Optional `instructions` parameter for pitch generation (e.g., "mention my tour")
+- Test-only `/api/admin/test-user/set-plan` endpoint for E2E paid-tier testing
+- E2E test suite for chat pitch generation with plan upgrade/downgrade coverage
+
+### Fixed
+
+- Free-tier plan limitations now list "pitch generation" as a blocked tool
+
 ## [26.4.77] - 2026-03-25
 
 ### Changed
