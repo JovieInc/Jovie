@@ -13,6 +13,7 @@ export interface AuthRouteConfig {
   showMobileTabs: boolean;
   isTableRoute: boolean;
   isArtistProfileSettings: boolean;
+  isDemoRoute: boolean;
 }
 
 /**
@@ -104,5 +105,6 @@ export function useAuthRouteConfig(): AuthRouteConfig {
     showMobileTabs,
     isTableRoute,
     isArtistProfileSettings,
+    isDemoRoute: isDemoReleasesRoute,
   };
 }

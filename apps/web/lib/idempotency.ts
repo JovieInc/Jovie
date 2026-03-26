@@ -30,6 +30,7 @@ export interface IdempotencyResult<T> {
   data?: T;
   error?: string;
   locked?: boolean;
+  backendUnavailable?: boolean;
 }
 
 export class IdempotencyError extends Error {
@@ -40,6 +41,17 @@ export class IdempotencyError extends Error {
     super(message);
     this.name = 'IdempotencyError';
   }
+}
+
+export class IdempotencyBackendUnavailableError extends Error {
+  constructor(public readonly key: string) {
+    super('This action is temporarily unavailable. Please try again later.');
+    this.name = 'IdempotencyBackendUnavailableError';
+  }
+}
+
+export interface IdempotencyOptions {
+  requireBackend?: boolean;
 }
 
 // ============================================================================
@@ -77,17 +89,30 @@ if (typeof setInterval !== 'undefined') {
  * @param ttlSeconds - Lock TTL in seconds
  * @returns true if lock acquired, false if already locked
  */
-async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
+type AcquireLockResult = 'acquired' | 'locked' | 'backend_unavailable';
+
+async function acquireLock(
+  key: string,
+  ttlSeconds: number,
+  options: IdempotencyOptions = {}
+): Promise<AcquireLockResult> {
   const lockKey = `idempotency:${key}`;
   const redis = getRedis();
 
   if (redis) {
-    // Use Redis NX (set if not exists) with expiry
-    const result = await redis.set(lockKey, '1', {
-      nx: true,
-      ex: ttlSeconds,
-    });
-    return result === 'OK';
+    try {
+      const result = await redis.set(lockKey, '1', {
+        nx: true,
+        ex: ttlSeconds,
+      });
+      return result === 'OK' ? 'acquired' : 'locked';
+    } catch {
+      if (options.requireBackend) {
+        return 'backend_unavailable';
+      }
+    }
+  } else if (options.requireBackend) {
+    return 'backend_unavailable';
   }
 
   // Fallback to memory-based locking
@@ -95,11 +120,11 @@ async function acquireLock(key: string, ttlSeconds: number): Promise<boolean> {
   const expiresAt = memoryLocks.get(lockKey);
 
   if (expiresAt && now < expiresAt) {
-    return false; // Already locked
+    return 'locked';
   }
 
   memoryLocks.set(lockKey, now + ttlSeconds * 1000);
-  return true;
+  return 'acquired';
 }
 
 /**
@@ -172,11 +197,16 @@ export async function isLocked(key: string): Promise<boolean> {
 export async function withIdempotency<T>(
   key: string,
   ttlSeconds: number,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options: IdempotencyOptions = {}
 ): Promise<T> {
-  const acquired = await acquireLock(key, ttlSeconds);
+  const acquireResult = await acquireLock(key, ttlSeconds, options);
 
-  if (!acquired) {
+  if (acquireResult === 'backend_unavailable') {
+    throw new IdempotencyBackendUnavailableError(key);
+  }
+
+  if (acquireResult !== 'acquired') {
     throw new IdempotencyError(
       'This action is already in progress. Please wait.',
       key
@@ -223,11 +253,20 @@ export async function withIdempotency<T>(
 export async function tryWithIdempotency<T>(
   key: string,
   ttlSeconds: number,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
+  options: IdempotencyOptions = {}
 ): Promise<IdempotencyResult<T>> {
-  const acquired = await acquireLock(key, ttlSeconds);
+  const acquireResult = await acquireLock(key, ttlSeconds, options);
 
-  if (!acquired) {
+  if (acquireResult === 'backend_unavailable') {
+    return {
+      success: false,
+      backendUnavailable: true,
+      error: 'This action is temporarily unavailable. Please try again later.',
+    };
+  }
+
+  if (acquireResult !== 'acquired') {
     return {
       success: false,
       locked: true,

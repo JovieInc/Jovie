@@ -67,7 +67,12 @@ export function ProfilePreview({
   }));
 
   return (
-    <div className={cn('w-full h-full overflow-hidden rounded-2xl', className)}>
+    <div
+      className={cn(
+        'h-full w-full overflow-hidden rounded-[22px] border border-(--linear-app-frame-seam)',
+        className
+      )}
+    >
       <div className='relative h-full w-full'>
         <StaticArtistPage
           mode='profile'

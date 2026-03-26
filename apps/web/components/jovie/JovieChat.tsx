@@ -329,7 +329,7 @@ export function JovieChat({
   return (
     <div
       ref={dropZoneRef}
-      className='relative flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_18%)]'
+      className='relative flex h-full flex-col bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_14%,transparent),transparent_18%)]'
     >
       {/* Hidden file input for image attachments */}
       <input
@@ -415,10 +415,16 @@ export function JovieChat({
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className='mx-auto max-w-[44rem] pb-7'>
                 <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
+                  <div
+                    data-testid='chat-loading-avatar'
+                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'
+                  >
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-2xl bg-surface-1 px-5 py-3.5'>
+                  <div
+                    data-testid='chat-loading-bubble'
+                    className='rounded-[16px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3'
+                  >
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'
@@ -470,7 +476,7 @@ export function JovieChat({
           )}
 
           {/* Input at bottom */}
-          <div className='border-t border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 py-4 sm:px-5'>
+          <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-4 sm:px-5'>
             <div className='mx-auto max-w-2xl space-y-2'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>
@@ -521,9 +527,9 @@ export function JovieChat({
               {!hasCarouselItems &&
                 (profileCompletion?.percentage ?? 0) >= 100 && (
                   <>
-                    <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-                      <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
-                        {isFirstSession ? 'Workspace ready' : 'Ask Jovie'}
+                    <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-center'>
+                      <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
+                        {isFirstSession ? 'Artist ready' : 'Ask Jovie'}
                       </p>
                       {isFirstSession ? (
                         <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
@@ -563,7 +569,7 @@ export function JovieChat({
           </div>
 
           {/* Input pinned at bottom */}
-          <div className='border-t border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
+          <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
             <div className='mx-auto w-full max-w-2xl space-y-3'>
               {isRateLimited && (
                 <p className='text-xs text-tertiary-token' aria-live='polite'>

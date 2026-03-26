@@ -177,11 +177,11 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
         itemId={id}
         actions={swipeActions}
         actionsWidth={180}
-        className='rounded-2xl'
+        className='rounded-[10px]'
       >
         <div
           className={cn(
-            'flex items-center gap-2 rounded-2xl bg-surface-2 px-3 py-3 sm:gap-3 sm:px-4',
+            'flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
             'transition-all duration-200',
             !visible && 'opacity-50',
             isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'
@@ -192,7 +192,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             <button
               type='button'
               className={cn(
-                'flex h-11 w-11 cursor-grab items-center justify-center rounded-lg sm:h-8 sm:w-8',
+                'flex h-11 w-11 cursor-grab items-center justify-center rounded-[6px] sm:h-8 sm:w-8',
                 'text-tertiary-token transition-colors',
                 'hover:text-secondary-token active:cursor-grabbing active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
@@ -206,7 +206,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Platform icon - larger on mobile */}
           <div
-            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-xl sm:h-10 sm:w-10 sm:rounded-lg'
+            className='flex h-12 w-12 shrink-0 items-center justify-center rounded-[10px] sm:h-10 sm:w-10 sm:rounded-[8px]'
             style={{
               backgroundColor: brandColor,
               color: getContrastTextOnBrand(brandColor),
@@ -220,7 +220,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
 
           {/* Content */}
           <div className='min-w-0 flex-1'>
-            <div className='truncate text-[15px] font-[510] text-primary-token sm:text-[13px]'>
+            <div className='truncate text-[13px] font-[510] text-primary-token'>
               {link.platform.name || link.platform.id}
             </div>
             {handle && (
@@ -236,7 +236,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             aria-label={`Open actions for ${link.platform.name}`}
             ref={floatingRefs.setReference}
             className={cn(
-              'inline-flex h-11 w-11 items-center justify-center rounded-xl sm:h-9 sm:w-9 sm:rounded-full',
+              'inline-flex h-11 w-11 items-center justify-center rounded-[6px] sm:h-9 sm:w-9 sm:rounded-[8px]',
               'text-secondary-token transition-colors',
               'hover:bg-surface-1 hover:text-primary-token',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',

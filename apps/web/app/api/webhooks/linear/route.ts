@@ -218,11 +218,24 @@ export async function POST(request: NextRequest) {
 
     const dedupeKey = `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}:${isPlanReadyEvent ? 'plan' : 'todo'}`;
     dedupeKeyForRetry = dedupeKey;
-    dedupeAcquired = await acquireRecentDispatch(
+    const dedupeResult = await acquireRecentDispatch(
       'linear',
       dedupeKey,
       DEDUPE_TTL_SECONDS
     );
+    dedupeAcquired = dedupeResult.acquired;
+
+    if (dedupeResult.reason === 'backend_unavailable') {
+      await captureCriticalError(
+        'Linear webhook dedupe backend unavailable',
+        new Error('Redis unavailable for webhook dedupe'),
+        { route: '/api/webhooks/linear', issueId }
+      );
+      return NextResponse.json(
+        { error: 'Webhook dedupe unavailable' },
+        { status: 503, headers: NO_STORE_HEADERS }
+      );
+    }
 
     if (!dedupeAcquired) {
       return NextResponse.json(
@@ -264,6 +277,11 @@ export async function POST(request: NextRequest) {
           },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
+        context: 'GitHub repository dispatch for Linear webhook',
+        retry: {
+          maxRetries: 2,
+          baseDelayMs: 500,
+        },
       }
     );
 

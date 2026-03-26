@@ -169,6 +169,15 @@ export const RATE_LIMITERS = {
     analytics: true,
   } satisfies RateLimitConfig,
 
+  /** Deploy promote: 1 request per minute globally */
+  deployPromote: {
+    name: 'Deploy Promote',
+    limit: 1,
+    window: '1 m',
+    prefix: 'admin:deploy-promote',
+    analytics: false,
+  } satisfies RateLimitConfig,
+
   // ---------------------------------------------------------------------------
   // Tracking & Analytics
   // ---------------------------------------------------------------------------
@@ -259,6 +268,15 @@ export const RATE_LIMITERS = {
     limit: 60,
     window: '1 m',
     prefix: 'general',
+    analytics: false,
+  } satisfies RateLimitConfig,
+
+  /** Changelog subscribe: 1 request per 10 seconds per IP */
+  changelogSubscribe: {
+    name: 'Changelog Subscribe',
+    limit: 1,
+    window: '10 s',
+    prefix: 'changelog:subscribe',
     analytics: false,
   } satisfies RateLimitConfig,
 

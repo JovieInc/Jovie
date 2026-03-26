@@ -950,14 +950,29 @@ export default async function middleware(
     pathname === '/clerk'
   ) {
     const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
-    const b64 = pk.replace(/^pk_(live|test)_/, '');
-    const fapiHost = atob(b64).replace(/\$$/, '');
+    let fapiHost = '';
+    try {
+      const b64 = pk.replace(/^pk_(live|test)_/, '');
+      fapiHost = b64 ? atob(b64).replace(/\$$/, '') : '';
+    } catch {
+      // malformed key
+    }
+    if (!fapiHost) {
+      return NextResponse.json(
+        {
+          error: 'Clerk proxy unavailable: missing or invalid publishable key',
+        },
+        { status: 503 }
+      );
+    }
+
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
     const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
 
     const headers = new Headers(req.headers);
     headers.set('host', fapiHost);
     headers.delete('connection');
+    headers.delete('transfer-encoding');
     headers.delete('x-forwarded-host');
     headers.delete('x-forwarded-proto');
     headers.delete('x-forwarded-for');
@@ -966,11 +981,21 @@ export default async function middleware(
     headers.delete('x-real-ip');
     headers.set('origin', `https://${fapiHost}`);
 
+    // For POST/PUT/PATCH, clone the body as an ArrayBuffer to avoid
+    // ReadableStream issues in edge runtime
+    let body: ArrayBuffer | undefined;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try {
+        body = await req.arrayBuffer();
+      } catch {
+        // empty body is fine for some requests
+      }
+    }
+
     const proxyRes = await fetch(targetUrl, {
       method: req.method,
       headers,
-      body:
-        req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      body,
       redirect: 'follow',
     });
 

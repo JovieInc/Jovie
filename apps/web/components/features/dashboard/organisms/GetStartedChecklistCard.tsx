@@ -162,9 +162,9 @@ export function GetStartedChecklistCard({
 
   return (
     <ContentSurfaceCard className='overflow-hidden p-0'>
-      <div className='flex items-center justify-between px-2 py-1'>
+      <div className='flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <div className='flex items-center gap-1.5'>
-          <h3 className='text-[11px] font-[510] text-secondary-token'>
+          <h3 className='text-[12px] font-[510] tracking-[-0.01em] text-primary-token'>
             Get started
           </h3>
           <span className='text-[11px] text-tertiary-token'>
@@ -185,7 +185,7 @@ export function GetStartedChecklistCard({
           <button
             type='button'
             onClick={handleDismiss}
-            className='text-[11px] text-tertiary-token transition-colors hover:text-secondary-token'
+            className='rounded-[8px] border border-transparent px-1.5 py-0.5 text-[11px] text-tertiary-token transition-colors hover:bg-surface-0 hover:text-secondary-token'
           >
             Dismiss
           </button>
@@ -193,16 +193,16 @@ export function GetStartedChecklistCard({
       </div>
 
       {/* Progress bar */}
-      <div className='mx-2 mb-px h-px rounded-full bg-surface-2'>
+      <div className='mx-3 mt-2 h-1 rounded-full bg-surface-0'>
         <div
-          className='h-px rounded-full bg-[var(--linear-accent)] transition-all duration-300'
+          className='h-1 rounded-full bg-[var(--linear-accent)] transition-all duration-300'
           style={{
             width: `${(completedCount / CHECKLIST_ITEMS.length) * 100}%`,
           }}
         />
       </div>
 
-      <ul className='px-1 pb-0.5'>
+      <ul className='px-2 py-2'>
         {CHECKLIST_ITEMS.map(item => {
           const isDone = completed.has(item.id);
 
@@ -223,14 +223,14 @@ export function GetStartedChecklistCard({
               }
             >
               {isDone ? (
-                <Check className='h-2 w-2 text-white' aria-hidden='true' />
+                <Check className='h-2.5 w-2.5 text-white' aria-hidden='true' />
               ) : null}
             </button>
           );
 
           const labelEl = (
             <p
-              className={`min-w-0 flex-1 text-[11px] leading-tight ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
+              className={`min-w-0 flex-1 text-[12px] leading-snug ${isDone ? 'line-through text-tertiary-token' : 'text-secondary-token'}`}
             >
               {item.label}
             </p>
@@ -240,7 +240,7 @@ export function GetStartedChecklistCard({
             return (
               <li
                 key={item.id}
-                className='flex items-center gap-1.5 rounded px-1 py-px hover:bg-surface-0/60'
+                className='flex items-center gap-2 rounded-[8px] px-2 py-1.5 hover:bg-surface-0'
               >
                 {checkboxEl}
                 <Link
@@ -256,8 +256,8 @@ export function GetStartedChecklistCard({
           return (
             <li
               key={item.id}
-              className={`flex items-center gap-1.5 rounded px-1 py-px transition-colors ${
-                isDone ? 'opacity-50' : 'hover:bg-surface-0/60'
+              className={`flex items-center gap-2 rounded-[8px] px-2 py-1.5 transition-colors ${
+                isDone ? 'opacity-50' : 'hover:bg-surface-0'
               }`}
             >
               {checkboxEl}
@@ -269,7 +269,7 @@ export function GetStartedChecklistCard({
                     e.stopPropagation();
                     handleCopyUrl();
                   }}
-                  className='text-[10px] text-tertiary-token transition-colors hover:text-secondary-token'
+                  className='rounded-[8px] border border-transparent px-1.5 py-0.5 text-[10px] text-tertiary-token transition-colors hover:bg-surface-1 hover:text-secondary-token'
                 >
                   Copy
                 </button>

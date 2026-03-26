@@ -8,10 +8,10 @@ import { contentSurfaceCardVariants } from '@/components/molecules/ContentSurfac
  * radii, shadows, and padding across all dashboard components.
  *
  * Design principles (from Linear):
- * 1. Surface hierarchy for depth (0-3 levels)
- * 2. Subtle shadows that respect light/dark modes
- * 3. Flat, non-animated cards — hover uses bg color changes only (no shadow/scale/translate)
- * 4. Perceptually uniform colors via OKLCH
+ * 1. Flat surfaces — all content cards share the parent surface color
+ * 2. Separation via 1px borders only (no shadows on content cards)
+ * 3. Hover uses bg color changes only (no shadow/scale/translate)
+ * 4. Shadows reserved exclusively for popovers/dropdowns
  */
 
 // Animation tokens - Linear-style timing
@@ -82,7 +82,6 @@ export const cardTokens = {
 
     active: tw`
       active:bg-[var(--color-bg-surface-3)]
-      active:shadow-sm
     `,
 
     focus: tw`
@@ -94,11 +93,11 @@ export const cardTokens = {
     `,
   },
 
-  // Glass effects for modern UI depth
+  // Glass effects — reserved for sticky headers/toolbars only (not content cards)
   glass: {
-    subtle: 'backdrop-blur-sm bg-[var(--color-bg-surface-1)]/80',
-    medium: 'backdrop-blur-md bg-[var(--color-bg-surface-1)]/70',
-    strong: 'backdrop-blur-lg bg-[var(--color-bg-surface-1)]/60',
+    subtle: 'backdrop-blur-sm bg-(--linear-app-content-surface)/80',
+    medium: 'backdrop-blur-md bg-(--linear-app-content-surface)/70',
+    strong: 'backdrop-blur-lg bg-(--linear-app-content-surface)/60',
   },
 
   // Status variants for feedback
@@ -148,45 +147,41 @@ export const cardTokens = {
       text-center
     `,
 
-    // Elevated card - stands out with stronger border, responsive padding
+    // Elevated card — flat (same surface as parent, border only)
     elevated: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-default)]
+      bg-(--linear-app-content-surface)
+      border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Floating card - modal-like presence, responsive padding
+    // Floating card — flat with border (shadow only for actual modals/popovers)
     floating: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-default)]
+      bg-(--linear-app-content-surface)
+      border border-(--linear-app-frame-seam)
       rounded-xl
       p-4 sm:p-6
-      shadow-md
-      backdrop-blur-lg
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Onboarding card - gradient border effect, responsive padding
+    // Onboarding card — flat with border
     onboarding: tw`
       relative
-      bg-[var(--color-bg-surface-1)]
+      bg-(--linear-app-content-surface)
+      border border-(--linear-app-frame-seam)
       rounded-2xl
-      shadow-sm
-      ring-1
-      ring-[var(--color-border-subtle)]
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
     `,
 
-    // Feature card - for showcasing features, responsive padding
+    // Feature card — flat with border
     feature: tw`
-      bg-[var(--color-bg-surface-1)]
-      border border-[var(--color-border-subtle)]
+      bg-(--linear-app-content-surface)
+      border border-(--linear-app-frame-seam)
       rounded-2xl
       p-6 sm:p-8
       transition-[background-color,border-color] ${timing.slow} ${timing.easing}
-      hover:border-[var(--color-accent-subtle)]
+      hover:border-[var(--color-border-default)]
     `,
 
     // Compact card - for dense layouts
@@ -210,55 +205,45 @@ export const cardTokens = {
 /**
  * Linear Surface Tokens
  *
- * Shared class strings for the Linear-style surface hierarchy.
- * These use `color-mix(in_oklab)` for perceptually uniform blending
- * between surface levels.
- *
- * Surface depth hierarchy (higher % = closer to the parent surface):
- *   84-86%  — drawer section cards (nested inside sidebars)
- *   88%     — content containers, result items (mid-level nesting)
- *   90%     — banner/callout cards
- *   92%     — dialog inner cards, app shell
- *   94%     — sticky headers (with backdrop blur)
- *   96%     — toolbars, popovers, dropdown menus
+ * Flat surface system matching Linear.app — all content surfaces are
+ * the same level as their parent. Separation is via 1px borders only.
+ * No color-mix depth, no shadows (except popovers).
  */
 export const LINEAR_SURFACE = {
-  /** Drawer section card — used inside sidebars for grouped content.
-   *  Compose with padding/overflow as needed: `cn(LINEAR_SURFACE.drawerCard, 'p-3.5')` */
+  /** Drawer section card — border-separated section inside sidebars. */
   drawerCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Smaller drawer section card — used for inline property groups inside drawer cards. */
+  /** Smaller drawer section card — inline property groups. */
   drawerCardSm:
-    'rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Primary sidebar card — slightly more contrast for header/analytics cards. */
+  /** Primary sidebar card — header/analytics cards in sidebars. */
   sidebarCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
   /** Content container — wraps tables, mobile lists, empty states. */
   contentContainer:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Banner/callout card — slightly quieter than content containers. */
+  /** Banner/callout card. */
   bannerCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Dialog inner card — for card-like sections inside dialogs. */
+  /** Dialog inner card — sections inside dialogs. */
   dialogCard:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
   /** Sticky header — toolbar-like headers with backdrop blur. */
   stickyHeader:
-    'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))]',
+    'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Toolbar / popover / dropdown — highest surface level. */
-  toolbar:
-    'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
+  /** Toolbar / popover / dropdown — same surface. */
+  toolbar: 'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
-  /** Popover container — toolbar surface + shadow + rounded corners. */
+  /** Popover container — the ONE surface that gets a shadow (floats above content). */
   popover:
-    'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_8px_24px_rgba(0,0,0,0.08)]',
 } as const;
 
 // Type exports for TypeScript consumers

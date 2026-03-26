@@ -20,7 +20,7 @@ export async function mapConcurrent<T, R>(
     while (!aborted && nextIndex < items.length) {
       const i = nextIndex++;
       try {
-        results[i] = await fn(items[i]!, i);
+        results[i] = await fn(items[i], i);
       } catch (err) {
         aborted = true;
         throw err;

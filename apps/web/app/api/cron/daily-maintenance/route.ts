@@ -18,7 +18,7 @@
 
 import { NextResponse } from 'next/server';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
-import { env } from '@/lib/env-server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { runReconciliation } from '../billing-reconciliation/route';
@@ -58,13 +58,10 @@ async function runSubJob(
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/daily-maintenance',
+  });
+  if (authError) return authError;
 
   const results: Record<string, SubJobResult> = {};
 

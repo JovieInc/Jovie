@@ -123,11 +123,11 @@ function AuthShellWrapperInner({
   const defaultHeaderAction = useMemo(
     () => (
       <>
-        <HeaderChatUsageIndicator />
+        {!config.isDemoRoute ? <HeaderChatUsageIndicator /> : null}
         <HeaderProfileProgress />
       </>
     ),
-    []
+    [config.isDemoRoute]
   );
   // Wrap page-injected header elements in ErrorBoundary so a throwing badge/action
   // degrades gracefully (renders nothing + toast) instead of crashing the shell.
