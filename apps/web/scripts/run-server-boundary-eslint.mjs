@@ -1,6 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { relative, resolve, sep } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..');
 const webRoot = resolve(import.meta.dirname, '..');
