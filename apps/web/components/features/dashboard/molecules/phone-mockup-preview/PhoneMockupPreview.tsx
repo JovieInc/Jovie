@@ -155,7 +155,7 @@ export function PhoneMockupPreview({
                     <div className='flex items-center gap-3'>
                       <div
                         className={cn(
-                          'shrink-0 w-10 h-10 rounded-[9px]',
+                          'shrink-0 w-10 h-10 rounded-[10px]',
                           'flex items-center justify-center',
                           'bg-surface-0',
                           'text-primary-token',

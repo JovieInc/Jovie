@@ -212,7 +212,7 @@ export const cardTokens = {
 export const LINEAR_SURFACE = {
   /** Drawer section card — border-separated section inside sidebars. */
   drawerCard:
-    'rounded-[9px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
 
   /** Smaller drawer section card — inline property groups. */
   drawerCardSm:

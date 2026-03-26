@@ -500,14 +500,14 @@ export function ProfileContactSidebar() {
               </div>
             </div>
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-              <div className='h-16 rounded-[9px] skeleton' />
-              <div className='h-10 rounded-[9px] skeleton' />
+              <div className='h-16 rounded-[8px] skeleton' />
+              <div className='h-10 rounded-[8px] skeleton' />
             </div>
           </div>
         }
         tabs={
           <div className='flex items-center gap-1'>
-            <div className='h-9 flex-1 rounded-[9px] skeleton' />
+            <div className='h-9 flex-1 rounded-[8px] skeleton' />
             <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
           </div>
         }
@@ -516,7 +516,7 @@ export function ProfileContactSidebar() {
           {[1, 2, 3, 4, 5].map(i => (
             <div
               key={i}
-              className='flex items-center gap-3 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+              className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
             >
               <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
               <div className='flex-1 h-4 rounded skeleton' />

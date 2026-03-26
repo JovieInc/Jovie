@@ -461,11 +461,11 @@ export function PreviewPanel() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[9px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
+                  className='shrink-0 rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -490,7 +490,7 @@ export function PreviewPanel() {
                 </p>
               </div>
 
-              <p className='rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
+              <p className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2 text-[11px] leading-5 text-secondary-token'>
                 {visibleLinkCount} visible link
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile

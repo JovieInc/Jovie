@@ -96,7 +96,7 @@ export function ArtistSelectionForm() {
                 </div>
 
                 {selectedArtist && (
-                  <div className='flex items-center gap-3 rounded-[9px] border border-green-500/30 bg-green-500/10 p-3'>
+                  <div className='flex items-center gap-3 rounded-[10px] border border-green-500/30 bg-green-500/10 p-3'>
                     {selectedArtist.imageUrl ? (
                       <Image
                         src={selectedArtist.imageUrl}

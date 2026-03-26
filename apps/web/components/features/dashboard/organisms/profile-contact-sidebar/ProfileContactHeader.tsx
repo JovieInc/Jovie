@@ -228,7 +228,7 @@ function EditableDisplayName({
         onChange={e => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
-        className='h-8 rounded-[9px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-[560]'
+        className='h-8 rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[14px] font-[560]'
       />
     );
   }

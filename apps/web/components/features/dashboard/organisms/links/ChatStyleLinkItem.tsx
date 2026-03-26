@@ -192,7 +192,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             <button
               type='button'
               className={cn(
-                'flex h-11 w-11 cursor-grab items-center justify-center rounded-[9px] sm:h-8 sm:w-8',
+                'flex h-11 w-11 cursor-grab items-center justify-center rounded-[6px] sm:h-8 sm:w-8',
                 'text-tertiary-token transition-colors',
                 'hover:text-secondary-token active:cursor-grabbing active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent'
@@ -236,7 +236,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
             aria-label={`Open actions for ${link.platform.name}`}
             ref={floatingRefs.setReference}
             className={cn(
-              'inline-flex h-11 w-11 items-center justify-center rounded-[9px] sm:h-9 sm:w-9 sm:rounded-[8px]',
+              'inline-flex h-11 w-11 items-center justify-center rounded-[6px] sm:h-9 sm:w-9 sm:rounded-[8px]',
               'text-secondary-token transition-colors',
               'hover:bg-surface-1 hover:text-primary-token',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',

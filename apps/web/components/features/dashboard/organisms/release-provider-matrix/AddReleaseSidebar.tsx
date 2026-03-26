@@ -158,7 +158,7 @@ export function AddReleaseSidebar({
                 <DrawerMediaThumb
                   src={artworkUrl.trim() || undefined}
                   alt='New release artwork'
-                  sizeClassName='h-[44px] w-[44px] rounded-[9px]'
+                  sizeClassName='h-[44px] w-[44px] rounded-[10px]'
                   sizes='44px'
                   fallback={
                     <Icon
