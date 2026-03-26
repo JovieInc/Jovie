@@ -17,6 +17,12 @@ import {
   getProfilesByUsernames,
 } from '@/lib/services/profile';
 
+/** Normalize a relative URL to absolute, or return undefined if empty. */
+function toAbsoluteUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  return url.startsWith('http') ? url : `${APP_URL}${url}`;
+}
+
 interface BlogPostPageProps {
   readonly params: Promise<{ slug: string }>;
 }
@@ -113,11 +119,7 @@ export default async function BlogPostRoute({
 
     // Build schemas
     // Normalize author URL to absolute
-    const authorUrl = author.profileUrl
-      ? author.profileUrl.startsWith('http')
-        ? author.profileUrl
-        : `${APP_URL}${author.profileUrl}`
-      : undefined;
+    const authorUrl = toAbsoluteUrl(author.profileUrl);
 
     const articleSchema = buildArticleSchema({
       headline: post.title,
