@@ -57,7 +57,7 @@ export default async function ReleasesPage() {
   const profileId = dashboardData.selectedProfile?.id;
   if (profileId) {
     const queryClient = getQueryClient();
-    void queryClient.prefetchQuery({
+    await queryClient.prefetchQuery({
       queryKey: queryKeys.releases.matrix(profileId),
       queryFn: () => loadReleaseMatrix(profileId),
     });

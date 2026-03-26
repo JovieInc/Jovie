@@ -44,7 +44,7 @@ export default async function EarningsPage() {
 
     // Prefetch earnings into TanStack Query for SPA navigation cache
     const queryClient = getQueryClient();
-    void queryClient.prefetchQuery({
+    await queryClient.prefetchQuery({
       queryKey: queryKeys.earnings.stats(),
       queryFn: async () => {
         // Earnings data is fetched client-side via API — seed with dashboard tipping stats

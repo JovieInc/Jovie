@@ -30,10 +30,13 @@ export function prefetchForRoute(
       });
       break;
     case 'audience':
-      // Audience uses cursor-based pagination — prefetch just checks
-      // the base key in cache. Full data fetched on page load.
+      // Audience uses cursor-based pagination — prefetch the first page
       queryClient.prefetchQuery({
         queryKey: queryKeys.audience.members(profileId),
+        queryFn: () =>
+          fetchWithTimeout<unknown>(
+            `/api/dashboard/audience/members?profileId=${encodeURIComponent(profileId)}`
+          ),
         staleTime,
       });
       break;
