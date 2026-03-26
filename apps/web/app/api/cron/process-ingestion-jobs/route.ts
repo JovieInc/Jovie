@@ -8,7 +8,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/env-server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
@@ -26,13 +26,10 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const MAX_CONCURRENT_JOBS = 3;
 
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/process-ingestion-jobs',
+  });
+  if (authError) return authError;
 
   const now = new Date();
   let processed = 0;
