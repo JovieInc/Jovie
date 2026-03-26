@@ -1,9 +1,6 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-} from '@tanstack/react-table';
+import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
