@@ -231,6 +231,25 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+type ViewState = 'loading' | 'listen-now' | 'pending' | 'subscribed' | 'form';
+
+/** Determine which view state the notification CTA should render. */
+function resolveViewState(
+  hydrationStatus: string,
+  notificationsEnabled: boolean,
+  notificationsState: string,
+  autoOpen: boolean,
+  hasSubscriptions: boolean
+): ViewState {
+  if (hydrationStatus === 'checking') return 'loading';
+  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
+    return 'listen-now';
+  }
+  if (notificationsState === 'pending_confirmation') return 'pending';
+  if (notificationsState === 'success' && hasSubscriptions) return 'subscribed';
+  return 'form';
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -296,20 +315,20 @@ export function ArtistNotificationsCTA({
   const shouldShowCountrySelector =
     otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
 
-  // Show loading skeleton while checking subscription status
-  if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
-  }
+  const viewState = resolveViewState(
+    hydrationStatus,
+    notificationsEnabled,
+    notificationsState,
+    autoOpen,
+    hasSubscriptions
+  );
 
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
+  if (viewState === 'loading') return <SubscriptionFormSkeleton />;
+  if (viewState === 'listen-now') {
     return <ListenNowCTA variant={variant} handle={artist.handle} />;
   }
-
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
-  }
-
-  if (isSubscribed) {
+  if (viewState === 'pending') return <SubscriptionPendingConfirmation />;
+  if (viewState === 'subscribed') {
     return (
       <SubscriptionSuccess
         artistName={artist.name}

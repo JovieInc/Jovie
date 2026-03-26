@@ -68,6 +68,88 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Persist a newly added link to the server, handling optimistic rollback on failure. */
+async function persistNewLink(params: {
+  profileId: string;
+  link: DetectedLink;
+  optimisticLinkId: string;
+  pendingAdds: Set<string>;
+  deletedWhilePending: Set<string>;
+  previewDataRef: React.RefObject<
+    ReturnType<typeof usePreviewPanelData>['previewData']
+  >;
+  setPreviewData: ReturnType<typeof usePreviewPanelData>['setPreviewData'];
+  removeLinkMutation: ReturnType<typeof useRemoveSocialLinkMutation>;
+}): Promise<void> {
+  const {
+    profileId,
+    link,
+    optimisticLinkId,
+    pendingAdds,
+    deletedWhilePending,
+    previewDataRef,
+    setPreviewData,
+    removeLinkMutation,
+  } = params;
+
+  pendingAdds.add(optimisticLinkId);
+  try {
+    const response = await fetch('/api/chat/confirm-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profileId,
+        platform: link.platform.id,
+        url: link.originalUrl,
+        normalizedUrl: link.normalizedUrl,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to add link');
+    }
+
+    const { linkId } = (await response.json()) as { linkId: string };
+
+    if (deletedWhilePending.has(optimisticLinkId)) {
+      deletedWhilePending.delete(optimisticLinkId);
+      if (linkId) {
+        removeLinkMutation.mutate({ profileId, linkId }, { onError: () => {} });
+      }
+      return;
+    }
+
+    if (linkId) {
+      const current = previewDataRef.current;
+      if (current) {
+        setPreviewData({
+          ...current,
+          links: current.links.map(l =>
+            l.id === optimisticLinkId ? { ...l, id: linkId } : l
+          ),
+        });
+      }
+    }
+
+    toast.success(`${link.platform.name} link added`);
+  } catch {
+    if (deletedWhilePending.has(optimisticLinkId)) {
+      deletedWhilePending.delete(optimisticLinkId);
+      return;
+    }
+    const current = previewDataRef.current;
+    if (current) {
+      setPreviewData({
+        ...current,
+        links: current.links.filter(l => l.id !== optimisticLinkId),
+      });
+    }
+    toast.error('Failed to add link');
+  } finally {
+    pendingAdds.delete(optimisticLinkId);
+  }
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -75,7 +157,9 @@ export function ProfileContactSidebar() {
 
   // Keep a ref to the latest previewData so async callbacks avoid stale closures
   const previewDataRef = useRef(previewData);
-  previewDataRef.current = previewData;
+  useEffect(() => {
+    previewDataRef.current = previewData;
+  });
 
   // Tab state
   const [selectedCategory, setSelectedCategory] = useState<
@@ -292,70 +376,16 @@ export function ProfileContactSidebar() {
       if (targetCategory) setSelectedCategory(targetCategory);
 
       // Save to server via confirm-link endpoint
-      pendingAddsRef.current.add(optimisticLink.id);
-      try {
-        const response = await fetch('/api/chat/confirm-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: selectedProfile.id,
-            platform: link.platform.id,
-            url: link.originalUrl,
-            normalizedUrl: link.normalizedUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add link');
-        }
-
-        const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
-          optimisticLink.id
-        );
-
-        if (wasDeletedWhilePending) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
-            removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
-              { onError: () => {} }
-            );
-          }
-          return;
-        }
-
-        if (linkId) {
-          const current = previewDataRef.current;
-          if (current) {
-            setPreviewData({
-              ...current,
-              links: current.links.map(l =>
-                l.id === optimisticLink.id ? { ...l, id: linkId } : l
-              ),
-            });
-          }
-        }
-
-        toast.success(`${link.platform.name} link added`);
-      } catch {
-        // If deleted while pending, the UI is already correct (link removed)
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          return;
-        }
-        // Revert on failure
-        const current = previewDataRef.current;
-        if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.filter(l => l.id !== optimisticLink.id),
-          });
-        }
-        toast.error('Failed to add link');
-      } finally {
-        pendingAddsRef.current.delete(optimisticLink.id);
-      }
+      await persistNewLink({
+        profileId: selectedProfile.id,
+        link,
+        optimisticLinkId: optimisticLink.id,
+        pendingAdds: pendingAddsRef.current,
+        deletedWhilePending: deletedWhilePendingRef.current,
+        previewDataRef,
+        setPreviewData,
+        removeLinkMutation,
+      });
     },
     [
       selectedProfile,

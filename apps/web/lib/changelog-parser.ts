@@ -64,47 +64,60 @@ function hasPublicEntries(release: ChangelogRelease): boolean {
  *
  * Filters out `[internal]` entries and releases with zero public entries.
  */
+interface ParseState {
+  current: ChangelogRelease | null;
+  currentSection: keyof ChangelogSection | null;
+}
+
+/** Process a single line and update parse state. Returns the new release if one was started. */
+function processLine(line: string, state: ParseState): ChangelogRelease | null {
+  const versionResult = parseVersionHeading(line);
+  if (versionResult === 'unreleased') {
+    state.current = null;
+    state.currentSection = null;
+    return null;
+  }
+  if (versionResult) {
+    state.current = versionResult;
+    state.currentSection = null;
+    return versionResult;
+  }
+
+  if (!state.current) return null;
+
+  if (
+    !state.currentSection &&
+    line.startsWith('> ') &&
+    !state.current.summary
+  ) {
+    state.current.summary = line.slice(2).trim();
+    return null;
+  }
+
+  const sMatch = SECTION_HEADING_RE.exec(line);
+  if (sMatch) {
+    state.currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
+    return null;
+  }
+
+  const trimmed = line.trim();
+  if (trimmed.startsWith('- ') && state.currentSection) {
+    const entry = trimmed.slice(2);
+    if (isPublicEntry(entry)) {
+      state.current.sections[state.currentSection].push(entry);
+    }
+  }
+  return null;
+}
+
 export function parseChangelog(markdown: string): ChangelogRelease[] {
   const lines = markdown.split('\n');
   const releases: ChangelogRelease[] = [];
-  let current: ChangelogRelease | null = null;
-  let currentSection: keyof ChangelogSection | null = null;
+  const state: ParseState = { current: null, currentSection: null };
 
   for (const line of lines) {
-    const versionResult = parseVersionHeading(line);
-    if (versionResult === 'unreleased') {
-      current = null;
-      currentSection = null;
-      continue;
-    }
-    if (versionResult) {
-      current = versionResult;
-      releases.push(current);
-      currentSection = null;
-      continue;
-    }
-
-    if (!current) continue;
-
-    // Capture summary blockquote (before any section heading)
-    if (!currentSection && line.startsWith('> ') && !current.summary) {
-      current.summary = line.slice(2).trim();
-      continue;
-    }
-
-    const sMatch = SECTION_HEADING_RE.exec(line);
-    if (sMatch) {
-      currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
-      continue;
-    }
-
-    const trimmed = line.trim();
-    if (trimmed.startsWith('- ') && currentSection) {
-      const entry = trimmed.slice(2);
-      if (isPublicEntry(entry)) {
-        current.sections[currentSection].push(entry);
-      }
-    }
+    const newRelease = processLine(line, state);
+    if (newRelease) releases.push(newRelease);
   }
 
   return releases.filter(hasPublicEntries);
