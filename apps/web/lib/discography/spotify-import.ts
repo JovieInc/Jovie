@@ -24,8 +24,8 @@ import {
   sanitizeName,
   sanitizeText,
 } from '@/lib/spotify/sanitize';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import { spotifyArtistIdSchema } from '@/lib/validation/schemas/spotify';
-
 import {
   parseArtistCredits,
   parseMainArtists,
@@ -102,8 +102,8 @@ export interface SpotifyImportOptions {
   includeTracks?: boolean;
   /** Market for availability. Defaults to 'US' */
   market?: string;
-  /** Discover cross-platform links after import. Defaults to true */
-  discoverLinks?: boolean;
+  /** Discover cross-platform links after import. Defaults to 'background' */
+  discoverLinks?: boolean | 'sync' | 'background';
 }
 
 /**
@@ -115,7 +115,7 @@ async function discoverLinksForReleases(
 ): Promise<void> {
   const importedReleases = await getReleasesForProfile(creatorProfileId);
 
-  for (const release of importedReleases) {
+  await mapConcurrent(importedReleases, 5, async release => {
     try {
       // Only count canonical/manual links as existing — search fallback URLs
       // should be upgraded to canonical links via ISRC/UPC discovery.
@@ -138,7 +138,7 @@ async function discoverLinksForReleases(
         data: { releaseId: release.id, error },
       });
     }
-  }
+  });
 }
 
 /**
@@ -241,9 +241,17 @@ export async function importReleasesFromSpotify(
   const {
     includeGroups = ['album', 'single', 'compilation'],
     includeTracks = true, // Default to true for ISRC discovery
-    discoverLinks = true,
+    discoverLinks: discoverLinksOpt = 'background',
     market = 'US',
   } = options;
+
+  // Normalize legacy boolean values to the new string union
+  const discoverLinksMode =
+    discoverLinksOpt === true
+      ? 'background'
+      : discoverLinksOpt === false
+        ? false
+        : discoverLinksOpt;
 
   const result: SpotifyImportResult = {
     success: false,
@@ -376,8 +384,21 @@ export async function importReleasesFromSpotify(
         }
 
         // 5. Discover cross-platform links
-        if (discoverLinks && includeTracks) {
-          await discoverLinksForReleases(creatorProfileId, market);
+        if (discoverLinksMode && includeTracks) {
+          if (discoverLinksMode === 'sync') {
+            await discoverLinksForReleases(creatorProfileId, market);
+          } else {
+            // Fire-and-forget: return import result immediately,
+            // cross-platform links populate in background
+            void discoverLinksForReleases(creatorProfileId, market).catch(
+              error => {
+                captureWarning('Background link discovery failed', error, {
+                  source: 'spotify_import',
+                  creatorProfileId,
+                });
+              }
+            );
+          }
         }
 
         // 6. Fetch the final state
