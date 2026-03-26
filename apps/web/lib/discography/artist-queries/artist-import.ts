@@ -16,21 +16,23 @@ import { deleteReleaseArtists, upsertReleaseArtist } from './release-artists';
 import { deleteTrackArtists, upsertTrackArtist } from './track-artists';
 import type { ArtistWithRole } from './types';
 
+type ArtistImportSourceType = 'manual' | 'admin' | 'ingested';
+
+type ArtistImportOptions = {
+  deleteExisting?: boolean;
+  sourceType?: ArtistImportSourceType;
+};
+
 /**
  * Process parsed artist credits for a track
  *
  * Creates/updates artist records and track-artist relationships.
  * The neon-http driver does not support transactions.
  */
-type CreditSourceType = 'manual' | 'admin' | 'ingested';
-
 export async function processTrackArtistCredits(
   trackId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: CreditSourceType;
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -88,10 +90,7 @@ export async function processTrackArtistCredits(
 export async function processReleaseArtistCredits(
   releaseId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
@@ -147,10 +146,7 @@ export async function processReleaseArtistCredits(
 export async function processRecordingArtistCredits(
   recordingId: string,
   credits: ParsedArtistCredit[],
-  options?: {
-    deleteExisting?: boolean;
-    sourceType?: 'manual' | 'admin' | 'ingested';
-  }
+  options?: ArtistImportOptions
 ): Promise<ArtistWithRole[]> {
   const { deleteExisting = true, sourceType = 'ingested' } = options ?? {};
 
