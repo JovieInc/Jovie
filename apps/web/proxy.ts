@@ -927,11 +927,13 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: fetch-based proxy to distinct-giraffe-5.clerk.accounts.dev.
-  // Both staging and production use the same Clerk instance.
-  // We use fetch() instead of NextResponse.rewrite() or vercel.json rewrites
-  // because both of those forward the original Host header (jov.ie) instead
-  // of the target host, causing Clerk to return 400 "Invalid host".
+  // Clerk FAPI proxy: fetch-based proxy that decodes the FAPI host from the
+  // publishable key. We use fetch() instead of NextResponse.rewrite() or
+  // vercel.json rewrites because both forward the original Host header (jov.ie)
+  // instead of the target host, causing Clerk to return 400 "Invalid host".
+  //
+  // Production PK encodes clerk.jov.ie, staging encodes clerk.staging.jov.ie,
+  // dev encodes distinct-giraffe-5.clerk.accounts.dev.
   // ========================================================================
   if (
     pathname.startsWith('/__clerk/') ||
@@ -939,12 +941,18 @@ export default async function middleware(
     pathname.startsWith('/clerk/') ||
     pathname === '/clerk'
   ) {
-    const CLERK_FAPI = 'https://distinct-giraffe-5.clerk.accounts.dev';
+    // Decode FAPI host from the environment-appropriate publishable key
+    const { publishableKey } = resolveClerkKeys(hostname);
+    const pkPayload = (publishableKey || '').replace(/^pk_(live|test)_/, '');
+    // Clerk base64-encodes the FAPI domain with a trailing $
+    const fapiHost = atob(pkPayload).replace(/\$$/, '');
+    const fapiUrl = `https://${fapiHost}`;
+
     const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
-    const targetUrl = `${CLERK_FAPI}/${subpath}${req.nextUrl.search}`;
+    const targetUrl = `${fapiUrl}/${subpath}${req.nextUrl.search}`;
 
     const headers = new Headers(req.headers);
-    headers.set('host', 'distinct-giraffe-5.clerk.accounts.dev');
+    headers.set('host', fapiHost);
     headers.delete('connection');
 
     const proxyRes = await fetch(targetUrl, {

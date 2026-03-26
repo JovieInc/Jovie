@@ -771,19 +771,18 @@ The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Cler
 
 **How the proxy works:**
 - Middleware in `proxy.ts` intercepts `/__clerk/*` and `/clerk/*` paths
-- Uses `fetch()` to proxy to `distinct-giraffe-5.clerk.accounts.dev` with the correct `Host` header
-- This works for ALL environments because they all use the same Clerk instance
-- `vercel.json` also has matching rewrites as a fallback
+- Decodes the FAPI host from the publishable key (base64 payload minus trailing `$`)
+- Uses `fetch()` to proxy with the correct `Host` header set to the decoded FAPI host
+- Production PK → `clerk.jov.ie`, Staging PK → `clerk.staging.jov.ie`, Dev PK → `distinct-giraffe-5.clerk.accounts.dev`
+- `vercel.json` also has matching rewrites as a fallback but they don't set Host correctly
 
 **DO NOT:**
 - Use `NextResponse.rewrite()` for clerk paths — Vercel doesn't set the Host header correctly, causing Clerk 400 "Invalid host"
 - Use `vercel.json` rewrites as the primary mechanism — same Host header problem
-- Reference `clerk.jov.ie` or `clerk.staging.jov.ie` — these domains are dead
-- Create separate staging Clerk keys/instances — there is only one instance
-- Add `isStagingHost()` checks for Clerk routing — not needed, same instance everywhere
+- Hardcode the FAPI host — it must be decoded from the publishable key at runtime
 
 **If Clerk auth breaks:**
-1. Check the `fetch()` proxy in `proxy.ts` sets `Host: distinct-giraffe-5.clerk.accounts.dev`
+1. Check the `fetch()` proxy in `proxy.ts` decodes the FAPI host from the publishable key
 2. Check the publishable key in Doppler (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`)
 3. Check CSP allows `distinct-giraffe-5.clerk.accounts.dev` in connect-src, script-src, frame-src
 
