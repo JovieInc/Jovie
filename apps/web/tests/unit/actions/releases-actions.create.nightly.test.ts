@@ -15,7 +15,11 @@ const {
   mockGetReleasesForProfile,
   mockThrowIfRedirect,
   mockDbSelect,
+  mockDbInsert,
+  mockDbInsertValues,
+  mockDbInsertReturning,
   mockDbUpdate,
+  mockGetReleaseById,
   mockCaptureError,
   mockTrackServerEvent,
 } = vi.hoisted(() => ({
@@ -30,7 +34,11 @@ const {
   mockGetReleasesForProfile: vi.fn(),
   mockThrowIfRedirect: vi.fn(),
   mockDbSelect: vi.fn(),
+  mockDbInsert: vi.fn(),
+  mockDbInsertValues: vi.fn(),
+  mockDbInsertReturning: vi.fn(),
   mockDbUpdate: vi.fn(),
+  mockGetReleaseById: vi.fn(),
   mockCaptureError: vi.fn(),
   mockTrackServerEvent: vi.fn(),
 }));
@@ -61,6 +69,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/db', () => ({
   db: {
     select: mockDbSelect,
+    insert: mockDbInsert,
     update: mockDbUpdate,
   },
 }));
@@ -79,7 +88,7 @@ vi.mock('@/lib/discography/config', () => ({
 }));
 
 vi.mock('@/lib/discography/queries', () => ({
-  getReleaseById: vi.fn(),
+  getReleaseById: mockGetReleaseById,
   getReleasesForProfile: mockGetReleasesForProfile,
   getTracksForReleaseWithProviders: vi.fn(),
   upsertProviderLink: vi.fn(),
@@ -251,6 +260,16 @@ function setupDbUpdateChain() {
   });
 }
 
+function setupDbInsertChain(result: unknown[]) {
+  mockDbInsertValues.mockReturnValue({
+    returning: mockDbInsertReturning,
+  });
+  mockDbInsertReturning.mockResolvedValue(result);
+  mockDbInsert.mockReturnValue({
+    values: mockDbInsertValues,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -258,7 +277,11 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDbSelect.mockReset();
+    mockDbInsert.mockReset();
+    mockDbInsertValues.mockReset();
+    mockDbInsertReturning.mockReset();
     mockDbUpdate.mockReset();
+    mockGetReleaseById.mockReset();
     mockGetCachedAuth.mockResolvedValue({ userId: MOCK_USER_ID });
     mockGetDashboardData.mockResolvedValue(makeDashboardData());
     mockRedirect.mockImplementation((url: string) => {
@@ -409,6 +432,85 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
       expect(result.success).toBe(false);
       expect(result.message).toBe('Spotify API rate limited');
       expect(result.errors).toContain('Spotify API rate limited');
+    });
+  });
+
+  // =========================================================================
+  // createRelease
+  // =========================================================================
+  describe('createRelease', () => {
+    it('persists genres and explicit state, then returns the mapped release', async () => {
+      setupDbInsertChain([{ id: 'rel_999' }]);
+      mockGetReleaseById.mockResolvedValue(
+        makeRelease({
+          id: 'rel_999',
+          title: 'Future Echoes',
+          slug: 'future-echoes',
+          providerLinks: [],
+          genres: ['indie pop', 'alt-pop'],
+          isExplicit: true,
+          releaseDate: new Date('2026-04-01T00:00:00.000Z'),
+        })
+      );
+
+      const { createRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await createRelease({
+        title: 'Future Echoes',
+        releaseType: 'single',
+        releaseDate: '2026-04-01',
+        genres: ['indie pop', 'alt-pop', 'synth pop', 'overflow'],
+        isExplicit: true,
+      });
+
+      expect(mockDbInsertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Future Echoes',
+          releaseType: 'single',
+          genres: ['indie pop', 'alt-pop', 'synth pop'],
+          isExplicit: true,
+          totalTracks: 1,
+        })
+      );
+      expect(result).toMatchObject({
+        success: true,
+        releaseId: 'rel_999',
+      });
+      expect(result.release).toMatchObject({
+        id: 'rel_999',
+        title: 'Future Echoes',
+        isExplicit: true,
+        genres: ['indie pop', 'alt-pop'],
+      });
+    });
+
+    it('returns the existing duplicate-slug failure message', async () => {
+      mockDbInsertValues.mockReturnValue({
+        returning: vi.fn().mockRejectedValue({
+          code: '23505',
+          constraint: 'discog_releases_creator_slug_unique',
+          message:
+            'duplicate key value violates unique constraint "discog_releases_creator_slug_unique"',
+        }),
+      });
+      mockDbInsert.mockReturnValue({
+        values: mockDbInsertValues,
+      });
+
+      const { createRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await createRelease({
+        title: 'Future Echoes',
+        releaseType: 'single',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        message:
+          'A release with the slug "future-echoes" already exists. Please choose a different title.',
+      });
     });
   });
 
