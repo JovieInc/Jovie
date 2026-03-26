@@ -88,10 +88,7 @@ export async function isSlugAvailable(
   // Reserved track slugs conflict with static route segments (e.g. /sounds/)
   // Only block for tracks — releases at /{handle}/{slug} don't collide
   const ct = options?.contentType;
-  if (
-    (ct === 'track' || ct === 'release_track') &&
-    RESERVED_TRACK_SLUGS.has(slug)
-  )
+  if ((ct === 'track' || ct === 'release_track') && isReservedTrackSlug(slug))
     return false;
 
   const { excludeReleaseId, excludeTrackId, excludeRecordingId } =

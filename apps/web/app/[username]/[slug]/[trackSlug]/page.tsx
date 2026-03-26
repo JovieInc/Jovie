@@ -263,6 +263,16 @@ export async function generateMetadata({
     return { title: 'Not Found' };
   }
 
+  // Mirror the unreleased guard from the page component (cache() means no extra DB cost)
+  const isUnreleased =
+    track.releaseDate && new Date(track.releaseDate) > new Date();
+  if (isUnreleased) {
+    const creatorPlan = await getCreatorPlan(creator.id);
+    if (!creatorPlan.canAccessFutureReleases) {
+      return { title: 'Not Found' };
+    }
+  }
+
   const artistName = creator.displayName ?? creator.username;
   const canonicalUrl = `${BASE_URL}/${creator.usernameNormalized}/${slug}/${trackSlug}`;
 

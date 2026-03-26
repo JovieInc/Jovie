@@ -536,41 +536,39 @@ export const getTrackBySlugInRelease = cache(
       .limit(1);
 
     if (releaseTrack) {
-      // Get recording for preview URL + canonical title fallback
-      const [recording] = await db
-        .select({
-          title: discogRecordings.title,
-          previewUrl: discogRecordings.previewUrl,
-        })
-        .from(discogRecordings)
-        .where(eq(discogRecordings.id, releaseTrack.recordingId))
-        .limit(1);
-
-      // Get release data for artwork + metadata
-      const [releaseData] = await db
-        .select({
-          artworkUrl: discogReleases.artworkUrl,
-          releaseDate: discogReleases.releaseDate,
-          slug: discogReleases.slug,
-          title: discogReleases.title,
-        })
-        .from(discogReleases)
-        .where(eq(discogReleases.id, releaseId))
-        .limit(1);
-
-      // Get provider links for this release-track
-      const links = await db
-        .select({
-          providerId: providerLinks.providerId,
-          url: providerLinks.url,
-        })
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'release_track'),
-            eq(providerLinks.releaseTrackId, releaseTrack.id)
-          )
-        );
+      // Fetch recording, release data, and provider links in parallel
+      const [[recording], [releaseData], links] = await Promise.all([
+        db
+          .select({
+            title: discogRecordings.title,
+            previewUrl: discogRecordings.previewUrl,
+          })
+          .from(discogRecordings)
+          .where(eq(discogRecordings.id, releaseTrack.recordingId))
+          .limit(1),
+        db
+          .select({
+            artworkUrl: discogReleases.artworkUrl,
+            releaseDate: discogReleases.releaseDate,
+            slug: discogReleases.slug,
+            title: discogReleases.title,
+          })
+          .from(discogReleases)
+          .where(eq(discogReleases.id, releaseId))
+          .limit(1),
+        db
+          .select({
+            providerId: providerLinks.providerId,
+            url: providerLinks.url,
+          })
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'release_track'),
+              eq(providerLinks.releaseTrackId, releaseTrack.id)
+            )
+          ),
+      ]);
 
       return {
         type: 'track',
@@ -605,29 +603,30 @@ export const getTrackBySlugInRelease = cache(
       .limit(1);
 
     if (legacyTrack) {
-      const [releaseData] = await db
-        .select({
-          artworkUrl: discogReleases.artworkUrl,
-          releaseDate: discogReleases.releaseDate,
-          slug: discogReleases.slug,
-          title: discogReleases.title,
-        })
-        .from(discogReleases)
-        .where(eq(discogReleases.id, releaseId))
-        .limit(1);
-
-      const links = await db
-        .select({
-          providerId: providerLinks.providerId,
-          url: providerLinks.url,
-        })
-        .from(providerLinks)
-        .where(
-          and(
-            eq(providerLinks.ownerType, 'track'),
-            eq(providerLinks.trackId, legacyTrack.id)
-          )
-        );
+      const [[releaseData], links] = await Promise.all([
+        db
+          .select({
+            artworkUrl: discogReleases.artworkUrl,
+            releaseDate: discogReleases.releaseDate,
+            slug: discogReleases.slug,
+            title: discogReleases.title,
+          })
+          .from(discogReleases)
+          .where(eq(discogReleases.id, releaseId))
+          .limit(1),
+        db
+          .select({
+            providerId: providerLinks.providerId,
+            url: providerLinks.url,
+          })
+          .from(providerLinks)
+          .where(
+            and(
+              eq(providerLinks.ownerType, 'track'),
+              eq(providerLinks.trackId, legacyTrack.id)
+            )
+          ),
+      ]);
 
       return {
         type: 'track',
