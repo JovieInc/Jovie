@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.76] - 2026-03-25
+
+### Changed
+
+- Settings pages now use a cleaner layout — flat section headers replace nested cards, eliminating redundant title bars
+- Arrow keys in admin tables now update the detail panel immediately without requiring a click
+
+### Removed
+
+- [internal] Removed 1,100+ lines of dead settings code (SettingsPolished, DashboardSettings, passthrough wrappers)
+
 ## [26.4.75] - 2026-03-25
 
 ### Fixed
