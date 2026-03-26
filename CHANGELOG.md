@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.75] - 2026-03-25
+
+### Fixed
+
+- Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
+- [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
+
 ## [26.4.74] - 2026-03-25
 
 ### Fixed

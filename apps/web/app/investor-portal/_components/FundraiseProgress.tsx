@@ -37,25 +37,13 @@ export function FundraiseProgress({
   return (
     <div className='flex flex-1 flex-col gap-1.5'>
       {/* Progress bar — 4px thin, accent fill */}
-      <div
-        className='h-1 w-full overflow-hidden rounded-full'
+      <progress
+        className='h-1 w-full appearance-none overflow-hidden rounded-full [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[var(--color-accent)] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[var(--color-bg-surface-2)] [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[var(--color-accent)] [&::-webkit-progress-value]:transition-all'
         style={{ background: 'var(--color-bg-surface-2)' }}
-        role='progressbar'
-        aria-valuenow={percentage}
-        aria-valuemin={0}
-        aria-valuemax={100}
+        value={percentage}
+        max={100}
         aria-label={`${formatAmount(committedAmount)} of ${formatAmount(raiseTarget)} committed`}
-      >
-        <div
-          className='h-full rounded-full transition-all'
-          style={{
-            width: `${percentage}%`,
-            background: 'var(--color-accent)',
-            transitionDuration: 'var(--duration-slower)',
-            transitionTimingFunction: 'var(--ease-out)',
-          }}
-        />
-      </div>
+      />
 
       {/* Text */}
       <p className='text-[length:var(--text-xs)] font-[510] text-[var(--color-text-tertiary-token)]'>

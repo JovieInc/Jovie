@@ -17,6 +17,18 @@ import {
 
 export type ContentType = 'release' | 'track' | 'release_track';
 
+/** Map a content type + ID to the correct slug exclusion option. */
+function buildExcludeOptions(contentType: ContentType, id?: string) {
+  switch (contentType) {
+    case 'release':
+      return { excludeReleaseId: id };
+    case 'release_track':
+      return { excludeRecordingId: id };
+    case 'track':
+      return { excludeTrackId: id };
+  }
+}
+
 /**
  * Generate a URL-safe slug from a title.
  * No longer appends Spotify ID suffix - uses collision numbering instead.
@@ -143,12 +155,7 @@ export async function generateUniqueSlug(
     return `untitled-${Date.now().toString(36)}`;
   }
 
-  const excludeOptions =
-    contentType === 'release'
-      ? { excludeReleaseId: existingId }
-      : contentType === 'release_track'
-        ? { excludeRecordingId: existingId }
-        : { excludeTrackId: existingId };
+  const excludeOptions = buildExcludeOptions(contentType, existingId);
 
   // Try the base slug first
   if (await isSlugAvailable(creatorProfileId, baseSlug, excludeOptions)) {
@@ -361,12 +368,7 @@ export async function updateSlugWithRedirect(params: {
   }
 
   // Check if the new slug is available
-  const excludeOptions =
-    contentType === 'release'
-      ? { excludeReleaseId: contentId }
-      : contentType === 'release_track'
-        ? { excludeRecordingId: contentId }
-        : { excludeTrackId: contentId };
+  const excludeOptions = buildExcludeOptions(contentType, contentId);
 
   const available = await isSlugAvailable(
     creatorProfileId,

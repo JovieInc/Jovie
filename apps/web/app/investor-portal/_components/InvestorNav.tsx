@@ -129,12 +129,11 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
           />
 
           {/* Sheet panel */}
-          <nav
+          <dialog
             id='mobile-nav'
-            role='dialog'
-            aria-modal='true'
+            open
             aria-label='Navigation'
-            className='absolute bottom-0 left-0 top-0 w-64 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-0)] px-3 py-6'
+            className='absolute bottom-0 left-0 top-0 m-0 w-64 border-r border-[var(--color-border-subtle)] bg-[var(--color-bg-surface-0)] px-3 py-6'
           >
             {/* Branding */}
             <div className='mb-8 flex items-center justify-between px-2'>
@@ -163,7 +162,7 @@ export function InvestorNav({ investorName, pages }: InvestorNavProps) {
             </div>
 
             {navLinks}
-          </nav>
+          </dialog>
         </div>
       )}
     </>

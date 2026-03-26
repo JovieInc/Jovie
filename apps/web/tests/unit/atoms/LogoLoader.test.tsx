@@ -56,6 +56,7 @@ describe('LogoLoader', () => {
 
   it('has no a11y violations', async () => {
     const { container } = render(<LogoLoader />);
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });

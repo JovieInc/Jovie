@@ -115,6 +115,7 @@ describe('BrandLogo', () => {
 
   it('passes a11y checks', async () => {
     const { container } = render(<BrandLogo />);
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });
