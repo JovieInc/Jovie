@@ -5,7 +5,7 @@ import Script from 'next/script';
 import React from 'react';
 import { DevToolbarGate } from '@/components/features/dev/DevToolbarGate';
 import { CoreProviders } from '@/components/providers/CoreProviders';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
@@ -54,21 +54,21 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(APP_URL),
+  metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: APP_URL,
+    url: BASE_URL,
     title: APP_NAME,
     description:
       'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
     siteName: APP_NAME,
     images: [
       {
-        url: `${APP_URL}/og/default.png`,
+        url: `${BASE_URL}/og/default.png`,
         width: 1200,
         height: 630,
         alt: APP_NAME,
@@ -80,7 +80,7 @@ export const metadata: Metadata = {
     title: APP_NAME,
     description:
       'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-    images: [`${APP_URL}/og/default.png`],
+    images: [`${BASE_URL}/og/default.png`],
     creator: '@jovieapp',
     site: '@jovieapp',
   },
@@ -233,14 +233,14 @@ export default async function RootLayout({
               '@type': 'WebSite',
               name: APP_NAME,
               alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
-              url: APP_URL,
+              url: BASE_URL,
               description:
                 'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
               inLanguage: 'en-US',
               publisher: {
                 '@type': 'Organization',
                 name: APP_NAME,
-                url: APP_URL,
+                url: BASE_URL,
               },
             })}
           </Script>
@@ -255,8 +255,8 @@ export default async function RootLayout({
               '@type': 'Organization',
               name: APP_NAME,
               legalName: 'Jovie Technology Inc.',
-              url: APP_URL,
-              logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
+              url: BASE_URL,
+              logo: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
               description:
                 'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
               sameAs: [

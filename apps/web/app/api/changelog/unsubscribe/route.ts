@@ -1,6 +1,6 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { db } from '@/lib/db';
 import { productUpdateSubscribers } from '@/lib/db/schema/product-update-subscribers';
 
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
         htmlPage(
           'Already unsubscribed',
           "You've already been unsubscribed from product updates.",
-          { text: 'Go to homepage', href: APP_URL }
+          { text: 'Go to homepage', href: BASE_URL }
         ),
         { status: 200, headers: { 'Content-Type': 'text/html' } }
       );
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
       htmlPage(
         'Unsubscribed',
         "You've been unsubscribed from product updates. You won't receive any more emails from us.",
-        { text: 'Go to homepage', href: APP_URL }
+        { text: 'Go to homepage', href: BASE_URL }
       ),
       { status: 200, headers: { 'Content-Type': 'text/html' } }
     );
@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       htmlPage(
         'Something went wrong',
         'We couldn\u2019t process your unsubscribe request right now. Please try again later.',
-        { text: 'Go to homepage', href: APP_URL }
+        { text: 'Go to homepage', href: BASE_URL }
       ),
       { status: 500, headers: { 'Content-Type': 'text/html' } }
     );
