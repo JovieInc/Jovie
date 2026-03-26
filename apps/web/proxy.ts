@@ -1002,7 +1002,7 @@ export default async function middleware(
         method: req.method,
         headers,
         body: body && body.byteLength > 0 ? body : undefined,
-        redirect: 'follow',
+        redirect: 'manual',
       });
 
       const resHeaders = new Headers(proxyRes.headers);
