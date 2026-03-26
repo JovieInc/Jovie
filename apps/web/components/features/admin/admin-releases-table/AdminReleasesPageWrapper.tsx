@@ -11,7 +11,6 @@ import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
 interface AdminReleasesPageWrapperProps {
   readonly releases: AdminReleaseRow[];
-  readonly page: number;
   readonly pageSize: number;
   readonly total: number;
   readonly search: string;

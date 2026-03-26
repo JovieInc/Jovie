@@ -93,7 +93,7 @@ function getOrderByExpressions(sort: AdminReleasesSort) {
     case 'created_asc':
       return [drizzleSql`${discogReleases.createdAt} ASC NULLS LAST`];
     case 'created_desc':
-      return [desc(discogReleases.createdAt)];
+      return [drizzleSql`${discogReleases.createdAt} DESC NULLS LAST`];
     case 'title_asc':
       return [discogReleases.title];
     case 'title_desc':
@@ -130,8 +130,10 @@ async function getProviderCountsForReleases(
         countMap.set(row.releaseId, row.count);
       }
     }
-  } catch {
-    // Provider links table may not exist in all environments
+  } catch (error) {
+    captureError('Failed to load provider counts for admin releases', error, {
+      releaseIds,
+    });
   }
 
   return countMap;

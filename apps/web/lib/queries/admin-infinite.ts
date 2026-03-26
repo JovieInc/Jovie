@@ -220,15 +220,7 @@ export function useAdminCreatorsInfiniteQuery({
   });
 }
 
-export type { AdminReleaseRow } from '@/lib/admin/releases';
-
-export type AdminReleasesSort =
-  | 'release_date_desc'
-  | 'release_date_asc'
-  | 'created_desc'
-  | 'created_asc'
-  | 'title_asc'
-  | 'title_desc';
+export type { AdminReleaseRow, AdminReleasesSort } from '@/lib/admin/releases';
 
 export function useAdminReleasesInfiniteQuery({
   sort,
@@ -236,7 +228,7 @@ export function useAdminReleasesInfiniteQuery({
   pageSize = DEFAULT_PAGE_SIZE,
   initialData,
 }: {
-  sort: AdminReleasesSort;
+  sort: import('@/lib/admin/releases').AdminReleasesSort;
   search: string;
   pageSize?: number;
   initialData?: InfinitePage<import('@/lib/admin/releases').AdminReleaseRow>;

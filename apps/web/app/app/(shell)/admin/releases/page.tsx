@@ -38,7 +38,6 @@ export default async function AdminReleasesPage({
       <PageContent noPadding>
         <AdminReleasesPageWrapper
           releases={releases}
-          page={1}
           pageSize={resolvedPageSize}
           total={total}
           search={q ?? ''}
