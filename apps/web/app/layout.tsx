@@ -188,10 +188,13 @@ export default async function RootLayout({
         crossOrigin='anonymous'
       />
       {/* Clerk Auth - authentication */}
-      <link rel='dns-prefetch' href='https://clerk.jov.ie' />
+      <link
+        rel='dns-prefetch'
+        href='https://distinct-giraffe-5.clerk.accounts.dev'
+      />
       <link
         rel='preconnect'
-        href='https://clerk.jov.ie'
+        href='https://distinct-giraffe-5.clerk.accounts.dev'
         crossOrigin='anonymous'
       />
       <link rel='dns-prefetch' href='https://img.clerk.com' />

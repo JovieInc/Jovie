@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.75] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in across all environments — Clerk proxy now targets the actual FAPI endpoint instead of dead `clerk.jov.ie` domain
+- [internal] Updated vercel.json rewrites, CSP, preconnect links to use `distinct-giraffe-5.clerk.accounts.dev`; removed dead middleware clerk proxy; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+
 ## [26.4.74] - 2026-03-25
 
 ### Fixed
