@@ -83,10 +83,12 @@ export const ReleaseCell = memo(function ReleaseCell({
             )}
           </DrawerInlineIconButton>
         ) : (
-          <VolumeX
-            className='h-[9px] w-[9px] text-quaternary-token/40'
-            aria-label='No preview available'
-          />
+          <span className='flex h-[16px] w-[16px] items-center justify-center rounded-[4px] bg-surface-1/60 text-secondary-token/80'>
+            <VolumeX
+              className='h-[11px] w-[11px]'
+              aria-label='No preview available'
+            />
+          </span>
         )}
       </div>
 

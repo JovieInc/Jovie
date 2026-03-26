@@ -29,7 +29,7 @@ export function ContentSectionHeader({
       className={cn(
         'flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-(--linear-app-header-padding-x)',
         density === 'compact'
-          ? 'min-h-[36px] py-1'
+          ? 'min-h-[34px] py-1'
           : 'min-h-(--linear-app-header-height) py-1.5',
         className
       )}
@@ -37,7 +37,7 @@ export function ContentSectionHeader({
       <div className={cn('min-w-0 flex-1 space-y-0', bodyClassName)}>
         <h2
           className={cn(
-            'truncate text-[12px] font-[560] tracking-[-0.014em] text-primary-token',
+            'truncate text-[12px] font-[550] tracking-[-0.01em] text-primary-token',
             titleClassName
           )}
         >
@@ -46,7 +46,7 @@ export function ContentSectionHeader({
         {subtitle ? (
           <p
             className={cn(
-              'text-[11px] leading-[14px] text-tertiary-token',
+              'text-[12px] leading-[16px] text-tertiary-token',
               subtitleClassName
             )}
           >

@@ -147,13 +147,13 @@ function SettingsNavigation({
       className='flex flex-1 flex-col gap-3 overflow-hidden'
     >
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1 block px-2.5 text-[12px] tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           General
         </span>
         <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
       </div>
       <div>
-        <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+        <span className='mb-1 block px-2.5 text-[12px] tracking-normal text-sidebar-muted/90 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           {artistName || 'Artist'}
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
@@ -169,12 +169,14 @@ function SidebarHeaderNav({
   isDashboardOrAdmin,
   profileHref,
   hasMultipleProfiles,
+  isDemoRoute,
 }: Readonly<{
   isInSettings: boolean;
   isAdmin: boolean;
   isDashboardOrAdmin: boolean;
   profileHref: string | undefined;
   hasMultipleProfiles: boolean;
+  isDemoRoute: boolean;
 }>) {
   return (
     <div className='flex w-full items-center'>
@@ -206,6 +208,26 @@ function SidebarHeaderNav({
                   Exit
                 </span>
               </Link>
+            </div>
+          );
+        }
+        if (isDemoRoute) {
+          return (
+            <div
+              className={cn(
+                'flex h-7 w-full items-center gap-1.5 rounded-full px-2',
+                'group-data-[collapsible=icon]:justify-center'
+              )}
+            >
+              <BrandLogo
+                size={16}
+                tone='auto'
+                rounded={false}
+                className='rounded-sm shrink-0'
+              />
+              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                Demo
+              </span>
             </div>
           );
         }
@@ -267,6 +289,7 @@ function SidebarHeaderNav({
 export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
   const { isAdmin: isUserAdmin, creatorProfiles } = useDashboardData();
   const pathname = usePathname();
+  const isDemoRoute = pathname === APP_ROUTES.DEMO;
   const isInSettings = section === 'settings';
   const isAdmin = section === 'admin';
   const isDashboardOrAdmin = section !== 'settings';
@@ -296,6 +319,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
           isDashboardOrAdmin={isDashboardOrAdmin}
           profileHref={profileHref}
           hasMultipleProfiles={hasMultipleProfiles}
+          isDemoRoute={isDemoRoute}
         />
       </SidebarHeader>
 
@@ -315,7 +339,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         <div className='px-2 pb-1'>
           <NowPlayingCard />
         </div>
-        <SidebarUpgradeBanner />
+        {!isDemoRoute ? <SidebarUpgradeBanner /> : null}
         <SidebarInstallBanner />
 
         {isUserAdmin && (

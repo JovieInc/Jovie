@@ -41,7 +41,7 @@ export function SettingsSection({
       <ContentSectionHeader
         density='compact'
         className={cn('min-h-0', headerClassName)}
-        bodyClassName='space-y-0.5'
+        bodyClassName='space-y-px'
         title={<span id={headingId}>{title}</span>}
         subtitle={
           description ? (
@@ -49,15 +49,15 @@ export function SettingsSection({
           ) : undefined
         }
         titleClassName={cn(
-          'dashboard-heading text-[15px] font-[590] text-primary-token tracking-[-0.02em]',
+          'dashboard-heading text-[14px] font-[560] text-primary-token tracking-[-0.015em]',
           titleClassName
         )}
         subtitleClassName={cn(
-          'dashboard-body text-[12px] text-secondary-token',
+          'dashboard-body text-[12px] leading-[16px] text-secondary-token',
           descriptionClassName
         )}
       />
-      <div className='space-y-3 px-4 py-3'>{children}</div>
+      <div className='space-y-3.5 px-4 py-3.5 sm:px-5'>{children}</div>
     </ContentSurfaceCard>
   );
 }

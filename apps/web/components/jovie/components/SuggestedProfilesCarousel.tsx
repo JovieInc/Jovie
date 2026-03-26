@@ -107,8 +107,8 @@ function ProfileReadyCard({
   return (
     <div
       className={cn(
-        'chat-card overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam)',
-        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -205,8 +205,8 @@ function SuggestionCard({
   return (
     <div
       className={cn(
-        'chat-card overflow-hidden rounded-[18px] border border-(--linear-app-frame-seam)',
-        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'chat-card overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
         'transition-all duration-300 ease-out',
         direction === 'left' && 'animate-slide-out-left',
         direction === 'right' && 'animate-slide-out-right'
@@ -416,9 +416,9 @@ export function SuggestedProfilesCarousel({
   return (
     <div className='space-y-3'>
       {/* Header */}
-      <div className='flex items-center justify-between rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-3.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+      <div className='flex items-center justify-between rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3.5 py-2.5'>
         <div>
-          <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+          <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
             Suggested identity
           </p>
           <p className='mt-0.5 text-[13px] font-medium text-secondary-token'>

@@ -53,22 +53,22 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex items-start gap-2.5 rounded-[14px] border border-(--linear-app-frame-seam)',
-        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-        'hover:bg-surface-0',
+        'chat-pill flex items-start gap-2.5 rounded-[12px] border border-(--linear-app-frame-seam)',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3.5 py-3 text-left',
+        'hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))]',
         'active:scale-[0.98]',
         'focus:outline-none',
         'cursor-pointer transition-[background-color,border-color] duration-fast'
       )}
     >
-      <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0'>
+      <span className='flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-[8px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))]'>
         {IconComponent && (
           <IconComponent
             className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
           />
         )}
       </span>
-      <span className='pt-0.5 text-[13px] leading-snug text-secondary-token'>
+      <span className='pt-0.5 text-[13px] leading-[1.35] text-secondary-token'>
         {suggestion.label}
       </span>
     </button>

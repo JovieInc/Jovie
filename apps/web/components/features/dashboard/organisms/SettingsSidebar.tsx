@@ -145,10 +145,10 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
   return (
     <aside className='h-fit' data-testid='settings-sidebar'>
       {/* Desktop sidebar */}
-      <div className='hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm lg:block'>
+      <div className='hidden max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-1.5 backdrop-blur-sm lg:block'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
-            <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
+            <p className='mb-1 px-2.5 text-[12px] font-[510] tracking-normal text-sidebar-muted/90'>
               {group.label}
             </p>
             <nav aria-label={`${group.label} settings`}>
@@ -162,10 +162,10 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
                         href={item.href}
                         aria-current={active ? 'page' : undefined}
                         className={cn(
-                          'flex min-h-7 items-center gap-2 rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                          'flex min-h-7 items-center gap-2.5 rounded-[9px] px-2.5 py-1 text-[13px] leading-[1.15] tracking-normal transition-[background-color,border-color,color]',
                           active
-                            ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                            : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+                            ? 'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-primary-token'
+                            : 'border border-transparent text-sidebar-item-foreground/78 hover:bg-(--linear-row-hover) hover:text-primary-token'
                         )}
                       >
                         <Icon
@@ -198,10 +198,10 @@ export const SettingsSidebar = memo(function SettingsSidebar() {
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-[510] tracking-[-0.012em] transition-colors whitespace-nowrap',
+                  'flex shrink-0 items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[13px] font-[510] tracking-normal transition-[background-color,border-color,color] whitespace-nowrap',
                   active
-                    ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
-                    : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
+                    ? 'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] text-primary-token'
+                    : 'border border-transparent text-sidebar-item-foreground/78 hover:bg-(--linear-row-hover) hover:text-primary-token'
                 )}
               >
                 <Icon className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />

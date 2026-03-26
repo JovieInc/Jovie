@@ -31,17 +31,17 @@ export function DspPresenceCard({
   return (
     <ContentSurfaceCard
       className={cn(
-        'cursor-pointer p-3.5 transition-[border-color,background-color,box-shadow] duration-150',
-        'bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)] hover:border-default hover:bg-(--linear-bg-surface-0)',
+        'cursor-pointer p-3 transition-[border-color,background-color,box-shadow] duration-150',
+        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] hover:border-default hover:bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))]',
         isSelected &&
-          'border-(--linear-border-focus) bg-(--linear-bg-surface-0) ring-1 ring-(--linear-border-focus)'
+          'border-(--linear-border-focus) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_24%,transparent)]'
       )}
       data-testid={`presence-card-${item.providerId}`}
     >
       <button
         type='button'
         onClick={onSelect}
-        className='w-full space-y-2.5 text-left'
+        className='w-full space-y-2 text-left'
       >
         <div className='flex items-start justify-between gap-2.5'>
           <div className='flex items-center gap-2.5'>
@@ -64,11 +64,11 @@ export function DspPresenceCard({
 
             <div className='min-w-0 flex-1'>
               <div className='flex items-center gap-2'>
-                <span className='truncate text-[13px] font-[510] text-primary-token'>
+                <span className='truncate text-[13px] font-[520] tracking-[-0.01em] text-primary-token'>
                   {item.externalArtistName ?? 'Unknown Artist'}
                 </span>
               </div>
-              <div className='mt-0.5 flex items-center gap-1.5 text-[12px] text-tertiary-token'>
+              <div className='mt-0.5 flex items-center gap-1.5 text-[11px] text-tertiary-token'>
                 <DspProviderIcon provider={item.providerId} size='sm' />
                 <span>{label}</span>
               </div>

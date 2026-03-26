@@ -53,7 +53,7 @@ export function TableToolbar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-3 border-b border-subtle bg-surface-0 px-4 py-2.5',
+        'flex items-center justify-between gap-3 border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-3.5 py-2',
         className
       )}
     >

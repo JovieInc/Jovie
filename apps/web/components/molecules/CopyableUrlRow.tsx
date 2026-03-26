@@ -76,18 +76,18 @@ export function CopyableUrlRow({
       glyph: 'h-[10px] w-[10px]',
     },
     md: {
-      container: 'h-[22px] gap-1 rounded-md px-1.5',
-      icon: 'h-[11px] w-[11px]',
-      value: 'text-[10.5px]',
-      button: 'h-4 w-4 rounded-full',
-      glyph: 'h-[10px] w-[10px]',
+      container: 'h-7 gap-1.5 rounded-[8px] px-2.5',
+      icon: 'h-3 w-3',
+      value: 'text-[11px]',
+      button: 'h-5 w-5 rounded-full',
+      glyph: 'h-3 w-3',
     },
     lg: {
-      container: 'h-[24px] gap-1 rounded-md px-1.5',
+      container: 'h-8 gap-1.5 rounded-[8px] px-2.5',
       icon: 'h-3.5 w-3.5',
-      value: 'text-[10.5px]',
-      button: 'h-4.5 w-4.5 rounded-full',
-      glyph: 'h-3 w-3',
+      value: 'text-[11.5px]',
+      button: 'h-5.5 w-5.5 rounded-full',
+      glyph: 'h-3.5 w-3.5',
     },
   } as const;
 
@@ -113,6 +113,7 @@ export function CopyableUrlRow({
         className={cn(
           'min-w-0 flex-1 truncate font-mono tracking-[-0.01em] text-secondary-token',
           styles.value,
+          'leading-none',
           valueClassName
         )}
         title={url}

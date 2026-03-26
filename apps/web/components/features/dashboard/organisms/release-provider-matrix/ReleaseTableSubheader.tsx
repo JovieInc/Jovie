@@ -75,8 +75,8 @@ interface ReleaseTableSubheaderProps {
 
 /** Options for release view segmented control */
 const RELEASE_VIEW_OPTIONS = [
-  { value: 'tracks', label: 'Tracks', icon: 'ListMusic' },
-  { value: 'releases', label: 'Releases', icon: 'Disc3' },
+  { value: 'tracks', label: 'Tracks' },
+  { value: 'releases', label: 'Releases' },
 ] as const;
 
 function ReleaseViewButtons({
@@ -94,21 +94,12 @@ function ReleaseViewButtons({
       onValueChange={onChange}
       options={RELEASE_VIEW_OPTIONS.map(option => ({
         value: option.value,
-        label: (
-          <span className='flex items-center justify-center gap-1.5'>
-            <Icon
-              name={option.icon}
-              className={PAGE_TOOLBAR_ICON_CLASS}
-              strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
-            />
-            <span>{option.label}</span>
-          </span>
-        ),
+        label: option.label,
       }))}
       size='sm'
       surface='muted'
       className={cn('w-full md:w-auto', className)}
-      triggerClassName='min-w-[88px] px-2.5'
+      triggerClassName='min-w-[72px] px-3'
       aria-label='Choose releases view'
     />
   );
@@ -128,16 +119,11 @@ function ReleaseViewSegmentedControl({
       onValueChange={onChange}
       options={RELEASE_VIEW_OPTIONS.map(option => ({
         value: option.value,
-        label: (
-          <span className='flex items-center justify-center gap-1.5'>
-            <Icon name={option.icon} className='h-4 w-4' />
-            <span>{option.label}</span>
-          </span>
-        ),
+        label: option.label,
       }))}
       size='md'
       className='grid w-full grid-cols-2'
-      triggerClassName='min-h-[36px] px-3 py-1.5 text-[12px]'
+      triggerClassName='min-h-[34px] px-3 py-1.5 text-[12px]'
       aria-label='Choose releases view'
     />
   );

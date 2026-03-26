@@ -10,17 +10,17 @@ import { cn } from '@/lib/utils';
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,
-  'h-7 rounded-full px-3 text-[11.5px] hover:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'h-7 rounded-full border border-transparent bg-transparent px-3 text-[12px] text-secondary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 export const DASHBOARD_HEADER_ACTION_TEXT_BUTTON_ACTIVE_CLASS =
-  'border-subtle bg-surface-1 text-primary-token';
+  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS =
-  'border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] hover:bg-surface-1 text-secondary-token';
+  'border-transparent bg-transparent text-tertiary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-1 hover:text-primary-token';
 
 export const DASHBOARD_HEADER_ACTION_ICON_BUTTON_ACTIVE_CLASS =
-  'border-default bg-surface-0 text-primary-token';
+  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
 
 export interface DashboardHeaderActionButtonProps {
   readonly ariaLabel: string;

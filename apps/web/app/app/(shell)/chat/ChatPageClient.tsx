@@ -41,11 +41,11 @@ interface ChatPageClientProps {
  */
 function ChatTitleBadge({ title }: { readonly title: string }) {
   return (
-    <span className='flex min-w-0 items-center gap-2 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] px-2.5 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-      <span className='shrink-0 text-[10px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+    <span className='flex min-w-0 items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-2.5 py-1.5'>
+      <span className='shrink-0 text-[11px] font-[560] tracking-normal text-tertiary-token'>
         Thread
       </span>
-      <span className='block max-w-[220px] truncate font-[510] text-primary-token'>
+      <span className='block max-w-[220px] truncate text-[12px] font-[510] text-primary-token'>
         {title}
       </span>
     </span>
@@ -168,7 +168,7 @@ export function ChatPageClient({
 
   const headerActions = useMemo(
     () => (
-      <div className='flex items-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'>
+      <div className='flex items-center gap-1 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-0.5'>
         {conversationId && (
           <SimpleTooltip
             content={sessionIdCopied ? 'Copied!' : 'Copy session ID'}

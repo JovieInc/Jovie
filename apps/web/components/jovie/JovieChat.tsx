@@ -328,7 +328,7 @@ export function JovieChat({
   return (
     <div
       ref={dropZoneRef}
-      className='relative flex h-full flex-col bg-[linear-gradient(180deg,rgba(255,255,255,0.02),transparent_18%)]'
+      className='relative flex h-full flex-col bg-[linear-gradient(180deg,color-mix(in_oklab,var(--linear-app-content-surface)_14%,transparent),transparent_18%)]'
     >
       {/* Hidden file input for image attachments */}
       <input
@@ -417,7 +417,7 @@ export function JovieChat({
                   <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-2xl bg-surface-1 px-5 py-3.5'>
+                  <div className='rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3'>
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'
@@ -520,8 +520,8 @@ export function JovieChat({
               {!hasCarouselItems &&
                 (profileCompletion?.percentage ?? 0) >= 100 && (
                   <>
-                    <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-                      <p className='text-[11px] font-[560] uppercase tracking-[0.08em] text-tertiary-token'>
+                    <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3.5 text-center'>
+                      <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
                         {isFirstSession ? 'Workspace ready' : 'Ask Jovie'}
                       </p>
                       {isFirstSession ? (
