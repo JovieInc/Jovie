@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.77] - 2026-03-25
+
+### Changed
+
+- Track URLs are now nested under their parent release (`/{handle}/{release}/{track}`) instead of flat (`/{handle}/{track}`), matching MusicBrainz hierarchy
+- Track sidebar label changed from "Smart link" to "Track link" to distinguish from release-level smart links
+- Track slug "sounds" is now reserved to prevent collision with the "Use This Sound" route
+
+### Added
+
+- New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
+- Flat track URLs now 302-redirect to the nested format when a parent release is known
+
 ## [26.4.76] - 2026-03-25
 
 ### Changed
