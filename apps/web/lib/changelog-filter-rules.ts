@@ -25,10 +25,7 @@ const VENDOR_NAMES = [
   'Conductor',
 ];
 
-/** Word-boundary regex for each vendor name (case-insensitive). */
-const VENDOR_PATTERNS = VENDOR_NAMES.map(
-  name => new RegExp(`\\b${name}\\b`, 'i')
-);
+const VENDOR_TOKENS = new Set(VENDOR_NAMES.map(name => name.toLowerCase()));
 
 /** Infrastructure, dev tooling, admin, and business-sensitive patterns. */
 const INTERNAL_PATTERNS = [
@@ -129,8 +126,13 @@ const INTERNAL_PATTERNS = [
 ];
 
 export function isInternalEntry(entry: string): boolean {
-  for (const pattern of VENDOR_PATTERNS) {
-    if (pattern.test(entry)) return true;
+  const normalizedTokens = entry
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+
+  for (const token of normalizedTokens) {
+    if (VENDOR_TOKENS.has(token)) return true;
   }
 
   for (const pattern of INTERNAL_PATTERNS) {
