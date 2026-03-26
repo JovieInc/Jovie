@@ -278,12 +278,12 @@ export default async function ContentSmartLinkPage({
     requestSearchParams
   );
 
-  // If this is a track with a known parent release, 302-redirect to the nested URL.
+  // If this is a track with a known parent release, permanently redirect to the nested URL.
   // Tracks should be deep links of releases: /{handle}/{releaseSlug}/{trackSlug}
   if (content.type === 'track' && content.releaseSlug) {
     const queryString = requestSearchParams.toString();
     const suffix = queryString ? `?${queryString}` : '';
-    redirect(
+    permanentRedirect(
       `/${creator.usernameNormalized}/${content.releaseSlug}/${content.slug}${suffix}`
     );
   }
