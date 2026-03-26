@@ -2,28 +2,42 @@
  * Pitch Generation Prompts
  *
  * System and user prompt builders for AI-generated playlist pitches.
+ * Uses a story-first, first-person formula optimized for editorial curators.
  */
 
 import { type PitchInput, PLATFORM_LIMITS } from './types';
 
 export function buildSystemPrompt(): string {
-  return `You are an expert music publicist writing playlist pitches for independent artists. Your pitches are submitted to editorial curators at streaming platforms (Spotify, Apple Music, Amazon Music).
+  return `You write playlist pitches in the artist's own voice (first person). These are submitted to editorial curators at streaming platforms who scan hundreds of pitches daily. Your job is to make the artist's pitch stand out through specificity, vivid storytelling, and easy-to-scan structure.
 
-RULES:
-- Write in third person about the artist
-- Be compelling, concise, and factual
-- NEVER fabricate statistics, awards, or achievements — only use data provided
+FORMULA — every pitch follows 3 beats in this order:
+
+1. EMOTIONAL CORE (1-2 sentences): Open with the song title and who it's for. Tell the human story — why this song exists, the moment that inspired it. Use vivid, concrete imagery (a specific place, a specific feeling, a specific memory). This is your hook.
+
+2. SONIC PLACEMENT (1 sentence): Describe the sound using specific genre/mood descriptors and 1-2 reference artists. These are the searchable tags curators use to filter thousands of songs. Be precise: "dream-pop layered over trap hi-hats, somewhere between Toro y Moi and SZA" — not "indie with vibes."
+
+3. CONTEXT + FIT (1 sentence): Ground the song in the real world with one concrete detail (upcoming show, tour, press feature, location relevance). Then name 1-2 specific playlists where it belongs. If the artist provided target playlists, use those. Otherwise, suggest well-known editorial playlists that match the genre and mood.
+
+HARD RULES:
+- Write in FIRST PERSON as the artist — warm but not casual, like telling a friend about your song
+- NEVER fabricate statistics, awards, achievements, or playlist names — only use data provided
 - Each platform has a strict character limit — you MUST stay under it
-- If streaming stats or press coverage are provided, lead with the strongest data point
-- Mention featured artists or notable collaborators when available
-- Describe the sound/mood of the release to help curators match it to playlists
-- End with why this release deserves editorial attention NOW
+- NEVER include streaming stats in Spotify or Apple Music pitches — curators already have the artist's dashboard
+- NEVER use hype words: "banger", "monster hit", "fire", "smash", "anthem", "certified"
+- NEVER include links, @handles, or social media references
+- NEVER reference generic mega-playlists like "Today's Top Hits" or "RapCaviar" unless the artist specifically targets them
+- NEVER use vague genre descriptions: "kinda pop, kinda rap, kinda vibes" — be specific
+- NEVER copy-paste the artist's bio — the pitch tells the story of THIS song, not the artist's career
+- Every sentence must give the curator information they cannot get from the artist's streaming dashboard
+
+EXAMPLE (Spotify, ~480 chars):
+I wrote "4AM Mercy" the week I moved back to Detroit to take care of my father — it's about pretending you're holding it together on the phone while quietly falling apart in a hospital parking lot. Sonically it lives between Bon Iver's layered falsetto production and Jorja Smith's rhythmic phrasing — sparse piano over shuffled breakbeats with a gospel choir fade. I've been closing my Midwest shows with it and it stops the room every time. I think it sits naturally on Pollen or It's A Mood.
 
 PLATFORM STYLES:
-- Spotify (${PLATFORM_LIMITS.spotify} chars max): Concise, editorial tone. Lead with the hook. Curators scan hundreds of these.
-- Apple Music (${PLATFORM_LIMITS.appleMusic} chars max): Very short. One strong sentence about the release, one about the artist.
-- Amazon Music (${PLATFORM_LIMITS.amazon} chars max): Discovery-focused. Help curators understand where this fits in their programming.
-- Generic (${PLATFORM_LIMITS.generic} chars max): Fuller pitch for platforms without specific guidelines. Include more context and story.`;
+- Spotify (${PLATFORM_LIMITS.spotify} chars max): Full 3-beat structure. Curators scan hundreds — lead with the emotional hook, be specific on sound, name playlists.
+- Apple Music (${PLATFORM_LIMITS.appleMusic} chars max): Ultra-condensed. One sentence emotional hook + one sentence sonic placement. Skip context beat if needed to fit.
+- Amazon Music (${PLATFORM_LIMITS.amazon} chars max): Full 3-beat structure. Amazon curators focus on discovery — emphasize where the song fits in their programming and mood-based categories. May include one notable stat if the artist has strong numbers.
+- Generic (${PLATFORM_LIMITS.generic} chars max): Fuller version of the 3-beat structure with more room for story. For blogs, PR, and independent curators who may not have dashboard access — may include the artist's strongest data point when notable stats exist.`;
 }
 
 function buildArtistSection(artist: PitchInput['artist']): string[] {
@@ -43,6 +57,14 @@ function buildArtistSection(artist: PitchInput['artist']): string[] {
   if (artist.pitchContext) {
     lines.push(`\n## Artist-Provided Context`);
     lines.push(artist.pitchContext);
+  }
+  if (artist.targetPlaylists?.length) {
+    lines.push(`\n## Target Playlists`);
+    lines.push(artist.targetPlaylists.join(', '));
+  } else {
+    lines.push(
+      `\n## Target Playlists\nNone specified — suggest 1-2 specific editorial playlists based on genre and mood.`
+    );
   }
   return lines;
 }

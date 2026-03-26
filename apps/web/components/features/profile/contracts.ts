@@ -81,6 +81,7 @@ export interface ProfileIdentityFields {
   readonly location: string;
   readonly hometown: string;
   readonly pitchContext: string;
+  readonly targetPlaylists: string;
   readonly profilePath: string;
 }
 

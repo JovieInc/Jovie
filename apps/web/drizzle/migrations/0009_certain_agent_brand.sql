@@ -1,0 +1,1 @@
+ALTER TABLE "creator_profiles" ADD COLUMN "target_playlists" text[];

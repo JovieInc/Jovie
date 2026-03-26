@@ -64,6 +64,13 @@
       "when": 1774340000000,
       "tag": "0008_repair_missing_claim_tables_retry",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774480204178,
+      "tag": "0009_certain_agent_brand",
+      "breakpoints": true
     }
   ]
 }
