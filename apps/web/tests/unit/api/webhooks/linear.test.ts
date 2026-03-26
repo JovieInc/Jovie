@@ -186,4 +186,66 @@ describe('POST /api/webhooks/linear', () => {
       })
     );
   });
+
+  it('uses transport-only retries for the GitHub dispatch POST', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      })
+    );
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      createdAt: '2026-03-10T00:00:00.000Z',
+      updatedFrom: { stateId: 'old' },
+      data: {
+        id: 'issue_123',
+        updatedAt: '2026-03-10T00:00:01.000Z',
+        stateId: 'new',
+        state: { name: 'Todo' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      headers: {
+        'linear-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        retry: expect.objectContaining({
+          maxRetries: 2,
+          baseDelayMs: 500,
+          retryOn: expect.any(Function),
+        }),
+      })
+    );
+
+    const retryOn = mockServerFetch.mock.calls[0]?.[1]?.retry?.retryOn;
+    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
+
+    expect(
+      retryOn?.({
+        error: new ServerFetchTimeoutError('timed out', 10_000, 'Dispatch'),
+      })
+    ).toBe(true);
+    expect(retryOn?.({ error: new TypeError('fetch failed') })).toBe(true);
+    expect(
+      retryOn?.({ response: new Response('retry', { status: 503 }) })
+    ).toBe(false);
+  });
 });

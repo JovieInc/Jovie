@@ -171,4 +171,62 @@ describe('POST /api/webhooks/sentry', () => {
       })
     );
   });
+
+  it('uses transport-only retries for the GitHub dispatch POST', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      })
+    );
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '42',
+          title: 'Webhook error',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        retry: expect.objectContaining({
+          maxRetries: 2,
+          baseDelayMs: 500,
+          retryOn: expect.any(Function),
+        }),
+      })
+    );
+
+    const retryOn = mockServerFetch.mock.calls[0]?.[1]?.retry?.retryOn;
+    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
+
+    expect(
+      retryOn?.({
+        error: new ServerFetchTimeoutError('timed out', 10_000, 'Dispatch'),
+      })
+    ).toBe(true);
+    expect(retryOn?.({ error: new TypeError('fetch failed') })).toBe(true);
+    expect(
+      retryOn?.({ response: new Response('retry', { status: 503 }) })
+    ).toBe(false);
+  });
 });

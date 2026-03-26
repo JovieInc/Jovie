@@ -131,5 +131,29 @@ describe('POST /api/deploy/promote', () => {
       message: 'Production deploy triggered',
       job: { id: 'job_123' },
     });
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://example.com/hook',
+      expect.objectContaining({
+        method: 'POST',
+        retry: expect.objectContaining({
+          maxRetries: 1,
+          baseDelayMs: 500,
+          retryOn: expect.any(Function),
+        }),
+      })
+    );
+
+    const retryOn = mockServerFetch.mock.calls[0]?.[1]?.retry?.retryOn;
+    const { ServerFetchTimeoutError } = await import('@/lib/http/server-fetch');
+
+    expect(
+      retryOn?.({
+        error: new ServerFetchTimeoutError('timed out', 30_000, 'Deploy hook'),
+      })
+    ).toBe(true);
+    expect(retryOn?.({ error: new TypeError('fetch failed') })).toBe(true);
+    expect(
+      retryOn?.({ response: new Response('retry', { status: 503 }) })
+    ).toBe(false);
   });
 });

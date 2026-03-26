@@ -44,19 +44,24 @@ function isRetryableStatus(status: number): boolean {
   return status === 408 || status === 429 || status >= 500;
 }
 
-function isRetryableError(error: Error): boolean {
-  if (
-    error instanceof ServerFetchTimeoutError ||
-    error instanceof ServerFetchRetryableStatusError
-  ) {
-    return true;
+export function isRetryableTransportError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
   }
-
   return (
+    error instanceof ServerFetchTimeoutError ||
     error.name === 'TypeError' ||
     error.name === 'FetchError' ||
     /network|fetch failed|econn|socket|dns/i.test(error.message)
   );
+}
+
+function isRetryableError(error: Error): boolean {
+  if (error instanceof ServerFetchRetryableStatusError) {
+    return true;
+  }
+
+  return isRetryableTransportError(error);
 }
 
 export async function serverFetch(
@@ -98,6 +103,10 @@ export async function serverFetch(
         (retry.retryOn?.({ response }) ?? true);
 
       if (shouldRetry) {
+        const cancelPromise = response.body?.cancel();
+        if (cancelPromise) {
+          void cancelPromise.catch(() => {});
+        }
         throw new ServerFetchRetryableStatusError(response, context);
       }
 

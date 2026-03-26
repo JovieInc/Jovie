@@ -166,6 +166,40 @@ export interface AdminActivityItem {
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const REDIS_REACHABILITY_TIMEOUT_MS = 250;
+
+async function isRedisReachable(): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) {
+    return false;
+  }
+
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    await Promise.race([
+      redis.ping(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Redis ping timed out after ${REDIS_REACHABILITY_TIMEOUT_MS}ms`
+              )
+            ),
+          REDIS_REACHABILITY_TIMEOUT_MS
+        );
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 export async function getAdminUsageSeries(
   days: number = 14
@@ -220,16 +254,17 @@ export async function getAdminUsageSeries(
 export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - MS_PER_DAY);
-  const [dbHealth, sentryMetrics, deployments] = await Promise.all([
-    checkDbHealth().catch(() => ({ latency: null })),
-    getAdminSentryMetrics().catch(() => null),
-    getHudDeployments().catch(() => ({
-      availability: 'error' as const,
-      current: null,
-      recent: [],
-    })),
-  ]);
-  const redisAvailable = getRedis() !== null;
+  const [dbHealth, sentryMetrics, deployments, redisAvailable] =
+    await Promise.all([
+      checkDbHealth().catch(() => ({ latency: null })),
+      getAdminSentryMetrics().catch(() => null),
+      getHudDeployments().catch(() => ({
+        availability: 'error' as const,
+        current: null,
+        recent: [],
+      })),
+      isRedisReachable(),
+    ]);
   const reliabilityBase = {
     p95LatencyMs: dbHealth.latency ?? null,
     unresolvedSentryIssues24h: sentryMetrics?.unresolvedIssues24h ?? 0,

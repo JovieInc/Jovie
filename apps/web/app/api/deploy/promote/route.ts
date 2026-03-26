@@ -2,7 +2,11 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import {
+  isRetryableTransportError,
+  ServerFetchTimeoutError,
+  serverFetch,
+} from '@/lib/http/server-fetch';
 import { createRateLimitHeaders, deployPromoteLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
@@ -67,6 +71,7 @@ export async function POST() {
       retry: {
         maxRetries: 1,
         baseDelayMs: 500,
+        retryOn: ({ error }) => isRetryableTransportError(error),
       },
     });
 
