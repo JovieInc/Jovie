@@ -604,7 +604,7 @@ export function SpotifyConnectDialog({
                           })
                         }
                       >
-                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
                           {artist.imageUrl ? (
                             <Image
                               src={artist.imageUrl}
@@ -673,7 +673,7 @@ export function SpotifyConnectDialog({
                     })
                   }
                 >
-                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
+                  <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
                     <Link2
                       className='h-5 w-5 text-tertiary-token'
                       aria-hidden='true'

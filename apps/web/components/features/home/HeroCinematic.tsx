@@ -2,9 +2,20 @@ import { Container } from '@/components/site/Container';
 import { ClaimHandleForm } from './claim-handle';
 import { MODES, PhoneShowcase } from './phone-showcase-primitives';
 
-export function HeroCinematic() {
+interface HeroCinematicProps {
+  /** When true, hero fills the viewport with no scroll and handles all breakpoints. */
+  readonly fullScreen?: boolean;
+}
+
+export function HeroCinematic({ fullScreen = false }: HeroCinematicProps) {
   return (
-    <section className='relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:hidden'>
+    <section
+      className={
+        fullScreen
+          ? 'relative flex items-center overflow-hidden h-[calc(100dvh-var(--linear-header-height))]'
+          : 'relative overflow-hidden pb-0 pt-[5.5rem] md:pt-[6.1rem] lg:hidden'
+      }
+    >
       <div
         aria-hidden='true'
         className='pointer-events-none absolute inset-0'
@@ -15,8 +26,13 @@ export function HeroCinematic() {
       <Container size='homepage'>
         <div className='mx-auto max-w-[1120px]'>
           <div className='hero-stagger'>
-            {/* Desktop: two-column | Mobile: single column */}
-            <div className='flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'>
+            <div
+              className={
+                fullScreen
+                  ? 'flex flex-col items-center gap-8 lg:grid lg:grid-cols-2 lg:items-center lg:gap-16'
+                  : 'flex flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-16'
+              }
+            >
               {/* Left: Copy + Claim Form */}
               <div className='max-w-[44rem] text-center lg:flex-1 lg:text-left'>
                 <p className='homepage-section-eyebrow'>
@@ -42,7 +58,13 @@ export function HeroCinematic() {
               </div>
 
               {/* Right: Phone */}
-              <div className='relative flex-shrink-0 lg:flex-none'>
+              <div
+                className={
+                  fullScreen
+                    ? 'relative flex items-center justify-center min-h-0 flex-1 lg:flex-none'
+                    : 'relative flex-shrink-0 lg:flex-none'
+                }
+              >
                 <div
                   className='animate-hero-phone-float'
                   style={{

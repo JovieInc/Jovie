@@ -414,10 +414,16 @@ export function JovieChat({
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className='mx-auto max-w-[44rem] pb-7'>
                 <div className='flex gap-3'>
-                  <div className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'>
+                  <div
+                    data-testid='chat-loading-avatar'
+                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'
+                  >
                     <BrandLogo size={16} tone='auto' />
                   </div>
-                  <div className='rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3'>
+                  <div
+                    data-testid='chat-loading-bubble'
+                    className='rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-4 py-3'
+                  >
                     <div className='flex items-center gap-1.5'>
                       <span
                         className='flex items-center gap-1'

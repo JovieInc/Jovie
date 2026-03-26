@@ -275,12 +275,7 @@ export function AnalyticsSidebar({ isOpen, onClose }: AnalyticsSidebarProps) {
         )}
       >
         {/* Funnel + Engagement — one cohesive card */}
-        <div
-          className={cn(
-            LINEAR_SURFACE.sidebarCard,
-            'overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-          )}
-        >
+        <div className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}>
           {/* Funnel: 3-column horizontal layout */}
           <div className='flex items-stretch divide-x divide-(--linear-app-frame-seam)'>
             {stages.map((stage, index) => {

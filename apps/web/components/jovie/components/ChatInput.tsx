@@ -244,7 +244,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-[18px] border transition-colors duration-fast',
+            'rounded-[12px] border transition-colors duration-fast',
             'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'

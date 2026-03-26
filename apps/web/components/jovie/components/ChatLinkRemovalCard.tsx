@@ -4,6 +4,7 @@ import { Check, Loader2, Trash2, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { usePreviewPanelContext } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { useConfirmChatRemoveLinkMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -92,7 +93,7 @@ export function ChatLinkRemovalCard({
 
   if (state === 'removed') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-success/30 bg-success-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]'>
+      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_8%,var(--linear-app-content-surface))] p-4'>
         <div className='flex items-center gap-2 text-success'>
           <Check className='h-4 w-4' />
           <span className='text-sm font-medium'>{platform} link removed</span>
@@ -103,7 +104,7 @@ export function ChatLinkRemovalCard({
 
   if (state === 'dismissed') {
     return (
-      <ContentSurfaceCard className='rounded-[18px] border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-4 opacity-60 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-4 opacity-60'>
         <div className='flex items-center gap-2 text-secondary-token'>
           <X className='h-4 w-4' />
           <span className='text-sm'>Removal cancelled</span>
@@ -113,9 +114,14 @@ export function ChatLinkRemovalCard({
   }
 
   return (
-    <ContentSurfaceCard className='rounded-[18px] border-error/20 bg-error-subtle p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'>
+    <ContentSurfaceCard className='border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))] p-4'>
       <div className='flex items-center gap-3'>
-        <span className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-error/20 bg-white/50'>
+        <span
+          className={cn(
+            LINEAR_SURFACE.drawerCardSm,
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] border-error/20 bg-[color-mix(in_oklab,var(--color-error)_8%,var(--linear-app-content-surface))]'
+          )}
+        >
           <SocialIcon
             platform={normalizeSocialPlatform(platform)}
             className='h-5 w-5 shrink-0'
@@ -139,7 +145,7 @@ export function ChatLinkRemovalCard({
             onClick={handleRemove}
             disabled={state === 'removing'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-xs font-medium',
+              'inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-xs font-medium',
               'bg-error text-error-foreground hover:bg-error/90',
               'disabled:opacity-50 transition-colors'
             )}
@@ -156,7 +162,7 @@ export function ChatLinkRemovalCard({
             onClick={handleDismiss}
             disabled={state === 'removing'}
             className={cn(
-              'inline-flex items-center gap-1 rounded-[10px] border border-transparent p-1.5 text-xs',
+              'inline-flex items-center gap-1 rounded-[8px] border border-transparent p-1.5 text-xs',
               'text-secondary-token hover:bg-surface-0 hover:text-primary-token',
               'disabled:opacity-50 transition-colors'
             )}

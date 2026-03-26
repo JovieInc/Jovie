@@ -6,6 +6,7 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import type { DspPresenceItem } from '@/app/app/(shell)/dashboard/presence/actions';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
+import { DrawerSurfaceCard } from '@/components/molecules/drawer/DrawerSurfaceCard';
 import { EntitySidebarShell } from '@/components/molecules/drawer/EntitySidebarShell';
 import { ConfidenceBadge } from '@/features/dashboard/atoms/ConfidenceBadge';
 import {
@@ -91,7 +92,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
   return (
     <div className='space-y-3'>
       <DrawerSection title='Match Status' className='space-y-1.5'>
-        <div className='space-y-2'>
+        <DrawerSurfaceCard variant='card' className='space-y-2 p-3'>
           <div className='flex items-center justify-between'>
             <span className='text-[12px] text-tertiary-token'>Status</span>
             <MatchStatusBadge status={item.status} size='sm' />
@@ -116,7 +117,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               </span>
             </div>
           )}
-        </div>
+        </DrawerSurfaceCard>
       </DrawerSection>
 
       {item.confidenceBreakdown && (
@@ -129,7 +130,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
       )}
 
       <DrawerSection title='Actions' className='space-y-1.5'>
-        <div className='space-y-2'>
+        <DrawerSurfaceCard variant='card' className='space-y-2 p-2'>
           {item.externalArtistUrl && (
             <a
               href={item.externalArtistUrl}
@@ -140,7 +141,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
               <Button
                 variant='ghost'
                 size='sm'
-                className='h-8 w-full justify-start rounded-md px-2.5 text-[12px] font-[510] text-tertiary-token hover:text-primary-token'
+                className='h-8 w-full justify-start rounded-[8px] border border-transparent px-2.5 text-[12px] font-[510] text-tertiary-token hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
               >
                 <Icon name='ExternalLink' className='mr-1.5 h-3.5 w-3.5' />
                 View on {label}
@@ -149,7 +150,7 @@ function SidebarContent({ item }: { readonly item: DspPresenceItem }) {
           )}
 
           {isSuggested && <SuggestedMatchActions matchId={item.matchId} />}
-        </div>
+        </DrawerSurfaceCard>
       </DrawerSection>
     </div>
   );
@@ -173,7 +174,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => rejectMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-md text-[12px] font-[510]'
+        className='h-8 flex-1 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 text-[12px] font-[510] text-secondary-token hover:bg-surface-1 hover:text-primary-token'
       >
         {isRejecting ? 'Rejecting...' : 'Reject'}
       </Button>
@@ -182,7 +183,7 @@ function SuggestedMatchActions({ matchId }: { readonly matchId: string }) {
         size='sm'
         onClick={() => confirmMatch(matchId)}
         disabled={isLoading}
-        className='h-8 flex-1 rounded-md text-[12px] font-[510]'
+        className='h-8 flex-1 rounded-[8px] text-[12px] font-[510]'
       >
         {isConfirming ? 'Confirming...' : 'Confirm Match'}
       </Button>

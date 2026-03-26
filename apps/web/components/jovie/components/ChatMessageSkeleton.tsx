@@ -20,7 +20,7 @@ export function ChatMessageSkeleton() {
 
       {/* User message skeleton */}
       <div className='flex justify-end gap-3'>
-        <div className='max-w-[52%] space-y-2 rounded-[18px] bg-accent/90 px-4 py-3'>
+        <div className='max-w-[52%] space-y-2 rounded-[14px] bg-accent/90 px-4 py-3'>
           <Skeleton className='h-4 w-36 bg-white/25' rounded='lg' />
         </div>
       </div>

@@ -24,7 +24,10 @@ export function DrawerTabs<T extends string>({
     <div
       role='tablist'
       aria-label={ariaLabel}
-      className={cn('flex items-center gap-1', className)}
+      className={cn(
+        'flex items-center gap-1 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-0.5',
+        className
+      )}
     >
       {options.map(option => (
         <button
@@ -34,9 +37,9 @@ export function DrawerTabs<T extends string>({
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
           className={cn(
-            'rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3.5 py-1 text-[11px] font-[510] text-secondary-token transition-colors hover:bg-surface-1 hover:text-primary-token',
+            'min-h-7 rounded-[8px] border border-transparent bg-transparent px-3 py-1 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token',
             value === option.value &&
-              'bg-surface-0 text-primary-token shadow-sm',
+              'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token',
             triggerClassName
           )}
         >

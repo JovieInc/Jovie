@@ -81,11 +81,11 @@ export function ReleaseEditDialog({
             {/* Release info header */}
             <DrawerSurfaceCard
               variant='card'
-              className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+              className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-3.5'
             >
               <EntityHeaderCard
                 image={
-                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-0'>
+                  <div className='relative h-16 w-16 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0'>
                     <ImageWithFallback
                       src={release.artworkUrl}
                       alt={`${release.title} artwork`}
@@ -101,7 +101,7 @@ export function ReleaseEditDialog({
                 badge={
                   <Badge
                     variant='secondary'
-                    className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
+                    className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-1 px-2 py-0.5 text-[11px] text-secondary-token'
                   >
                     {release.releaseDate
                       ? formatReleaseDateShort(release.releaseDate)
@@ -127,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_86%,var(--linear-bg-surface-0))] p-2.5'
+                    className='rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>
@@ -143,7 +143,7 @@ export function ReleaseEditDialog({
                       {existing?.source === 'manual' ? (
                         <Badge
                           variant='secondary'
-                          className='rounded-[8px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300'
+                          className='rounded-[6px] border border-amber-500/20 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300'
                         >
                           Manual
                         </Badge>

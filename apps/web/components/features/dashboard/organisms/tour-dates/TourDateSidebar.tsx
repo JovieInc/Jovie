@@ -201,7 +201,7 @@ export function TourDateSidebar({
           !formData.city ||
           !formData.country
         }
-        className='flex-1'
+        className='h-8 flex-1 rounded-[8px]'
       >
         {updateMutation.isPending ? (
           <>
@@ -220,7 +220,7 @@ export function TourDateSidebar({
         variant='ghost'
         onClick={handleDeleteClick}
         disabled={isPending}
-        className='text-destructive hover:bg-destructive/10 hover:text-destructive'
+        className='h-8 rounded-[8px] border border-transparent px-2.5 text-destructive hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
       >
         <Icon name='Trash2' className='h-4 w-4' />
       </Button>
@@ -243,10 +243,10 @@ export function TourDateSidebar({
           <div className='space-y-2'>
             {/* Source indicator */}
             {tourDate.provider === 'bandsintown' && (
-              <div className='flex items-center gap-2 rounded-md bg-teal-50 px-3 py-2 text-[13px] text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'>
+              <DrawerSurfaceCard className='flex items-center gap-2 border border-emerald-500/15 bg-emerald-500/5 px-3 py-2 text-[12px] text-emerald-700 dark:text-emerald-300'>
                 <Icon name='Link' className='h-4 w-4' />
                 <span>Synced from Bandsintown</span>
-              </div>
+              </DrawerSurfaceCard>
             )}
 
             {/* Title */}
@@ -409,10 +409,10 @@ export function TourDateSidebar({
                       }
                       disabled={isPending}
                       className={cn(
-                        'flex-1 rounded-md border px-3 py-2 text-[13px] font-[510] transition-colors',
+                        'flex-1 rounded-[8px] border px-3 py-2 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
                         formData.ticketStatus === status
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2'
+                          ? 'border-accent/35 bg-accent/10 text-accent'
+                          : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
                       )}
                     >
                       {status === 'available' && 'On Sale'}
@@ -425,7 +425,7 @@ export function TourDateSidebar({
             </div>
 
             {/* Analytics */}
-            <div className='border-t border-subtle pt-2'>
+            <div className='border-t border-subtle/60 pt-2'>
               <DrawerSection title='Analytics'>
                 {analyticsLoading && (
                   <DrawerSurfaceCard className='space-y-2 p-3'>

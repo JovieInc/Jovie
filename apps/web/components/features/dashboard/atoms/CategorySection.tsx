@@ -21,7 +21,9 @@ export function CategorySection({
   return (
     <section
       className={cn(
-        variant === 'flat' ? 'py-2' : 'rounded-xl bg-surface-1/60 p-3',
+        variant === 'flat'
+          ? 'py-2'
+          : 'rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-3',
         className
       )}
     >

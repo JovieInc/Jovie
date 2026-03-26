@@ -1,14 +1,15 @@
 'use client';
 
+import { Badge } from '@jovie/ui';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import type { InsightResponse } from '@/types/insights';
 import { InsightActions } from './InsightActions';
 import { InsightCategoryIcon } from './InsightCategoryIcon';
 
-const PRIORITY_STYLES = {
-  high: 'border-l-orange-500 dark:border-l-orange-400',
-  medium: 'border-l-blue-500 dark:border-l-blue-400',
-  low: 'border-l-gray-400 dark:border-l-gray-500',
+const PRIORITY_BADGE_STYLES = {
+  high: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300',
+  medium: 'border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300',
+  low: 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token',
 } as const;
 
 const PRIORITY_LABELS = {
@@ -25,37 +26,45 @@ export function InsightCard({ insight }: InsightCardProps) {
   return (
     <ContentSurfaceCard
       as='article'
-      className={`border-l-[3px] ${PRIORITY_STYLES[insight.priority]} p-4 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0`}
+      surface='details'
+      className='p-3.5 transition-[border-color,background-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0'
       aria-label={`${PRIORITY_LABELS[insight.priority]} insight: ${insight.title}`}
     >
       <div className='flex items-start gap-3'>
         <InsightCategoryIcon category={insight.category} />
 
         <div className='min-w-0 flex-1'>
-          {/* Title */}
-          <h3 className='text-[13px] font-[590] text-primary-token leading-snug'>
-            {insight.title}
-          </h3>
+          <div className='flex flex-wrap items-center justify-between gap-2'>
+            <h3 className='text-[13px] font-[590] leading-snug text-primary-token'>
+              {insight.title}
+            </h3>
+            <Badge
+              variant='secondary'
+              size='sm'
+              className={`rounded-[6px] px-1.5 py-0.5 text-[10px] ${PRIORITY_BADGE_STYLES[insight.priority]}`}
+            >
+              {PRIORITY_LABELS[insight.priority]}
+            </Badge>
+          </div>
 
-          {/* Description */}
-          <p className='mt-1 text-[13px] text-secondary-token leading-relaxed'>
+          <p className='mt-1 text-[13px] leading-relaxed text-secondary-token'>
             {insight.description}
           </p>
 
-          {/* Action suggestion */}
           {insight.actionSuggestion ? (
-            <p className='mt-2 text-[13px] font-[510] text-primary-token'>
-              &rarr; {insight.actionSuggestion}
-            </p>
+            <div className='mt-2 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+              <p className='text-[12px] font-[510] text-primary-token'>
+                {insight.actionSuggestion}
+              </p>
+            </div>
           ) : null}
 
-          {/* Footer: metadata + actions */}
-          <div className='mt-3 flex flex-wrap items-center justify-between gap-2'>
-            <div className='flex items-center gap-3'>
-              <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
+          <div className='mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-subtle/60 pt-3'>
+            <div className='flex items-center gap-2'>
+              <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token capitalize'>
                 {insight.category}
               </span>
-              <span className='text-[10px] text-tertiary-token'>
+              <span className='text-[10px] text-tertiary-token tabular-nums'>
                 Confidence: {Math.round(Number(insight.confidence) * 100)}%
               </span>
             </div>

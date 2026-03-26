@@ -28,7 +28,7 @@ export interface PillClassNameParams {
 const BASE_CLASSES = [
   'group/pill relative min-w-0 border text-[12px] font-[510] tracking-[-0.01em]',
   'border-(--pill-border) hover:border-(--pill-border-hover)',
-  'bg-surface-1 hover:bg-(--pill-bg-hover)',
+  'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] hover:bg-(--pill-bg-hover)',
   'text-secondary-token hover:text-primary-token',
   'transition-[background-color,border-color,color,grid-template-columns,max-width,opacity,padding,margin] duration-180 ease-out',
 ] as const;
@@ -53,14 +53,14 @@ function getLayoutClasses(
 ): string {
   if (collapsed) {
     return cn(
-      'inline-grid max-w-[24px] grid-cols-[18px_0fr] items-center gap-0.5 overflow-hidden rounded-full px-[3px] py-[3px]',
+      'inline-grid max-w-[24px] grid-cols-[18px_0fr] items-center gap-0.5 overflow-hidden rounded-[8px] px-[3px] py-[3px]',
       !defaultExpanded &&
         'group-hover/pill:max-w-[132px] group-hover/pill:grid-cols-[18px_minmax(0,1fr)] group-focus-visible/pill:max-w-[132px] group-focus-visible/pill:grid-cols-[18px_minmax(0,1fr)] lg:group-hover/pill:max-w-[164px] lg:group-focus-visible/pill:max-w-[164px]',
       defaultExpanded &&
         'max-w-[132px] grid-cols-[18px_minmax(0,1fr)] lg:max-w-[164px]'
     );
   }
-  return 'inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-[3px] min-h-[24px]';
+  return 'inline-flex min-h-[24px] max-w-full items-center gap-1.5 rounded-[9px] px-2 py-[3px]';
 }
 
 /**
@@ -90,7 +90,7 @@ function getStateClasses(state: PlatformPillState): string {
  */
 function getToneClasses(tone: PlatformPillTone): string {
   if (tone === 'faded') {
-    return 'bg-surface-1/60 text-secondary-token/85 hover:text-primary-token';
+    return 'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] text-secondary-token/85 hover:text-primary-token';
   }
   return '';
 }

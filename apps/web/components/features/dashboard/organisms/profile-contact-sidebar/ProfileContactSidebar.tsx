@@ -447,14 +447,14 @@ export function ProfileContactSidebar() {
               </div>
             </div>
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-              <div className='h-16 rounded-[10px] skeleton' />
-              <div className='h-10 rounded-[10px] skeleton' />
+              <div className='h-16 rounded-[9px] skeleton' />
+              <div className='h-10 rounded-[9px] skeleton' />
             </div>
           </div>
         }
         tabs={
           <div className='flex items-center gap-1'>
-            <div className='h-9 flex-1 rounded-[10px] skeleton' />
+            <div className='h-9 flex-1 rounded-[9px] skeleton' />
             <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
           </div>
         }
@@ -463,7 +463,7 @@ export function ProfileContactSidebar() {
           {[1, 2, 3, 4, 5].map(i => (
             <div
               key={i}
-              className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
+              className='flex items-center gap-3 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'
             >
               <div className='h-8 w-8 shrink-0 rounded-[8px] skeleton' />
               <div className='flex-1 h-4 rounded skeleton' />
@@ -520,12 +520,7 @@ export function ProfileContactSidebar() {
       entityHeader={
         <div className='space-y-3'>
           {/* Artist card — name + avatar only */}
-          <div
-            className={cn(
-              LINEAR_SURFACE.sidebarCard,
-              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-            )}
-          >
+          <div className={cn(LINEAR_SURFACE.sidebarCard, 'px-3.5 py-3')}>
             <ProfileContactHeader
               displayName={displayName}
               username={username}
@@ -537,23 +532,18 @@ export function ProfileContactSidebar() {
           </div>
 
           {/* Link card — URL + analytics combined */}
-          <div
-            className={cn(
-              LINEAR_SURFACE.sidebarCard,
-              'overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
-            )}
-          >
+          <div className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}>
             <div className='px-2.5 pt-2.5 pb-2'>
               <div className='flex items-center gap-1.5'>
                 <CopyLinkInput
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-[9px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                  className='shrink-0 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -570,7 +560,7 @@ export function ProfileContactSidebar() {
                   trigger={
                     <button
                       type='button'
-                      className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                      className='shrink-0 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
                       aria-label='Open profile share options'
                     >
                       <MoreHorizontal className='h-3 w-3' aria-hidden='true' />
@@ -603,7 +593,7 @@ export function ProfileContactSidebar() {
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-[26px] w-[26px] rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                className='h-[26px] w-[26px] rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token shadow-none hover:border-default hover:bg-surface-1 hover:text-primary-token'
                 ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-3.5 w-3.5' />

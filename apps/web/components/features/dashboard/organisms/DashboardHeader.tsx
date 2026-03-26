@@ -48,7 +48,7 @@ export function DashboardHeader({
         </h1>
         <div className='flex items-center gap-2'>
           {action ? (
-            <div className='flex items-center gap-1 rounded-full border border-subtle bg-surface-1 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] [&_button]:h-8 [&_button]:rounded-[10px] [&_button]:border [&_button]:border-subtle [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
+            <div className='flex items-center gap-1 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-1 [&_button]:h-8 [&_button]:rounded-[8px] [&_button]:border [&_button]:border-(--linear-app-frame-seam) [&_button]:bg-surface-0 [&_button>svg]:h-4 [&_button>svg]:w-4'>
               {action}
             </div>
           ) : (

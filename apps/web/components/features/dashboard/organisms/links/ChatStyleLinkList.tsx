@@ -147,7 +147,7 @@ export const ChatStyleLinkList = React.memo(function ChatStyleLinkList<
                       transform: `translateY(${virtualRow.start}px)`,
                     }}
                   >
-                    <div className='flex items-center gap-3 rounded-2xl bg-surface-2 px-4 py-3 opacity-60'>
+                    <div className='flex items-center gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-4 py-3 opacity-60'>
                       <div className='h-4 w-4' />
                       <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-lg skeleton' />
                       <div className='flex-1'>

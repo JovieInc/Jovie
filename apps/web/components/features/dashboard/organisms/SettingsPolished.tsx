@@ -94,7 +94,7 @@ const SettingsSidebar = memo(
     useRouteLinks = false,
   }: SettingsSidebarProps) => (
     <aside className='h-fit'>
-      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_97%,var(--linear-bg-surface-0))] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] backdrop-blur-sm'>
+      <div className='max-h-[calc(100vh-4.5rem)] overflow-y-auto rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-2 backdrop-blur-sm'>
         {groups.map(group => (
           <div key={group.id} className='mb-2 last:mb-0'>
             <p className='mb-1 px-2.5 text-[11px] font-[590] uppercase tracking-[0.08em] text-tertiary-token'>
@@ -114,7 +114,7 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            'flex min-h-7 items-center rounded-[8px] px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
                             isActive
                               ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
                               : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
@@ -127,7 +127,7 @@ const SettingsSidebar = memo(
                           href={href}
                           aria-current={isActive ? 'page' : undefined}
                           className={cn(
-                            'flex min-h-7 items-center rounded-full px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
+                            'flex min-h-7 items-center rounded-[8px] px-2.5 py-1 text-[12px] tracking-[-0.012em] transition-colors',
                             isActive
                               ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-primary-token'
                               : 'border border-transparent text-secondary-token hover:bg-surface-0 hover:text-primary-token'
@@ -163,7 +163,7 @@ function MobileProfilePanelTrigger() {
     <button
       type='button'
       onClick={open}
-      className='flex w-full items-center justify-between rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
+      className='flex w-full items-center justify-between rounded-[9px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] px-3 py-3 text-left transition-colors hover:bg-surface-0 active:bg-surface-1 lg:hidden'
     >
       <div>
         <p className='text-[14px] font-[510] text-primary-token'>
