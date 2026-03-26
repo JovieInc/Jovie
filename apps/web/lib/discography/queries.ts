@@ -31,6 +31,7 @@ export type ReleaseSourceType = 'manual' | 'admin' | 'ingested';
 export interface TrackSummary {
   totalDurationMs: number | null;
   primaryIsrc: string | null;
+  primaryPreviewUrl: string | null;
 }
 
 // Types for release data with provider links
@@ -152,6 +153,10 @@ async function getTrackSummariesForReleases(
         drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
+      primaryPreviewUrl:
+        drizzleSql<string>`(array_agg(${discogRecordings.previewUrl} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.previewUrl} IS NOT NULL))[1]`.as(
+          'primary_preview_url'
+        ),
     })
     .from(discogReleaseTracks)
     .innerJoin(
@@ -166,6 +171,7 @@ async function getTrackSummariesForReleases(
     summaryMap.set(row.releaseId, {
       totalDurationMs: row.totalDurationMs ?? null,
       primaryIsrc: row.primaryIsrc ?? null,
+      primaryPreviewUrl: row.primaryPreviewUrl ?? null,
     });
   }
   return summaryMap;
@@ -1401,6 +1407,10 @@ export async function getReleaseTrackSummariesForReleases(
         drizzleSql<string>`(array_agg(${discogRecordings.isrc} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.isrc} IS NOT NULL))[1]`.as(
           'primary_isrc'
         ),
+      primaryPreviewUrl:
+        drizzleSql<string>`(array_agg(${discogRecordings.previewUrl} ORDER BY ${discogReleaseTracks.discNumber}, ${discogReleaseTracks.trackNumber}) FILTER (WHERE ${discogRecordings.previewUrl} IS NOT NULL))[1]`.as(
+          'primary_preview_url'
+        ),
     })
     .from(discogReleaseTracks)
     .innerJoin(
@@ -1415,6 +1425,7 @@ export async function getReleaseTrackSummariesForReleases(
     summaryMap.set(row.releaseId, {
       totalDurationMs: row.totalDurationMs ?? null,
       primaryIsrc: row.primaryIsrc ?? null,
+      primaryPreviewUrl: row.primaryPreviewUrl ?? null,
     });
   }
 

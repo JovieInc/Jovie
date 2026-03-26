@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { Pause, Play, VolumeX } from 'lucide-react';
+import { Disc3, Pause, Play } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
@@ -69,21 +69,25 @@ export const ReleaseCell = memo(function ReleaseCell({
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className='h-[16px] w-[16px] rounded-[4px] p-0 text-quaternary-token opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-visible:opacity-100 aria-[pressed=true]:opacity-100'
+            className={`h-[16px] w-[16px] rounded-[4px] p-0 transition-opacity duration-150 focus-visible:opacity-100 ${
+              isPlaying
+                ? 'text-(--linear-accent) opacity-100'
+                : 'text-quaternary-token opacity-40 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
+            }`}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-[8px] w-[8px]' />
+              <Pause className='h-[10px] w-[10px]' />
             ) : (
-              <Play className='h-[8px] w-[8px]' />
+              <Play className='h-[10px] w-[10px]' />
             )}
           </DrawerInlineIconButton>
         ) : (
-          <VolumeX
-            className='h-[9px] w-[9px] text-quaternary-token/40'
+          <Disc3
+            className='h-[10px] w-[10px] text-quaternary-token/30'
             aria-label='No preview available'
           />
         )}

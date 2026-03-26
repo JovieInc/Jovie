@@ -10,7 +10,7 @@ import { formatDuration } from '@/lib/utils/formatDuration';
 import { useSidebar } from './context';
 
 export function NowPlayingCard() {
-  const { playbackState, toggleTrack, onError } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek, onError } = useTrackAudioPlayer();
   const { state: sidebarState } = useSidebar();
   const isCollapsed = sidebarState === 'closed';
 
@@ -133,15 +133,36 @@ export function NowPlayingCard() {
       </div>
 
       <div className='space-y-0.5'>
-        <div className='h-[3px] w-full overflow-hidden rounded-full bg-surface-1'>
-          <div
-            className='h-full rounded-full bg-(--linear-accent) transition-[width] duration-200'
-            style={{ width: `${progressPercent}%` }}
-          />
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: seek bar is supplementary to play button */}
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: seek bar is supplementary to play button */}
+        {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: seek bar is supplementary to play button */}
+        <div
+          className='cursor-pointer py-[5px] -my-[5px]'
+          onClick={event => {
+            if (playbackState.duration <= 0) return;
+            const rect = event.currentTarget.getBoundingClientRect();
+            const clickX = Math.max(
+              0,
+              Math.min(event.clientX - rect.left, rect.width)
+            );
+            seek((clickX / rect.width) * playbackState.duration);
+          }}
+        >
+          <div className='h-[3px] w-full overflow-hidden rounded-full bg-surface-1'>
+            <div
+              className='h-full rounded-full bg-(--linear-accent) transition-[width] duration-200'
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
         <div className='flex items-center justify-between text-[10px] tabular-nums text-quaternary-token'>
           <span>{currentTimeFormatted}</span>
-          {durationFormatted && <span>{durationFormatted}</span>}
+          <span>
+            {durationFormatted}
+            {playbackState.duration > 0 && playbackState.duration < 45
+              ? ' · Preview'
+              : ''}
+          </span>
         </div>
       </div>
     </div>

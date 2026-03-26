@@ -49,7 +49,7 @@ export function ReleaseTrackList({
   onTrackClick,
   tracksOverride,
 }: ReleaseTrackListProps) {
-  const { playbackState, toggleTrack } = useTrackAudioPlayer();
+  const { playbackState, toggleTrack, seek } = useTrackAudioPlayer();
   const [isExpanded, setIsExpanded] = useState(true);
   const {
     data: fetchedTracks,
@@ -146,6 +146,7 @@ export function ReleaseTrackList({
               onClick={onTrackClick}
               playbackState={playbackState}
               onToggleTrack={toggleTrack}
+              onSeek={seek}
             />
           ))}
       </div>
@@ -159,6 +160,7 @@ function TrackItem({
   onClick,
   playbackState,
   onToggleTrack,
+  onSeek,
 }: {
   readonly track: ReleaseSidebarTrack;
   readonly release: Release;
@@ -177,6 +179,7 @@ function TrackItem({
     artistName?: string;
     artworkUrl?: string | null;
   }) => Promise<void>;
+  readonly onSeek: (time: number) => void;
 }) {
   const trackLabel =
     track.discNumber > 1
@@ -311,18 +314,40 @@ function TrackItem({
                   <Play className='h-[11px] w-[11px]' />
                 )}
               </button>
-              <div className='h-0.5 flex-1 rounded-full bg-surface-1/90'>
-                <div
-                  className='h-full rounded-full bg-(--linear-accent) transition-[width]'
-                  style={{ width: `${progressPercent}%` }}
-                />
+              {/* biome-ignore lint/a11y/useKeyWithClickEvents: seek bar is supplementary to play button */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: seek bar is supplementary to play button */}
+              {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: seek bar is supplementary to play button */}
+              <div
+                className='flex-1 cursor-pointer py-[7px] -my-[7px]'
+                onClick={event => {
+                  event.stopPropagation();
+                  if (progressDuration <= 0) return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  const clickX = Math.max(
+                    0,
+                    Math.min(event.clientX - rect.left, rect.width)
+                  );
+                  onSeek((clickX / rect.width) * progressDuration);
+                }}
+              >
+                <div className='h-0.5 rounded-full bg-surface-1/90'>
+                  <div
+                    className='h-full rounded-full bg-(--linear-accent) transition-[width]'
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
             </div>
-            <p className='text-[10px] text-tertiary-token'>
-              {track.audioFormat
-                ? `Audio preview · ${track.audioFormat.toUpperCase()}`
-                : 'Audio preview'}
-            </p>
+            {isActiveTrack && (
+              <p className='text-[10px] text-tertiary-token'>
+                {track.audioFormat
+                  ? `Audio preview · ${track.audioFormat.toUpperCase()}`
+                  : 'Audio preview'}
+                {progressDuration > 0 && progressDuration < 45
+                  ? ` (${Math.round(progressDuration)}s)`
+                  : ''}
+              </p>
+            )}
           </div>
         )}
       </div>

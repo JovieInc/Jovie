@@ -132,6 +132,13 @@ export function useTrackAudioPlayer() {
     await audio.play();
   }, []);
 
+  const seek = useCallback((time: number) => {
+    const audio = getAudio();
+    if (!audio || !Number.isFinite(time)) return;
+    if (!Number.isFinite(audio.duration) || audio.duration === 0) return;
+    audio.currentTime = Math.max(0, Math.min(time, audio.duration));
+  }, []);
+
   const onError = useCallback((cb: () => void) => {
     errorListeners.add(cb);
     return () => {
@@ -142,6 +149,7 @@ export function useTrackAudioPlayer() {
   return {
     playbackState,
     toggleTrack,
+    seek,
     onError,
   };
 }
