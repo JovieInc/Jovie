@@ -1,7 +1,6 @@
 'use client';
 
-import { Badge } from '@jovie/ui';
-import { Disc3, Pause, Play } from 'lucide-react';
+import { Pause, Play, VolumeX } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -10,11 +9,11 @@ import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useT
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { cn } from '@/lib/utils';
 
 interface ReleaseCellProps {
   readonly release: ReleaseViewModel;
   readonly artistName?: string | null;
-  /** Whether to show release type inline (when type column is hidden) */
   readonly showType?: boolean;
 }
 
@@ -54,10 +53,6 @@ export const ReleaseCell = memo(function ReleaseCell({
     ]
   );
 
-  const manualOverrideCount = release.providers.filter(
-    provider => provider.source === 'manual'
-  ).length;
-
   const typeStyle = release.releaseType
     ? getReleaseTypeStyle(release.releaseType)
     : null;
@@ -68,66 +63,68 @@ export const ReleaseCell = memo(function ReleaseCell({
   );
 
   return (
-    <div className='grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-start gap-x-2.5'>
-      <div className='flex w-[16px] items-center justify-center pt-0.5'>
+    <div className='flex min-w-0 items-center gap-2.5'>
+      {/* Play/status indicator — 16px column */}
+      <div className='flex w-4 shrink-0 items-center justify-center'>
         {hasPreview ? (
           <DrawerInlineIconButton
             onClick={handleTogglePlayback}
-            className={`h-[16px] w-[16px] rounded-[4px] p-0 transition-opacity duration-150 focus-visible:opacity-100 ${
+            className={cn(
+              'h-4 w-4 rounded-[3px] p-0 transition-opacity duration-150 focus-visible:opacity-100',
               isPlaying
                 ? 'text-(--linear-accent) opacity-100'
-                : 'text-quaternary-token opacity-40 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
-            }`}
+                : 'text-quaternary-token opacity-0 group-hover:opacity-100 aria-[pressed=true]:opacity-100'
+            )}
             aria-label={
               isPlaying ? `Pause ${release.title}` : `Play ${release.title}`
             }
             aria-pressed={isPlaying}
           >
             {isPlaying ? (
-              <Pause className='h-[10px] w-[10px]' />
+              <Pause className='h-2.5 w-2.5' />
             ) : (
-              <Play className='h-[10px] w-[10px]' />
+              <Play className='h-2.5 w-2.5' />
             )}
           </DrawerInlineIconButton>
+        ) : showType && typeStyle ? (
+          <span
+            className={cn('h-2 w-2 shrink-0 rounded-full', typeStyle.dot)}
+            title={typeStyle.label}
+          />
         ) : (
-          <Disc3
-            className='h-[10px] w-[10px] text-quaternary-token/30'
+          <VolumeX
+            className='h-3 w-3 text-quaternary-token'
             aria-label='No preview available'
           />
         )}
       </div>
 
-      <div className='min-w-0 space-y-px'>
+      {/* Title + artist */}
+      <div className='min-w-0 flex-1'>
         <div className='flex min-w-0 items-center gap-1.5 leading-none'>
           <TruncatedText
             lines={1}
-            className='min-w-0 flex-1 text-[12.5px] font-[510] leading-[1.1] tracking-[-0.012em] text-primary-token'
+            className='min-w-0 flex-1 text-[13px] font-[510] leading-[1.15] tracking-[-0.012em] text-primary-token'
             tooltipSide='top'
             tooltipAlign='start'
           >
             {release.title}
           </TruncatedText>
-          {showType && typeStyle && (
-            <Badge
-              size='sm'
-              className={`inline-flex h-[16px] shrink-0 items-center justify-center rounded-[6px] px-1.5 py-0 align-middle text-[9px] font-[510] leading-none tracking-normal ${typeStyle.bg} ${typeStyle.text}`}
+          {showType && typeStyle && hasPreview && (
+            <span
+              className={cn(
+                'shrink-0 text-[10px] font-[510] leading-none tracking-normal',
+                typeStyle.text
+              )}
             >
               {typeStyle.label}
-            </Badge>
-          )}
-          {manualOverrideCount > 0 && (
-            <Badge
-              variant='secondary'
-              className='hidden h-[16px] shrink-0 items-center justify-center rounded-[6px] bg-amber-500/10 px-1.5 py-0 text-[9px] font-[510] leading-none tracking-normal text-amber-700 xl:inline-flex dark:text-amber-300'
-            >
-              {manualOverrideCount} edited
-            </Badge>
+            </span>
           )}
         </div>
         {artistLine ? (
           <TruncatedText
             lines={1}
-            className='text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-tertiary-token'
+            className='mt-px text-[11px] font-[400] leading-[1.2] tracking-[-0.005em] text-secondary-token'
           >
             {artistLine}
           </TruncatedText>

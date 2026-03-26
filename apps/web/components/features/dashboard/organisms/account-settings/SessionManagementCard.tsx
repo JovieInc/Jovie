@@ -10,8 +10,9 @@
 import { Button } from '@jovie/ui';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from '@/components/molecules/ConfirmDialog';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { captureError } from '@/lib/error-tracking';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 
 import type { ClerkSessionResource, ClerkUserResource } from './types';
@@ -50,7 +51,9 @@ export function SessionManagementCard({
       } catch (error) {
         if (!cancelled) {
           setSessionsError('Unable to load active sessions right now.');
-          console.error('Failed to load sessions:', error);
+          void captureError('Failed to load sessions', error, {
+            source: 'SessionManagementCard',
+          });
         }
       } finally {
         if (!cancelled) {
@@ -82,68 +85,80 @@ export function SessionManagementCard({
 
   if (sessionsLoading) {
     return (
-      <ContentSurfaceCard className='overflow-hidden'>
-        <div className='space-y-3 px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
-            <LoadingSkeleton height='h-10' />
-          </ContentSurfaceCard>
-          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
-            <LoadingSkeleton height='h-10' />
-          </ContentSurfaceCard>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='divide-y divide-subtle/60 overflow-hidden'
+      >
+        <div className='px-4 py-3 sm:px-5'>
+          <LoadingSkeleton height='h-10' />
         </div>
-      </ContentSurfaceCard>
+        <div className='px-4 py-3 sm:px-5'>
+          <LoadingSkeleton height='h-10' />
+        </div>
+      </DashboardCard>
     );
   }
 
   if (sessionsError) {
     return (
-      <ContentSurfaceCard className='overflow-hidden'>
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
-            <p className='text-[13px] text-destructive'>{sessionsError}</p>
-          </ContentSurfaceCard>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <div className='px-4 py-3 sm:px-5'>
+          <p className='text-[13px] text-destructive'>{sessionsError}</p>
         </div>
-      </ContentSurfaceCard>
+      </DashboardCard>
     );
   }
 
   if (sessions.length === 0) {
     return (
-      <ContentSurfaceCard className='overflow-hidden'>
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-3.5'>
-            <p className='text-[13px] text-secondary-token'>
-              No other active sessions.
-            </p>
-          </ContentSurfaceCard>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='overflow-hidden'
+      >
+        <div className='px-4 py-3 sm:px-5'>
+          <p className='text-[13px] text-secondary-token'>
+            No other active sessions.
+          </p>
         </div>
-      </ContentSurfaceCard>
+      </DashboardCard>
     );
   }
 
   return (
-    <ContentSurfaceCard className='overflow-hidden'>
-      <div className='space-y-3 px-4 py-3'>
+    <>
+      <DashboardCard
+        variant='settings'
+        padding='none'
+        className='divide-y divide-subtle/60 overflow-hidden'
+      >
         {sessions.map(session => {
           const isCurrent = session.id === activeSessionId;
           const activity = session.latestActivity;
 
           return (
-            <ContentSurfaceCard
+            <div
               key={session.id}
-              className='flex items-center justify-between gap-3 bg-surface-0 p-3.5'
+              className='flex items-start justify-between gap-3 px-4 py-3 sm:px-5'
             >
               <div className='min-w-0'>
-                <p className='flex items-center gap-2 text-[13px] text-primary-token'>
-                  {isCurrent
-                    ? 'This device'
-                    : activity?.browserName || 'Unknown device'}
+                <div className='flex flex-wrap items-center gap-1.5'>
+                  <p className='text-[13px] font-[510] text-primary-token'>
+                    {isCurrent
+                      ? 'This device'
+                      : activity?.browserName || 'Unknown device'}
+                  </p>
                   {isCurrent ? (
-                    <span className='text-[11px] text-secondary-token'>
+                    <span className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 py-0.5 text-[10px] font-[510] text-secondary-token'>
                       Current session
                     </span>
                   ) : null}
-                </p>
+                </div>
                 <p className='mt-0.5 text-[11px] text-secondary-token'>
                   Last active {formatRelativeDate(session.lastActiveAt)}
                   {activity?.city && activity?.country
@@ -154,19 +169,19 @@ export function SessionManagementCard({
 
               {isCurrent ? null : (
                 <Button
-                  variant='destructive'
+                  variant='ghost'
                   size='sm'
                   disabled={endingSessionId === session.id}
                   onClick={() => setSessionToEnd(session)}
-                  className='shrink-0'
+                  className='h-7 shrink-0 rounded-[8px] border border-transparent bg-transparent px-2.5 text-[11px] font-[510] text-secondary-token hover:border-destructive/20 hover:bg-destructive/10 hover:text-destructive'
                 >
                   {endingSessionId === session.id ? 'Ending…' : 'End session'}
                 </Button>
               )}
-            </ContentSurfaceCard>
+            </div>
           );
         })}
-      </div>
+      </DashboardCard>
 
       <ConfirmDialog
         open={Boolean(sessionToEnd)}
@@ -181,6 +196,6 @@ export function SessionManagementCard({
           if (sessionToEnd) await handleEndSession(sessionToEnd);
         }}
       />
-    </ContentSurfaceCard>
+    </>
   );
 }

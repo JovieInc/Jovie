@@ -15,10 +15,13 @@ import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
   DrawerPropertyRow,
+  DrawerSurfaceCard,
+  DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerSection } from '@/components/molecules/drawer/DrawerSection';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   CONTACT_ROLE_OPTIONS,
   CONTACT_TERRITORY_PRESETS,
@@ -67,6 +70,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
   onDelete,
   contextMenuItems,
 }: ContactDetailSidebarProps) {
+  const [activeTab, setActiveTab] = useState<'info' | 'territories'>('info');
   const [editingField, setEditingField] = useState<EditableField>(null);
   const [editValue, setEditValue] = useState<string>('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -296,135 +300,178 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
       title={headerTitle}
       onClose={handleClose}
       headerActions={headerActions}
+      actionsInEntityHeader
       contextMenuItems={contextMenuItems}
       isEmpty={!hasContact}
       emptyMessage='Select a contact to view details'
+      tabs={
+        <DrawerTabs
+          value={activeTab}
+          onValueChange={v => setActiveTab(v as 'info' | 'territories')}
+          options={[
+            { value: 'info' as const, label: 'Info' },
+            { value: 'territories' as const, label: 'Territories' },
+          ]}
+          ariaLabel='Contact tabs'
+        />
+      }
       entityHeader={
         contact ? (
-          <div className='space-y-1'>
-            <p className='text-[15px] font-[520] leading-5 text-primary-token'>
-              {contactDisplayName}
-            </p>
-            <p className='mt-1 text-[12px] text-secondary-token'>{roleLabel}</p>
-          </div>
+          <DrawerSurfaceCard
+            className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
+          >
+            <div className='p-2.5'>
+              <div className='space-y-px'>
+                <p className='truncate text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token'>
+                  {contactDisplayName}
+                </p>
+                <p className='truncate text-[11px] leading-[14px] tracking-[-0.005em] text-secondary-token'>
+                  {roleLabel}
+                </p>
+              </div>
+            </div>
+          </DrawerSurfaceCard>
         ) : undefined
       }
     >
       {contact && (
         <>
-          <DrawerSection title='Role' className='space-y-2'>
-            <Label className='text-[13px] text-secondary-token'>
-              Contact type
-            </Label>
-            <Select value={contact.role} onValueChange={handleRoleChange}>
-              <SelectTrigger className='h-8 rounded-md bg-surface-1 px-2.5 text-[13px]'>
-                <SelectValue>{roleLabel}</SelectValue>
-              </SelectTrigger>
-              <SelectContent className='p-0.5'>
-                {CONTACT_ROLE_OPTIONS.map(option => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className='rounded px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
-                  >
-                    <div className='flex items-center gap-2'>
-                      <Icon
-                        name={option.iconName}
-                        className='h-4 w-4 text-tertiary-token'
-                      />
-                      <span>{option.label}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </DrawerSection>
-
-          <DrawerSection title='Contact Info' className='space-y-2'>
-            <div className='space-y-1'>
-              {renderEditableField(
-                'personName',
-                'Name',
-                contact.personName,
-                'Contact name'
-              )}
-              {renderEditableField(
-                'companyName',
-                'Company',
-                contact.companyName,
-                'Company name'
-              )}
-              {renderEditableField('email', 'Email', contact.email, 'Email')}
-              {renderEditableField('phone', 'Phone', contact.phone, 'Phone')}
-            </div>
-          </DrawerSection>
-
-          {/* Preferred Channel */}
-          {hasEmailAndPhone && (
-            <DrawerSection title='Preferred Contact' className='space-y-2'>
-              <div className='space-y-2'>
+          {activeTab === 'info' && (
+            <>
+              <DrawerSection title='Role' className='space-y-2'>
                 <Label className='text-[13px] text-secondary-token'>
-                  Default action
+                  Contact type
                 </Label>
-                <Select
-                  value={contact.preferredChannel || ''}
-                  onValueChange={handlePreferredChannelChange}
-                >
-                  <SelectTrigger className='h-8 rounded-md bg-surface-1 px-2.5 text-[13px]'>
-                    <SelectValue placeholder='Select preferred channel'>
-                      {getPreferredChannelLabel(contact.preferredChannel)}
-                    </SelectValue>
+                <Select value={contact.role} onValueChange={handleRoleChange}>
+                  <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px]'>
+                    <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='email'>Email</SelectItem>
-                    <SelectItem value='phone'>Phone</SelectItem>
+                  <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                    {CONTACT_ROLE_OPTIONS.map(option => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className='rounded-[6px] px-2 py-1.5 text-[13px] font-[510] text-secondary-token data-highlighted:bg-surface-0 data-highlighted:text-primary-token'
+                      >
+                        <div className='flex items-center gap-2'>
+                          <Icon
+                            name={option.iconName}
+                            className='h-4 w-4 text-tertiary-token'
+                          />
+                          <span>{option.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+              </DrawerSection>
+
+              <DrawerSection title='Contact Info' className='space-y-2'>
+                <div className='space-y-1'>
+                  {renderEditableField(
+                    'personName',
+                    'Name',
+                    contact.personName,
+                    'Contact name'
+                  )}
+                  {renderEditableField(
+                    'companyName',
+                    'Company',
+                    contact.companyName,
+                    'Company name'
+                  )}
+                  {renderEditableField(
+                    'email',
+                    'Email',
+                    contact.email,
+                    'Email'
+                  )}
+                  {renderEditableField(
+                    'phone',
+                    'Phone',
+                    contact.phone,
+                    'Phone'
+                  )}
+                </div>
+              </DrawerSection>
+
+              {/* Preferred Channel */}
+              {hasEmailAndPhone && (
+                <DrawerSection title='Preferred Contact' className='space-y-2'>
+                  <div className='space-y-2'>
+                    <Label className='text-[13px] text-secondary-token'>
+                      Default action
+                    </Label>
+                    <Select
+                      value={contact.preferredChannel || ''}
+                      onValueChange={handlePreferredChannelChange}
+                    >
+                      <SelectTrigger className='h-8 rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 text-[13px]'>
+                        <SelectValue placeholder='Select preferred channel'>
+                          {getPreferredChannelLabel(contact.preferredChannel)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent className='rounded-[10px] border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'>
+                        <SelectItem value='email'>Email</SelectItem>
+                        <SelectItem value='phone'>Phone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </DrawerSection>
+              )}
+            </>
+          )}
+
+          {activeTab === 'territories' && (
+            <DrawerSection title='Territories' className='space-y-2'>
+              <div className='space-y-2'>
+                <DrawerPropertyRow
+                  label='Coverage'
+                  value={
+                    <Badge
+                      size='sm'
+                      className='rounded-[6px] border border-(--linear-app-frame-seam) bg-surface-0 px-1.5 text-[10px] text-secondary-token'
+                    >
+                      {territorySummary}
+                    </Badge>
+                  }
+                  labelWidth={96}
+                  labelClassName='normal-case tracking-normal text-[12px]'
+                />
+                <div className='flex flex-wrap gap-1.5'>
+                  {CONTACT_TERRITORY_PRESETS.map(territory => {
+                    const isSelected = contact.territories.includes(territory);
+                    return (
+                      <button
+                        key={territory}
+                        type='button'
+                        onClick={() => handleTerritoryToggle(territory)}
+                        className={cn(
+                          'rounded-[8px] border px-2.5 py-1 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
+                          isSelected
+                            ? 'border-(--linear-border-focus)/35 bg-surface-1 text-primary-token'
+                            : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                        )}
+                      >
+                        {territory}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </DrawerSection>
           )}
 
-          <DrawerSection title='Territories' className='space-y-2'>
-            <div className='space-y-2'>
-              <DrawerPropertyRow
-                label='Coverage'
-                value={<Badge size='sm'>{territorySummary}</Badge>}
-                labelWidth={96}
-                labelClassName='normal-case tracking-normal text-[12px]'
-              />
-              <div className='flex flex-wrap gap-1.5'>
-                {CONTACT_TERRITORY_PRESETS.map(territory => {
-                  const isSelected = contact.territories.includes(territory);
-                  return (
-                    <button
-                      key={territory}
-                      type='button'
-                      onClick={() => handleTerritoryToggle(territory)}
-                      className={cn(
-                        'rounded-md px-2 py-1 text-[13px] transition-[background-color,color] duration-150',
-                        isSelected
-                          ? 'bg-surface-1 text-primary-token'
-                          : 'bg-surface-0 text-secondary-token hover:bg-surface-1'
-                      )}
-                    >
-                      {territory}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </DrawerSection>
-
           {/* Error display */}
           {contact.error && (
-            <div className='rounded-md bg-red-500/5 p-2'>
+            <div className='rounded-[8px] border border-destructive/15 bg-destructive/5 px-3 py-2'>
               <p className='text-[13px] text-destructive'>{contact.error}</p>
             </div>
           )}
 
           {/* Saving indicator */}
           {contact.isSaving && (
-            <div className='text-center text-[13px] text-tertiary-token'>
+            <div className='rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-center text-[13px] text-tertiary-token'>
               Saving...
             </div>
           )}

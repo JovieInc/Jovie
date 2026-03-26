@@ -18,13 +18,13 @@ export function SetupTaskItem({
   action,
 }: SetupTaskItemProps): React.ReactElement {
   return (
-    <li className='flex h-full flex-col gap-3 rounded-xl border border-subtle bg-surface-1/70 p-4 shadow-card'>
+    <li className='flex h-full flex-col gap-3 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'>
       <div className='flex items-center gap-2'>
         <div
-          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-[510] ${
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-[13px] font-[510] ${
             complete
-              ? 'bg-surface-1 text-secondary-token ring-1 ring-inset ring-subtle'
-              : 'bg-accent/15 text-accent ring-1 ring-inset ring-interactive/20'
+              ? 'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'
+              : 'border border-accent/20 bg-accent/10 text-accent'
           }`}
           aria-hidden='true'
         >

@@ -188,6 +188,7 @@ export function ReleaseDspLinks({
   return (
     <DrawerLinkSection
       title='Platforms'
+      showHeading={false}
       onAdd={
         isEditable && availableProviders.length > 0
           ? () => onSetIsAddingLink(true)

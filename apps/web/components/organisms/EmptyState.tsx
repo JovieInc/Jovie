@@ -65,7 +65,7 @@ const variantStyles: Record<
   default: {
     iconWrapper: 'text-tertiary-token',
     heading: 'text-secondary-token',
-    description: 'text-tertiary-token',
+    description: 'text-secondary-token',
   },
   search: {
     iconWrapper: 'text-sky-600 dark:text-sky-300',

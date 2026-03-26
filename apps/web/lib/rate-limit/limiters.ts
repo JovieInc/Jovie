@@ -116,6 +116,17 @@ export const adminCreatorIngestLimiter = createRateLimiter(
 );
 
 /**
+ * Deploy promote rate limiter
+ * Limit: 1 request per minute globally
+ */
+export const deployPromoteLimiter = createRateLimiter(
+  RATE_LIMITERS.deployPromote,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Admin outreach rate limiter
  * Limit: 10 per hour per admin
  * Prevents excessive bulk external API calls via Instantly
@@ -206,6 +217,17 @@ export const healthLimiter = createRateLimiter(RATE_LIMITERS.health, {
 export const generalLimiter = createRateLimiter(RATE_LIMITERS.general, {
   requireRedis: true,
 });
+
+/**
+ * Changelog subscribe limiter
+ * Limit: 1 request per 10 seconds per IP
+ */
+export const changelogSubscribeLimiter = createRateLimiter(
+  RATE_LIMITERS.changelogSubscribe,
+  {
+    requireRedis: true,
+  }
+);
 
 // ============================================================================
 // Convenience Functions
@@ -837,6 +859,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     adminFitScores: adminFitScoresLimiter,
     adminCreatorIngest: adminCreatorIngestLimiter,
     adminOutreach: adminOutreachLimiter,
+    deployPromote: deployPromoteLimiter,
     dspDiscovery: dspDiscoveryLimiter,
     isrcRescan: isrcRescanLimiter,
     trackingClicks: trackingClicksLimiter,
@@ -848,6 +871,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicVisit: publicVisitLimiter,
     health: healthLimiter,
     general: generalLimiter,
+    changelogSubscribe: changelogSubscribeLimiter,
     spotifySearch: spotifySearchLimiter,
     spotifySearchApi: spotifySearchApiLimiter,
     spotifyClaim: spotifyClaimLimiter,

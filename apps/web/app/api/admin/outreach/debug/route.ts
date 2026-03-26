@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { isSpotifyConfigured, validateSpotifyEnv } from '@/lib/spotify/env';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
@@ -73,11 +74,16 @@ async function probeInstantly(): Promise<ConnectivityResult> {
 
   const start = Date.now();
   try {
-    const res = await fetch(
+    const res = await serverFetch(
       'https://api.instantly.ai/api/v2/campaigns?limit=1',
       {
         headers: { Authorization: `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(10_000),
+        timeoutMs: 10_000,
+        context: 'Instantly connectivity probe',
+        retry: {
+          maxRetries: 1,
+          baseDelayMs: 300,
+        },
       }
     );
     const latencyMs = Date.now() - start;
@@ -90,6 +96,14 @@ async function probeInstantly(): Promise<ConnectivityResult> {
       error: `HTTP ${res.status}: ${text.slice(0, 200)}`,
     };
   } catch (err) {
+    if (err instanceof ServerFetchTimeoutError) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: err.message,
+      };
+    }
+
     return {
       ok: false,
       latencyMs: Date.now() - start,
@@ -118,8 +132,13 @@ async function probeGoogleCSE(): Promise<ConnectivityResult> {
     url.searchParams.set('q', 'test');
     url.searchParams.set('num', '1');
 
-    const res = await fetch(url.toString(), {
-      signal: AbortSignal.timeout(10_000),
+    const res = await serverFetch(url.toString(), {
+      timeoutMs: 10_000,
+      context: 'Google CSE connectivity probe',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 300,
+      },
     });
     const latencyMs = Date.now() - start;
 
@@ -132,6 +151,14 @@ async function probeGoogleCSE(): Promise<ConnectivityResult> {
       error: `HTTP ${res.status}: ${text.slice(0, 200)}`,
     };
   } catch (err) {
+    if (err instanceof ServerFetchTimeoutError) {
+      return {
+        ok: false,
+        latencyMs: Date.now() - start,
+        error: err.message,
+      };
+    }
+
     return {
       ok: false,
       latencyMs: Date.now() - start,

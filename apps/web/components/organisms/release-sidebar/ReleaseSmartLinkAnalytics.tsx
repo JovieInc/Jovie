@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerEmptyState,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
 async function fetchReleaseAnalytics(
@@ -84,18 +86,38 @@ export function ReleaseSmartLinkAnalytics({
 
   const showSkeleton = isLoading && !data;
 
+  const smartLinkUrl = release.smartLinkPath
+    ? `${getBaseUrl()}${release.smartLinkPath}`
+    : '';
+
   return (
     <DrawerSurfaceCard
       className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
       testId='release-smart-link-analytics'
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Analytics
-        </p>
-      </div>
+      {/* Smart link URL + actions */}
+      {release.smartLinkPath && (
+        <div className='px-2.5 pt-2.5 pb-2'>
+          <CopyableUrlRow
+            url={smartLinkUrl}
+            displayValue={release.smartLinkPath}
+            size='md'
+            valueClassName='text-tertiary-token'
+            copyButtonTitle='Copy link'
+            openButtonTitle='Open smart link'
+            surface='boxed'
+          />
+        </div>
+      )}
 
-      <div className='p-3'>
+      {/* Analytics metrics */}
+      <div
+        className={cn(
+          'px-3 pb-3',
+          release.smartLinkPath && 'pt-0',
+          !release.smartLinkPath && 'pt-3'
+        )}
+      >
         {showSkeleton && (
           <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
             <div className='space-y-1 pr-3'>

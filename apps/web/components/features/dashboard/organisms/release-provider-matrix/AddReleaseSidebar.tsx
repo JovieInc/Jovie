@@ -31,7 +31,7 @@ const RELEASE_TYPE_OPTIONS = [
 ] as const;
 
 const ADD_RELEASE_CARD_CLASSNAME =
-  'overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))]';
+  'overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)';
 
 type ReleaseType = (typeof RELEASE_TYPE_OPTIONS)[number]['value'];
 
@@ -183,7 +183,7 @@ export function AddReleaseSidebar({
       footer={
         <DrawerButton
           tone='primary'
-          className='h-8 w-full'
+          className='h-8 w-full rounded-[8px]'
           onClick={handleSubmit}
           disabled={isSubmitting || !title.trim()}
         >
@@ -212,7 +212,7 @@ export function AddReleaseSidebar({
               onChange={e => setTitle(e.target.value)}
               placeholder='My New Release'
               autoFocus
-              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormField>
 
@@ -223,7 +223,7 @@ export function AddReleaseSidebar({
             >
               <SelectTrigger
                 id='release-type'
-                className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
               >
                 <SelectValue />
               </SelectTrigger>
@@ -243,7 +243,7 @@ export function AddReleaseSidebar({
               type='date'
               value={releaseDate}
               onChange={e => setReleaseDate(e.target.value)}
-              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormField>
 
@@ -254,7 +254,7 @@ export function AddReleaseSidebar({
               value={artworkUrl}
               onChange={e => setArtworkUrl(e.target.value)}
               placeholder='https://example.com/artwork.jpg'
-              className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+              className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
             />
           </DrawerFormField>
         </div>
@@ -282,7 +282,7 @@ export function AddReleaseSidebar({
                   handleProviderUrlChange(provider.key, e.target.value)
                 }
                 placeholder={provider.placeholder}
-                className='h-[32px] border-subtle bg-surface-0 text-[12px]'
+                className='h-[32px] rounded-[8px] border-subtle bg-surface-0 text-[12px]'
               />
             </DrawerFormField>
           ))}

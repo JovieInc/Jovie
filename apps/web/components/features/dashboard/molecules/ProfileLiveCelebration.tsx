@@ -201,8 +201,8 @@ export function ProfileLiveCelebration({
           Your profile is live
         </h2>
 
-        <div className='flex items-center gap-2 rounded-xl border border-subtle bg-surface-1 px-4 py-2.5'>
-          <span className='text-[15px] font-medium text-primary-token'>
+        <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
+          <span className='text-[13px] font-medium text-primary-token'>
             {profileUrl}
           </span>
           <CopyToClipboardButton
