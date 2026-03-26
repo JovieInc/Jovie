@@ -34,6 +34,8 @@ export interface EntitySidebarShellProps {
 
   /** Entity header slot — image + name area below the header bar */
   readonly entityHeader?: ReactNode;
+  /** When true, header actions render inside the entity header card instead of the title bar */
+  readonly actionsInEntityHeader?: boolean;
   /** Tabs slot — SegmentControl rendered below entity header */
   readonly tabs?: ReactNode;
   /** Optional className override for the tabs wrapper */
@@ -85,6 +87,7 @@ export function EntitySidebarShell({
   onClose,
   headerActions,
   entityHeader,
+  actionsInEntityHeader = false,
   tabs,
   tabsContainerClassName,
   children,
@@ -92,6 +95,24 @@ export function EntitySidebarShell({
   isEmpty = false,
   emptyMessage = 'Select an item to view details.',
 }: EntitySidebarShellProps) {
+  const titleBarActions = actionsInEntityHeader ? (
+    onClose ? (
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[]}
+        onClose={onClose}
+      />
+    ) : undefined
+  ) : (
+    (headerActions ??
+    (onClose ? (
+      <DrawerHeaderActions
+        primaryActions={[]}
+        overflowActions={[]}
+        onClose={onClose}
+      />
+    ) : undefined))
+  );
   return (
     <RightDrawer
       isOpen={isOpen}
@@ -113,22 +134,15 @@ export function EntitySidebarShell({
                 'border-b border-transparent backdrop-blur-[12px]'
               )}
             >
-              <DrawerHeader
-                title={title}
-                actions={
-                  headerActions ??
-                  (onClose ? (
-                    <DrawerHeaderActions
-                      primaryActions={[]}
-                      overflowActions={[]}
-                      onClose={onClose}
-                    />
-                  ) : undefined)
-                }
-              />
+              <DrawerHeader title={title} actions={titleBarActions} />
 
               {entityHeader ? (
                 <div className='overflow-visible px-3 pb-2.5 pt-2.5'>
+                  {actionsInEntityHeader && headerActions ? (
+                    <div className='mb-2 flex items-center justify-end gap-1'>
+                      {headerActions}
+                    </div>
+                  ) : null}
                   {entityHeader}
                 </div>
               ) : null}
@@ -136,7 +150,7 @@ export function EntitySidebarShell({
               {tabs ? (
                 <div
                   className={cn(
-                    'overflow-visible border-t border-(--linear-app-frame-seam) px-3 py-2 [&>*]:w-full',
+                    'overflow-visible px-2.5 py-1.5 [&>*]:w-full',
                     tabsContainerClassName
                   )}
                 >

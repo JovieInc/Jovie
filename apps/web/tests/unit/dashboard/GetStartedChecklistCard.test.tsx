@@ -47,7 +47,7 @@ describe('GetStartedChecklistCard', () => {
 
   it('shows progress bar', () => {
     const { container } = render(<GetStartedChecklistCard userId={userId} />);
-    expect(container.querySelector('.bg-surface-2')).toBeInTheDocument();
+    expect(container.querySelector('.bg-surface-0')).toBeInTheDocument();
   });
 
   it('shows "Later" dismiss button', () => {

@@ -88,11 +88,7 @@ export function CompactLinkRail({
             collapsed={useCollapsedPills}
             stackable={useCollapsedPills}
             onClick={item.onClick}
-            className={cn(
-              useCollapsedPills
-                ? 'max-w-[132px] lg:max-w-[168px]'
-                : 'max-w-[168px] lg:max-w-[220px]'
-            )}
+            className='min-w-0 max-w-full'
           />
         ))}
       </div>

@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * Shared primitives for phone showcase sections (hero, sticky tour).
  *
@@ -5,12 +7,15 @@
  * and StickyPhoneTour (scroll-driven phone with mode transitions).
  */
 
-import { Bell, Calendar, DollarSign, Mail } from 'lucide-react';
-import { Children, isValidElement } from 'react';
+import {
+  Children,
+  isValidElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { ArtistName } from '@/components/atoms/ArtistName';
-import { BrandLogo } from '@/components/atoms/BrandLogo';
-import { CircleIconButton } from '@/components/atoms/CircleIconButton';
-import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { Avatar } from '@/components/molecules/Avatar';
 import { PhoneFrame } from './PhoneFrame';
 import {
@@ -59,35 +64,6 @@ export const MODES: ModeData[] = [
     description:
       'A new listener taps once. Jovie routes them to Spotify, Apple Music, or YouTube Music without the usual friction.',
     outcome: 'Boost streams',
-  },
-] as const;
-
-/** Icons shown in the phone's social/action bar, matching the real profile. */
-const SOCIAL_BAR_ICONS = [
-  {
-    key: 'mail',
-    activeMode: null,
-    render: () => <Mail className='h-3.5 w-3.5' />,
-  },
-  {
-    key: 'instagram',
-    activeMode: null,
-    render: () => <SocialIcon platform='instagram' size={14} aria-hidden />,
-  },
-  {
-    key: 'spotify',
-    activeMode: null,
-    render: () => <SocialIcon platform='spotify' size={14} aria-hidden />,
-  },
-  {
-    key: 'tour',
-    activeMode: 'tour' as const,
-    render: () => <Calendar className='h-3.5 w-3.5' />,
-  },
-  {
-    key: 'tip',
-    activeMode: 'tip' as const,
-    render: () => <DollarSign className='h-3.5 w-3.5' />,
   },
 ] as const;
 
@@ -146,106 +122,205 @@ export function CrossfadeBlock({
 }
 
 /* ------------------------------------------------------------------ */
-/*  PhoneShowcase — artist header + dot indicators + mode content       */
+/*  PhoneShowcase — auto-rotating with tabs                            */
 /* ------------------------------------------------------------------ */
 
+const ROTATION_INTERVAL = 3500;
+const ROTATION_DELAY = 1500;
+
+/** Tab labels shown beneath the phone, using URL-style paths. */
+export const MODE_TAB_LABELS: Record<string, string> = {
+  profile: '/profile',
+  tour: '/tour',
+  tip: '/tip',
+  listen: '/listen',
+};
+
 interface PhoneShowcaseProps {
-  readonly activeIndex: number;
+  readonly activeIndex?: number;
   readonly modes: readonly ModeData[];
+  /** Auto-rotate through modes. Defaults to true. */
+  readonly autoRotate?: boolean;
+  /** Called when active index changes (for external tab rendering). */
+  readonly onIndexChange?: (index: number) => void;
+  /** Hide built-in tabs (render them externally instead). */
+  readonly hideTabs?: boolean;
 }
 
-export function PhoneShowcase({ activeIndex, modes }: PhoneShowcaseProps) {
-  return (
-    <PhoneFrame>
-      <div className='flex items-center justify-between px-4 pt-10 pb-1'>
-        <CircleIconButton size='xs' variant='surface' ariaLabel='Jovie'>
-          <BrandLogo size={14} tone='auto' rounded={false} aria-hidden />
-        </CircleIconButton>
-        <CircleIconButton size='xs' variant='ghost' ariaLabel='Notifications'>
-          <Bell className='h-4 w-4' />
-        </CircleIconButton>
-      </div>
+export function PhoneShowcase({
+  activeIndex: controlledIndex,
+  modes,
+  autoRotate = true,
+  onIndexChange,
+  hideTabs = false,
+}: PhoneShowcaseProps) {
+  const [internalIndex, setInternalIndex] = useState(0);
+  const [direction, setDirection] = useState<'left' | 'right'>('left');
+  const [started, setStarted] = useState(!autoRotate);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-      <div className='flex flex-col items-center px-5 pb-2'>
-        <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
-          <Avatar
-            src={MOCK_ARTIST.image}
-            alt={MOCK_ARTIST.name}
-            name={MOCK_ARTIST.name}
-            size='display-md'
-            verified={MOCK_ARTIST.isVerified}
-          />
+  const activeIndex = controlledIndex ?? internalIndex;
+
+  // Notify parent of index changes
+  useEffect(() => {
+    onIndexChange?.(internalIndex);
+  }, [internalIndex, onIndexChange]);
+
+  const goTo = useCallback(
+    (next: number) => {
+      setDirection(next > internalIndex ? 'left' : 'right');
+      setInternalIndex(next);
+    },
+    [internalIndex]
+  );
+
+  // Delayed start + auto-rotation
+  useEffect(() => {
+    if (!autoRotate) return;
+
+    const delayTimer = setTimeout(() => {
+      setStarted(true);
+      setDirection('left');
+      setInternalIndex(1);
+    }, ROTATION_DELAY);
+
+    return () => clearTimeout(delayTimer);
+  }, [autoRotate]);
+
+  useEffect(() => {
+    if (!autoRotate || !started) return;
+
+    timerRef.current = setInterval(() => {
+      setInternalIndex(prev => {
+        const next = (prev + 1) % modes.length;
+        setDirection('left');
+        return next;
+      });
+    }, ROTATION_INTERVAL);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [autoRotate, started, modes.length]);
+
+  const handleTabClick = useCallback(
+    (index: number) => {
+      goTo(index);
+      // Reset the auto-rotation timer on manual click
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (autoRotate) {
+        timerRef.current = setInterval(() => {
+          setInternalIndex(prev => {
+            const next = (prev + 1) % modes.length;
+            setDirection('left');
+            return next;
+          });
+        }, ROTATION_INTERVAL);
+      }
+    },
+    [goTo, autoRotate, modes.length]
+  );
+
+  // Slide direction: entering slides in from left/right, exiting slides out the other way
+  const slideOffset = direction === 'left' ? '100%' : '-100%';
+  const slideOffsetOut = direction === 'left' ? '-100%' : '100%';
+
+  return (
+    <div className='flex flex-col items-center'>
+      <PhoneFrame>
+        {/* Minimal profile header */}
+        <div className='flex flex-col items-center px-5 pt-14 pb-3'>
+          <div className='rounded-full p-[2px] ring-1 ring-white/6 shadow-sm'>
+            <Avatar
+              src={MOCK_ARTIST.image}
+              alt={MOCK_ARTIST.name}
+              name={MOCK_ARTIST.name}
+              size='display-md'
+            />
+          </div>
+          <div className='mt-2.5 text-center'>
+            <ArtistName
+              name={MOCK_ARTIST.name}
+              handle={MOCK_ARTIST.handle}
+              isVerified={MOCK_ARTIST.isVerified}
+              size='md'
+              showLink={false}
+              as='p'
+            />
+          </div>
         </div>
-        <div className='mt-2.5 text-center'>
-          <ArtistName
-            name={MOCK_ARTIST.name}
-            handle={MOCK_ARTIST.handle}
-            isVerified={MOCK_ARTIST.isVerified}
-            size='md'
-            showLink={false}
-            as='p'
-          />
-          <p className='mt-0.5 text-xs text-tertiary-token tracking-[0.2em] uppercase'>
-            Artist
+
+        {/* Mode content — slide transitions */}
+        <div
+          className='relative overflow-hidden'
+          style={{ height: PHONE_CONTENT_HEIGHT }}
+        >
+          {modes.map((mode, i) => {
+            const isActive = i === activeIndex;
+            let transform = `translateX(${slideOffset})`;
+            if (isActive) transform = 'translateX(0)';
+            else if (
+              i < activeIndex ||
+              (activeIndex === 0 && i === modes.length - 1)
+            )
+              transform = `translateX(${slideOffsetOut})`;
+
+            return (
+              <div
+                key={mode.id}
+                className='absolute inset-0 px-5 transition-transform duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                style={{
+                  transform,
+                  opacity: isActive ? 1 : 0,
+                  pointerEvents: isActive ? 'auto' : 'none',
+                }}
+              >
+                {MODE_CONTENT[mode.id]}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className='pb-3 pt-1 text-center'>
+          <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
+            Powered by Jovie
           </p>
         </div>
-      </div>
+      </PhoneFrame>
 
-      <div
-        className='flex items-center justify-center gap-1.5 py-2.5'
-        aria-hidden='true'
-      >
-        {SOCIAL_BAR_ICONS.map(icon => {
-          const isActive =
-            icon.activeMode !== null &&
-            modes[activeIndex]?.id === icon.activeMode;
-          return (
-            <span
-              key={icon.key}
-              aria-hidden='true'
-              className='inline-flex h-7 w-7 items-center justify-center rounded-full border transition-all duration-300'
+      {/* Tabs beneath the phone (can be hidden when rendered externally) */}
+      {!hideTabs && (
+        <nav
+          className='mt-4 flex items-center gap-1'
+          aria-label='Phone mode tabs'
+        >
+          {modes.map((mode, i) => (
+            <button
+              key={mode.id}
+              type='button'
+              onClick={() => handleTabClick(i)}
+              className='rounded-full px-3 py-1 text-[11px] font-mono tracking-[-0.02em] transition-all duration-300'
               style={{
-                borderColor: isActive
-                  ? 'var(--linear-border-default)'
-                  : 'rgba(255,255,255,0.06)',
-                backgroundColor: isActive
-                  ? 'var(--linear-bg-surface-1)'
-                  : 'transparent',
-                color: isActive
-                  ? 'var(--linear-text-primary)'
-                  : 'var(--linear-text-tertiary)',
+                backgroundColor:
+                  i === activeIndex
+                    ? 'var(--linear-bg-surface-2)'
+                    : 'transparent',
+                color:
+                  i === activeIndex
+                    ? 'var(--linear-text-primary)'
+                    : 'var(--linear-text-quaternary)',
+                border:
+                  i === activeIndex
+                    ? '1px solid var(--linear-border-default)'
+                    : '1px solid transparent',
               }}
             >
-              {icon.render()}
-            </span>
-          );
-        })}
-      </div>
-
-      <div
-        className='relative overflow-hidden'
-        style={{ height: PHONE_CONTENT_HEIGHT }}
-      >
-        {modes.map((mode, i) => (
-          <div
-            key={mode.id}
-            className='absolute inset-0 px-5 transition-opacity duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
-            style={{
-              opacity: i === activeIndex ? 1 : 0,
-              pointerEvents: i === activeIndex ? 'auto' : 'none',
-            }}
-          >
-            {MODE_CONTENT[mode.id]}
-          </div>
-        ))}
-      </div>
-
-      <div className='pb-3 pt-1 text-center'>
-        <p className='text-[9px] uppercase tracking-[0.15em] text-quaternary-token'>
-          Powered by Jovie
-        </p>
-      </div>
-    </PhoneFrame>
+              {MODE_TAB_LABELS[mode.id] ?? `/${mode.id}`}
+            </button>
+          ))}
+        </nav>
+      )}
+    </div>
   );
 }
 

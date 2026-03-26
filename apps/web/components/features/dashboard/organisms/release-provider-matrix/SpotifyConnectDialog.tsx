@@ -425,7 +425,7 @@ export function SpotifyConnectDialog({
       <DialogBody className='space-y-3'>
         <DrawerSurfaceCard
           variant='card'
-          className='overflow-visible bg-[color-mix(in_oklab,var(--linear-app-content-surface)_92%,var(--linear-bg-surface-0))] p-3.5'
+          className='overflow-visible bg-(--linear-app-content-surface) p-3.5'
         >
           <div className='mb-2.5'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
@@ -505,7 +505,7 @@ export function SpotifyConnectDialog({
             )}
 
             {shouldShowDropdown && (
-              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
+              <div className='absolute z-50 mt-1.5 w-full overflow-hidden rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-[0_12px_24px_rgba(0,0,0,0.06)]'>
                 <select
                   id='spotify-connect-results'
                   className='sr-only'
@@ -586,7 +586,7 @@ export function SpotifyConnectDialog({
                             'border-(--linear-app-frame-seam) bg-surface-1',
                           artist.isClaimed
                             ? 'opacity-50 cursor-not-allowed'
-                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1/70'
+                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1'
                         )}
                         onClick={() =>
                           !artist.isClaimed && handleArtistSelect(artist)
@@ -604,7 +604,7 @@ export function SpotifyConnectDialog({
                           })
                         }
                       >
-                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-surface-1'>
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
                           {artist.imageUrl ? (
                             <Image
                               src={artist.imageUrl}
@@ -658,7 +658,7 @@ export function SpotifyConnectDialog({
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1/70',
+                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1',
                     formState.activeResultIndex === pasteUrlIndex &&
                       'bg-surface-1'
                   )}
@@ -673,7 +673,7 @@ export function SpotifyConnectDialog({
                     })
                   }
                 >
-                  <div className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'>
+                  <div className='flex h-10 w-10 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'>
                     <Link2
                       className='h-5 w-5 text-tertiary-token'
                       aria-hidden='true'

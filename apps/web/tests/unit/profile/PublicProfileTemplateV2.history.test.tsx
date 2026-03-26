@@ -10,26 +10,25 @@ vi.mock('@/components/organisms/profile-shell', () => ({
   useProfileShell: () => ({ notificationsContextValue: null }),
 }));
 
-vi.mock('@/components/organisms/profile-header-v2/ProfileHeaderV2', () => ({
-  ProfileHeaderV2: ({ activeMode, modes, onModeSelect }: any) => (
-    <div role='tablist' aria-label='Profile sections'>
-      {modes.map((mode: string) => (
-        <button
-          key={mode}
-          type='button'
-          role='tab'
-          aria-selected={mode === activeMode}
-          onClick={() => onModeSelect(mode)}
-        >
-          {mode}
-        </button>
-      ))}
+vi.mock('@/features/profile/ProfileHeroCard', () => ({
+  ArtistHero: ({ activeMode, modes, onModeSelect }: any) => (
+    <div>
+      <div role='tablist' aria-label='Profile sections'>
+        {modes.map((mode: string) => (
+          <button
+            key={mode}
+            type='button'
+            role='tab'
+            aria-selected={mode === activeMode}
+            onClick={() => onModeSelect(mode)}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+      <div>hero</div>
     </div>
   ),
-}));
-
-vi.mock('@/features/profile/ProfileHeroCard', () => ({
-  ProfileHeroCard: () => <div>hero</div>,
 }));
 
 vi.mock('@/features/profile/SwipeableModeContainer', () => ({

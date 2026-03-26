@@ -10,8 +10,8 @@ export function ReleaseTaskEmptyState({
   isLoading,
 }: ReleaseTaskEmptyStateProps) {
   return (
-    <div className='flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-subtle/45 bg-[var(--linear-bg-surface-card)] px-4 py-12 text-center'>
-      <p className='text-[15px] font-medium text-primary-token mb-1'>
+    <div className='flex min-h-[220px] flex-col items-center justify-center rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-12 text-center'>
+      <p className='text-[13px] font-medium text-primary-token mb-1'>
         Your release playbook
       </p>
       <p className='text-[12px] text-tertiary-token mb-4 max-w-[280px]'>

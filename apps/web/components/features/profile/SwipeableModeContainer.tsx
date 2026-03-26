@@ -6,6 +6,7 @@ import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/a
 import { AboutSection } from '@/features/profile/AboutSection';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
 import { LatestReleaseCard } from '@/features/profile/LatestReleaseCard';
+import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
@@ -45,35 +46,47 @@ interface SwipeableModeContainerProps {
 
 function ProfilePane({
   artist,
+  socialLinks,
   latestRelease,
   mergedDSPs,
   enableDynamicEngagement,
 }: {
   readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
   readonly latestRelease?: SwipeableModeContainerProps['latestRelease'];
   readonly mergedDSPs: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
 }) {
-  if (!latestRelease) {
-    return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
-        New music and major updates will show up here first.
-      </div>
-    );
-  }
-
   return (
-    <div className='space-y-3'>
-      <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
-        Latest release
-      </p>
-      <LatestReleaseCard
-        release={latestRelease}
-        artistHandle={artist.handle}
-        artist={artist}
-        dsps={mergedDSPs}
-        enableDynamicEngagement={enableDynamicEngagement}
-      />
+    <div className='space-y-4'>
+      <div className='mx-auto max-w-xs'>
+        <ProfilePrimaryCTA
+          artist={artist}
+          socialLinks={socialLinks}
+          mergedDSPs={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+          showCapture
+        />
+      </div>
+
+      {latestRelease ? (
+        <div className='space-y-3'>
+          <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+            Latest release
+          </p>
+          <LatestReleaseCard
+            release={latestRelease}
+            artistHandle={artist.handle}
+            artist={artist}
+            dsps={mergedDSPs}
+            enableDynamicEngagement={enableDynamicEngagement}
+          />
+        </div>
+      ) : (
+        <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
+          New music and major updates will show up here first.
+        </div>
+      )}
     </div>
   );
 }
@@ -96,7 +109,7 @@ function TourPane({
 
   if (sortedDates.length === 0) {
     return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
         No upcoming shows right now. Subscribe to hear about the next tour stop.
       </div>
     );
@@ -112,7 +125,7 @@ function TourPane({
         return (
           <div
             key={tourDate.id}
-            className='rounded-3xl border border-subtle bg-surface-1 p-4 shadow-sm'
+            className='rounded-2xl border border-subtle bg-surface-1 p-4 shadow-sm'
           >
             <div className='flex items-start justify-between gap-3'>
               <div className='min-w-0'>
@@ -164,7 +177,7 @@ function TipPane({
 
   if (!venmoLink) {
     return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
         Tipping is not available for this artist yet.
       </div>
     );
@@ -201,7 +214,7 @@ export function SwipeableModeContainer({
   return (
     <div
       ref={containerRef}
-      className='relative h-full overflow-hidden'
+      className='relative -mt-3 h-full overflow-hidden rounded-t-2xl'
       {...handlers}
     >
       <div
@@ -220,19 +233,20 @@ export function SwipeableModeContainer({
             id={`profile-pane-${mode}`}
             role='tabpanel'
             aria-hidden={mode !== modes[activeIndex]}
-            className='h-full min-w-full overflow-y-auto px-3 pb-4'
+            className='h-full min-w-full overflow-y-auto px-3 pb-4 pt-3'
             style={{ contentVisibility: 'auto' }}
           >
             {mode === 'profile' ? (
               <ProfilePane
                 artist={artist}
+                socialLinks={socialLinks}
                 latestRelease={latestRelease}
                 mergedDSPs={mergedDSPs}
                 enableDynamicEngagement={enableDynamicEngagement}
               />
             ) : null}
             {mode === 'listen' ? (
-              <div className='rounded-3xl border border-subtle bg-surface-1 p-4 shadow-sm'>
+              <div className='rounded-2xl border border-subtle bg-surface-1 p-4 shadow-sm'>
                 <StaticListenInterface
                   artist={artist}
                   handle={artist.handle}

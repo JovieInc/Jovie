@@ -73,7 +73,7 @@ function ProfilePageChatInner() {
             </div>
           </div>
           <div className='shrink-0 px-4 py-4'>
-            <div className='mx-auto max-w-2xl rounded-[22px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+            <div className='mx-auto max-w-2xl rounded-[22px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
               <div className='h-10 rounded-[16px] skeleton' />
             </div>
           </div>
@@ -105,7 +105,7 @@ function ProfilePageChatSkeleton() {
           </div>
         </div>
         <div className='shrink-0 px-4 py-4'>
-          <div className='mx-auto max-w-2xl rounded-[22px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
+          <div className='mx-auto max-w-2xl rounded-[22px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
             <div className='h-10 rounded-[16px] skeleton' />
           </div>
         </div>

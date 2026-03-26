@@ -698,7 +698,7 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         <h1 className='sr-only'>Releases</h1>
 
         {/* Banners — inset from shell edge */}
-        {(showReleasesTable || showImportProgress) && (
+        {showImportProgress && (
           <div className='mx-3 lg:mx-4 mt-2.5'>
             <ImportProgressBanner
               artistName={artistName}
