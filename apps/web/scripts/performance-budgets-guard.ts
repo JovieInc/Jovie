@@ -122,6 +122,8 @@ const HOMEPAGE_SHELL_SELECTOR = '[data-testid="homepage-shell"]';
 const HOMEPAGE_PRIMARY_CTA_SELECTOR = '[data-testid="homepage-primary-cta"]';
 const PERF_BUDGET_INIT_SCRIPT = `
 (() => {
+  const isHomepage = location.pathname === '/';
+  const interactiveShellDeadline = performance.now() + 5000;
   const metrics = {
     lcp: 0,
     cls: 0,
@@ -149,6 +151,9 @@ const PERF_BUDGET_INIT_SCRIPT = `
     if (metrics.interactiveShellReady > 0) {
       return;
     }
+    if (performance.now() > interactiveShellDeadline) {
+      return;
+    }
 
     const shell =
       Array.from(document.querySelectorAll(${JSON.stringify(HOMEPAGE_SHELL_SELECTOR)})).find(element =>
@@ -172,7 +177,9 @@ const PERF_BUDGET_INIT_SCRIPT = `
     globalThis.requestAnimationFrame(sampleInteractiveShellReady);
   };
 
-  globalThis.requestAnimationFrame(sampleInteractiveShellReady);
+  if (isHomepage) {
+    globalThis.requestAnimationFrame(sampleInteractiveShellReady);
+  }
 
   new PerformanceObserver(list => {
     const entries = list.getEntries();

@@ -145,16 +145,24 @@ export function StickyPhoneTour() {
   const [EnhancedTour, setEnhancedTour] = useState<ComponentType | null>(null);
 
   useEffect(() => {
+    if (!globalThis.matchMedia('(min-width: 1024px)').matches) {
+      return;
+    }
+
     let active = true;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const loadEnhancement = () => {
-      void import('./StickyPhoneTourClient').then(mod => {
-        if (!active) {
-          return;
-        }
-        setEnhancedTour(() => mod.StickyPhoneTourClient);
-      });
+      void import('./StickyPhoneTourClient')
+        .then(mod => {
+          if (!active) {
+            return;
+          }
+          setEnhancedTour(() => mod.StickyPhoneTourClient);
+        })
+        .catch(() => {
+          // Keep the static fallback if the enhancement chunk cannot load.
+        });
     };
 
     if ('requestIdleCallback' in globalThis) {
