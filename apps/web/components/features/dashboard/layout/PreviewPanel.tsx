@@ -38,10 +38,10 @@ export const PREVIEW_PANEL_WIDTH = 360;
 function PreviewPanelEmpty({
   isOpen,
   close,
-}: {
+}: Readonly<{
   isOpen: boolean;
   close: () => void;
-}) {
+}>) {
   return (
     <RightDrawer
       isOpen={isOpen}

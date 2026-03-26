@@ -357,6 +357,117 @@ export async function forwardEvent(
 }
 
 /**
+ * If all platforms were skipped but stale failure statuses remain,
+ * clear them so the cron stops reprocessing this event.
+ */
+async function clearStaleFailures(
+  event: PixelEvent,
+  results: ForwardingResult[]
+): Promise<void> {
+  if (results.length !== 0) return;
+
+  const hasStaleFailures = Object.values(event.forwardingStatus ?? {}).some(
+    p => p?.status === 'failed'
+  );
+  if (!hasStaleFailures) return;
+
+  const cleaned: PixelForwardingStatus = {};
+  for (const [k, v] of Object.entries(event.forwardingStatus ?? {})) {
+    cleaned[k] =
+      v?.status === 'failed'
+        ? { ...v, status: 'skipped', error: 'platform_unavailable' }
+        : v;
+  }
+  await db
+    .update(pixelEvents)
+    .set({ forwardingStatus: cleaned })
+    .where(eq(pixelEvents.id, event.id));
+}
+
+/**
+ * Handle a failed forwarding attempt: dead-letter or schedule retry.
+ * Returns true if the event was dead-lettered.
+ */
+async function handleFailedForwarding(
+  event: PixelEvent,
+  results: ForwardingResult[]
+): Promise<boolean> {
+  const retryCount = event.retryCount ?? 0;
+
+  if (retryCount >= MAX_RETRIES) {
+    const deadLetterStatus: PixelForwardingStatus = {};
+    for (const result of results) {
+      deadLetterStatus[result.platform] = {
+        status: result.success ? 'sent' : 'dead_letter',
+        sentAt: new Date().toISOString(),
+        ...(result.error && { error: result.error }),
+      };
+    }
+    await db
+      .update(pixelEvents)
+      .set({
+        forwardingStatus: {
+          ...event.forwardingStatus,
+          ...deadLetterStatus,
+        },
+      })
+      .where(eq(pixelEvents.id, event.id));
+
+    logger.warn('[Pixel Metrics] Dead letter', {
+      eventId: event.id,
+      platforms: results.filter(r => !r.success).map(r => r.platform),
+      totalAttempts: retryCount + 1,
+    });
+    return true;
+  }
+
+  // Schedule retry with exponential backoff
+  const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
+  const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
+
+  await db
+    .update(pixelEvents)
+    .set({
+      forwardAt: nextRetry,
+      retryCount: retryCount + 1,
+    })
+    .where(eq(pixelEvents.id, event.id));
+
+  logger.info('[Pixel Metrics] Retry scheduled', {
+    event_id: event.id,
+    retry_count: retryCount + 1,
+    next_retry_at: nextRetry.toISOString(),
+  });
+  return false;
+}
+
+/**
+ * Process one event: forward, then classify result.
+ * Returns 'success', 'failed', or 'dead_lettered'.
+ */
+async function processOneEvent(
+  event: PixelEvent,
+  creatorConfigMap: Map<string, CreatorPixel>
+): Promise<'success' | 'failed' | 'dead_lettered'> {
+  try {
+    const results = await forwardEvent(event, creatorConfigMap);
+    const allSuccessful = results.every(r => r.success);
+    if (allSuccessful) {
+      await clearStaleFailures(event, results);
+      return 'success';
+    }
+    const wasDeadLettered = await handleFailedForwarding(event, results);
+    return wasDeadLettered ? 'dead_lettered' : 'failed';
+  } catch (error) {
+    logger.error('[Pixel Forwarding] Event processing error', {
+      eventId: event.id,
+      error,
+    });
+    return 'failed';
+  }
+}
+
+/**
  * Process a batch of events that need retry.
  * Called by the consolidated cron job.
  *
@@ -426,94 +537,13 @@ export async function processPendingEvents(limit = 100): Promise<{
     );
 
     for (const event of pendingEvents) {
-      try {
-        const results = await forwardEvent(event, creatorConfigMap);
-        processed++;
-
-        const allSuccessful = results.every(r => r.success);
-        if (allSuccessful) {
-          successful++;
-          // If no platforms were forwarded (all disabled/skipped) but old
-          // failed statuses remain, clear them so cron stops reprocessing.
-          if (results.length === 0) {
-            const hasStaleFailures = Object.values(
-              event.forwardingStatus ?? {}
-            ).some(p => p?.status === 'failed');
-            if (hasStaleFailures) {
-              const cleaned: PixelForwardingStatus = {};
-              for (const [k, v] of Object.entries(
-                event.forwardingStatus ?? {}
-              )) {
-                cleaned[k] =
-                  v?.status === 'failed'
-                    ? { ...v, status: 'skipped', error: 'platform_unavailable' }
-                    : v;
-              }
-              await db
-                .update(pixelEvents)
-                .set({ forwardingStatus: cleaned })
-                .where(eq(pixelEvents.id, event.id));
-            }
-          }
-        } else {
-          failed++;
-          const retryCount = event.retryCount ?? 0;
-
-          if (retryCount >= MAX_RETRIES) {
-            // Dead letter — stop retrying. Merge with existing status
-            // to preserve prior 'sent' entries from other platforms.
-            const deadLetterStatus: PixelForwardingStatus = {};
-            for (const result of results) {
-              deadLetterStatus[result.platform] = {
-                status: result.success ? 'sent' : 'dead_letter',
-                sentAt: new Date().toISOString(),
-                ...(result.error && { error: result.error }),
-              };
-            }
-            await db
-              .update(pixelEvents)
-              .set({
-                forwardingStatus: {
-                  ...event.forwardingStatus,
-                  ...deadLetterStatus,
-                },
-              })
-              .where(eq(pixelEvents.id, event.id));
-
-            logger.warn('[Pixel Metrics] Dead letter', {
-              eventId: event.id,
-              platforms: results.filter(r => !r.success).map(r => r.platform),
-              totalAttempts: retryCount + 1,
-            });
-            deadLettered++;
-          } else {
-            // Schedule retry with exponential backoff
-            const backoffMinutes = Math.min(5 * Math.pow(3, retryCount), 180); // Max 3 hours
-            const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000);
-
-            await db
-              .update(pixelEvents)
-              .set({
-                forwardAt: nextRetry,
-                retryCount: retryCount + 1,
-              })
-              .where(eq(pixelEvents.id, event.id));
-
-            logger.info('[Pixel Metrics] Retry scheduled', {
-              event_id: event.id,
-              retry_count: retryCount + 1,
-              next_retry_at: nextRetry.toISOString(),
-            });
-          }
-        }
-      } catch (error) {
-        logger.error('[Pixel Forwarding] Event processing error', {
-          eventId: event.id,
-          error,
-        });
+      const outcome = await processOneEvent(event, creatorConfigMap);
+      processed++;
+      if (outcome === 'success') successful++;
+      else if (outcome === 'dead_lettered') {
         failed++;
-        processed++;
-      }
+        deadLettered++;
+      } else failed++;
     }
   } catch (error) {
     logger.error('[Pixel Forwarding] Batch processing error', { error });

@@ -949,6 +949,13 @@ export default async function middleware(
     const headers = new Headers(req.headers);
     headers.set('host', fapiHost);
     headers.delete('connection');
+    headers.delete('x-forwarded-host');
+    headers.delete('x-forwarded-proto');
+    headers.delete('x-forwarded-for');
+    headers.delete('x-vercel-forwarded-for');
+    headers.delete('x-vercel-ip-country');
+    headers.delete('x-real-ip');
+    headers.set('origin', `https://${fapiHost}`);
 
     const proxyRes = await fetch(targetUrl, {
       method: req.method,
@@ -960,6 +967,20 @@ export default async function middleware(
 
     const resHeaders = new Headers(proxyRes.headers);
     resHeaders.delete('content-encoding');
+
+    // Rewrite redirect Location headers to route back through /__clerk
+    // so the browser never hits the FAPI host directly (e.g. Clerk's
+    // /npm/ 307 redirects to versioned JS bundles).
+    const location = resHeaders.get('location');
+    if (location) {
+      const fapiOrigin = `https://${fapiHost}`;
+      if (location.startsWith(fapiOrigin)) {
+        resHeaders.set(
+          'location',
+          location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
+        );
+      }
+    }
 
     return new NextResponse(proxyRes.body, {
       status: proxyRes.status,

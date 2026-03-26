@@ -93,7 +93,7 @@ export function TrackSidebar({
   const smartLinkUrl = track ? `${getBaseUrl()}${track.smartLinkPath}` : '';
 
   const showSmartLinkCopied = useCallback(() => {
-    toast.success('Smart link copied');
+    toast.success('Track link copied');
     setIsSmartLinkCopied(true);
     if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
     copyTimeoutRef.current = setTimeout(
@@ -135,7 +135,7 @@ export function TrackSidebar({
     return [
       {
         id: 'refresh-copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy smart link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
         icon: Copy,
         activeIcon: Check,
         isActive: isSmartLinkCopied,
@@ -143,7 +143,7 @@ export function TrackSidebar({
       },
       {
         id: 'open',
-        label: 'Open smart link',
+        label: 'Open track link',
         icon: ExternalLink,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -175,7 +175,7 @@ export function TrackSidebar({
     return [
       {
         id: 'copy',
-        label: isSmartLinkCopied ? 'Copied!' : 'Copy smart link',
+        label: isSmartLinkCopied ? 'Copied!' : 'Copy track link',
         icon: Copy,
         activeIcon: Check,
         isActive: isSmartLinkCopied,
@@ -183,7 +183,7 @@ export function TrackSidebar({
       },
       {
         id: 'open',
-        label: 'Open smart link',
+        label: 'Open track link',
         icon: ExternalLink,
         onClick: () => {
           if (track.smartLinkPath) {
@@ -271,63 +271,65 @@ export function TrackSidebar({
               />
             </div>
 
-            {activeTab === 'details' && (
-              <DrawerSurfaceCard
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-              >
-                <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-                  <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                    Smart link
-                  </p>
-                </div>
-                <div className='p-2.5'>
-                  <CopyableUrlRow
-                    url={smartLinkUrl}
-                    size='md'
-                    className='rounded-[8px]'
-                    surface='boxed'
-                    copyButtonTitle='Copy smart link'
-                    openButtonTitle='Open smart link'
-                    onCopySuccess={() => {
-                      showSmartLinkCopied();
-                    }}
-                    onCopyError={() => {
-                      toast.error('Failed to copy link');
-                    }}
-                  />
-                </div>
-              </DrawerSurfaceCard>
-            )}
-
-            {activeTab === 'details' && (
-              <DrawerSurfaceCard
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-              >
-                <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-                  <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-                    Actions
-                  </p>
-                </div>
-                <div className='space-y-1.5 p-2.5'>
-                  {track.isrc && (
-                    <DrawerActionRow
-                      onClick={handleCopyIsrc}
-                      icon={<Hash className='h-3.5 w-3.5' />}
-                      label='Copy ISRC'
-                      trailing={
-                        <span className='font-mono text-[10px] text-tertiary-token'>
-                          {track.isrc}
-                        </span>
-                      }
+            <div className='space-y-2.5 bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_92%,transparent)] p-2.5'>
+              {activeTab === 'details' && (
+                <DrawerSurfaceCard
+                  className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+                >
+                  <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+                    <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                      Track link
+                    </p>
+                  </div>
+                  <div className='p-2.5'>
+                    <CopyableUrlRow
+                      url={smartLinkUrl}
+                      size='md'
+                      className='rounded-[8px]'
+                      surface='boxed'
+                      copyButtonTitle='Copy track link'
+                      openButtonTitle='Open track link'
+                      onCopySuccess={() => {
+                        showSmartLinkCopied();
+                      }}
+                      onCopyError={() => {
+                        toast.error('Failed to copy link');
+                      }}
                     />
-                  )}
-                </div>
-              </DrawerSurfaceCard>
-            )}
+                  </div>
+                </DrawerSurfaceCard>
+              )}
 
-            {activeTab === 'platforms' && (
-              <TrackPlatformLinksSection providers={streamingProviders} />
-            )}
+              {activeTab === 'details' && (
+                <DrawerSurfaceCard
+                  className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
+                >
+                  <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+                    <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                      Actions
+                    </p>
+                  </div>
+                  <div className='space-y-1.5 p-2.5'>
+                    {track.isrc && (
+                      <DrawerActionRow
+                        onClick={handleCopyIsrc}
+                        icon={<Hash className='h-3.5 w-3.5' />}
+                        label='Copy ISRC'
+                        trailing={
+                          <span className='font-mono text-[10px] text-tertiary-token'>
+                            {track.isrc}
+                          </span>
+                        }
+                      />
+                    )}
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+
+              {activeTab === 'platforms' && (
+                <TrackPlatformLinksSection providers={streamingProviders} />
+              )}
+            </div>
           </div>
         </div>
       )}

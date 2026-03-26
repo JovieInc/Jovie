@@ -1,6 +1,10 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -131,6 +135,24 @@ function FeedbackActionsCell({
   );
 }
 
+interface FeedbackActionsColumnMeta {
+  getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+}
+
+/** Standalone cell renderer for Actions column — reads getContextMenuItems from column meta. */
+function renderFeedbackActionsCell(ctx: CellContext<FeedbackRow, unknown>) {
+  const meta = ctx.column.columnDef.meta as
+    | FeedbackActionsColumnMeta
+    | undefined;
+  if (!meta) return null;
+  return (
+    <FeedbackActionsCell
+      row={ctx.row.original}
+      getContextMenuItems={meta.getContextMenuItems}
+    />
+  );
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -232,12 +254,8 @@ export function AdminFeedbackTable({
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <FeedbackActionsCell
-            row={row.original}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ),
+        cell: renderFeedbackActionsCell,
+        meta: { getContextMenuItems },
         size: 48,
       }),
     ],
