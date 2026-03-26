@@ -1,18 +1,101 @@
 'use client';
 
-import { type ComponentType, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Container } from '@/components/site/Container';
-import { MODES, MobileCard, PhoneShowcase } from './phone-showcase-primitives';
+import {
+  CrossfadeBlock,
+  MODES,
+  MobileCard,
+  PhoneShowcase,
+  scrollToActiveIndex,
+} from './phone-showcase-primitives';
 
 const SLIDE_COUNT = MODES.length;
 const VH_PER_SLIDE = 80;
 
-function StickyPhoneTourFallback() {
+export function StickyPhoneTourClient() {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [activeSlide, setActiveSlide] = useState(0);
+
+  const handleScroll = useCallback(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+    const rect = section.getBoundingClientRect();
+    const newIndex = scrollToActiveIndex(
+      rect.top,
+      rect.height,
+      globalThis.innerHeight,
+      SLIDE_COUNT
+    );
+    setActiveSlide(newIndex);
+  }, []);
+
+  useEffect(() => {
+    let animationFrame = 0;
+
+    const runOnIdle = () => {
+      globalThis.addEventListener('scroll', handleScroll, { passive: true });
+      handleScroll();
+    };
+
+    if ('requestIdleCallback' in globalThis) {
+      const idleId = globalThis.requestIdleCallback(runOnIdle, {
+        timeout: 1500,
+      });
+      return () => {
+        globalThis.cancelIdleCallback(idleId);
+        globalThis.removeEventListener('scroll', handleScroll);
+        if (animationFrame) {
+          globalThis.cancelAnimationFrame(animationFrame);
+        }
+      };
+    }
+
+    animationFrame = globalThis.requestAnimationFrame(runOnIdle);
+    return () => {
+      globalThis.removeEventListener('scroll', handleScroll);
+      if (animationFrame) {
+        globalThis.cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [handleScroll]);
+
+  const phoneIndex = activeSlide;
+
+  const headlines = useMemo(
+    () =>
+      MODES.map(mode => (
+        <h3
+          key={mode.id}
+          className='text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'
+        >
+          {mode.headline}
+        </h3>
+      )),
+    []
+  );
+
+  const descriptions = useMemo(
+    () =>
+      MODES.map(mode => (
+        <p
+          key={mode.id}
+          className='max-w-[400px] marketing-lead-linear text-secondary-token'
+        >
+          {mode.description}
+        </p>
+      )),
+    []
+  );
+
   return (
     <>
       <section
+        ref={sectionRef}
         className='relative hidden lg:block section-spacing-linear'
-        style={{ height: `${SLIDE_COUNT * VH_PER_SLIDE}vh` }}
+        style={{
+          height: `${SLIDE_COUNT * VH_PER_SLIDE}vh`,
+        }}
       >
         <div
           aria-hidden='true'
@@ -25,7 +108,9 @@ function StickyPhoneTourFallback() {
         <div
           aria-hidden='true'
           className='pointer-events-none absolute inset-x-0 top-0 h-screen'
-          style={{ background: 'var(--linear-hero-backdrop)' }}
+          style={{
+            background: 'var(--linear-hero-backdrop)',
+          }}
         />
         <div
           aria-hidden='true'
@@ -45,13 +130,17 @@ function StickyPhoneTourFallback() {
                     The right action for every fan.
                   </h2>
 
-                  <h3 className='mt-6 text-xl font-[590] leading-snug tracking-[-0.012em] text-secondary-token'>
-                    {MODES[0]?.headline}
-                  </h3>
+                  <div className='mt-6'>
+                    <CrossfadeBlock activeIndex={phoneIndex}>
+                      {headlines}
+                    </CrossfadeBlock>
+                  </div>
 
-                  <p className='mt-5 max-w-[400px] marketing-lead-linear text-secondary-token'>
-                    {MODES[0]?.description}
-                  </p>
+                  <div className='mt-5'>
+                    <CrossfadeBlock activeIndex={phoneIndex}>
+                      {descriptions}
+                    </CrossfadeBlock>
+                  </div>
                 </div>
 
                 <div className='flex flex-col items-center gap-4'>
@@ -61,16 +150,30 @@ function StickyPhoneTourFallback() {
                         'drop-shadow(0 25px 60px rgba(0,0,0,0.35)) drop-shadow(0 8px 30px rgba(94,106,210,0.15))',
                     }}
                   >
-                    <PhoneShowcase activeIndex={0} modes={MODES} />
+                    <PhoneShowcase activeIndex={phoneIndex} modes={MODES} />
                   </div>
                 </div>
 
-                <div className='flex flex-col items-end justify-center gap-4'>
+                <div
+                  className='flex flex-col items-end justify-center gap-4 transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                  style={{
+                    opacity: 1,
+                    transform: 'translateX(0)',
+                  }}
+                >
                   {MODES.map((mode, i) => {
                     const slug = mode.id === 'profile' ? '' : `/${mode.id}`;
-                    const isActive = i === 0;
+                    const isActive = i === phoneIndex;
                     return (
-                      <div key={mode.id} className='text-right'>
+                      <div
+                        key={mode.id}
+                        className='text-right transition-all duration-500 ease-[cubic-bezier(0.33,.01,.27,1)]'
+                        style={{
+                          transform: isActive
+                            ? 'translateX(0)'
+                            : 'translateX(8px)',
+                        }}
+                      >
                         <p
                           className='font-mono tracking-[-0.02em]'
                           style={{
@@ -79,6 +182,8 @@ function StickyPhoneTourFallback() {
                             color: isActive
                               ? 'var(--linear-text-primary)'
                               : 'var(--linear-text-secondary)',
+                            transition:
+                              'font-size 0.5s cubic-bezier(0.33,.01,.27,1), font-weight 0.5s cubic-bezier(0.33,.01,.27,1), color 0.5s cubic-bezier(0.33,.01,.27,1)',
                           }}
                         >
                           jov.ie/timwhite
@@ -139,46 +244,4 @@ function StickyPhoneTourFallback() {
       </section>
     </>
   );
-}
-
-export function StickyPhoneTour() {
-  const [EnhancedTour, setEnhancedTour] = useState<ComponentType | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    const loadEnhancement = () => {
-      void import('./StickyPhoneTourClient').then(mod => {
-        if (!active) {
-          return;
-        }
-        setEnhancedTour(() => mod.StickyPhoneTourClient);
-      });
-    };
-
-    if ('requestIdleCallback' in globalThis) {
-      const idleId = globalThis.requestIdleCallback(loadEnhancement, {
-        timeout: 1500,
-      });
-      return () => {
-        active = false;
-        globalThis.cancelIdleCallback(idleId);
-      };
-    }
-
-    timeoutId = globalThis.setTimeout(loadEnhancement, 200);
-    return () => {
-      active = false;
-      if (timeoutId) {
-        globalThis.clearTimeout(timeoutId);
-      }
-    };
-  }, []);
-
-  if (EnhancedTour) {
-    return <EnhancedTour />;
-  }
-
-  return <StickyPhoneTourFallback />;
 }
