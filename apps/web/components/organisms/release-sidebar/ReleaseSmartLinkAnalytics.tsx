@@ -102,7 +102,6 @@ export function ReleaseSmartLinkAnalytics({
             url={smartLinkUrl}
             displayValue={release.smartLinkPath}
             size='md'
-            className='rounded-[10px]'
             valueClassName='text-tertiary-token'
             copyButtonTitle='Copy link'
             openButtonTitle='Open smart link'

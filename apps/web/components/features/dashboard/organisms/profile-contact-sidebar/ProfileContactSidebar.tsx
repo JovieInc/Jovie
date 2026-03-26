@@ -595,11 +595,11 @@ export function ProfileContactSidebar() {
                   url={profileUrl}
                   size='md'
                   className='flex-1'
-                  inputClassName='h-8 rounded-[9px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
+                  inputClassName='h-8 rounded-full border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1.5 text-[11px]'
                 />
                 <button
                   type='button'
-                  className='shrink-0 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                  className='shrink-0 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
                   onClick={() =>
                     globalThis.open(profileUrl, '_blank', 'noopener,noreferrer')
                   }
@@ -616,7 +616,7 @@ export function ProfileContactSidebar() {
                   trigger={
                     <button
                       type='button'
-                      className='shrink-0 rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                      className='shrink-0 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-secondary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-primary-token'
                       aria-label='Open profile share options'
                     >
                       <MoreHorizontal className='h-3 w-3' aria-hidden='true' />

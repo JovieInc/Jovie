@@ -309,7 +309,6 @@ export function TrackSidebar({
                     <CopyableUrlRow
                       url={smartLinkUrl}
                       size='md'
-                      className='rounded-[8px]'
                       surface='boxed'
                       copyButtonTitle='Copy track link'
                       openButtonTitle='Open track link'
