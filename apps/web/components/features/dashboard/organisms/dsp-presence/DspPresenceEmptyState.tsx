@@ -9,7 +9,7 @@ export function DspPresenceEmptyState() {
       <EmptyState
         icon={<Radio className='h-12 w-12' />}
         heading='No DSP profiles found'
-        description='Once your music is matched to streaming platforms like Spotify, Apple Music, and Deezer, your profiles will appear here.'
+        description='Once your music is matched to streaming platforms, your profiles will appear here.'
       />
     </div>
   );
