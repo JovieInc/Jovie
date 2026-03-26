@@ -34,25 +34,33 @@ export async function PATCH(
   try {
     const { id } = await params;
     const now = new Date();
+    const [existingLead] = await db
+      .select({
+        id: leads.id,
+        firstContactedAt: leads.firstContactedAt,
+      })
+      .from(leads)
+      .where(eq(leads.id, id))
+      .limit(1);
+
+    if (!existingLead) {
+      return NextResponse.json(
+        { error: 'Lead not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const [updated] = await db
       .update(leads)
       .set({
         dmSentAt: now,
         outreachStatus: 'dm_sent',
-        firstContactedAt: now,
+        firstContactedAt: existingLead.firstContactedAt ?? now,
         lastContactedAt: now,
         updatedAt: now,
       })
       .where(eq(leads.id, id))
       .returning();
-
-    if (!updated) {
-      return NextResponse.json(
-        { error: 'Lead not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
 
     await recordLeadFunnelEvent(
       {
