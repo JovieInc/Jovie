@@ -467,12 +467,6 @@ export function SettingsAdPixelsSection({
     );
   }
 
-  // Check if any pixels are configured
-  const hasAnyPixels =
-    existingSettings?.pixels?.facebookPixelId ||
-    existingSettings?.pixels?.googleMeasurementId ||
-    existingSettings?.pixels?.tiktokPixelId;
-
   return (
     <form onSubmit={handlePixelSubmit} className='space-y-6'>
       <DashboardCard
@@ -502,15 +496,6 @@ export function SettingsAdPixelsSection({
         />
 
         <div className='space-y-3 px-4 py-3'>
-          {!hasAnyPixels && (
-            <ContentSurfaceCard className='bg-surface-0 px-6 py-5 text-center'>
-              <p className='text-[13px] leading-[18px] text-secondary-token'>
-                No tracking pixels configured yet. Add your first destination to
-                start tracking conversions.
-              </p>
-            </ContentSurfaceCard>
-          )}
-
           <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
             <p className='text-[13px] leading-[18px] text-secondary-token'>
               Configure each retargeting destination independently.
