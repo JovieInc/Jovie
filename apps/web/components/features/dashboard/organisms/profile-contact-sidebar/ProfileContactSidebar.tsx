@@ -541,6 +541,7 @@ export function ProfileContactSidebar() {
       ariaLabel='Profile Contact'
       title={headerTitle}
       headerActions={headerActions}
+      actionsInEntityHeader
       entityHeader={
         <div className='space-y-3'>
           {/* Artist card — name + avatar only */}

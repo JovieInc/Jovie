@@ -247,6 +247,7 @@ export function TrackSidebar({
           onClose={onClose}
         />
       }
+      actionsInEntityHeader
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
     >

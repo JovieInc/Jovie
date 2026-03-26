@@ -444,6 +444,7 @@ export function ReleaseSidebar({
       title={headerTitle}
       onClose={onClose}
       headerActions={headerActions}
+      actionsInEntityHeader
       isEmpty={!release}
       emptyMessage='Select a release in the table to view its details.'
       footer={
