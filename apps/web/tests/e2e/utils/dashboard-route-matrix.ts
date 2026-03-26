@@ -59,11 +59,16 @@ const creatorDashboardRoutes = [
   },
 ] as const satisfies readonly DashboardRouteDescriptor[];
 
-const creatorHealthFastRoutes = [
-  creatorDashboardRoutes[0],
-  creatorDashboardRoutes[1],
-  creatorDashboardRoutes[4],
-] as const satisfies readonly DashboardRouteDescriptor[];
+const creatorHealthFastRoutePaths = new Set([
+  APP_ROUTES.AUDIENCE,
+  APP_ROUTES.CHAT,
+  APP_ROUTES.RELEASES,
+]);
+
+const creatorHealthFastRoutes: readonly DashboardRouteDescriptor[] =
+  creatorDashboardRoutes.filter(route =>
+    creatorHealthFastRoutePaths.has(route.path)
+  );
 
 const creatorSettingsRoutes = [
   { path: APP_ROUTES.SETTINGS_ACCOUNT, name: 'Account Settings' },
