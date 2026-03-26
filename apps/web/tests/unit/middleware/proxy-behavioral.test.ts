@@ -523,15 +523,32 @@ describe('proxy.ts middleware', () => {
   });
 
   // ==========================================================================
-  // Clerk FAPI Proxy Rewrites
+  // Clerk FAPI Proxy (vercel.json config validation)
   // ==========================================================================
-  // ==========================================================================
-  // Clerk FAPI Proxy
-  // ==========================================================================
-  // Clerk FAPI proxy is now handled entirely by vercel.json static rewrites
-  // (/__clerk/* and /clerk/* → distinct-giraffe-5.clerk.accounts.dev).
-  // Both staging and production use the same Clerk instance.
-  // Middleware no longer intercepts these paths — no tests needed.
+  describe('Clerk FAPI proxy rewrites (vercel.json)', () => {
+    it('keeps /__clerk and /clerk mapped to the shared Clerk FAPI host', async () => {
+      const { readFile } = await import('node:fs/promises');
+      const { resolve } = await import('node:path');
+      const raw = await readFile(resolve(process.cwd(), 'vercel.json'), 'utf8');
+      const cfg = JSON.parse(raw) as {
+        rewrites?: Array<{ source: string; destination: string }>;
+      };
+      const rewrites = cfg.rewrites ?? [];
+
+      expect(rewrites).toEqual(
+        expect.arrayContaining([
+          {
+            source: '/__clerk/(.*)',
+            destination: 'https://distinct-giraffe-5.clerk.accounts.dev/$1',
+          },
+          {
+            source: '/clerk/(.*)',
+            destination: 'https://distinct-giraffe-5.clerk.accounts.dev/$1',
+          },
+        ])
+      );
+    });
+  });
 
   // ==========================================================================
   // meetjovie.com Redirect

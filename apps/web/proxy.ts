@@ -927,12 +927,43 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: /__clerk/* and /clerk/* are handled by vercel.json
-  // static rewrites → distinct-giraffe-5.clerk.accounts.dev. No middleware
-  // interception needed. Both staging and production use the same Clerk
-  // instance. Do NOT add middleware rewrites here — vercel.json rewrites
-  // correctly set the Host header which Clerk requires for proxy validation.
+  // Clerk FAPI proxy: fetch-based proxy to distinct-giraffe-5.clerk.accounts.dev.
+  // Both staging and production use the same Clerk instance.
+  // We use fetch() instead of NextResponse.rewrite() or vercel.json rewrites
+  // because both of those forward the original Host header (jov.ie) instead
+  // of the target host, causing Clerk to return 400 "Invalid host".
   // ========================================================================
+  if (
+    pathname.startsWith('/__clerk/') ||
+    pathname === '/__clerk' ||
+    pathname.startsWith('/clerk/') ||
+    pathname === '/clerk'
+  ) {
+    const CLERK_FAPI = 'https://distinct-giraffe-5.clerk.accounts.dev';
+    const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
+    const targetUrl = `${CLERK_FAPI}/${subpath}${req.nextUrl.search}`;
+
+    const headers = new Headers(req.headers);
+    headers.set('host', 'distinct-giraffe-5.clerk.accounts.dev');
+    headers.delete('connection');
+
+    const proxyRes = await fetch(targetUrl, {
+      method: req.method,
+      headers,
+      body:
+        req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      redirect: 'manual',
+    });
+
+    const resHeaders = new Headers(proxyRes.headers);
+    resHeaders.delete('content-encoding');
+
+    return new NextResponse(proxyRes.body, {
+      status: proxyRes.status,
+      statusText: proxyRes.statusText,
+      headers: resHeaders,
+    });
+  }
 
   const pathInfo = categorizePath(pathname);
 
