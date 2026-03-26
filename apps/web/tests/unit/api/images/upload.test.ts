@@ -262,6 +262,16 @@ describe('/api/images/upload', () => {
     };
   }
 
+  function createRejectingSelectChain(error: Error) {
+    return {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockRejectedValue(error),
+        }),
+      }),
+    };
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockReset();
@@ -457,6 +467,47 @@ describe('/api/images/upload', () => {
       'processing',
       'ready',
     ]);
+  });
+
+  it('should return a retryable error when press-photo schema is unavailable', async () => {
+    mockAuth.mockResolvedValue({ userId: 'test-user-id' });
+    mockSelect.mockReset();
+
+    mockSelect
+      .mockReturnValueOnce(
+        createSelectChain([{ activeProfileId: 'profile-123' }])
+      )
+      .mockReturnValueOnce(
+        createSelectChain([
+          {
+            id: 'profile-123',
+            usernameNormalized: 'testuser',
+            settings: {},
+          },
+        ])
+      )
+      .mockReturnValueOnce(
+        createRejectingSelectChain(
+          new Error('column "photo_type" does not exist')
+        )
+      );
+
+    const formData = new FormData();
+    const file = createValidImageFile('press.jpg', 'image/jpeg');
+    formData.append('file', file);
+    formData.append('photoType', 'press');
+
+    const request = createMultipartRequest(formData);
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(503);
+    const data = await response.json();
+    expect(data.error).toContain(
+      'Press photos are temporarily unavailable while setup finishes'
+    );
+    expect(data.code).toBe('UPLOAD_FAILED');
+    expect(data.retryable).toBe(true);
   });
 
   it('should accept JPEG images', async () => {

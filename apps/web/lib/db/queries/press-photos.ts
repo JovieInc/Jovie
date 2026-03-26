@@ -17,6 +17,19 @@ const pressPhotoSelect = {
   sortOrder: profilePhotos.sortOrder,
 } as const;
 
+export function isPressPhotoSchemaUnavailableError(error: unknown): boolean {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const causeMessage =
+    error instanceof Error && error.cause instanceof Error
+      ? error.cause.message
+      : '';
+
+  return (
+    errorMessage.includes('does not exist') ||
+    causeMessage.includes('does not exist')
+  );
+}
+
 export async function getPressPhotosByUserId(
   userId: string,
   creatorProfileId?: string
@@ -30,11 +43,24 @@ export async function getPressPhotosByUserId(
     filters.push(eq(profilePhotos.creatorProfileId, creatorProfileId));
   }
 
-  return db
-    .select(pressPhotoSelect)
-    .from(profilePhotos)
-    .where(and(...filters))
-    .orderBy(asc(profilePhotos.sortOrder), asc(profilePhotos.createdAt));
+  try {
+    return await db
+      .select(pressPhotoSelect)
+      .from(profilePhotos)
+      .where(and(...filters))
+      .orderBy(asc(profilePhotos.sortOrder), asc(profilePhotos.createdAt));
+  } catch (error: unknown) {
+    if (isPressPhotoSchemaUnavailableError(error)) {
+      captureWarning(
+        '[press-photos] profile_photos press fields unavailable, returning empty',
+        error,
+        { userId, creatorProfileId }
+      );
+      return [];
+    }
+
+    throw error;
+  }
 }
 
 export async function getPressPhotosByProfileId(
@@ -54,16 +80,7 @@ export async function getPressPhotosByProfileId(
       .orderBy(asc(profilePhotos.sortOrder), asc(profilePhotos.createdAt))
       .limit(6);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const causeMessage =
-      error instanceof Error && error.cause instanceof Error
-        ? error.cause.message
-        : '';
-
-    if (
-      errorMessage.includes('does not exist') ||
-      causeMessage.includes('does not exist')
-    ) {
+    if (isPressPhotoSchemaUnavailableError(error)) {
       captureWarning(
         '[press-photos] profile_photos press fields unavailable, returning empty',
         error,

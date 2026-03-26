@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateAvatarCache, invalidateProfileCache } from '@/lib/cache';
+import { isPressPhotoSchemaUnavailableError } from '@/lib/db/queries/press-photos';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, profilePhotos } from '@/lib/db/schema/profiles';
@@ -439,6 +440,15 @@ export async function POST(request: NextRequest) {
         'Upload was cancelled.',
         UPLOAD_ERROR_CODES.UPLOAD_FAILED,
         499
+      );
+    }
+
+    if (isPressPhotoSchemaUnavailableError(error)) {
+      return errorResponse(
+        'Press photos are temporarily unavailable while setup finishes. Please try again in a minute.',
+        UPLOAD_ERROR_CODES.UPLOAD_FAILED,
+        503,
+        { retryable: true }
       );
     }
 

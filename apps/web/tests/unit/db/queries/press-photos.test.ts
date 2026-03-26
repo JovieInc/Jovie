@@ -24,6 +24,27 @@ function createSelectChain(result: unknown[] = []) {
   return chain;
 }
 
+function createProfileRejectingSelectChain(error: Error) {
+  const chain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockRejectedValue(error),
+  };
+  mockDbSelect.mockReturnValue(chain);
+  return chain;
+}
+
+function createUserRejectingSelectChain(error: Error) {
+  const chain = {
+    from: vi.fn().mockReturnThis(),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockRejectedValue(error),
+  };
+  mockDbSelect.mockReturnValue(chain);
+  return chain;
+}
+
 describe('press photo queries', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,14 +76,9 @@ describe('press photo queries', () => {
   });
 
   it('returns an empty array when the press-photo schema is unavailable', async () => {
-    mockDbSelect.mockReturnValue({
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockReturnThis(),
-      limit: vi
-        .fn()
-        .mockRejectedValue(new Error('column "photo_type" does not exist')),
-    });
+    createProfileRejectingSelectChain(
+      new Error('column "photo_type" does not exist')
+    );
 
     const { getPressPhotosByProfileId } = await import(
       '@/lib/db/queries/press-photos'
@@ -74,6 +90,24 @@ describe('press photo queries', () => {
       '[press-photos] profile_photos press fields unavailable, returning empty',
       expect.any(Error),
       { profileId: 'profile-123' }
+    );
+  });
+
+  it('returns an empty array for dashboard reads when the press-photo schema is unavailable', async () => {
+    createUserRejectingSelectChain(
+      new Error('column "photo_type" does not exist')
+    );
+
+    const { getPressPhotosByUserId } = await import(
+      '@/lib/db/queries/press-photos'
+    );
+    const result = await getPressPhotosByUserId('user-123', 'profile-123');
+
+    expect(result).toEqual([]);
+    expect(mockCaptureWarning).toHaveBeenCalledWith(
+      '[press-photos] profile_photos press fields unavailable, returning empty',
+      expect.any(Error),
+      { userId: 'user-123', creatorProfileId: 'profile-123' }
     );
   });
 
