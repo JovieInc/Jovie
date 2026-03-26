@@ -28,7 +28,9 @@ import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardNav } from '@/features/dashboard/dashboard-nav';
 import {
+  adminSettingsNavItem,
   artistSettingsNavigation,
+  paymentsNavItem,
   userSettingsNavigation,
 } from '@/features/dashboard/dashboard-nav/config';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
@@ -36,6 +38,8 @@ import { SidebarInstallBanner } from '@/features/feedback/SidebarInstallBanner';
 import { SidebarUpgradeBanner } from '@/features/feedback/SidebarUpgradeBanner';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import { useProfileData } from '@/hooks/useProfileData';
+import { useFeatureGate } from '@/lib/feature-flags/client';
+import { FEATURE_FLAG_KEYS } from '@/lib/feature-flags/shared';
 import { useDashboardProfileQuery } from '@/lib/queries/useDashboardProfileQuery';
 import { cn } from '@/lib/utils';
 import { ProfileSwitcher } from './ProfileSwitcher';
@@ -113,7 +117,10 @@ function SettingsNavigation({
   pathname: string;
   section: string;
 }) {
-  const { selectedProfile } = useDashboardData();
+  const { selectedProfile, isAdmin } = useDashboardData();
+  const isStripeConnectEnabled = useFeatureGate(
+    FEATURE_FLAG_KEYS.STRIPE_CONNECT_ENABLED
+  );
   // Prefer the TanStack Query cache (updated by profile mutations) over
   // the server-rendered context so the sidebar reflects name edits immediately.
   const { data: cachedProfileData } = useDashboardProfileQuery();
@@ -133,6 +140,18 @@ function SettingsNavigation({
       ? selectedProfile?.displayName?.trim() || undefined
       : cachedDisplayName.trim() || undefined;
 
+  // Build user settings items with conditional Payments
+  const userItems = useMemo(() => {
+    if (!isStripeConnectEnabled) return userSettingsNavigation;
+    // Insert Payments after Billing & Subscription
+    const billingIndex = userSettingsNavigation.findIndex(
+      i => i.id === 'billing'
+    );
+    const items = [...userSettingsNavigation];
+    items.splice(billingIndex + 1, 0, paymentsNavItem);
+    return items;
+  }, [isStripeConnectEnabled]);
+
   // Replace "Profile" label with the artist's display name when available
   const artistItems = useMemo(() => {
     if (!artistName) return artistSettingsNavigation;
@@ -150,7 +169,7 @@ function SettingsNavigation({
         <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
           General
         </span>
-        <SettingsNavGroup items={userSettingsNavigation} pathname={pathname} />
+        <SettingsNavGroup items={userItems} pathname={pathname} />
       </div>
       <div>
         <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
@@ -158,6 +177,17 @@ function SettingsNavigation({
         </span>
         <SettingsNavGroup items={artistItems} pathname={pathname} />
       </div>
+      {isAdmin && (
+        <div>
+          <span className='mb-1 block px-2 text-2xs tracking-tight text-sidebar-item-icon/70 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+            Admin
+          </span>
+          <SettingsNavGroup
+            items={[adminSettingsNavItem]}
+            pathname={pathname}
+          />
+        </div>
+      )}
     </nav>
   );
 }
@@ -178,65 +208,71 @@ function SidebarHeaderNav({
 }>) {
   return (
     <div className='flex w-full items-center'>
-      {isInSettings ? (
-        <div className='flex w-full items-center gap-2'>
-          <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
-            <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
-              Workspace
-            </p>
-            <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
-              Settings
-            </p>
-          </div>
-          <Link
-            href={APP_ROUTES.DASHBOARD}
-            aria-label='Exit settings and return to app'
-            className={cn(
-              'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
-              'rounded-full group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
-            )}
-          >
-            <ArrowLeft
-              className='size-3 text-sidebar-item-icon/70'
-              aria-hidden='true'
-            />
-            <span className='truncate group-data-[collapsible=icon]:hidden'>
-              Exit
-            </span>
-          </Link>
-        </div>
-      ) : hasMultipleProfiles && !isAdmin ? (
-        <ProfileSwitcher />
-      ) : (
-        <UserButton
-          profileHref={profileHref}
-          settingsHref={APP_ROUTES.SETTINGS}
-          trigger={
-            <button
-              type='button'
-              aria-label='Open workspace menu'
-              className={cn(
-                'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
-                'group-data-[collapsible=icon]:justify-center'
-              )}
-            >
-              <BrandLogo
-                size={16}
-                tone='auto'
-                rounded={false}
-                className='rounded-sm shrink-0'
-              />
-              <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
-                {isAdmin ? 'Admin' : 'Jovie'}
-              </span>
-              <ChevronDown
-                className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
-                aria-hidden='true'
-              />
-            </button>
-          }
-        />
-      )}
+      {(() => {
+        if (isInSettings) {
+          return (
+            <div className='flex w-full items-center gap-2'>
+              <div className='min-w-0 group-data-[collapsible=icon]:hidden'>
+                <p className='text-2xs tracking-tight text-sidebar-item-icon/70 [font-weight:var(--font-weight-nav)]'>
+                  Workspace
+                </p>
+                <p className='truncate text-app tracking-tight text-sidebar-item-foreground/88 [font-weight:var(--font-weight-nav)]'>
+                  Settings
+                </p>
+              </div>
+              <Link
+                href={APP_ROUTES.DASHBOARD}
+                aria-label='Exit settings and return to app'
+                className={cn(
+                  'ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2 text-app tracking-tight text-sidebar-item-foreground/78 transition-[background,color,border-color] duration-normal ease-interactive hover:border-sidebar-border hover:bg-sidebar-accent/60 hover:text-sidebar-item-foreground/95 focus-visible:outline-none focus-visible:border-sidebar-border focus-visible:bg-sidebar-accent/60 focus-visible:text-sidebar-item-foreground/95 [font-weight:var(--font-weight-nav)]',
+                  'rounded-full group-data-[collapsible=icon]:ml-0 group-data-[collapsible=icon]:size-7 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0'
+                )}
+              >
+                <ArrowLeft
+                  className='size-3 text-sidebar-item-icon/70'
+                  aria-hidden='true'
+                />
+                <span className='truncate group-data-[collapsible=icon]:hidden'>
+                  Exit
+                </span>
+              </Link>
+            </div>
+          );
+        }
+        if (hasMultipleProfiles && !isAdmin) {
+          return <ProfileSwitcher />;
+        }
+        return (
+          <UserButton
+            profileHref={profileHref}
+            settingsHref={APP_ROUTES.SETTINGS}
+            trigger={
+              <button
+                type='button'
+                aria-label='Open workspace menu'
+                className={cn(
+                  'flex h-7 w-full items-center gap-1.5 rounded-full px-2 transition-[background,color] duration-normal ease-interactive hover:bg-sidebar-accent/60 focus-visible:outline-none focus-visible:bg-sidebar-accent/60',
+                  'group-data-[collapsible=icon]:justify-center'
+                )}
+              >
+                <BrandLogo
+                  size={16}
+                  tone='auto'
+                  rounded={false}
+                  className='rounded-sm shrink-0'
+                />
+                <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground/78 group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
+                  {isAdmin ? 'Admin' : 'Jovie'}
+                </span>
+                <ChevronDown
+                  className='size-2.5 shrink-0 text-sidebar-item-icon/55 group-data-[collapsible=icon]:hidden'
+                  aria-hidden='true'
+                />
+              </button>
+            }
+          />
+        );
+      })()}
 
       {!isInSettings && isDashboardOrAdmin && (
         <Link
@@ -305,7 +341,7 @@ export function UnifiedSidebar({ section }: UnifiedSidebarProps) {
         </SidebarGroup>
       </SidebarContent>
 
-      <div className='mt-auto shrink-0 bg-sidebar/45 backdrop-blur-[1px]'>
+      <div className='mt-auto shrink-0'>
         <div className='px-2 pb-1'>
           <NowPlayingCard />
         </div>

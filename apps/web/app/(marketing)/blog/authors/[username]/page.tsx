@@ -10,6 +10,13 @@ import {
 } from '@/lib/constants/schemas';
 import type { ProfileData } from '@/lib/services/profile';
 import { getProfileByUsername } from '@/lib/services/profile';
+
+/** Normalize a relative URL to absolute, or return undefined if empty. */
+function toAbsoluteUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  return url.startsWith('http') ? url : `${APP_URL}${url}`;
+}
+
 import { BlogAuthorCard } from '../../components/BlogAuthorCard';
 import { BlogCard } from '../../components/BlogCard';
 
@@ -87,11 +94,7 @@ export default async function AuthorPage({
   const author = resolveAuthor(authorPosts[0], profile);
 
   // Normalize profile URL to absolute
-  const absoluteProfileUrl = author.profileUrl
-    ? author.profileUrl.startsWith('http')
-      ? author.profileUrl
-      : `${APP_URL}${author.profileUrl}`
-    : undefined;
+  const absoluteProfileUrl = toAbsoluteUrl(author.profileUrl);
 
   // Build schemas
   const personSchema = buildPersonSchema({

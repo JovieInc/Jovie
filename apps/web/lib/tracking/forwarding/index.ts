@@ -345,7 +345,7 @@ export async function forwardEvent(
 
   // Merge new results with prior statuses (preserve 'sent' from earlier runs)
   const forwardingStatus = {
-    ...(event.forwardingStatus ?? {}),
+    ...event.forwardingStatus,
     ...buildForwardingStatus(results),
   };
   await db
@@ -474,7 +474,7 @@ export async function processPendingEvents(limit = 100): Promise<{
               .update(pixelEvents)
               .set({
                 forwardingStatus: {
-                  ...(event.forwardingStatus ?? {}),
+                  ...event.forwardingStatus,
                   ...deadLetterStatus,
                 },
               })

@@ -33,6 +33,32 @@ const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
 const INTERNAL_PREFIX = '[internal]';
 
+/** Try to parse a version heading; returns a new release or 'unreleased' sentinel. */
+function parseVersionHeading(
+  line: string
+): ChangelogRelease | 'unreleased' | null {
+  const match = VERSION_HEADING_RE.exec(line);
+  if (!match) return null;
+  const [, version, date] = match;
+  if (version.toLowerCase() === 'unreleased') return 'unreleased';
+  return {
+    version,
+    date: date || '',
+    summary: '',
+    sections: { added: [], changed: [], fixed: [], removed: [] },
+  };
+}
+
+/** Check if a bullet entry should be included in public output. */
+function isPublicEntry(entry: string): boolean {
+  return !entry.startsWith(INTERNAL_PREFIX) && !isInternalEntry(entry);
+}
+
+/** Returns true when a release has at least one public entry. */
+function hasPublicEntries(release: ChangelogRelease): boolean {
+  return Object.values(release.sections).some(entries => entries.length > 0);
+}
+
 /**
  * Parse CHANGELOG.md into structured release data for public display.
  *
@@ -45,20 +71,14 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
   let currentSection: keyof ChangelogSection | null = null;
 
   for (const line of lines) {
-    const vMatch = line.match(VERSION_HEADING_RE);
-    if (vMatch) {
-      const [, version, date] = vMatch;
-      if (version.toLowerCase() === 'unreleased') {
-        current = null;
-        currentSection = null;
-        continue;
-      }
-      current = {
-        version,
-        date: date || '',
-        summary: '',
-        sections: { added: [], changed: [], fixed: [], removed: [] },
-      };
+    const versionResult = parseVersionHeading(line);
+    if (versionResult === 'unreleased') {
+      current = null;
+      currentSection = null;
+      continue;
+    }
+    if (versionResult) {
+      current = versionResult;
       releases.push(current);
       currentSection = null;
       continue;
@@ -72,7 +92,7 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
       continue;
     }
 
-    const sMatch = line.match(SECTION_HEADING_RE);
+    const sMatch = SECTION_HEADING_RE.exec(line);
     if (sMatch) {
       currentSection = sMatch[1].toLowerCase() as keyof ChangelogSection;
       continue;
@@ -81,20 +101,11 @@ export function parseChangelog(markdown: string): ChangelogRelease[] {
     const trimmed = line.trim();
     if (trimmed.startsWith('- ') && currentSection) {
       const entry = trimmed.slice(2);
-      // Skip internal entries — not meant for public display
-      // Also auto-filter entries with vendor names, dev tooling, etc.
-      if (!entry.startsWith(INTERNAL_PREFIX) && !isInternalEntry(entry)) {
+      if (isPublicEntry(entry)) {
         current.sections[currentSection].push(entry);
       }
     }
   }
 
-  // Filter out releases with no public entries
-  return releases.filter(r => {
-    const totalEntries = Object.values(r.sections).reduce(
-      (sum, entries) => sum + entries.length,
-      0
-    );
-    return totalEntries > 0;
-  });
+  return releases.filter(hasPublicEntries);
 }

@@ -40,7 +40,7 @@ import {
 function useLocalOverrides() {
   const [overrides, setOverridesState] = useState<Record<string, boolean>>(
     () => {
-      if (typeof window === 'undefined') return {};
+      if (typeof globalThis.window === 'undefined') return {};
       try {
         return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
       } catch {
@@ -112,13 +112,13 @@ function useBreakpoint() {
   const [bp, setBp] = useState('xs');
   useEffect(() => {
     const update = () => {
-      const w = window.innerWidth;
+      const w = globalThis.innerWidth;
       const match = BREAKPOINTS.find(b => w >= b.min);
       setBp(match?.name ?? 'xs');
     };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    globalThis.addEventListener('resize', update);
+    return () => globalThis.removeEventListener('resize', update);
   }, []);
   return bp;
 }
@@ -330,7 +330,7 @@ export function DevToolbar({
       const data = await res.json().catch(() => null);
       if (data?.success) {
         setUnwaitlistState('done');
-        setTimeout(() => window.location.reload(), 500);
+        setTimeout(() => globalThis.location.reload(), 500);
       } else {
         setUnwaitlistState('error');
         setTimeout(() => setUnwaitlistState('idle'), 3000);
@@ -367,7 +367,7 @@ export function DevToolbar({
         }
 
         setClearSessionState('done');
-        setTimeout(() => window.location.reload(), 500);
+        setTimeout(() => globalThis.location.reload(), 500);
       } else {
         setClearSessionState('error');
         setTimeout(() => setClearSessionState('idle'), 3000);
@@ -601,8 +601,10 @@ export function DevToolbar({
 
           <button
             type='button'
-            onClick={() => copyToClipboard(window.location.pathname, 'route')}
-            title={`Copy route: ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
+            onClick={() =>
+              copyToClipboard(globalThis.location.pathname, 'route')
+            }
+            title={`Copy route: ${typeof globalThis.window !== 'undefined' ? globalThis.location.pathname : ''}`}
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label='Copy route'
           >
@@ -696,7 +698,7 @@ export function DevToolbar({
                 } else {
                   await unregisterServiceWorker();
                 }
-                window.location.reload();
+                globalThis.location.reload();
               }}
               title={
                 swEnabled

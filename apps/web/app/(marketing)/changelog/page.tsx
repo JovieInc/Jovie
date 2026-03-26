@@ -130,7 +130,7 @@ export default async function ChangelogPage() {
         <div className='flex flex-wrap items-center gap-3'>
           {thisMonthCount > 0 && (
             <Badge variant='outline' className='text-xs'>
-              {thisMonthCount} update{thisMonthCount !== 1 ? 's' : ''} this
+              {thisMonthCount} update{thisMonthCount === 1 ? '' : 's'} this
               month
             </Badge>
           )}

@@ -488,8 +488,8 @@ export function JovieChat({
       ) : (
         // Empty state - centered content with input pinned at bottom
         <div className='flex flex-1 flex-col'>
-          {/* Centered content area */}
-          <div className='flex flex-1 flex-col items-center justify-center px-4 sm:px-5'>
+          {/* Content area — pinned near the input for a conversational feel */}
+          <div className='flex flex-1 flex-col items-center justify-end px-4 pb-6 sm:px-5'>
             <div className='chat-stagger w-full max-w-[46rem] space-y-5'>
               {/* Suggested profiles carousel (DSP matches, social links, avatars, profile ready) */}
               {showSuggestedProfiles && (

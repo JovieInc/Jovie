@@ -34,6 +34,91 @@ import { cn } from '@/lib/utils';
 
 export const PREVIEW_PANEL_WIDTH = 360;
 
+/** Empty / loading state shown while preview data is hydrating. */
+function PreviewPanelEmpty({
+  isOpen,
+  close,
+}: {
+  isOpen: boolean;
+  close: () => void;
+}) {
+  return (
+    <RightDrawer
+      isOpen={isOpen}
+      width={PREVIEW_PANEL_WIDTH}
+      ariaLabel='Live Preview'
+    >
+      <div className='flex h-full flex-col'>
+        <DrawerHeader
+          title='Live preview'
+          actions={
+            <DrawerHeaderActions
+              primaryActions={[]}
+              overflowActions={[]}
+              onClose={close}
+            />
+          }
+        />
+
+        <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
+          <div className='space-y-3 pb-5'>
+            <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+              <div className='space-y-0.5'>
+                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                  Live preview
+                </p>
+                <p className='text-xs text-secondary-token'>
+                  This drawer will populate as soon as the profile preview state
+                  hydrates.
+                </p>
+              </div>
+
+              <DrawerEmptyState message='Loading profile preview…' />
+
+              <div className='mx-auto w-full max-w-[320px]'>
+                <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
+                  <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
+                    <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
+                      <div className='h-2.5 w-16 rounded skeleton' />
+                      <div className='h-5 w-20 rounded-full skeleton' />
+                    </div>
+                    <div className='relative aspect-[9/19.5] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40'>
+                      <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
+                        <div className='h-1.5 w-24 rounded-full bg-black/55' />
+                      </div>
+                      <div className='flex h-full flex-col items-center justify-center gap-3 px-6'>
+                        <div className='h-16 w-16 rounded-full skeleton' />
+                        <div className='h-3 w-28 rounded skeleton' />
+                        <div className='h-3 w-40 rounded skeleton' />
+                        <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
+                        <div className='h-9 w-full rounded-[16px] skeleton' />
+                        <div className='h-9 w-full rounded-[16px] skeleton' />
+                      </div>
+                      <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
+                        <div className='h-1.5 w-28 rounded-full bg-black/55' />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </RightDrawer>
+  );
+}
+
+function getHometownTag(
+  hometown: string | null | undefined,
+  location: string | null | undefined
+): string | null {
+  if (!hometown || hometown === location || hometown.trim().length === 0) {
+    return null;
+  }
+  return `From ${hometown}`;
+}
+
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -183,88 +268,25 @@ export function PreviewPanel() {
   );
 
   if (!previewData) {
-    return (
-      <RightDrawer
-        isOpen={isOpen}
-        width={PREVIEW_PANEL_WIDTH}
-        ariaLabel='Live Preview'
-      >
-        <div className='flex h-full flex-col'>
-          <DrawerHeader
-            title='Live preview'
-            actions={
-              <DrawerHeaderActions
-                primaryActions={[]}
-                overflowActions={[]}
-                onClose={close}
-              />
-            }
-          />
-
-          <div className='flex-1 min-h-0 overflow-y-auto px-4 py-3'>
-            <div className='space-y-3 pb-5'>
-              <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
-                <div className='space-y-0.5'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
-                    Live preview
-                  </p>
-                  <p className='text-xs text-secondary-token'>
-                    This drawer will populate as soon as the profile preview
-                    state hydrates.
-                  </p>
-                </div>
-
-                <DrawerEmptyState message='Loading profile preview…' />
-
-                <div className='mx-auto w-full max-w-[320px]'>
-                  <div className={cn(LINEAR_SURFACE.sidebarCard, 'p-2.5')}>
-                    <div className='rounded-[28px] border border-subtle bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.02))] p-2 shadow-[0_20px_50px_-34px_rgba(15,23,42,0.7)]'>
-                      <div className='mb-2 flex items-center justify-between px-2.5 pt-1'>
-                        <div className='h-2.5 w-16 rounded skeleton' />
-                        <div className='h-5 w-20 rounded-full skeleton' />
-                      </div>
-                      <div className='relative aspect-[9/19.5] overflow-hidden rounded-[24px] border border-subtle bg-surface-1/40'>
-                        <div className='pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2.5'>
-                          <div className='h-1.5 w-24 rounded-full bg-black/55' />
-                        </div>
-                        <div className='flex h-full flex-col items-center justify-center gap-3 px-6'>
-                          <div className='h-16 w-16 rounded-full skeleton' />
-                          <div className='h-3 w-28 rounded skeleton' />
-                          <div className='h-3 w-40 rounded skeleton' />
-                          <div className='mt-2 h-9 w-full rounded-[16px] skeleton' />
-                          <div className='h-9 w-full rounded-[16px] skeleton' />
-                          <div className='h-9 w-full rounded-[16px] skeleton' />
-                        </div>
-                        <div className='pointer-events-none absolute inset-x-0 bottom-0 z-10 flex justify-center pb-2.5'>
-                          <div className='h-1.5 w-28 rounded-full bg-black/55' />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </RightDrawer>
-    );
+    return <PreviewPanelEmpty isOpen={isOpen} close={close} />;
   }
 
   const { username, displayName, avatarUrl, links } = previewData;
   const visibleLinkCount = links.filter(link => link.isVisible).length;
   const hiddenLinkCount = links.length - visibleLinkCount;
+  const hiddenDraftLabel = `${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'}`;
   const connectedDspCount = [
     previewData.dspConnections.spotify.connected,
     previewData.dspConnections.appleMusic.connected,
   ].filter(Boolean).length;
   const hasBio = (previewData.bio?.trim().length ?? 0) > 0;
+  const hometownTag = getHometownTag(
+    previewData.hometown,
+    previewData.location
+  );
   const snapshotTags = [
     previewData.location,
-    previewData.hometown &&
-    previewData.hometown !== previewData.location &&
-    previewData.hometown.trim().length > 0
-      ? `From ${previewData.hometown}`
-      : null,
+    hometownTag,
     ...(previewData.genres?.slice(0, 2) ?? []),
     previewData.activeSinceYear ? `Since ${previewData.activeSinceYear}` : null,
     hasBio ? 'Bio live' : null,
@@ -473,7 +495,7 @@ export function PreviewPanel() {
                 {visibleLinkCount === 1 ? '' : 's'} currently anchor the public
                 profile
                 {hiddenLinkCount > 0
-                  ? `, with ${hiddenLinkCount} draft${hiddenLinkCount === 1 ? '' : 's'} still hidden from visitors.`
+                  ? `, with ${hiddenDraftLabel} still hidden from visitors.`
                   : '.'}
               </p>
 

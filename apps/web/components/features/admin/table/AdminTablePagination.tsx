@@ -115,98 +115,114 @@ export function AdminTablePagination({
           </div>
         )}
         <div className='flex items-center gap-1 sm:gap-2'>
-          {onPrevClick ? (
-            <Button
-              type='button'
-              size='sm'
-              variant='ghost'
-              disabled={!canPrev}
-              onClick={onPrevClick}
-              className={paginationButtonClassName}
-              aria-label='Previous page'
-            >
-              <ChevronLeft
-                className='h-3.5 w-3.5 sm:hidden'
-                aria-hidden='true'
-              />
-              <span className='hidden sm:inline'>Previous</span>
-            </Button>
-          ) : prevHref ? (
-            <Button
-              asChild
-              size='sm'
-              variant='ghost'
-              className={paginationButtonClassName}
-            >
-              <Link href={prevHref} aria-label='Previous page'>
+          {(() => {
+            if (onPrevClick) {
+              return (
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='ghost'
+                  disabled={!canPrev}
+                  onClick={onPrevClick}
+                  className={paginationButtonClassName}
+                  aria-label='Previous page'
+                >
+                  <ChevronLeft
+                    className='h-3.5 w-3.5 sm:hidden'
+                    aria-hidden='true'
+                  />
+                  <span className='hidden sm:inline'>Previous</span>
+                </Button>
+              );
+            }
+            if (prevHref) {
+              return (
+                <Button
+                  asChild
+                  size='sm'
+                  variant='ghost'
+                  className={paginationButtonClassName}
+                >
+                  <Link href={prevHref} aria-label='Previous page'>
+                    <ChevronLeft
+                      className='h-3.5 w-3.5 sm:hidden'
+                      aria-hidden='true'
+                    />
+                    <span className='hidden sm:inline'>Previous</span>
+                  </Link>
+                </Button>
+              );
+            }
+            return (
+              <Button
+                size='sm'
+                variant='ghost'
+                disabled
+                className={paginationButtonClassName}
+                aria-label='Previous page'
+              >
                 <ChevronLeft
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
                 <span className='hidden sm:inline'>Previous</span>
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              size='sm'
-              variant='ghost'
-              disabled
-              className={paginationButtonClassName}
-              aria-label='Previous page'
-            >
-              <ChevronLeft
-                className='h-3.5 w-3.5 sm:hidden'
-                aria-hidden='true'
-              />
-              <span className='hidden sm:inline'>Previous</span>
-            </Button>
-          )}
-          {onNextClick ? (
-            <Button
-              type='button'
-              size='sm'
-              variant='ghost'
-              disabled={!canNext}
-              onClick={onNextClick}
-              className={paginationButtonClassName}
-              aria-label='Next page'
-            >
-              <ChevronRight
-                className='h-3.5 w-3.5 sm:hidden'
-                aria-hidden='true'
-              />
-              <span className='hidden sm:inline'>Next</span>
-            </Button>
-          ) : nextHref ? (
-            <Button
-              asChild
-              size='sm'
-              variant='ghost'
-              className={paginationButtonClassName}
-            >
-              <Link href={nextHref} aria-label='Next page'>
+              </Button>
+            );
+          })()}
+          {(() => {
+            if (onNextClick) {
+              return (
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='ghost'
+                  disabled={!canNext}
+                  onClick={onNextClick}
+                  className={paginationButtonClassName}
+                  aria-label='Next page'
+                >
+                  <ChevronRight
+                    className='h-3.5 w-3.5 sm:hidden'
+                    aria-hidden='true'
+                  />
+                  <span className='hidden sm:inline'>Next</span>
+                </Button>
+              );
+            }
+            if (nextHref) {
+              return (
+                <Button
+                  asChild
+                  size='sm'
+                  variant='ghost'
+                  className={paginationButtonClassName}
+                >
+                  <Link href={nextHref} aria-label='Next page'>
+                    <ChevronRight
+                      className='h-3.5 w-3.5 sm:hidden'
+                      aria-hidden='true'
+                    />
+                    <span className='hidden sm:inline'>Next</span>
+                  </Link>
+                </Button>
+              );
+            }
+            return (
+              <Button
+                size='sm'
+                variant='ghost'
+                disabled
+                className={paginationButtonClassName}
+                aria-label='Next page'
+              >
                 <ChevronRight
                   className='h-3.5 w-3.5 sm:hidden'
                   aria-hidden='true'
                 />
                 <span className='hidden sm:inline'>Next</span>
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              size='sm'
-              variant='ghost'
-              disabled
-              className={paginationButtonClassName}
-              aria-label='Next page'
-            >
-              <ChevronRight
-                className='h-3.5 w-3.5 sm:hidden'
-                aria-hidden='true'
-              />
-              <span className='hidden sm:inline'>Next</span>
-            </Button>
-          )}
+              </Button>
+            );
+          })()}
         </div>
       </div>
     </div>

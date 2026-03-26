@@ -6,6 +6,7 @@ import {
   Home,
   IdCard,
   Image as ImageIcon,
+  Lock,
   MailCheck,
   MessageSquare,
   Music,
@@ -93,12 +94,26 @@ export const userSettingsNavigation: NavItem[] = [
     icon: ShieldCheck,
   },
   {
-    name: 'Billing',
+    name: 'Billing & Subscription',
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     icon: Banknote,
   },
+  {
+    name: 'Data & Privacy',
+    href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
+    id: 'data-privacy',
+    icon: Lock,
+  },
 ];
+
+/** Payments settings item — feature-gated, included conditionally */
+export const paymentsNavItem: NavItem = {
+  name: 'Payments',
+  href: APP_ROUTES.SETTINGS_PAYMENTS,
+  id: 'payments',
+  icon: HandCoins,
+};
 
 /** Artist-level settings: profile, links, branding, tracking */
 export const artistSettingsNavigation: NavItem[] = [
@@ -121,12 +136,26 @@ export const artistSettingsNavigation: NavItem[] = [
     icon: CalendarDays,
   },
   {
+    name: 'Analytics',
+    href: APP_ROUTES.SETTINGS_ANALYTICS,
+    id: 'analytics',
+    icon: PieChart,
+  },
+  {
     name: 'Audience & Tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
     id: 'audience-tracking',
     icon: MailCheck,
   },
 ];
+
+/** Admin settings item — shown only to admin users */
+export const adminSettingsNavItem: NavItem = {
+  name: 'Admin',
+  href: APP_ROUTES.SETTINGS_ADMIN,
+  id: 'admin-settings',
+  icon: Settings,
+};
 
 /** Combined settings navigation (all items flat) */
 export const settingsNavigation: NavItem[] = [
