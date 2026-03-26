@@ -1921,31 +1921,25 @@ export async function createRelease(formData: {
     const releaseId = inserted.id;
     const insertedRelease = await getReleaseById(releaseId);
     const providerLabels = buildProviderLabels();
-    const release =
-      insertedRelease != null
-        ? mapReleaseToViewModel(
-            insertedRelease,
-            providerLabels,
-            profile.id,
-            profile.handle
-          )
-        : {
-            profileId: profile.id,
-            id: releaseId,
-            title,
-            artistNames: [],
-            releaseDate: toISOStringOrNull(releaseDate) ?? undefined,
-            slug,
-            smartLinkPath: buildSmartLinkPath(profile.handle, slug),
-            providers: [],
-            releaseType: formData.releaseType,
-            isExplicit: formData.isExplicit ?? false,
-            totalTracks: formData.releaseType === 'single' ? 1 : 0,
-            genres: formData.genres?.slice(0, 3) ?? [],
-          };
 
     revalidatePath(APP_ROUTES.RELEASES);
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+
+    if (insertedRelease == null) {
+      return {
+        success: false,
+        message:
+          'Release was created but could not be loaded. Please refresh and try again.',
+        releaseId,
+      };
+    }
+
+    const release = mapReleaseToViewModel(
+      insertedRelease,
+      providerLabels,
+      profile.id,
+      profile.handle
+    );
 
     return {
       success: true,

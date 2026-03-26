@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -255,6 +261,7 @@ const defaultProps = {
   artistName: 'Test Artist',
   onClose: vi.fn(),
   onCreated: vi.fn(),
+  onReleaseUpdated: vi.fn(),
 };
 
 describe('AddReleaseSidebar', () => {
@@ -267,19 +274,23 @@ describe('AddReleaseSidebar', () => {
     });
   });
 
-  it('renders exactly two cards with mirrored header content', () => {
+  it('renders the mirrored header content with the primary release form', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
-    expect(screen.getByTestId('add-release-sidebar')).toBeInTheDocument();
+    const sidebar = screen.getByTestId('add-release-sidebar');
+
+    expect(sidebar).toBeInTheDocument();
     expect(screen.getByTestId('shell-title')).toHaveTextContent('New Release');
-    expect(screen.getAllByTestId('drawer-surface-card')).toHaveLength(2);
-    expect(screen.getAllByText('New Release')).toHaveLength(2);
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
       'Untitled'
     );
     expect(screen.getByTestId('entity-header-subtitle')).toHaveTextContent(
       'Test Artist'
     );
+    expect(within(sidebar).getByLabelText('Title')).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole('button', { name: 'Create Release' })
+    ).toBeDisabled();
   });
 
   it('updates the header preview title and release fields as form values change', async () => {
@@ -358,9 +369,54 @@ describe('AddReleaseSidebar', () => {
       });
     });
     expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    expect(defaultProps.onClose).toHaveBeenCalled();
     expect(mockToast.success).toHaveBeenCalledWith(
       'Release "Midnight Sun" created.'
     );
+  });
+
+  it('opens the release drawer immediately and updates artwork in the background after creation', async () => {
+    const user = userEvent.setup();
+    mockCreateRelease.mockResolvedValue({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ artworkUrl: 'https://cdn.example.com/cover.png' }),
+    } as Response);
+
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(
+      screen.getByRole('button', { name: 'Midnight Sun artwork' })
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
+    );
+
+    await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
+    expect(defaultProps.onClose).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/images/artwork/upload?releaseId=release-1',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+    expect(defaultProps.onReleaseUpdated).toHaveBeenCalledWith({
+      ...defaultRelease,
+      artworkUrl: 'https://cdn.example.com/cover.png',
+    });
   });
 
   it('continues into the release drawer flow when artwork upload fails after creation', async () => {
@@ -389,6 +445,11 @@ describe('AddReleaseSidebar', () => {
     );
 
     await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
+    expect(defaultProps.onClose).toHaveBeenCalled();
+
+    await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/images/artwork/upload?releaseId=release-1',
         expect.objectContaining({
@@ -396,7 +457,7 @@ describe('AddReleaseSidebar', () => {
         })
       );
     });
-    expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    expect(defaultProps.onReleaseUpdated).not.toHaveBeenCalled();
     expect(mockToast.warning).toHaveBeenCalledWith(
       'Release created, but artwork upload failed. You can retry from the release drawer.'
     );

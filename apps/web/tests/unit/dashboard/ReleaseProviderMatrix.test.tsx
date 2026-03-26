@@ -238,11 +238,24 @@ vi.mock(
 vi.mock('@/components/organisms/release-sidebar', () => ({
   ReleaseSidebar: ({
     release,
+    onReleaseChange,
   }: {
     release: { title: string; id: string } | null;
+    onReleaseChange?: (release: { title: string; id: string }) => void;
   }) =>
     release ? (
-      <div data-testid='release-sidebar'>{`${release.id}:${release.title}`}</div>
+      <div>
+        <div data-testid='release-sidebar'>{`${release.id}:${release.title}`}</div>
+        <button
+          type='button'
+          data-testid='release-sidebar-update'
+          onClick={() =>
+            onReleaseChange?.({ ...release, title: 'Updated Release' })
+          }
+        >
+          update-release
+        </button>
+      </div>
     ) : null,
   TrackSidebar: () => null,
 }));
@@ -575,6 +588,43 @@ describe('ReleaseProviderMatrix', () => {
         );
       });
       expect(mockRouterRefresh).not.toHaveBeenCalled();
+    });
+
+    it('updates the open release drawer when the release changes after it opens', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create a new release' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Created Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('release-sidebar-update'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
     });
   });
 });

@@ -48,6 +48,7 @@ export interface AddReleaseSidebarProps {
   readonly artistName?: string | null;
   readonly onClose: () => void;
   readonly onCreated: (release: ReleaseViewModel) => void;
+  readonly onReleaseUpdated?: (release: ReleaseViewModel) => void;
 }
 
 export function AddReleaseSidebar({
@@ -55,6 +56,7 @@ export function AddReleaseSidebar({
   artistName,
   onClose,
   onCreated,
+  onReleaseUpdated,
 }: AddReleaseSidebarProps) {
   const [title, setTitle] = useState('');
   const [releaseType, setReleaseType] = useState<ReleaseType>('single');
@@ -72,12 +74,7 @@ export function AddReleaseSidebar({
     'Single';
 
   const replaceStagedArtworkPreview = useCallback((nextUrl: string | null) => {
-    setStagedArtworkPreviewUrl(current => {
-      if (current && current !== nextUrl) {
-        URL.revokeObjectURL(current);
-      }
-      return nextUrl;
-    });
+    setStagedArtworkPreviewUrl(nextUrl);
   }, []);
 
   const resetForm = useCallback(() => {
@@ -140,49 +137,53 @@ export function AddReleaseSidebar({
         return;
       }
 
-      let createdRelease = result.release;
-
-      if (stagedArtworkFile) {
-        const formData = new FormData();
-        formData.append('file', stagedArtworkFile);
-
-        try {
-          const response = await fetch(
-            `/api/images/artwork/upload?releaseId=${encodeURIComponent(result.releaseId)}`,
-            {
-              method: 'POST',
-              body: formData,
-            }
-          );
-
-          if (!response.ok) {
-            const error = await response
-              .json()
-              .catch(() => ({ message: 'Upload failed' }));
-            throw new Error(error.message ?? 'Failed to upload artwork');
-          }
-
-          const uploadResult = (await response.json()) as {
-            artworkUrl?: string;
-          };
-
-          if (uploadResult.artworkUrl) {
-            createdRelease = {
-              ...createdRelease,
-              artworkUrl: uploadResult.artworkUrl,
-            };
-          }
-        } catch {
-          toast.warning(
-            'Release created, but artwork upload failed. You can retry from the release drawer.'
-          );
-        }
-      }
+      const releaseId = result.releaseId;
+      const artworkFile = stagedArtworkFile;
+      const createdRelease = result.release;
 
       toast.success(result.message);
       resetForm();
       onCreated(createdRelease);
       onClose();
+
+      if (artworkFile) {
+        void (async () => {
+          const formData = new FormData();
+          formData.append('file', artworkFile);
+
+          try {
+            const response = await fetch(
+              `/api/images/artwork/upload?releaseId=${encodeURIComponent(releaseId)}`,
+              {
+                method: 'POST',
+                body: formData,
+              }
+            );
+
+            if (!response.ok) {
+              const error = await response
+                .json()
+                .catch(() => ({ message: 'Upload failed' }));
+              throw new Error(error.message ?? 'Failed to upload artwork');
+            }
+
+            const uploadResult = (await response.json()) as {
+              artworkUrl?: string;
+            };
+
+            if (uploadResult.artworkUrl) {
+              onReleaseUpdated?.({
+                ...createdRelease,
+                artworkUrl: uploadResult.artworkUrl,
+              });
+            }
+          } catch {
+            toast.warning(
+              'Release created, but artwork upload failed. You can retry from the release drawer.'
+            );
+          }
+        })();
+      }
     } catch {
       toast.error('Failed to create release. Please try again.');
     } finally {
@@ -193,6 +194,7 @@ export function AddReleaseSidebar({
     isExplicit,
     onClose,
     onCreated,
+    onReleaseUpdated,
     releaseDate,
     releaseType,
     resetForm,

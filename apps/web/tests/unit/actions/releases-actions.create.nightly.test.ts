@@ -512,6 +512,28 @@ describe('@critical releases/actions.ts — create/sync operations', () => {
           'A release with the slug "future-echoes" already exists. Please choose a different title.',
       });
     });
+
+    it('fails closed when the created release cannot be reloaded', async () => {
+      setupDbInsertChain([{ id: 'rel_404' }]);
+      mockGetReleaseById.mockResolvedValue(null);
+
+      const { createRelease } = await import(
+        '@/app/app/(shell)/dashboard/releases/actions'
+      );
+      const result = await createRelease({
+        title: 'Future Echoes',
+        releaseType: 'single',
+      });
+
+      expect(result).toEqual({
+        success: false,
+        message:
+          'Release was created but could not be loaded. Please refresh and try again.',
+        releaseId: 'rel_404',
+      });
+      expect(mockRevalidatePath).toHaveBeenCalledWith('/dashboard/releases');
+      expect(mockRevalidateTag).toHaveBeenCalled();
+    });
   });
 
   // =========================================================================

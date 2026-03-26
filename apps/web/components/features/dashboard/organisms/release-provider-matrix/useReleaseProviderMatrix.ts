@@ -434,6 +434,7 @@ export function useReleaseProviderMatrix({
     totalOverrides,
     openEditor,
     closeEditor,
+    updateRow,
     handleCopy,
     handleSave,
     handleReset,
