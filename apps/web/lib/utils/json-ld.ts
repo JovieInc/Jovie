@@ -6,11 +6,11 @@
  * the script tag and enables XSS.
  *
  * This utility replaces dangerous sequences per the HTML spec:
- * - "</" → "<\\/" (prevents closing script/style tags)
- * - "<!--" → "<\\!--" (prevents HTML comment injection)
+ * - "</" → "\\u003c/" (prevents closing script/style tags)
+ * - "<!--" → "\\u003c!--" (prevents HTML comment injection)
  */
 export function safeJsonLdStringify(data: unknown): string {
   return JSON.stringify(data)
-    .replaceAll('</', String.raw`<\/`)
-    .replaceAll('<!--', String.raw`<\!--`);
+    .replaceAll('</', String.raw`\u003c/`)
+    .replaceAll('<!--', String.raw`\u003c!--`);
 }
