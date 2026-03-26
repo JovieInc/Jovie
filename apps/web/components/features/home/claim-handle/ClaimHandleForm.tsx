@@ -41,11 +41,9 @@ function getInputRowStyle(
 
   const isDisplay = size === 'display';
   const isHeroLike = size !== 'default';
-  const borderColor = isAvailable
-    ? 'rgba(74,222,128,0.25)'
-    : isHeroLike
-      ? 'rgba(255,255,255,0.1)'
-      : 'rgba(255,255,255,0.06)';
+  let borderColor = 'rgba(255,255,255,0.06)';
+  if (isAvailable) borderColor = 'rgba(74,222,128,0.25)';
+  else if (isHeroLike) borderColor = 'rgba(255,255,255,0.1)';
 
   const heroShadow = [
     '0 14px 38px rgba(0,0,0,0.18)',
@@ -62,8 +60,12 @@ function getInputRowStyle(
       : '0 1px 2px rgba(0,0,0,0.1)',
   ].join(', ');
 
+  let minHeight = 52;
+  if (isDisplay) minHeight = 88;
+  else if (isHeroLike) minHeight = 58;
+
   return {
-    minHeight: isDisplay ? 88 : isHeroLike ? 58 : 52,
+    minHeight,
     background: isHeroLike
       ? 'linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.024) 100%)'
       : 'rgba(255,255,255,0.03)',
@@ -277,6 +279,14 @@ export function ClaimHandleForm({
   const inputStyle = getInputStyle(size, isAvailable);
   const buttonStyle = getButtonStyle(size, isDisabled);
 
+  let sizeRoundingClass = 'rounded-xl p-1';
+  if (isDisplay) sizeRoundingClass = 'rounded-[1.4rem] p-1.5 sm:p-2';
+  else if (isHero) sizeRoundingClass = 'rounded-[1rem] p-[0.35rem]';
+
+  let buttonRoundingClass = 'rounded-lg px-3.5 sm:px-4';
+  if (isDisplay) buttonRoundingClass = 'rounded-[1rem] px-6 sm:px-7';
+  else if (isHero) buttonRoundingClass = 'rounded-[0.8rem] px-4';
+
   return (
     <form onSubmit={onSubmit} className='w-full' noValidate>
       {/* Input row */}
@@ -284,11 +294,7 @@ export function ClaimHandleForm({
         className={cn(
           'claim-input-row',
           'relative flex w-full items-center gap-2 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]',
-          isDisplay
-            ? 'rounded-[1.4rem] p-1.5 sm:p-2'
-            : isHero
-              ? 'rounded-[1rem] p-[0.35rem]'
-              : 'rounded-xl p-1',
+          sizeRoundingClass,
           isAvailable && 'claim-input-row--available'
         )}
         style={inputRowStyle}
@@ -349,11 +355,7 @@ export function ClaimHandleForm({
           disabled={isDisabled}
           className={cn(
             'group shrink-0 inline-flex items-center justify-center gap-1.5 transition-all duration-200 focus-ring-themed',
-            isDisplay
-              ? 'rounded-[1rem] px-6 sm:px-7'
-              : isHero
-                ? 'rounded-[0.8rem] px-4'
-                : 'rounded-lg px-3.5 sm:px-4',
+            buttonRoundingClass,
             isDisabled
               ? 'cursor-not-allowed opacity-40'
               : 'hover:brightness-110 active:scale-[0.98]'

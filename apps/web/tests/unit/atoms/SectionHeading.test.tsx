@@ -86,6 +86,7 @@ describe('SectionHeading', () => {
         Accessible Heading
       </SectionHeading>
     );
-    await expectNoA11yViolations(container);
+    const result = await expectNoA11yViolations(container);
+    expect(result).toBeUndefined();
   });
 });
