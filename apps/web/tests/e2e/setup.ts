@@ -4,8 +4,9 @@ import { test as base } from '@playwright/test';
 declare global {
   interface Window {
     __REACT_DEVTOOLS_GLOBAL_HOOK__?: {
+      renderers: Map<unknown, unknown>;
       supportsFiber: boolean;
-      inject: () => void;
+      inject: () => number;
       onCommitFiberRoot: () => void;
       onCommitFiberUnmount: () => void;
     };
@@ -51,8 +52,9 @@ export const test = base.extend({
     await page.addInitScript(() => {
       // Mock React context providers for testing
       window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+        renderers: new Map(),
         supportsFiber: true,
-        inject: () => {},
+        inject: () => 1,
         onCommitFiberRoot: () => {},
         onCommitFiberUnmount: () => {},
       };

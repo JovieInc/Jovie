@@ -3,6 +3,7 @@ import 'server-only';
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -13,10 +14,30 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BASELINE_BURN_USD = 5_000;
 
 function isMissingLeadsOutreachStatusColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .toLowerCase()
-    .includes('column leads.outreach_status does not exist');
+  const message = getDeepErrorMessage(error).toLowerCase();
+  return (
+    message.includes('does not exist') &&
+    (message.includes('column leads.outreach_status') ||
+      message.includes('column "outreach_status"'))
+  );
+}
+
+function isMissingLeadAttributionColumnError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (!message.includes('does not exist')) {
+    return false;
+  }
+
+  return [
+    'column leads.signup_at',
+    'column "signup_at"',
+    'column leads.signup_user_id',
+    'column "signup_user_id"',
+    'column leads.paid_at',
+    'column "paid_at"',
+    'column leads.paid_subscription_id',
+    'column "paid_subscription_id"',
+  ].some(pattern => message.includes(pattern));
 }
 
 export interface AdminFunnelMetrics {
@@ -169,6 +190,14 @@ async function getSignups7d(sevenDaysAgo: Date): Promise<number> {
 
     return Number(row?.count ?? 0);
   } catch (error) {
+    if (isMissingLeadAttributionColumnError(error)) {
+      await captureWarning(
+        '[admin/funnel-metrics] lead attribution columns missing; returning 0 signups count',
+        error
+      );
+      return 0;
+    }
+
     captureError('Error fetching signups count', error);
     return 0;
   }
@@ -194,6 +223,14 @@ async function getPaidConversions7d(sevenDaysAgo: Date): Promise<number> {
 
     return Number(row?.count ?? 0);
   } catch (error) {
+    if (isMissingLeadAttributionColumnError(error)) {
+      await captureWarning(
+        '[admin/funnel-metrics] lead attribution columns missing; returning 0 paid conversions count',
+        error
+      );
+      return 0;
+    }
+
     captureError('Error fetching paid conversions count', error);
     return 0;
   }
