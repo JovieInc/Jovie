@@ -14,6 +14,10 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Publish rules promote streaming DSPs to fan-facing pages automatically; video/metadata platforms stored raw for future features
 - Structured enrichment logging shows returned/stored/published counts per MusicFetch call
 
+### Fixed
+
+- Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name
+
 ## [26.4.76] - 2026-03-25
 
 ### Changed
