@@ -53,6 +53,10 @@ This project includes [gstack](https://github.com/garrytan/gstack) vendored at `
 
 This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
 
+## Clerk Auth Proxy — DO NOT CHANGE
+
+One Clerk instance for all envs: `distinct-giraffe-5.clerk.accounts.dev`. Proxy path: `/__clerk`. Handled by `vercel.json` static rewrites. **Do NOT add middleware rewrites for `/__clerk` — causes 400 errors.** `clerk.jov.ie` is dead. See `AGENTS.md` → "Clerk Auth Proxy Architecture" for details.
+
 ## E2E Test Authentication
 
 Test auth uses Clerk `+clerk_test` emails with magic OTP `424242`. **No password needed.**
