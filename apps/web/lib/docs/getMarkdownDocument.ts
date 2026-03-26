@@ -8,6 +8,8 @@ import { visit } from 'unist-util-visit';
 import { LEGAL_ENTITY_NAME } from '@/constants/app';
 import type { MarkdownDocument, TocEntry } from '@/types/docs';
 
+const CONTENT_ROOT = path.resolve(process.cwd(), 'content');
+
 const slugifyHeading = (value: string): string => {
   const safeValue = value.slice(0, 200);
   return safeValue
@@ -32,6 +34,16 @@ type HeadingNode = {
 const applyMarkdownTemplate = (raw: string): string => {
   return raw.replaceAll(/\{\{\s*LEGAL_ENTITY_NAME\s*\}\}/g, LEGAL_ENTITY_NAME);
 };
+
+function resolveContentPath(relativePath: string): string {
+  const absolutePath = path.resolve(CONTENT_ROOT, relativePath);
+
+  if (!absolutePath.startsWith(CONTENT_ROOT + path.sep)) {
+    throw new Error(`Invalid content path: ${relativePath}`);
+  }
+
+  return absolutePath;
+}
 
 export async function getMarkdownDocument(
   relativePath: string
@@ -81,7 +93,7 @@ export async function createMarkdownDocument(
 async function getMarkdownDocumentUncached(
   relativePath: string
 ): Promise<MarkdownDocument> {
-  const absolutePath = path.join(process.cwd(), relativePath);
+  const absolutePath = resolveContentPath(relativePath);
   const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
   return createMarkdownDocument(raw);
@@ -89,7 +101,7 @@ async function getMarkdownDocumentUncached(
 
 const getMarkdownDocumentCached = cache(
   async (relativePath: string): Promise<MarkdownDocument> => {
-    const absolutePath = path.join(process.cwd(), relativePath);
+    const absolutePath = resolveContentPath(relativePath);
     const raw = applyMarkdownTemplate(await fs.readFile(absolutePath, 'utf-8'));
 
     return createMarkdownDocument(raw);

@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 
@@ -19,79 +18,49 @@ export interface ScreenshotInfo {
   url: string;
 }
 
+const REPO_ROOT = resolve(process.cwd(), '..', '..');
+const WEB_ROOT = resolve(process.cwd());
+
 const SCREENSHOT_SOURCES = [
   {
     key: 'docs',
     label: 'Docs',
-    relativePath: 'docs/screenshots',
+    directoryPath: resolve(REPO_ROOT, 'docs', 'screenshots'),
   },
   {
     key: 'visual-regression',
     label: 'Visual Regression',
-    relativePath: 'apps/web/tests/e2e/__snapshots__/visual-regression.spec.ts',
+    directoryPath: resolve(
+      WEB_ROOT,
+      'tests',
+      'e2e',
+      '__snapshots__',
+      'visual-regression.spec.ts'
+    ),
   },
   {
     key: 'homepage-a11y',
     label: 'Homepage A11y',
-    relativePath:
-      'apps/web/tests/e2e/__snapshots__/homepage-visual-a11y.spec.ts',
+    directoryPath: resolve(
+      WEB_ROOT,
+      'tests',
+      'e2e',
+      '__snapshots__',
+      'homepage-visual-a11y.spec.ts'
+    ),
   },
 ] as const;
 
-let _cachedRoot: string | undefined;
-
-/**
- * Resolve the monorepo root directory by trying multiple candidate paths.
- * In Next.js, process.cwd() typically resolves to apps/web (two levels deep),
- * but this may vary depending on the environment.
- *
- * The result is cached and resolved to an absolute path so that the Next.js
- * bundler sees a single canonical path instead of multiple candidates (which
- * previously caused "overly broad patterns" warnings matching 16k+ files).
- */
-function getMonorepoRoot(): string {
-  if (_cachedRoot) return _cachedRoot;
-
-  const cwd = process.cwd();
-  const candidates = [
-    resolve(cwd, '..', '..'), // apps/web -> root
-    resolve(cwd, '..'), // apps -> root (or packages/x -> root)
-    cwd, // already at root
-  ];
-
-  for (const candidate of candidates) {
-    // A valid monorepo root will have a pnpm-workspace.yaml
-    if (existsSync(join(candidate, 'pnpm-workspace.yaml'))) {
-      _cachedRoot = candidate;
-      return _cachedRoot;
-    }
-  }
-
-  // Fall back to MONOREPO_ROOT env var if set
-  const envRoot = process.env.MONOREPO_ROOT;
-  if (envRoot && existsSync(envRoot)) {
-    _cachedRoot = resolve(envRoot);
-    return _cachedRoot;
-  }
-
-  throw new Error(
-    'Unable to determine monorepo root. Set the MONOREPO_ROOT environment variable or run from within the monorepo.'
-  );
-}
-
 export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
-  const root = getMonorepoRoot();
   const results: ScreenshotInfo[] = [];
 
   for (const source of SCREENSHOT_SOURCES) {
-    const dirPath = join(root, source.relativePath);
-
     try {
-      const files = await readdir(dirPath);
+      const files = await readdir(source.directoryPath);
       const pngFiles = files.filter(f => f.toLowerCase().endsWith('.png'));
 
       for (const filename of pngFiles) {
-        const filePath = join(dirPath, filename);
+        const filePath = join(source.directoryPath, filename);
         const fileStat = await stat(filePath);
         const nameWithoutExt = basename(filename, '.png');
         const displayName = nameWithoutExt.replaceAll(/[-_]/g, ' ');
@@ -154,5 +123,5 @@ export function resolveScreenshotPath(
 
   if (!filename.toLowerCase().endsWith('.png')) return null;
 
-  return join(getMonorepoRoot(), source.relativePath, filename);
+  return join(source.directoryPath, filename);
 }

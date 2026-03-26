@@ -103,7 +103,6 @@ export function initializeDb(): DbType {
     maxConnections: poolConfig.max,
     playwrightWorkerIndex: process.env.TEST_WORKER_INDEX ?? null,
     vitestWorkerId: process.env.VITEST_POOL_ID ?? null,
-    pid: process.pid,
   });
 
   // Handle pool-level errors so unexpected connection terminations
