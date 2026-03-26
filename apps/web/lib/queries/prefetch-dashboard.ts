@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { loadReleaseMatrix } from '@/app/app/(shell)/dashboard/releases/actions';
+import { FREQUENT_CACHE } from './cache-strategies';
 import { createQueryFn, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -10,7 +11,7 @@ const fetchEarnings = createQueryFn('/api/dashboard/earnings');
  *
  * Maps dashboard route IDs to their primary query keys and fetch functions
  * so hovering a nav link warms the cache before the user clicks. Uses
- * `staleTime` to avoid re-prefetching on rapid hover events within 60s.
+ * FREQUENT_CACHE staleTime to avoid re-prefetching on rapid hover events.
  */
 export function prefetchForRoute(
   routeId: string,
@@ -19,7 +20,7 @@ export function prefetchForRoute(
 ): void {
   if (!profileId) return;
 
-  const staleTime = 60_000;
+  const { staleTime } = FREQUENT_CACHE;
 
   switch (routeId) {
     case 'releases':
