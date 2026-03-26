@@ -148,7 +148,7 @@ export function StickyPhoneTour() {
                   {/* Tour mode content — slides 1-4 */}
                   <div
                     aria-hidden={!inTourMode}
-                    inert={!inTourMode ? true : undefined}
+                    inert={inTourMode ? undefined : true}
                     className='absolute inset-0 flex flex-col gap-5 justify-center transition-all duration-700 ease-[cubic-bezier(0.33,.01,.27,1)]'
                     style={{
                       opacity: inTourMode ? 1 : 0,

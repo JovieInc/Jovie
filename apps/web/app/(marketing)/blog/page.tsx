@@ -1,5 +1,5 @@
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { getBlogPosts } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
 import type { ProfileData } from '@/lib/services/profile';
@@ -14,7 +14,7 @@ export const metadata = {
   description:
     'Signals, playbooks, and product notes for building lasting momentum as an independent artist.',
   alternates: {
-    canonical: `${APP_URL}/blog`,
+    canonical: `${BASE_URL}/blog`,
   },
 };
 

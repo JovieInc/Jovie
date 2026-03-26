@@ -66,9 +66,9 @@ export default async function ReleasesPage() {
  */
 async function ReleasesContent({
   dashboardData,
-}: {
+}: Readonly<{
   dashboardData: DashboardData;
-}) {
+}>) {
   // Fire all fetches in parallel — no sequential waterfall
   const [releasesResult, spotifyResult, appleMusicResult] =
     await Promise.allSettled([

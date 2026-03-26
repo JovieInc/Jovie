@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getCategoryBySlug } from '@/lib/blog/categories';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { resolveAuthor } from '@/lib/blog/resolveAuthor';
@@ -45,12 +45,12 @@ export async function generateMetadata({ params }: CategoryPageProps) {
     title: `${category.name} — Jovie Blog`,
     description: category.description,
     alternates: {
-      canonical: `${APP_URL}/blog/category/${slug}`,
+      canonical: `${BASE_URL}/blog/category/${slug}`,
     },
     openGraph: {
       title: `${category.name} — Jovie Blog`,
       description: category.description,
-      url: `${APP_URL}/blog/category/${slug}`,
+      url: `${BASE_URL}/blog/category/${slug}`,
     },
   };
 }
@@ -91,9 +91,9 @@ export default async function CategoryPage({
   }
 
   const breadcrumbSchema = buildBreadcrumbSchema([
-    { name: APP_NAME, url: APP_URL },
-    { name: 'Blog', url: `${APP_URL}/blog` },
-    { name: category.name, url: `${APP_URL}/blog/category/${slug}` },
+    { name: APP_NAME, url: BASE_URL },
+    { name: 'Blog', url: `${BASE_URL}/blog` },
+    { name: category.name, url: `${BASE_URL}/blog/category/${slug}` },
   ]);
 
   return (

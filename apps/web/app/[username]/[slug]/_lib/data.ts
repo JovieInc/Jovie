@@ -167,6 +167,10 @@ export interface ContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   releaseId?: string | null;
+  /** Parent release slug — present for tracks, used for nested deep link URLs */
+  releaseSlug?: string | null;
+  /** Parent release title — present for tracks, shown as "from [Release]" link */
+  releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
   creator: {
     id: string;
@@ -194,6 +198,8 @@ export interface CachedContentData {
   totalTracks?: number | null;
   previewUrl?: string | null;
   releaseId?: string | null;
+  releaseSlug?: string | null;
+  releaseTitle?: string | null;
   credits?: SmartLinkCreditGroup[];
 }
 
@@ -355,6 +361,8 @@ const fetchContentBySlug = async (
             .select({
               artworkUrl: discogReleases.artworkUrl,
               releaseDate: discogReleases.releaseDate,
+              slug: discogReleases.slug,
+              title: discogReleases.title,
             })
             .from(discogReleases)
             .where(eq(discogReleases.id, releaseId))
@@ -387,6 +395,8 @@ const fetchContentBySlug = async (
       providerLinks: links,
       previewUrl: recording.previewUrl,
       releaseId: releaseId ?? null,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
     };
   }
 
@@ -414,6 +424,8 @@ const fetchContentBySlug = async (
         .select({
           artworkUrl: discogReleases.artworkUrl,
           releaseDate: discogReleases.releaseDate,
+          slug: discogReleases.slug,
+          title: discogReleases.title,
         })
         .from(discogReleases)
         .where(eq(discogReleases.id, track.releaseId))
@@ -443,6 +455,8 @@ const fetchContentBySlug = async (
       providerLinks: links,
       previewUrl: track.previewUrl,
       releaseId: track.releaseId,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
     };
   }
 
@@ -493,6 +507,141 @@ export const getContentBySlug = cache(
     return cached ? rehydrateContent(cached) : null;
   }
 );
+
+/**
+ * Get a track within a specific release by slug.
+ * Three-tier lookup: discog_release_tracks → discog_tracks (legacy), scoped to the release.
+ * Returns null if the track doesn't exist in this release.
+ */
+export async function getTrackBySlugInRelease(
+  releaseId: string,
+  trackSlug: string
+): Promise<Omit<ContentData, 'creator'> | null> {
+  // Try new model: discog_release_tracks joined to discog_recordings
+  const [releaseTrack] = await db
+    .select({
+      id: discogReleaseTracks.id,
+      recordingId: discogReleaseTracks.recordingId,
+      title: discogReleaseTracks.title,
+      slug: discogReleaseTracks.slug,
+    })
+    .from(discogReleaseTracks)
+    .where(
+      and(
+        eq(discogReleaseTracks.releaseId, releaseId),
+        eq(discogReleaseTracks.slug, trackSlug)
+      )
+    )
+    .limit(1);
+
+  if (releaseTrack) {
+    // Get recording for preview URL
+    const [recording] = await db
+      .select({ previewUrl: discogRecordings.previewUrl })
+      .from(discogRecordings)
+      .where(eq(discogRecordings.id, releaseTrack.recordingId))
+      .limit(1);
+
+    // Get release data for artwork + metadata
+    const [releaseData] = await db
+      .select({
+        artworkUrl: discogReleases.artworkUrl,
+        releaseDate: discogReleases.releaseDate,
+        slug: discogReleases.slug,
+        title: discogReleases.title,
+      })
+      .from(discogReleases)
+      .where(eq(discogReleases.id, releaseId))
+      .limit(1);
+
+    // Get provider links for this release-track
+    const links = await db
+      .select({
+        providerId: providerLinks.providerId,
+        url: providerLinks.url,
+      })
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'release_track'),
+          eq(providerLinks.releaseTrackId, releaseTrack.id)
+        )
+      );
+
+    return {
+      type: 'track',
+      id: releaseTrack.recordingId,
+      title: releaseTrack.title ?? '',
+      slug: releaseTrack.slug ?? trackSlug,
+      artworkUrl: releaseData?.artworkUrl ?? null,
+      releaseDate: releaseData?.releaseDate ?? null,
+      providerLinks: links,
+      previewUrl: recording?.previewUrl ?? null,
+      releaseId,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
+    };
+  }
+
+  // Fall back to legacy discog_tracks
+  const [legacyTrack] = await db
+    .select({
+      id: discogTracks.id,
+      title: discogTracks.title,
+      slug: discogTracks.slug,
+      previewUrl: discogTracks.previewUrl,
+    })
+    .from(discogTracks)
+    .where(
+      and(
+        eq(discogTracks.releaseId, releaseId),
+        eq(discogTracks.slug, trackSlug)
+      )
+    )
+    .limit(1);
+
+  if (legacyTrack) {
+    const [releaseData] = await db
+      .select({
+        artworkUrl: discogReleases.artworkUrl,
+        releaseDate: discogReleases.releaseDate,
+        slug: discogReleases.slug,
+        title: discogReleases.title,
+      })
+      .from(discogReleases)
+      .where(eq(discogReleases.id, releaseId))
+      .limit(1);
+
+    const links = await db
+      .select({
+        providerId: providerLinks.providerId,
+        url: providerLinks.url,
+      })
+      .from(providerLinks)
+      .where(
+        and(
+          eq(providerLinks.ownerType, 'track'),
+          eq(providerLinks.trackId, legacyTrack.id)
+        )
+      );
+
+    return {
+      type: 'track',
+      id: legacyTrack.id,
+      title: legacyTrack.title,
+      slug: legacyTrack.slug,
+      artworkUrl: releaseData?.artworkUrl ?? null,
+      releaseDate: releaseData?.releaseDate ?? null,
+      providerLinks: links,
+      previewUrl: legacyTrack.previewUrl,
+      releaseId,
+      releaseSlug: releaseData?.slug ?? null,
+      releaseTitle: releaseData?.title ?? null,
+    };
+  }
+
+  return null;
+}
 
 /**
  * Get a creator's plan entitlements by profile ID.

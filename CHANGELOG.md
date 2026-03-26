@@ -7,8 +7,16 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [26.4.77] - 2026-03-25
 
+### Changed
+
+- Track URLs are now nested under their parent release (`/{handle}/{release}/{track}`) instead of flat (`/{handle}/{track}`), matching MusicBrainz hierarchy
+- Track sidebar label changed from "Smart link" to "Track link" to distinguish from release-level smart links
+- Track slug "sounds" is now reserved to prevent collision with the "Use This Sound" route
+
 ### Added
 
+- New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
+- Flat track URLs now 302-redirect to the nested format when a parent release is known
 - Canonical artist identity layer — stores all platform data from enrichment sources (MusicFetch, MusicBrainz, SERP) in a raw `artist_identity_links` table with full provenance tracking
 - MusicFetch now saves all 30+ platforms it discovers (previously only 7 DSPs were saved, the rest silently dropped)
 - Publish rules promote streaming DSPs to fan-facing pages automatically; video/metadata platforms stored raw for future features

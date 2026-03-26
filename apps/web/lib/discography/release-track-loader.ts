@@ -10,7 +10,7 @@ import {
   type TrackWithProviders,
 } from '@/lib/discography/queries';
 import type { ProviderKey, TrackViewModel } from '@/lib/discography/types';
-import { buildSmartLinkPath } from '@/lib/discography/utils';
+import { buildTrackDeepLinkPath } from '@/lib/discography/utils';
 import { toISOStringOrFallback } from '@/lib/utils/date';
 
 function buildProviderLabels(): Record<ProviderKey, string> {
@@ -32,7 +32,8 @@ function mapProviders(
   }>,
   providerLabels: Record<ProviderKey, string>,
   profileHandle: string,
-  slug: string
+  releaseSlug: string,
+  trackSlug: string
 ): TrackViewModel['providers'] {
   return Object.entries(providerLabels)
     .map(([key, label]) => {
@@ -48,7 +49,14 @@ function mapProviders(
         url,
         source,
         updatedAt: toISOStringOrFallback(match?.updatedAt),
-        path: url ? buildSmartLinkPath(profileHandle, slug, providerKey) : '',
+        path: url
+          ? buildTrackDeepLinkPath(
+              profileHandle,
+              releaseSlug,
+              trackSlug,
+              providerKey
+            )
+          : '',
         isPrimary: PRIMARY_PROVIDER_KEYS.includes(providerKey),
       };
     })
@@ -58,14 +66,20 @@ function mapProviders(
 function mapLegacyTrackToViewModel(
   track: TrackWithProviders,
   providerLabels: Record<ProviderKey, string>,
-  profileHandle: string
+  profileHandle: string,
+  releaseSlug: string
 ): TrackViewModel {
   return {
     id: track.id,
     releaseId: track.releaseId,
+    releaseSlug,
     title: track.title,
     slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
+    smartLinkPath: buildTrackDeepLinkPath(
+      profileHandle,
+      releaseSlug,
+      track.slug
+    ),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -78,6 +92,7 @@ function mapLegacyTrackToViewModel(
       track.providerLinks,
       providerLabels,
       profileHandle,
+      releaseSlug,
       track.slug
     ),
   };
@@ -86,16 +101,22 @@ function mapLegacyTrackToViewModel(
 function mapReleaseTrackToViewModel(
   track: ReleaseTrackWithProviders,
   providerLabels: Record<ProviderKey, string>,
-  profileHandle: string
+  profileHandle: string,
+  releaseSlug: string
 ): TrackViewModel {
   return {
     id: track.recordingId,
     releaseTrackId: track.id,
     recordingId: track.recordingId,
     releaseId: track.releaseId,
+    releaseSlug,
     title: track.title,
     slug: track.slug,
-    smartLinkPath: buildSmartLinkPath(profileHandle, track.slug),
+    smartLinkPath: buildTrackDeepLinkPath(
+      profileHandle,
+      releaseSlug,
+      track.slug
+    ),
     trackNumber: track.trackNumber,
     discNumber: track.discNumber,
     durationMs: track.durationMs,
@@ -108,6 +129,7 @@ function mapReleaseTrackToViewModel(
       track.providerLinks,
       providerLabels,
       profileHandle,
+      releaseSlug,
       track.slug
     ),
   };
@@ -125,6 +147,7 @@ export async function loadReleaseTracksForProfile(params: {
   }
 
   const providerLabels = buildProviderLabels();
+  const releaseSlug = release.slug;
 
   // Try new model first, fall back to legacy
   const newResult = await getReleaseTracksForReleaseWithProviders(
@@ -133,7 +156,12 @@ export async function loadReleaseTracksForProfile(params: {
 
   if (newResult.total > 0) {
     return newResult.tracks.map(track =>
-      mapReleaseTrackToViewModel(track, providerLabels, params.profileHandle)
+      mapReleaseTrackToViewModel(
+        track,
+        providerLabels,
+        params.profileHandle,
+        releaseSlug
+      )
     );
   }
 
@@ -141,6 +169,11 @@ export async function loadReleaseTracksForProfile(params: {
   const { tracks } = await getTracksForReleaseWithProviders(params.releaseId);
 
   return tracks.map(track =>
-    mapLegacyTrackToViewModel(track, providerLabels, params.profileHandle)
+    mapLegacyTrackToViewModel(
+      track,
+      providerLabels,
+      params.profileHandle,
+      releaseSlug
+    )
   );
 }

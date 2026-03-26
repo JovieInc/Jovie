@@ -2,7 +2,11 @@
 
 import { Badge } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
+import {
+  type CellContext,
+  type ColumnDef,
+  createColumnHelper,
+} from '@tanstack/react-table';
 import {
   AlertTriangle,
   Check,
@@ -11,7 +15,14 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from 'sonner';
 import {
   PageToolbar,
@@ -181,6 +192,24 @@ function renderToolsCell({ row }: { row: { original: AdminLead } }) {
   return <span className='text-secondary-token'>{tools.join(', ')}</span>;
 }
 
+interface LeadActionsColumnMeta {
+  onUpdateStatus: (id: string, status: 'approved' | 'rejected') => void;
+  actioningRef: RefObject<ActioningState | null>;
+}
+
+/** Standalone cell renderer for Actions column — reads callbacks from column meta. */
+function renderLeadActionsCell(ctx: CellContext<AdminLead, unknown>) {
+  const meta = ctx.column.columnDef.meta as LeadActionsColumnMeta | undefined;
+  if (!meta) return null;
+  return (
+    <LeadActionsCell
+      lead={ctx.row.original}
+      onUpdateStatus={meta.onUpdateStatus}
+      actioning={meta.actioningRef.current}
+    />
+  );
+}
+
 export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
@@ -286,16 +315,11 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         id: 'actions',
         header: 'Actions',
         size: 80,
-        cell: ({ row }) => (
-          <LeadActionsCell
-            lead={row.original}
-            onUpdateStatus={updateLeadStatus}
-            actioning={actioningRef.current}
-          />
-        ),
+        cell: renderLeadActionsCell,
+        meta: { onUpdateStatus: updateLeadStatus, actioningRef },
       }),
     ],
-    [updateLeadStatus]
+    [updateLeadStatus, actioningRef]
   );
 
   const handleLoadMore = useCallback(() => {
