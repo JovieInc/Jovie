@@ -131,6 +131,61 @@ const ENV_COLORS: Record<string, string> = {
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
 
+type ActionState = 'idle' | 'loading' | 'done' | 'error';
+
+function getActionLabel(
+  state: ActionState,
+  labels: { loading: string; done: string; error: string; idle: string }
+): string {
+  if (state === 'loading') return labels.loading;
+  if (state === 'done') return labels.done;
+  if (state === 'error') return labels.error;
+  return labels.idle;
+}
+
+type PromoteState =
+  | 'idle'
+  | 'checking'
+  | 'ready'
+  | 'promoting'
+  | 'done'
+  | 'error';
+
+function getPromoteLabel(state: PromoteState): string {
+  if (state === 'promoting') return 'Deploying...';
+  if (state === 'done') return 'Deployed!';
+  if (state === 'error') return 'Failed';
+  return 'Promote';
+}
+
+function getPromoteButtonClass(state: PromoteState): string {
+  if (state === 'done') return 'text-[var(--color-accent)]';
+  if (state === 'error') return 'text-red-400';
+  return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
+}
+
+function resolvePromoteState(
+  prev: PromoteState,
+  needsPromote: boolean
+): PromoteState {
+  if (prev === 'promoting' || prev === 'done') return prev;
+  return needsPromote ? 'ready' : 'idle';
+}
+
+function ActionIcon({
+  state,
+  idleIcon: IdleIcon,
+}: Readonly<{
+  state: ActionState | PromoteState;
+  idleIcon: React.ComponentType<{ size: number }>;
+}>) {
+  if (state === 'loading' || state === 'promoting')
+    return <Loader2 size={11} className='animate-spin' />;
+  if (state === 'done')
+    return <Check size={11} className='text-[var(--color-accent)]' />;
+  return <IdleIcon size={11} />;
+}
+
 export function DevToolbar({
   env,
   sha,
@@ -230,13 +285,7 @@ export function DevToolbar({
           staging: data.stagingSha,
           prod: data.prodSha,
         });
-        setPromoteState(prev =>
-          prev === 'promoting' || prev === 'done'
-            ? prev
-            : data.needsPromote
-              ? 'ready'
-              : 'idle'
-        );
+        setPromoteState(prev => resolvePromoteState(prev, data.needsPromote));
       } catch {
         // Silent fail — status is best-effort
       }
@@ -637,21 +686,14 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear session'
             >
-              {clearSessionState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : clearSessionState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Trash2 size={11} />
-              )}
+              <ActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='hidden sm:inline text-[10px]'>
-                {clearSessionState === 'loading'
-                  ? 'Clearing...'
-                  : clearSessionState === 'done'
-                    ? 'Cleared!'
-                    : clearSessionState === 'error'
-                      ? 'Failed'
-                      : 'Clear'}
+                {getActionLabel(clearSessionState, {
+                  loading: 'Clearing...',
+                  done: 'Cleared!',
+                  error: 'Failed',
+                  idle: 'Clear',
+                })}
               </span>
             </button>
           )}
@@ -667,21 +709,14 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
-              {unwaitlistState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : unwaitlistState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <UserCheck size={11} />
-              )}
+              <ActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='hidden sm:inline text-[10px]'>
-                {unwaitlistState === 'loading'
-                  ? 'Working...'
-                  : unwaitlistState === 'done'
-                    ? 'Done!'
-                    : unwaitlistState === 'error'
-                      ? 'Failed'
-                      : 'Unwaitlist'}
+                {getActionLabel(unwaitlistState, {
+                  loading: 'Working...',
+                  done: 'Done!',
+                  error: 'Failed',
+                  idle: 'Unwaitlist',
+                })}
               </span>
             </button>
           )}
@@ -736,30 +771,12 @@ export function DevToolbar({
                       ? `Promote ${promoteSha.staging} → prod (currently ${promoteSha.prod})`
                       : 'Promote to production'
                   }
-                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                    promoteState === 'done'
-                      ? 'text-[var(--color-accent)]'
-                      : promoteState === 'error'
-                        ? 'text-red-400'
-                        : 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10'
-                  }`}
+                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonClass(promoteState)}`}
                   aria-label='Promote to production'
                 >
-                  {promoteState === 'promoting' ? (
-                    <Loader2 size={11} className='animate-spin' />
-                  ) : promoteState === 'done' ? (
-                    <Check size={11} />
-                  ) : (
-                    <ArrowUpCircle size={11} />
-                  )}
+                  <ActionIcon state={promoteState} idleIcon={ArrowUpCircle} />
                   <span className='hidden sm:inline text-[10px]'>
-                    {promoteState === 'promoting'
-                      ? 'Deploying...'
-                      : promoteState === 'done'
-                        ? 'Deployed!'
-                        : promoteState === 'error'
-                          ? 'Failed'
-                          : 'Promote'}
+                    {getPromoteLabel(promoteState)}
                   </span>
                   {promoteState === 'ready' && promoteSha && (
                     <span className='hidden md:inline text-[9px] opacity-60'>
