@@ -92,6 +92,8 @@ describe('buildSystemPrompt', () => {
     const prompt = buildSystemPrompt();
     expect(prompt.toLowerCase()).toContain('never use hype words');
     expect(prompt.toLowerCase()).toContain('never include links');
+    expect(prompt.toLowerCase()).toContain('never include streaming stats');
+    expect(prompt.toLowerCase()).toContain('never copy-paste');
   });
 
   it('includes an example pitch', () => {
