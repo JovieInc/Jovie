@@ -197,7 +197,7 @@ export function TourDatesManager({
             <div className='flex flex-col items-center justify-center px-4 py-16 text-center'>
               <Icon name='CalendarX2' className='h-6 w-6 text-tertiary-token' />
               <p className='mt-4 text-[13px] text-secondary-token'>
-                No tour dates found
+                No upcoming tour dates
               </p>
               {isConnected && (
                 <Button
