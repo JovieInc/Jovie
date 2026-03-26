@@ -238,6 +238,28 @@ function ActionsCellRenderer({
   );
 }
 
+interface TourDateActionsMeta {
+  getContextMenuItems: (tourDate: TourDateViewModel) => ContextMenuItemType[];
+}
+
+/** File-level cell renderer that reads getContextMenuItems from column meta. */
+function renderActionsCellFromMeta({
+  row,
+  column,
+}: {
+  row: { original: TourDateViewModel };
+  column: { columnDef: { meta?: unknown } };
+}) {
+  const meta = column.columnDef.meta as TourDateActionsMeta | undefined;
+  if (!meta) return null;
+  return (
+    <ActionsCellRenderer
+      row={row}
+      getContextMenuItems={meta.getContextMenuItems}
+    />
+  );
+}
+
 export function TourDatesTable({
   tourDates,
   onEdit,
@@ -324,12 +346,8 @@ export function TourDatesTable({
       columnHelper.display({
         id: 'actions',
         header: () => <ActionsHeader onSync={onSync} isSyncing={isSyncing} />, // NOSONAR
-        cell: ({ row }) => (
-          <ActionsCellRenderer
-            row={row}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ), // NOSONAR - TanStack Table render prop
+        cell: renderActionsCellFromMeta,
+        meta: { getContextMenuItems } satisfies TourDateActionsMeta,
         size: 80,
       }),
     ];

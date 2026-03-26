@@ -67,6 +67,29 @@ function getEmptyDescription(search: string, statusFilter: string): string {
   return 'No leads have been discovered yet';
 }
 
+interface LeadActionsMeta {
+  onUpdateStatus: (id: string, status: 'approved' | 'rejected') => void;
+  actioningRef: React.RefObject<ActioningState | null>;
+}
+
+function renderLeadActionsCell({
+  row,
+  column,
+}: {
+  row: { original: AdminLead };
+  column: { columnDef: { meta?: unknown } };
+}) {
+  const meta = column.columnDef.meta as LeadActionsMeta | undefined;
+  if (!meta) return null;
+  return (
+    <LeadActionsCell
+      lead={row.original}
+      onUpdateStatus={meta.onUpdateStatus}
+      actioning={meta.actioningRef.current}
+    />
+  );
+}
+
 function LeadActionsCell({
   lead,
   onUpdateStatus,
@@ -286,13 +309,11 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
         id: 'actions',
         header: 'Actions',
         size: 80,
-        cell: ({ row }) => (
-          <LeadActionsCell
-            lead={row.original}
-            onUpdateStatus={updateLeadStatus}
-            actioning={actioningRef.current}
-          />
-        ),
+        cell: renderLeadActionsCell,
+        meta: {
+          onUpdateStatus: updateLeadStatus,
+          actioningRef,
+        } satisfies LeadActionsMeta,
       }),
     ],
     [updateLeadStatus]

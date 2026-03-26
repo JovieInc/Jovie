@@ -131,6 +131,27 @@ function FeedbackActionsCell({
   );
 }
 
+interface FeedbackActionsMeta {
+  getContextMenuItems: (item: FeedbackRow) => ContextMenuItemType[];
+}
+
+function renderFeedbackActionsCell({
+  row,
+  column,
+}: {
+  row: { original: FeedbackRow };
+  column: { columnDef: { meta?: unknown } };
+}) {
+  const meta = column.columnDef.meta as FeedbackActionsMeta | undefined;
+  if (!meta) return null;
+  return (
+    <FeedbackActionsCell
+      row={row.original}
+      getContextMenuItems={meta.getContextMenuItems}
+    />
+  );
+}
+
 export function AdminFeedbackTable({
   items,
 }: Readonly<AdminFeedbackTableProps>) {
@@ -232,12 +253,8 @@ export function AdminFeedbackTable({
       columnHelper.display({
         id: 'actions',
         header: '',
-        cell: ({ row }) => (
-          <FeedbackActionsCell
-            row={row.original}
-            getContextMenuItems={getContextMenuItems}
-          />
-        ),
+        cell: renderFeedbackActionsCell,
+        meta: { getContextMenuItems } satisfies FeedbackActionsMeta,
         size: 48,
       }),
     ],
