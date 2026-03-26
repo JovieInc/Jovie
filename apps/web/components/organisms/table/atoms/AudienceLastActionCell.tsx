@@ -41,10 +41,12 @@ export function AudienceLastActionCell({
         className
       )}
     >
-      <span className='inline-flex h-5 w-5 items-center justify-center rounded-full border border-subtle bg-surface-0 text-tertiary-token'>
-        <Icon name={iconName} className='h-3 w-3' aria-hidden='true' />
-      </span>
-      <span className='truncate'>{actionLabel}</span>
+      <Icon
+        name={iconName}
+        className='h-3.5 w-3.5 shrink-0 text-quaternary-token'
+        aria-hidden='true'
+      />
+      <span className='truncate text-[12px]'>{actionLabel}</span>
     </div>
   );
 }
