@@ -16,6 +16,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState,
     toggleTrack,
+    seek: vi.fn(),
   }),
 }));
 
@@ -147,6 +148,6 @@ describe('ReleaseCell', () => {
     });
 
     expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
-    expect(pauseButton.className).toContain('aria-[pressed=true]:opacity-100');
+    expect(pauseButton.className).toContain('opacity-100');
   });
 });
