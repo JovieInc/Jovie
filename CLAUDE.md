@@ -55,7 +55,7 @@ This file is intentionally kept minimal. The canonical source is `AGENTS.md`.
 
 ## Clerk Auth Proxy — DO NOT CHANGE
 
-One Clerk instance for all envs: `distinct-giraffe-5.clerk.accounts.dev`. Proxy path: `/__clerk`. Handled by `fetch()` proxy in middleware (NOT `NextResponse.rewrite()` — that breaks Host headers). `clerk.jov.ie` is dead. See `AGENTS.md` → "Clerk Auth Proxy Architecture" for details.
+One Clerk instance per env (keys in Doppler). Proxy path: `/__clerk`. Handled by `fetch()` proxy in middleware (NOT `NextResponse.rewrite()` — that breaks Host headers). FAPI host decoded from publishable key at runtime. `clerk.jov.ie` is dead as a public URL. See `AGENTS.md` → "Clerk Auth Proxy Architecture" for details.
 
 ## E2E Test Authentication
 
