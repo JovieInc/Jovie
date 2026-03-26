@@ -82,7 +82,11 @@ export function getDeepErrorMessage(error: unknown): string {
     depth++;
   }
 
-  return messages.join(' | ');
+  return messages.length > 0
+    ? messages.join(' | ')
+    : error instanceof Error
+      ? error.message
+      : String(error);
 }
 
 export function isUniqueViolation(
