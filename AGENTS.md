@@ -754,12 +754,37 @@ Name tests by behavior: `describe('ComponentName')` → `it('shows error when in
 | Language | TypeScript (strict mode) |
 | Styling | Tailwind CSS v4 |
 | Database | Neon PostgreSQL + Drizzle ORM |
-| Auth | Clerk |
+| Auth | Clerk (single instance, proxy via `/__clerk`) |
 | Payments | Stripe |
 | Linting | Biome |
 | Package Manager | pnpm 9.15.4 |
 | Monorepo | Turborepo |
 | Runtime | Node.js 22 LTS |
+
+### Clerk Auth Proxy Architecture
+
+**CRITICAL — read this before touching anything Clerk-related.**
+
+There is ONE Clerk instance for all environments: `distinct-giraffe-5.clerk.accounts.dev` (test mode). Both `jov.ie` and `staging.jov.ie` use the same Clerk instance and the same publishable key.
+
+The proxy path is `/__clerk`. ClerkProvider sets `proxyUrl="/__clerk"`. All Clerk JS requests go to `/__clerk/*` on the current origin.
+
+**How the proxy works:**
+- `vercel.json` has static rewrites: `/__clerk/(.*)` → `https://distinct-giraffe-5.clerk.accounts.dev/$1`
+- This works for ALL environments (staging, production, preview) because they all use the same Clerk instance
+- The middleware does NOT intercept `/__clerk` paths — vercel.json handles it
+
+**DO NOT:**
+- Add middleware `NextResponse.rewrite()` for `/__clerk` paths — Vercel's edge proxy doesn't set the Host header correctly for external rewrites, causing Clerk 400 "Invalid host" errors
+- Reference `clerk.jov.ie` or `clerk.staging.jov.ie` — these domains are dead
+- Create separate staging Clerk keys/instances — there is only one instance
+- Add `isStagingHost()` checks for Clerk routing — not needed, same instance everywhere
+
+**If Clerk auth breaks:**
+1. Check `vercel.json` rewrites point to `distinct-giraffe-5.clerk.accounts.dev`
+2. Check the publishable key in Doppler (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`)
+3. Check CSP allows `distinct-giraffe-5.clerk.accounts.dev` in connect-src, script-src, frame-src
+4. Do NOT add middleware rewrites as a fix
 
 ### API Runtime
 

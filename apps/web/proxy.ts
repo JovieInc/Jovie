@@ -927,26 +927,12 @@ export default async function middleware(
   const hostname = req.nextUrl.hostname;
 
   // ========================================================================
-  // Clerk FAPI proxy: rewrite /__clerk/* and /clerk/* to the staging Clerk
-  // Frontend API when running on staging hosts. Production requests fall
-  // through to the vercel.json static rewrites (which correctly set the Host
-  // header for Clerk's proxy domain validation). Only staging needs dynamic
-  // middleware because the same build is promoted staging → production and
-  // vercel.json can only target one host.
+  // Clerk FAPI proxy: /__clerk/* and /clerk/* are handled by vercel.json
+  // static rewrites → distinct-giraffe-5.clerk.accounts.dev. No middleware
+  // interception needed. Both staging and production use the same Clerk
+  // instance. Do NOT add middleware rewrites here — vercel.json rewrites
+  // correctly set the Host header which Clerk requires for proxy validation.
   // ========================================================================
-  if (
-    isStagingHost(hostname) &&
-    (pathname.startsWith('/__clerk/') ||
-      pathname === '/__clerk' ||
-      pathname.startsWith('/clerk/') ||
-      pathname === '/clerk')
-  ) {
-    const fapiHost = 'clerk.staging.jov.ie';
-    const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
-    return NextResponse.rewrite(
-      new URL(`https://${fapiHost}/${subpath}${req.nextUrl.search}`)
-    );
-  }
 
   const pathInfo = categorizePath(pathname);
 

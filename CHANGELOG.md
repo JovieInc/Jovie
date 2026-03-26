@@ -20,6 +20,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Fixed sign-in across all environments — Clerk proxy now targets the actual FAPI endpoint instead of dead `clerk.jov.ie` domain
+- [internal] Updated vercel.json rewrites, CSP, preconnect links to use `distinct-giraffe-5.clerk.accounts.dev`; removed dead middleware clerk proxy; added Clerk architecture docs to AGENTS.md and CLAUDE.md
 - Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
 - [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
 
