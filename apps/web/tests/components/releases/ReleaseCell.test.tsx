@@ -90,9 +90,10 @@ describe('ReleaseCell', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
-    const typeBadge = screen.getByText('Single');
-    expect(typeBadge).toBeInTheDocument();
-    expect(typeBadge.className).toContain('shrink-0');
+    // Without a previewUrl the type renders as a colored dot with title, not text
+    const typeDot = screen.getByTitle('Single');
+    expect(typeDot).toBeInTheDocument();
+    expect(typeDot.className).toContain('shrink-0');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 
