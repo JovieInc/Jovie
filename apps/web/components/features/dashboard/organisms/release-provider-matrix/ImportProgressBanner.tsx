@@ -74,24 +74,12 @@ export const ImportProgressBanner = memo(function ImportProgressBanner({
                 : `${importedCount} imported`}
             </span>
           </div>
-          <div
-            className='h-1 overflow-hidden rounded-full bg-[#1DB954]/12'
-            role='progressbar'
-            aria-valuenow={importedCount}
-            aria-valuemax={totalCount > 0 ? totalCount : undefined}
+          <progress
+            className='h-1 w-full appearance-none overflow-hidden rounded-full bg-[#1DB954]/12 [&::-moz-progress-bar]:rounded-full [&::-moz-progress-bar]:bg-[#1DB954] [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-bar]:bg-[#1DB954]/12 [&::-webkit-progress-value]:rounded-full [&::-webkit-progress-value]:bg-[#1DB954] [&::-webkit-progress-value]:transition-[width] [&::-webkit-progress-value]:duration-700 [&::-webkit-progress-value]:ease-out'
+            value={totalCount > 0 ? importedCount : undefined}
+            max={totalCount > 0 ? totalCount : undefined}
             aria-label={progressLabel}
-          >
-            {totalCount > 0 ? (
-              <div
-                className='h-full rounded-full bg-[#1DB954] transition-[width] duration-700 ease-out'
-                style={{
-                  width: `${Math.min((importedCount / totalCount) * 100, 100)}%`,
-                }}
-              />
-            ) : (
-              <div className='h-full w-full animate-[progress-shimmer_2.5s_linear_infinite] rounded-full bg-gradient-to-r from-transparent via-[#1DB954]/60 to-transparent bg-[length:200%_100%]' />
-            )}
-          </div>
+          />
         </div>
       </DrawerSurfaceCard>
       {enrichmentStatus === 'enriching' && (
