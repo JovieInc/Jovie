@@ -209,7 +209,7 @@ export async function GET(request: NextRequest) {
         })
         .from(leads)
         .where(where)
-        .orderBy(orderFn(orderColumn))
+        .orderBy(orderFn(orderColumn), orderFn(leads.id))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
       db.select({ count: count() }).from(leads).where(where),

@@ -39,7 +39,9 @@ test.describe('Admin GTM Health @smoke', () => {
       await expect(page.getByText('Pipeline controls')).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(page.getByText('Ramp recommendation')).toBeVisible({
+      await expect(
+        page.getByText('Ramp recommendation', { exact: true })
+      ).toBeVisible({
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
       await assertNoCriticalErrors(getContext(), testInfo);
