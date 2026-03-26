@@ -69,7 +69,7 @@ const SIDEBAR_TAB_OPTIONS = [
 
 const RELEASE_SIDEBAR_CARD_CLASSNAME = cn(
   LINEAR_SURFACE.sidebarCard,
-  'overflow-hidden bg-[color-mix(in_oklab,var(--linear-bg-surface-0)_94%,transparent)]'
+  'overflow-hidden'
 );
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {

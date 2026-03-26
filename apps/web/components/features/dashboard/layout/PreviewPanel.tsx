@@ -482,7 +482,7 @@ export function PreviewPanel() {
 
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-3')}>
               <div className='space-y-0.5'>
-                <p className='text-[10px] font-semibold uppercase tracking-[0.14em] text-tertiary-token'>
+                <p className='text-[10.5px] font-[510] leading-none text-tertiary-token'>
                   Profile snapshot
                 </p>
                 <p className='text-xs text-secondary-token'>
@@ -499,28 +499,28 @@ export function PreviewPanel() {
                   : '.'}
               </p>
 
-              <div className='grid grid-cols-3 gap-2'>
-                <div className='rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+              <div className='grid grid-cols-3 divide-x divide-(--linear-app-frame-seam)'>
+                <div className='space-y-px pr-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     Visible
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {visibleLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                <div className='space-y-px px-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     Hidden
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {hiddenLinkCount}
                   </p>
                 </div>
-                <div className='rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
-                  <p className='text-[10px] font-semibold uppercase tracking-[0.12em] text-tertiary-token'>
+                <div className='space-y-px pl-3'>
+                  <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
                     DSPs
                   </p>
-                  <p className='mt-1 text-sm font-[560] text-primary-token'>
+                  <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
                     {connectedDspCount}
                   </p>
                 </div>

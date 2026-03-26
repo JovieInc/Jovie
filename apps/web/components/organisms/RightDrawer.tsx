@@ -95,7 +95,7 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'overflow-hidden border-l border-(--linear-app-frame-seam)',
+          'overflow-hidden',
           'bg-(--linear-app-content-surface)',
           'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
           'pb-[env(safe-area-inset-bottom)]',
@@ -122,7 +122,7 @@ export function RightDrawer({
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible border-l border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none'
+          ? 'opacity-100 visible bg-(--linear-app-content-surface) shadow-none'
           : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}

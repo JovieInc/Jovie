@@ -188,9 +188,7 @@ export function DashboardNav(_: DashboardNavProps) {
             {navSections.map((section, index) => (
               <div key={section.key} data-nav-section>
                 {/* Section divider for visual separation (except for first section) */}
-                {index > 0 && (
-                  <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                )}
+                {index > 0 && <div className='my-1.5' />}
                 {renderSection(section.items)}
               </div>
             ))}
@@ -210,9 +208,7 @@ export function DashboardNav(_: DashboardNavProps) {
             <div className='space-y-2'>
               {adminNavigationSections.map((section, index) => (
                 <div key={section.label} data-admin-section={section.label}>
-                  {index > 0 ? (
-                    <div className='mx-2.5 my-1.5 border-t border-sidebar-border/70' />
-                  ) : null}
+                  {index > 0 ? <div className='my-1.5' /> : null}
                   <p className='px-2.5 pb-0.5 text-[11px] font-[560] tracking-[-0.01em] text-sidebar-muted/80 group-data-[collapsible=icon]:hidden'>
                     {section.label}
                   </p>

@@ -103,11 +103,15 @@ function FunnelColumn({
 
   return (
     <div className='flex flex-1 flex-col items-center justify-center px-2 py-3 text-center'>
-      <p className='text-[11px] font-[510] text-tertiary-token'>{label}</p>
-      <p className='mt-1 text-[20px] font-[590] leading-none tracking-[-0.02em] text-primary-token tabular-nums'>
+      <p className='text-[10.5px] font-[500] leading-[14px] text-tertiary-token'>
+        {label}
+      </p>
+      <p className='mt-1 tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
         {value}
       </p>
-      <p className='mt-1 text-[10px] text-tertiary-token'>{description}</p>
+      <p className='mt-1 text-[10px] leading-[13px] text-tertiary-token'>
+        {description}
+      </p>
     </div>
   );
 }
@@ -138,10 +142,12 @@ function EngagementColumn({
 
   return (
     <div className='flex flex-1 flex-col items-center justify-center px-2 py-2.5 text-center'>
-      <p className='text-[16px] font-[590] leading-none tracking-[-0.011em] text-primary-token tabular-nums'>
+      <p className='tabular-nums text-[18px] font-[590] leading-none tracking-[-0.02em] text-primary-token'>
         {value}
       </p>
-      <p className='mt-1 text-[10px] text-tertiary-token'>{label}</p>
+      <p className='mt-1 text-[10px] leading-[13px] text-tertiary-token'>
+        {label}
+      </p>
     </div>
   );
 }
