@@ -18,7 +18,7 @@ export default async function OnboardingLayout({
   );
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
         {children}
       </FeatureFlagsProvider>

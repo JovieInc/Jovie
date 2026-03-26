@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
+import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -12,6 +12,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -148,11 +149,23 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
+const heroOnly =
+  !FEATURE_FLAGS.SHOW_PHONE_TOUR &&
+  !FEATURE_FLAGS.SHOW_LOGO_BAR &&
+  !FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE &&
+  !FEATURE_FLAGS.SHOW_FINAL_CTA;
+
 export default function HomePage() {
   return (
-    <div className='relative min-h-screen'>
+    <div
+      className={
+        heroOnly
+          ? 'relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'
+          : 'relative min-h-screen'
+      }
+    >
       {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
-      <AuthRedirectHandler />
+      <LazyAuthRedirectHandler />
 
       {/* Structured Data */}
       <script
@@ -168,23 +181,35 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
 
+      {/* In hero-only mode, hide footer and prevent scroll (footer is in layout) */}
+      {heroOnly && (
+        <style
+          dangerouslySetInnerHTML={{
+            __html:
+              'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}',
+          }}
+        />
+      )}
+
       {/* 1. Hero — claim form left, phone right */}
-      <HeroCinematic />
+      <HeroCinematic fullScreen={heroOnly} />
 
       {/* 2. Sticky phone product tour — scroll-driven mode transitions */}
-      <StickyPhoneTour />
+      {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
 
       {/* 3. Logo bar — z-index wipe over sticky phone */}
-      <LogoBar />
+      {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
 
       {/* 4. Feature showcase — bento grid */}
-      <FeatureShowcase />
+      {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
+        <>
+          <FeatureShowcase />
+          <div aria-hidden='true' className='section-gradient-divider' />
+        </>
+      )}
 
-      {/* 5. Divider before CTA */}
-      <div aria-hidden='true' className='section-gradient-divider' />
-
-      {/* 6. Final CTA */}
-      <FinalCTASection />
+      {/* 5. Final CTA */}
+      {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
     </div>
   );
 }

@@ -60,22 +60,22 @@ export const PopularityIcon = memo(function PopularityIcon({
       <TooltipTrigger asChild>
         <button
           type='button'
-          className='inline-flex items-end gap-px rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
+          className='inline-flex items-end gap-[1.5px] rounded-sm opacity-80 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
           aria-label={`Popularity ${displayPopularity} out of 100`}
         >
           {/* Bar 1 - shortest (4px) */}
           <div
-            className={`w-[2px] rounded-sm ${filledBars >= 1 ? activeColor : inactiveColor}`}
+            className={`w-[2.5px] rounded-sm ${filledBars >= 1 ? activeColor : inactiveColor}`}
             style={{ height: '4px' }}
           />
           {/* Bar 2 - medium (8px) */}
           <div
-            className={`w-[2px] rounded-sm ${filledBars >= 2 ? activeColor : inactiveColor}`}
+            className={`w-[2.5px] rounded-sm ${filledBars >= 2 ? activeColor : inactiveColor}`}
             style={{ height: '8px' }}
           />
           {/* Bar 3 - tallest (12px) */}
           <div
-            className={`w-[2px] rounded-sm ${filledBars >= 3 ? activeColor : inactiveColor}`}
+            className={`w-[2.5px] rounded-sm ${filledBars >= 3 ? activeColor : inactiveColor}`}
             style={{ height: '12px' }}
           />
         </button>

@@ -226,7 +226,7 @@ const VenmoConnectDialog = memo(function VenmoConnectDialog({
     <Dialog open={open} onClose={onClose} size='sm'>
       <div className='flex items-start gap-3'>
         <div
-          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent/10'
+          className='flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
           aria-hidden='true'
         >
           <Wallet className='h-4.5 w-4.5 text-accent-token' />
@@ -311,7 +311,7 @@ const TipLinkSection = memo(function TipLinkSection({
     <ContentSurfaceCard className='p-4 sm:p-5'>
       <div className='flex items-center gap-2 mb-3'>
         <div
-          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-info-subtle'
+          className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] border border-info/20 bg-info-subtle'
           aria-hidden='true'
         >
           <Link2 className='h-3.5 w-3.5 text-info' />
@@ -319,7 +319,7 @@ const TipLinkSection = memo(function TipLinkSection({
         <h3 className='text-[13px] font-[510] text-primary-token'>Tip link</h3>
       </div>
 
-      <div className='flex items-center gap-2 rounded-lg border border-subtle bg-surface-0 px-3 py-2.5'>
+      <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5'>
         <Copy className='hidden h-3.5 w-3.5 shrink-0 text-tertiary-token sm:block' />
         <span className='min-w-0 flex-1 truncate text-[13px] text-secondary-token'>
           {tipUrl}
@@ -459,7 +459,7 @@ export function DashboardTipping() {
           <ContentSurfaceCard className='px-6 py-12 sm:px-8 sm:py-14'>
             <div className='mx-auto flex max-w-md flex-col items-center text-center'>
               <div
-                className='mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10'
+                className='mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-accent/20 bg-accent/10'
                 aria-hidden='true'
               >
                 <Wallet className='h-5 w-5 text-accent-token' />
@@ -475,7 +475,7 @@ export function DashboardTipping() {
                 onClick={() => setIsConnectOpen(true)}
                 variant='primary'
                 size='sm'
-                className='mt-5'
+                className='mt-5 rounded-[10px] text-[11px] font-[510] tracking-[-0.01em]'
               >
                 Connect Venmo
               </Button>

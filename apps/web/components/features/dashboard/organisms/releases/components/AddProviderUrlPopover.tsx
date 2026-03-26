@@ -91,7 +91,7 @@ export function AddProviderUrlPopover({
       </PopoverTrigger>
       <PopoverContent
         align='start'
-        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+        className='w-[280px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
         onOpenAutoFocus={e => {
           e.preventDefault();
           inputRef.current?.focus();

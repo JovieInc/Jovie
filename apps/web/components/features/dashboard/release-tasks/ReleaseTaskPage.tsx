@@ -74,7 +74,7 @@ export function ReleaseTaskPage({
           <h3 className='px-4 text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-2'>
             Up Next
           </h3>
-          <div className='rounded-lg border border-subtle/45 bg-[var(--linear-bg-surface-card)]'>
+          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
             {upNextTasks.map(task => (
               <ReleaseTaskRow
                 key={task.id}

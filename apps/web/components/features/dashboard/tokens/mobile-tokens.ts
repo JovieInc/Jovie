@@ -6,7 +6,7 @@
  * spacing/typography can evolve consistently without inline class drift.
  */
 export const mobileReleaseTokens = {
-  list: 'overflow-hidden rounded-[16px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_88%,var(--linear-bg-surface-0))]',
+  list: 'overflow-hidden rounded-[16px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
   row: {
     container:
       'flex w-full items-center gap-3 px-4 py-3 text-left transition-[background-color,border-color] active:bg-surface-0 focus-visible:outline-none focus-visible:bg-surface-0',
@@ -21,7 +21,7 @@ export const mobileReleaseTokens = {
     dot: 'text-[10px] text-quaternary-token',
   },
   groupHeader:
-    'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-2',
+    'sticky top-0 z-10 flex items-center justify-between border-b border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2',
   groupHeaderTitle: 'text-[12px] font-[590] text-primary-token',
   groupHeaderCount: 'text-[11px] tabular-nums text-tertiary-token',
   footer: {

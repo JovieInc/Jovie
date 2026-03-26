@@ -8,12 +8,12 @@ import {
   lte,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 
@@ -307,13 +307,10 @@ export async function scheduleReleaseNotifications(): Promise<{
  * Schedule: On demand or via the consolidated /api/cron/frequent handler
  */
 export async function GET(request: Request) {
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/schedule-release-notifications',
+  });
+  if (authError) return authError;
 
   try {
     const result = await scheduleReleaseNotifications();

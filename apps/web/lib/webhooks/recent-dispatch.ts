@@ -4,6 +4,11 @@ import { getRedis } from '@/lib/redis';
 
 const DISPATCH_PREFIX = 'webhook-dispatch';
 
+export interface RecentDispatchAcquireResult {
+  acquired: boolean;
+  reason: 'acquired' | 'duplicate' | 'backend_unavailable';
+}
+
 function buildDispatchKey(scope: string, key: string): string {
   return `${DISPATCH_PREFIX}:${scope}:${key}`;
 }
@@ -25,22 +30,40 @@ export async function acquireRecentDispatch(
   scope: string,
   key: string,
   ttlSeconds: number
-): Promise<boolean> {
+): Promise<RecentDispatchAcquireResult> {
   const redis = getRedis();
   if (!redis) {
-    return true;
+    if (process.env.NODE_ENV === 'production') {
+      return {
+        acquired: false,
+        reason: 'backend_unavailable',
+      };
+    }
+
+    return {
+      acquired: true,
+      reason: 'acquired',
+    };
   }
 
-  const result = await redis.set(
-    buildDispatchKey(scope, key),
-    Date.now().toString(),
-    {
-      nx: true,
-      ex: ttlSeconds,
-    }
-  );
+  try {
+    const result = await redis.set(
+      buildDispatchKey(scope, key),
+      Date.now().toString(),
+      {
+        nx: true,
+        ex: ttlSeconds,
+      }
+    );
 
-  return result === 'OK';
+    return result === 'OK'
+      ? { acquired: true, reason: 'acquired' }
+      : { acquired: false, reason: 'duplicate' };
+  } catch {
+    return process.env.NODE_ENV === 'production'
+      ? { acquired: false, reason: 'backend_unavailable' }
+      : { acquired: true, reason: 'acquired' };
+  }
 }
 
 export async function markRecentDispatch(

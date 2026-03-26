@@ -53,6 +53,18 @@ export const FEATURE_FLAGS = {
    * Set to true to enable the PWA install prompt for users.
    */
   PWA_INSTALL_BANNER: false,
+
+  /** Sticky phone tour (scroll-driven mode transitions) on marketing homepage. */
+  SHOW_PHONE_TOUR: false,
+
+  /** Logo bar ("Trusted by artists on") on marketing homepage. */
+  SHOW_LOGO_BAR: false,
+
+  /** Feature showcase bento grid on marketing homepage. */
+  SHOW_FEATURE_SHOWCASE: false,
+
+  /** Final CTA section on marketing homepage. */
+  SHOW_FINAL_CTA: false,
 } as const;
 
 export type CodeFlagName = keyof typeof FEATURE_FLAGS;
@@ -63,4 +75,8 @@ export const CODE_FLAG_KEYS = {
   THREADS_ENABLED: 'code:THREADS_ENABLED',
   SHOW_REPLACES_SECTION: 'code:SHOW_REPLACES_SECTION',
   PWA_INSTALL_BANNER: 'code:PWA_INSTALL_BANNER',
+  SHOW_PHONE_TOUR: 'code:SHOW_PHONE_TOUR',
+  SHOW_LOGO_BAR: 'code:SHOW_LOGO_BAR',
+  SHOW_FEATURE_SHOWCASE: 'code:SHOW_FEATURE_SHOWCASE',
+  SHOW_FINAL_CTA: 'code:SHOW_FINAL_CTA',
 } as const satisfies Record<CodeFlagName, string>;

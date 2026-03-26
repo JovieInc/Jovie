@@ -20,7 +20,7 @@ export default async function WaitlistLayout({
   const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
       {children}
     </ClientProviders>
   );

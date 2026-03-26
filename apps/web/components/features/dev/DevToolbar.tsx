@@ -12,6 +12,7 @@ import {
   Loader2,
   Monitor,
   Moon,
+  RefreshCw,
   Route,
   Search,
   Sun,
@@ -240,6 +241,9 @@ export function DevToolbar({
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const [syncClerkState, setSyncClerkState] = useState<
+    'idle' | 'loading' | 'done' | 'noop' | 'error'
+  >('idle');
   const [unwaitlistState, setUnwaitlistState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
@@ -429,6 +433,29 @@ export function DevToolbar({
     } catch {
       setUnwaitlistState('error');
       setTimeout(() => setUnwaitlistState('idle'), 3000);
+    }
+  }
+
+  async function handleSyncClerk() {
+    setSyncClerkState('loading');
+    try {
+      const res = await fetch('/api/dev/sync-clerk', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        if (data.synced) {
+          setSyncClerkState('done');
+          setTimeout(() => window.location.reload(), 500);
+        } else {
+          setSyncClerkState('noop');
+          setTimeout(() => setSyncClerkState('idle'), 2000);
+        }
+      } else {
+        setSyncClerkState('error');
+        setTimeout(() => setSyncClerkState('idle'), 3000);
+      }
+    } catch {
+      setSyncClerkState('error');
+      setTimeout(() => setSyncClerkState('idle'), 3000);
     }
   }
 
@@ -741,6 +768,43 @@ export function DevToolbar({
               <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='hidden sm:inline text-[10px]'>
                 {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
+              </span>
+            </button>
+          )}
+
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={handleSyncClerk}
+              disabled={
+                syncClerkState === 'loading' || syncClerkState === 'done'
+              }
+              title='Sync Clerk user ID to DB (fixes clerk_id mismatch between dev/prod)'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              aria-label='Sync Clerk ID'
+            >
+              {syncClerkState === 'loading' ? (
+                <Loader2 size={11} className='animate-spin' />
+              ) : syncClerkState === 'done' ? (
+                <Check size={11} className='text-[var(--color-accent)]' />
+              ) : syncClerkState === 'noop' ? (
+                <Check
+                  size={11}
+                  className='text-[var(--color-text-quaternary-token)]'
+                />
+              ) : (
+                <RefreshCw size={11} />
+              )}
+              <span className='hidden sm:inline text-[10px]'>
+                {syncClerkState === 'loading'
+                  ? 'Syncing...'
+                  : syncClerkState === 'done'
+                    ? 'Synced!'
+                    : syncClerkState === 'noop'
+                      ? 'In sync'
+                      : syncClerkState === 'error'
+                        ? 'Failed'
+                        : 'Sync Clerk'}
               </span>
             </button>
           )}
