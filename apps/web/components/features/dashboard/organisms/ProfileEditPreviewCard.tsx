@@ -90,7 +90,7 @@ export function ProfileEditPreviewCard({
   // Show completed state
   if (applied) {
     return (
-      <ContentSurfaceCard className='border-success/20 bg-[color-mix(in_oklab,var(--color-success)_7%,var(--linear-app-content-surface))] p-3'>
+      <ContentSurfaceCard className='border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-3'>
         <div className='flex items-center justify-between gap-2'>
           <div className='min-w-0 space-y-0.5'>
             <p className='truncate text-[13px] font-[560] tracking-[-0.01em] text-primary-token'>
@@ -158,7 +158,7 @@ export function ProfileEditPreviewCard({
             {formatValue(preview.currentValue)}
           </div>
         </div>
-        <div className='rounded-[9px] border border-accent/20 bg-[color-mix(in_oklab,var(--linear-accent)_8%,var(--linear-app-content-surface))] px-2.5 py-2'>
+        <div className='rounded-[9px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 py-2'>
           <div className='mb-0.5 text-[13px] font-[510] tracking-normal text-(--linear-accent)'>
             New
           </div>
