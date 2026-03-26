@@ -2,36 +2,52 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
+import { createRateLimitHeaders, deployPromoteLimiter } from '@/lib/rate-limit';
 import { logger } from '@/lib/utils/logger';
 
-// Best-effort rate limit — not durable across serverless instances.
-// Acceptable for V1 since this is admin-only and double-deploys are idempotent.
-let lastPromoteTimestamp = 0;
-const RATE_LIMIT_MS = 60_000;
+const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const RATE_LIMIT_SECONDS = 60;
+
+function isLimiterUnavailable(reason: string | undefined): boolean {
+  return reason?.includes('temporarily unavailable') ?? false;
+}
 
 /**
  * POST /api/deploy/promote
  * Trigger a production deployment via Vercel Deploy Hook.
  *
  * Requires: Admin privileges
- * Rate limit: 1 per 60 seconds (best-effort, in-memory)
+ * Rate limit: 1 per 60 seconds (Redis-backed in production)
  */
 export async function POST() {
-  // Cache auth result for both admin check and logging
   const { userId } = await auth();
 
   const authError = await requireAdmin();
   if (authError) return authError;
 
-  // Rate limit
-  const now = Date.now();
-  if (now - lastPromoteTimestamp < RATE_LIMIT_MS) {
-    const retryAfter = Math.ceil(
-      (RATE_LIMIT_MS - (now - lastPromoteTimestamp)) / 1000
-    );
+  const rateLimitResult = await deployPromoteLimiter.limit(
+    'deploy:promote:production'
+  );
+  if (!rateLimitResult.success) {
+    const status = isLimiterUnavailable(rateLimitResult.reason) ? 503 : 429;
     return NextResponse.json(
-      { error: 'Too many requests. Try again shortly.' },
-      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      {
+        error:
+          status === 503
+            ? 'Deploy promotion is temporarily unavailable.'
+            : 'Too many requests. Try again shortly.',
+      },
+      {
+        status,
+        headers: {
+          ...NO_STORE_HEADERS,
+          ...createRateLimitHeaders(rateLimitResult),
+          ...(status === 503
+            ? { 'Retry-After': String(RATE_LIMIT_SECONDS) }
+            : {}),
+        },
+      }
     );
   }
 
@@ -39,14 +55,19 @@ export async function POST() {
   if (!hookUrl) {
     return NextResponse.json(
       { error: 'Deploy hook not configured' },
-      { status: 500 }
+      { status: 500, headers: NO_STORE_HEADERS }
     );
   }
 
   try {
-    const response = await fetch(hookUrl, {
+    const response = await serverFetch(hookUrl, {
       method: 'POST',
-      signal: AbortSignal.timeout(30_000),
+      timeoutMs: 30_000,
+      context: 'Vercel production deploy hook',
+      retry: {
+        maxRetries: 1,
+        baseDelayMs: 500,
+      },
     });
 
     if (!response.ok) {
@@ -56,21 +77,32 @@ export async function POST() {
       );
     }
 
-    lastPromoteTimestamp = Date.now();
-
     logger.info(
       `[deploy/promote] Production deploy triggered by ${userId ?? 'unknown'}`
     );
 
-    // Note: .json() is safe here — .text() is only called in the throw-path above
     const data = await response.json().catch(() => ({}));
 
-    return NextResponse.json({
-      success: true,
-      message: 'Production deploy triggered',
-      job: data,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Production deploy triggered',
+        job: data,
+      },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      await captureCriticalError('Production deploy trigger timed out', error, {
+        route: '/api/deploy/promote',
+        timeoutMs: error.timeoutMs,
+      });
+      return NextResponse.json(
+        { error: 'Production deploy trigger timed out' },
+        { status: 504, headers: NO_STORE_HEADERS }
+      );
+    }
+
     logger.error(
       '[deploy/promote] Failed to trigger production deploy:',
       error
@@ -80,7 +112,7 @@ export async function POST() {
     });
     return NextResponse.json(
       { error: 'Failed to trigger production deploy' },
-      { status: 500 }
+      { status: 502, headers: NO_STORE_HEADERS }
     );
   }
 }

@@ -6,9 +6,12 @@ import { checkDbHealth, db, doesTableExist, TABLE_NAMES } from '@/lib/db';
 import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
+import { getHudDeployments } from '@/lib/deployments/github';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { getRedis } from '@/lib/redis';
 import { getAdminMercuryMetrics } from './mercury-metrics';
+import { getAdminSentryMetrics } from './sentry-metrics';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
 
 const DISABLED_TABLES = new Set<string>();
@@ -146,6 +149,10 @@ export interface AdminReliabilitySummary {
   p95LatencyMs: number | null;
   incidents24h: number;
   lastIncidentAt: Date | null;
+  unresolvedSentryIssues24h: number;
+  redisAvailable: boolean;
+  deploymentAvailability: 'available' | 'error' | 'not_configured';
+  deploymentState: 'success' | 'failure' | 'in_progress' | 'unknown' | null;
 }
 
 export type AdminActivityStatus = 'success' | 'warning' | 'error';
@@ -213,23 +220,40 @@ export async function getAdminUsageSeries(
 export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySummary> {
   const now = new Date();
   const dayAgo = new Date(now.getTime() - MS_PER_DAY);
+  const [dbHealth, sentryMetrics, deployments] = await Promise.all([
+    checkDbHealth().catch(() => ({ latency: null })),
+    getAdminSentryMetrics().catch(() => null),
+    getHudDeployments().catch(() => ({
+      availability: 'error' as const,
+      current: null,
+      recent: [],
+    })),
+  ]);
+  const redisAvailable = getRedis() !== null;
+  const reliabilityBase = {
+    p95LatencyMs: dbHealth.latency ?? null,
+    unresolvedSentryIssues24h: sentryMetrics?.unresolvedIssues24h ?? 0,
+    redisAvailable,
+    deploymentAvailability: deployments.availability,
+    deploymentState:
+      deployments.current?.status === 'not_configured'
+        ? null
+        : (deployments.current?.status ?? null),
+  };
   const hasStripeEvents =
     !DISABLED_TABLES.has(TABLE_NAMES.stripeWebhookEvents) &&
     (await doesTableExist(TABLE_NAMES.stripeWebhookEvents));
 
   if (!hasStripeEvents) {
-    const dbHealth = await checkDbHealth();
     return {
       errorRatePercent: 0,
-      p95LatencyMs: dbHealth.latency ?? null,
       incidents24h: 0,
       lastIncidentAt: null,
+      ...reliabilityBase,
     };
   }
 
   try {
-    const dbHealth = await checkDbHealth();
-
     let totalEvents = 0;
     let incidentCount = 0;
     let lastIncidentAt: Date | null = null;
@@ -250,9 +274,9 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
       return {
         errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
         incidents24h: 0,
         lastIncidentAt: null,
+        ...reliabilityBase,
       };
     }
 
@@ -292,9 +316,9 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
       return {
         errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
         incidents24h: 0,
         lastIncidentAt: null,
+        ...reliabilityBase,
       };
     }
 
@@ -303,29 +327,19 @@ export async function getAdminReliabilitySummary(): Promise<AdminReliabilitySumm
 
     return {
       errorRatePercent,
-      p95LatencyMs: dbHealth.latency ?? null,
       incidents24h: Number(incidentCount),
       lastIncidentAt,
+      ...reliabilityBase,
     };
   } catch (error) {
     captureError('Error loading admin reliability summary', error);
 
-    try {
-      const dbHealth = await checkDbHealth();
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: dbHealth.latency ?? null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    } catch {
-      return {
-        errorRatePercent: 0,
-        p95LatencyMs: null,
-        incidents24h: 0,
-        lastIncidentAt: null,
-      };
-    }
+    return {
+      errorRatePercent: 0,
+      incidents24h: 0,
+      lastIncidentAt: null,
+      ...reliabilityBase,
+    };
   }
 }
 
