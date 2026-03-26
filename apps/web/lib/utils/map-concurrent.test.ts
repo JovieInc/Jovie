@@ -65,4 +65,22 @@ describe('mapConcurrent', () => {
     });
     expect(order).toEqual([1, 2, 3]);
   });
+
+  it('stops picking up new items after a failure', async () => {
+    const processed: number[] = [];
+    const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
+    await expect(
+      mapConcurrent(items, 2, async item => {
+        processed.push(item);
+        await new Promise(r => setTimeout(r, 10));
+        if (item === 2) throw new Error('boom');
+        return item;
+      })
+    ).rejects.toThrow('boom');
+
+    // With 2 workers and abort, we should NOT process all 10 items.
+    // Workers stop picking up new work after the error.
+    expect(processed.length).toBeLessThan(items.length);
+  });
 });

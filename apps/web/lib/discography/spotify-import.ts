@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { after } from 'next/server';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -241,17 +242,22 @@ export async function importReleasesFromSpotify(
   const {
     includeGroups = ['album', 'single', 'compilation'],
     includeTracks = true, // Default to true for ISRC discovery
-    discoverLinks: discoverLinksOpt = 'background',
+    discoverLinks: discoverLinksOpt,
     market = 'US',
   } = options;
 
-  // Normalize legacy boolean values to the new string union
-  const discoverLinksMode =
-    discoverLinksOpt === true
-      ? 'background'
-      : discoverLinksOpt === false
-        ? false
-        : discoverLinksOpt;
+  // Normalize legacy boolean values to the new string union.
+  // `true` preserves original sync behavior; only omitted defaults to background.
+  let discoverLinksMode: false | 'sync' | 'background';
+  if (discoverLinksOpt === undefined) {
+    discoverLinksMode = 'background';
+  } else if (discoverLinksOpt === true) {
+    discoverLinksMode = 'sync';
+  } else if (discoverLinksOpt === false) {
+    discoverLinksMode = false;
+  } else {
+    discoverLinksMode = discoverLinksOpt;
+  }
 
   const result: SpotifyImportResult = {
     success: false,
@@ -388,15 +394,17 @@ export async function importReleasesFromSpotify(
           if (discoverLinksMode === 'sync') {
             await discoverLinksForReleases(creatorProfileId, market);
           } else {
-            // Fire-and-forget: return import result immediately,
-            // cross-platform links populate in background
-            void discoverLinksForReleases(creatorProfileId, market).catch(
-              error => {
-                captureWarning('Background link discovery failed', error, {
-                  source: 'spotify_import',
-                  creatorProfileId,
-                });
-              }
+            // Use after() so the Vercel runtime keeps the function alive
+            // until link discovery completes, even after the response is sent.
+            after(
+              discoverLinksForReleases(creatorProfileId, market).catch(
+                error => {
+                  captureWarning('Background link discovery failed', error, {
+                    source: 'spotify_import',
+                    creatorProfileId,
+                  });
+                }
+              )
             );
           }
         }
