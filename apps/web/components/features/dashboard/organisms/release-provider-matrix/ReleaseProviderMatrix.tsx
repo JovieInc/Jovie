@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   lazy,
   memo,
@@ -96,7 +95,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   initialTotalCount = 0,
   experienceAdapter,
 }: ReleaseProviderMatrixProps) {
-  const router = useRouter();
   const experienceMode = experienceAdapter?.mode ?? 'live';
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
@@ -117,6 +115,8 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
+    updateRow,
+    patchRow,
     openEditor,
     closeEditor,
     handleCopy,
@@ -399,9 +399,27 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setAddReleaseOpen(true);
   }, [experienceAdapter]);
 
-  const handleAddReleaseCreated = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  const handleAddReleaseCreated = useCallback(
+    (createdRelease: ReleaseViewModel) => {
+      setRows(currentRows => {
+        const existingIndex = currentRows.findIndex(
+          release => release.id === createdRelease.id
+        );
+
+        if (existingIndex === -1) {
+          return [createdRelease, ...currentRows];
+        }
+
+        return currentRows.map(release =>
+          release.id === createdRelease.id ? createdRelease : release
+        );
+      });
+      setAddReleaseOpen(false);
+      setEditingTrack(null);
+      openEditor(createdRelease);
+    },
+    [openEditor, setRows]
+  );
 
   // Artwork upload handler - calls the artwork upload API endpoint
   const handleArtworkUpload = useCallback(
@@ -439,9 +457,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Handle release changes from the sidebar (e.g., after artwork upload)
   const handleReleaseChange = useCallback(
     (updated: ReleaseViewModel) => {
-      setRows(prev => prev.map(row => (row.id === updated.id ? updated : row)));
+      updateRow(updated);
     },
-    [setRows]
+    [updateRow]
+  );
+
+  const handleReleaseArtworkUploaded = useCallback(
+    (releaseId: string, artworkUrl: string) => {
+      patchRow(releaseId, { artworkUrl });
+    },
+    [patchRow]
   );
 
   // Show import progress banner when actively importing
@@ -889,8 +914,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         >
           <AddReleaseSidebar
             isOpen={addReleaseOpen}
+            artistName={artistName}
             onClose={() => setAddReleaseOpen(false)}
             onCreated={handleAddReleaseCreated}
+            onArtworkUploaded={handleReleaseArtworkUploaded}
           />
         </Suspense>
       )}

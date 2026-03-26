@@ -1,8 +1,28 @@
-import { render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AddReleaseSidebar } from '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar';
+import type { ReleaseViewModel } from '@/lib/discography/types';
+
+const { mockCreateRelease, mockToast } = vi.hoisted(() => ({
+  mockCreateRelease: vi.fn(),
+  mockToast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    warning: vi.fn(),
+  },
+}));
+
+vi.mock('sonner', () => ({
+  toast: mockToast,
+}));
 
 vi.mock('@/components/organisms/RightDrawer', () => ({
   RightDrawer: ({
@@ -50,23 +70,44 @@ vi.mock('@/components/molecules/drawer', () => ({
       {children}
     </div>
   ),
-  DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerSettingsToggle: ({
+    label,
+    checked,
+    onCheckedChange,
+  }: {
+    label: string;
+    checked: boolean;
+    onCheckedChange: (value: boolean) => void;
+  }) => (
+    <label>
+      {label}
+      <input
+        type='checkbox'
+        aria-label={label}
+        checked={checked}
+        onChange={event => onCheckedChange(event.target.checked)}
+      />
+    </label>
+  ),
   DrawerSurfaceCard: ({ children }: { children: ReactNode }) => (
     <div data-testid='drawer-surface-card'>{children}</div>
   ),
   EntityHeaderCard: ({
     title,
     subtitle,
+    meta,
     image,
   }: {
     title: ReactNode;
     subtitle?: ReactNode;
+    meta?: ReactNode;
     image?: ReactNode;
   }) => (
     <div data-testid='entity-header-card'>
       {image}
       <div data-testid='entity-header-title'>{title}</div>
       <div data-testid='entity-header-subtitle'>{subtitle}</div>
+      <div data-testid='entity-header-meta'>{meta}</div>
     </div>
   ),
   EntitySidebarShell: ({
@@ -74,20 +115,80 @@ vi.mock('@/components/molecules/drawer', () => ({
     entityHeader,
     footer,
     'data-testid': testId,
+    onClose,
     title,
   }: {
     children: ReactNode;
     entityHeader?: ReactNode;
     footer?: ReactNode;
     'data-testid'?: string;
+    onClose?: () => void;
     title?: ReactNode;
-    [key: string]: unknown;
   }) => (
     <div data-testid={testId}>
       <div data-testid='shell-title'>{title}</div>
+      <button type='button' data-testid='shell-close' onClick={onClose}>
+        Close
+      </button>
       <div data-testid='shell-entity-header'>{entityHeader}</div>
       <div data-testid='shell-body'>{children}</div>
       <div data-testid='shell-footer'>{footer}</div>
+    </div>
+  ),
+}));
+
+vi.mock('@/components/organisms/AvatarUploadable', () => ({
+  AvatarUploadable: ({
+    onUpload,
+    alt,
+  }: {
+    onUpload?: (file: File) => Promise<string>;
+    alt?: string;
+  }) => (
+    <button
+      type='button'
+      aria-label={alt}
+      onClick={() => {
+        void onUpload?.(new File(['art'], 'cover.png', { type: 'image/png' }));
+      }}
+    >
+      Stage Artwork
+    </button>
+  ),
+}));
+
+vi.mock('@/components/molecules/GenrePicker', () => ({
+  GenrePicker: ({
+    selected,
+    onChange,
+    trigger,
+  }: {
+    selected: string[];
+    onChange: (genres: string[]) => void;
+    trigger: ReactNode;
+  }) => (
+    <div>
+      {trigger}
+      <button type='button' onClick={() => onChange(['indie pop'])}>
+        Choose Genre
+      </button>
+      <div data-testid='selected-genres'>{selected.join(',')}</div>
+    </div>
+  ),
+}));
+
+vi.mock('@/components/organisms/release-sidebar/ReleaseFields', () => ({
+  ReleaseFields: ({
+    releaseDate,
+    releaseType,
+    totalTracks,
+  }: {
+    releaseDate?: string;
+    releaseType?: string;
+    totalTracks?: number;
+  }) => (
+    <div data-testid='release-fields'>
+      {`type:${releaseType ?? ''}|date:${releaseDate ?? ''}|tracks:${String(totalTracks ?? '')}`}
     </div>
   ),
 }));
@@ -106,19 +207,21 @@ vi.mock('@jovie/ui', () => ({
     onChange,
     id,
     placeholder,
+    type = 'text',
     ...props
   }: {
     value?: string;
     onChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
     id?: string;
     placeholder?: string;
-    [key: string]: unknown;
+    type?: string;
   }) => (
     <input
       id={id}
       value={value}
       onChange={onChange}
       placeholder={placeholder}
+      type={type}
       {...props}
     />
   ),
@@ -134,93 +237,280 @@ vi.mock('@jovie/ui', () => ({
       {children}
     </button>
   ),
-  SelectValue: () => <span>Single</span>,
+  SelectValue: ({ children }: { children?: ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
-  createRelease: vi.fn(),
+  createRelease: mockCreateRelease,
 }));
+
+const defaultRelease: ReleaseViewModel = {
+  profileId: 'profile-1',
+  id: 'release-1',
+  title: 'Midnight Sun',
+  artistNames: ['Test Artist'],
+  releaseDate: '2026-04-01T00:00:00.000Z',
+  slug: 'midnight-sun',
+  smartLinkPath: '/artist/midnight-sun',
+  providers: [],
+  releaseType: 'single',
+  isExplicit: true,
+  totalTracks: 1,
+  genres: ['indie pop'],
+};
 
 const defaultProps = {
   isOpen: true,
+  artistName: 'Test Artist',
   onClose: vi.fn(),
   onCreated: vi.fn(),
+  onArtworkUploaded: vi.fn(),
 };
 
 describe('AddReleaseSidebar', () => {
-  it('renders with card-based layout using DrawerSurfaceCards', () => {
-    render(<AddReleaseSidebar {...defaultProps} />);
-
-    expect(screen.getByTestId('add-release-sidebar')).toBeInTheDocument();
-    // Shell title
-    expect(screen.getByTestId('shell-title')).toHaveTextContent('Add Release');
-    // Three DrawerSurfaceCards: preview, details, platform links
-    const cards = screen.getAllByTestId('drawer-surface-card');
-    expect(cards).toHaveLength(3);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:preview'),
+      revokeObjectURL: vi.fn(),
+    });
   });
 
-  it('renders preview card with entity header showing default title and release type', () => {
+  it('renders the mirrored header content with the primary release form', () => {
     render(<AddReleaseSidebar {...defaultProps} />);
 
-    const headerCard = screen.getByTestId('entity-header-card');
-    expect(headerCard).toBeInTheDocument();
+    const sidebar = screen.getByTestId('add-release-sidebar');
 
+    expect(sidebar).toBeInTheDocument();
+    expect(screen.getByTestId('shell-title')).toHaveTextContent('New Release');
     expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
-      'New Release'
+      'Untitled'
     );
     expect(screen.getByTestId('entity-header-subtitle')).toHaveTextContent(
-      'Single'
+      'Test Artist'
     );
-    expect(screen.getByText('Preview')).toBeInTheDocument();
+    expect(within(sidebar).getByLabelText('Title')).toBeInTheDocument();
+    expect(
+      within(sidebar).getByRole('button', { name: 'Create Release' })
+    ).toBeDisabled();
   });
 
-  it('renders details card with title, release type, date, and artwork URL fields', () => {
+  it('updates the header preview title and release fields as form values change', async () => {
+    const user = userEvent.setup();
     render(<AddReleaseSidebar {...defaultProps} />);
 
-    expect(screen.getByText('Details')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    fireEvent.change(screen.getByLabelText('Release Date'), {
+      target: { value: '2026-04-01' },
+    });
+
+    expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
+      'Midnight Sun'
+    );
+    expect(screen.getByTestId('release-fields')).toHaveTextContent(
+      'type:single|date:2026-04-01|tracks:1'
+    );
+  });
+
+  it('renders metadata inputs and removes legacy artwork url and provider fields', () => {
+    render(<AddReleaseSidebar {...defaultProps} />);
+
     expect(screen.getByLabelText('Title')).toBeInTheDocument();
     expect(screen.getByLabelText('Release Type')).toBeInTheDocument();
     expect(screen.getByLabelText('Release Date')).toBeInTheDocument();
-    expect(screen.getByLabelText('Artwork URL (optional)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Explicit')).toBeInTheDocument();
+    expect(screen.getByText('Choose Genre')).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('Artwork URL (optional)')
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Spotify')).not.toBeInTheDocument();
+    expect(screen.queryByText('Platform Links')).not.toBeInTheDocument();
   });
 
-  it('renders platform links card with all provider URL fields', () => {
-    render(<AddReleaseSidebar {...defaultProps} />);
-
-    expect(screen.getByText('Platform Links')).toBeInTheDocument();
-    expect(screen.getByLabelText('Spotify')).toBeInTheDocument();
-    expect(screen.getByLabelText('Apple Music')).toBeInTheDocument();
-    expect(screen.getByLabelText('YouTube Music')).toBeInTheDocument();
-    expect(screen.getByLabelText('Tidal')).toBeInTheDocument();
-    expect(screen.getByLabelText('Amazon Music')).toBeInTheDocument();
-    expect(screen.getByLabelText('SoundCloud')).toBeInTheDocument();
-    expect(screen.getByLabelText('Deezer')).toBeInTheDocument();
-  });
-
-  it('renders footer with a Create Release submit button', () => {
+  it('keeps submit disabled until title exists', async () => {
+    const user = userEvent.setup();
     render(<AddReleaseSidebar {...defaultProps} />);
 
     const submitButton = screen.getByRole('button', {
       name: 'Create Release',
     });
-    expect(submitButton).toBeInTheDocument();
-    // Button is disabled when title is empty
     expect(submitButton).toBeDisabled();
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+
+    expect(submitButton).toBeEnabled();
   });
 
-  it('updates the preview title when the title input changes', async () => {
+  it('submits genres and explicit state, then calls onCreated with the created release', async () => {
     const user = userEvent.setup();
+    mockCreateRelease.mockResolvedValue({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+
     render(<AddReleaseSidebar {...defaultProps} />);
 
-    const titleInput = screen.getByLabelText('Title');
-    await user.type(titleInput, 'Midnight Sun');
-
-    expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
-      'Midnight Sun'
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(screen.getByText('Choose Genre'));
+    await user.click(screen.getByLabelText('Explicit'));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
     );
-    // Submit button should be enabled now that title is not empty
-    expect(
-      screen.getByRole('button', { name: 'Create Release' })
-    ).toBeEnabled();
+
+    await waitFor(() => {
+      expect(mockCreateRelease).toHaveBeenCalledWith({
+        title: 'Midnight Sun',
+        releaseType: 'single',
+        releaseDate: null,
+        genres: ['indie pop'],
+        isExplicit: true,
+      });
+    });
+    expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    expect(defaultProps.onClose).toHaveBeenCalled();
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Release "Midnight Sun" created.'
+    );
+  });
+
+  it('opens the release drawer immediately and updates artwork in the background after creation', async () => {
+    const user = userEvent.setup();
+    mockCreateRelease.mockResolvedValue({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ artworkUrl: 'https://cdn.example.com/cover.png' }),
+    } as Response);
+
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(
+      screen.getByRole('button', { name: 'Midnight Sun artwork' })
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
+    );
+
+    await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
+    expect(defaultProps.onClose).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/images/artwork/upload?releaseId=release-1',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+    expect(defaultProps.onArtworkUploaded).toHaveBeenCalledWith(
+      'release-1',
+      'https://cdn.example.com/cover.png'
+    );
+  });
+
+  it('continues into the release drawer flow when artwork upload fails after creation', async () => {
+    const user = userEvent.setup();
+    mockCreateRelease.mockResolvedValue({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ message: 'Upload failed' }),
+    } as Response);
+
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(
+      screen.getByRole('button', { name: 'Midnight Sun artwork' })
+    );
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
+    );
+
+    await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
+    expect(defaultProps.onClose).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/images/artwork/upload?releaseId=release-1',
+        expect.objectContaining({
+          method: 'POST',
+        })
+      );
+    });
+    expect(defaultProps.onArtworkUploaded).not.toHaveBeenCalled();
+    expect(mockToast.warning).toHaveBeenCalledWith(
+      'Release created, but artwork upload failed. You can retry from the release drawer.'
+    );
+  });
+
+  it('ignores close requests while the create request is still pending', async () => {
+    const user = userEvent.setup();
+    let resolveCreate:
+      | ((value: {
+          success: boolean;
+          message: string;
+          releaseId: string;
+          release: ReleaseViewModel;
+        }) => void)
+      | null = null;
+
+    mockCreateRelease.mockReturnValue(
+      new Promise(resolve => {
+        resolveCreate = resolve;
+      })
+    );
+
+    render(<AddReleaseSidebar {...defaultProps} />);
+
+    await user.type(screen.getByLabelText('Title'), 'Midnight Sun');
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Create Release',
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Creating/i })).toBeDisabled();
+    });
+
+    await user.click(screen.getByTestId('shell-close'));
+
+    expect(defaultProps.onClose).not.toHaveBeenCalled();
+
+    resolveCreate?.({
+      success: true,
+      message: 'Release "Midnight Sun" created.',
+      releaseId: 'release-1',
+      release: defaultRelease,
+    });
+
+    await waitFor(() => {
+      expect(defaultProps.onCreated).toHaveBeenCalledWith(defaultRelease);
+    });
   });
 });
