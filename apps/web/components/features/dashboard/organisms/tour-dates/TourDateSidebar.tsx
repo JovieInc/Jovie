@@ -425,7 +425,7 @@ export function TourDateSidebar({
             </div>
 
             {/* Analytics */}
-            <div className='border-t border-subtle/60 pt-2'>
+            <div className='border-t border-(--linear-app-frame-seam) pt-2'>
               <DrawerSection title='Analytics'>
                 {analyticsLoading && (
                   <DrawerSurfaceCard className='space-y-2 p-3'>

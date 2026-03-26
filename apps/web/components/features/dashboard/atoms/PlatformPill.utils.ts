@@ -60,7 +60,7 @@ function getLayoutClasses(
         'max-w-[132px] grid-cols-[18px_minmax(0,1fr)] lg:max-w-[164px]'
     );
   }
-  return 'inline-flex min-h-[24px] max-w-full items-center gap-1.5 rounded-[9px] px-2 py-[3px]';
+  return 'inline-flex min-h-[24px] max-w-full items-center gap-1.5 rounded-[8px] px-2 py-[3px]';
 }
 
 /**

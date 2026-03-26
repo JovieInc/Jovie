@@ -586,7 +586,7 @@ export function SpotifyConnectDialog({
                             'border-(--linear-app-frame-seam) bg-surface-1',
                           artist.isClaimed
                             ? 'opacity-50 cursor-not-allowed'
-                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1/70'
+                            : 'cursor-pointer hover:border-(--linear-app-frame-seam) hover:bg-surface-1'
                         )}
                         onClick={() =>
                           !artist.isClaimed && handleArtistSelect(artist)
@@ -658,7 +658,7 @@ export function SpotifyConnectDialog({
                   type='button'
                   tabIndex={0}
                   className={cn(
-                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_72%,var(--linear-bg-surface-0))] px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1/70',
+                    'm-2 mt-0 flex w-[calc(100%-1rem)] cursor-pointer items-center gap-2.5 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20 focus-visible:ring-inset hover:bg-surface-1',
                     formState.activeResultIndex === pasteUrlIndex &&
                       'bg-surface-1'
                   )}

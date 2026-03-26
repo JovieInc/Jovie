@@ -144,7 +144,7 @@ export function ChatAvatarUploadCard() {
           onDrop={handleDrop}
           disabled={state === 'uploading'}
           className={cn(
-            'w-full rounded-[9px] border border-dashed p-8 text-center transition-colors',
+            'w-full rounded-[8px] border border-dashed p-8 text-center transition-colors',
             isDragOver
               ? 'border-accent bg-accent/10'
               : 'border-(--linear-app-frame-seam) bg-surface-0 hover:border-accent/50 hover:bg-surface-1',

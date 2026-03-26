@@ -191,7 +191,7 @@ const MobileCardList = memo(function MobileCardList({
           return (
             <div
               key={member.id}
-              className='absolute left-0 w-full border-b border-subtle/60'
+              className='absolute left-0 w-full border-b border-(--linear-app-frame-seam)'
               style={{
                 height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,

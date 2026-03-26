@@ -101,7 +101,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         maxLength={2000}
         disabled={feedbackMutation.isPending}
         className={cn(
-          'mt-4 w-full resize-none rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
+          'mt-4 w-full resize-none rounded-[8px] border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
           'text-sm text-primary-token placeholder:text-tertiary-token',
           'focus:border-default focus:outline-none',
           'disabled:opacity-50'
