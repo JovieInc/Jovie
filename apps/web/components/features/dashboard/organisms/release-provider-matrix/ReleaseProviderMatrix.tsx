@@ -115,8 +115,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
+    handleReleaseCreated,
     updateRow,
-    patchRow,
+    handleReleaseArtworkUploaded,
     openEditor,
     closeEditor,
     handleCopy,
@@ -401,24 +402,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const handleAddReleaseCreated = useCallback(
     (createdRelease: ReleaseViewModel) => {
-      setRows(currentRows => {
-        const existingIndex = currentRows.findIndex(
-          release => release.id === createdRelease.id
-        );
-
-        if (existingIndex === -1) {
-          return [createdRelease, ...currentRows];
-        }
-
-        return currentRows.map(release =>
-          release.id === createdRelease.id ? createdRelease : release
-        );
-      });
+      handleReleaseCreated(createdRelease);
       setAddReleaseOpen(false);
       setEditingTrack(null);
-      openEditor(createdRelease);
     },
-    [openEditor, setRows]
+    [handleReleaseCreated]
   );
 
   // Artwork upload handler - calls the artwork upload API endpoint
@@ -460,13 +448,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       updateRow(updated);
     },
     [updateRow]
-  );
-
-  const handleReleaseArtworkUploaded = useCallback(
-    (releaseId: string, artworkUrl: string) => {
-      patchRow(releaseId, { artworkUrl });
-    },
-    [patchRow]
   );
 
   // Show import progress banner when actively importing

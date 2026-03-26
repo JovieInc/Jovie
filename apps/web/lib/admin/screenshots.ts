@@ -56,14 +56,12 @@ export async function getScreenshots(): Promise<readonly ScreenshotInfo[]> {
   const results: ScreenshotInfo[] = [];
 
   for (const source of SCREENSHOT_SOURCES) {
-    const dirPath = source.directoryPath;
-
     try {
-      const files = await readdir(dirPath);
+      const files = await readdir(source.directoryPath);
       const pngFiles = files.filter(f => f.toLowerCase().endsWith('.png'));
 
       for (const filename of pngFiles) {
-        const filePath = join(dirPath, filename);
+        const filePath = join(source.directoryPath, filename);
         const fileStat = await stat(filePath);
         const nameWithoutExt = basename(filename, '.png');
         const displayName = nameWithoutExt.replaceAll(/[-_]/g, ' ');

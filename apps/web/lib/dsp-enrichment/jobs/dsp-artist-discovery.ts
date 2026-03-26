@@ -185,6 +185,7 @@ async function storeMatch(
       totalTracksChecked: match.totalTracksChecked,
       status,
       confirmedAt: status === 'auto_confirmed' ? now : null,
+      matchSource: 'isrc_discovery',
       createdAt: now,
       updatedAt: now,
     })
@@ -209,6 +210,7 @@ async function storeMatch(
         totalTracksChecked: match.totalTracksChecked,
         status,
         confirmedAt: status === 'auto_confirmed' ? now : null,
+        matchSource: 'isrc_discovery',
         updatedAt: now,
       },
     })

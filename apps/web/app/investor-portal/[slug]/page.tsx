@@ -74,7 +74,7 @@ export default async function InvestorMemoPage({ params }: PageProps) {
     notFound();
   }
 
-  const doc = await getMarkdownDocument(`content/investors/${page.file}`);
+  const doc = await getMarkdownDocument(`investors/${page.file}`);
   const toc = doc.toc
     .filter(entry => entry.level === 2)
     .map(entry => ({ id: entry.id, title: entry.title }));
