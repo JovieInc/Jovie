@@ -91,7 +91,7 @@ function getOrderByExpressions(sort: AdminReleasesSort) {
     case 'release_date_asc':
       return [drizzleSql`${discogReleases.releaseDate} ASC NULLS LAST`];
     case 'created_asc':
-      return [discogReleases.createdAt];
+      return [drizzleSql`${discogReleases.createdAt} ASC NULLS LAST`];
     case 'created_desc':
       return [desc(discogReleases.createdAt)];
     case 'title_asc':

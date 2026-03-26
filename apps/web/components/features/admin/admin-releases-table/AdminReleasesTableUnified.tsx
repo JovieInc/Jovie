@@ -269,7 +269,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
       onClick: () => {
         globalThis.open(
           `${APP_ROUTES.ADMIN_CREATORS}?q=${encodeURIComponent(release.artistUsername)}`,
-          '_self'
+          '_blank'
         );
       },
     },
@@ -283,7 +283,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
       onClick: () => {
         globalThis.open(
           `/api/admin/impersonate?userId=${release.artistUserId}`,
-          '_self'
+          '_blank'
         );
       },
     });
