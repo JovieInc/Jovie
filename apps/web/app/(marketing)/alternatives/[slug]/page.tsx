@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FaqSection, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
 import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
@@ -28,12 +28,12 @@ export async function generateMetadata({
     title: `${data.title} | ${APP_NAME}`,
     description: data.metaDescription,
     alternates: {
-      canonical: `${APP_URL}/alternatives/${data.slug}`,
+      canonical: `${BASE_URL}/alternatives/${data.slug}`,
     },
     openGraph: {
       title: data.title,
       description: data.metaDescription,
-      url: `${APP_URL}/alternatives/${data.slug}`,
+      url: `${BASE_URL}/alternatives/${data.slug}`,
       type: 'website',
     },
   };
@@ -48,9 +48,9 @@ export default async function AlternativesPage({
 
   const faqSchema = buildFaqSchema(data.faq);
   const breadcrumbSchema = buildBreadcrumbSchema([
-    { name: APP_NAME, url: APP_URL },
-    { name: 'Blog', url: `${APP_URL}/blog` },
-    { name: data.title, url: `${APP_URL}/alternatives/${data.slug}` },
+    { name: APP_NAME, url: BASE_URL },
+    { name: 'Blog', url: `${BASE_URL}/blog` },
+    { name: data.title, url: `${BASE_URL}/alternatives/${data.slug}` },
   ]);
 
   return (
