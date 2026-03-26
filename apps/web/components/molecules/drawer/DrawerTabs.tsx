@@ -24,10 +24,7 @@ export function DrawerTabs<T extends string>({
     <div
       role='tablist'
       aria-label={ariaLabel}
-      className={cn(
-        'flex items-center gap-1 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0.5',
-        className
-      )}
+      className={cn('flex items-center gap-0', className)}
     >
       {options.map(option => (
         <button
@@ -37,13 +34,15 @@ export function DrawerTabs<T extends string>({
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
           className={cn(
-            'min-h-7 rounded-[8px] border border-transparent bg-transparent px-3 py-1 text-[11px] font-[510] tracking-[-0.01em] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:bg-surface-1 hover:text-primary-token',
-            value === option.value &&
-              'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token',
+            'relative px-3 py-1.5 text-[12px] font-[510] tracking-[-0.01em] text-tertiary-token transition-colors duration-150 hover:text-primary-token',
+            value === option.value && 'text-primary-token',
             triggerClassName
           )}
         >
           {option.label}
+          {value === option.value && (
+            <span className='absolute inset-x-3 bottom-0 h-[1.5px] rounded-full bg-primary-token' />
+          )}
         </button>
       ))}
     </div>

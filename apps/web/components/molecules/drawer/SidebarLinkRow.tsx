@@ -156,8 +156,8 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex min-h-[36px] items-center justify-between rounded-lg',
-          'bg-transparent px-2.5 py-1.5 lg:px-2.5 lg:py-1.5',
+          'group flex min-h-[32px] items-center justify-between rounded-[6px]',
+          'bg-transparent px-2 py-1 lg:px-2 lg:py-1',
           'active:bg-surface-1 lg:hover:bg-surface-1',
           'transition-[background-color,box-shadow,border-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
           !isVisible && 'opacity-60',
@@ -167,10 +167,10 @@ export function SidebarLinkRow({
       >
         {/* Left: Icon + Label */}
         <div className='flex min-w-0 flex-1 items-center gap-2.25'>
-          <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-(--linear-app-content-surface)'>
+          <span className='flex h-5 w-5 shrink-0 items-center justify-center text-tertiary-token'>
             {icon}
           </span>
-          <span className='text-[12px] font-[510] text-secondary-token'>
+          <span className='text-[13px] font-[460] text-primary-token'>
             {label}
           </span>
           {badge && (
@@ -188,7 +188,7 @@ export function SidebarLinkRow({
               <button
                 type='button'
                 className={cn(
-                  'rounded-full border border-transparent p-1 text-tertiary-token',
+                  'rounded-[6px] border border-transparent p-1 text-tertiary-token',
                   'hover:border-subtle hover:bg-surface-0 hover:text-primary-token',
                   'transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none',
                   'focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-1 focus-visible:ring-(--linear-border-focus)'
