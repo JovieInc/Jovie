@@ -15,6 +15,8 @@ import { OtpInput } from '@/features/auth/atoms/otp-input';
 import { CountrySelector } from '@/features/profile/notifications';
 import { track } from '@/lib/analytics';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import type { Artist } from '@/types/db';
+import type { NotificationChannel } from '@/types/notifications';
 import {
   noFontSynthesisStyle,
   SubscriptionFormSkeleton,
@@ -231,6 +233,60 @@ function getSubmitButtonLabel(isSubmitting: boolean, otpStep: string): string {
   return 'Get Notified';
 }
 
+/**
+ * Handles early-return states (loading, disabled, pending, subscribed) to
+ * reduce cognitive complexity in the main component.
+ */
+function getEarlyReturnContent({
+  hydrationStatus,
+  notificationsEnabled,
+  notificationsState,
+  autoOpen,
+  isSubscribed,
+  variant,
+  artist,
+  channel,
+  emailInput,
+  subscribedChannels,
+}: {
+  hydrationStatus: 'idle' | 'checking' | 'done';
+  notificationsEnabled: boolean;
+  notificationsState: string;
+  autoOpen: boolean;
+  isSubscribed: boolean;
+  variant: 'link' | 'button';
+  artist: Artist;
+  channel: NotificationChannel;
+  emailInput: string;
+  subscribedChannels: Partial<Record<NotificationChannel, boolean>>;
+}): React.JSX.Element | null {
+  if (hydrationStatus === 'checking') {
+    return <SubscriptionFormSkeleton />;
+  }
+
+  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
+    return <ListenNowCTA variant={variant} handle={artist.handle} />;
+  }
+
+  if (notificationsState === 'pending_confirmation') {
+    return <SubscriptionPendingConfirmation />;
+  }
+
+  if (isSubscribed) {
+    return (
+      <SubscriptionSuccess
+        artistName={artist.name}
+        handle={artist.handle}
+        subscribedChannels={subscribedChannels}
+        artistId={artist.id}
+        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
+      />
+    );
+  }
+
+  return null;
+}
+
 export function ArtistNotificationsCTA({
   artist,
   variant = 'link',
@@ -296,30 +352,19 @@ export function ArtistNotificationsCTA({
   const shouldShowCountrySelector =
     otpStep === 'input' && channel === 'sms' && phoneInput.length > 0;
 
-  // Show loading skeleton while checking subscription status
-  if (hydrationStatus === 'checking') {
-    return <SubscriptionFormSkeleton />;
-  }
-
-  if (!notificationsEnabled || (notificationsState === 'idle' && !autoOpen)) {
-    return <ListenNowCTA variant={variant} handle={artist.handle} />;
-  }
-
-  if (notificationsState === 'pending_confirmation') {
-    return <SubscriptionPendingConfirmation />;
-  }
-
-  if (isSubscribed) {
-    return (
-      <SubscriptionSuccess
-        artistName={artist.name}
-        handle={artist.handle}
-        subscribedChannels={subscribedChannels}
-        artistId={artist.id}
-        subscriberEmail={channel === 'email' ? emailInput.trim() : undefined}
-      />
-    );
-  }
+  const earlyReturn = getEarlyReturnContent({
+    hydrationStatus,
+    notificationsEnabled,
+    notificationsState,
+    autoOpen,
+    isSubscribed,
+    variant,
+    artist,
+    channel,
+    emailInput,
+    subscribedChannels,
+  });
+  if (earlyReturn) return earlyReturn;
 
   const inputConfig = getInputConfig(channel);
   const inputValue = getInputDisplayValue(
