@@ -208,7 +208,7 @@ export function ReleaseLandingPage({
           </h1>
           {parentRelease && (
             <Link
-              href={parentRelease.url}
+              href={appendUTMParamsToUrl(parentRelease.url, utmParams)}
               className='text-muted-foreground hover:text-foreground mt-0.5 block text-xs transition-colors'
             >
               from {parentRelease.title}
