@@ -544,20 +544,32 @@ export function ProfileContactSidebar() {
       actionsInEntityHeader
       entityHeader={
         <div className='space-y-3'>
-          {/* Artist card — name + avatar only */}
-          <div className={cn(LINEAR_SURFACE.sidebarCard, 'px-3.5 py-3')}>
-            <ProfileContactHeader
-              displayName={displayName}
-              username={username}
-              avatarUrl={avatarUrl}
-              editable
-              onDisplayNameChange={handleDisplayNameChange}
-              onAvatarUpload={handleAvatarUpload}
-            />
+          {/* Artist card — name + avatar */}
+          <div className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}>
+            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                Profile
+              </p>
+            </div>
+            <div className='p-2.5'>
+              <ProfileContactHeader
+                displayName={displayName}
+                username={username}
+                avatarUrl={avatarUrl}
+                editable
+                onDisplayNameChange={handleDisplayNameChange}
+                onAvatarUpload={handleAvatarUpload}
+              />
+            </div>
           </div>
 
           {/* Link card — URL + analytics combined */}
           <div className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}>
+            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                Smart link
+              </p>
+            </div>
             <div className='px-2.5 pt-2.5 pb-2'>
               <div className='flex items-center gap-1.5'>
                 <CopyLinkInput

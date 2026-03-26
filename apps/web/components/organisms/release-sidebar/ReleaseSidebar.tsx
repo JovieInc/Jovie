@@ -112,10 +112,12 @@ function ReleaseEntityHeader({
       className={RELEASE_SIDEBAR_CARD_CLASSNAME}
       testId='release-header-card'
     >
-      <div className='p-2.5'>
-        <p className='mb-1 text-[10.5px] font-[510] leading-none text-tertiary-token'>
+      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
           Release
         </p>
+      </div>
+      <div className='p-2.5'>
         <div className='flex items-start gap-2.5'>
           <div className='group/artwork relative shrink-0'>
             <AlbumArtworkContextMenu

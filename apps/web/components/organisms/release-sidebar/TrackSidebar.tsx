@@ -196,14 +196,14 @@ export function TrackSidebar({
 
   const trackHeaderCard = track ? (
     <DrawerSurfaceCard
-      className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+      className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
     >
       <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
         <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
           Track
         </p>
       </div>
-      <div className='p-3.5'>
+      <div className='p-2.5'>
         <TrackMetaSummary
           title={track.title}
           trackNumber={track.trackNumber}

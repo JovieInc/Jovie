@@ -119,7 +119,7 @@ export function ProfileContactHeader({
   const avatarAlt = displayName ? `${displayName} avatar` : 'Profile avatar';
 
   return (
-    <div className='flex items-center gap-4'>
+    <div className='flex items-start gap-2.5'>
       <ProfileAvatar
         editable={editable}
         avatarUrl={avatarUrl}
@@ -128,7 +128,7 @@ export function ProfileContactHeader({
         onAvatarUpload={onAvatarUpload}
       />
 
-      <div className='min-w-0 flex-1 space-y-1'>
+      <div className='min-w-0 flex-1 space-y-px'>
         <EditableDisplayName
           editable={editable}
           isEditing={editingField === 'displayName'}
@@ -237,7 +237,7 @@ function EditableDisplayName({
     <button
       type='button'
       className={cn(
-        'block w-full truncate text-left text-[15px] font-[560] tracking-[-0.016em] text-primary-token',
+        'block w-full truncate text-left text-[13px] font-[590] leading-[15px] tracking-[-0.01em] text-primary-token',
         editable &&
           '-mx-1 rounded-[8px] px-1 py-0.5 transition-colors hover:bg-surface-0 cursor-text'
       )}
