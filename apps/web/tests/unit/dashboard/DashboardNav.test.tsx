@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -109,12 +110,18 @@ function renderDashboardNav(
 ) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
 
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   return fastRender(
-    <DashboardDataProvider value={value}>
-      <SidebarProvider {...sidebarProps}>
-        <DashboardNav />
-      </SidebarProvider>
-    </DashboardDataProvider>
+    <QueryClientProvider client={queryClient}>
+      <DashboardDataProvider value={value}>
+        <SidebarProvider {...sidebarProps}>
+          <DashboardNav />
+        </SidebarProvider>
+      </DashboardDataProvider>
+    </QueryClientProvider>
   );
 }
 

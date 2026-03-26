@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.80] - 2026-03-26
+
+### Changed
+
+- Dashboard core data cache TTL increased from 30s to 5min — tag-based invalidation handles mutations, reducing DB queries on navigation [internal]
+- Release matrix cache TTL increased from 30s to 5min — releases only change on import/sync [internal]
+- Lighthouse performance budgets tightened 2-3x (FCP 4s→1.5s, LCP 5s→2s, TBT 1.5s→500ms, performance score 50%→75%) [internal]
+
+### Added
+
+- Nav hover prefetching — hovering a dashboard nav link preloads page data into TanStack Query cache with 150ms debounce [internal]
+- Per-page TanStack Query hydration — releases and earnings pages prefetch data server-side for instant SPA navigation [internal]
+- Cache tag constant usage in settings action — replaced string literals with CACHE_TAGS.DASHBOARD_DATA [internal]
+
 ## [26.4.79] - 2026-03-26
 
 ### Added

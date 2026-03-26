@@ -10,37 +10,37 @@
         "interactive": [
           "warn",
           {
-            "maxNumericValue": 5000
+            "maxNumericValue": 2000
           }
         ],
         "first-contentful-paint": [
           "warn",
           {
-            "maxNumericValue": 4000
+            "maxNumericValue": 1500
           }
         ],
         "largest-contentful-paint": [
           "warn",
           {
-            "maxNumericValue": 5000
+            "maxNumericValue": 2000
           }
         ],
         "cumulative-layout-shift": [
           "warn",
           {
-            "maxNumericValue": 0.25
+            "maxNumericValue": 0.1
           }
         ],
         "total-blocking-time": [
           "warn",
           {
-            "maxNumericValue": 1500
+            "maxNumericValue": 500
           }
         ],
         "speed-index": [
           "warn",
           {
-            "maxNumericValue": 6000
+            "maxNumericValue": 3000
           }
         ]
       },
@@ -51,7 +51,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.5
+                "minScore": 0.75
               }
             ],
             "categories:accessibility": [
@@ -80,7 +80,7 @@
             "categories:performance": [
               "error",
               {
-                "minScore": 0.5
+                "minScore": 0.75
               }
             ],
             "categories:accessibility": [
