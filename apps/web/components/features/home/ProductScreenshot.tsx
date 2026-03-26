@@ -27,15 +27,14 @@ interface ProductScreenshotProps {
 }
 
 /**
- * Renders a real product screenshot inside Mac-style window chrome.
- * Drop-in replacement for hand-coded dashboard/analytics mockups.
+ * Renders a product screenshot with minimal wrapper — rounded corners,
+ * subtle border, and elevated shadow. No browser chrome.
  */
 export function ProductScreenshot({
   src,
   alt,
   width,
   height,
-  title = 'Jovie',
   priority = false,
   className,
   skipCheck = false,
@@ -73,14 +72,14 @@ export function ProductScreenshot({
       aria-label={alt}
       data-testid={testId}
       className={[
-        'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-[1rem]',
+        'relative overflow-hidden rounded-xl border md:rounded-2xl',
         className,
       ]
         .filter(Boolean)
         .join(' ')}
       style={{
-        boxShadow:
-          '0 0 0 1px var(--linear-app-shell-border), 0 28px 70px rgba(0,0,0,0.28), 0 10px 22px rgba(0,0,0,0.18)',
+        borderColor: 'rgba(255,255,255,0.08)',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.25), 0 8px 20px rgba(0,0,0,0.15)',
       }}
     >
       {/* Top shine */}
@@ -89,33 +88,17 @@ export function ProductScreenshot({
         className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px'
         style={{
           background:
-            'linear-gradient(90deg, transparent, rgba(255,255,255,0.16) 24%, rgba(255,255,255,0.22) 50%, rgba(255,255,255,0.16) 76%, transparent)',
+            'linear-gradient(90deg, transparent, rgba(255,255,255,0.1) 30%, rgba(255,255,255,0.14) 50%, rgba(255,255,255,0.1) 70%, transparent)',
         }}
       />
-
-      {/* Mac window chrome */}
-      <div className='flex h-10 items-center border-b border-subtle bg-surface-1 px-4 sm:px-5'>
-        <div className='flex gap-2' aria-hidden='true'>
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#ED6A5E]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#F4BF4F]' />
-          <div className='h-3 w-3 rounded-full border border-black/10 bg-[#61C554]' />
-        </div>
-        <div className='flex-1 text-center text-xs text-tertiary-token'>
-          {title}
-        </div>
-        <div className='w-[52px]' />
-      </div>
 
       {/* Screenshot image */}
       {isAvailable === false ? (
         <div
-          className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
+          className='grid w-full place-items-center bg-surface-1 px-6 py-10 text-center'
           style={{ aspectRatio }}
         >
           <div className='max-w-[22rem]'>
-            <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
-              {title}
-            </div>
             <p className='text-lg font-medium tracking-tight text-primary-token'>
               Preview coming soon
             </p>

@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { APP_NAME, APP_URL } from '@/constants/app';
+import { AIFeaturesSection } from '@/features/home/AIFeaturesSection';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { FeatureShowcase } from '@/features/home/FeatureShowcase';
-import { FinalCTASection } from '@/features/home/FinalCTASection';
-import { HeroCinematic } from '@/features/home/HeroCinematic';
+import { BottomCTA } from '@/features/home/BottomCTA';
+import { HeroProductShot } from '@/features/home/HeroProductShot';
 import { LogoBar } from '@/features/home/LogoBar';
-import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
+import { SmartLinksSection } from '@/features/home/SmartLinksSection';
+import { UnifiedProfileSection } from '@/features/home/UnifiedProfileSection';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -17,33 +18,32 @@ import { publicEnv } from '@/lib/env-public';
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = { absolute: `${APP_NAME} | Release More Music.` };
+  const title = {
+    absolute: `${APP_NAME} | The Operating System for Music Releases.`,
+  };
   const description =
-    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.';
+    'The operating system for music releases. Smart links, fan notifications, playlist pitches, and release automation — so you stay in the studio and ship more often.';
   const keywords = [
+    'release management',
+    'music release management',
+    'release automation',
+    'smart links',
     'smart link in bio',
     'link in bio for musicians',
     'linktree alternative for artists',
-    'music link in bio',
-    'creator profile',
-    'music artist',
-    'spotify link',
-    'apple music link',
-    'youtube music link',
-    'social media links',
-    'music promotion',
-    'artist profile',
     'music marketing',
-    'streaming links',
-    'music links',
-    'artist bio',
-    'music discovery',
-    'fan engagement',
-    'email subscribers',
-    'sms marketing',
-    'fan conversion',
-    'smart links',
+    'music promotion',
+    'release day automation',
     'pre-save links',
+    'streaming links',
+    'artist profile',
+    'audience intelligence',
+    'fan engagement',
+    'fan CRM',
+    'music links',
+    'independent artist tools',
+    'release workflow',
+    'AI music marketing',
   ];
 
   return {
@@ -85,7 +85,7 @@ export async function generateMetadata(): Promise<Metadata> {
           secureUrl: `${APP_URL}/og/default.png`,
           width: 1200,
           height: 630,
-          alt: `${APP_NAME} - Release More Music.`,
+          alt: `${APP_NAME} — The Operating System for Music Releases.`,
           type: 'image/png',
         },
       ],
@@ -97,7 +97,7 @@ export async function generateMetadata(): Promise<Metadata> {
       images: [
         {
           url: `${APP_URL}/og/default.png`,
-          alt: `${APP_NAME} - Release More Music.`,
+          alt: `${APP_NAME} — The Operating System for Music Releases.`,
           width: 1200,
           height: 630,
         },
@@ -132,19 +132,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Pre-serialized JSON-LD structured data for static generation
 const WEBSITE_SCHEMA = buildWebsiteSchema({
-  alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
+  alternateName: ['Jovie', 'jov.ie', 'Jovie Release Management'],
   description:
-    'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.',
+    'The operating system for music releases. Smart links, fan notifications, playlist pitches, and release automation — so artists stay in the studio and ship more often.',
 });
 
 const SOFTWARE_SCHEMA = buildSoftwareSchema(
-  'Release more music with smart links, audience intelligence, paid release notifications, and AI support built for independent musicians.'
+  'The operating system for music releases — smart links, fan notifications, playlist pitches, and release automation so artists can ship more and find their sound faster.'
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
-    'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
+    'Jovie is the operating system for music releases, combining smart links, fan notifications, playlist pitches, and release automation for independent artists.',
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
@@ -168,23 +168,26 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: ORGANIZATION_SCHEMA }}
       />
 
-      {/* 1. Hero — claim form left, phone right */}
-      <HeroCinematic />
+      {/* 1. Hero — product shot with Get Started CTA */}
+      <HeroProductShot />
 
-      {/* 2. Sticky phone product tour — scroll-driven mode transitions */}
-      <StickyPhoneTour />
-
-      {/* 3. Logo bar — z-index wipe over sticky phone */}
+      {/* 2. Logo bar — social proof */}
       <LogoBar />
 
-      {/* 4. Feature showcase — bento grid */}
-      <FeatureShowcase />
+      {/* 3. Smart links — automatic release links */}
+      <SmartLinksSection />
 
-      {/* 5. Divider before CTA */}
+      {/* 4. Unified profile — everything in one place */}
+      <UnifiedProfileSection />
+
+      {/* 5. AI features — pitches, presence, audience */}
+      <AIFeaturesSection />
+
+      {/* 6. Divider before CTA */}
       <div aria-hidden='true' className='section-gradient-divider' />
 
-      {/* 6. Final CTA */}
-      <FinalCTASection />
+      {/* 7. Bottom CTA */}
+      <BottomCTA />
     </div>
   );
 }

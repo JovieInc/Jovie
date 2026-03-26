@@ -470,19 +470,13 @@ body {
       line-height: 1;
     }
   }
-  /* Hero radial glow — dramatic depth cue behind heading */
+  /* Hero radial glow — subtle depth cue behind heading */
   .hero-glow {
-    background:
-      radial-gradient(
-        ellipse 42% 32% at 22% 16%,
-        oklch(32% 0.04 265 / 0.34),
-        transparent 72%
-      ),
-      radial-gradient(
-        ellipse 36% 26% at 78% 12%,
-        oklch(24% 0.03 250 / 0.18),
-        transparent 72%
-      );
+    background: radial-gradient(
+      ellipse 50% 40% at 50% 60%,
+      oklch(16% 0.02 265 / 0.25),
+      transparent 70%
+    );
   }
   @media (prefers-contrast: more) {
     .hero-glow {
