@@ -116,7 +116,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'location',
     header: 'Location',
     cell: renderLocationCellFromRow,
-    size: 130,
+    size: 160,
     enableSorting: false,
   }),
   memberColumnHelper.accessor('intentLevel', {
@@ -144,7 +144,7 @@ const MEMBER_COLUMNS: ColumnDef<AudienceMember, any>[] = [
     id: 'lastAction',
     header: 'Last Action',
     cell: renderLastActionCell,
-    size: 160,
+    size: 180,
     enableSorting: true,
   }),
   memberColumnHelper.display({

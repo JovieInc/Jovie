@@ -99,7 +99,7 @@ export function CopyableUrlRow({
       className={cn(
         'flex items-center transition-[background-color,border-color] duration-150',
         surface === 'boxed'
-          ? 'border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_84%,var(--linear-bg-surface-0))] hover:bg-surface-1'
+          ? 'border border-(--linear-app-frame-seam) bg-surface-0 hover:bg-surface-1'
           : 'border border-transparent bg-transparent hover:bg-surface-1/80',
         styles.container,
         className
