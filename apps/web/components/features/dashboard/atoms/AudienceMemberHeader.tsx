@@ -1,7 +1,10 @@
 'use client';
 
 import { Avatar } from '@/components/molecules/Avatar';
-import { EntityHeaderCard } from '@/components/molecules/drawer';
+import {
+  DrawerSurfaceCard,
+  EntityHeaderCard,
+} from '@/components/molecules/drawer';
 
 export interface AudienceMemberHeaderProps {
   readonly title: string;
@@ -19,18 +22,23 @@ export function AudienceMemberHeader({
   className,
 }: AudienceMemberHeaderProps) {
   return (
-    <EntityHeaderCard
-      image={
-        <Avatar
-          src={avatarSrc}
-          alt={title ? `${title} avatar` : 'Audience member avatar'}
-          name={avatarName}
-          size='lg'
-        />
-      }
-      title={title}
-      subtitle={subtitle}
-      className={className}
-    />
+    <DrawerSurfaceCard variant='card' className='p-3'>
+      <p className='mb-2 text-[10.5px] font-[510] leading-none text-tertiary-token'>
+        Audience member
+      </p>
+      <EntityHeaderCard
+        image={
+          <Avatar
+            src={avatarSrc}
+            alt={title ? `${title} avatar` : 'Audience member avatar'}
+            name={avatarName}
+            size='lg'
+          />
+        }
+        title={title}
+        subtitle={subtitle}
+        className={className}
+      />
+    </DrawerSurfaceCard>
   );
 }

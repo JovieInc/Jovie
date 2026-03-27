@@ -6,6 +6,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { approveLead } from '@/lib/leads/approve-lead';
+import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pipelineLog } from '@/lib/leads/pipeline-logger';
 import { leadStatusUpdateSchema } from '@/lib/validation/lead-schemas';
 
@@ -70,6 +71,13 @@ export async function PATCH(
       }
 
       pipelineLog('reject', 'Lead rejected', { leadId: id });
+      await recordLeadFunnelEvent(
+        {
+          leadId: id,
+          eventType: 'rejected',
+        },
+        { idempotent: true }
+      );
       return NextResponse.json(updated, {
         status: 200,
         headers: NO_STORE_HEADERS,

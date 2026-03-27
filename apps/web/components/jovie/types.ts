@@ -167,10 +167,22 @@ export interface StarterSuggestionContext {
  */
 export const DEFAULT_SUGGESTIONS: readonly ChatSuggestion[] = [
   {
+    icon: 'Eye',
+    label: 'Preview my profile',
+    prompt: 'Preview my profile.',
+    accent: 'purple',
+  },
+  {
     icon: 'Camera',
     label: 'Change profile photo',
     prompt: 'Help me change my profile photo.',
     accent: 'purple',
+  },
+  {
+    icon: 'Link2',
+    label: 'Set up a release link',
+    prompt: 'Set up a link for my latest release.',
+    accent: 'blue',
   },
 ] as const;
 

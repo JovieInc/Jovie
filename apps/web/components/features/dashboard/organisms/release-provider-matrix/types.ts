@@ -99,6 +99,10 @@ export interface UseReleaseProviderMatrixReturn {
   totalOverrides: number;
   openEditor: (release: ReleaseViewModel) => void;
   closeEditor: () => void;
+  handleReleaseCreated: (createdRelease: ReleaseViewModel) => void;
+  updateRow: (updated: ReleaseViewModel) => void;
+  patchRow: (releaseId: string, patch: Partial<ReleaseViewModel>) => void;
+  handleReleaseArtworkUploaded: (releaseId: string, artworkUrl: string) => void;
   handleCopy: (path: string, label: string, testId: string) => Promise<string>;
   handleSave: (provider: ProviderKey) => void;
   handleReset: (provider: ProviderKey) => void;

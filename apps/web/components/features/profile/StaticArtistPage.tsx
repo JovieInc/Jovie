@@ -239,6 +239,7 @@ export function StaticArtistPage({
         genres={genres}
         pressPhotos={pressPhotos}
         allowPhotoDownloads={allowPhotoDownloads}
+        photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
       />
