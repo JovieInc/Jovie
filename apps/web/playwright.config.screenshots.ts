@@ -4,14 +4,9 @@
  * Generates high-resolution marketing screenshots from a running app instance.
  * Uses a wide viewport at 2x device scale for retina-quality output.
  *
- * Prerequisites:
- *   1. E2E test user must exist (run seed-test-data.ts)
- *   2. Screenshot data must be seeded (run tests/product-screenshots/seed.ts)
- *   3. App must be running or will be started via webServer config
- *
  * Usage:
- *   pnpm --filter web screenshots          # seed + capture
- *   pnpm --filter web screenshots:capture  # capture only (skip seed)
+ *   pnpm --filter web screenshots
+ *   pnpm --filter web screenshots:capture
  */
 
 import { defineConfig, devices } from '@playwright/test';
@@ -29,7 +24,7 @@ const webServerCommand = process.env.DATABASE_URL
 
 export default defineConfig({
   testDir: './tests/product-screenshots',
-  testMatch: '**/*.spec.ts',
+  testMatch: '**/catalog.spec.ts',
   fullyParallel: false, // Run sequentially for deterministic screenshots
   forbidOnly: true,
   retries: 1, // One retry in case of flaky image loads
@@ -45,22 +40,12 @@ export default defineConfig({
     video: 'off',
     navigationTimeout: 90_000,
     actionTimeout: 30_000,
-    // Reuse authenticated session from global setup
-    storageState: 'tests/.auth/user.json',
     ...(Object.keys(extraHTTPHeaders).length > 0 && { extraHTTPHeaders }),
   },
 
   projects: [
     {
-      name: 'auth-setup',
-      testMatch: /auth\.setup\.ts/,
-      testDir: './tests/e2e',
-      // Ensure setup project never attempts to read persisted auth from disk.
-      use: { storageState: { cookies: [], origins: [] } },
-    },
-    {
       name: 'screenshots',
-      dependencies: ['auth-setup'],
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1440, height: 900 },
@@ -99,6 +84,4 @@ export default defineConfig({
           stderr: 'pipe',
         },
       }),
-
-  globalSetup: require.resolve('./tests/global-setup.ts'),
 });

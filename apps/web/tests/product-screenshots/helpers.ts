@@ -11,7 +11,9 @@ export const TIMEOUTS = {
   SETTLE: 3_000,
 } as const;
 
-export const OUTPUT_DIR = 'public/product-screenshots';
+export const CATALOG_OUTPUT_DIR = 'screenshot-catalog/current';
+export const PUBLIC_EXPORT_DIR = 'public/product-screenshots';
+export const OUTPUT_DIR = PUBLIC_EXPORT_DIR;
 
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.
@@ -117,31 +119,4 @@ export async function waitForImages(
     containerSelector,
     { timeout }
   );
-}
-
-/** Standard auth guard — skips the test if credentials aren't available */
-export function shouldSkipAuth(testInfo: { skip: () => void }): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME;
-  if (!username) {
-    console.warn('⚠ Skipping: E2E_CLERK_USER_USERNAME not configured');
-    testInfo.skip();
-    return true;
-  }
-  // +clerk_test emails use Clerk's testing library (magic OTP 424242) — no password needed
-  if (
-    !username.includes('+clerk_test') &&
-    !process.env.E2E_CLERK_USER_PASSWORD
-  ) {
-    console.warn(
-      '⚠ Skipping: E2E_CLERK_USER_PASSWORD not configured (required for non-test emails)'
-    );
-    testInfo.skip();
-    return true;
-  }
-  if (process.env.CLERK_TESTING_SETUP_SUCCESS !== 'true') {
-    console.warn('⚠ Skipping: Clerk testing setup was not successful');
-    testInfo.skip();
-    return true;
-  }
-  return false;
 }

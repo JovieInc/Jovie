@@ -53,7 +53,7 @@
     "e2e:full:fast": "node scripts/run-playwright-fast.mjs",
     "e2e:visual": "playwright test tests/e2e/visual-regression.spec.ts",
     "e2e:visual:update": "playwright test tests/e2e/visual-regression.spec.ts --update-snapshots",
-    "screenshots": "tsx tests/product-screenshots/seed.ts && playwright test --config=playwright.config.screenshots.ts",
+    "screenshots": "playwright test --config=playwright.config.screenshots.ts",
     "screenshots:capture": "playwright test --config=playwright.config.screenshots.ts",
     "screenshots:seed": "tsx tests/product-screenshots/seed.ts",
     "e2e:full:noauth": "playwright test --config=playwright.config.noauth.ts",

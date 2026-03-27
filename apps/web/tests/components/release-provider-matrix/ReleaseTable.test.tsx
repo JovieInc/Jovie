@@ -96,6 +96,7 @@ vi.mock('@/components/organisms/table', () => ({
     columns,
     getRowId,
     getRowClassName,
+    getRowTestId,
     expandedRowIds,
     renderExpandedContent,
   }: {
@@ -103,6 +104,7 @@ vi.mock('@/components/organisms/table', () => ({
     columns: unknown[];
     getRowId: (row: { id: string }) => string;
     getRowClassName: (row: { id: string }) => string;
+    getRowTestId?: (row: { id: string }, index: number) => string | undefined;
     expandedRowIds?: Set<string>;
     renderExpandedContent?: (
       row: { id: string },
@@ -110,12 +112,12 @@ vi.mock('@/components/organisms/table', () => ({
     ) => ReactNode;
   }) => (
     <div data-testid='unified-table'>
-      {data.map(row => {
+      {data.map((row, index) => {
         const rowId = getRowId(row);
         return (
-          <div key={rowId}>
+          <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
             <div
-              data-testid={`release-row-${rowId}`}
+              data-testid={getRowTestId?.(row, index)}
               className={getRowClassName(row)}
             />
             {expandedRowIds?.has(rowId) ? (
@@ -160,8 +162,12 @@ describe('ReleaseTable', () => {
       />
     );
 
-    const expandedRow = screen.getByTestId('release-row-release_1');
-    const selectedRow = screen.getByTestId('release-row-release_2');
+    const expandedRow = screen
+      .getByTestId('release-row-wrapper-release_1')
+      .querySelector('div');
+    const selectedRow = screen
+      .getByTestId('release-row-wrapper-release_2')
+      .querySelector('div');
 
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
@@ -171,7 +177,9 @@ describe('ReleaseTable', () => {
   it('gives idle release rows the same visible rounded hover silhouette', () => {
     render(<ReleaseTable {...commonProps} showTracks={false} />);
 
-    const idleRow = screen.getByTestId('release-row-release_1');
+    const idleRow = screen
+      .getByTestId('release-row-wrapper-release_1')
+      .querySelector('div');
     expect(idleRow).toBeInTheDocument();
   });
 

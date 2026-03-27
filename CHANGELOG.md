@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.82] - 2026-03-26
+
+### Added
+
+- Canonical screenshot catalog plumbing for admin: registry + manifest metadata, deterministic demo showcase routes, and a catalog-backed admin gallery with grouping and consumer filters [internal]
+- Product screenshot registry coverage test plus shared jsdom browser stubs for `window.open`, canvas contexts, and anchor navigation in Vitest [internal]
+
+### Changed
+
+- Screenshot automation now captures a finite overwrite-in-place catalog, writes an internal manifest, and refreshes public marketing exports from the same scenario registry [internal]
+- `pnpm vitest --run --changed` now uses a stable single-fork configuration so large affected-test sweeps don't fail on worker startup churn [internal]
+
 ## [26.4.81] - 2026-03-26
 
 ### Changed
