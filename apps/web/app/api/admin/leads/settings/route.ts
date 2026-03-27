@@ -66,6 +66,23 @@ function makeDefaultSettings() {
 }
 
 function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
+  const candidate = error as
+    | {
+        code?: string;
+        sqlState?: string;
+        cause?: { code?: string; sqlState?: string };
+      }
+    | undefined;
+  const errorCode =
+    candidate?.code ??
+    candidate?.sqlState ??
+    candidate?.cause?.code ??
+    candidate?.cause?.sqlState;
+
+  if (errorCode === '42P01' || errorCode === '42703') {
+    return true;
+  }
+
   const message = getDeepErrorMessage(error).toLowerCase();
   if (!message.includes('does not exist')) {
     return false;

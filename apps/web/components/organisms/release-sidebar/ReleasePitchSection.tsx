@@ -8,7 +8,7 @@ import {
   type GeneratedPitches,
   PLATFORM_LIMITS,
   type PlatformKey,
-} from '@/lib/services/pitch';
+} from '@/lib/services/pitch/types';
 import { cn } from '@/lib/utils';
 
 const PLATFORM_CONFIG = [

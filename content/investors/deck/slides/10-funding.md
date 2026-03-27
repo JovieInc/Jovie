@@ -1,11 +1,11 @@
 # Funding
 
-Angel round — proving the flywheel works.
+Angel round — proving artists reach fit faster.
 
 - **Committed:** $25K angel check
-- **Use of funds:** Ship MVP decisioning + instrumentation, run pilot cohort, build retargeting + messaging loops, validate repeatable GTM
+- **Use of funds:** Harden onboarding, deepen the release loop, onboard the first cohort, and ship the first orchestration surfaces
 - **Near-term milestones (60-90 days):**
-  - Launch pilot cohort with baseline → lift metrics
-  - Demonstrate cross-artist personalization impact
-  - Validate 1-2 automation plays
-  - Define pricing from observed ROI
+  - Onboard the first paying cohort and prove the wedge with non-founder artists
+  - Show artists using Jovie to ship releases with less friction
+  - Validate retention around the release loop
+  - Ship the first workflow/orchestration surface on top of live context

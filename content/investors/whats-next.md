@@ -1,8 +1,10 @@
 # What's Next for Music
 
-The problem with the music industry isn't talent. It's not distribution. It's not even money.
+The problem with the music industry isn't talent. It's that independent artists do not release enough music to learn what works before they run out of money, time, or motivation.
 
-It's that you can't afford a team until you no longer desperately need one.
+Startups die before product-market fit. Artists quit before they learn what works.
+
+And one of the biggest reasons is simple: you can't afford a team until you no longer desperately need one.
 
 Building a music career requires a manager to coordinate, a publicist to pitch press, a radio plugger to work records, a designer for album art, a photographer for press shots, an editor for lyric videos, someone to run socials, someone to handle booking. Each person holds a fragment of context, does their piece, and passes it along.
 
@@ -26,9 +28,11 @@ Whether you record in a studio or generate a track with AI, the post-creation wo
 
 Independent artists — half of all streaming royalties now — need album art designed, press shots retouched, lyric videos cut, radio pluggers working their singles, blogs pitched, social content scheduled, booking inquiries answered. The work is real. The budget isn't there.
 
-So they do it themselves, or they don't do it at all. The average independent artist releases 1-3 songs a year. Not because they can only write 1-3 songs — because the coordination tax per release is so high that each one becomes a months-long project.
+So they do it themselves, or they don't do it at all. The average independent artist releases 1-3 songs a year. Not because they can only write 1-3 songs — because the work around each release is so heavy that each one becomes a months-long project.
 
-Flip that. If an artist could release a song every week — with every release automatically getting smart links, fan notifications, press outreach, social content, playlist pitching — that's 52 shots on goal per year. Each one gets a full marketing effort. Even if 9 out of 10 bomb, you end the year with 5 that make noise. That's how you build demand: not by marketing harder on fewer releases, but by removing the friction that keeps release velocity artificially low.
+Every release is a test. You ship a song, the world tells you what it thinks, you learn, and you make the next one. If one artist ships 10 songs and another ships three, the first artist gets 10 learning loops. More releases means faster learning.
+
+Flip that. If an artist could release a song every week — with every release automatically getting smart links, fan notifications, playlist pitching, and audience capture — that's 52 shots on goal per year. Each one gets a full learning loop. Even if 9 out of 10 bomb, you end the year with signal. That's how you build demand: not by marketing harder on fewer releases, but by removing the friction that keeps release velocity artificially low.
 
 Coordination isn't downstream of demand. It's the bottleneck that's choking it.
 
@@ -58,7 +62,7 @@ I spent 15 years as an artist, songwriter, producer, and digital strategist. My 
 
 Jovie started with a simple observation: artists shouldn't have to do repetitive work every time they release music.
 
-Today, when an artist joins Jovie, they connect their Spotify once. From that moment forward, every new release is automatically detected — smart links generated across all platforms, fans notified, collaborators credited and linked. After that one-time connection, releases are processed automatically. Jovie monitors, detects, generates, and delivers.
+Today, when an artist joins Jovie, they connect their Spotify once. From that moment forward, every new release is automatically detected — smart links generated across all platforms, fans captured into CRM, release notifications sent automatically, AI playlist pitches generated inside the release flow, collaborators credited and linked. After that one-time connection, releases are processed automatically. Jovie monitors, detects, generates, and delivers.
 
 This isn't a future we're pitching. It's what the product does today.
 
@@ -72,7 +76,7 @@ That context is the foundation.
 
 What we're building — what Jovie becomes — is the system where every artist gets a team from day one. Some of those team members are agents. Some are humans. The artist doesn't have to care which.
 
-**Today, Jovie automates.** New release detected → smart links generated → fans notified → collaborators linked. Zero artist input, zero configuration. Not agents that reason — automations that execute reliably because they already have the context. They work for free, and they never miss a release. These are your first team members.
+**Today, Jovie automates.** New release detected → smart links generated → fans captured → notifications sent → playlist pitch generated → collaborators linked. Zero artist input, zero configuration. Not agents that reason — automations that execute reliably because they already have the context. They work for free, and they never miss a release. These are your first team members.
 
 **What we're building next: Jovie adds roles.** A booking inquiry arrives at your permanent Jovie email. An agent handles intake — asking the right questions, gathering the right information, only escalating when human judgment is needed. Your album art gets generated from your release mood and brand. Your press shot gets retouched. Your lyric video gets cut. Your radio plugger starts working the single. Each role is filled by an agent that has full context on your career — or by a human specialist you bring in, who inherits that same context instantly.
 
@@ -96,7 +100,7 @@ Jovie is the shared system for an artist's career. It captures the context that 
 
 Every artist who joins makes the system smarter. Every release deepens the context. Every fan interaction refines the understanding.
 
-90 million streams taught me exactly which parts of a music career are creative decisions and which parts are coordination tax. The creative decisions should be human. Everything else should be automatic.
+90 million streams taught me exactly which parts of a music career are creative decisions and which parts are manual work. The creative decisions should be human. Everything else should be automatic. The point is to help artists release more music, learn faster, and find what works before they quit.
 
 This is what's next.
 
