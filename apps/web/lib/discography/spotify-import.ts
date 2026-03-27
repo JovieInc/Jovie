@@ -61,6 +61,8 @@ const MAX_TRACKS_PER_RELEASE = 100;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
+const AFTER_REQUEST_SCOPE_ERROR = '`after` was called outside a request scope';
+
 function sanitizeBoundedInteger(
   value: number | null | undefined,
   min: number,
@@ -105,6 +107,37 @@ export interface SpotifyImportOptions {
   market?: string;
   /** Discover cross-platform links after import. Defaults to 'background' */
   discoverLinks?: boolean | 'sync' | 'background';
+}
+
+function scheduleBackgroundLinkDiscovery(
+  creatorProfileId: string,
+  market: string
+): void {
+  const discoveryTask = discoverLinksForReleases(
+    creatorProfileId,
+    market
+  ).catch(error => {
+    captureWarning('Background link discovery failed', error, {
+      source: 'spotify_import',
+      creatorProfileId,
+    });
+  });
+
+  try {
+    // Prefer after() in request lifecycles so the runtime keeps the task alive.
+    after(discoveryTask);
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !error.message.includes(AFTER_REQUEST_SCOPE_ERROR)
+    ) {
+      throw error;
+    }
+
+    // Tests and background jobs do not have a request scope. The task is
+    // already running and its rejection is handled above, so allow it to
+    // continue without after().
+  }
 }
 
 /**
@@ -394,18 +427,7 @@ export async function importReleasesFromSpotify(
           if (discoverLinksMode === 'sync') {
             await discoverLinksForReleases(creatorProfileId, market);
           } else {
-            // Use after() so the Vercel runtime keeps the function alive
-            // until link discovery completes, even after the response is sent.
-            after(
-              discoverLinksForReleases(creatorProfileId, market).catch(
-                error => {
-                  captureWarning('Background link discovery failed', error, {
-                    source: 'spotify_import',
-                    creatorProfileId,
-                  });
-                }
-              )
-            );
+            scheduleBackgroundLinkDiscovery(creatorProfileId, market);
           }
         }
 

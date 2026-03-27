@@ -11,7 +11,7 @@ const UNAUTHORIZED_MESSAGES = new Set([
  * without constructing a response object.
  */
 function isKnownSessionErrorMessage(error: unknown): boolean {
-  if (!(error instanceof Error)) {
+  if (!(error instanceof TypeError)) {
     return false;
   }
   return (
@@ -27,7 +27,7 @@ export function getSessionErrorResponse(
   error: unknown,
   headers: HeadersInit
 ): NextResponse | null {
-  if (!(error instanceof Error)) {
+  if (!(error instanceof TypeError)) {
     return null;
   }
 
