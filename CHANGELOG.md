@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.83] - 2026-03-27
+
+### Changed
+
+- Conductor workspace archive script now cleans up `.claude/worktrees` (stale agent worktrees) alongside node_modules and build artifacts [internal]
+
 ## [26.4.82] - 2026-03-26
 
 ### Added
