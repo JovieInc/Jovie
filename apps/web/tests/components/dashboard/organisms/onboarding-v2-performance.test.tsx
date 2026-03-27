@@ -238,8 +238,13 @@ const SCREEN_BUDGETS = {
   upgrade: 150,
 } as const;
 
+// Budgets are set from local profiling targets with headroom for regressions:
+// tight enough to catch meaningful render-cost growth, loose enough to avoid
+// failing on normal p95/p99 variance during local runs.
 const IS_CI =
   process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+// Shared CI runners routinely show 3-5x timing variance versus local jsdom
+// runs, so widen thresholds there instead of disabling the budget checks.
 const CI_BUDGET_MULTIPLIER = 5;
 
 function getBudgetThreshold(budgetMs: number) {
@@ -259,16 +264,26 @@ beforeEach(() => {
 
   vi.stubGlobal(
     'fetch',
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({ snapshot: DISCOVERY_SNAPSHOT, success: true }),
-          {
-            headers: { 'Content-Type': 'application/json' },
-            status: 200,
-          }
-        )
-    )
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+
+      if (!url.includes('/api/onboarding/discovery')) {
+        throw new Error(`Unexpected fetch to: ${url}`);
+      }
+
+      return new Response(
+        JSON.stringify({ snapshot: DISCOVERY_SNAPSHOT, success: true }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
+    })
   );
 });
 

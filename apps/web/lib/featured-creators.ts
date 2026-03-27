@@ -357,7 +357,7 @@ async function queryFeaturedCreatorsForSearch(): Promise<VipArtistLookup> {
     )
     .limit(200);
 
-  const vipLookup: VipArtistLookup = {};
+  const vipLookup = Object.create(null) as VipArtistLookup;
 
   for (const creator of data) {
     // Skip creators without Spotify IDs

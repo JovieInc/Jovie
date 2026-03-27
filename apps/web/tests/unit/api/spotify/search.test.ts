@@ -245,7 +245,7 @@ describe('GET /api/spotify/search', () => {
     expect(mockApplyVipBoostWithMeta).toHaveBeenCalledWith([], 'vip artist', 5);
   });
 
-  it('returns degraded enrichment results without caching them at the response layer', async () => {
+  it('returns degraded enrichment results gracefully when enrichment falls back', async () => {
     mockSearchArtists.mockResolvedValue([
       {
         spotifyId: 'artist_1',

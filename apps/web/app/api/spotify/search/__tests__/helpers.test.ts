@@ -184,6 +184,33 @@ describe('applyVipBoost', () => {
     expect(boosted).toEqual(results);
   });
 
+  it('supports vip entries stored under __proto__ on a null-prototype lookup', async () => {
+    const vipLookup = Object.create(null) as Record<
+      string,
+      {
+        spotifyId: string;
+        name: string;
+        imageUrl: string | null;
+        followers: number;
+        popularity: number;
+      }
+    >;
+    vipLookup.__proto__ = {
+      spotifyId: 'vip-id',
+      name: '__proto__',
+      imageUrl: null,
+      followers: 9900,
+      popularity: 60,
+    };
+    mockGetFeatured.mockResolvedValue(vipLookup);
+
+    const boosted = await applyVipBoost([], '__proto__', 5);
+
+    expect(boosted).toHaveLength(1);
+    expect(boosted[0]?.id).toBe('vip-id');
+    expect(boosted[0]?.name).toBe('__proto__');
+  });
+
   it('VIP at top with no same-name collisions returns unchanged order', async () => {
     mockGetFeatured.mockResolvedValue({
       'tim white': {
