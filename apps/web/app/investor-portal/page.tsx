@@ -5,14 +5,11 @@ import { db } from '@/lib/db';
 import { investorLinks } from '@/lib/db/schema/investors';
 import { getMarkdownDocument } from '@/lib/docs/getMarkdownDocument';
 import { getInvestorManifest } from '@/lib/investors/manifest';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { DeckViewer } from './_components/DeckViewer';
 
 export const metadata: Metadata = {
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: { index: false, follow: false },
-  },
+  robots: NOINDEX_ROBOTS,
 };
 
 /**
