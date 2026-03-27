@@ -142,6 +142,24 @@ async function discoverLinksForReleases(
   });
 }
 
+function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
+  try {
+    after(task);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('outside a request scope')
+    ) {
+      queueMicrotask(() => {
+        void task();
+      });
+      return;
+    }
+
+    throw error;
+  }
+}
+
 /**
  * Import a batch of albums and track results
  */
@@ -394,9 +412,9 @@ export async function importReleasesFromSpotify(
           if (discoverLinksMode === 'sync') {
             await discoverLinksForReleases(creatorProfileId, market);
           } else {
-            // Use after() so the Vercel runtime keeps the function alive
-            // until link discovery completes, even after the response is sent.
-            after(
+            // Use after() in request scope, but fall back for tests and other
+            // non-request call sites that still need fire-and-forget behavior.
+            scheduleBackgroundDiscovery(() =>
               discoverLinksForReleases(creatorProfileId, market).catch(
                 error => {
                   captureWarning('Background link discovery failed', error, {
