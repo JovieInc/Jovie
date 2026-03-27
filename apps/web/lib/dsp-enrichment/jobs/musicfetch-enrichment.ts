@@ -30,7 +30,10 @@ import {
 import { publishIdentityLinks } from '@/lib/identity/publish';
 import { storeRawIdentityLinks } from '@/lib/identity/store';
 import { normalizeAndMergeExtraction } from '@/lib/ingestion/merge';
-import { MusicfetchRequestError } from '@/lib/musicfetch/resilient-client';
+import {
+  isMusicfetchInvalidServicesError,
+  MusicfetchRequestError,
+} from '@/lib/musicfetch/resilient-client';
 import { isBlacklistedSpotifyId } from '@/lib/spotify/blacklist';
 import { logger } from '@/lib/utils/logger';
 import { setEnrichmentJobStatus } from '../enrichment-status';
@@ -486,6 +489,15 @@ export async function processMusicFetchEnrichmentJob(
   } catch (error) {
     // 400 = bad URL, removed artist, non-artist entity — permanent failure, don't retry
     if (error instanceof MusicfetchRequestError && error.statusCode === 400) {
+      if (isMusicfetchInvalidServicesError(error)) {
+        await setEnrichmentJobStatus(
+          tx,
+          creatorProfileId,
+          'musicfetch',
+          'failed'
+        );
+        throw error;
+      }
       logger.warn('MusicFetch enrichment: permanent failure (400)', {
         creatorProfileId,
         spotifyUrl,
