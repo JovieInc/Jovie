@@ -89,16 +89,31 @@ export function extractSignupClaimArtistSelection(): AutoConnectedArtistSelectio
  * Now fully non-blocking — fires connect + enrichment in background,
  * does NOT block step transitions or show staged spinners.
  */
-function tryAutoConnectSpotify(
-  setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>,
-  setEnrichedProfile: Dispatch<SetStateAction<EnrichedProfileData | null>>,
-  setIsEnriching: Dispatch<SetStateAction<boolean>>,
-  setIsConnecting: Dispatch<SetStateAction<boolean>>,
-  signal: AbortSignal,
-  profileId: string | null,
-  userId: string,
-  onAutoConnectStarted?: (selection: AutoConnectedArtistSelection) => void
-): void {
+interface TryAutoConnectSpotifyOptions {
+  readonly setSpotifyImportState: Dispatch<SetStateAction<SpotifyImportState>>;
+  readonly setEnrichedProfile: Dispatch<
+    SetStateAction<EnrichedProfileData | null>
+  >;
+  readonly setIsEnriching: Dispatch<SetStateAction<boolean>>;
+  readonly setIsConnecting: Dispatch<SetStateAction<boolean>>;
+  readonly signal: AbortSignal;
+  readonly profileId: string | null;
+  readonly userId: string;
+  readonly onAutoConnectStarted?: (
+    selection: AutoConnectedArtistSelection
+  ) => void;
+}
+
+function tryAutoConnectSpotify({
+  setSpotifyImportState,
+  setEnrichedProfile,
+  setIsEnriching,
+  setIsConnecting,
+  signal,
+  profileId,
+  userId,
+  onAutoConnectStarted,
+}: TryAutoConnectSpotifyOptions): void {
   try {
     const selection = extractSignupClaimArtistSelection();
     const spotifyExpected =
@@ -437,16 +452,16 @@ export function useOnboardingSubmit({
         spotifyAbortRef.current?.abort();
         const controller = new AbortController();
         spotifyAbortRef.current = controller;
-        tryAutoConnectSpotify(
+        tryAutoConnectSpotify({
           setSpotifyImportState,
           setEnrichedProfile,
           setIsEnriching,
           setIsConnecting,
-          controller.signal,
-          completion.profileId,
+          signal: controller.signal,
+          profileId: completion.profileId,
           userId,
-          onAutoConnectStarted
-        );
+          onAutoConnectStarted,
+        });
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
       }
