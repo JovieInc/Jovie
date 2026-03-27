@@ -55,8 +55,16 @@ describe('session error response helpers', () => {
     expect(isSessionError(new Error('boom'))).toBe(false);
   });
 
-  it('returns null for non-TypeError instances', () => {
-    expect(getSessionErrorResponse(new Error('Unauthorized'), {})).toBeNull();
-    expect(isSessionError(new Error('Unauthorized'))).toBe(false);
+  it('maps matching Error instances even when they are not TypeError', async () => {
+    const response = getSessionErrorResponse(new Error('Unauthorized'), {
+      'Cache-Control': 'no-store',
+    });
+
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(401);
+    await expect(response?.json()).resolves.toEqual({
+      error: 'Unauthorized',
+    });
+    expect(isSessionError(new Error('Unauthorized'))).toBe(true);
   });
 });
