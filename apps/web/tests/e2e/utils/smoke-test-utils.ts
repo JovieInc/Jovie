@@ -145,6 +145,12 @@ export interface SmokeTestContext {
  */
 export function isExpectedError(errorText: string): boolean {
   const lowerText = errorText.toLowerCase();
+  if (
+    lowerText.includes('clerk.accounts.dev/npm/@clerk/') &&
+    lowerText.includes('redirect is not allowed for a preflight request')
+  ) {
+    return true;
+  }
   return EXPECTED_ERROR_PATTERNS.some(pattern => lowerText.includes(pattern));
 }
 

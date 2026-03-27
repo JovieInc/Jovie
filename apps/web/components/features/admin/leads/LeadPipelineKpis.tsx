@@ -4,7 +4,25 @@ import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeade
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { KpiItem } from '@/features/admin/KpiItem';
 import { db } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
+import { captureWarning } from '@/lib/error-tracking';
+
+function isMissingLeadPipelineSettingsSchemaError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  return (
+    message.includes('does not exist') &&
+    [
+      'lead_pipeline_settings',
+      'column "daily_send_cap"',
+      'column "max_per_hour"',
+      'column "ramp_mode"',
+      'column "guardrails_enabled"',
+      'column "guardrail_thresholds"',
+      'column "auto_ingest_daily_limit"',
+    ].some(pattern => message.includes(pattern))
+  );
+}
 
 async function getLeadKpis() {
   const [totalRow] = await db.select({ count: count() }).from(leads);
@@ -30,12 +48,23 @@ async function getLeadKpis() {
     .where(eq(leads.status, 'qualified'));
 
   let settings = null;
-  const [settingsRow] = await db
-    .select()
-    .from(leadPipelineSettings)
-    .where(eq(leadPipelineSettings.id, 1))
-    .limit(1);
-  settings = settingsRow;
+  try {
+    const [settingsRow] = await db
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
+    settings = settingsRow;
+  } catch (error) {
+    if (isMissingLeadPipelineSettingsSchemaError(error)) {
+      await captureWarning(
+        '[admin/leads/kpis] lead pipeline settings schema missing; using KPI defaults',
+        error
+      );
+    } else {
+      throw error;
+    }
+  }
 
   return {
     total: totalRow?.count ?? 0,

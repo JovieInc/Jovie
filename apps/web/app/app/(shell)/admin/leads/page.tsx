@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { ContentMetricCardSkeleton } from '@/components/molecules/ContentMetricCardSkeleton';
 import { ContentSectionHeaderSkeleton } from '@/components/molecules/ContentSectionHeaderSkeleton';
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
+import { LeadGtmInsights } from '@/features/admin/leads/LeadGtmInsights';
 import { LeadPipelineKpis } from '@/features/admin/leads/LeadPipelineKpis';
 import { LeadPipelineWorkspace } from '@/features/admin/leads/LeadPipelineWorkspace';
 
@@ -36,6 +37,10 @@ export default function AdminLeadsPage() {
         <div className='flex flex-col gap-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
           <Suspense fallback={<KpisSkeleton />}>
             <LeadPipelineKpis />
+          </Suspense>
+
+          <Suspense fallback={<KpisSkeleton />}>
+            <LeadGtmInsights />
           </Suspense>
 
           <LeadPipelineWorkspace />
