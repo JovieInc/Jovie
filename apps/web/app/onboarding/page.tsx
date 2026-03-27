@@ -2,10 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import { redirect } from 'next/navigation';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions';
 import { APP_ROUTES } from '@/constants/routes';
-import { AuthLayout } from '@/features/auth';
-import { PROFILE_REVIEW_STEP_INDEX } from '@/features/dashboard/organisms/apple-style-onboarding/types';
 import { OnboardingFormWrapper } from '@/features/dashboard/organisms/OnboardingFormWrapper';
-import { resolveInitialStep } from '@/features/dashboard/organisms/onboarding/profile-review-guards';
 import { getCachedCurrentUser } from '@/lib/auth/cached';
 import { resolveClerkIdentity } from '@/lib/auth/clerk-identity';
 import { CanonicalUserState, resolveUserState } from '@/lib/auth/gate';
@@ -17,6 +14,7 @@ import { extractErrorMessage } from '@/lib/utils/errors';
 interface OnboardingPageProps {
   readonly searchParams?: Promise<{
     readonly handle?: string;
+    readonly resume?: string;
   }>;
 }
 
@@ -53,9 +51,20 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
+  const hasOnboardingContinuationSignal = Boolean(
+    resolvedSearchParams?.handle || resolvedSearchParams?.resume
+  );
+
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
-  // direct navigation. If the user is already active, send them to /app.
-  if (authResult.state === CanonicalUserState.ACTIVE) {
+  // direct navigation. V2 intentionally allows explicit resume targets
+  // after handle completion, because step 0 activates the user record.
+  // The handle query is also treated as a continuation signal because
+  // completeOnboarding triggers a server rerender before the client can
+  // upgrade the URL to a resume target.
+  if (
+    authResult.state === CanonicalUserState.ACTIVE &&
+    !hasOnboardingContinuationSignal
+  ) {
     redirect('/app');
   }
 
@@ -96,18 +105,6 @@ export default async function OnboardingPage({
   const initialDisplayName =
     existingProfile?.displayName || clerkIdentity.displayName || '';
 
-  // Step-resume: existing user with completed onboarding but missing photo
-  // Routes them directly to profile review to upload a photo
-  const initialStepIndex = resolveInitialStep(
-    existingProfile
-      ? {
-          onboardingCompletedAt: existingProfile.onboardingCompletedAt ?? null,
-          avatarUrl: existingProfile.avatarUrl ?? null,
-        }
-      : null,
-    PROFILE_REVIEW_STEP_INDEX
-  );
-
   const spotifySuggestedHandle = clerkIdentity.spotifyUsername ?? '';
 
   const providedHandle =
@@ -130,30 +127,19 @@ export default async function OnboardingPage({
     !user?.username;
 
   return (
-    <AuthLayout
-      formTitle='Choose your handle'
-      showFooterPrompt={false}
-      showFormTitle={false}
-      logoSpinDelayMs={10000}
-      showLogoutButton
-      logoutRedirectUrl={APP_ROUTES.SIGNIN}
-    >
-      <div className='relative min-h-[500px]'>
-        {/* Unified onboarding form */}
-        <OnboardingFormWrapper
-          initialDisplayName={initialDisplayName}
-          initialHandle={initialHandle}
-          isReservedHandle={Boolean(reservedHandle)}
-          userEmail={userEmail}
-          userId={userId}
-          shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-          initialStepIndex={initialStepIndex}
-          existingAvatarUrl={existingProfile?.avatarUrl ?? null}
-          existingBio={existingProfile?.bio ?? null}
-          existingGenres={existingProfile?.genres ?? null}
-        />
-      </div>
-    </AuthLayout>
+    <OnboardingFormWrapper
+      initialDisplayName={initialDisplayName}
+      initialHandle={initialHandle}
+      isReservedHandle={Boolean(reservedHandle)}
+      userEmail={userEmail}
+      userId={userId}
+      shouldAutoSubmitHandle={shouldAutoSubmitHandle}
+      initialProfileId={existingProfile?.id ?? authResult.profileId}
+      initialResumeStep={resolvedSearchParams?.resume ?? null}
+      existingAvatarUrl={existingProfile?.avatarUrl ?? null}
+      existingBio={existingProfile?.bio ?? null}
+      existingGenres={existingProfile?.genres ?? null}
+    />
   );
 }
 
