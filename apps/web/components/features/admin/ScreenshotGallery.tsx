@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
@@ -27,13 +27,22 @@ const GROUP_FILTERS: ReadonlyArray<{
   })),
 ] as const;
 
+type DisplayScreenshotConsumer = Exclude<ScreenshotConsumer, 'admin'>;
+
+const CONSUMER_LABELS: Record<DisplayScreenshotConsumer, string> = {
+  'marketing-export': 'Marketing Export',
+  'investor-ready': 'Investor Ready',
+};
+
 const CONSUMER_FILTERS: ReadonlyArray<{
-  readonly id: 'all' | ScreenshotConsumer;
+  readonly id: 'all' | DisplayScreenshotConsumer;
   readonly label: string;
 }> = [
   { id: 'all', label: 'All Uses' },
-  { id: 'marketing-export', label: 'Marketing Export' },
-  { id: 'investor-ready', label: 'Investor Ready' },
+  ...Object.entries(CONSUMER_LABELS).map(([id, label]) => ({
+    id: id as DisplayScreenshotConsumer,
+    label,
+  })),
 ] as const;
 
 function formatSize(bytes: number) {
@@ -49,10 +58,9 @@ function formatCaptureDate(value: string) {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
+    timeZone: 'UTC',
   }).format(timestamp);
 }
-
-type DisplayScreenshotConsumer = Exclude<ScreenshotConsumer, 'admin'>;
 
 function isDisplayConsumer(
   consumer: ScreenshotConsumer
@@ -61,23 +69,17 @@ function isDisplayConsumer(
 }
 
 function formatConsumerLabel(consumer: DisplayScreenshotConsumer) {
-  switch (consumer) {
-    case 'marketing-export':
-      return 'Marketing Export';
-    case 'investor-ready':
-      return 'Investor Ready';
-  }
+  return CONSUMER_LABELS[consumer];
 }
 
 export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [groupFilter, setGroupFilter] = useState<'all' | ScreenshotGroup>(
     'all'
   );
   const [consumerFilter, setConsumerFilter] = useState<
-    'all' | ScreenshotConsumer
+    'all' | DisplayScreenshotConsumer
   >('all');
-  const isOpen = selectedIndex !== null;
   const filteredScreenshots = screenshots.filter(screenshot => {
     const groupMatch =
       groupFilter === 'all' || screenshot.group === groupFilter;
@@ -86,36 +88,64 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
     return groupMatch && consumerMatch;
   });
   const selected =
-    selectedIndex === null ? null : filteredScreenshots[selectedIndex];
+    selectedId === null
+      ? null
+      : (filteredScreenshots.find(screenshot => screenshot.id === selectedId) ??
+        null);
+  const selectedIndex =
+    selected === null
+      ? -1
+      : filteredScreenshots.findIndex(
+          screenshot => screenshot.id === selected.id
+        );
+  const isOpen = selected !== null;
   const filteredScreenshotsCount = filteredScreenshots.length;
+  const selectedIndexRef = useRef(selectedIndex);
+  const filteredScreenshotsRef = useRef(filteredScreenshots);
 
   function handleClose() {
-    setSelectedIndex(null);
+    setSelectedId(null);
   }
+
+  useEffect(() => {
+    selectedIndexRef.current = selectedIndex;
+    filteredScreenshotsRef.current = filteredScreenshots;
+  }, [filteredScreenshots, selectedIndex]);
 
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
+      const currentIndex = selectedIndexRef.current;
+      const currentScreenshots = filteredScreenshotsRef.current;
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        setSelectedIndex(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+        const previousScreenshot = currentScreenshots[currentIndex - 1];
+        if (previousScreenshot) {
+          setSelectedId(previousScreenshot.id);
+        }
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        setSelectedIndex(prev =>
-          prev !== null && prev < filteredScreenshotsCount - 1 ? prev + 1 : prev
-        );
+        const nextScreenshot = currentScreenshots[currentIndex + 1];
+        if (nextScreenshot) {
+          setSelectedId(nextScreenshot.id);
+        }
       }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [filteredScreenshotsCount, isOpen]);
+  }, [isOpen]);
 
   useEffect(() => {
-    setSelectedIndex(null);
+    setSelectedId(null);
   }, [groupFilter, consumerFilter]);
 
-  const indexMap = new Map(filteredScreenshots.map((s, i) => [s.id, i]));
+  useEffect(() => {
+    if (selectedId !== null && selected === null) {
+      setSelectedId(null);
+    }
+  }, [selected, selectedId]);
+
   const grouped = new Map<string, ScreenshotInfo[]>();
   for (const ss of filteredScreenshots) {
     const group = grouped.get(ss.groupLabel) ?? [];
@@ -146,7 +176,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   aria-pressed={groupFilter === filter.id}
                   className={`rounded-full border px-3 py-1.5 text-[12px] ${
                     groupFilter === filter.id
-                      ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                      ? 'border-focus bg-surface-1 text-primary-token'
                       : 'border-subtle bg-surface-0 text-secondary-token'
                   }`}
                 >
@@ -164,7 +194,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                 aria-pressed={consumerFilter === filter.id}
                 className={`rounded-full border px-3 py-1.5 text-[12px] ${
                   consumerFilter === filter.id
-                    ? 'border-(--linear-accent) bg-(--linear-accent)/10 text-primary-token'
+                    ? 'border-focus bg-surface-1 text-primary-token'
                     : 'border-subtle bg-surface-0 text-secondary-token'
                 }`}
               >
@@ -190,7 +220,6 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             </div>
             <div className='grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'>
               {items.map(ss => {
-                const globalIndex = indexMap.get(ss.id) ?? 0;
                 return (
                   <ContentSurfaceCard
                     key={ss.id}
@@ -198,7 +227,7 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
                   >
                     <button
                       type='button'
-                      onClick={() => setSelectedIndex(globalIndex)}
+                      onClick={() => setSelectedId(ss.id)}
                       className='block w-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)'
                       aria-label={`View ${ss.title}`}
                     >
@@ -267,30 +296,31 @@ export function ScreenshotGallery({ screenshots }: ScreenshotGalleryProps) {
             <DrawerButton
               tone='ghost'
               size='icon'
-              onClick={() =>
-                setSelectedIndex(prev =>
-                  prev !== null && prev > 0 ? prev - 1 : prev
-                )
-              }
-              disabled={selectedIndex === 0}
+              onClick={() => {
+                const previousScreenshot =
+                  filteredScreenshots[selectedIndex - 1];
+                if (previousScreenshot) {
+                  setSelectedId(previousScreenshot.id);
+                }
+              }}
+              disabled={selectedIndex <= 0}
               aria-label='Previous screenshot'
             >
               <ChevronLeft className='size-4' />
             </DrawerButton>
             <span className='text-xs text-secondary-token tabular-nums min-w-[4ch] text-center'>
-              {selectedIndex === null ? 0 : selectedIndex + 1}/
+              {selectedIndex < 0 ? 0 : selectedIndex + 1}/
               {filteredScreenshots.length}
             </span>
             <DrawerButton
               tone='ghost'
               size='icon'
-              onClick={() =>
-                setSelectedIndex(prev =>
-                  prev !== null && prev < filteredScreenshotsCount - 1
-                    ? prev + 1
-                    : prev
-                )
-              }
+              onClick={() => {
+                const nextScreenshot = filteredScreenshots[selectedIndex + 1];
+                if (nextScreenshot) {
+                  setSelectedId(nextScreenshot.id);
+                }
+              }}
               disabled={selectedIndex === filteredScreenshotsCount - 1}
               aria-label='Next screenshot'
             >

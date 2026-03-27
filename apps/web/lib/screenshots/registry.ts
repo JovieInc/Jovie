@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '@/constants/routes';
 import type {
   ScreenshotConsumer,
   ScreenshotGroup,
@@ -77,7 +78,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'marketing-home-desktop',
       title: 'Homepage',
-      route: '/',
+      route: APP_ROUTES.HOME,
       waitFor: 'main',
     },
   ]),
@@ -85,14 +86,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'dashboard-releases-desktop',
       title: 'Releases Dashboard',
-      route: '/demo',
+      route: APP_ROUTES.DEMO,
       waitFor: '[data-testid="releases-matrix"]',
       publicExportPath: 'releases-dashboard-full.png',
     },
     {
       id: 'dashboard-releases-sidebar-desktop',
       title: 'Releases With Sidebar',
-      route: '/demo',
+      route: APP_ROUTES.DEMO,
       waitFor: '[data-testid="release-sidebar"]',
       interaction: 'open-first-release',
       publicExportPath: 'releases-dashboard-sidebar.png',
@@ -100,7 +101,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'dashboard-release-sidebar-detail-desktop',
       title: 'Release Sidebar Detail',
-      route: '/demo',
+      route: APP_ROUTES.DEMO,
       waitFor: '[data-testid="release-sidebar"]',
       captureTarget: 'locator',
       captureSelector: '[data-testid="release-sidebar"]',
@@ -110,7 +111,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'dashboard-audience-desktop',
       title: 'Audience CRM',
-      route: '/demo/audience',
+      route: APP_ROUTES.DEMO_AUDIENCE,
       waitFor: 'table, [role="grid"], [data-testid="unified-table"]',
       publicExportPath: 'audience-crm.png',
     },
@@ -119,13 +120,13 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'dashboard-analytics-desktop',
       title: 'Analytics Overview',
-      route: '/demo/showcase/analytics',
+      route: APP_ROUTES.DEMO_SHOWCASE_ANALYTICS,
       waitFor: '[data-testid="demo-showcase-analytics"]',
     },
     {
       id: 'dashboard-earnings-desktop',
       title: 'Earnings Overview',
-      route: '/demo/showcase/earnings',
+      route: APP_ROUTES.DEMO_SHOWCASE_EARNINGS,
       waitFor: '[data-testid="demo-showcase-earnings"]',
     },
   ]),
@@ -133,7 +134,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'settings-profile-desktop',
       title: 'Artist Profile Settings',
-      route: '/demo/showcase/settings',
+      route: APP_ROUTES.DEMO_SHOWCASE_SETTINGS,
       waitFor: '[data-testid="demo-showcase-settings"]',
     },
   ]),
@@ -141,7 +142,7 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'settings-links-desktop',
       title: 'Links Manager',
-      route: '/demo/showcase/links',
+      route: APP_ROUTES.DEMO_SHOWCASE_LINKS,
       waitFor: '[data-testid="demo-showcase-links"]',
     },
   ]),
@@ -149,19 +150,19 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'onboarding-handle-desktop',
       title: 'Onboarding Handle Step',
-      route: '/demo/showcase/onboarding-handle',
+      route: APP_ROUTES.DEMO_SHOWCASE_ONBOARDING_HANDLE,
       waitFor: '#handle-input',
     },
     {
       id: 'onboarding-dsp-desktop',
       title: 'Onboarding DSP Step',
-      route: '/demo/showcase/onboarding-dsp',
+      route: APP_ROUTES.DEMO_SHOWCASE_ONBOARDING_DSP,
       waitFor: '[data-testid="spotify-link-input"]',
     },
     {
       id: 'onboarding-profile-review-desktop',
       title: 'Onboarding Profile Review',
-      route: '/demo/showcase/onboarding-profile-review',
+      route: APP_ROUTES.DEMO_SHOWCASE_ONBOARDING_PROFILE_REVIEW,
       waitFor: 'text=Continue to Dashboard',
     },
   ]),
@@ -169,14 +170,14 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
     {
       id: 'public-profile-desktop',
       title: 'Public Profile',
-      route: '/demo/showcase/public-profile',
+      route: APP_ROUTES.DEMO_SHOWCASE_PUBLIC_PROFILE,
       waitFor: '[data-testid="demo-showcase-public-profile"]',
       publicExportPath: 'profile-desktop.png',
     },
     {
       id: 'public-profile-mobile',
       title: 'Public Profile Mobile',
-      route: '/demo/showcase/public-profile',
+      route: APP_ROUTES.DEMO_SHOWCASE_PUBLIC_PROFILE,
       waitFor: '[data-testid="demo-showcase-public-profile"]',
       viewport: 'mobile',
       publicExportPath: 'profile-phone.png',

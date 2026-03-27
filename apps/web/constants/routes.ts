@@ -11,6 +11,8 @@
 
 // App routes - dashboard paths within /app/*
 export const APP_ROUTES = {
+  HOME: '/',
+
   // Dashboard
   DASHBOARD: '/app',
   DASHBOARD_OVERVIEW: '/app/dashboard',
@@ -80,6 +82,17 @@ export const APP_ROUTES = {
 
   // Marketing
   DEMO: '/demo',
+  DEMO_AUDIENCE: '/demo/audience',
+  DEMO_SHOWCASE: '/demo/showcase',
+  DEMO_SHOWCASE_ANALYTICS: '/demo/showcase/analytics',
+  DEMO_SHOWCASE_EARNINGS: '/demo/showcase/earnings',
+  DEMO_SHOWCASE_LINKS: '/demo/showcase/links',
+  DEMO_SHOWCASE_SETTINGS: '/demo/showcase/settings',
+  DEMO_SHOWCASE_ONBOARDING_HANDLE: '/demo/showcase/onboarding-handle',
+  DEMO_SHOWCASE_ONBOARDING_DSP: '/demo/showcase/onboarding-dsp',
+  DEMO_SHOWCASE_ONBOARDING_PROFILE_REVIEW:
+    '/demo/showcase/onboarding-profile-review',
+  DEMO_SHOWCASE_PUBLIC_PROFILE: '/demo/showcase/public-profile',
   PRICING: '/pricing',
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',

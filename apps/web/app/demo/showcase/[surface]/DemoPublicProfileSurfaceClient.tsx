@@ -1,7 +1,9 @@
+'use client';
+
+import { DemoClientProviders } from '@/features/demo/DemoClientProviders';
 import { buildDemoProfile } from '@/features/demo/mock-dashboard-data';
 import { StaticArtistPage } from '@/features/profile/StaticArtistPage';
 import type { Artist, LegacySocialLink } from '@/types/db';
-import { DemoClientProviders } from './DemoClientProviders';
 
 const DEMO_PUBLIC_PROFILE = buildDemoProfile();
 const DEMO_PUBLIC_ARTIST: Artist = {
@@ -63,7 +65,7 @@ const DEMO_PUBLIC_SOCIAL_LINKS: readonly LegacySocialLink[] = [
   },
 ] as const;
 
-export function DemoPublicProfileSurface() {
+export function DemoPublicProfileSurfaceClient() {
   return (
     <DemoClientProviders>
       <div data-testid='demo-showcase-public-profile'>

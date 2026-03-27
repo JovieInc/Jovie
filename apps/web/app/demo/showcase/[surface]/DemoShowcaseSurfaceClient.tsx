@@ -6,17 +6,17 @@ import { AuthLayout } from '@/features/auth';
 import { OnboardingDspStep } from '@/features/dashboard/organisms/onboarding/OnboardingDspStep';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding/OnboardingHandleStep';
 import { OnboardingProfileReviewStep } from '@/features/dashboard/organisms/onboarding/OnboardingProfileReviewStep';
+import { DemoAuthShell } from '@/features/demo/DemoAuthShell';
+import { DemoClientProviders } from '@/features/demo/DemoClientProviders';
+import { DemoSettingsPanel } from '@/features/demo/DemoSettingsPanel';
+import type { DemoShowcaseSurfaceId } from '@/features/demo/showcase-surfaces';
 import { DashboardAnalyticsDemo } from '@/features/home/demo/DashboardAnalyticsDemo';
 import { DashboardEarningsDemo } from '@/features/home/demo/DashboardEarningsDemo';
 import { DashboardLinksDemo } from '@/features/home/demo/DashboardLinksDemo';
-import { DemoAuthShell } from './DemoAuthShell';
-import { DemoClientProviders } from './DemoClientProviders';
-import { DemoSettingsPanel } from './DemoSettingsPanel';
-import type { DemoShowcaseSurfaceId } from './showcase-surfaces';
 
 type DemoRenderableSurfaceId = Exclude<DemoShowcaseSurfaceId, 'public-profile'>;
 
-interface DemoShowcaseSurfaceProps {
+interface DemoShowcaseSurfaceClientProps {
   readonly surface: DemoRenderableSurfaceId;
 }
 
@@ -63,9 +63,9 @@ function DemoShowcasePanel({
   );
 }
 
-export function DemoShowcaseSurface({
+export function DemoShowcaseSurfaceClient({
   surface,
-}: Readonly<DemoShowcaseSurfaceProps>) {
+}: Readonly<DemoShowcaseSurfaceClientProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [handleInput, setHandleInput] = useState('soravale');
   const noop = useCallback(() => {}, []);

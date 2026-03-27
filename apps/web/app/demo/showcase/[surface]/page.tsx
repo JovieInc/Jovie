@@ -4,8 +4,8 @@ import {
   DEMO_SHOWCASE_SURFACE_IDS,
   type DemoShowcaseSurfaceId,
 } from '@/components/features/demo/showcase-surfaces';
-import { DemoPublicProfileSurface } from '@/features/demo/DemoPublicProfileSurface';
-import { DemoShowcaseSurface } from '@/features/demo/DemoShowcaseSurface';
+import { DemoPublicProfileSurfaceClient } from './DemoPublicProfileSurfaceClient';
+import { DemoShowcaseSurfaceClient } from './DemoShowcaseSurfaceClient';
 
 interface DemoShowcasePageProps {
   readonly params: Promise<{ surface: string }>;
@@ -14,7 +14,7 @@ interface DemoShowcasePageProps {
 function isDemoShowcaseSurfaceId(
   value: string
 ): value is DemoShowcaseSurfaceId {
-  return DEMO_SHOWCASE_SURFACE_IDS.includes(value as DemoShowcaseSurfaceId);
+  return (DEMO_SHOWCASE_SURFACE_IDS as readonly string[]).includes(value);
 }
 
 export const metadata: Metadata = {
@@ -32,8 +32,8 @@ export default async function DemoShowcasePage({
   }
 
   if (surface === 'public-profile') {
-    return <DemoPublicProfileSurface />;
+    return <DemoPublicProfileSurfaceClient />;
   }
 
-  return <DemoShowcaseSurface surface={surface} />;
+  return <DemoShowcaseSurfaceClient surface={surface} />;
 }

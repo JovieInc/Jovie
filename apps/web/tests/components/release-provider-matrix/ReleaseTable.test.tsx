@@ -117,7 +117,8 @@ vi.mock('@/components/organisms/table', () => ({
         return (
           <div key={rowId} data-testid={`release-row-wrapper-${rowId}`}>
             <div
-              data-testid={getRowTestId?.(row, index)}
+              data-testid={`release-row-${rowId}`}
+              data-row-testid={getRowTestId?.(row, index)}
               className={getRowClassName(row)}
             />
             {expandedRowIds?.has(rowId) ? (
@@ -162,25 +163,22 @@ describe('ReleaseTable', () => {
       />
     );
 
-    const expandedRow = screen
-      .getByTestId('release-row-wrapper-release_1')
-      .querySelector('div');
-    const selectedRow = screen
-      .getByTestId('release-row-wrapper-release_2')
-      .querySelector('div');
+    const expandedRow = screen.getByTestId('release-row-release_1');
+    const selectedRow = screen.getByTestId('release-row-release_2');
 
     expect(expandedRow).toBeInTheDocument();
     expect(selectedRow).toBeInTheDocument();
     expect(expandedRow).not.toBe(selectedRow);
+    expect(expandedRow).toHaveAttribute('data-row-testid', 'release-row');
+    expect(selectedRow).not.toHaveAttribute('data-row-testid');
   });
 
   it('gives idle release rows the same visible rounded hover silhouette', () => {
     render(<ReleaseTable {...commonProps} showTracks={false} />);
 
-    const idleRow = screen
-      .getByTestId('release-row-wrapper-release_1')
-      .querySelector('div');
+    const idleRow = screen.getByTestId('release-row-release_1');
     expect(idleRow).toBeInTheDocument();
+    expect(idleRow).toHaveAttribute('data-row-testid', 'release-row');
   });
 
   it('passes the selected track state into expanded track rows', () => {
