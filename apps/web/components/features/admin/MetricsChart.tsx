@@ -3,7 +3,7 @@
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useMemo } from 'react';
-import type { AdminUsagePoint } from '@/lib/admin/overview';
+import type { AdminUsagePoint } from '@/lib/admin/types';
 
 const LazyLineChart = dynamic(
   () =>

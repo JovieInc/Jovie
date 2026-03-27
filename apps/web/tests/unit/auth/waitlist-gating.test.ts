@@ -43,7 +43,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 describe('checkUserStatus', () => {
   // Import directly since it has no server-only guard
   let checkUserStatus: typeof import('@/lib/auth/status-checker').checkUserStatus;
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -138,7 +138,7 @@ describe('checkUserStatus', () => {
     const statusModule = await import('@/lib/auth/status-checker');
     checkUserStatus = statusModule.checkUserStatus;
     const gateModule = await import('@/lib/auth/gate');
-    UserState = gateModule.UserState;
+    CanonicalUserState = gateModule.CanonicalUserState;
   });
 
   it('allows active users (no ban, no deletion)', () => {
@@ -150,20 +150,20 @@ describe('checkUserStatus', () => {
   it('blocks banned users', () => {
     const result = checkUserStatus('banned', null);
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
     expect(result.redirectTo).toBe('/banned');
   });
 
   it('blocks suspended users', () => {
     const result = checkUserStatus('suspended', null);
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
   });
 
   it('blocks soft-deleted users', () => {
     const result = checkUserStatus('active', new Date());
     expect(result.isBlocked).toBe(true);
-    expect(result.blockedState).toBe(UserState.BANNED);
+    expect(result.blockedState).toBe(CanonicalUserState.BANNED);
   });
 
   it('blocks deleted users even with null status', () => {
@@ -194,7 +194,7 @@ describe('checkUserStatus', () => {
 describe('resolveProfileState', () => {
   let resolveProfileState: typeof import('@/lib/auth/profile-state-resolver').resolveProfileState;
   let isProfileComplete: typeof import('@/lib/auth/profile-state-resolver').isProfileComplete;
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -274,7 +274,7 @@ describe('resolveProfileState', () => {
     resolveProfileState = mod.resolveProfileState;
     isProfileComplete = mod.isProfileComplete;
     const gateMod = await import('@/lib/auth/gate');
-    UserState = gateMod.UserState;
+    CanonicalUserState = gateMod.CanonicalUserState;
   });
 
   const completeProfile = {
@@ -290,14 +290,14 @@ describe('resolveProfileState', () => {
 
   it('returns ACTIVE for complete profile', () => {
     const result = resolveProfileState(completeProfile);
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
     expect(result.redirectTo).toBeNull();
     expect(result.profileId).toBe('profile-1');
   });
 
   it('returns NEEDS_ONBOARDING when profile is null', () => {
     const result = resolveProfileState(null);
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     expect(result.redirectTo).toContain('/onboarding');
   });
 
@@ -307,7 +307,7 @@ describe('resolveProfileState', () => {
       username: null,
       usernameNormalized: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile has no display name', () => {
@@ -315,7 +315,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       displayName: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile has blank display name', () => {
@@ -323,7 +323,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       displayName: '   ',
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns ACTIVE when profile has no avatar (avatar optional)', () => {
@@ -331,7 +331,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       avatarUrl: null,
     });
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
   });
 
   it('returns ACTIVE when profile has blank avatar (avatar optional)', () => {
@@ -339,7 +339,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       avatarUrl: '   ',
     });
-    expect(result.state).toBe(UserState.ACTIVE);
+    expect(result.state).toBe(CanonicalUserState.ACTIVE);
   });
 
   it('returns NEEDS_ONBOARDING when onboarding not completed', () => {
@@ -347,7 +347,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       onboardingCompletedAt: null,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   it('returns NEEDS_ONBOARDING when profile is not public', () => {
@@ -355,7 +355,7 @@ describe('resolveProfileState', () => {
       ...completeProfile,
       isPublic: false,
     });
-    expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+    expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
   });
 
   describe('isProfileComplete', () => {
@@ -489,7 +489,7 @@ describe('sanitizeRedirectUrl', () => {
 // ============================================================================
 
 describe('gate.ts utility functions', () => {
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
   let canAccessApp: typeof import('@/lib/auth/gate').canAccessApp;
   let canAccessOnboarding: typeof import('@/lib/auth/gate').canAccessOnboarding;
   let requiresRedirect: typeof import('@/lib/auth/gate').requiresRedirect;
@@ -570,7 +570,7 @@ describe('gate.ts utility functions', () => {
     }));
 
     const mod = await import('@/lib/auth/gate');
-    UserState = mod.UserState;
+    CanonicalUserState = mod.CanonicalUserState;
     canAccessApp = mod.canAccessApp;
     canAccessOnboarding = mod.canAccessOnboarding;
     requiresRedirect = mod.requiresRedirect;
@@ -579,81 +579,91 @@ describe('gate.ts utility functions', () => {
 
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', () => {
-      expect(canAccessApp(UserState.ACTIVE)).toBe(true);
+      expect(canAccessApp(CanonicalUserState.ACTIVE)).toBe(true);
     });
 
     it('returns false for all non-ACTIVE states', () => {
-      expect(canAccessApp(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(false);
-      expect(canAccessApp(UserState.WAITLIST_PENDING)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_ONBOARDING)).toBe(false);
-      expect(canAccessApp(UserState.BANNED)).toBe(false);
-      expect(canAccessApp(UserState.USER_CREATION_FAILED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.UNAUTHENTICATED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+        false
+      );
+      expect(canAccessApp(CanonicalUserState.WAITLIST_PENDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_ONBOARDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.BANNED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.USER_CREATION_FAILED)).toBe(false);
     });
   });
 
   describe('canAccessOnboarding', () => {
     it('returns true for NEEDS_ONBOARDING', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
+        true
+      );
     });
 
     it('returns true for ACTIVE (can revisit onboarding)', () => {
-      expect(canAccessOnboarding(UserState.ACTIVE)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.ACTIVE)).toBe(true);
     });
 
     it('returns false for waitlisted users', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        canAccessOnboarding(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.WAITLIST_PENDING)).toBe(
         false
       );
-      expect(canAccessOnboarding(UserState.WAITLIST_PENDING)).toBe(false);
     });
 
     it('returns false for banned users', () => {
-      expect(canAccessOnboarding(UserState.BANNED)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.BANNED)).toBe(false);
     });
   });
 
   describe('requiresRedirect', () => {
     it('returns false only for ACTIVE state', () => {
-      expect(requiresRedirect(UserState.ACTIVE)).toBe(false);
+      expect(requiresRedirect(CanonicalUserState.ACTIVE)).toBe(false);
     });
 
     it('returns true for all other states', () => {
-      expect(requiresRedirect(UserState.UNAUTHENTICATED)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(requiresRedirect(UserState.WAITLIST_PENDING)).toBe(true);
-      expect(requiresRedirect(UserState.BANNED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.UNAUTHENTICATED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.WAITLIST_PENDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.BANNED)).toBe(true);
     });
   });
 
   describe('getRedirectForState', () => {
     it('returns null for ACTIVE (no redirect needed)', () => {
-      expect(getRedirectForState(UserState.ACTIVE)).toBeNull();
+      expect(getRedirectForState(CanonicalUserState.ACTIVE)).toBeNull();
     });
 
     it('returns /signin for UNAUTHENTICATED', () => {
-      expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
+      expect(getRedirectForState(CanonicalUserState.UNAUTHENTICATED)).toBe(
+        '/signin'
+      );
     });
 
     it('returns /waitlist for waitlist states', () => {
-      expect(getRedirectForState(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe('/waitlist');
+      expect(getRedirectForState(CanonicalUserState.WAITLIST_PENDING)).toBe(
         '/waitlist'
       );
-      expect(getRedirectForState(UserState.WAITLIST_PENDING)).toBe('/waitlist');
     });
 
     it('returns /onboarding for onboarding states', () => {
-      const redirect = getRedirectForState(UserState.NEEDS_ONBOARDING);
+      const redirect = getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING);
       expect(redirect).toContain('/onboarding');
     });
 
     it('returns /banned for BANNED state', () => {
-      expect(getRedirectForState(UserState.BANNED)).toBe('/banned');
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe('/banned');
     });
 
     it('returns error page for USER_CREATION_FAILED', () => {
-      expect(getRedirectForState(UserState.USER_CREATION_FAILED)).toBe(
+      expect(getRedirectForState(CanonicalUserState.USER_CREATION_FAILED)).toBe(
         '/error/user-creation-failed'
       );
     });
@@ -849,11 +859,11 @@ describe('cache invalidation contract', () => {
 });
 
 // ============================================================================
-// Tests for UserState enum completeness
+// Tests for CanonicalUserState enum completeness
 // ============================================================================
 
-describe('UserState enum', () => {
-  let UserState: typeof import('@/lib/auth/gate').UserState;
+describe('CanonicalUserState enum', () => {
+  let CanonicalUserState: typeof import('@/lib/auth/gate').CanonicalUserState;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -930,22 +940,22 @@ describe('UserState enum', () => {
     }));
 
     const mod = await import('@/lib/auth/gate');
-    UserState = mod.UserState;
+    CanonicalUserState = mod.CanonicalUserState;
   });
 
   it('contains all expected states', () => {
-    expect(UserState.UNAUTHENTICATED).toBeDefined();
-    expect(UserState.NEEDS_DB_USER).toBeDefined();
-    expect(UserState.NEEDS_WAITLIST_SUBMISSION).toBeDefined();
-    expect(UserState.WAITLIST_PENDING).toBeDefined();
-    expect(UserState.NEEDS_ONBOARDING).toBeDefined();
-    expect(UserState.ACTIVE).toBeDefined();
-    expect(UserState.BANNED).toBeDefined();
-    expect(UserState.USER_CREATION_FAILED).toBeDefined();
+    expect(CanonicalUserState.UNAUTHENTICATED).toBeDefined();
+    expect(CanonicalUserState.NEEDS_DB_USER).toBeDefined();
+    expect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION).toBeDefined();
+    expect(CanonicalUserState.WAITLIST_PENDING).toBeDefined();
+    expect(CanonicalUserState.NEEDS_ONBOARDING).toBeDefined();
+    expect(CanonicalUserState.ACTIVE).toBeDefined();
+    expect(CanonicalUserState.BANNED).toBeDefined();
+    expect(CanonicalUserState.USER_CREATION_FAILED).toBeDefined();
   });
 
   it('has exactly 8 states', () => {
-    const stateValues = Object.values(UserState).filter(
+    const stateValues = Object.values(CanonicalUserState).filter(
       v => typeof v === 'string'
     );
     expect(stateValues).toHaveLength(8);

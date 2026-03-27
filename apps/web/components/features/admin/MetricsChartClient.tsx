@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@jovie/ui';
 import dynamic from 'next/dynamic';
-import type { AdminUsagePoint } from '@/lib/admin/overview';
+import type { AdminUsagePoint } from '@/lib/admin/types';
 
 interface MetricsChartClientProps {
   readonly points: AdminUsagePoint[];

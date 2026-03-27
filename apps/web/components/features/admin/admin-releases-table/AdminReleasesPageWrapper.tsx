@@ -6,7 +6,7 @@ import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
-import type { AdminReleaseRow, AdminReleasesSort } from '@/lib/admin/releases';
+import type { AdminReleaseRow, AdminReleasesSort } from '@/lib/admin/types';
 import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
 interface AdminReleasesPageWrapperProps {
