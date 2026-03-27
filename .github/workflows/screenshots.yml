@@ -16,9 +16,8 @@ on:
       - 'apps/web/app/**/layout.tsx'
       - 'apps/web/app/globals.css'
       - 'packages/ui/**'
-    paths-ignore:
-      - 'apps/web/public/product-screenshots/**'
-      - 'apps/web/screenshot-catalog/current/**'
+      - '!apps/web/public/product-screenshots/**'
+      - '!apps/web/screenshot-catalog/current/**'
   schedule:
     - cron: '0 9 * * *'
   workflow_dispatch:
