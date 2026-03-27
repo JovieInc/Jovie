@@ -254,6 +254,9 @@ export const leadFunnelEvents = pgTable(
     createdAt: timestamp('created_at').defaultNow().notNull(),
   },
   table => ({
+    leadEventTypeUniqueIndex: uniqueIndex(
+      'idx_lead_funnel_events_lead_event_type_unique'
+    ).on(table.leadId, table.eventType),
     leadOccurredAtIndex: index('idx_lead_funnel_events_lead_occurred_at').on(
       table.leadId,
       table.occurredAt

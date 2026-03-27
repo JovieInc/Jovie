@@ -1,9 +1,9 @@
 # Why Now
 
-The bottleneck in music is no longer creation — it's attention, conversion, and monetization.
+Creation is abundant. Coordination is scarce.
 
-- Supply of new music is exploding (60K+ tracks/day on Spotify alone)
-- Generative AI accelerating the content firehose
-- Static link pages and broadcast messages stop working at scale
-- Jovie sits at the universal traffic choke point (link in bio)
-- Each visit becomes a personalized, measurable funnel
+- AI makes music creation cheaper and faster
+- Independent artists now drive half of all streaming royalties
+- Live music keeps growing as fans pay more for real artists
+- The post-release workload is still manual and fragmented
+- The system that removes manual release work wins
