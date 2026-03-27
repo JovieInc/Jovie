@@ -1,5 +1,7 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
+// Intentional exception: this suite locks design-system parity across demo
+// surfaces, so computed-style assertions are the contract under test.
 test.use({ storageState: { cookies: [], origins: [] } });
 
 async function setTheme(page: Page, theme: 'light' | 'dark') {

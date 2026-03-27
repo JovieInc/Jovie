@@ -45,6 +45,7 @@ export function SettingsSection({
         {description ? (
           <p
             id={descriptionId}
+            data-testid={`${id}-description`}
             className={cn(
               'dashboard-body max-w-[60ch] text-[13px] leading-[19px] text-secondary-token',
               descriptionClassName

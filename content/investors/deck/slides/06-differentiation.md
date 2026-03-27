@@ -2,7 +2,7 @@
 
 What makes Jovie different from Linktree, Linkfire, and the rest.
 
-- **Personalization at first touchpoint** — not just the inbox
-- **Anonymous → identifiable** — smart capture moments turn traffic into retargetable audience
-- **Experimentation baked in** — decide → show → measure → learn
-- **Cross-artist learning** — intent archetypes travel with the fan (streamer vs ticket buyer vs merch buyer)
+- **Release system, not profile surface** — Jovie owns the release loop, not just the page
+- **Music context built in** — catalog, fans, collaborators, and release history live in one place
+- **Faster learning loops** — more releases, more signal, faster insight into what fans actually want
+- **Natural path to orchestration** — the wedge already owns the context generic PM tools do not

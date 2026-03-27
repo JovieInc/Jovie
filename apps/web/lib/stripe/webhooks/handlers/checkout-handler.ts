@@ -137,7 +137,15 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
     await invalidateBillingCache(userId);
 
     if (result.success && result.isActive) {
-      await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+      try {
+        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+      } catch (error) {
+        logger.warn('Failed to attribute lead paid conversion on checkout', {
+          userId,
+          subscriptionId: subscription.id,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
     }
 
     return result;

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReleasePitchSection } from '@/components/organisms/release-sidebar/ReleasePitchSection';
-import type { GeneratedPitches } from '@/lib/services/pitch';
+import type { GeneratedPitches } from '@/lib/services/pitch/types';
 
 // Mock sonner toast
 const mockToast = vi.hoisted(() => ({

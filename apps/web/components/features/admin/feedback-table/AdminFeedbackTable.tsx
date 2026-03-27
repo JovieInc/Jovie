@@ -2,7 +2,7 @@
 
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText, XCircle } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -13,10 +13,7 @@ import {
   DrawerSurfaceCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import {
-  type DrawerHeaderAction,
-  DrawerHeaderActions,
-} from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { type DrawerHeaderAction } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -187,15 +184,27 @@ export function AdminFeedbackTable({
   );
   const { mutateAsync: dismissFeedback } = useDismissFeedbackMutation();
   const [rows, setRows] = useState(items);
+  const [dismissingIds, setDismissingIds] = useState<Record<string, true>>({});
+  const dismissingIdsRef = useRef<Set<string>>(new Set());
 
   const selected = useMemo(
     () => rows.find(item => item.id === selectedId) ?? null,
     [rows, selectedId]
   );
 
+  const isDismissPending = useCallback(
+    (id: string) => Boolean(dismissingIds[id]),
+    [dismissingIds]
+  );
+
   const dismissRow = useCallback(
     async (item: FeedbackRow) => {
       if (item.status === 'dismissed') return;
+      if (dismissingIdsRef.current.has(item.id)) return;
+
+      dismissingIdsRef.current.add(item.id);
+      setDismissingIds(current => ({ ...current, [item.id]: true }));
+
       try {
         await dismissFeedback(item.id);
         setRows(current =>
@@ -211,6 +220,13 @@ export function AdminFeedbackTable({
         );
       } catch {
         // Error toast handled by mutation's onError callback
+      } finally {
+        dismissingIdsRef.current.delete(item.id);
+        setDismissingIds(current => {
+          const next = { ...current };
+          delete next[item.id];
+          return next;
+        });
       }
     },
     [dismissFeedback]
@@ -235,10 +251,10 @@ export function AdminFeedbackTable({
         label: 'Dismiss',
         icon: <XCircle className='h-4 w-4' />,
         onClick: () => dismissRow(item),
-        disabled: item.status === 'dismissed',
+        disabled: item.status === 'dismissed' || isDismissPending(item.id),
       },
     ],
-    [copyRowAsMarkdown, dismissRow]
+    [copyRowAsMarkdown, dismissRow, isDismissPending]
   );
 
   const copyAllAsMarkdown = useCallback(async () => {
@@ -333,19 +349,12 @@ export function AdminFeedbackTable({
         title='Feedback details'
         onClose={() => setSelectedId(null)}
         headerMode='minimal'
-        headerActions={
-          <DrawerHeaderActions
-            primaryActions={[]}
-            overflowActions={[]}
-            onClose={() => setSelectedId(null)}
-          />
-        }
         isEmpty={!selected}
         emptyMessage='Select a feedback row to view details.'
         entityHeader={
           selected ? (
             <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+              <div className='border-b border-subtle px-3 py-2'>
                 <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
                   Feedback
                 </p>
@@ -373,6 +382,7 @@ export function AdminFeedbackTable({
                             id: 'dismiss-feedback',
                             label: 'Dismiss',
                             icon: XCircle,
+                            disabled: isDismissPending(selected.id),
                             onClick: () => {
                               void dismissRow(selected);
                             },
@@ -389,9 +399,8 @@ export function AdminFeedbackTable({
                     } satisfies DrawerHeaderAction,
                   ] satisfies readonly DrawerHeaderAction[]
                 }
-                className='mx-[-14px]'
               />
-              <div className='border-t border-(--linear-app-frame-seam) px-3.5 py-2'>
+              <div className='border-t border-subtle px-3.5 py-2'>
                 <span className='text-[12px] leading-[16px] text-tertiary-token'>
                   {selected.status !== 'dismissed'
                     ? 'Marked as pending'

@@ -8,7 +8,7 @@ import { useHapticFeedback } from '@/hooks/useHapticFeedback';
 import { cn } from '@/lib/utils';
 
 interface AuthBackButtonProps {
-  readonly onClick?: () => void;
+  readonly onClick?: (event?: React.MouseEvent<HTMLElement>) => void;
   readonly href?: string;
   readonly className?: string;
   readonly ariaLabel?: string;
@@ -43,9 +43,9 @@ export function AuthBackButton({
     className
   );
 
-  const handleClick = () => {
+  const handleClick = (event?: React.MouseEvent<HTMLElement>) => {
     haptic.light();
-    onClick?.();
+    onClick?.(event);
   };
 
   if (href) {
@@ -57,7 +57,12 @@ export function AuthBackButton({
         aria-label={ariaLabel}
         className={controlClasses}
       >
-        <Link href={href} onClick={() => haptic.light()}>
+        <Link
+          href={href}
+          onClick={event => {
+            handleClick(event);
+          }}
+        >
           <ArrowLeft className='h-3.5 w-3.5' />
           <span className='text-[12px] font-[510] tracking-[-0.012em]'>
             Back

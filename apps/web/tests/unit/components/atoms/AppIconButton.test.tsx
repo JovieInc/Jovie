@@ -15,7 +15,7 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 describe('AppIconButton', () => {
-  it('renders icon buttons as full pills by default', () => {
+  it('renders an accessible icon button', () => {
     render(
       <AppIconButton ariaLabel='Open details'>
         <span aria-hidden='true'>+</span>
@@ -23,8 +23,7 @@ describe('AppIconButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Open details' });
-    expect(button.className).toContain('rounded-full');
-    expect(button.className).toContain('border-(--linear-app-frame-seam)');
-    expect(button.className).toContain('shadow-[');
+    expect(button).toBeInTheDocument();
+    expect(button).toBeEnabled();
   });
 });

@@ -55,7 +55,7 @@ export const AudienceHeaderBadge = memo(function AudienceHeaderBadge({
       <div
         className={cn(
           DRAWER_TABS_RAIL_CLASSNAME,
-          'w-max min-w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-1'
+          'w-max min-w-full rounded-[10px] border border-subtle bg-surface-1 p-1'
         )}
       >
         {VIEW_OPTIONS.map(({ value, icon }) => (
