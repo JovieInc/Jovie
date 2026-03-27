@@ -171,6 +171,48 @@ describe('onboarding page', () => {
     expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 
+  it.each([
+    'artist-confirm',
+    'upgrade',
+    'late-arrivals',
+  ] as const)('allows active users to stay in onboarding on the %s resume path', async resume => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    vi.mocked(getDashboardData).mockResolvedValueOnce({
+      selectedProfile: {
+        id: 'profile_123',
+        username: 'artist',
+        displayName: 'Artist',
+        avatarUrl: null,
+        bio: null,
+        genres: null,
+      },
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({ resume }),
+    });
+
+    expect(page).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+  });
+
   it('allows active users to continue onboarding when the handle query is still present', async () => {
     const { resolveUserState } = await import('@/lib/auth/gate');
     const { getDashboardData } = await import(

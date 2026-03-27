@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
 import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
-import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { LogoBar } from '@/features/home/LogoBar';
 import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
@@ -14,7 +14,6 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
-// Marketing pages must remain fully static.
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -155,6 +154,8 @@ const heroOnly =
   !FEATURE_FLAGS.SHOW_FINAL_CTA;
 
 export default function HomePage() {
+  const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
+
   return (
     <div
       className={
@@ -163,7 +164,7 @@ export default function HomePage() {
           : 'relative min-h-screen'
       }
     >
-      <LazyAuthRedirectHandler />
+      <script suppressHydrationWarning>{authRedirectScript}</script>
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
