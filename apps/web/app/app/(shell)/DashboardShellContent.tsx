@@ -7,10 +7,7 @@ import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
 import type { FeatureFlagsBootstrap } from '@/lib/feature-flags/shared';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
-import {
-  getDashboardDataEssential,
-  setSidebarCollapsed,
-} from './dashboard/actions';
+import { getDashboardData, setSidebarCollapsed } from './dashboard/actions';
 import { DashboardDataProvider } from './dashboard/DashboardDataContext';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 
@@ -33,15 +30,18 @@ export async function DashboardShellContent({
 }) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
 
-  // Use the essential (fast-path) fetch: only user + profiles + settings.
-  // Skips tipping stats, social links, and avatar quality (~3 queries
-  // instead of ~6). Those fields get safe defaults — pages that need
-  // them call getDashboardData() themselves.
+  // Full dashboard data fetch — the provider wraps the entire (shell) tree
+  // and client components (DashboardTipping, ProfileCompletion, etc.) read
+  // tippingStats, hasSocialLinks, hasMusicLinks from context. Using the
+  // essential fetch here would return zeros for those fields.
+  // The Suspense boundary in the layout streams the skeleton while this resolves.
   const [dashboardData, featureFlagsBootstrap] = await Promise.all([
-    getDashboardDataEssential(),
+    getDashboardData(),
     isE2EClientRuntime
       ? Promise.resolve(EMPTY_FEATURE_FLAGS_BOOTSTRAP)
-      : getFeatureFlagsBootstrap(userId),
+      : getFeatureFlagsBootstrap(userId).catch(
+          () => EMPTY_FEATURE_FLAGS_BOOTSTRAP
+        ),
   ]);
 
   // Read sidebar cookie server-side so SSR matches client state (no flash)

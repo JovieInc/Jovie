@@ -1,14 +1,13 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { ChatPageClient } from './chat/ChatPageClient';
-import { getDashboardDataEssential } from './dashboard/actions';
+import { getDashboardData } from './dashboard/actions';
 
 const DASHBOARD_DESCRIPTION = 'Start a new thread with Jovie AI';
 
 export async function generateMetadata(): Promise<Metadata> {
-  // Use essential fetch (deduplicated via React.cache()) — only needs
-  // profile data for the title, not tipping stats or social links.
-  const data = await getDashboardDataEssential();
+  // Deduplicated via React.cache() — shares the same fetch as the layout.
+  const data = await getDashboardData();
   const displayName = data.selectedProfile?.displayName?.trim();
 
   return {
@@ -19,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 // Chat-first experience: /app renders the new chat directly
 export default async function AppRootPage() {
-  const dashboardData = await getDashboardDataEssential();
+  const dashboardData = await getDashboardData();
 
   // Only redirect to onboarding for genuine missing profiles, not DB errors.
   // When getDashboardData() catches a DB error it sets needsOnboarding: true

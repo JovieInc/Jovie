@@ -196,19 +196,17 @@ module.exports = {
       path: '/app',
       auth: true,
       timings: [
-        // Main dashboard (chat-first) — Gmail rule: 100ms perceived, 500ms hard budget.
-        // Shell streams via Suspense. Essential data fetch (~3 fast single-row queries)
-        // replaces the full 6-query sequential fetch.
-        //
-        // Warm-cache production numbers: TTFB ~30ms, skeleton-to-content ~130ms.
-        // Budgets account for Neon connection variance and Playwright browser overhead.
-        // FCP/LCP include ~1s Playwright overhead (real users see ~100ms perceived).
+        // Main dashboard (chat-first). Shell streams via Suspense while
+        // getDashboardData() resolves. Warm-cache production: TTFB ~30ms,
+        // skeleton-to-content ~130ms. Neon cold starts add ~1-2s variance.
+        // FCP/LCP include ~1s Playwright browser overhead.
         { metric: 'first-contentful-paint', budget: 1500 },
         { metric: 'largest-contentful-paint', budget: 3000 },
         { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
         { metric: 'time-to-first-byte', budget: 1500 },
-        // Custom: time from navigation to chat content visible
+        // Time from navigation to chat content visible.
+        // Warm cache: ~130ms. Budget includes Neon cold start headroom.
         { metric: 'skeleton-to-content', budget: 2000 },
       ],
       resourceSizes: chatResourceBudgets,

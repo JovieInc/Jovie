@@ -1,5 +1,7 @@
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 
+const navLabelWidths = ['w-16', 'w-20', 'w-14', 'w-14', 'w-14'] as const;
+
 /**
  * Streaming fallback for the dashboard shell.
  *
@@ -33,7 +35,7 @@ export function DashboardShellSkeleton() {
               <LoadingSkeleton height='h-4' width='w-4' rounded='sm' />
               <LoadingSkeleton
                 height='h-3.5'
-                width={i === 1 ? 'w-16' : i === 2 ? 'w-20' : 'w-14'}
+                width={navLabelWidths[i - 1]}
                 rounded='sm'
               />
             </div>

@@ -442,19 +442,12 @@ const measureSkeletonToContent = async (
 
   if (isChatPage) {
     try {
-      // Wait for chat content or dashboard nav to become visible.
-      // chat-content appears when JovieChat mounts; dashboard nav
-      // appears when the shell renders (fallback for error/no-profile states).
-      await Promise.race([
-        page.waitForSelector('[data-testid="chat-content"]', {
-          state: 'visible',
-          timeout: 15000,
-        }),
-        page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
-          state: 'visible',
-          timeout: 15000,
-        }),
-      ]);
+      // Wait for JovieChat to mount (data-testid="chat-content").
+      // This is the real content-ready signal — not the nav or shell skeleton.
+      await page.waitForSelector('[data-testid="chat-content"]', {
+        state: 'visible',
+        timeout: 15000,
+      });
       return Date.now() - start;
     } catch {
       return Date.now() - start;
