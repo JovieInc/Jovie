@@ -1,0 +1,159 @@
+@layer components {
+  .marketing-h1-linear {
+    font-size: var(--linear-h1-size-sm);
+    font-weight: 510;
+    letter-spacing: -0.022em;
+    line-height: 1.1;
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    text-wrap: balance;
+  }
+
+  @media (min-width: 768px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size-md);
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .marketing-h1-linear {
+      font-size: var(--linear-h1-size);
+      line-height: 1.06;
+    }
+  }
+
+  .marketing-lead-linear {
+    font-size: 18px;
+    font-weight: 400;
+    font-feature-settings: var(--linear-font-features);
+    font-variation-settings: "opsz" var(--linear-font-optical-sizing);
+    letter-spacing: -0.011em;
+    line-height: 1.65;
+  }
+
+  .homepage-section-eyebrow {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 9999px;
+    border: 1px solid var(--linear-border-subtle);
+    background: color-mix(
+      in oklab,
+      var(--linear-bg-surface-1) 72%,
+      transparent
+    );
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    font-weight: var(--linear-font-weight-medium);
+    letter-spacing: -0.01em;
+    color: var(--linear-text-tertiary);
+  }
+
+  .hero-glow {
+    background:
+      radial-gradient(
+        ellipse 42% 32% at 22% 16%,
+        oklch(32% 0.04 265 / 0.34),
+        transparent 72%
+      ),
+      radial-gradient(
+        ellipse 36% 26% at 78% 12%,
+        oklch(24% 0.03 250 / 0.18),
+        transparent 72%
+      );
+  }
+
+  .hero-gradient-text {
+    background-image: linear-gradient(
+      135deg,
+      var(--linear-text-primary) 0%,
+      var(--linear-text-primary) 35%,
+      #aebde5 50%,
+      var(--linear-text-primary) 65%,
+      var(--linear-text-primary) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% 100%;
+  }
+
+  .home-legal-bar {
+    border-top: 1px solid var(--linear-border-subtle);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0)),
+      color-mix(in oklab, var(--linear-bg-surface-0) 92%, var(--linear-bg-page));
+  }
+
+  .home-legal-link {
+    color: var(--linear-text-tertiary);
+    transition: color 120ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .home-legal-link:hover {
+    color: var(--linear-text-primary);
+  }
+}
+
+@keyframes hero-phone-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-hero-phone-float {
+  animation: hero-phone-float 4s ease-in-out infinite;
+}
+
+@media (prefers-contrast: more) {
+  .hero-glow {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .marketing-h1-linear {
+    font-family:
+      ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: clamp(2.1rem, 8.2vw, 2.65rem);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    font-feature-settings: normal;
+    font-variation-settings: normal;
+    text-wrap: initial;
+  }
+
+  .marketing-lead-linear {
+    font-size: 0.975rem;
+    line-height: 1.55;
+  }
+
+  .hero-gradient-text {
+    background-image: none;
+    -webkit-text-fill-color: var(--linear-text-primary);
+    color: var(--linear-text-primary);
+  }
+
+  .hero-glow {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-phone-float {
+    animation: none;
+  }
+
+  .hero-gradient-text {
+    background-image: none;
+    -webkit-text-fill-color: var(--linear-text-primary);
+    color: var(--linear-text-primary);
+  }
+}

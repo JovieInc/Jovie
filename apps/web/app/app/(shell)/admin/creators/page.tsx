@@ -1,14 +1,10 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { APP_ROUTES } from '@/constants/routes';
-import { AdminCreatorsPageWrapper } from '@/features/admin/admin-creator-profiles/AdminCreatorsPageWrapper';
-import { getAdminCreatorProfiles } from '@/lib/admin/creator-profiles';
-import { adminCreatorsSearchParams } from '@/lib/nuqs';
-
-interface AdminCreatorsPageProps {
-  readonly searchParams: Promise<SearchParams>;
-}
+import {
+  buildAdminPeopleHref,
+  searchParamsFromRecord,
+} from '@/constants/admin-navigation';
 
 export const metadata: Metadata = {
   title: 'Admin creators',
@@ -16,36 +12,13 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
-export default async function AdminCreatorsPage({
+interface AdminCreatorsRedirectPageProps {
+  readonly searchParams: Promise<SearchParams>;
+}
+
+export default async function AdminCreatorsRedirectPage({
   searchParams,
-}: Readonly<AdminCreatorsPageProps>) {
-  const { pageSize, sort, q } =
-    await adminCreatorsSearchParams.parse(searchParams);
-
-  const {
-    profiles,
-    pageSize: resolvedPageSize,
-    total,
-  } = await getAdminCreatorProfiles({
-    page: 1,
-    pageSize,
-    search: q ?? '',
-    sort,
-  });
-
-  return (
-    <PageShell>
-      <PageContent noPadding>
-        <AdminCreatorsPageWrapper
-          profiles={profiles}
-          page={1}
-          pageSize={resolvedPageSize}
-          total={total}
-          search={q ?? ''}
-          sort={sort}
-          basePath={APP_ROUTES.ADMIN_CREATORS}
-        />
-      </PageContent>
-    </PageShell>
-  );
+}: Readonly<AdminCreatorsRedirectPageProps>) {
+  const params = searchParamsFromRecord(await searchParams);
+  redirect(buildAdminPeopleHref('creators', params));
 }

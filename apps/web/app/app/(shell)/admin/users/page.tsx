@@ -1,41 +1,10 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
+import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
-
-import { TableSkeleton } from '@/components/molecules/LoadingSkeleton';
-import { PageContent, PageShell } from '@/components/organisms/PageShell';
-import { getAdminUsers } from '@/lib/admin/users';
-import { adminUsersSearchParams } from '@/lib/nuqs';
-
-const AdminUsersTableUnified = dynamic(
-  () =>
-    import('@/features/admin/admin-users-table/AdminUsersTableUnified').then(
-      mod => ({
-        default: mod.AdminUsersTableUnified,
-      })
-    ),
-  {
-    loading: () => (
-      <div className='p-6 space-y-6'>
-        <div className='flex items-center justify-between'>
-          <div className='space-y-2'>
-            <div className='h-8 w-32 skeleton rounded-md' />
-            <div className='h-4 w-48 skeleton rounded-md' />
-          </div>
-          <div className='flex gap-2'>
-            <div className='h-10 w-48 skeleton rounded-md' />
-            <div className='h-10 w-24 skeleton rounded-md' />
-          </div>
-        </div>
-        <TableSkeleton rows={10} columns={4} />
-      </div>
-    ),
-  }
-);
-
-interface AdminUsersPageProps {
-  readonly searchParams: Promise<SearchParams>;
-}
+import {
+  buildAdminPeopleHref,
+  searchParamsFromRecord,
+} from '@/constants/admin-navigation';
 
 export const metadata: Metadata = {
   title: 'Admin users',
@@ -43,31 +12,13 @@ export const metadata: Metadata = {
 
 export const runtime = 'nodejs';
 
-export default async function AdminUsersPage({
+interface AdminUsersRedirectPageProps {
+  readonly searchParams: Promise<SearchParams>;
+}
+
+export default async function AdminUsersRedirectPage({
   searchParams,
-}: Readonly<AdminUsersPageProps>) {
-  const { pageSize, sort, q } =
-    await adminUsersSearchParams.parse(searchParams);
-
-  const { users, total } = await getAdminUsers({
-    page: 1,
-    pageSize,
-    search: q ?? '',
-    sort,
-  });
-
-  return (
-    <PageShell>
-      <PageContent noPadding>
-        <AdminUsersTableUnified
-          users={users}
-          page={1}
-          pageSize={pageSize}
-          total={total}
-          search={q ?? ''}
-          sort={sort}
-        />
-      </PageContent>
-    </PageShell>
-  );
+}: Readonly<AdminUsersRedirectPageProps>) {
+  const params = searchParamsFromRecord(await searchParams);
+  redirect(buildAdminPeopleHref('users', params));
 }

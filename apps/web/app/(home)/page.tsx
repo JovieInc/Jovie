@@ -14,7 +14,6 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
-// Marketing pages must remain fully static.
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
