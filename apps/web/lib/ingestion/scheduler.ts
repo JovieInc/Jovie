@@ -5,6 +5,7 @@ import { musicFetchEnrichmentPayloadSchema } from '@/lib/dsp-enrichment/jobs/mus
 import { sendClaimInvitePayloadSchema } from '@/lib/email/jobs/send-claim-invite';
 import { captureError } from '@/lib/error-tracking';
 import {
+  isMusicfetchInvalidServicesError,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
 } from '@/lib/musicfetch/errors';
@@ -66,6 +67,13 @@ export function determineJobFailure(error: unknown): {
     (error instanceof MusicfetchRequestError && error.statusCode === 429)
   ) {
     return { message: error.message, reason: 'rate_limited' };
+  }
+
+  if (
+    error instanceof MusicfetchRequestError &&
+    isMusicfetchInvalidServicesError(error)
+  ) {
+    return { message: error.message, reason: 'permanent' };
   }
 
   const message =
@@ -336,8 +344,8 @@ export async function failJob(
   options: { reason?: JobFailureReason } = {}
 ): Promise<void> {
   const maxAttempts = job.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
-  const shouldRetry = job.attempts < maxAttempts;
   const reason = options.reason ?? 'transient';
+  const shouldRetry = reason !== 'permanent' && job.attempts < maxAttempts;
 
   if (shouldRetry) {
     const backoffMs = calculateBackoff(job.attempts, reason);
