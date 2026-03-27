@@ -40,12 +40,7 @@ export const test = base.extend({
       if (msg.type() === 'warning') {
         const warningText = msg.text();
         // Skip expected warnings
-        if (
-          !isExpectedWarning(warningText) &&
-          !warningText.includes('React Hook') &&
-          !warningText.includes('useContext') &&
-          !warningText.includes('Invalid hook call')
-        ) {
+        if (!isExpectedWarning(warningText)) {
           consoleWarnings.push(warningText);
         }
       }
