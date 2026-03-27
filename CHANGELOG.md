@@ -16,6 +16,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
+- Artist profile settings page no longer crashes when a social link has an unexpected `platformType` value from the database; unknown values now fall back to the "Web" section with a Sentry breadcrumb for observability
+- Unsafe type cast in `PreviewDataHydrator` replaced with runtime validation guard to prevent bad DB data from being laundered into trusted app state
 - Fix batch fit scoring to apply pixel suppression filtering (matching individual scoring path) [internal]
 - Unskip avatar upload validation error tracking test (hook already implemented) [internal]
 - Document Linktree suppressed pixel ID methodology (no platform-owned pixel IDs detected) [internal]
@@ -24,6 +26,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
+- DSP Presence page converted from card grid to Linear-style table with sortable columns, external link icons, and keyboard navigation
+- Suggested DSP matches now sort first so actionable items appear at the top of the list
 - Conductor workspace archive script now cleans up `.claude/worktrees` (stale agent worktrees) alongside node_modules and build artifacts [internal]
 
 ## [26.4.82] - 2026-03-26
