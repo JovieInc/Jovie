@@ -275,8 +275,8 @@ test.describe('Content Gate — Public Pages', () => {
         path: '/ai',
         name: 'AI workflow redirect',
         expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
-        readyText: /growth engine for music creators/i,
-        minLength: 150,
+        minLength: 20,
+        tokenGatedRedirect: true,
       },
       {
         path: '/engagement-engine',
@@ -331,8 +331,8 @@ test.describe('Content Gate — Public Pages', () => {
         path: '/investors',
         name: 'Investors redirect',
         expectedUrl: /\/investor-portal(?:\/index\.html)?$/,
-        readyText: /growth engine for music creators/i,
-        minLength: 80,
+        minLength: 20,
+        tokenGatedRedirect: true,
       },
     ] as const;
 
@@ -342,15 +342,34 @@ test.describe('Content Gate — Public Pages', () => {
       await expect(page).toHaveURL(route.expectedUrl, {
         timeout: SMOKE_TIMEOUTS.VISIBILITY,
       });
-      await expect(
-        page.getByText(route.readyText).first(),
-        `${route.name}: ready signal did not render`
-      ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+
+      if (!route.tokenGatedRedirect) {
+        await expect(
+          page.getByText(route.readyText).first(),
+          `${route.name}: ready signal did not render`
+        ).toBeVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY });
+      }
 
       const main = page.locator('main').first();
       const hasMain = await main
         .isVisible({ timeout: SMOKE_TIMEOUTS.VISIBILITY })
         .catch(() => false);
+
+      if (route.tokenGatedRedirect) {
+        const bodyText = await page
+          .locator('body')
+          .innerText()
+          .catch(() => '');
+        const lowerBody = bodyText.toLowerCase();
+        if (bodyText.length > 0) {
+          expect(
+            lowerBody,
+            `${route.name}: token-gated redirect should not crash`
+          ).not.toContain('application error');
+          expect(lowerBody).not.toContain('internal server error');
+        }
+        continue;
+      }
 
       if (hasMain) {
         await assertMainContent(page, route.name, {

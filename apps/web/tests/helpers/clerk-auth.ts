@@ -124,6 +124,16 @@ export function isClerkOriginMismatchMessage(message: string): boolean {
   return CLERK_ORIGIN_MISMATCH_PATTERNS.some(pattern => pattern.test(message));
 }
 
+export function hasClerkOriginMismatchSignal(
+  errorMessage: string,
+  consoleMessages: readonly string[] = []
+): boolean {
+  return (
+    isClerkOriginMismatchMessage(errorMessage) ||
+    consoleMessages.some(isClerkOriginMismatchMessage)
+  );
+}
+
 /**
  * Creates or reuses a Clerk test user session for the given email.
  *
@@ -230,13 +240,13 @@ export async function signInUser(
   // This is required for the testing token to be included in Clerk's FAPI requests
   await setupClerkTestingToken({ page });
 
-  const clerkConsoleErrors: string[] = [];
+  const clerkConsoleMessages: string[] = [];
   const handleConsoleMessage = (message: {
     type(): string;
     text(): string;
   }) => {
-    if (message.type() === 'error') {
-      clerkConsoleErrors.push(message.text());
+    if (message.type() === 'error' || message.type() === 'warning') {
+      clerkConsoleMessages.push(message.text());
     }
   };
   page.on('console', handleConsoleMessage);
@@ -322,9 +332,10 @@ export async function signInUser(
     }
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    const sawOriginMismatch =
-      isClerkOriginMismatchMessage(msg) ||
-      clerkConsoleErrors.some(isClerkOriginMismatchMessage);
+    const sawOriginMismatch = hasClerkOriginMismatchSignal(
+      msg,
+      clerkConsoleMessages
+    );
 
     // Handle "already signed in" — testing token may auto-authenticate
     if (msg.includes('already signed in')) {

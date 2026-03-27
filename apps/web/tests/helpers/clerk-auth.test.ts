@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  hasClerkOriginMismatchSignal,
   isClerkHandshakeUrl,
   isClerkOriginMismatchMessage,
 } from './clerk-auth';
@@ -32,6 +33,19 @@ describe('clerk-auth helpers', () => {
     ).toBe(true);
     expect(
       isClerkOriginMismatchMessage('TimeoutError: page.waitForFunction')
+    ).toBe(false);
+  });
+
+  it('detects clerk origin mismatch from timeout plus console warning', () => {
+    expect(
+      hasClerkOriginMismatchSignal('TimeoutError: page.waitForFunction', [
+        'Clerk: Production Keys are only allowed for domain "staging.jov.ie".',
+      ])
+    ).toBe(true);
+    expect(
+      hasClerkOriginMismatchSignal('TimeoutError: page.waitForFunction', [
+        'Some unrelated warning',
+      ])
     ).toBe(false);
   });
 });
