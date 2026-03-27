@@ -11,6 +11,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -20,6 +21,7 @@ import {
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
@@ -27,6 +29,7 @@ import {
   useLeadsInfiniteQuery,
   useUpdateLeadStatusMutation,
 } from '@/lib/queries';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -54,6 +57,8 @@ const columnHelper = createColumnHelper<AdminLead>();
 
 interface LeadTableProps {
   readonly refreshKey?: number;
+  readonly initialSearch?: string;
+  readonly basePath?: string;
 }
 
 interface ActioningState {
@@ -234,10 +239,16 @@ function buildLeadColumns(deps: {
   ];
 }
 
-export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
+export function LeadTable({
+  refreshKey = 0,
+  initialSearch = '',
+  basePath = APP_ROUTES.ADMIN_LEADS,
+}: Readonly<LeadTableProps>) {
+  const router = useRouter();
+ 
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const sortBy: AdminLeadsSortBy = 'createdAt';
   const [actioning, setActioning] = useState<ActioningState | null>(null);
   const actioningRef = useRef<ActioningState | null>(null);
@@ -270,6 +281,18 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       return true;
     });
   }, [data]);
+
+  useEffect(() => {
+    setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    router.replace(
+      mergeHrefSearchParams(basePath, {
+        q: search.trim() || null,
+      })
+    );
+  }, [basePath, router, search]);
 
   useEffect(() => {
     if (refreshKey > 0) {
