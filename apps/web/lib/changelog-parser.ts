@@ -13,7 +13,7 @@
  *   patterns are automatically excluded even without the `[internal]` prefix.
  */
 
-import { isInternalEntry } from '../../../scripts/lib/changelog-filter-rules.mjs';
+import { isInternalEntry } from './changelog-filter-rules';
 
 export interface ChangelogSection {
   added: string[];
@@ -31,7 +31,7 @@ export interface ChangelogRelease {
 
 const VERSION_HEADING_RE = /^## \[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?$/;
 const SECTION_HEADING_RE = /^### (Added|Changed|Fixed|Removed)$/;
-const INTERNAL_PREFIX = '[internal]';
+const INTERNAL_MARKER_RE = /\[\s*internal\s*\]/i;
 
 /** Try to parse a version heading; returns a new release or 'unreleased' sentinel. */
 function parseVersionHeading(
@@ -51,7 +51,7 @@ function parseVersionHeading(
 
 /** Check if a bullet entry should be included in public output. */
 function isPublicEntry(entry: string): boolean {
-  return !entry.startsWith(INTERNAL_PREFIX) && !isInternalEntry(entry);
+  return !INTERNAL_MARKER_RE.test(entry) && !isInternalEntry(entry);
 }
 
 /** Returns true when a release has at least one public entry. */
@@ -110,7 +110,10 @@ function tryParseSummary(
   currentSection: keyof ChangelogSection | null
 ): LineState | null {
   if (!currentSection && line.startsWith('> ') && !current.summary) {
-    current.summary = line.slice(2).trim();
+    const summary = line.slice(2).trim();
+    if (!INTERNAL_MARKER_RE.test(summary) && !isInternalEntry(summary)) {
+      current.summary = summary;
+    }
     return { current, currentSection };
   }
   return null;

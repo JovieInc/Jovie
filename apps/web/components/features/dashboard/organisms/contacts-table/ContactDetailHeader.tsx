@@ -20,6 +20,8 @@ interface UseContactDetailHeaderProps {
 interface UseContactDetailHeaderResult {
   readonly title: string;
   readonly actions: ReactNode | undefined;
+  readonly primaryActions: DrawerHeaderAction[];
+  readonly overflowActions: DrawerHeaderAction[];
 }
 
 export function useContactDetailHeaderParts({
@@ -85,5 +87,7 @@ export function useContactDetailHeaderParts({
           onClose={onClose}
         />
       ) : undefined,
+    primaryActions,
+    overflowActions,
   };
 }

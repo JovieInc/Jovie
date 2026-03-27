@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { Icon } from '@/components/atoms/Icon';
 import { DrawerInlineIconButton } from '@/components/molecules/drawer';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -34,7 +35,12 @@ function ProviderActionButtons({
   onCopyClick,
 }: ProviderActionButtonsProps) {
   return (
-    <div className='inline-flex items-center gap-1 rounded-md bg-surface-1 px-1 py-0.5'>
+    <div
+      className={cn(
+        APP_CONTROL_BUTTON_CLASS,
+        'inline-flex h-7 gap-1 rounded-full px-1.5 py-0 text-secondary-token'
+      )}
+    >
       <DrawerInlineIconButton
         title='Open'
         onClick={event => {
@@ -134,8 +140,8 @@ export const ProviderCell = memo(function ProviderCell({
           clearTimeout(copyTimeoutRef.current);
         }
         copyTimeoutRef.current = setTimeout(() => setCopiedTestId(null), 2000);
-      } catch (error) {
-        console.error('Failed to copy link:', error);
+      } catch {
+        setCopiedTestId(null);
       }
     },
     [onCopy]

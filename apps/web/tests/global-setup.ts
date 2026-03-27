@@ -12,9 +12,13 @@ import { seedTestData } from './seed-test-data';
 // Load environment variables in priority order (first-loaded wins with override: false)
 const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '../..');
+const bootstrapBaseUrl = process.env.BASE_URL;
+const shouldLoadRepoEnvLocal = !isExternalBaseUrl(bootstrapBaseUrl);
 
 config({ path: path.join(webRoot, '.env.development.local') }); // E2E creds
-config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+if (shouldLoadRepoEnvLocal) {
+  config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+}
 config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;

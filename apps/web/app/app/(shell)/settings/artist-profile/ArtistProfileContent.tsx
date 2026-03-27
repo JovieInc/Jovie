@@ -37,7 +37,7 @@ function MobileProfilePanelTrigger() {
 
 export function ArtistProfileContent() {
   const router = useRouter();
-  const { artist, setArtist, isPro } = useSettingsContext();
+  const { artist, setArtist, isPro, avatarQuality } = useSettingsContext();
 
   if (!artist) {
     return (
@@ -55,6 +55,7 @@ export function ArtistProfileContent() {
         <div className='space-y-4'>
           <SettingsProfileSection
             artist={artist}
+            avatarQuality={avatarQuality}
             onArtistUpdate={setArtist}
             onRefresh={() => router.refresh()}
           />

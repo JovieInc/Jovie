@@ -13,9 +13,30 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
+const {
+  mockLogger,
+  mockStoreRawIdentityLinks,
+  mockPublishIdentityLinks,
+  mockPlainDbOnConflictDoUpdate,
+  mockPlainDbValues,
+  mockPlainDbInsert,
+} = vi.hoisted(() => ({
+  mockLogger: {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
+  mockStoreRawIdentityLinks: vi.fn(),
+  mockPublishIdentityLinks: vi.fn(),
+  mockPlainDbOnConflictDoUpdate: vi.fn(),
+  mockPlainDbValues: vi.fn(),
+  mockPlainDbInsert: vi.fn(),
+}));
+
 // Logger
 vi.mock('@/lib/utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: mockLogger,
 }));
 
 // Resilient client — expose MusicfetchRequestError for error-handling tests
@@ -23,15 +44,18 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
   class MusicfetchRequestError extends Error {
     statusCode?: number;
     retryAfterSeconds?: number;
+    details?: string;
     constructor(
       message: string,
       statusCode?: number,
-      retryAfterSeconds?: number
+      retryAfterSeconds?: number,
+      details?: string
     ) {
       super(message);
       this.name = 'MusicfetchRequestError';
       this.statusCode = statusCode;
       this.retryAfterSeconds = retryAfterSeconds;
+      this.details = details;
     }
   }
   class MusicfetchBudgetExceededError extends MusicfetchRequestError {
@@ -47,7 +71,17 @@ vi.mock('@/lib/musicfetch/resilient-client', () => {
       this.budgetScope = budgetScope;
     }
   }
-  return { MusicfetchRequestError, MusicfetchBudgetExceededError };
+  return {
+    isMusicfetchInvalidServicesError: (
+      error: Partial<{ statusCode: number; details: string; message: string }>
+    ) =>
+      error.statusCode === 400 &&
+      (error.details ?? error.message ?? '').includes(
+        'services - Invalid value'
+      ),
+    MusicfetchRequestError,
+    MusicfetchBudgetExceededError,
+  };
 });
 
 // MusicFetch provider
@@ -98,6 +132,16 @@ const mockNormalizeAndMergeExtraction = vi.fn().mockResolvedValue({
 vi.mock('@/lib/ingestion/merge', () => ({
   normalizeAndMergeExtraction: (...args: unknown[]) =>
     mockNormalizeAndMergeExtraction(...args),
+}));
+
+vi.mock('@/lib/identity/store', () => ({
+  storeRawIdentityLinks: (...args: unknown[]) =>
+    mockStoreRawIdentityLinks(...args),
+}));
+
+vi.mock('@/lib/identity/publish', () => ({
+  publishIdentityLinks: (...args: unknown[]) =>
+    mockPublishIdentityLinks(...args),
 }));
 
 const mockImportReleasesFromSpotify = vi.fn().mockResolvedValue({
@@ -159,6 +203,12 @@ const mockIsBlacklistedSpotifyId = vi.fn((id: string) => {
 
 vi.mock('@/lib/spotify/blacklist', () => ({
   isBlacklistedSpotifyId: (id: string) => mockIsBlacklistedSpotifyId(id),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    insert: (...args: unknown[]) => mockPlainDbInsert(...args),
+  },
 }));
 
 // Mock DB transaction
@@ -259,6 +309,27 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function getInsertedProviderIds(): string[] {
+  return mockPlainDbValues.mock.calls
+    .map(([values]) => (values as { providerId?: string }).providerId)
+    .filter((providerId): providerId is string => Boolean(providerId));
+}
+
+function getOnConflictSqlParts(value: unknown): readonly string[] | null {
+  if (
+    value &&
+    typeof value === 'object' &&
+    'type' in value &&
+    value.type === 'sql' &&
+    'strings' in value &&
+    Array.isArray(value.strings)
+  ) {
+    return value.strings as readonly string[];
+  }
+
+  return null;
+}
+
 describe('musicfetch-enrichment', () => {
   let mockTx: ReturnType<typeof createMockTx>;
 
@@ -277,6 +348,18 @@ describe('musicfetch-enrichment', () => {
       releases: [],
       errors: [],
     });
+    mockStoreRawIdentityLinks.mockResolvedValue(0);
+    mockPublishIdentityLinks.mockResolvedValue({
+      inserted: 0,
+      updated: 0,
+    });
+    mockPlainDbValues.mockImplementation(() => ({
+      onConflictDoUpdate: mockPlainDbOnConflictDoUpdate,
+    }));
+    mockPlainDbInsert.mockImplementation(() => ({
+      values: mockPlainDbValues,
+    }));
+    mockPlainDbOnConflictDoUpdate.mockResolvedValue(undefined);
     mockTxLimit.mockResolvedValue([makeProfile()]);
   });
 
@@ -379,6 +462,30 @@ describe('musicfetch-enrichment', () => {
       );
 
       expect(result.errors[0]).toContain('MusicFetch API rejected request');
+    });
+
+    it('re-throws invalid-service 400 responses so configuration bugs fail loudly', async () => {
+      mockFetchArtistBySpotifyUrl.mockRejectedValue(
+        new MusicfetchRequestError(
+          'MusicFetch API error: 400 - services - Invalid value "soundCloud"',
+          400,
+          undefined,
+          'services - Invalid value "soundCloud"'
+        )
+      );
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await expect(
+        processMusicFetchEnrichmentJob(
+          mockTx as unknown as Parameters<
+            typeof processMusicFetchEnrichmentJob
+          >[0],
+          makePayload()
+        )
+      ).rejects.toThrow('services - Invalid value');
     });
 
     it('re-throws on 500 response (transient failure, should retry)', async () => {
@@ -549,6 +656,208 @@ describe('musicfetch-enrichment', () => {
       );
     });
 
+    it('does not double-count Spotify when MusicFetch already returns it', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          spotify: {
+            id: 'spotify-service-id',
+            url: 'https://open.spotify.com/artist/123',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const seededLog = mockLogger.info.mock.calls.find(
+        ([message]) =>
+          message === 'MusicFetch enrichment: seeded DSP presence matches'
+      );
+
+      const insertedProviderIds = getInsertedProviderIds();
+
+      expect(
+        insertedProviderIds.filter(providerId => providerId === 'spotify')
+      ).toHaveLength(1);
+      expect(seededLog?.[1]).toEqual(
+        expect.objectContaining({
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          seeded: 8,
+        })
+      );
+    });
+
+    it('repairs missing external artist ids when MusicFetch returns one', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          appleMusic: {
+            id: '123456',
+            url: 'https://music.apple.com/us/artist/test-artist/123456',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const appleMusicInsert = mockPlainDbValues.mock.calls.find(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'apple_music'
+      )?.[0] as { externalArtistId?: string } | undefined;
+      const appleMusicInsertIndex = mockPlainDbValues.mock.calls.findIndex(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'apple_music'
+      );
+      const repairCall =
+        appleMusicInsertIndex >= 0
+          ? (mockPlainDbOnConflictDoUpdate.mock.calls[
+              appleMusicInsertIndex
+            ]?.[0] as { set?: { externalArtistId?: unknown } } | undefined)
+          : undefined;
+      const externalArtistIdSqlParts = getOnConflictSqlParts(
+        repairCall?.set?.externalArtistId
+      );
+
+      expect(appleMusicInsert?.externalArtistId).toBe('123456');
+      expect(externalArtistIdSqlParts?.join('')).toContain('COALESCE(');
+      expect(externalArtistIdSqlParts?.join('')).toContain(
+        'excluded.external_artist_id'
+      );
+    });
+
+    it('backfills Spotify external ids from the fallback URL when MusicFetch omits them', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          spotify: {
+            url: 'https://open.spotify.com/artist/123',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const spotifyInsertCalls = mockPlainDbValues.mock.calls.filter(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'spotify'
+      );
+      const spotifyInsertIndex = mockPlainDbValues.mock.calls.findIndex(
+        ([values]) =>
+          (values as { providerId?: string }).providerId === 'spotify'
+      );
+      const spotifyRepairCall =
+        spotifyInsertIndex >= 0
+          ? (mockPlainDbOnConflictDoUpdate.mock.calls[
+              spotifyInsertIndex
+            ]?.[0] as { set?: { externalArtistId?: unknown } } | undefined)
+          : undefined;
+      const externalArtistIdSqlParts = getOnConflictSqlParts(
+        spotifyRepairCall?.set?.externalArtistId
+      );
+      const seededLog = mockLogger.info.mock.calls.find(
+        ([message]) =>
+          message === 'MusicFetch enrichment: seeded DSP presence matches'
+      );
+
+      expect(spotifyInsertCalls).toHaveLength(1);
+      expect(
+        (spotifyInsertCalls[0]?.[0] as { externalArtistId?: string })
+          .externalArtistId
+      ).toBe('123');
+      expect(externalArtistIdSqlParts?.join('')).toContain('COALESCE(');
+      expect(seededLog?.[1]).toEqual(
+        expect.objectContaining({
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          seeded: 8,
+        })
+      );
+    });
+
+    it('seeds well above ten streaming DSP matches when MusicFetch returns a broad service set', async () => {
+      const musicFetchResult = makeMusicFetchResult({
+        services: {
+          ...makeMusicFetchResult().services,
+          amazonMusic: {
+            url: 'https://music.amazon.com/artists/B001TEST',
+          },
+          audiomack: { url: 'https://audiomack.com/test-artist' },
+          qobuz: { url: 'https://open.qobuz.com/artist/test-artist' },
+          anghami: { url: 'https://play.anghami.com/artist/123' },
+          netease: { url: 'https://music.163.com/artist?id=123' },
+          pandora: {
+            url: 'https://www.pandora.com/artist/test-artist/TR123',
+          },
+        },
+      });
+      mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);
+
+      const { processMusicFetchEnrichmentJob } = await import(
+        '@/lib/dsp-enrichment/jobs/musicfetch-enrichment'
+      );
+
+      await processMusicFetchEnrichmentJob(
+        mockTx as unknown as Parameters<
+          typeof processMusicFetchEnrichmentJob
+        >[0],
+        makePayload()
+      );
+
+      const seededLog = mockLogger.info.mock.calls.find(
+        ([message]) =>
+          message === 'MusicFetch enrichment: seeded DSP presence matches'
+      );
+
+      const insertedProviderIds = getInsertedProviderIds();
+
+      expect(insertedProviderIds).toEqual(
+        expect.arrayContaining([
+          'amazon_music',
+          'anghami',
+          'audiomack',
+          'netease',
+          'pandora',
+          'qobuz',
+          'spotify',
+        ])
+      );
+      expect(insertedProviderIds.length).toBeGreaterThanOrEqual(10);
+      expect(seededLog?.[1]).toEqual(
+        expect.objectContaining({
+          creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
+          seeded: 14,
+        })
+      );
+    });
     it('imports Spotify releases without cross-platform discovery fan-out', async () => {
       const musicFetchResult = makeMusicFetchResult();
       mockFetchArtistBySpotifyUrl.mockResolvedValue(musicFetchResult);

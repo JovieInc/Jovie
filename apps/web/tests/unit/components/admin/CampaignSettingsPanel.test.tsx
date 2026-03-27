@@ -109,9 +109,7 @@ describe('CampaignSettingsPanel', () => {
     renderWithQueryClient(<CampaignSettingsPanel />);
 
     await waitFor(() => {
-      expect(
-        screen.getByText('Campaign targeting & throttling')
-      ).toBeInTheDocument();
+      expect(screen.getByText('Campaign targeting')).toBeInTheDocument();
     });
 
     expect(screen.getByLabelText('Minimum Fit Score')).toBeInTheDocument();

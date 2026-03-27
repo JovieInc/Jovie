@@ -50,11 +50,11 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(screen.getByText('Copy ISRC')).toBeInTheDocument();
+    expect(screen.getAllByText('Copy ISRC')).toHaveLength(2);
 
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
 
-    expect(screen.queryByText('Copy ISRC')).not.toBeInTheDocument();
+    expect(screen.queryAllByText('Copy ISRC')).toHaveLength(0);
   });
 
   it('renders empty platforms state when there are no provider links', async () => {
@@ -84,6 +84,6 @@ describe('TrackSidebar', () => {
     );
 
     expect(screen.getAllByText('Midnight Echo').length).toBeGreaterThan(0);
-    expect(screen.getByText('Copy ISRC')).toBeInTheDocument();
+    expect(screen.getAllByText('Copy ISRC')).toHaveLength(2);
   });
 });

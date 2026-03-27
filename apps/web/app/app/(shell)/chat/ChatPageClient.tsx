@@ -24,6 +24,10 @@ import { useClipboard } from '@/hooks/useClipboard';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
+import {
+  ONBOARDING_PREVIEW_SNAPSHOT_KEY,
+  ONBOARDING_WELCOME_REPLY_KEY,
+} from '@/lib/onboarding/session-keys';
 import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
@@ -72,6 +76,8 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
+  const [hasBootstrappedWelcomeChat, setHasBootstrappedWelcomeChat] =
+    useState(false);
 
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
@@ -82,6 +88,7 @@ export function ChatPageClient({
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
   const canAutoRetry = isProfileSetupRace && autoRetryCount < 3;
   const enablePreviewPanel = !env.IS_E2E;
+  const fromOnboarding = searchParams.get('from') === 'onboarding';
 
   // Register ProfileContactSidebar in the unified right panel system
   useRegisterRightPanel(
@@ -95,6 +102,24 @@ export function ChatPageClient({
   // Fetch social links for the selected profile
   const profileId = enablePreviewPanel ? (activeProfile?.id ?? '') : '';
   const { data: socialLinks } = useDashboardSocialLinksQuery(profileId);
+
+  useEffect(() => {
+    if (!enablePreviewPanel || !fromOnboarding) return;
+
+    try {
+      const rawSnapshot = globalThis.sessionStorage?.getItem(
+        ONBOARDING_PREVIEW_SNAPSHOT_KEY
+      );
+      if (!rawSnapshot) return;
+
+      const snapshot = JSON.parse(rawSnapshot) as Parameters<
+        typeof setPreviewData
+      >[0];
+      setPreviewData(snapshot);
+    } catch {
+      // sessionStorage may be unavailable or the payload may be malformed
+    }
+  }, [enablePreviewPanel, fromOnboarding, setPreviewData]);
 
   // Convert API links to preview panel format
   const previewLinks: PreviewPanelLink[] = useMemo(
@@ -252,6 +277,76 @@ export function ChatPageClient({
       setInitialQueryHandled(true);
     }
   }, [rawQuery, conversationId]);
+
+  useEffect(() => {
+    if (
+      !fromOnboarding ||
+      conversationId ||
+      !activeProfile ||
+      hasBootstrappedWelcomeChat
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const bootstrapWelcomeChat = async () => {
+      setHasBootstrappedWelcomeChat(true);
+
+      let initialReply = '';
+      try {
+        initialReply =
+          globalThis.sessionStorage?.getItem(ONBOARDING_WELCOME_REPLY_KEY) ??
+          '';
+      } catch {
+        initialReply = '';
+      }
+
+      const response = await fetch('/api/onboarding/welcome-chat', {
+        body: JSON.stringify({ initialReply }),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        setHasBootstrappedWelcomeChat(false);
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        route?: string;
+      };
+
+      try {
+        globalThis.sessionStorage?.removeItem(ONBOARDING_WELCOME_REPLY_KEY);
+        globalThis.sessionStorage?.removeItem(ONBOARDING_PREVIEW_SNAPSHOT_KEY);
+      } catch {
+        // sessionStorage cleanup is non-critical
+      }
+
+      if (!controller.signal.aborted && payload.route) {
+        router.replace(payload.route, { scroll: false });
+      }
+    };
+
+    const bootstrapPromise = bootstrapWelcomeChat();
+    bootstrapPromise.catch(() => {
+      if (!controller.signal.aborted) {
+        setHasBootstrappedWelcomeChat(false);
+      }
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    activeProfile,
+    conversationId,
+    fromOnboarding,
+    hasBootstrappedWelcomeChat,
+    router,
+  ]);
 
   // Profile unavailable — show actionable error instead of infinite spinner.
   // This happens when billing/entitlements fail or the DB query times out,

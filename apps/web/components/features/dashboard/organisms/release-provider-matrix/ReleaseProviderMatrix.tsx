@@ -21,15 +21,11 @@ import {
   DrawerButton,
   DrawerLoadingSkeleton,
 } from '@/components/molecules/drawer';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -115,8 +111,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
+    handleReleaseCreated,
     updateRow,
-    patchRow,
+    handleReleaseArtworkUploaded,
     openEditor,
     closeEditor,
     handleCopy,
@@ -401,24 +398,11 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
 
   const handleAddReleaseCreated = useCallback(
     (createdRelease: ReleaseViewModel) => {
-      setRows(currentRows => {
-        const existingIndex = currentRows.findIndex(
-          release => release.id === createdRelease.id
-        );
-
-        if (existingIndex === -1) {
-          return [createdRelease, ...currentRows];
-        }
-
-        return currentRows.map(release =>
-          release.id === createdRelease.id ? createdRelease : release
-        );
-      });
+      handleReleaseCreated(createdRelease);
       setAddReleaseOpen(false);
       setEditingTrack(null);
-      openEditor(createdRelease);
     },
-    [openEditor, setRows]
+    [handleReleaseCreated]
   );
 
   // Artwork upload handler - calls the artwork upload API endpoint
@@ -460,13 +444,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
       updateRow(updated);
     },
     [updateRow]
-  );
-
-  const handleReleaseArtworkUploaded = useCallback(
-    (releaseId: string, artworkUrl: string) => {
-      patchRow(releaseId, { artworkUrl });
-    },
-    [patchRow]
   );
 
   // Show import progress banner when actively importing
@@ -515,64 +492,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSidebarOpen,
   ]);
 
-  // Set header badge (DSP pills on left) and actions (drawer toggle on right)
   const { setHeaderActions } = useSetHeaderActions();
 
-  // Memoize both badge and actions to avoid creating new JSX on every render
-  // This is CRITICAL to prevent infinite render loops when updating context
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        className='min-w-0 flex-1 gap-2'
-        leadingClassName='min-w-0 gap-1.5'
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
-            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-          />
-        }
-      >
-        <HeaderSearchAction
-          searchValue={searchQuery}
-          onSearchValueChange={setSearchQuery}
-          onClearAction={() => setSearchQuery('')}
-          onApply={() => undefined}
-          placeholder='Search releases'
-          ariaLabel='Search releases'
-          submitAriaLabel='Search releases'
-          submitIcon={
-            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
-          }
-          tooltipLabel='Search'
-          className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
-        />
-        {canCreateManualReleases ? (
-          <DashboardHeaderActionButton
-            ariaLabel='Create a new release'
-            onClick={handleNewRelease}
-            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
-            label='New Release'
-            iconOnly
-            tooltipLabel='New Release'
-            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-          />
-        ) : null}
-      </DashboardHeaderActionGroup>
-    ),
-    [canCreateManualReleases, handleNewRelease, searchQuery]
-  );
-
   useEffect(() => {
-    // New Release button on the right side (use memoized element to prevent infinite loops)
-    setHeaderActions(headerActions);
+    setHeaderActions(null);
 
     return () => {
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
-  }, [headerActions]);
+  }, []);
 
   const releaseSidebarHandlers = useMemo(
     () => ({
@@ -791,6 +720,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
                 onGroupByYearChange={onGroupByYearChange}
                 releaseView={releaseView}
                 onReleaseViewChange={setReleaseView}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                onCreateRelease={handleNewRelease}
+                canCreateManualReleases={canCreateManualReleases}
               />
               <ReleaseTable
                 releases={filteredRows}
