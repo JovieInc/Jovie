@@ -839,6 +839,16 @@ export function OnboardingV2Form({
       setCurrentStep('artist-confirm');
     },
     onAutoConnectFailed: message => {
+      const currentStepAtFailure = currentStepRef.current;
+
+      if (
+        currentStepAtFailure !== 'spotify' &&
+        currentStepAtFailure !== 'artist-confirm'
+      ) {
+        setDiscoveryError(message);
+        return;
+      }
+
       setSelectedArtist(
         discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
       );
