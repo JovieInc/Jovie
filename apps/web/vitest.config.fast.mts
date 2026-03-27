@@ -35,7 +35,6 @@ const changedSuiteStabilityConfig = isChangedRun
       testTimeout: 12_000,
       hookTimeout: 12_000,
       teardownTimeout: 12_000,
-      singleFork: true,
     }
   : {};
 
@@ -87,6 +86,12 @@ export default defineConfig({
     // Performance optimizations
     // Use forks for better memory isolation (Vitest 4 style)
     pool: 'forks',
+    poolOptions: {
+      forks: {
+        isolate: true,
+        singleFork: isChangedRun,
+      },
+    },
     // CI stability: reduce memory pressure
     maxWorkers: isCI ? 2 : undefined,
     minWorkers: 1,

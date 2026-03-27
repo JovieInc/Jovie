@@ -133,6 +133,11 @@ export interface UnifiedTableProps<TData> {
   readonly getRowClassName?: (row: TData, index: number) => string;
 
   /**
+   * Get a stable test ID for a row when callers need selector-level targeting.
+   */
+  readonly getRowTestId?: (row: TData, index: number) => string | undefined;
+
+  /**
    * Additional table class names
    */
   readonly className?: string;
@@ -333,6 +338,7 @@ export function UnifiedTable<TData>({
   onRowContextMenu,
   getContextMenuItems,
   getRowClassName,
+  getRowTestId,
   className,
   containerClassName,
   minWidth = `${TABLE_MIN_WIDTHS.MEDIUM}px`,
@@ -519,6 +525,7 @@ export function UnifiedTable<TData>({
           onKeyDown={handleKeyDown}
           onFocusChange={setFocusedIndex}
           getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
           onRowShiftClick={onRowShiftClick}
         />
       );
@@ -560,6 +567,7 @@ export function UnifiedTable<TData>({
       handleKeyDown,
       setFocusedIndex,
       getRowClassName,
+      getRowTestId,
       onRowShiftClick,
       getExpandableRowId,
       expandedRowIds,
@@ -697,6 +705,7 @@ export function UnifiedTable<TData>({
           getContextMenuItems={getContextMenuItems}
           onRowShiftClick={onRowShiftClick}
           getRowClassName={getRowClassName}
+          getRowTestId={getRowTestId}
           renderRow={renderRow}
           getRowId={getRowId}
           expandedRowIds={expandedRowIds}

@@ -139,6 +139,7 @@ export function OnboardingDspStep({
                 <input
                   ref={inputRef}
                   type='text'
+                  data-testid='spotify-link-input'
                   value={state.searchQuery}
                   onChange={e => handleInputChange(e.target.value)}
                   placeholder='Search for your artist or paste a Spotify link'

@@ -11,12 +11,16 @@ on:
       - 'apps/web/app/demo/**'
       - 'apps/web/components/**'
       - 'apps/web/features/**'
+      - 'apps/web/lib/screenshots/**'
       - 'apps/web/tests/product-screenshots/**'
       - 'apps/web/tailwind.config.*'
       - 'apps/web/app/**/layout.tsx'
       - 'apps/web/app/globals.css'
       - 'packages/ui/**'
       - '!apps/web/public/product-screenshots/**'
+      - '!apps/web/screenshot-catalog/current/**'
+  schedule:
+    - cron: '0 9 * * *'
   workflow_dispatch:
 
 permissions:
@@ -58,47 +62,25 @@ jobs:
           pnpm run start &
           npx wait-on http://localhost:3000 --timeout 60000
 
-      - name: Capture demo screenshots
+      - name: Capture screenshot catalog
         run: |
           pnpm exec playwright test \
             --config=playwright.config.screenshots.ts \
-            --project=screenshots \
-            tests/product-screenshots/audience.spec.ts \
-            tests/product-screenshots/releases.spec.ts \
-            tests/product-screenshots/profile.spec.ts
+            --project=screenshots
         env:
           BASE_URL: http://localhost:3000
-          E2E_SKIP_SEED: '1'
-          E2E_SKIP_WARMUP: '1'
-
-      - name: Remove orphan screenshots
-        working-directory: .
-        run: |
-          # Keep only screenshots that are referenced in source code.
-          # This prevents stale PNGs from accumulating when specs or
-          # home page references are removed.
-          SCREENSHOT_DIR="apps/web/public/product-screenshots"
-          for f in "$SCREENSHOT_DIR"/*.png; do
-            [ -f "$f" ] || continue
-            BASENAME=$(basename "$f")
-            # Search source files (excluding the screenshot dir itself)
-            if ! grep -rq "$BASENAME" apps/web/app apps/web/components apps/web/features apps/web/tests/product-screenshots --include='*.ts' --include='*.tsx' 2>/dev/null; then
-              echo "Removing orphan screenshot: $BASENAME"
-              rm "$f"
-            fi
-          done
 
       - name: Check for changes
         id: diff
         working-directory: .
         run: |
-          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/)" ]; then
+          if [ -z "$(git status --porcelain apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/)" ]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "No screenshot changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "Screenshots changed:"
-            git status --short apps/web/public/product-screenshots/
+            git status --short apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           fi
 
       - name: Create or update screenshot PR
@@ -112,7 +94,7 @@ jobs:
 
           BRANCH="screenshots/auto-update"
           git checkout -b "$BRANCH"
-          git add apps/web/public/product-screenshots/
+          git add apps/web/public/product-screenshots/ apps/web/screenshot-catalog/current/
           git commit -m "chore: update product screenshots [auto]"
           git fetch origin "$BRANCH" 2>/dev/null || true
           git push --force-with-lease origin "$BRANCH"

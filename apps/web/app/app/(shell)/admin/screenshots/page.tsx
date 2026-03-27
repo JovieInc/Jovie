@@ -47,7 +47,7 @@ export default async function AdminScreenshotsPage() {
     <PageShell>
       <PageHeader
         title='Screenshots'
-        description={`${screenshots.length} screenshots from docs and e2e tests`}
+        description={`${screenshots.length} canonical product surfaces from the latest screenshot catalog`}
       />
       <PageContent>
         <ScreenshotGallery screenshots={screenshots} />
