@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-import { APP_ROUTES } from '@/constants/routes';
+import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { FeatureShowcase } from '@/features/home/FeatureShowcase';
+import { FinalCTASection } from '@/features/home/FinalCTASection';
 import { HeroCinematic } from '@/features/home/HeroCinematic';
+import { LogoBar } from '@/features/home/LogoBar';
+import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 export const revalidate = false;
 
@@ -142,18 +147,49 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   sameAs: ['https://instagram.com/meetjovie'],
 });
 
-export default function HomePage() {
-  const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
+const heroOnly =
+  !FEATURE_FLAGS.SHOW_PHONE_TOUR &&
+  !FEATURE_FLAGS.SHOW_LOGO_BAR &&
+  !FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE &&
+  !FEATURE_FLAGS.SHOW_FINAL_CTA;
 
+export default function HomePage() {
   return (
-    <div className='relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'>
-      <script suppressHydrationWarning>{authRedirectScript}</script>
+    <div
+      className={
+        heroOnly
+          ? 'relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'
+          : 'relative min-h-screen'
+      }
+    >
+      <AuthRedirectHandler />
 
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      <HeroCinematic fullScreen />
+      {heroOnly && (
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
+      )}
+
+      <HeroCinematic fullScreen={heroOnly} />
+
+      {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
+
+      {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
+
+      {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
+        <>
+          <FeatureShowcase />
+          <div aria-hidden='true' className='section-gradient-divider' />
+        </>
+      )}
+
+      {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
     </div>
   );
 }

@@ -17,8 +17,6 @@ export default async function WaitlistLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // proxy.ts already ensured user needsWaitlist
-  // Just render the page - no redirects!
   const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (

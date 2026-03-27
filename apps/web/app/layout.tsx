@@ -2,13 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
 import React from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
-// Feature flags removed - pre-launch
-// import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
 import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { publicEnv } from '@/lib/env-public';
 
-// Configure Inter Variable font from local file (no external network requests)
 const inter = localFont({
   src: '../public/fonts/Inter-Variable.woff2',
   variable: '--font-inter',
@@ -124,10 +121,8 @@ export const metadata: Metadata = {
       },
     ],
   },
-  // manifest.ts in app/ auto-generates the manifest link
 };
 
-// Viewport configuration with viewport-fit=cover for iOS safe area insets
 export const viewport: Viewport = {
   viewportFit: 'cover',
   width: 'device-width',
@@ -141,18 +136,11 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const isE2EClientRuntime = process.env.NEXT_PUBLIC_E2E_MODE === '1';
-
-  // Keep the root layout fully static for public/ISR routes. Dev toolbar visibility
-  // is resolved client-side so a production cookie doesn't force per-request SSR.
   const devEnv =
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development';
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
   const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
 
-  // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
-  // response header set by the middleware (proxy.ts). No need to read headers() here,
-  // which would force all routes into dynamic rendering.
-  // Cookie banner visibility is determined client-side by reading document.cookie.
   let devToolbar: React.ReactNode = null;
 
   if (!(isE2EClientRuntime || devEnv === 'production')) {

@@ -34,7 +34,6 @@ export default function UILayout({
   return (
     <TooltipProvider delayDuration={0}>
       <div className='flex min-h-screen bg-page text-primary-token'>
-        {/* Left nav */}
         <aside className='sticky top-0 flex h-screen w-52 shrink-0 flex-col overflow-y-auto border-r border-subtle py-6'>
           <div className='px-4 pb-4'>
             <span className='text-[11px] font-semibold uppercase tracking-wider text-tertiary-token'>
@@ -67,7 +66,6 @@ export default function UILayout({
           ))}
         </aside>
 
-        {/* Content */}
         <main className='flex-1 overflow-y-auto p-10'>{children}</main>
       </div>
     </TooltipProvider>
