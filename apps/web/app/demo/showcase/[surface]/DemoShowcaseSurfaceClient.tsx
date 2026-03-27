@@ -30,8 +30,7 @@ const HANDLE_VALIDATION_MOCK = {
 
 const PROFILE_REVIEW_DATA: EnrichedProfileData = {
   name: 'Sora Vale',
-  imageUrl:
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=640&q=80',
+  imageUrl: '/images/avatars/nova-lane.jpg',
   bio: 'Indie electronic artist from Portland creating cinematic synth pop for late-night drives.',
   genres: ['Indie Electronic', 'Synthwave', 'Ambient Pop'],
   followers: 184_000,

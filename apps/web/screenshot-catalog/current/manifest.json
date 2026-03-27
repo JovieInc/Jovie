@@ -8,7 +8,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:31:07.723Z",
+    "capturedAt": "2026-03-27T06:44:01.462Z",
     "gitSha": null,
     "imagePath": "marketing-home-desktop.png"
   },
@@ -21,7 +21,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:31:31.330Z",
+    "capturedAt": "2026-03-27T06:44:25.618Z",
     "gitSha": null,
     "imagePath": "dashboard-releases-desktop.png",
     "publicExportPath": "releases-dashboard-full.png"
@@ -35,7 +35,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:31:57.298Z",
+    "capturedAt": "2026-03-27T06:44:52.017Z",
     "gitSha": null,
     "imagePath": "dashboard-releases-sidebar-desktop.png",
     "publicExportPath": "releases-dashboard-sidebar.png"
@@ -49,7 +49,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:32:22.959Z",
+    "capturedAt": "2026-03-27T06:45:18.447Z",
     "gitSha": null,
     "imagePath": "dashboard-release-sidebar-detail-desktop.png",
     "publicExportPath": "release-sidebar-detail.png"
@@ -63,7 +63,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:32:46.439Z",
+    "capturedAt": "2026-03-27T06:45:42.395Z",
     "gitSha": null,
     "imagePath": "dashboard-audience-desktop.png",
     "publicExportPath": "audience-crm.png"
@@ -77,7 +77,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:33:10.276Z",
+    "capturedAt": "2026-03-27T06:46:06.532Z",
     "gitSha": null,
     "imagePath": "dashboard-analytics-desktop.png"
   },
@@ -90,7 +90,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:33:33.750Z",
+    "capturedAt": "2026-03-27T06:46:30.224Z",
     "gitSha": null,
     "imagePath": "dashboard-earnings-desktop.png"
   },
@@ -103,7 +103,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin"],
-    "capturedAt": "2026-03-27T04:33:57.119Z",
+    "capturedAt": "2026-03-27T06:46:53.898Z",
     "gitSha": null,
     "imagePath": "settings-profile-desktop.png"
   },
@@ -116,7 +116,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:34:20.496Z",
+    "capturedAt": "2026-03-27T06:47:17.587Z",
     "gitSha": null,
     "imagePath": "settings-links-desktop.png"
   },
@@ -142,7 +142,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:35:07.273Z",
+    "capturedAt": "2026-03-27T06:48:04.172Z",
     "gitSha": null,
     "imagePath": "onboarding-dsp-desktop.png"
   },
@@ -155,7 +155,7 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-03-27T04:35:10.803Z",
+    "capturedAt": "2026-03-27T06:48:07.619Z",
     "gitSha": null,
     "imagePath": "onboarding-profile-review-desktop.png"
   },
@@ -164,11 +164,11 @@
     "title": "Public Profile",
     "group": "public-profile",
     "groupLabel": "Public Profile",
-    "route": "/e2e-test-user",
+    "route": "/demo/showcase/public-profile",
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:35:17.542Z",
+    "capturedAt": "2026-03-27T06:48:11.601Z",
     "gitSha": null,
     "imagePath": "public-profile-desktop.png",
     "publicExportPath": "profile-desktop.png"
@@ -178,11 +178,11 @@
     "title": "Public Profile Mobile",
     "group": "public-profile",
     "groupLabel": "Public Profile",
-    "route": "/e2e-test-user",
+    "route": "/demo/showcase/public-profile",
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-03-27T04:35:21.434Z",
+    "capturedAt": "2026-03-27T06:48:15.348Z",
     "gitSha": null,
     "imagePath": "public-profile-mobile.png",
     "publicExportPath": "profile-phone.png"
