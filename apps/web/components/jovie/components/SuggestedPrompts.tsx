@@ -61,10 +61,10 @@ function SuggestionPill({
       )}
       aria-label={suggestion.label}
     >
-      <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-colors duration-150 group-hover:text-primary-token'>
+      <span className='flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-black/[0.035] text-secondary-token transition-colors duration-150 group-hover:bg-black/[0.05] group-hover:text-primary-token dark:bg-white/[0.045] dark:group-hover:bg-white/[0.065]'>
         {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
       </span>
-      <span className='min-w-0 flex-1 truncate pt-0.5 leading-none'>
+      <span className='min-w-0 flex-1 truncate leading-none'>
         {suggestion.label}
       </span>
     </button>

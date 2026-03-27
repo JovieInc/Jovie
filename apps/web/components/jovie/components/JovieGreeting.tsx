@@ -28,11 +28,11 @@ export function JovieGreeting({
   });
 
   return (
-    <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-center'>
-      <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
+    <div className='rounded-[24px] border border-black/6 bg-[color-mix(in_oklab,var(--linear-app-content-surface)_99%,var(--linear-bg-surface-0))] px-4 py-3 text-center shadow-[0_1px_0_rgba(255,255,255,0.6)] dark:border-white/8'>
+      <p className='text-[10px] font-[560] tracking-[0.01em] text-tertiary-token'>
         {greeting.label}
       </p>
-      <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
+      <p className='mt-1.5 text-[14px] leading-6 text-secondary-token'>
         {greeting.body}{' '}
         {greeting.profileHref && greeting.profileLabel ? (
           <>
