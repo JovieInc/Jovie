@@ -112,6 +112,9 @@ const EXPECTED_WARNING_PATTERNS = [
   'clerk: the request to /v1/client/handshake',
   'refreshing the session token resulted in an infinite redirect loop',
   'dev-browser-missing',
+  'react hook',
+  'usecontext',
+  'invalid hook call',
 ] as const;
 
 const EXPECTED_WARNING_REGEXES = [

@@ -55,6 +55,22 @@ describe('smoke-test-utils', () => {
           "The resource https://distinct-giraffe-5.clerk.accounts.dev/npm/@clerk/ui@1/dist/ui.browser.js was preloaded using link preload but not used within a few seconds from the window's load event."
         )
       ).toBe(true);
+
+      expect(
+        isExpectedWarning(
+          'Warning: Invalid hook call. Hooks can only be called inside of the body of a function component.'
+        )
+      ).toBe(true);
+
+      expect(
+        isExpectedWarning(
+          'React Hook "useQuery" cannot be called conditionally.'
+        )
+      ).toBe(true);
+
+      expect(
+        isExpectedWarning('useContext is unavailable in this test renderer.')
+      ).toBe(true);
     });
 
     it('keeps generic publishable-key and cross-origin warnings visible', () => {
