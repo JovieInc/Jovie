@@ -2,14 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import { BadgeCheck, BarChart3, Eye, Sparkles } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Avatar } from '@/components/molecules/Avatar/Avatar';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
 import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
+import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 
 interface OnboardingCheckoutClientProps {
   readonly plan: PlanIntentTier;
@@ -211,6 +212,7 @@ export function OnboardingCheckoutClient({
   spotifyFollowers,
   isDefaultUpsell,
 }: OnboardingCheckoutClientProps) {
+  const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
   const hasAnnualOption = annualPriceId !== null && annualAmount !== null;
   const annualSavingsPercent = hasAnnualOption
@@ -230,6 +232,7 @@ export function OnboardingCheckoutClient({
   const currentAmount =
     isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
+  const returnTo = normalizeOnboardingReturnTo(searchParams.get('returnTo'));
   const handleToggleBranding = useCallback(() => {
     setShowBranding(current => !current);
   }, []);
@@ -258,7 +261,11 @@ export function OnboardingCheckoutClient({
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: currentPriceId, source: 'onboarding' }),
+        body: JSON.stringify({
+          priceId: currentPriceId,
+          returnTo,
+          source: 'onboarding',
+        }),
       });
 
       if (!response.ok) {
@@ -280,7 +287,7 @@ export function OnboardingCheckoutClient({
       );
       setIsLoading(false);
     }
-  }, [plan, currentPriceId, interval, isDefaultUpsell]);
+  }, [plan, currentPriceId, interval, isDefaultUpsell, returnTo]);
 
   const handleSkip = useCallback(() => {
     track('onboarding_checkout_skipped', {
@@ -288,14 +295,8 @@ export function OnboardingCheckoutClient({
       intent_source: isDefaultUpsell ? 'upsell_intercept' : 'paid_intent',
     });
     clearPlanIntent();
-    // Preserve the dashboard handoff query so ChatPageClient auto-submits
-    // the onboarding prompt (mirrors AppleStyleOnboardingForm behavior)
-    const initialQuery =
-      spotifyFollowers == null
-        ? 'Connect my Spotify'
-        : 'Show me my latest releases';
-    globalThis.location.href = `${APP_ROUTES.DASHBOARD}?q=${encodeURIComponent(initialQuery)}`;
-  }, [plan, isDefaultUpsell, spotifyFollowers]);
+    globalThis.location.href = returnTo;
+  }, [isDefaultUpsell, plan, returnTo]);
 
   return (
     <div className='flex flex-col items-center justify-center'>

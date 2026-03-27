@@ -21,6 +21,7 @@ import {
   OnboardingErrorCode,
   onboardingErrorToError,
 } from '@/lib/errors/onboarding';
+import { attributeLeadSignupFromClerkUserId } from '@/lib/leads/funnel-events';
 import { cacheHandleAvailability } from '@/lib/onboarding/handle-availability-cache';
 import { enforceOnboardingRateLimit } from '@/lib/onboarding/rate-limit';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
@@ -253,6 +254,8 @@ export async function completeOnboarding({
 
     // Step 8: Sync operations (parallel, fire-and-forget)
     runBackgroundSyncOperations(userId, completion.username);
+
+    await attributeLeadSignupFromClerkUserId(userId);
 
     // ENG-002: Set completion cookie to prevent redirect loop race condition
     // The proxy checks this cookie and bypasses needsOnboarding check for 30s

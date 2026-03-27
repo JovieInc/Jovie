@@ -4,12 +4,15 @@ import { OnboardingFormWrapper } from '@/features/dashboard/organisms/Onboarding
 
 const formPropsSpy = vi.fn();
 
-vi.mock('@/features/dashboard/organisms/apple-style-onboarding', () => ({
-  AppleStyleOnboardingForm: (props: { initialHandle?: string }) => {
-    formPropsSpy(props);
-    return <div data-testid='mock-onboarding-form' />;
-  },
-}));
+vi.mock(
+  '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form',
+  () => ({
+    OnboardingV2Form: (props: { initialHandle?: string }) => {
+      formPropsSpy(props);
+      return <div data-testid='mock-onboarding-form' />;
+    },
+  })
+);
 
 describe('OnboardingFormWrapper', () => {
   beforeEach(() => {

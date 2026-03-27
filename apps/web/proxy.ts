@@ -568,6 +568,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const isRSCPrefetch =
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
+    const hasOnboardingContinuationSignal =
+      req.nextUrl.searchParams.has('handle') ||
+      req.nextUrl.searchParams.has('resume');
 
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
@@ -701,7 +704,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
         isNavigationMethod &&
-        !isRSCPrefetch
+        !isRSCPrefetch &&
+        !hasOnboardingContinuationSignal
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {

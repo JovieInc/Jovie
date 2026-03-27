@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AppleStyleOnboardingForm } from './apple-style-onboarding';
+import { OnboardingV2Form } from './onboarding-v2/OnboardingV2Form';
 
 /** Max age (ms) for a pendingClaim entry to be considered valid (10 minutes). */
 const PENDING_CLAIM_MAX_AGE_MS = 10 * 60 * 1000;
@@ -36,8 +36,8 @@ interface OnboardingFormWrapperProps {
   readonly userEmail?: string | null;
   readonly userId: string;
   readonly shouldAutoSubmitHandle?: boolean;
-  /** Step to start on (default 0). Used for step-resume when existing users return. */
-  readonly initialStepIndex?: number;
+  readonly initialProfileId?: string | null;
+  readonly initialResumeStep?: string | null;
   /** Existing profile avatar URL for step-resume users */
   readonly existingAvatarUrl?: string | null;
   /** Existing profile bio for step-resume users */
@@ -53,7 +53,8 @@ export function OnboardingFormWrapper({
   userEmail = null,
   userId,
   shouldAutoSubmitHandle = false,
-  initialStepIndex = 0,
+  initialProfileId = null,
+  initialResumeStep = null,
   existingAvatarUrl = null,
   existingBio = null,
   existingGenres = null,
@@ -86,7 +87,7 @@ export function OnboardingFormWrapper({
 
   return (
     <div data-testid='onboarding-form-wrapper'>
-      <AppleStyleOnboardingForm
+      <OnboardingV2Form
         key={formKey}
         initialDisplayName={initialDisplayName}
         initialHandle={resolvedHandle}
@@ -94,7 +95,8 @@ export function OnboardingFormWrapper({
         userEmail={userEmail}
         userId={userId}
         shouldAutoSubmitHandle={shouldAutoSubmitHandle}
-        initialStepIndex={initialStepIndex}
+        initialProfileId={initialProfileId}
+        initialResumeStep={initialResumeStep}
         existingAvatarUrl={existingAvatarUrl}
         existingBio={existingBio}
         existingGenres={existingGenres}
