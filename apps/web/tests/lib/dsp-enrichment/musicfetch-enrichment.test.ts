@@ -795,6 +795,9 @@ describe('musicfetch-enrichment', () => {
           .externalArtistId
       ).toBe('123');
       expect(externalArtistIdSqlParts?.join('')).toContain('COALESCE(');
+      expect(externalArtistIdSqlParts?.join('')).toContain(
+        'excluded.external_artist_id'
+      );
       expect(seededLog?.[1]).toEqual(
         expect.objectContaining({
           creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',

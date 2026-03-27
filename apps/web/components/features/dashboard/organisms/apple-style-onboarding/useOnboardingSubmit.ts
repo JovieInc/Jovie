@@ -102,6 +102,7 @@ interface TryAutoConnectSpotifyOptions {
   readonly onAutoConnectStarted?: (
     selection: AutoConnectedArtistSelection
   ) => void;
+  readonly onAutoConnectFailed?: (message: string) => void;
 }
 
 function tryAutoConnectSpotify({
@@ -113,6 +114,7 @@ function tryAutoConnectSpotify({
   profileId,
   userId,
   onAutoConnectStarted,
+  onAutoConnectFailed,
 }: TryAutoConnectSpotifyOptions): void {
   try {
     const selection = extractSignupClaimArtistSelection();
@@ -165,10 +167,30 @@ function tryAutoConnectSpotify({
             user_id: userId,
             releasesImported: result.importing ? 0 : result.imported,
           });
+          return;
+        }
+
+        if (!signal.aborted) {
+          const message =
+            result.message || 'Failed to connect your Spotify artist.';
+          setSpotifyImportState({
+            status: 'error',
+            stage: 2,
+            message,
+          });
+          onAutoConnectFailed?.(message);
         }
       })
       .catch(() => {
-        // Import failure is non-critical during onboarding
+        if (!signal.aborted) {
+          const message = 'Failed to connect your Spotify artist.';
+          setSpotifyImportState({
+            status: 'error',
+            stage: 2,
+            message,
+          });
+          onAutoConnectFailed?.(message);
+        }
       })
       .finally(() => {
         if (!signal.aborted) setIsConnecting(false);
@@ -211,6 +233,7 @@ interface UseOnboardingSubmitOptions {
   onboardingStartedAtMs: number;
   onCompleted?: (result: CompletionResult) => void;
   onAutoConnectStarted?: (selection: AutoConnectedArtistSelection) => void;
+  onAutoConnectFailed?: (message: string) => void;
 }
 
 interface UseOnboardingSubmitReturn {
@@ -245,6 +268,7 @@ export function useOnboardingSubmit({
   onboardingStartedAtMs,
   onCompleted,
   onAutoConnectStarted,
+  onAutoConnectFailed,
 }: UseOnboardingSubmitOptions): UseOnboardingSubmitReturn {
   const router = useRouter();
   const [state, setState] = useState<OnboardingState>({
@@ -461,6 +485,7 @@ export function useOnboardingSubmit({
           profileId: completion.profileId,
           userId,
           onAutoConnectStarted,
+          onAutoConnectFailed,
         });
       } catch (error) {
         handleSubmitError(error, resolvedHandle, redirectUrl);
@@ -480,6 +505,7 @@ export function useOnboardingSubmit({
       isReservedHandle,
       onboardingStartedAtMs,
       onAutoConnectStarted,
+      onAutoConnectFailed,
       onCompleted,
     ]
   );
