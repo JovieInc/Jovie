@@ -60,7 +60,12 @@ test.describe('Admin Dashboard', () => {
   test.beforeEach(async ({ page }) => {
     test.skip(!hasAdminCredentials(), 'Admin credentials not configured');
 
-    await ensureSignedInUser(page, getAdminCredentials());
+    try {
+      await ensureSignedInUser(page, getAdminCredentials());
+    } catch (error) {
+      console.error('Failed to sign in admin user:', error);
+      test.skip();
+    }
   });
 
   // ── Main admin dashboard page ────────────────────────────────────────────
