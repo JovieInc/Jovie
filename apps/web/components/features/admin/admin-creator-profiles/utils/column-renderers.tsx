@@ -5,7 +5,7 @@ import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 
 /**
  * Renders the avatar cell with profile information

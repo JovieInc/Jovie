@@ -13,10 +13,7 @@ import {
   AdminTableHeader,
   AdminTableSubheader,
 } from '@/features/admin/table/AdminTableHeader';
-import type {
-  AdminActivityItem,
-  AdminActivityStatus,
-} from '@/lib/admin/overview';
+import type { AdminActivityItem, AdminActivityStatus } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 
 const statusVariant: Record<

@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Building2, Mail, MousePointerClick, Tag, Users } from 'lucide-react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminBraggingRights } from '@/lib/admin/bragging-rights';
+import type { AdminBraggingRights } from '@/lib/admin/types';
 
 interface BraggingRightsStripProps {
   readonly data: AdminBraggingRights;

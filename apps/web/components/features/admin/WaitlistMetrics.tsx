@@ -1,6 +1,6 @@
 import { CheckCircle2, MailCheck, UserPlus2 } from 'lucide-react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/waitlist';
+import type { WaitlistMetrics as WaitlistMetricsType } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 
 interface MetricCardProps {

@@ -1,4 +1,4 @@
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { Contact } from '@/types';
 
 /**

@@ -128,13 +128,13 @@ vi.mock('@sentry/nextjs', () => ({
 // 3. Import tested module AFTER mocks
 // =============================================================================
 import {
+  CanonicalUserState,
   canAccessApp,
   canAccessOnboarding,
   getRedirectForState,
   getWaitlistAccess,
   requiresRedirect,
   resolveUserState,
-  UserState,
 } from '@/lib/auth/gate';
 
 // =============================================================================
@@ -239,7 +239,7 @@ describe('@critical gate.ts', () => {
     mockIsWaitlistGateEnabled.mockResolvedValue(false);
     setupNonBlockedStatus();
     mockResolveProfileState.mockReturnValue({
-      state: UserState.NEEDS_ONBOARDING,
+      state: CanonicalUserState.NEEDS_ONBOARDING,
       profileId: null,
       redirectTo: '/onboarding?fresh_signup=true',
     });
@@ -255,7 +255,7 @@ describe('@critical gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.UNAUTHENTICATED);
+      expect(result.state).toBe(CanonicalUserState.UNAUTHENTICATED);
       expect(result.clerkUserId).toBeNull();
       expect(result.dbUserId).toBeNull();
       expect(result.redirectTo).toBe('/signin');
@@ -278,14 +278,14 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: 'profile-123',
         redirectTo: null,
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.ACTIVE);
+      expect(result.state).toBe(CanonicalUserState.ACTIVE);
       expect(result.clerkUserId).toBe('clerk_123');
       expect(result.dbUserId).toBe('db-user-123');
       expect(result.profileId).toBe('profile-123');
@@ -300,14 +300,14 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.NEEDS_ONBOARDING,
+        state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
         redirectTo: '/onboarding?fresh_signup=true',
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
     });
 
@@ -320,13 +320,13 @@ describe('@critical gate.ts', () => {
 
       mockCheckUserStatus.mockReturnValue({
         isBlocked: true,
-        blockedState: UserState.BANNED,
+        blockedState: CanonicalUserState.BANNED,
         redirectTo: '/banned',
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.BANNED);
+      expect(result.state).toBe(CanonicalUserState.BANNED);
       expect(result.redirectTo).toBe('/banned');
       expect(result.dbUserId).toBe('db-user-123');
     });
@@ -340,13 +340,13 @@ describe('@critical gate.ts', () => {
 
       mockCheckUserStatus.mockReturnValue({
         isBlocked: true,
-        blockedState: UserState.BANNED,
+        blockedState: CanonicalUserState.BANNED,
         redirectTo: '/banned',
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.BANNED);
+      expect(result.state).toBe(CanonicalUserState.BANNED);
     });
 
     it('returns NEEDS_DB_USER when createDbUserIfMissing is false and no DB user', async () => {
@@ -358,7 +358,7 @@ describe('@critical gate.ts', () => {
 
       const result = await resolveUserState({ createDbUserIfMissing: false });
 
-      expect(result.state).toBe(UserState.NEEDS_DB_USER);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_DB_USER);
       expect(result.dbUserId).toBeNull();
       expect(result.redirectTo).toBe('/onboarding?fresh_signup=true');
     });
@@ -384,14 +384,14 @@ describe('@critical gate.ts', () => {
       mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.NEEDS_ONBOARDING,
+        state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
         redirectTo: '/onboarding?fresh_signup=true',
       });
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(result.dbUserId).toBe('new-user-id');
       expect(mockDbInsert).toHaveBeenCalled();
     });
@@ -412,7 +412,7 @@ describe('@critical gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.USER_CREATION_FAILED);
+      expect(result.state).toBe(CanonicalUserState.USER_CREATION_FAILED);
       expect(result.redirectTo).toBe('/error/user-creation-failed');
       expect(result.context.errorCode).toBe('USER_CREATION_FAILED');
       expect(mockCaptureCriticalError).toHaveBeenCalled();
@@ -453,7 +453,7 @@ describe('@critical gate.ts', () => {
       mockDbUpdate.mockReturnValue(updateChain);
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.NEEDS_ONBOARDING,
+        state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
         redirectTo: '/onboarding?fresh_signup=true',
       });
@@ -461,7 +461,7 @@ describe('@critical gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.dbUserId).toBe('adopted-user-id');
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
       expect(mockDbUpdate).toHaveBeenCalled();
       expect(updateChain.where).toHaveBeenCalledWith({
         eq: 'MixedCase+clerk_test@Jov.ie',
@@ -479,7 +479,7 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: null,
         redirectTo: null,
       });
@@ -502,7 +502,7 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: null,
         redirectTo: null,
       });
@@ -522,14 +522,14 @@ describe('@critical gate.ts', () => {
       mockSyncEmailFromClerk.mockRejectedValue(new Error('sync failed'));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: null,
         redirectTo: null,
       });
 
       // Should not throw despite sync failure
       const result = await resolveUserState();
-      expect(result.state).toBe(UserState.ACTIVE);
+      expect(result.state).toBe(CanonicalUserState.ACTIVE);
       expect(mockSentryAddBreadcrumb).toHaveBeenCalledWith(
         expect.objectContaining({
           category: 'auth-gate',
@@ -547,7 +547,7 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: null,
         redirectTo: null,
       });
@@ -579,7 +579,7 @@ describe('@critical gate.ts', () => {
 
       const result = await resolveUserState();
 
-      expect(result.state).toBe(UserState.NEEDS_WAITLIST_SUBMISSION);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION);
       expect(result.redirectTo).toBe('/waitlist');
     });
 
@@ -607,7 +607,7 @@ describe('@critical gate.ts', () => {
       mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.NEEDS_ONBOARDING,
+        state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
         redirectTo: '/onboarding?fresh_signup=true',
       });
@@ -615,7 +615,7 @@ describe('@critical gate.ts', () => {
       const result = await resolveUserState();
 
       expect(result.dbUserId).toBe('new-user-id');
-      expect(result.state).toBe(UserState.NEEDS_ONBOARDING);
+      expect(result.state).toBe(CanonicalUserState.NEEDS_ONBOARDING);
     });
 
     it('throws TypeError when createDbUserIfMissing is true but no email', async () => {
@@ -649,7 +649,7 @@ describe('@critical gate.ts', () => {
       mockDbSelect.mockReturnValue(createJoinSelectChain([dbResult]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.ACTIVE,
+        state: CanonicalUserState.ACTIVE,
         profileId: 'profile-456',
         redirectTo: null,
       });
@@ -683,7 +683,7 @@ describe('@critical gate.ts', () => {
       mockDbInsert.mockReturnValue(createInsertChain([{ id: 'new-user-id' }]));
 
       mockResolveProfileState.mockReturnValue({
-        state: UserState.NEEDS_ONBOARDING,
+        state: CanonicalUserState.NEEDS_ONBOARDING,
         profileId: null,
         redirectTo: '/onboarding?fresh_signup=true',
       });
@@ -743,48 +743,62 @@ describe('@critical gate.ts', () => {
   // ===========================================================================
   describe('canAccessApp', () => {
     it('returns true only for ACTIVE state', () => {
-      expect(canAccessApp(UserState.ACTIVE)).toBe(true);
-      expect(canAccessApp(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(false);
-      expect(canAccessApp(UserState.WAITLIST_PENDING)).toBe(false);
-      expect(canAccessApp(UserState.NEEDS_ONBOARDING)).toBe(false);
-      expect(canAccessApp(UserState.BANNED)).toBe(false);
-      expect(canAccessApp(UserState.USER_CREATION_FAILED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.ACTIVE)).toBe(true);
+      expect(canAccessApp(CanonicalUserState.UNAUTHENTICATED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+        false
+      );
+      expect(canAccessApp(CanonicalUserState.WAITLIST_PENDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.NEEDS_ONBOARDING)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.BANNED)).toBe(false);
+      expect(canAccessApp(CanonicalUserState.USER_CREATION_FAILED)).toBe(false);
     });
   });
 
   describe('canAccessOnboarding', () => {
     it('returns true for NEEDS_ONBOARDING and ACTIVE states', () => {
-      expect(canAccessOnboarding(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(canAccessOnboarding(UserState.ACTIVE)).toBe(true);
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
+        true
+      );
+      expect(canAccessOnboarding(CanonicalUserState.ACTIVE)).toBe(true);
     });
 
     it('returns false for all other states', () => {
-      expect(canAccessOnboarding(UserState.UNAUTHENTICATED)).toBe(false);
-      expect(canAccessOnboarding(UserState.NEEDS_DB_USER)).toBe(false);
-      expect(canAccessOnboarding(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(canAccessOnboarding(CanonicalUserState.UNAUTHENTICATED)).toBe(
         false
       );
-      expect(canAccessOnboarding(UserState.WAITLIST_PENDING)).toBe(false);
-      expect(canAccessOnboarding(UserState.BANNED)).toBe(false);
-      expect(canAccessOnboarding(UserState.USER_CREATION_FAILED)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.NEEDS_DB_USER)).toBe(false);
+      expect(
+        canAccessOnboarding(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.WAITLIST_PENDING)).toBe(
+        false
+      );
+      expect(canAccessOnboarding(CanonicalUserState.BANNED)).toBe(false);
+      expect(canAccessOnboarding(CanonicalUserState.USER_CREATION_FAILED)).toBe(
+        false
+      );
     });
   });
 
   describe('requiresRedirect', () => {
     it('returns false only for ACTIVE state', () => {
-      expect(requiresRedirect(UserState.ACTIVE)).toBe(false);
+      expect(requiresRedirect(CanonicalUserState.ACTIVE)).toBe(false);
     });
 
     it('returns true for all non-ACTIVE states', () => {
-      expect(requiresRedirect(UserState.UNAUTHENTICATED)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_DB_USER)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(true);
-      expect(requiresRedirect(UserState.WAITLIST_PENDING)).toBe(true);
-      expect(requiresRedirect(UserState.NEEDS_ONBOARDING)).toBe(true);
-      expect(requiresRedirect(UserState.BANNED)).toBe(true);
-      expect(requiresRedirect(UserState.USER_CREATION_FAILED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.UNAUTHENTICATED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_DB_USER)).toBe(true);
+      expect(
+        requiresRedirect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.WAITLIST_PENDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.NEEDS_ONBOARDING)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.BANNED)).toBe(true);
+      expect(requiresRedirect(CanonicalUserState.USER_CREATION_FAILED)).toBe(
+        true
+      );
     });
   });
 
@@ -793,61 +807,67 @@ describe('@critical gate.ts', () => {
   // ===========================================================================
   describe('getRedirectForState', () => {
     it('returns /signin for UNAUTHENTICATED', () => {
-      expect(getRedirectForState(UserState.UNAUTHENTICATED)).toBe('/signin');
+      expect(getRedirectForState(CanonicalUserState.UNAUTHENTICATED)).toBe(
+        '/signin'
+      );
     });
 
     it('returns /onboarding?fresh_signup=true for NEEDS_DB_USER', () => {
-      expect(getRedirectForState(UserState.NEEDS_DB_USER)).toBe(
+      expect(getRedirectForState(CanonicalUserState.NEEDS_DB_USER)).toBe(
         '/onboarding?fresh_signup=true'
       );
     });
 
     it('returns /waitlist for NEEDS_WAITLIST_SUBMISSION', () => {
-      expect(getRedirectForState(UserState.NEEDS_WAITLIST_SUBMISSION)).toBe(
+      expect(
+        getRedirectForState(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION)
+      ).toBe('/waitlist');
+    });
+
+    it('returns /waitlist for WAITLIST_PENDING', () => {
+      expect(getRedirectForState(CanonicalUserState.WAITLIST_PENDING)).toBe(
         '/waitlist'
       );
     });
 
-    it('returns /waitlist for WAITLIST_PENDING', () => {
-      expect(getRedirectForState(UserState.WAITLIST_PENDING)).toBe('/waitlist');
-    });
-
     it('returns /onboarding?fresh_signup=true for NEEDS_ONBOARDING', () => {
-      expect(getRedirectForState(UserState.NEEDS_ONBOARDING)).toBe(
+      expect(getRedirectForState(CanonicalUserState.NEEDS_ONBOARDING)).toBe(
         '/onboarding?fresh_signup=true'
       );
     });
 
     it('returns /banned for BANNED', () => {
-      expect(getRedirectForState(UserState.BANNED)).toBe('/banned');
+      expect(getRedirectForState(CanonicalUserState.BANNED)).toBe('/banned');
     });
 
     it('returns /error/user-creation-failed for USER_CREATION_FAILED', () => {
-      expect(getRedirectForState(UserState.USER_CREATION_FAILED)).toBe(
+      expect(getRedirectForState(CanonicalUserState.USER_CREATION_FAILED)).toBe(
         '/error/user-creation-failed'
       );
     });
 
     it('returns null for ACTIVE', () => {
-      expect(getRedirectForState(UserState.ACTIVE)).toBeNull();
+      expect(getRedirectForState(CanonicalUserState.ACTIVE)).toBeNull();
     });
   });
 
   // ===========================================================================
-  // UserState enum completeness
+  // CanonicalUserState enum completeness
   // ===========================================================================
-  describe('UserState enum', () => {
+  describe('CanonicalUserState enum', () => {
     it('has all expected states', () => {
-      expect(UserState.UNAUTHENTICATED).toBe('UNAUTHENTICATED');
-      expect(UserState.NEEDS_DB_USER).toBe('NEEDS_DB_USER');
-      expect(UserState.NEEDS_WAITLIST_SUBMISSION).toBe(
+      expect(CanonicalUserState.UNAUTHENTICATED).toBe('UNAUTHENTICATED');
+      expect(CanonicalUserState.NEEDS_DB_USER).toBe('NEEDS_DB_USER');
+      expect(CanonicalUserState.NEEDS_WAITLIST_SUBMISSION).toBe(
         'NEEDS_WAITLIST_SUBMISSION'
       );
-      expect(UserState.WAITLIST_PENDING).toBe('WAITLIST_PENDING');
-      expect(UserState.NEEDS_ONBOARDING).toBe('NEEDS_ONBOARDING');
-      expect(UserState.ACTIVE).toBe('ACTIVE');
-      expect(UserState.BANNED).toBe('BANNED');
-      expect(UserState.USER_CREATION_FAILED).toBe('USER_CREATION_FAILED');
+      expect(CanonicalUserState.WAITLIST_PENDING).toBe('WAITLIST_PENDING');
+      expect(CanonicalUserState.NEEDS_ONBOARDING).toBe('NEEDS_ONBOARDING');
+      expect(CanonicalUserState.ACTIVE).toBe('ACTIVE');
+      expect(CanonicalUserState.BANNED).toBe('BANNED');
+      expect(CanonicalUserState.USER_CREATION_FAILED).toBe(
+        'USER_CREATION_FAILED'
+      );
     });
   });
 });

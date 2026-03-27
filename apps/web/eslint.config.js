@@ -230,14 +230,6 @@ module.exports = [
       '@jovie/server-only-imports': 'off',
     },
   },
-  // TODO: Admin components have legacy server import patterns that need refactoring
-  // These should be migrated to use server actions instead of direct imports
-  {
-    files: ['**/components/admin/**', '**/components/features/admin/**'],
-    rules: {
-      '@jovie/server-only-imports': 'off',
-    },
-  },
 
   {
     files: ['components/atoms/**/*.tsx'],

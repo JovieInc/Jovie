@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
-import type { ScreenshotInfo } from '@/lib/admin/screenshots';
+import type { ScreenshotInfo } from '@/lib/admin/types';
 import { GROUP_LABELS } from '@/lib/screenshots/registry';
 import type {
   ScreenshotConsumer,
