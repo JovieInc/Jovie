@@ -278,10 +278,6 @@ export async function POST(request: NextRequest) {
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
         context: 'GitHub repository dispatch for Linear webhook',
-        retry: {
-          maxRetries: 2,
-          baseDelayMs: 500,
-        },
       }
     );
 
