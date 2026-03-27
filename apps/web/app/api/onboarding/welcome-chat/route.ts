@@ -135,7 +135,7 @@ export async function POST(request: Request) {
           releaseCountResult,
           dspCountResult,
           socialCountResult,
-          profileIdentity,
+          profileIdentityResult,
         ] = await Promise.all([
           tx
             .select({ value: count() })
@@ -179,9 +179,10 @@ export async function POST(request: Request) {
             })
             .from(creatorProfiles)
             .where(eq(creatorProfiles.id, profile.id))
-            .limit(1)
-            .then(rows => rows[0] ?? null),
+            .limit(1),
         ]);
+
+        const profileIdentity = profileIdentityResult[0] ?? null;
 
         const hasSpotifyIdentity = Boolean(
           profileIdentity?.spotifyId || profileIdentity?.spotifyUrl
