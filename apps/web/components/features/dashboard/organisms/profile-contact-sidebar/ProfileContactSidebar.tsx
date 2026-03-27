@@ -10,29 +10,22 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import {
-  DrawerCardActionBar,
-  DrawerTabs,
-  EntitySidebarShell,
-} from '@/components/molecules/drawer';
+import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
-  useAvatarMutation,
   useDeletePressPhotoMutation,
   usePressPhotosQuery,
   usePressPhotoUploadMutation,
   useProfileSaveMutation,
-  useReleasesQuery,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
-import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { ProfileSmartLinkAnalytics } from './ProfileSmartLinkAnalytics';
 import { SidebarLinkInput } from './SidebarLinkInput';
@@ -109,7 +102,6 @@ export function ProfileContactSidebar() {
 
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
-  const avatarMutation = useAvatarMutation();
   const pressPhotoUploadMutation = usePressPhotoUploadMutation(
     selectedProfile?.id
   );
@@ -120,7 +112,6 @@ export function ProfileContactSidebar() {
   const { data: pressPhotos = [] } = usePressPhotosQuery(
     selectedProfile?.id ?? ''
   );
-  const { data: releases } = useReleasesQuery(selectedProfile?.id ?? '');
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -148,53 +139,6 @@ export function ProfileContactSidebar() {
 
   const supportsAddAction = LINK_ACTION_CATEGORIES.has(
     resolvedCategory as CategoryOption
-  );
-
-  // Handle display name change — save to server and instantly update sidebar
-  const handleDisplayNameChange = useCallback(
-    (value: string) => {
-      if (!selectedProfile || !previewData) return;
-
-      // Instantly update sidebar
-      setPreviewData({
-        ...previewData,
-        displayName: value,
-      });
-
-      // Save to server
-      profileMutation.mutate(
-        { updates: { displayName: value } },
-        {
-          onError: () => {
-            // Revert on failure
-            setPreviewData({
-              ...previewData,
-              displayName: previewData.displayName,
-            });
-          },
-        }
-      );
-    },
-    [selectedProfile, previewData, setPreviewData, profileMutation]
-  );
-
-  // Handle avatar upload — save to server and instantly update sidebar
-  const handleAvatarUpload = useCallback(
-    async (file: File): Promise<string> => {
-      const url = await avatarMutation.mutateAsync(file);
-
-      // Instantly update sidebar
-      if (previewData) {
-        setPreviewData({
-          ...previewData,
-          avatarUrl: url,
-        });
-      }
-
-      toast.success('Profile photo updated');
-      return url;
-    },
-    [avatarMutation, previewData, setPreviewData]
   );
 
   const handlePressPhotoUpload = useCallback(
@@ -474,7 +418,7 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { primaryActions, overflowActions } = useProfileHeaderParts({
+  const { overflowActions } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
@@ -498,20 +442,6 @@ export function ProfileContactSidebar() {
         title='Profile'
         headerMode='minimal'
         headerActions={closeOnlyHeaderActions}
-        entityHeader={
-          <div
-            className={cn(
-              LINEAR_SURFACE.sidebarCard,
-              'flex items-center gap-3 px-3.5 py-3'
-            )}
-          >
-            <div className='h-10 w-10 rounded-full skeleton' />
-            <div className='space-y-1.5'>
-              <div className='h-4 w-24 rounded skeleton' />
-              <div className='h-3 w-16 rounded skeleton' />
-            </div>
-          </div>
-        }
       >
         <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
           <div className={cn(LINEAR_SURFACE.sidebarCard, 'space-y-2.5 p-3')}>
@@ -550,9 +480,6 @@ export function ProfileContactSidebar() {
   }
 
   const {
-    username,
-    displayName,
-    avatarUrl,
     bio,
     genres,
     location,
@@ -578,34 +505,9 @@ export function ProfileContactSidebar() {
       headerActions={
         <DrawerHeaderActions
           primaryActions={[]}
-          overflowActions={[]}
+          overflowActions={overflowActions}
           onClose={close}
         />
-      }
-      entityHeader={
-        <div
-          className={cn(
-            LINEAR_SURFACE.sidebarCard,
-            'relative overflow-hidden p-2.5'
-          )}
-        >
-          <DrawerCardActionBar
-            primaryActions={primaryActions}
-            overflowActions={overflowActions}
-            overflowTriggerIcon='vertical'
-            className='absolute right-2.5 top-2.5 border-0 bg-transparent px-0 py-0'
-          />
-          <ProfileContactHeader
-            displayName={displayName}
-            username={username}
-            avatarUrl={avatarUrl}
-            editable
-            onDisplayNameChange={handleDisplayNameChange}
-            onAvatarUpload={handleAvatarUpload}
-            releaseCount={releases?.length}
-            linkCount={links.length}
-          />
-        </div>
       }
     >
       <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
