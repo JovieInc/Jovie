@@ -1,13 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
-import { DevToolbarGate } from '@/components/features/dev/DevToolbarGate';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
-import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { publicEnv } from '@/lib/env-public';
 
 // Configure Inter Variable font from local file (no external network requests)
@@ -95,9 +93,6 @@ export const metadata: Metadata = {
     google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
@@ -158,114 +153,22 @@ export default async function RootLayout({
   // response header set by the middleware (proxy.ts). No need to read headers() here,
   // which would force all routes into dynamic rendering.
   // Cookie banner visibility is determined client-side by reading document.cookie.
+  let devToolbar: React.ReactNode = null;
 
-  const headContent = (
-    <head>
-      {isE2EClientRuntime ? null : (
-        // eslint-disable-next-line @next/next/no-sync-scripts -- blocking theme script prevents FOUC; nonce hydration mismatch requires native <script> with suppressHydrationWarning
-        <script src='/theme-init.js' suppressHydrationWarning />
-      )}
-      {/* Icons and manifest are now handled by Next.js metadata export */}
+  if (!(isE2EClientRuntime || devEnv === 'production')) {
+    const { DevToolbarGate } = await import(
+      '@/components/features/dev/DevToolbarGate'
+    );
 
-      {/* DNS Prefetch and Preconnect for critical external resources */}
-      {/* Spotify CDN - artist images */}
-      <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='anonymous' />
-      {/* Note: Font preloading is handled automatically by Next.js localFont */}
-      {/* Spotify API */}
-      <link rel='dns-prefetch' href='https://api.spotify.com' />
-      {/* Vercel Blob Storage - avatar images */}
-      <link rel='dns-prefetch' href='https://public.blob.vercel-storage.com' />
-      <link
-        rel='preconnect'
-        href='https://public.blob.vercel-storage.com'
-        crossOrigin='anonymous'
+    devToolbar = (
+      <DevToolbarGate
+        disabled={false}
+        env={devEnv}
+        sha={devSha}
+        version={devVersion}
       />
-      {/* Clerk Auth - authentication */}
-      <link
-        rel='dns-prefetch'
-        href='https://distinct-giraffe-5.clerk.accounts.dev'
-      />
-      <link
-        rel='preconnect'
-        href='https://distinct-giraffe-5.clerk.accounts.dev'
-        crossOrigin='anonymous'
-      />
-      <link rel='dns-prefetch' href='https://img.clerk.com' />
-      <link
-        rel='preconnect'
-        href='https://img.clerk.com'
-        crossOrigin='anonymous'
-      />
-      {/* Clerk Auth API */}
-      <link
-        rel='preconnect'
-        href='https://api.clerk.com'
-        crossOrigin='anonymous'
-      />
-      <link
-        rel='preconnect'
-        href='https://images.clerk.dev'
-        crossOrigin='anonymous'
-      />
-      {/* Unsplash - fallback images */}
-      <link rel='dns-prefetch' href='https://images.unsplash.com' />
-      <link
-        rel='preconnect'
-        href='https://images.unsplash.com'
-        crossOrigin='anonymous'
-      />
-
-      {/* Structured Data: WebSite + Organization (global, all pages) */}
-      {isE2EClientRuntime ? null : (
-        <>
-          <Script
-            id='website-schema'
-            type='application/ld+json'
-            strategy='afterInteractive'
-            suppressHydrationWarning
-          >
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: APP_NAME,
-              alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
-              url: BASE_URL,
-              description:
-                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-              inLanguage: 'en-US',
-              publisher: {
-                '@type': 'Organization',
-                name: APP_NAME,
-                url: BASE_URL,
-              },
-            })}
-          </Script>
-          <Script
-            id='organization-schema'
-            type='application/ld+json'
-            strategy='afterInteractive'
-            suppressHydrationWarning
-          >
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: APP_NAME,
-              legalName: 'Jovie Technology Inc.',
-              url: BASE_URL,
-              logo: `${BASE_URL}/brand/Jovie-Logo-Icon.svg`,
-              description:
-                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-              sameAs: [
-                'https://x.com/jovieapp',
-                'https://instagram.com/jovieapp',
-              ],
-            })}
-          </Script>
-        </>
-      )}
-    </head>
-  );
+    );
+  }
 
   const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
   return (
@@ -275,17 +178,11 @@ export default async function RootLayout({
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
-      {headContent}
+      <head />
       <body className={bodyClassName}>
         {children}
-        <DevToolbarGate
-          disabled={isE2EClientRuntime}
-          env={devEnv}
-          sha={devSha}
-          version={devVersion}
-        />
-
-        <CookieBannerSection />
+        {devToolbar}
+        <CookieBannerMount />
       </body>
     </html>
   );
