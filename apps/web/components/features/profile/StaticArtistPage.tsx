@@ -226,7 +226,7 @@ export function StaticArtistPage({
     showShopButton,
   });
 
-  if (profileV2Enabled && supportsProfileV2Mode(mode)) {
+  if (profileV2Enabled && supportsProfileV2Mode(mode, contacts.length > 0)) {
     return (
       <PublicProfileTemplateV2
         mode={mode}

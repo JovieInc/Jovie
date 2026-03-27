@@ -2,6 +2,7 @@
 
 import { Button } from '@jovie/ui';
 import {
+  AlertCircle,
   ArrowRight,
   Check,
   Disc3,
@@ -525,12 +526,14 @@ function SelectedArtistCard({
 }
 
 function PreviewPanel({
+  avatarQuality,
   discoverySnapshot,
   existingAvatarUrl,
   existingBio,
   existingGenres,
   selectedArtist,
 }: Readonly<{
+  avatarQuality: AvatarQuality | null;
   discoverySnapshot: DiscoverySnapshot | null;
   existingAvatarUrl: string | null;
   existingBio: string | null;
@@ -538,6 +541,9 @@ function PreviewPanel({
   selectedArtist: SelectedArtist | null;
 }>) {
   const profile = discoverySnapshot?.profile;
+  const previewAvatarUrl = profile?.avatarUrl ?? existingAvatarUrl;
+  const isUsingExistingAvatar =
+    !profile?.avatarUrl && Boolean(existingAvatarUrl);
   const activeLinks = (discoverySnapshot?.socialItems ?? []).filter(
     item => item.kind === 'link' && item.state === 'active'
   );
@@ -550,9 +556,9 @@ function PreviewPanel({
       <div className='sticky top-8 space-y-4'>
         <ContentSurfaceCard className='overflow-hidden p-5'>
           <div className='flex items-center gap-3'>
-            {(profile?.avatarUrl ?? existingAvatarUrl) ? (
+            {previewAvatarUrl ? (
               <Image
-                src={profile?.avatarUrl ?? existingAvatarUrl ?? ''}
+                src={previewAvatarUrl}
                 alt=''
                 width={56}
                 height={56}
@@ -573,6 +579,20 @@ function PreviewPanel({
               </p>
             </div>
           </div>
+
+          {isUsingExistingAvatar && avatarQuality?.status === 'low' ? (
+            <div className='mt-3 flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
+              <AlertCircle
+                className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                aria-hidden='true'
+              />
+              <p>
+                This photo is only {avatarQuality.width}x{avatarQuality.height}.
+                Jovie profiles look best at 512x512 or higher, so swap in a
+                sharper image if you have one.
+              </p>
+            </div>
+          ) : null}
 
           <div className='mt-4 grid grid-cols-3 gap-2 text-center'>
             <div className='rounded-2xl bg-surface-0 px-3 py-2'>
@@ -1955,6 +1975,7 @@ export function OnboardingV2Form({
         </div>
 
         <PreviewPanel
+          avatarQuality={existingAvatarQuality}
           discoverySnapshot={discoverySnapshot}
           existingAvatarUrl={existingAvatarUrl}
           existingBio={existingBio}

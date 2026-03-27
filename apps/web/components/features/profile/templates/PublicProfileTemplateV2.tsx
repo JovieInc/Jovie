@@ -234,6 +234,7 @@ export function PublicProfileTemplateV2({
 
   const handlePlayClick = () => {
     if (mergedDSPs.length === 0) {
+      setSubscribeDrawerOpen(true);
       return;
     }
 
