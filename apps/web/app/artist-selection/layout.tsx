@@ -1,17 +1,17 @@
 import { ClientProviders } from '@/components/providers/ClientProviders';
-import { publicEnv } from '@/lib/env-public';
+import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 
 export const dynamic = 'force-dynamic';
 
-export default function ArtistSelectionLayout({
+export default async function ArtistSelectionLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
       {children}
     </ClientProviders>
   );

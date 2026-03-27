@@ -18,12 +18,12 @@
    ============================================ */
 :root {
   /* Core Theme Inputs */
-  --theme-base-hue: 272;
-  /* Neutral foundation hue (blue-gray) */
+  --theme-base-hue: 282;
+  /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
   --theme-base-chroma: 0.015;
   /* Very low chroma for neutrals */
-  --theme-accent-hue: 271;
-  /* Brand accent hue (purple) */
+  --theme-accent-hue: 282;
+  /* Brand accent hue — aligned with base hue per Linear refresh */
   --theme-accent-chroma: 0.18;
   /* Vibrant accent saturation */
   --theme-contrast: 65;
@@ -65,8 +65,8 @@
   --color-bg-surface-0: #f5f5f5;
   /* Page bg */
   /* prettier-ignore */
-  --color-bg-surface-1: var(--linear-bg-surface-0);
-  /* Elevated surfaces — single source of truth via linear token */
+  --color-bg-surface-1: var(--linear-app-content-surface);
+  /* App card surface — same semantic tier in both themes */
   /* prettier-ignore */
   --color-bg-surface-2: #f2f3f5;
   /* Cards */
@@ -85,7 +85,8 @@
   --color-bg-active: #ebecef;
   /* Same as surface-3 */
   --color-bg-primary: lch(98.94% 0.5 282);
-  --color-bg-secondary: lch(93.797% 1.529 282);
+  --color-bg-secondary: lch(95.94% 0.5 282);
+  /* Linear March 2026 exact — was lch(93.797% 1.529 282), too dark/saturated */
   --color-bg-button: #e3e5e8;
   --color-bg-tooltip: #101012;
   /* Linear dark background for light mode tooltips */
@@ -93,7 +94,7 @@
   /* Text hierarchy - contrast-aware */
   --color-text-primary-token: lch(9.894% 0 282);
   --color-text-secondary-token: lch(19.788% 1.25 282);
-  --color-text-tertiary-token: lch(39.576% 1.25 282);
+  --color-text-tertiary-token: lch(34% 1.25 282);
   --color-text-quaternary-token: lch(65.3% 1.25 282);
   --color-text-disabled-token: oklch(
     70% var(--theme-base-chroma) var(--theme-base-hue)
@@ -193,8 +194,8 @@
   /* sidebar/page bg */
   --color-bg-surface-0: #0f1011;
   /* primary app surface — matches --linear-bg-surface-0 */
-  --color-bg-surface-1: var(--linear-bg-surface-2);
-  /* cards/panels — single source of truth via linear token */
+  --color-bg-surface-1: var(--linear-app-content-surface);
+  /* App card surface — same semantic tier in both themes */
   --color-bg-surface-2: #23252a;
   /* inputs, elevated */
   --color-bg-surface-3: #2a2c32;
@@ -231,16 +232,16 @@
      --color-text-tertiary:   lch(62.6% 1.35 272)   = #969799
      --color-text-quaternary: lch(38.29% 1.35 272)   = #5A5B5D
      --content-color:         #6b6f76               = content/meta text */
-  --color-text-primary-token: lch(100% 0 272);
-  /* Pure white — Linear exact */
-  --color-text-secondary-token: lch(90.65% 1.35 272);
+  --color-text-primary-token: lch(100% 0 282);
+  /* Pure white — Linear exact (hue 282 per March 2026 refresh) */
+  --color-text-secondary-token: lch(90.65% 1.35 282);
   /* #E3E4E6 — Linear exact */
-  --color-text-tertiary-token: lch(62.6% 1.35 272);
+  --color-text-tertiary-token: lch(68% 1.35 282);
   /* #969799 — Linear exact */
   --color-text-quaternary-token: #62666d;
   /* Linear: --color-text-quaternary = #62666d (extracted 2026-03-16) */
-  --color-text-disabled-token: oklch(28% 0.006 272);
-  --color-text-tooltip: lch(100% 0 272);
+  --color-text-disabled-token: oklch(28% 0.006 282);
+  --color-text-tooltip: lch(100% 0 282);
   /* White text on dark tooltips */
 
   /* Logo muted tokens for label logos bar */
@@ -440,7 +441,7 @@
   --color-text-quaternary-token: oklch(
     55% var(--theme-base-chroma) var(--theme-base-hue)
   );
-  --color-text-disabled-token: oklch(40% 0.006 272);
+  --color-text-disabled-token: oklch(40% 0.006 282);
 
   /* Borders — much stronger */
   --color-border-subtle: oklch(100% 0 0 / 15%);
@@ -449,7 +450,7 @@
 
   /* Surfaces — more separation between layers */
   --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-elevated: lch(8% 0.7 272);
+  --color-bg-elevated: lch(8% 0.7 282);
 
   /* Interactive states — more visible */
   --color-interactive-hover: rgba(255, 255, 255, 0.08);
@@ -678,7 +679,8 @@
        --font-weight-bold: 700 */
   --font-weight-normal: 400;
   /* Linear: --font-weight-normal = 400 (extracted 2026-03-16) */
-  --font-weight-book: 400;
+  --font-weight-book: 450;
+  /* Linear's "book" weight — their default UI weight (confirmed from live extraction) */
   /* Alias for normal */
   --font-weight-medium: 510;
   /* Linear: --font-weight-medium = 510 */
@@ -857,61 +859,64 @@
 :root {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base: #f5f5f5 = rgb(245,245,245) */
-  --sidebar-background: 245 245 245;
-  /* Matches base */
+  --sidebar-background: 247 248 248;
+  /* Linear: --linear-app-sidebar-background-rgb */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
-  --sidebar-accent: 237 237 237;
-  /* Slightly darker neutral for hover */
-  --sidebar-accent-foreground: 12 12 12;
-  --sidebar-border: 229 229 229;
-  /* Neutral border */
+  --sidebar-accent: 242 243 245;
+  /* Linear: --linear-app-sidebar-accent-rgb */
+  --sidebar-accent-foreground: 18 18 20;
+  --sidebar-border: 0 0 0 / 0.06;
+  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
-  --sidebar-muted: 115 115 115;
-  /* Neutral muted */
-  --sidebar-muted-foreground: 140 140 140;
-  /* Neutral muted text */
-  --sidebar-surface: 245 245 245;
-  /* Matches base */
-  --sidebar-surface-hover: 237 237 237;
-  /* Neutral hover */
+  --sidebar-muted: 112 116 124;
+  /* Linear: --linear-app-sidebar-muted-rgb */
+  --sidebar-muted-foreground: 112 116 124;
+  --sidebar-surface: 247 248 248;
+  /* Matches sidebar background */
+  --sidebar-surface-hover: 242 243 245;
+  /* Matches sidebar accent */
   --sidebar-input-background: 255 255 255;
-  --sidebar-input-border: 229 229 229;
-  --sidebar-item-foreground: 90 90 95;
-  --sidebar-item-icon: 115 115 120;
-  --sidebar-accent-active: 230 230 232;
+  --sidebar-input-border: 0 0 0 / 0.06;
+  --sidebar-item-foreground: 88 90 96;
+  /* Linear: --linear-app-sidebar-item-foreground-rgb */
+  --sidebar-item-icon: 122 125 132;
+  /* Linear: --linear-app-sidebar-item-icon-rgb */
+  --sidebar-accent-active: 236 238 241;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 :root.dark {
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
-  /* Matches new bg-base: rgb(8,9,10) extracted from Linear */
-  --sidebar-background: 8 9 10;
-  /* rgb(8,9,10) - matches bg-base */
+  /* Pull the shell closer to the app surface to avoid a hard seam. */
+  --sidebar-background: 18 19 21;
+  /* Linear: --linear-app-sidebar-background-rgb (elevated from page bg) */
   --sidebar-foreground: 227 228 229;
-  /* Linear: lch(90.421 1 272) = #E3E4E5 */
+  /* Linear: --linear-app-sidebar-foreground-rgb */
   --sidebar-primary: 227 228 229;
   --sidebar-primary-foreground: 12 12 12;
-  --sidebar-accent: 255 255 255 / 0.02;
-  /* Hover bg — Linear: rgba(255,255,255,0.02) */
+  --sidebar-accent: 255 255 255 / 0.04;
+  /* Linear: --linear-app-sidebar-accent-rgb */
   --sidebar-accent-foreground: 227 228 229;
-  --sidebar-border: 255 255 255 / 0.05;
+  --sidebar-border: 255 255 255 / 0.06;
+  /* Linear: --linear-app-sidebar-border-rgb */
   --sidebar-ring: 109 119 230 / 0.55;
-  --sidebar-muted: 98 102 109;
-  /* Section headers — Linear: rgb(98,102,109) */
-  --sidebar-muted-foreground: 98 102 109;
-  --sidebar-surface: 17 17 17;
-  /* Matches bg-base */
-  --sidebar-surface-hover: 255 255 255 / 0.02;
-  /* Hover — matches sidebar-accent */
+  --sidebar-muted: 107 111 118;
+  /* Linear: --linear-app-sidebar-muted-rgb */
+  --sidebar-muted-foreground: 107 111 118;
+  --sidebar-surface: 18 19 21;
+  /* Matches sidebar background */
+  --sidebar-surface-hover: 255 255 255 / 0.04;
+  /* Matches sidebar accent */
   --sidebar-input-background: 255 255 255 / 0.06;
   --sidebar-input-border: 255 255 255 / 0.06;
-  --sidebar-item-foreground: 208 214 224;
-  /* Nav text — Linear: rgb(208,214,224) */
-  --sidebar-item-icon: 98 102 109;
-  /* Nav icons — Linear: rgb(98,102,109) */
-  --sidebar-accent-active: 255 255 255 / 0.04;
-  /* Active bg — Linear: rgba(255,255,255,0.04) */
+  --sidebar-item-foreground: 220 223 229;
+  /* Linear: --linear-app-sidebar-item-foreground-rgb */
+  --sidebar-item-icon: 125 129 137;
+  /* Linear: --linear-app-sidebar-item-icon-rgb */
+  --sidebar-accent-active: 255 255 255 / 0.06;
+  /* Linear: --linear-app-sidebar-accent-active-rgb */
 }
 
 /* ============================================

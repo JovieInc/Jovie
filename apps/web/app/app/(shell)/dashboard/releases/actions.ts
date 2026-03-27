@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { createSmartLinkContentTag } from '@/lib/cache/tags';
+import { CACHE_TTL, createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { isUniqueViolation } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -221,6 +221,7 @@ function mapReleaseToViewModel(
       (
         release.metadata as Record<string, unknown> | null
       )?.lyrics?.toString() || undefined,
+    previewUrl: release.trackSummary?.primaryPreviewUrl || null,
   };
 }
 
@@ -254,12 +255,13 @@ async function resolveReleaseMatrix(
 
   const profile = await requireProfile(profileId);
 
-  // Cache with 30s TTL and tags for invalidation
+  // Cache with 5min TTL and tags for invalidation.
+  // Releases only change on import/sync — tag-based invalidation handles mutations.
   return unstable_cache(
     () => fetchReleaseMatrixCore(profile.id, profile.handle),
     ['releases-matrix', userId, profile.id],
     {
-      revalidate: 30,
+      revalidate: CACHE_TTL.MEDIUM,
       tags: [`releases:${userId}:${profile.id}`],
     }
   )();
@@ -1867,41 +1869,18 @@ export async function revertReleaseArtwork(
   return { artworkUrl: originalArtworkUrl, originalArtworkUrl };
 }
 
-async function upsertReleaseProviderUrls(
-  releaseId: string,
-  providerUrls: Record<string, string>
-): Promise<void> {
-  const providerLabels = buildProviderLabels();
-  const entries = Object.entries(providerUrls).filter(
-    ([, url]) => url.trim().length > 0
-  );
-  for (const [key, url] of entries) {
-    const provider = key as ProviderKey;
-    const providerLabel = providerLabels[provider];
-    if (!providerLabel) continue;
-    const trimmedUrl = url.trim();
-    const validation = validateProviderUrl(trimmedUrl, provider, providerLabel);
-    if (!validation.valid) continue;
-    await upsertProviderLink({
-      releaseId,
-      providerId: provider,
-      url: trimmedUrl,
-      sourceType: 'manual',
-    });
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  createRelease — manually add a release to the creator's discography */
-/* ------------------------------------------------------------------ */
-
 export async function createRelease(formData: {
   title: string;
   releaseType: 'single' | 'ep' | 'album' | 'compilation' | 'live';
   releaseDate?: string | null;
-  artworkUrl?: string | null;
-  providerUrls?: Record<string, string>;
-}): Promise<{ success: boolean; message: string; releaseId?: string }> {
+  genres?: string[];
+  isExplicit?: boolean;
+}): Promise<{
+  success: boolean;
+  message: string;
+  releaseId?: string;
+  release?: ReleaseViewModel;
+}> {
   noStore();
 
   const profile = await requireProfile();
@@ -1932,26 +1911,41 @@ export async function createRelease(formData: {
         slug,
         releaseType: formData.releaseType,
         releaseDate,
-        artworkUrl: formData.artworkUrl ?? null,
+        genres: formData.genres?.slice(0, 3) ?? null,
+        isExplicit: formData.isExplicit ?? false,
         sourceType: 'manual',
         totalTracks: formData.releaseType === 'single' ? 1 : 0,
       })
       .returning({ id: discogReleases.id });
 
     const releaseId = inserted.id;
-
-    // Upsert any provider URLs the user supplied
-    if (formData.providerUrls) {
-      await upsertReleaseProviderUrls(releaseId, formData.providerUrls);
-    }
+    const insertedRelease = await getReleaseById(releaseId);
+    const providerLabels = buildProviderLabels();
 
     revalidatePath(APP_ROUTES.RELEASES);
     revalidateTag(createSmartLinkContentTag(profile.id), 'max');
+
+    if (insertedRelease == null) {
+      return {
+        success: false,
+        message:
+          'Release was created but could not be loaded. Please refresh and try again.',
+        releaseId,
+      };
+    }
+
+    const release = mapReleaseToViewModel(
+      insertedRelease,
+      providerLabels,
+      profile.id,
+      profile.handle
+    );
 
     return {
       success: true,
       message: `Release "${title}" created.`,
       releaseId,
+      release,
     };
   } catch (error) {
     throwIfRedirect(error);

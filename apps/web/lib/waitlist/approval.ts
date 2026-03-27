@@ -99,7 +99,8 @@ export async function approveWaitlistEntryInTx(
       isClaimed: true,
       isPublic: true,
       claimedAt: now,
-      onboardingCompletedAt: now,
+      // onboardingCompletedAt intentionally NOT set — user must complete onboarding
+      // to choose their handle, upload avatar, connect Spotify, etc.
       updatedAt: now,
     })
     .where(eq(creatorProfiles.id, profile.id));
@@ -111,7 +112,11 @@ export async function approveWaitlistEntryInTx(
 
   await tx
     .update(users)
-    .set({ userStatus: 'active', activeProfileId: profile.id, updatedAt: now })
+    .set({
+      userStatus: 'active',
+      activeProfileId: profile.id,
+      updatedAt: now,
+    })
     .where(eq(users.id, user.id));
 
   return {

@@ -10,6 +10,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     start_url: '/',
     display: 'standalone',
+    display_override: ['standalone', 'minimal-ui'],
     background_color: '#0a0a0a',
     theme_color: '#0a0a0a',
     orientation: 'portrait',
@@ -52,15 +53,6 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '180x180',
         type: 'image/png',
         purpose: 'any',
-      },
-    ],
-    screenshots: [
-      {
-        src: '/web-app-manifest-512x512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        form_factor: 'narrow',
-        label: `${APP_NAME} - Artist profiles for music artists`,
       },
     ],
     shortcuts: [

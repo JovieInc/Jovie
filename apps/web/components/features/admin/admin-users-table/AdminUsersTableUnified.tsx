@@ -477,6 +477,16 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
     [SelectHeader, SelectCell, ActionsCell]
   );
 
+  // Arrow keys update detail drawer when it's already open
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (selectedUser && users[index]) {
+        setSelectedUser(users[index]);
+      }
+    },
+    [selectedUser, users]
+  );
+
   // Get row className - highlight selected row, hover for others
   const getRowClassName = useCallback(
     (row: AdminUserRow) =>
@@ -600,6 +610,7 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
                   getRowId={row => row.id}
                   getRowClassName={getRowClassName}
                   onRowClick={handleRowClick}
+                  onFocusedRowChange={handleFocusedRowChange}
                   getContextMenuItems={getContextMenuItems}
                   enableVirtualization={true}
                   minWidth={`${TABLE_MIN_WIDTHS.MEDIUM}px`}

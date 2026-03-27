@@ -157,7 +157,7 @@ export async function withRetry<T>(
               isRetryable,
               willRetry: false,
             },
-            { asBreadcrumb: false }
+            { asBreadcrumb: isRetryable }
           );
           throw error;
         });

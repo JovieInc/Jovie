@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { SearchParams } from 'nuqs/server';
 import { Suspense } from 'react';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { DashboardAudienceClient } from '@/features/dashboard/organisms/DashboardAudienceClient';
 import { AudienceTableLoadingShell } from '@/features/dashboard/organisms/dashboard-audience-table/AudienceTableLoadingShell';
@@ -10,7 +10,6 @@ import { PageErrorState } from '@/features/feedback/PageErrorState';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { audienceFilters, audienceSearchParams } from '@/lib/nuqs';
-import { logger } from '@/lib/utils/logger';
 import { throwIfRedirect } from '@/lib/utils/redirect-error';
 import {
   trimLeadingSlashes,
@@ -21,8 +20,6 @@ import { getDashboardData } from '../actions';
 import { loadUpcomingTourDates } from '../tour-dates/actions';
 import { getAudienceServerData } from './audience-data';
 
-// User-specific page - always render fresh
-export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 async function AudienceContent({
@@ -74,7 +71,7 @@ async function AudienceContent({
 
     const profileUrl =
       artist?.handle && artist.handle.length > 0
-        ? `${trimTrailingSlashes(APP_URL)}/${trimLeadingSlashes(artist.handle)}`
+        ? `${trimTrailingSlashes(BASE_URL)}/${trimLeadingSlashes(artist.handle)}`
         : undefined;
 
     // Parse search params using nuqs for type-safe URL state
@@ -134,7 +131,9 @@ async function AudienceContent({
     );
   } catch (error) {
     throwIfRedirect(error);
-    logger.error('[AudiencePage] Failed to load audience data', { error });
+    void captureError('Audience page failed', error, {
+      route: APP_ROUTES.DASHBOARD_AUDIENCE,
+    });
 
     return (
       <PageErrorState message='Failed to load audience data. Please refresh the page.' />

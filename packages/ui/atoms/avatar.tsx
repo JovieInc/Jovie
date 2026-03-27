@@ -258,6 +258,6 @@ export {
   AvatarFallback,
   AvatarImage,
   AvatarStatusDot,
-  UserAvatar,
   getInitials,
+  UserAvatar,
 };

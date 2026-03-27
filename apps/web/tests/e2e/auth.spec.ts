@@ -1,3 +1,4 @@
+import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Browser, Page } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import { expect, test } from './setup';
@@ -103,8 +104,19 @@ async function createFreshAuthPage(browser: Browser): Promise<Page> {
   const context = await browser.newContext({
     storageState: EMPTY_STORAGE_STATE,
   });
+  const page = await context.newPage();
 
-  return context.newPage();
+  if (process.env.CLERK_TESTING_SETUP_SUCCESS === 'true') {
+    await setupClerkTestingToken({ page }).catch((error: unknown) => {
+      // Signed-out auth-page assertions do not require the Clerk testing token.
+      console.warn(
+        '[auth.spec] setupClerkTestingToken skipped:',
+        error instanceof Error ? error.message : String(error)
+      );
+    });
+  }
+
+  return page;
 }
 
 test.describe('Auth', () => {
@@ -152,25 +164,39 @@ test.describe('Auth', () => {
     }
   });
 
-  test('signin and signup navigation stays on the canonical routes', async ({
+  test('signin and signup navigation stays on the canonical routes and preserves redirect_url', async ({
     browser,
   }, testInfo) => {
     const page = await createFreshAuthPage(browser);
     const { getContext, cleanup } = setupPageMonitoring(page);
+    const redirectUrl = APP_ROUTES.ONBOARDING;
 
     try {
-      await openAuthPage(page, APP_ROUTES.SIGNIN);
+      await openAuthPage(
+        page,
+        `${APP_ROUTES.SIGNIN}?redirect_url=${encodeURIComponent(redirectUrl)}`
+      );
 
       await page.getByRole('link', { name: /sign up|create account/i }).click();
-      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNUP, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === APP_ROUTES.SIGNUP &&
+          url.searchParams.get('redirect_url') === redirectUrl,
+        {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        }
+      );
       await expectClerkAuthUi(page);
 
       await page.getByRole('link', { name: /sign in|log in/i }).click();
-      await expect(page).toHaveURL(url => url.pathname === APP_ROUTES.SIGNIN, {
-        timeout: SMOKE_TIMEOUTS.NAVIGATION,
-      });
+      await expect(page).toHaveURL(
+        url =>
+          url.pathname === APP_ROUTES.SIGNIN &&
+          url.searchParams.get('redirect_url') === redirectUrl,
+        {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        }
+      );
       await expectClerkAuthUi(page);
       await assertNoCriticalErrors(getContext(), testInfo);
     } finally {

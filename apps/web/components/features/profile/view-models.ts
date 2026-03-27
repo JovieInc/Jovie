@@ -3,6 +3,7 @@ import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 import {
   type ProfileIdentityFields,
   type ProfilePreviewLinkViewModel,
@@ -22,6 +23,7 @@ interface BuildProfilePublicViewModelInput {
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes?: AvatarSize[];
   readonly allowPhotoDownloads?: boolean;
+  readonly pressPhotos?: PressPhoto[];
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
   readonly tourDates?: TourDateViewModel[];
@@ -46,6 +48,7 @@ export function buildProfilePublicViewModel({
   latestRelease,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  pressPhotos = [],
   subscribeTwoStep = false,
   genres,
   tourDates = [],
@@ -80,6 +83,7 @@ export function buildProfilePublicViewModel({
     latestRelease,
     photoDownloadSizes,
     allowPhotoDownloads,
+    pressPhotos,
     subscribeTwoStep,
     genres,
     tourDates,
@@ -102,6 +106,7 @@ export function buildProfileIdentityFields(
     location: artist.location ?? '',
     hometown: artist.hometown ?? '',
     pitchContext: artist.pitch_context ?? '',
+    targetPlaylists: artist.target_playlists?.join(', ') ?? '',
     profilePath: `/${artist.handle}`,
   };
 }

@@ -14,10 +14,15 @@ vi.mock('@/lib/env-server', () => ({
   },
 }));
 
-const getBlogPostSlugs = vi.fn();
-vi.mock('@/lib/blog/getBlogPosts', () => ({
-  getBlogPostSlugs,
-}));
+const getBlogPosts = vi.fn();
+vi.mock('@/lib/blog/getBlogPosts', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/blog/getBlogPosts')>();
+  return {
+    getBlogPosts,
+    slugifyCategory: actual.slugifyCategory,
+  };
+});
 
 const queryMock = vi.fn();
 const whereMock = vi.fn<() => Promise<unknown[]>>(() => Promise.resolve([]));
@@ -71,7 +76,20 @@ vi.mock('@sentry/nextjs', () => ({
 
 describe('sitemap', () => {
   it('returns marketing, blog, profile, release, and deduplicated track URLs', async () => {
-    getBlogPostSlugs.mockResolvedValue(['hello-world']);
+    getBlogPosts.mockResolvedValue([
+      {
+        slug: 'hello-world',
+        title: 'Hello World',
+        date: '2026-01-01',
+        author: 'Tim',
+        authorUsername: 'tim',
+        category: 'Test',
+        tags: [],
+        excerpt: 'Test',
+        readingTime: 3,
+        wordCount: 714,
+      },
+    ]);
 
     whereMock
       .mockResolvedValueOnce([
@@ -118,6 +136,18 @@ describe('sitemap', () => {
       entry => entry.url === 'https://jov.ie/tim/album'
     );
     expect(albumMatches).toHaveLength(1);
+
+    for (const blockedUrl of [
+      'https://jov.ie/demo',
+      'https://jov.ie/sandbox',
+      'https://jov.ie/spinner-test',
+      'https://jov.ie/sentry-example-page',
+      'https://jov.ie/ui/buttons',
+      'https://jov.ie/hud',
+      'https://jov.ie/investor-portal',
+    ]) {
+      expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
+    }
 
     expect(selectMock).toHaveBeenCalledTimes(3);
     expect(queryMock).toHaveBeenCalled();

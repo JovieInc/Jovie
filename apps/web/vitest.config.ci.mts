@@ -13,6 +13,7 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     exclude: [
       'tests/e2e/**',
+      'tests/eval/**',
       'tests/performance/**',
       'tests/product-screenshots/**',
       'node_modules/**',
@@ -38,7 +39,7 @@ export default defineConfig({
     // Coverage optimization
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       exclude: [
         'node_modules/**',
         'tests/**',

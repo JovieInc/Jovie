@@ -7,7 +7,6 @@ import { queryKeys } from './keys';
 export interface WaitlistStatusResponse {
   hasEntry: boolean;
   status: 'pending' | 'invited' | 'claimed' | null;
-  inviteToken: string | null;
   inviteUsername: string | null;
 }
 

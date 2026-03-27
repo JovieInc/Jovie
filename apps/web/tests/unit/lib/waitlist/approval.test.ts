@@ -77,12 +77,27 @@ describe('approveWaitlistEntryInTx', () => {
       })
     );
 
+    // Approval should NOT set onboardingCompletedAt — user must complete onboarding
     expect(updateSet).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
         userId: 'user-1',
         isClaimed: true,
         isPublic: true,
+      })
+    );
+    expect(updateSet).toHaveBeenNthCalledWith(
+      2,
+      expect.not.objectContaining({
+        onboardingCompletedAt: expect.anything(),
+      })
+    );
+
+    // User status stays active — onboarding is gated by isProfileComplete() not userStatus
+    expect(updateSet).toHaveBeenNthCalledWith(
+      4,
+      expect.objectContaining({
+        userStatus: 'active',
       })
     );
   });
@@ -110,6 +125,20 @@ describe('approveWaitlistEntryInTx', () => {
       expect.objectContaining({
         userId: 'user-1',
         isClaimed: true,
+      })
+    );
+    // Should NOT set onboardingCompletedAt
+    expect(updateSet).toHaveBeenNthCalledWith(
+      1,
+      expect.not.objectContaining({
+        onboardingCompletedAt: expect.anything(),
+      })
+    );
+    // User status stays active
+    expect(updateSet).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        userStatus: 'active',
       })
     );
   });

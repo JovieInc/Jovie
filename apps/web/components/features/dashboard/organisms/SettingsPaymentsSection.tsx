@@ -2,10 +2,10 @@
 
 import { Button } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, CreditCard, Unlink } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 
 interface StripeConnectStatus {
   connected: boolean;
@@ -19,6 +19,17 @@ export function SettingsPaymentsSection() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const renderPanel = (children: ReactNode, footer?: ReactNode) => (
+    <SettingsPanel>
+      <div className='px-4 py-4 sm:px-5'>{children}</div>
+      {footer ? (
+        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+          {footer}
+        </div>
+      ) : null}
+    </SettingsPanel>
+  );
 
   // Fetch status on mount
   const fetchStatus = useCallback(async () => {
@@ -89,131 +100,75 @@ export function SettingsPaymentsSection() {
   };
 
   if (isLoading) {
-    return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Stripe payouts'
-          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-[13px] text-secondary-token'>
-              Loading payment settings...
-            </p>
-          </ContentSurfaceCard>
-        </div>
-      </DashboardCard>
+    return renderPanel(
+      <SettingsActionRow
+        icon={<CreditCard className='h-4 w-4' aria-hidden />}
+        title='Loading payments'
+        description='Checking your Stripe connection and payout status.'
+      />
     );
   }
 
   // Error state
   if (error && !status) {
-    return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Stripe payouts'
-          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3'>
-          <ContentSurfaceCard className='bg-surface-0 px-4 py-3.5'>
-            <p className='text-[13px] text-error'>{error}</p>
-          </ContentSurfaceCard>
-        </div>
-      </DashboardCard>
+    return renderPanel(
+      <SettingsActionRow
+        icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
+        title='Unable to load payments'
+        description={error}
+        action={
+          <Button variant='secondary' size='sm' onClick={() => fetchStatus()}>
+            Try again
+          </Button>
+        }
+      />
     );
   }
 
   // Not connected
   if (!status?.connected) {
-    return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Stripe payouts'
-          subtitle='Connect Stripe to receive fan payments directly through Jovie.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3 space-y-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-4'>
-            <div className='flex items-start gap-3'>
-              <CreditCard className='mt-0.5 h-5 w-5 shrink-0 text-secondary-token' />
-              <div className='flex-1'>
-                <p className='text-[13px] font-[510] text-primary-token'>
-                  Connect with Stripe
-                </p>
-                <p className='mt-1 text-[13px] text-secondary-token'>
-                  Set up Stripe Connect to receive payments directly from fans.
-                  Stripe handles all payment processing, payouts, and tax
-                  reporting.
-                </p>
-              </div>
-            </div>
-            {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
-          </ContentSurfaceCard>
+    return renderPanel(
+      <SettingsActionRow
+        icon={<CreditCard className='h-4 w-4' aria-hidden />}
+        title='Stripe not connected'
+        description='Connect Stripe to receive fan payments directly through Jovie. Stripe handles payment processing, payouts, and tax reporting.'
+        action={
           <Button
             onClick={handleConnect}
             loading={isActionLoading || undefined}
             variant='primary'
             size='sm'
-            className='w-full sm:w-auto'
           >
-            Connect with Stripe
+            Connect Stripe
           </Button>
-        </div>
-      </DashboardCard>
+        }
+      />,
+      error ? (
+        <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+      ) : undefined
     );
   }
 
   // Connected but onboarding incomplete
   if (!status.onboardingComplete) {
-    return (
-      <DashboardCard
-        variant='settings'
-        padding='none'
-        className='overflow-hidden'
-      >
-        <ContentSectionHeader
-          title='Stripe payouts'
-          subtitle='Finish Stripe onboarding to enable payouts and collect payments.'
-          className='min-h-0 px-4 py-3'
-        />
-        <div className='px-4 py-3 space-y-3'>
-          <ContentSurfaceCard className='bg-surface-0 p-4'>
-            <div className='flex items-start gap-3'>
-              <AlertTriangle className='mt-0.5 h-5 w-5 shrink-0 text-warning' />
-              <div className='flex-1'>
-                <p className='text-[13px] font-[510] text-primary-token'>
-                  Stripe setup incomplete
-                </p>
-                <p className='mt-1 text-[13px] text-secondary-token'>
-                  Your Stripe account is connected but onboarding is not
-                  complete. Finish setup to start receiving payments.
-                </p>
-              </div>
-            </div>
-            {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
-          </ContentSurfaceCard>
-          <div className='flex gap-2'>
+    return renderPanel(
+      <SettingsActionRow
+        icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
+        title='Finish Stripe setup'
+        description={
+          status.email
+            ? `Connected as ${status.email}. Finish onboarding to enable payouts and start receiving payments.`
+            : 'Your Stripe account is connected, but onboarding is not complete yet. Finish setup to enable payouts.'
+        }
+        action={
+          <div className='flex flex-wrap items-center gap-2'>
             <Button
               onClick={handleConnect}
               loading={isActionLoading || undefined}
               variant='primary'
               size='sm'
             >
-              Complete Stripe Setup
+              Complete setup
             </Button>
             <Button
               onClick={handleDisconnect}
@@ -221,59 +176,44 @@ export function SettingsPaymentsSection() {
               variant='ghost'
               size='sm'
             >
-              <Unlink className='h-3.5 w-3.5 mr-1' />
+              <Unlink className='mr-1 h-3.5 w-3.5' />
               Disconnect
             </Button>
           </div>
-        </div>
-      </DashboardCard>
+        }
+      />,
+      error ? (
+        <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+      ) : undefined
     );
   }
 
   // Connected and active
-  return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
-    >
-      <ContentSectionHeader
-        title='Stripe payouts'
-        subtitle='Stripe is connected and ready to handle fan payments.'
-        className='min-h-0 px-4 py-3'
-      />
-      <div className='px-4 py-3 space-y-3'>
-        <ContentSurfaceCard className='bg-surface-0 p-4'>
-          <div className='flex items-start gap-3'>
-            <CheckCircle2 className='mt-0.5 h-5 w-5 shrink-0 text-success' />
-            <div className='flex-1'>
-              <p className='text-[13px] font-[510] text-primary-token'>
-                Stripe connected
-              </p>
-              <p className='mt-1 text-[13px] text-secondary-token'>
-                {status.payoutsEnabled
-                  ? 'Payouts are enabled. You are ready to receive payments.'
-                  : 'Account connected. Payouts are being reviewed by Stripe.'}
-              </p>
-              {status.email && (
-                <p className='mt-1 text-[13px] text-secondary-token'>
-                  Payout email: {status.email}
-                </p>
-              )}
-            </div>
-          </div>
-          {error && <p className='mt-3 text-[13px] text-error'>{error}</p>}
-        </ContentSurfaceCard>
+  return renderPanel(
+    <SettingsActionRow
+      icon={<CheckCircle2 className='h-4 w-4' aria-hidden />}
+      title='Stripe connected'
+      description={
+        status.email
+          ? `${status.payoutsEnabled ? 'Payouts are enabled and you are ready to receive payments.' : 'Account connected. Stripe is still reviewing payouts.'} Payout email: ${status.email}.`
+          : status.payoutsEnabled
+            ? 'Payouts are enabled and you are ready to receive payments.'
+            : 'Account connected. Stripe is still reviewing payouts.'
+      }
+      action={
         <Button
           onClick={handleDisconnect}
           loading={isActionLoading || undefined}
           variant='ghost'
           size='sm'
         >
-          <Unlink className='h-3.5 w-3.5 mr-1' />
+          <Unlink className='mr-1 h-3.5 w-3.5' />
           Disconnect
         </Button>
-      </div>
-    </DashboardCard>
+      }
+    />,
+    error ? (
+      <p className='text-[13px] leading-[18px] text-destructive'>{error}</p>
+    ) : undefined
   );
 }

@@ -10,26 +10,45 @@ vi.mock('@/components/organisms/profile-shell', () => ({
   useProfileShell: () => ({ notificationsContextValue: null }),
 }));
 
-vi.mock('@/components/organisms/profile-header-v2/ProfileHeaderV2', () => ({
-  ProfileHeaderV2: ({ activeMode, modes, onModeSelect }: any) => (
-    <div role='tablist' aria-label='Profile sections'>
-      {modes.map((mode: string) => (
-        <button
-          key={mode}
-          type='button'
-          role='tab'
-          aria-selected={mode === activeMode}
-          onClick={() => onModeSelect(mode)}
-        >
-          {mode}
-        </button>
-      ))}
+vi.mock('@/features/profile/ProfileHeroCard', () => ({
+  ArtistHero: ({ onPlayClick, onBellClick }: any) => (
+    <div>
+      <button type='button' onClick={onPlayClick}>
+        Play
+      </button>
+      <button type='button' onClick={onBellClick}>
+        Bell
+      </button>
     </div>
   ),
 }));
 
-vi.mock('@/features/profile/ProfileHeroCard', () => ({
-  ProfileHeroCard: () => <div>hero</div>,
+vi.mock('@/features/profile/ProfileViewportShell', () => ({
+  ProfileViewportShell: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
+vi.mock('@/features/profile/ProfileQuickActions', () => ({
+  ProfileQuickActions: ({ onModeSelect, onBookClick }: any) => (
+    <div>
+      <button type='button' onClick={() => onModeSelect('profile')}>
+        Home
+      </button>
+      <button type='button' onClick={() => onModeSelect('tour')}>
+        Tour
+      </button>
+      <button type='button' onClick={() => onModeSelect('tip')}>
+        Tip
+      </button>
+      <button type='button' onClick={() => onModeSelect('about')}>
+        About
+      </button>
+      <button type='button' onClick={onBookClick}>
+        Book
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('@/features/profile/SwipeableModeContainer', () => ({
@@ -39,11 +58,33 @@ vi.mock('@/features/profile/SwipeableModeContainer', () => ({
 }));
 
 vi.mock('@/features/profile/ListenDrawer', () => ({
-  ListenDrawer: () => null,
+  ListenDrawer: ({ open }: { open: boolean }) => (
+    <div data-testid='listen-drawer'>{open ? 'open' : 'closed'}</div>
+  ),
+}));
+
+vi.mock('@/features/profile/SubscribeDrawer', () => ({
+  SubscribeDrawer: ({ open }: { open: boolean }) => (
+    <div data-testid='subscribe-drawer'>{open ? 'open' : 'closed'}</div>
+  ),
+}));
+
+vi.mock('@/features/profile/artist-contacts-button/ContactDrawer', () => ({
+  ContactDrawer: ({ open }: { open: boolean }) => (
+    <div data-testid='contact-drawer'>{open ? 'open' : 'closed'}</div>
+  ),
+}));
+
+vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
+  useArtistContacts: ({ contacts }: { contacts: unknown[] }) => ({
+    available: contacts,
+    primaryChannel: contacts[0] ?? null,
+    isEnabled: contacts.length > 0,
+  }),
 }));
 
 vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [],
+  getCanonicalProfileDSPs: () => [{ key: 'spotify' }],
 }));
 
 vi.mock('@/lib/utils/context-aware-links', () => ({
@@ -79,26 +120,34 @@ const artist = {
   image_url: 'https://example.com/tim.jpg',
 } as any;
 
+const contacts = [
+  {
+    id: 'contact-1',
+    type: 'email',
+    value: 'bookings@example.com',
+  },
+] as any;
+
 describe('PublicProfileTemplateV2 history behavior', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/tim?ff_profile_v2=1');
   });
 
-  it('pushes a new URL when a mode tab is selected', async () => {
+  it('pushes a new URL when a dock mode is selected', async () => {
     render(
       <PublicProfileTemplateV2
         mode='profile'
         artist={artist}
         socialLinks={[]}
-        contacts={[]}
+        contacts={contacts}
         tourDates={[]}
       />
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'listen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tour' }));
 
     await waitFor(() => {
-      expect(window.location.search).toContain('mode=listen');
+      expect(window.location.search).toContain('mode=tour');
     });
   });
 
@@ -108,15 +157,15 @@ describe('PublicProfileTemplateV2 history behavior', () => {
         mode='profile'
         artist={artist}
         socialLinks={[]}
-        contacts={[]}
+        contacts={contacts}
         tourDates={[]}
       />
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'listen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Tour' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('mode-panel')).toHaveTextContent('listen');
+      expect(screen.getByTestId('mode-panel')).toHaveTextContent('tour');
     });
 
     window.history.pushState(null, '', '/tim?ff_profile_v2=1');
@@ -124,6 +173,57 @@ describe('PublicProfileTemplateV2 history behavior', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('mode-panel')).toHaveTextContent('profile');
+    });
+  });
+
+  it('maps legacy listen mode to the profile pane and opens the listen drawer', async () => {
+    render(
+      <PublicProfileTemplateV2
+        mode='listen'
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        tourDates={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mode-panel')).toHaveTextContent('profile');
+      expect(screen.getByTestId('listen-drawer')).toHaveTextContent('open');
+    });
+  });
+
+  it('maps legacy subscribe mode to the profile pane and opens the subscribe drawer', async () => {
+    render(
+      <PublicProfileTemplateV2
+        mode='subscribe'
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        tourDates={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mode-panel')).toHaveTextContent('profile');
+      expect(screen.getByTestId('subscribe-drawer')).toHaveTextContent('open');
+    });
+  });
+
+  it('maps legacy contact mode to the profile pane and opens the booking drawer', async () => {
+    render(
+      <PublicProfileTemplateV2
+        mode='contact'
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        tourDates={[]}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mode-panel')).toHaveTextContent('profile');
+      expect(screen.getByTestId('contact-drawer')).toHaveTextContent('open');
     });
   });
 });

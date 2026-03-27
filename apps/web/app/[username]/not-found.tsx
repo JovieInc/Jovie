@@ -19,11 +19,11 @@ export default function NotFound() {
           {/* Content */}
           <div className='-mt-16 relative'>
             <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
-              Profile not found
+              Page not found
             </h1>
             <p className='text-[13px] text-tertiary-token leading-relaxed mb-8'>
-              The profile you&apos;re looking for doesn&apos;t exist or
-              isn&apos;t public.
+              The link you followed may be broken, or the page may have been
+              removed.
             </p>
 
             <Link

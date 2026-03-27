@@ -40,14 +40,14 @@ export function ProfileLiveCelebration({
   // Check localStorage to prevent re-firing celebration
   const celebrationKey = profileId ? `celebrated_${profileId}` : null;
   const alreadyCelebrated = celebrationKey
-    ? typeof window !== 'undefined' &&
-      window.localStorage.getItem(celebrationKey) !== null
+    ? globalThis.window !== undefined &&
+      globalThis.localStorage.getItem(celebrationKey) !== null
     : false;
 
   // Mark as celebrated on first render
   useEffect(() => {
     if (celebrationKey && !alreadyCelebrated) {
-      window.localStorage.setItem(celebrationKey, String(Date.now()));
+      globalThis.localStorage.setItem(celebrationKey, String(Date.now()));
     }
   }, [celebrationKey, alreadyCelebrated]);
 
@@ -143,7 +143,10 @@ export function ProfileLiveCelebration({
       }
 
       const first = tabbable[0];
-      const last = tabbable.at(-1)!;
+      const last = tabbable.at(-1);
+      if (!last) {
+        return;
+      }
 
       if (event.shiftKey && globalThis.document.activeElement === first) {
         event.preventDefault();
@@ -198,8 +201,8 @@ export function ProfileLiveCelebration({
           Your profile is live
         </h2>
 
-        <div className='flex items-center gap-2 rounded-xl border border-subtle bg-surface-1 px-4 py-2.5'>
-          <span className='text-[15px] font-medium text-primary-token'>
+        <div className='flex items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-2.5'>
+          <span className='text-[13px] font-medium text-primary-token'>
             {profileUrl}
           </span>
           <CopyToClipboardButton

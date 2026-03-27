@@ -1,29 +1,24 @@
 import type { Metadata } from 'next';
-import { NumberedSection } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
-import { AiDemo } from '@/features/home/AiDemo';
-import { AudienceCRMSection } from '@/features/home/AudienceCRMSection';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
+import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_ROUTES } from '@/constants/routes';
+import { FeatureShowcase } from '@/features/home/FeatureShowcase';
 import { FinalCTASection } from '@/features/home/FinalCTASection';
-import { HeroScrollSection } from '@/features/home/HeroScrollSection';
+import { HeroCinematic } from '@/features/home/HeroCinematic';
 import { LogoBar } from '@/features/home/LogoBar';
-import { PhoneProfileDemo } from '@/features/home/PhoneProfileDemo';
-import { PricingSection } from '@/features/home/PricingSection';
-import { ReleasesSection } from '@/features/home/ReleasesSection';
-import { TestimonialsSection } from '@/features/home/TestimonialsSection';
-import { ValuePropsSection } from '@/features/home/ValuePropsSection';
+import { StickyPhoneTour } from '@/features/home/StickyPhoneTour';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { FEATURE_FLAGS } from '@/lib/feature-flags/shared';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
 
 export async function generateMetadata(): Promise<Metadata> {
-  const title = `${APP_NAME} | Release More Music.`;
+  const title = { absolute: `${APP_NAME} | Release More Music.` };
   const description =
     'Release more music. Do less release work. Jovie gives independent artists smart links, artist profiles, audience intelligence, and release automation built for every drop.';
   const keywords = [
@@ -59,7 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
     authors: [
       {
         name: APP_NAME,
-        url: APP_URL,
+        url: BASE_URL,
       },
     ],
     creator: APP_NAME,
@@ -71,7 +66,7 @@ export async function generateMetadata(): Promise<Metadata> {
       address: false,
       telephone: false,
     },
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: '/',
       languages: {
@@ -81,14 +76,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: APP_URL,
+      url: BASE_URL,
       title,
       description,
       siteName: APP_NAME,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
-          secureUrl: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
+          secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
           alt: `${APP_NAME} - Release More Music.`,
@@ -102,14 +97,14 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
           alt: `${APP_NAME} - Release More Music.`,
           width: 1200,
           height: 630,
         },
       ],
-      creator: '@jovieapp',
-      site: '@jovieapp',
+      creator: '@meetjovie',
+      site: '@meetjovie',
     },
     robots: {
       index: true,
@@ -151,94 +146,54 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
   legalName: 'Jovie Technology Inc.',
   description:
     'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
-  sameAs: ['https://x.com/jovieapp', 'https://instagram.com/jovieapp'],
+  sameAs: ['https://instagram.com/meetjovie'],
 });
 
-const AI_SUB_ITEMS = [
-  {
-    number: '4.1',
-    title: 'Press Releases',
-    description:
-      'A press release that says you dropped "Never Say A Word" with The Orchard on March 3rd, it hit 42K streams in the first week, and you\'ve toured 12 cities this year. ChatGPT can\'t write that.',
-  },
-  {
-    number: '4.2',
-    title: 'Career Context',
-    description:
-      "Every release date, every stream count, every collab, every city you've played. The AI has your full history loaded — not a blank prompt.",
-  },
-  {
-    number: '4.3',
-    title: 'Release Strategy',
-    description:
-      'Rollout plans built on your actual numbers — which platforms drive your streams, when your fans are most active, what worked last time.',
-  },
-];
-
-function AiSection() {
-  return (
-    <NumberedSection
-      id='ai'
-      sectionNumber='4.0'
-      sectionTitle='AI'
-      heading='AI that knows every song.'
-      description='Your releases, your stream counts, your tour history, your collabs — all loaded. Ask it to write a press release and it cites real numbers. Ask it to plan a rollout and it pulls from what actually worked.'
-      subItems={AI_SUB_ITEMS}
-      className='relative overflow-hidden bg-page'
-    >
-      <div
-        className='homepage-surface-card overflow-hidden rounded-[1rem]'
-        style={{
-          boxShadow:
-            '0 0 0 1px rgba(255,255,255,0.04), 0 20px 50px rgba(0,0,0,0.25)',
-        }}
-      >
-        <AiDemo />
-      </div>
-    </NumberedSection>
-  );
-}
+const heroOnly =
+  !FEATURE_FLAGS.SHOW_PHONE_TOUR &&
+  !FEATURE_FLAGS.SHOW_LOGO_BAR &&
+  !FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE &&
+  !FEATURE_FLAGS.SHOW_FINAL_CTA;
 
 export default function HomePage() {
-  return (
-    <div className='relative min-h-screen'>
-      {/* Non-blocking: redirects signed-in users to dashboard after hydration */}
-      <AuthRedirectHandler />
+  const authRedirectScript = `(function(){try{var cookies=document.cookie.split(';');var active=cookies.some(function(cookie){var trimmed=cookie.trim();if(!trimmed.startsWith('__client_uat=')){return false;}var value=trimmed.split('=')[1];return Boolean(value&&value!=='0');});if(active){window.location.replace('${APP_ROUTES.DASHBOARD}');}}catch(_error){}})();`;
 
-      {/* Structured Data */}
+  return (
+    <div
+      className={
+        heroOnly
+          ? 'relative h-[calc(100dvh-var(--linear-header-height))] overflow-hidden'
+          : 'relative min-h-screen'
+      }
+    >
+      <script suppressHydrationWarning>{authRedirectScript}</script>
+
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
 
-      {/* 1. Hero */}
-      <HeroScrollSection />
+      {heroOnly && (
+        <style>
+          {
+            'html,body{overflow:hidden!important;height:100dvh!important}footer{display:none!important}'
+          }
+        </style>
+      )}
 
-      {/* Logo trust bar */}
-      <LogoBar />
+      <HeroCinematic fullScreen={heroOnly} />
 
-      {/* Value proposition — FIG cards */}
-      <ValuePropsSection />
+      {FEATURE_FLAGS.SHOW_PHONE_TOUR && <StickyPhoneTour />}
 
-      {/* 1.0 Release */}
-      <ReleasesSection />
+      {FEATURE_FLAGS.SHOW_LOGO_BAR && <LogoBar />}
 
-      {/* 2.0 Profile */}
-      <PhoneProfileDemo />
+      {FEATURE_FLAGS.SHOW_FEATURE_SHOWCASE && (
+        <>
+          <FeatureShowcase />
+          <div aria-hidden='true' className='section-gradient-divider' />
+        </>
+      )}
 
-      {/* 3.0 Audience */}
-      <AudienceCRMSection />
-
-      {/* 4.0 AI */}
-      <AiSection />
-
-      {/* Pricing — must show before CTA for conversion */}
-      <PricingSection />
-
-      {/* Testimonials */}
-      <TestimonialsSection />
-
-      {/* Final CTA */}
-      <FinalCTASection />
+      {FEATURE_FLAGS.SHOW_FINAL_CTA && <FinalCTASection />}
     </div>
   );
 }

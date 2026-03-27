@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ReleaseDayNotificationData } from '@/lib/email/templates/release-day-notification';
 import {
+  getReleaseDayNotificationEmail,
   getReleaseDayNotificationHtml,
   getReleaseDayNotificationSubject,
   getReleaseDayNotificationText,
+  getReleaseDayUnsubscribeHeaders,
 } from '@/lib/email/templates/release-day-notification';
 
 /** Minimal valid fixture shared across all tests */
@@ -85,6 +87,26 @@ describe('release day notification subscriber name personalization', () => {
 
       expect(withName).toBe(withoutName);
       expect(withName).toBe('Dua Lipa just dropped new music');
+    });
+  });
+
+  describe('getReleaseDayUnsubscribeHeaders', () => {
+    it('includes correctly formatted List-Unsubscribe header', () => {
+      const headers = getReleaseDayUnsubscribeHeaders('dualipa');
+      expect(headers['List-Unsubscribe']).toMatch(/^<https?:\/\/.+\/dualipa>$/);
+    });
+
+    it('does not include List-Unsubscribe-Post (no POST endpoint yet)', () => {
+      const headers = getReleaseDayUnsubscribeHeaders('dualipa');
+      expect(headers['List-Unsubscribe-Post']).toBeUndefined();
+    });
+  });
+
+  describe('getReleaseDayNotificationEmail', () => {
+    it('includes headers in the email payload', () => {
+      const email = getReleaseDayNotificationEmail(baseData);
+      expect(email.headers).toBeDefined();
+      expect(email.headers!['List-Unsubscribe']).toContain('dualipa');
     });
   });
 });

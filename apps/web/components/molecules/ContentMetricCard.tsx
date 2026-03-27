@@ -39,7 +39,7 @@ export function ContentMetricCard({
   ...props
 }: Readonly<ContentMetricCardProps>) {
   return (
-    <ContentSurfaceCard as={as} className={cn('p-3', className)} {...props}>
+    <ContentSurfaceCard as={as} className={cn('p-3.5', className)} {...props}>
       <div className={cn('space-y-1', bodyClassName)}>
         <div className={cn('flex items-center gap-1.5', headerClassName)}>
           <div className='min-w-0 flex items-center gap-1.5'>
@@ -53,7 +53,7 @@ export function ContentMetricCard({
             ) : null}
             <p
               className={cn(
-                'truncate text-[11px] font-[510] tracking-[0.04em] text-tertiary-token',
+                'truncate text-[11px] font-[560] tracking-normal text-tertiary-token',
                 labelClassName
               )}
             >
@@ -66,7 +66,7 @@ export function ContentMetricCard({
         </div>
         <p
           className={cn(
-            'text-[28px] font-[620] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
+            'text-[26px] font-[610] leading-none tracking-[-0.03em] text-primary-token tabular-nums',
             valueClassName
           )}
         >
@@ -75,7 +75,7 @@ export function ContentMetricCard({
         {subtitle ? (
           <div
             className={cn(
-              'text-[12px] leading-[17px] text-secondary-token',
+              'text-[12px] leading-[16px] text-secondary-token',
               subtitleClassName
             )}
           >

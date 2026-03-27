@@ -29,14 +29,19 @@ function renderWithQueryClient(ui: ReactElement) {
 }
 
 describe('FinalCTASection', () => {
-  it('renders headline', () => {
+  it('renders headline and form', () => {
     renderWithQueryClient(<FinalCTASection />);
-    expect(screen.getByTestId('final-cta-headline')).toBeInTheDocument();
-    expect(screen.getByText('Available today.')).toBeInTheDocument();
+    const headline = screen.getByTestId('final-cta-headline');
+    expect(headline).toBeInTheDocument();
+    expect(headline.textContent?.trim().length).toBeGreaterThan(0);
   });
 
   it('renders claim handle form', () => {
     renderWithQueryClient(<FinalCTASection />);
-    expect(screen.getByTestId('final-cta-dock')).toBeInTheDocument();
+    expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
+      'Claim your handle.'
+    );
+    expect(screen.getByTestId('final-cta-form')).toBeInTheDocument();
+    expect(screen.getByRole('textbox')).toBeInTheDocument();
   });
 });

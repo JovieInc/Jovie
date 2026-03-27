@@ -8,7 +8,7 @@
  * - DB warm ping: every invocation (15 min) — keeps Neon from auto-suspending
  * - Process campaigns: every invocation (15 min)
  * - Pixel forwarding retry: every other invocation (~30 min)
- * - Send release notifications: on the hour (~60 min)
+ * - Schedule + send release notifications: every invocation (15 min)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -18,6 +18,7 @@
 
 import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import {
   discoveryKeywords,
@@ -25,7 +26,6 @@ import {
   leads,
 } from '@/lib/db/schema/leads';
 import { processCampaigns } from '@/lib/email/campaigns/processor';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import {
   claimPendingJobs,
@@ -42,6 +42,7 @@ import { cleanupExpiredSuppressions } from '@/lib/notifications/suppression';
 import { warmAlphabetCache } from '@/lib/spotify/alphabet-cache';
 import { processPendingEvents } from '@/lib/tracking/forwarding';
 import { logger } from '@/lib/utils/logger';
+import { scheduleReleaseNotifications } from '../schedule-release-notifications/route';
 import { sendPendingNotifications } from '../send-release-notifications/route';
 
 export const runtime = 'nodejs';
@@ -77,13 +78,10 @@ async function runSubJob(
 export async function GET(request: Request) {
   const startTime = Date.now();
 
-  const authHeader = request.headers.get('authorization');
-  if (!env.CRON_SECRET || authHeader !== `Bearer ${env.CRON_SECRET}`) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401, headers: NO_STORE_HEADERS }
-    );
-  }
+  const authError = verifyCronRequest(request, {
+    route: '/api/cron/frequent',
+  });
+  if (authError) return authError;
 
   const minute = new Date().getMinutes();
   const results: Record<string, SubJobResult> = {};
@@ -111,16 +109,22 @@ export async function GET(request: Request) {
         })
       : { success: true, skipped: true };
 
-  // 4. Send release notifications — on the hour (minute < 15)
-  results.sendNotifications =
-    minute < 15
-      ? await runSubJob('sendNotifications', async () => {
-          const notifResult = await sendPendingNotifications();
-          return notifResult as unknown as Record<string, unknown>;
-        })
-      : { success: true, skipped: true };
+  // 4. Schedule release notifications — every invocation (15 min)
+  results.scheduleNotifications = await runSubJob(
+    'scheduleNotifications',
+    async () => {
+      const scheduleResult = await scheduleReleaseNotifications();
+      return scheduleResult as unknown as Record<string, unknown>;
+    }
+  );
 
-  // 5. Lead discovery + qualification + auto-approve — every invocation (15 min)
+  // 5. Send release notifications — every invocation (15 min)
+  results.sendNotifications = await runSubJob('sendNotifications', async () => {
+    const notifResult = await sendPendingNotifications();
+    return notifResult as unknown as Record<string, unknown>;
+  });
+
+  // 6. Lead discovery + qualification + auto-approve — every invocation (15 min)
   results.leadDiscovery = await runSubJob('leadDiscovery', async () => {
     // Fetch settings (upsert default if missing)
     let [settings] = await db
@@ -197,7 +201,7 @@ export async function GET(request: Request) {
     } as unknown as Record<string, unknown>;
   });
 
-  // 6. Warm Spotify alphabet cache — every 6 hours
+  // 7. Warm Spotify alphabet cache — every 6 hours
   const hour = new Date().getHours();
   if (hour % 6 === 0 && minute < 15) {
     try {
@@ -223,7 +227,7 @@ export async function GET(request: Request) {
     results.alphabetCache = { success: true, skipped: true };
   }
 
-  // 7. Fallback ingestion job processing — drains up to 2 jobs if the
+  // 8. Fallback ingestion job processing — drains up to 2 jobs if the
   //    dedicated cron hasn't picked them up. Runs last to stay within budget.
   const elapsed = Date.now() - startTime;
   if (elapsed < 50_000) {

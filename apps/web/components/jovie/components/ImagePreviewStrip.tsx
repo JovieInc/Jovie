@@ -20,10 +20,10 @@ export function ImagePreviewStrip({
   if (images.length === 0) return null;
 
   return (
-    <div className='rounded-[20px] border border-subtle bg-surface-2/70 p-3'>
+    <div className='rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-3'>
       <div className='mb-3 flex items-center justify-between gap-3'>
         <div>
-          <p className='text-[11px] font-semibold uppercase tracking-[0.16em] text-secondary-token'>
+          <p className='text-[11px] font-[510] tracking-[-0.01em] text-secondary-token'>
             Attachments
           </p>
           <p className='text-xs text-tertiary-token'>
@@ -37,7 +37,7 @@ export function ImagePreviewStrip({
           {images.map(image => (
             <motion.div
               key={image.id}
-              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-subtle bg-surface-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              className='group relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-1'
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
@@ -60,7 +60,7 @@ export function ImagePreviewStrip({
                 onClick={() => onRemove(image.id)}
                 className={cn(
                   'absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center',
-                  'rounded-full border border-white/15 bg-black/55 text-white transition-opacity',
+                  'rounded-[8px] border border-white/15 bg-black/55 text-white transition-opacity',
                   'opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100'
                 )}
                 aria-label={`Remove ${image.name}`}

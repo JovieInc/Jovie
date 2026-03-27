@@ -1,6 +1,7 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import {
   type NextFetchEvent,
+  type NextMiddleware,
   type NextRequest,
   NextResponse,
 } from 'next/server';
@@ -11,10 +12,16 @@ import {
   HOMEPAGE_CITY_COOKIE,
   HOMEPAGE_REGION_COOKIE,
 } from '@/constants/app';
-import { PROFILE_HOSTNAME } from '@/constants/domains';
+import { HOSTNAME } from '@/constants/domains';
+import { buildProtectedAuthRedirectUrl } from '@/lib/auth/build-auth-route-url';
+import {
+  type ClerkBypassPathInfo,
+  shouldBypassClerkForRequest,
+} from '@/lib/auth/clerk-middleware-bypass';
 import { sanitizeRedirectUrl } from '@/lib/auth/constants';
 import type { ProxyUserState } from '@/lib/auth/proxy-state';
 import { getUserState, isKnownActiveUser } from '@/lib/auth/proxy-state';
+import { isStagingHost, resolveClerkKeys } from '@/lib/auth/staging-clerk-keys';
 import {
   resolveTestBypassUserId,
   TEST_AUTH_BYPASS_MODE,
@@ -43,12 +50,12 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
 // - meetjovie.com: 301 redirects to jov.ie (legacy redirect domain)
+// - support.jov.ie: 308 redirects to jov.ie/support (retired help center)
 // ============================================================================
 
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
 const META_BOT_REGEX =
   /facebookexternalhit|facebot|facebook|instagram|whatsapp/i;
-const SENSITIVE_API_REGEX = /^\/api\/link\//;
 
 /**
  * Fast bot detection using pre-compiled regex
@@ -63,9 +70,6 @@ function detectMetaBot(userAgent: string): boolean {
 
 interface PathCategory {
   needsNonce: boolean;
-  isAppPath: boolean;
-  isDashboardPath: boolean;
-  isSettingsPath: boolean;
   isProtectedPath: boolean;
   isAuthPath: boolean;
   isAuthCallbackPath: boolean;
@@ -77,30 +81,17 @@ function matchesRoute(pathname: string, route: string): boolean {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-/** Check if pathname matches any of the given routes */
-function matchesAnyRoute(pathname: string, routes: readonly string[]): boolean {
-  return routes.some(route => matchesRoute(pathname, route));
-}
+const STAGING_HOSTNAMES = new Set([
+  `staging.${HOSTNAME}`,
+  `main.${HOSTNAME}`, // Legacy staging hostname
+]);
 
-// Route groups for path categorization
-// All routes use /app/* prefix (single-domain architecture)
-const DASHBOARD_ROUTES = [
-  '/app/profile',
-  '/app/contacts',
-  '/app/releases',
-  '/app/tour-dates',
-  '/app/audience',
-  '/app/earnings',
-  '/app/links',
-  '/app/chat',
-] as const;
-
-const SETTINGS_ROUTES = [
-  '/app/settings',
-  '/app/admin',
-  '/app/billing',
-  '/app/account',
-] as const;
+// Legacy subdomain set — kept for redirect to /investor-portal
+const INVESTOR_HOSTNAMES = new Set([
+  `investors.${HOSTNAME}`,
+  'investors.localhost',
+  'investors.jov.ie',
+]);
 
 /**
  * Categorize a pathname once for all routing decisions.
@@ -121,11 +112,9 @@ function categorizePath(pathname: string): PathCategory {
     pathname === '/sign-up/sso-callback' ||
     pathname === '/sign-in/sso-callback';
 
-  // Dashboard paths (used for app subdomain rewrites)
-  const isDashboardPath = matchesAnyRoute(pathname, DASHBOARD_ROUTES);
-
-  // Settings-like paths
-  const isSettingsPath = matchesAnyRoute(pathname, SETTINGS_ROUTES);
+  const isAppShellPath = pathname === '/app' || pathname.startsWith('/app/');
+  const isAccountPath = matchesRoute(pathname, '/account');
+  const isBillingPath = matchesRoute(pathname, '/billing');
 
   // Onboarding/waitlist paths
   const isOnboardingPath = matchesRoute(pathname, '/onboarding');
@@ -133,37 +122,26 @@ function categorizePath(pathname: string): PathCategory {
 
   // Protected paths (require auth)
   const isProtectedPath =
-    isDashboardPath || isSettingsPath || isWaitlistPath || isOnboardingPath;
-
-  // App paths (dashboard and protected routes at /app/*)
-  const isAppPath =
-    pathname === '/' ||
-    isDashboardPath ||
-    isSettingsPath ||
-    isOnboardingPath ||
+    isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
     isWaitlistPath ||
-    pathname === '/monitoring' ||
-    pathname.startsWith('/monitoring/') ||
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/app/');
+    isOnboardingPath;
 
   // Paths that need CSP nonce (app/protected routes, not marketing)
   const needsNonce =
     pathname.startsWith('/api/') ||
-    pathname === '/app' ||
-    pathname.startsWith('/app/') ||
-    isSettingsPath ||
+    isAppShellPath ||
+    isAccountPath ||
+    isBillingPath ||
     isOnboardingPath ||
     isWaitlistPath;
 
   // Sensitive API paths for bot blocking
-  const isSensitiveAPI = SENSITIVE_API_REGEX.test(pathname);
+  const isSensitiveAPI = pathname.startsWith('/api/link/');
 
   return {
     needsNonce,
-    isAppPath,
-    isDashboardPath,
-    isSettingsPath,
     isProtectedPath,
     isAuthPath,
     isAuthCallbackPath,
@@ -179,55 +157,52 @@ interface HostInfo {
   isMainHost: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
+  isSupportHost: boolean;
   isInvestorPortal: boolean;
 }
 
 /**
  * Analyze hostname once for all routing decisions.
  * Single domain architecture: everything on jov.ie.
- * Investor portal: investors.jov.ie (subdomain, bypasses Clerk auth)
+ * Investor portal: /investor-portal (path-based, bypasses Clerk auth)
  */
 function analyzeHost(hostname: string): HostInfo {
   const isDevOrPreview =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
     hostname.includes('vercel.app') ||
-    hostname.startsWith('main.');
+    STAGING_HOSTNAMES.has(hostname);
 
   const isMainHost =
-    hostname === PROFILE_HOSTNAME ||
-    hostname === `www.${PROFILE_HOSTNAME}` ||
-    hostname === `main.${PROFILE_HOSTNAME}` ||
+    hostname === HOSTNAME ||
+    hostname === `www.${HOSTNAME}` ||
+    STAGING_HOSTNAMES.has(hostname) ||
     isDevOrPreview;
 
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
+  const isSupportHost = hostname === `support.${HOSTNAME}`;
 
-  const isInvestorPortal =
-    hostname === `investors.${PROFILE_HOSTNAME}` ||
-    hostname === 'investors.localhost' ||
-    hostname === 'investors.jov.ie';
+  const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
 
-  return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
-}
-
-function getClerkProxyUrl(req: NextRequest): string | undefined {
-  const hostname = req.nextUrl.hostname;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return undefined;
-  }
-
-  return '/clerk';
+  return {
+    isMainHost,
+    isDevOrPreview,
+    isMeetJovie,
+    isSupportHost,
+    isInvestorPortal,
+  };
 }
 
 /** Dashboard is always at /app in single-domain architecture */
 const DASHBOARD_URL = '/app';
 
 // ============================================================================
-// Investor Portal — Token-gated subdomain (investors.jov.ie)
+// Investor Portal — Path-based token auth (/investor-portal?t=TOKEN)
 // ============================================================================
 // Bypasses Clerk entirely. Auth is via a secret token in URL param or cookie.
 // Token validated against investor_links table on every request (volume is tiny).
+// Legacy subdomain (investors.jov.ie) redirects to /investor-portal.
 // ============================================================================
 
 const INVESTOR_TOKEN_COOKIE = '__investor_token';
@@ -235,8 +210,10 @@ const INVESTOR_TOKEN_PARAM = 't';
 
 /**
  * Handle investor portal requests.
- * Validates token from URL param or cookie, sets cookie, rewrites to /investor-portal.
- * Returns null if the request is NOT for the investor portal.
+ *
+ * 1. Legacy subdomain (investors.jov.ie) → 301 redirect to /investor-portal
+ * 2. /investor-portal?t=TOKEN → validate, set cookie, strip param
+ * 3. /investor-portal with cookie → validate, record view, continue
  */
 async function handleInvestorRequest(
   req: NextRequest,
@@ -244,30 +221,44 @@ async function handleInvestorRequest(
 ): Promise<NextResponse | null> {
   const hostname = req.nextUrl.hostname;
   const hostInfo = analyzeHost(hostname);
-
-  if (!hostInfo.isInvestorPortal) {
-    return null;
-  }
-
   const pathname = req.nextUrl.pathname;
 
-  // Allow Next.js internals and static files to pass through
+  // --- Legacy subdomain redirect ---
+  if (hostInfo.isInvestorPortal) {
+    // Allow Next.js internals and static files to pass through
+    if (
+      pathname.startsWith('/_next') ||
+      pathname.startsWith('/favicon') ||
+      pathname.endsWith('.ico') ||
+      pathname.endsWith('.png') ||
+      pathname.endsWith('.jpg') ||
+      pathname.endsWith('.svg')
+    ) {
+      return NextResponse.next();
+    }
+
+    // Redirect to main host /investor-portal, preserving token param
+    const redirectUrl = req.nextUrl.clone();
+    redirectUrl.hostname = HOSTNAME;
+    redirectUrl.port = '';
+    const subPath = pathname === '/' ? '' : pathname;
+    redirectUrl.pathname = `/investor-portal${subPath}`;
+
+    return NextResponse.redirect(redirectUrl, 301);
+  }
+
+  // --- Path-based investor portal ---
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.endsWith('.ico') ||
-    pathname.endsWith('.png') ||
-    pathname.endsWith('.jpg') ||
-    pathname.endsWith('.svg')
+    !pathname.startsWith('/investor-portal') ||
+    pathname.startsWith('/_next')
   ) {
-    return NextResponse.next();
+    return null;
   }
 
   // Check for token in URL param (first visit from shared link)
   const tokenParam = req.nextUrl.searchParams.get(INVESTOR_TOKEN_PARAM);
 
   if (tokenParam) {
-    // Validate token against DB
     const isValid = await validateInvestorToken(tokenParam);
 
     if (!isValid) {
@@ -301,20 +292,12 @@ async function handleInvestorRequest(
   const isValid = await validateInvestorToken(tokenCookie);
 
   if (!isValid) {
-    // Invalid/expired/deactivated token: clear cookie, return 404
     const res = new NextResponse(null, { status: 404 });
     res.cookies.delete(INVESTOR_TOKEN_COOKIE);
     return res;
   }
 
-  // Valid token: rewrite to /investor-portal route group
-  const rewriteUrl = req.nextUrl.clone();
-  // Map / to /investor-portal, /ai to /investor-portal/ai, etc.
-  const investorPath =
-    pathname === '/' ? '/investor-portal' : `/investor-portal${pathname}`;
-  rewriteUrl.pathname = investorPath;
-
-  const res = NextResponse.rewrite(rewriteUrl);
+  const res = NextResponse.next();
 
   // Anti-scraping headers
   res.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
@@ -428,14 +411,13 @@ const CLERK_SENSITIVE_PATTERNS = [
   'placeholder',
 ] as const;
 
-function isMockOrMissingClerkConfig(): boolean {
-  const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-  const secretKey = process.env.CLERK_SECRET_KEY;
+function isMockOrMissingClerkConfig(hostname: string): boolean {
+  const keys = resolveClerkKeys(hostname);
 
-  if (!publishableKey || !secretKey) return true;
+  if (!keys.publishableKey || !keys.secretKey) return true;
 
-  const publishableLower = publishableKey.toLowerCase();
-  const secretLower = secretKey.toLowerCase();
+  const publishableLower = keys.publishableKey.toLowerCase();
+  const secretLower = keys.secretKey.toLowerCase();
 
   return CLERK_SENSITIVE_PATTERNS.some(
     pattern =>
@@ -452,7 +434,7 @@ function generateNonce(): string {
   crypto.getRandomValues(nonceBytes);
   let binary = '';
   for (let i = 0; i < 16; i++) {
-    binary += String.fromCharCode(nonceBytes[i]);
+    binary += String.fromCodePoint(nonceBytes[i]);
   }
   return btoa(binary);
 }
@@ -517,6 +499,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       return NextResponse.redirect(targetUrl, 301);
     }
 
+    // 308 redirect retired support subdomain to the main support page
+    if (hostInfo.isSupportHost) {
+      const targetUrl = new URL('/support', 'https://jov.ie');
+      targetUrl.search = req.nextUrl.search;
+      return NextResponse.redirect(targetUrl, 308);
+    }
+
     // ========================================================================
     // Unauthenticated user handling (no getUserState call needed)
     // ========================================================================
@@ -538,8 +527,14 @@ async function handleRequest(req: NextRequest, userId: string | null) {
 
       if (needsAuth) {
         const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
-        const authUrl = new URL(authPage, req.url);
-        authUrl.searchParams.set('redirect_url', req.nextUrl.pathname);
+        const authUrl = new URL(
+          buildProtectedAuthRedirectUrl(
+            authPage,
+            req.nextUrl.pathname,
+            req.nextUrl.search
+          ),
+          req.url
+        );
         return NextResponse.redirect(authUrl);
       }
 
@@ -573,6 +568,9 @@ async function handleRequest(req: NextRequest, userId: string | null) {
     const isRSCPrefetch =
       req.headers.get('Next-Router-Prefetch') === '1' ||
       req.nextUrl.searchParams.has('_rsc');
+    const hasOnboardingContinuationSignal =
+      req.nextUrl.searchParams.has('handle') ||
+      req.nextUrl.searchParams.has('resume');
 
     // Fetch user state ONCE for all authenticated routing decisions
     let userState: ProxyUserState | null = null;
@@ -706,7 +704,8 @@ async function handleRequest(req: NextRequest, userId: string | null) {
         !userState.needsOnboarding &&
         pathname === '/onboarding' &&
         isNavigationMethod &&
-        !isRSCPrefetch
+        !isRSCPrefetch &&
+        !hasOnboardingContinuationSignal
       ) {
         return NextResponse.redirect(new URL(DASHBOARD_URL, req.url));
       } else if (pathInfo.isAuthPath && isNavigationMethod && !isRSCPrefetch) {
@@ -903,15 +902,35 @@ function buildFinalResponse(
   return res;
 }
 
-const clerkWrappedMiddleware = clerkMiddleware(
-  async (auth, req) => {
-    const { userId } = await auth();
-    return handleRequest(req, userId);
-  },
-  req => ({
-    proxyUrl: getClerkProxyUrl(req),
-  })
-);
+// Production Clerk middleware (default keys from env)
+const clerkProductionMiddleware = clerkMiddleware(async (auth, req) => {
+  const { userId } = await auth();
+  return handleRequest(req, userId);
+});
+
+// Staging Clerk middleware — lazy-initialized with separate instance keys.
+// The same build is promoted staging → production, so staging keys are
+// stored as server-only runtime env vars (not NEXT_PUBLIC_).
+let _clerkStagingMiddleware: NextMiddleware | null = null;
+function getClerkStagingMiddleware() {
+  if (_clerkStagingMiddleware === null) {
+    const stagingPk = process.env.CLERK_PUBLISHABLE_KEY_STAGING;
+    const stagingSk = process.env.CLERK_SECRET_KEY_STAGING;
+    if (stagingPk && stagingSk) {
+      _clerkStagingMiddleware = clerkMiddleware(
+        async (auth, req) => {
+          const { userId } = await auth();
+          return handleRequest(req, userId);
+        },
+        {
+          publishableKey: stagingPk,
+          secretKey: stagingSk,
+        }
+      );
+    }
+  }
+  return _clerkStagingMiddleware;
+}
 
 export default async function middleware(
   req: NextRequest,
@@ -919,7 +938,8 @@ export default async function middleware(
 ) {
   // ========================================================================
   // Investor portal: handle before Clerk (no auth needed)
-  // investors.jov.ie uses token-based access, not Clerk sessions
+  // /investor-portal uses token-based access, not Clerk sessions
+  // Legacy investors.jov.ie subdomain redirects to /investor-portal
   // ========================================================================
   const investorResponse = await handleInvestorRequest(req, event);
   if (investorResponse) return investorResponse;
@@ -931,8 +951,110 @@ export default async function middleware(
     }
   }
 
-  // Check if Clerk config is missing or mocked
-  const clerkConfigMissing = isMockOrMissingClerkConfig();
+  const pathname = req.nextUrl.pathname;
+
+  const hostname = req.nextUrl.hostname;
+
+  // ========================================================================
+  // Clerk FAPI proxy: fetch-based proxy using the FAPI host decoded from
+  // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY. Each env (staging/production) has its
+  // own publishable key via Doppler, so the proxy automatically routes to
+  // the correct Clerk instance. We use fetch() because NextResponse.rewrite()
+  // and vercel.json rewrites forward the original Host header, causing Clerk
+  // to return 400 "Invalid host".
+  // ========================================================================
+  if (
+    pathname.startsWith('/__clerk/') ||
+    pathname === '/__clerk' ||
+    pathname.startsWith('/clerk/') ||
+    pathname === '/clerk'
+  ) {
+    const pk = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+    let fapiHost = '';
+    try {
+      const b64 = pk.replace(/^pk_(live|test)_/, '');
+      fapiHost = b64 ? atob(b64).replace(/\$$/, '') : '';
+    } catch {
+      // malformed key
+    }
+    if (!fapiHost) {
+      return NextResponse.json(
+        {
+          error: 'Clerk proxy unavailable: missing or invalid publishable key',
+        },
+        { status: 503 }
+      );
+    }
+
+    const subpath = pathname.replace(/^\/__clerk\/?|^\/clerk\/?/, '');
+    const targetUrl = `https://${fapiHost}/${subpath}${req.nextUrl.search}`;
+
+    // Read body FIRST so content-length stays accurate
+    let body: ArrayBuffer | null = null;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      try {
+        body = await req.arrayBuffer();
+      } catch {
+        // empty body
+      }
+    }
+
+    // Build clean headers — only forward what Clerk needs
+    const headers = new Headers();
+    headers.set('host', fapiHost);
+    headers.set('origin', `https://${fapiHost}`);
+    const ct = req.headers.get('content-type');
+    if (ct) headers.set('content-type', ct);
+    const accept = req.headers.get('accept');
+    if (accept) headers.set('accept', accept);
+    const cookie = req.headers.get('cookie');
+    if (cookie) headers.set('cookie', cookie);
+    const ua = req.headers.get('user-agent');
+    if (ua) headers.set('user-agent', ua);
+    const auth = req.headers.get('authorization');
+    if (auth) headers.set('authorization', auth);
+    if (body && body.byteLength > 0) {
+      headers.set('content-length', String(body.byteLength));
+    }
+
+    try {
+      const proxyRes = await fetch(targetUrl, {
+        method: req.method,
+        headers,
+        body: body && body.byteLength > 0 ? body : undefined,
+        redirect: 'manual',
+      });
+
+      const resHeaders = new Headers(proxyRes.headers);
+      resHeaders.delete('content-encoding');
+
+      // Rewrite redirect Location headers to route back through /__clerk
+      const location = resHeaders.get('location');
+      if (location) {
+        const fapiOrigin = `https://${fapiHost}`;
+        if (location.startsWith(fapiOrigin)) {
+          resHeaders.set(
+            'location',
+            location.replace(fapiOrigin, `${req.nextUrl.origin}/__clerk`)
+          );
+        }
+      }
+
+      return new NextResponse(proxyRes.body, {
+        status: proxyRes.status,
+        statusText: proxyRes.statusText,
+        headers: resHeaders,
+      });
+    } catch (err) {
+      console.error('[clerk-proxy] fetch failed:', err);
+      return NextResponse.json({ error: 'Clerk proxy error' }, { status: 502 });
+    }
+  }
+
+  const pathInfo = categorizePath(pathname);
+
+  // Check if Clerk config is missing or mocked (staging-aware)
+  const clerkConfigMissing = isMockOrMissingClerkConfig(hostname);
 
   // In test mode, always bypass Clerk if config is missing
   if (process.env.NODE_ENV === 'test' && clerkConfigMissing) {
@@ -942,9 +1064,6 @@ export default async function middleware(
   // In production/dev, if Clerk config is missing, handle gracefully
   // This can happen during Vercel cold starts when env vars are temporarily unavailable
   if (clerkConfigMissing) {
-    const pathname = req.nextUrl.pathname;
-    const pathInfo = categorizePath(pathname);
-
     // For public routes (non-protected), proceed without auth
     // This allows the homepage, marketing pages, and public profiles to load
     if (!pathInfo.isProtectedPath) {
@@ -968,7 +1087,24 @@ export default async function middleware(
     );
   }
 
-  return clerkWrappedMiddleware(req, event);
+  const clerkPathInfo: ClerkBypassPathInfo = pathInfo;
+
+  if (
+    shouldBypassClerkForRequest({
+      pathname,
+      pathInfo: clerkPathInfo,
+      cookies: req.cookies.getAll(),
+    })
+  ) {
+    return handleRequest(req, null);
+  }
+
+  // Select the correct Clerk middleware based on hostname.
+  // Staging uses a separate Clerk instance with its own keys.
+  const selectedMiddleware = isStagingHost(hostname)
+    ? (getClerkStagingMiddleware() ?? clerkProductionMiddleware)
+    : clerkProductionMiddleware;
+  return selectedMiddleware(req, event);
 }
 
 export const config = {
@@ -977,5 +1113,8 @@ export const config = {
     '/((?!_next|\.well-known|.*\.(?:html?|css|js|json|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
     // Always run for API routes
     '/(api|trpc)(.*)',
+    // Always run for Clerk proxy paths (including .js bundles from /npm/)
+    '/__clerk/(.*)',
+    '/clerk/(.*)',
   ],
 };

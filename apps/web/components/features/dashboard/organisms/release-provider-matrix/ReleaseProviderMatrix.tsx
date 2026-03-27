@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import {
   lazy,
   memo,
@@ -22,15 +21,11 @@ import {
   DrawerButton,
   DrawerLoadingSkeleton,
 } from '@/components/molecules/drawer';
-import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import { useTableMeta } from '@/components/organisms/AuthShellWrapper';
 import { ArtistSearchCommandPalette } from '@/components/organisms/artist-search-palette';
 import { DialogLoadingSkeleton } from '@/components/organisms/DialogLoadingSkeleton';
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
-import { DashboardHeaderActionButton } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
-import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
-import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
@@ -96,7 +91,6 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   initialTotalCount = 0,
   experienceAdapter,
 }: ReleaseProviderMatrixProps) {
-  const router = useRouter();
   const experienceMode = experienceAdapter?.mode ?? 'live';
   const [isConnected, setIsConnected] = useState(spotifyConnected);
   const [artistName, setArtistName] = useState(spotifyArtistName);
@@ -117,6 +111,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     editingRelease,
     isSaving,
     isSyncing,
+    handleReleaseCreated,
+    updateRow,
+    handleReleaseArtworkUploaded,
     openEditor,
     closeEditor,
     handleCopy,
@@ -399,9 +396,14 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     setAddReleaseOpen(true);
   }, [experienceAdapter]);
 
-  const handleAddReleaseCreated = useCallback(() => {
-    router.refresh();
-  }, [router]);
+  const handleAddReleaseCreated = useCallback(
+    (createdRelease: ReleaseViewModel) => {
+      handleReleaseCreated(createdRelease);
+      setAddReleaseOpen(false);
+      setEditingTrack(null);
+    },
+    [handleReleaseCreated]
+  );
 
   // Artwork upload handler - calls the artwork upload API endpoint
   const handleArtworkUpload = useCallback(
@@ -439,9 +441,9 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   // Handle release changes from the sidebar (e.g., after artwork upload)
   const handleReleaseChange = useCallback(
     (updated: ReleaseViewModel) => {
-      setRows(prev => prev.map(row => (row.id === updated.id ? updated : row)));
+      updateRow(updated);
     },
-    [setRows]
+    [updateRow]
   );
 
   // Show import progress banner when actively importing
@@ -490,64 +492,16 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
     isSidebarOpen,
   ]);
 
-  // Set header badge (DSP pills on left) and actions (drawer toggle on right)
   const { setHeaderActions } = useSetHeaderActions();
 
-  // Memoize both badge and actions to avoid creating new JSX on every render
-  // This is CRITICAL to prevent infinite render loops when updating context
-  const headerActions = useMemo(
-    () => (
-      <DashboardHeaderActionGroup
-        className='min-w-0 flex-1 gap-2'
-        leadingClassName='min-w-0 gap-1.5'
-        trailing={
-          <DrawerToggleButton
-            ariaLabel='Toggle release preview'
-            label='Preview'
-            tooltipLabel='Preview'
-            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-          />
-        }
-      >
-        <HeaderSearchAction
-          searchValue={searchQuery}
-          onSearchValueChange={setSearchQuery}
-          onClearAction={() => setSearchQuery('')}
-          onApply={() => undefined}
-          placeholder='Search releases'
-          ariaLabel='Search releases'
-          submitAriaLabel='Search releases'
-          submitIcon={
-            <Icon name='Search' className='h-4 w-4' strokeWidth={2} />
-          }
-          tooltipLabel='Search'
-          className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
-        />
-        {canCreateManualReleases ? (
-          <DashboardHeaderActionButton
-            ariaLabel='Create a new release'
-            onClick={handleNewRelease}
-            icon={<Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />}
-            label='New Release'
-            iconOnly
-            tooltipLabel='New Release'
-            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
-          />
-        ) : null}
-      </DashboardHeaderActionGroup>
-    ),
-    [canCreateManualReleases, handleNewRelease, searchQuery]
-  );
-
   useEffect(() => {
-    // New Release button on the right side (use memoized element to prevent infinite loops)
-    setHeaderActions(headerActions);
+    setHeaderActions(null);
 
     return () => {
       setHeaderActions(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- setHeaderActions is a stable context setter
-  }, [headerActions]);
+  }, []);
 
   const releaseSidebarHandlers = useMemo(
     () => ({
@@ -692,167 +646,162 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
   return (
     <>
       <div
-        className='flex h-full min-h-0 min-w-0 flex-col bg-[color-mix(in_oklab,var(--linear-bg-page)_72%,var(--linear-bg-surface-1))]'
+        className='flex h-full min-h-0 min-w-0 flex-col'
         data-testid='releases-matrix'
       >
         <h1 className='sr-only'>Releases</h1>
-        <div className='flex-1 min-h-0 flex flex-col'>
-          {/* Scrollable content area */}
-          <div className='flex-1 min-h-0 overflow-auto'>
-            <div className='flex min-h-full flex-col px-3.5 pb-3.5 pt-2.5 lg:px-4 lg:pb-4 lg:pt-3'>
-              {(showReleasesTable || showImportProgress) && (
-                <ImportProgressBanner
-                  artistName={artistName}
-                  importedCount={importedCount}
-                  totalCount={totalCount}
-                  visible={showImportProgress}
+
+        {/* Banners — inset from shell edge */}
+        {showImportProgress && (
+          <div className='mx-3 lg:mx-4 mt-2.5'>
+            <ImportProgressBanner
+              artistName={artistName}
+              importedCount={importedCount}
+              totalCount={totalCount}
+              visible={showImportProgress}
+            />
+          </div>
+        )}
+        {showReleasesTable &&
+          rows[0]?.profileId &&
+          !isAmConnected &&
+          !isImporting && (
+            <AppleMusicSyncBanner
+              profileId={rows[0].profileId}
+              spotifyConnected={isConnected}
+              releases={rows}
+              onMatchStatusChange={handleMatchStatusChange}
+              className='mx-3 lg:mx-4 mt-3'
+            />
+          )}
+        {showEmptyState && (
+          <div className='mx-3 lg:mx-4'>
+            <ReleasesEmptyState
+              onConnectSpotify={() => setSpotifySearchOpen(true)}
+            />
+          </div>
+        )}
+
+        {/* Soft-cap banner: request higher limit when over 100 smart links */}
+        {showReleasesTable && !isPro && releasedCount > SMART_LINK_SOFT_CAP && (
+          <SmartLinkGateBanner
+            mode='soft-cap'
+            releasedCount={releasedCount}
+            softCap={SMART_LINK_SOFT_CAP}
+            className='mx-3 lg:mx-4 mt-3'
+          />
+        )}
+
+        {/* Pre-release upsell for free users with unreleased music */}
+        {showReleasesTable &&
+          !isPro &&
+          !canAccessFutureReleases &&
+          unreleasedCount > 0 && (
+            <SmartLinkGateBanner
+              mode='unreleased'
+              unreleasedCount={unreleasedCount}
+              className='mx-3 lg:mx-4 mt-3'
+            />
+          )}
+
+        {/* Table — fills edge-to-edge within the app shell */}
+        {showReleasesTable && (
+          <QueryErrorBoundary>
+            <div
+              className='flex flex-1 min-h-0 flex-col'
+              data-testid='release-table-shell'
+            >
+              <ReleaseTableSubheader
+                releases={filteredRows}
+                selectedIds={selectedIds}
+                filters={filters}
+                onFiltersChange={setFilters}
+                groupByYear={groupByYear}
+                onGroupByYearChange={onGroupByYearChange}
+                releaseView={releaseView}
+                onReleaseViewChange={setReleaseView}
+                searchQuery={searchQuery}
+                onSearchQueryChange={setSearchQuery}
+                onCreateRelease={handleNewRelease}
+                canCreateManualReleases={canCreateManualReleases}
+              />
+              <ReleaseTable
+                releases={filteredRows}
+                providerConfig={providerConfig}
+                artistName={artistName}
+                onCopy={copyHandler}
+                onEdit={openEditor}
+                columnVisibility={columnVisibility}
+                rowHeight={rowHeight}
+                groupByYear={groupByYear}
+                selectedReleaseId={editingRelease?.id}
+                selectedTrackId={editingTrack?.id}
+                refreshingReleaseId={refreshingReleaseId}
+                flashedReleaseId={flashedReleaseId}
+                isSmartLinkLocked={isSmartLinkLocked}
+                getSmartLinkLockReason={getSmartLinkLockReason}
+                onTrackClick={openTrackDrawer}
+              />
+            </div>
+          </QueryErrorBoundary>
+        )}
+
+        {/* Show "No releases" state when connected but no releases and not importing */}
+        {isConnected && rows.length === 0 && !isImporting && (
+          <div className='mx-3 lg:mx-4 mt-2.5 flex flex-1'>
+            <div
+              className={cn(
+                LINEAR_SURFACE.contentContainer,
+                'flex min-h-[260px] w-full flex-col items-center justify-center px-4 py-12 text-center'
+              )}
+            >
+              <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
+                <Icon
+                  name='Disc3'
+                  className='h-6 w-6 text-tertiary-token'
+                  aria-hidden='true'
                 />
-              )}
-              {showReleasesTable &&
-                rows[0]?.profileId &&
-                !isAmConnected &&
-                !isImporting && (
-                  <AppleMusicSyncBanner
-                    profileId={rows[0].profileId}
-                    spotifyConnected={isConnected}
-                    releases={rows}
-                    onMatchStatusChange={handleMatchStatusChange}
-                    className='mt-3'
-                  />
-                )}
-              {showEmptyState && (
-                <ReleasesEmptyState
-                  onConnectSpotify={() => setSpotifySearchOpen(true)}
-                />
-              )}
-
-              {/* Soft-cap banner: request higher limit when over 100 smart links */}
-              {showReleasesTable &&
-                !isPro &&
-                releasedCount > SMART_LINK_SOFT_CAP && (
-                  <SmartLinkGateBanner
-                    mode='soft-cap'
-                    releasedCount={releasedCount}
-                    softCap={SMART_LINK_SOFT_CAP}
-                    className='mt-3'
-                  />
-                )}
-
-              {/* Pre-release upsell for free users with unreleased music */}
-              {showReleasesTable &&
-                !isPro &&
-                !canAccessFutureReleases &&
-                unreleasedCount > 0 && (
-                  <SmartLinkGateBanner
-                    mode='unreleased'
-                    unreleasedCount={unreleasedCount}
-                    className='mt-3'
-                  />
-                )}
-
-              {showReleasesTable && (
-                <QueryErrorBoundary>
-                  <div
+              </div>
+              <h3 className='mt-4 text-[14px] font-[590] tracking-[-0.012em] text-primary-token'>
+                No releases yet
+              </h3>
+              <p className='mt-1 max-w-sm text-[12px] leading-[18px] text-secondary-token'>
+                {canCreateManualReleases
+                  ? 'Sync from Spotify or create one manually to start generating smart links.'
+                  : 'Sync from Spotify to start generating smart links.'}
+              </p>
+              <div className='mt-4 flex flex-wrap items-center justify-center gap-2.5'>
+                <DrawerButton
+                  tone='primary'
+                  disabled={isSyncing}
+                  onClick={experienceAdapter?.onSync ?? handleSync}
+                  className='inline-flex items-center gap-2'
+                  data-testid='sync-spotify-empty-state'
+                >
+                  <Icon
+                    name={isSyncing ? 'Loader2' : 'RefreshCw'}
                     className={cn(
-                      LINEAR_SURFACE.contentContainer,
-                      'mt-2.5 flex min-h-[420px] flex-1 flex-col overflow-hidden'
+                      'h-4 w-4',
+                      isSyncing && 'animate-spin motion-reduce:animate-none'
                     )}
+                    aria-hidden='true'
+                  />
+                  {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
+                </DrawerButton>
+                {canCreateManualReleases && (
+                  <DrawerButton
+                    onClick={handleNewRelease}
+                    className='inline-flex items-center gap-2'
+                    data-testid='create-release-empty-state'
                   >
-                    <ReleaseTableSubheader
-                      releases={filteredRows}
-                      selectedIds={selectedIds}
-                      filters={filters}
-                      onFiltersChange={setFilters}
-                      groupByYear={groupByYear}
-                      onGroupByYearChange={onGroupByYearChange}
-                      releaseView={releaseView}
-                      onReleaseViewChange={setReleaseView}
-                    />
-                    <ReleaseTable
-                      releases={filteredRows}
-                      providerConfig={providerConfig}
-                      artistName={artistName}
-                      onCopy={copyHandler}
-                      onEdit={openEditor}
-                      columnVisibility={columnVisibility}
-                      rowHeight={rowHeight}
-                      groupByYear={groupByYear}
-                      selectedReleaseId={editingRelease?.id}
-                      selectedTrackId={editingTrack?.id}
-                      refreshingReleaseId={refreshingReleaseId}
-                      flashedReleaseId={flashedReleaseId}
-                      isSmartLinkLocked={isSmartLinkLocked}
-                      getSmartLinkLockReason={getSmartLinkLockReason}
-                      onTrackClick={openTrackDrawer}
-                    />
-                  </div>
-                </QueryErrorBoundary>
-              )}
-
-              {/* Show "No releases" state when connected but no releases and not importing */}
-              {isConnected && rows.length === 0 && !isImporting && (
-                <div className='mt-2.5 flex flex-1'>
-                  <div
-                    className={cn(
-                      LINEAR_SURFACE.contentContainer,
-                      'flex min-h-[260px] w-full flex-col items-center justify-center px-4 py-12 text-center'
-                    )}
-                  >
-                    <div className='flex h-12 w-12 items-center justify-center rounded-[12px] border border-(--linear-app-frame-seam) bg-surface-1'>
-                      <Icon
-                        name='Disc3'
-                        className='h-6 w-6 text-tertiary-token'
-                        aria-hidden='true'
-                      />
-                    </div>
-                    <h3 className='mt-4 text-[14px] font-[590] tracking-[-0.012em] text-primary-token'>
-                      No releases yet
-                    </h3>
-                    <p className='mt-1 max-w-sm text-[12px] leading-[18px] text-secondary-token'>
-                      {canCreateManualReleases
-                        ? 'Sync from Spotify or create one manually to start generating smart links.'
-                        : 'Sync from Spotify to start generating smart links.'}
-                    </p>
-                    <div className='mt-4 flex flex-wrap items-center justify-center gap-2.5'>
-                      <DrawerButton
-                        tone='primary'
-                        disabled={isSyncing}
-                        onClick={experienceAdapter?.onSync ?? handleSync}
-                        className='inline-flex items-center gap-2'
-                        data-testid='sync-spotify-empty-state'
-                      >
-                        <Icon
-                          name={isSyncing ? 'Loader2' : 'RefreshCw'}
-                          className={cn(
-                            'h-4 w-4',
-                            isSyncing &&
-                              'animate-spin motion-reduce:animate-none'
-                          )}
-                          aria-hidden='true'
-                        />
-                        {isSyncing ? 'Syncing...' : 'Sync from Spotify'}
-                      </DrawerButton>
-                      {canCreateManualReleases && (
-                        <DrawerButton
-                          onClick={handleNewRelease}
-                          className='inline-flex items-center gap-2'
-                          data-testid='create-release-empty-state'
-                        >
-                          <Icon
-                            name='Plus'
-                            className='h-4 w-4'
-                            aria-hidden='true'
-                          />
-                          Create Release
-                        </DrawerButton>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                    <Icon name='Plus' className='h-4 w-4' aria-hidden='true' />
+                    Create Release
+                  </DrawerButton>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Apple Music artist search command palette */}
@@ -898,8 +847,10 @@ export const ReleaseProviderMatrix = memo(function ReleaseProviderMatrix({
         >
           <AddReleaseSidebar
             isOpen={addReleaseOpen}
+            artistName={artistName}
             onClose={() => setAddReleaseOpen(false)}
             onCreated={handleAddReleaseCreated}
+            onArtworkUploaded={handleReleaseArtworkUploaded}
           />
         </Suspense>
       )}

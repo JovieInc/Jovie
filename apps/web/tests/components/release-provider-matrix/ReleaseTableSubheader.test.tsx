@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
@@ -23,6 +24,14 @@ vi.mock(
 
 vi.mock('@/components/atoms/Icon', () => ({
   Icon: ({ name }: { name: string }) => <span>{name}</span>,
+}));
+
+vi.mock('@/components/molecules/HeaderSearchAction', () => ({
+  HeaderSearchAction: () => (
+    <button type='button' data-testid='toolbar-search'>
+      Search
+    </button>
+  ),
 }));
 
 vi.mock('@/components/atoms/AppSegmentControl', () => ({
@@ -60,8 +69,16 @@ vi.mock('@/components/organisms/table', () => ({
   PAGE_TOOLBAR_END_GROUP_CLASS: 'end-group',
   PAGE_TOOLBAR_ICON_CLASS: 'icon',
   PAGE_TOOLBAR_ICON_STROKE_WIDTH: 2,
-  PageToolbar: ({ start, end }: { start: ReactNode; end: ReactNode }) => (
-    <div>
+  PageToolbar: ({
+    start,
+    end,
+    className,
+  }: {
+    start: ReactNode;
+    end: ReactNode;
+    className?: string;
+  }) => (
+    <div data-testid='page-toolbar' className={className}>
       <div>{start}</div>
       <div>{end}</div>
     </div>
@@ -78,6 +95,17 @@ vi.mock('@/components/organisms/table', () => ({
     </button>
   ),
   ExportCSVButton: () => <button type='button'>Export</button>,
+  PageToolbarActionButton: ({
+    label,
+    onClick,
+  }: {
+    label: ReactNode;
+    onClick?: () => void;
+  }) => (
+    <button type='button' onClick={onClick}>
+      {label}
+    </button>
+  ),
 }));
 
 const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
@@ -85,7 +113,7 @@ const { ReleaseTableSubheader, DEFAULT_RELEASE_FILTERS } = await import(
 );
 
 describe('ReleaseTableSubheader', () => {
-  it('renders the drawer toggle button in page-toolbar chrome', () => {
+  it('attaches the divider to the top edge of the subheader shell', () => {
     render(
       <ReleaseTableSubheader
         releases={[] as ReleaseViewModel[]}
@@ -94,15 +122,55 @@ describe('ReleaseTableSubheader', () => {
         onFiltersChange={() => undefined}
         releaseView='tracks'
         onReleaseViewChange={() => undefined}
+        searchQuery=''
+        onSearchQueryChange={() => undefined}
       />
     );
 
-    expect(screen.getByTestId('drawer-toggle-button')).toBeInTheDocument();
-    expect(drawerToggleButtonMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        chrome: 'page-toolbar',
-        tooltipLabel: 'Preview',
-      })
+    const toolbar = screen.getByTestId('page-toolbar');
+    expect(toolbar.className).toContain('border-t');
+    expect(toolbar.className).toContain('border-b-0');
+  });
+
+  it('orders toolbar controls as search, filters, display, export, preview, and create', async () => {
+    const user = userEvent.setup();
+    const onCreateRelease = vi.fn();
+
+    render(
+      <ReleaseTableSubheader
+        releases={[] as ReleaseViewModel[]}
+        selectedIds={new Set<string>()}
+        filters={DEFAULT_RELEASE_FILTERS}
+        onFiltersChange={() => undefined}
+        releaseView='tracks'
+        onReleaseViewChange={() => undefined}
+        searchQuery=''
+        onSearchQueryChange={() => undefined}
+        onCreateRelease={onCreateRelease}
+        canCreateManualReleases
+      />
     );
+
+    const controls = [
+      screen.getByTestId('toolbar-search'),
+      screen.getByRole('button', { name: 'Filters' }),
+      screen.getByRole('button', { name: /display/i }),
+      screen.getByRole('button', { name: 'Export' }),
+      screen.getByTestId('drawer-toggle-button'),
+      screen.getByRole('button', { name: 'New Release' }),
+    ];
+
+    controls.reduce((previous, current) => {
+      if (previous) {
+        expect(
+          previous.compareDocumentPosition(current) &
+            Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+      }
+      return current;
+    });
+
+    await user.click(screen.getByRole('button', { name: 'New Release' }));
+    expect(onCreateRelease).toHaveBeenCalledTimes(1);
   });
 });

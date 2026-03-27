@@ -1,9 +1,10 @@
 'use client';
 
-import { useClerk, useUser } from '@clerk/nextjs';
+import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { APP_ROUTES } from '@/constants/routes';
+import { useAuthSafe, useUserSafe } from '@/hooks/useClerkSafe';
 import { env } from '@/lib/env-client';
 import { useBillingStatusQuery } from '@/lib/queries';
 import { upgradeOAuthAvatarUrl } from '@/lib/utils/avatar-url';
@@ -28,7 +29,7 @@ export interface BillingStatus {
 
 export interface UseUserButtonReturn {
   isLoaded: boolean;
-  user: ReturnType<typeof useUser>['user'];
+  user: ReturnType<typeof useUserSafe>['user'];
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   isFeedbackOpen: boolean;
@@ -43,13 +44,15 @@ export function useUserButton({
   profileHref,
   settingsHref,
 }: UseUserButtonProps): UseUserButtonReturn {
-  const { isLoaded, user } = useUser();
-  const { signOut } = useClerk();
+  const pathname = usePathname();
+  const { isLoaded, user } = useUserSafe();
+  const { signOut } = useAuthSafe();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const isPassiveRuntime = env.IS_E2E;
+  const isDemoRoute = pathname === APP_ROUTES.DEMO;
   const { data, isLoading, error } = useBillingStatusQuery({
-    enabled: !isPassiveRuntime,
+    enabled: !isPassiveRuntime && !isDemoRoute,
   });
   const billingErrorNotifiedRef = useRef(false);
 
@@ -64,14 +67,14 @@ export function useUserButton({
   const billingStatus: BillingStatus = useMemo(
     () => ({
       isPro: isPassiveRuntime ? false : (data?.isPro ?? false),
-      plan: isPassiveRuntime ? null : (data?.plan ?? null),
+      plan: isPassiveRuntime || isDemoRoute ? null : (data?.plan ?? null),
       hasStripeCustomer: isPassiveRuntime
         ? false
         : (data?.hasStripeCustomer ?? false),
-      loading: isPassiveRuntime ? false : isLoading,
-      error: isPassiveRuntime ? null : errorMessage,
+      loading: isPassiveRuntime || isDemoRoute ? false : isLoading,
+      error: isPassiveRuntime || isDemoRoute ? null : errorMessage,
     }),
-    [data, errorMessage, isLoading, isPassiveRuntime]
+    [data, errorMessage, isDemoRoute, isLoading, isPassiveRuntime]
   );
 
   const redirectToUrl = (url: string) => {

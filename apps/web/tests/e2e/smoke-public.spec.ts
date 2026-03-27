@@ -67,7 +67,7 @@ test('homepage: hero heading, CTA, final claim CTA', async ({ page }) => {
     'Homepage did not render the final claim CTA section'
   ).toBeVisible({ timeout: 20_000 });
   await expect(
-    page.getByTestId('final-cta-dock'),
+    page.getByTestId('final-cta-headline'),
     'Homepage did not render the final claim handle form'
   ).toBeVisible({ timeout: 20_000 });
 
@@ -117,7 +117,9 @@ test.describe('Public Profile - dualipa', () => {
       return;
     }
 
-    await expect(page.locator('h1').first()).toContainText(/dua lipa/i, {
+    await expect(
+      page.getByText('Dua Lipa', { exact: true }).first()
+    ).toBeVisible({
       timeout: 60_000,
     });
 

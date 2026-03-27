@@ -15,6 +15,7 @@
 
 import { test } from '@playwright/test';
 import {
+  assertNoDevOverlays,
   hideTransientUI,
   OUTPUT_DIR,
   TIMEOUTS,
@@ -37,9 +38,10 @@ test.describe('Product Screenshots – Public Profile', () => {
       timeout: TIMEOUTS.NAVIGATION,
     });
 
-    // Wait for profile content to load — look for avatar or profile header
+    // Wait for profile content to load — look for profile-specific elements
+    // (not img[alt] which matches hidden dark-mode logos)
     await page
-      .locator('img[alt], [data-testid="profile-header"], h1')
+      .locator('[data-testid="profile-header"], h1, main img[alt]:visible')
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
@@ -51,6 +53,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-phone.png`,
@@ -69,7 +72,7 @@ test.describe('Product Screenshots – Public Profile', () => {
     });
 
     await page
-      .locator('img[alt], [data-testid="profile-header"], h1')
+      .locator('[data-testid="profile-header"], h1, main img[alt]:visible')
       .first()
       .waitFor({ state: 'visible', timeout: TIMEOUTS.CONTENT_VISIBLE });
 
@@ -79,6 +82,7 @@ test.describe('Product Screenshots – Public Profile', () => {
 
     await waitForSettle(page);
     await hideTransientUI(page);
+    await assertNoDevOverlays(page);
 
     await page.screenshot({
       path: `${OUTPUT_DIR}/profile-desktop.png`,

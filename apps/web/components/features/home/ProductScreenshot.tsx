@@ -22,6 +22,8 @@ interface ProductScreenshotProps {
    *  Use for committed screenshots where the file is guaranteed to exist.
    *  This preserves the next/image priority preload for above-fold images. */
   readonly skipCheck?: boolean;
+  /** Stable test selector for screenshot wrapper assertions. */
+  readonly testId?: string;
 }
 
 /**
@@ -37,6 +39,7 @@ export function ProductScreenshot({
   priority = false,
   className,
   skipCheck = false,
+  testId,
 }: ProductScreenshotProps) {
   const [isAvailable, setIsAvailable] = useState<boolean | null>(
     skipCheck ? true : null
@@ -68,6 +71,7 @@ export function ProductScreenshot({
   return (
     <figure
       aria-label={alt}
+      data-testid={testId}
       className={[
         'relative overflow-hidden rounded-[0.95rem] border border-subtle bg-surface-0 shadow-card-elevated md:rounded-[1rem]',
         className,
@@ -103,39 +107,46 @@ export function ProductScreenshot({
       </div>
 
       {/* Screenshot image */}
-      {isAvailable === false ? (
-        <div
-          className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
-          style={{ aspectRatio }}
-        >
-          <div className='max-w-[22rem]'>
-            <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
-              Product preview
+      {(() => {
+        if (isAvailable === false) {
+          return (
+            <div
+              className='grid w-full place-items-center bg-[radial-gradient(circle_at_top,rgba(113,112,255,0.12),transparent_44%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0))] px-6 py-10 text-center'
+              style={{ aspectRatio }}
+            >
+              <div className='max-w-[22rem]'>
+                <div className='mb-4 inline-flex rounded-full border border-subtle bg-surface-1 px-3 py-1 text-xs text-tertiary-token'>
+                  {title}
+                </div>
+                <p className='text-lg font-medium tracking-tight text-primary-token'>
+                  Preview coming soon
+                </p>
+                <p className='mt-2 text-sm leading-6 text-secondary-token'>
+                  See it live when you sign up.
+                </p>
+              </div>
             </div>
-            <p className='text-lg font-medium tracking-tight text-primary-token'>
-              Screenshot unavailable in this worktree
-            </p>
-            <p className='mt-2 text-sm leading-6 text-secondary-token'>
-              The marketing surface still renders and stays reviewable while the
-              generated product screenshot assets are absent.
-            </p>
-          </div>
-        </div>
-      ) : isAvailable === true ? (
-        <Image
-          src={src}
-          alt={alt}
-          width={width}
-          height={height}
-          priority={priority}
-          className='w-full'
-        />
-      ) : (
-        <div
-          className='w-full animate-pulse bg-surface-1'
-          style={{ aspectRatio }}
-        />
-      )}
+          );
+        }
+        if (isAvailable === true) {
+          return (
+            <Image
+              src={src}
+              alt={alt}
+              width={width}
+              height={height}
+              priority={priority}
+              className='w-full'
+            />
+          );
+        }
+        return (
+          <div
+            className='w-full animate-pulse bg-surface-1'
+            style={{ aspectRatio }}
+          />
+        );
+      })()}
     </figure>
   );
 }

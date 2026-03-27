@@ -51,6 +51,12 @@ export const queryKeys = {
         'social-links',
         ...(profileId === undefined ? [] : [profileId]),
       ] as const,
+    pressPhotos: (profileId?: string) =>
+      [
+        ...queryKeys.dashboard.all,
+        'press-photos',
+        ...(profileId === undefined ? [] : [profileId]),
+      ] as const,
     activityFeed: (profileId?: string, range?: string) =>
       [
         ...queryKeys.dashboard.all,
@@ -72,6 +78,17 @@ export const queryKeys = {
     featured: () => [...queryKeys.creators.all, 'featured'] as const,
     socialLinks: (profileId: string) =>
       [...queryKeys.creators.all, 'social-links', profileId] as const,
+  },
+
+  // Admin releases
+  adminReleases: {
+    all: ['admin-releases'] as const,
+    list: (filters?: Record<string, unknown>) =>
+      [
+        ...queryKeys.adminReleases.all,
+        'list',
+        ...(filters === undefined ? [] : [filters]),
+      ] as const,
   },
 
   // Admin users

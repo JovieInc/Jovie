@@ -5,6 +5,655 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
+## [26.4.81] - 2026-03-26
+
+### Changed
+
+- Public deploy, changelog subscribe, webhook dispatch, and cron control paths now fail closed when durable coordination is unavailable instead of degrading to in-memory behavior [internal]
+- Server-side operational HTTP now uses bounded timeout and retry handling through the shared `serverFetch()` wrapper [internal]
+- Admin reliability now includes unresolved Sentry issues, Redis availability, and deployment state alongside latency and incident metrics [internal]
+
+### Added
+
+- Shared cron auth helper with timing-safe bearer verification and optional trusted-origin enforcement [internal]
+- Redis-backed limiters for changelog subscription and deploy promotion [internal]
+- Route and helper test coverage for deploy control, changelog subscription, cron auth, idempotency, webhook dedupe, and operational webhook/cron entrypoints [internal]
+
+## [26.4.80] - 2026-03-26
+
+### Changed
+
+- Dashboard core data cache TTL increased from 30s to 5min — tag-based invalidation handles mutations, reducing DB queries on navigation [internal]
+- Release matrix cache TTL increased from 30s to 5min — releases only change on import/sync [internal]
+- Lighthouse performance budgets tightened 2-3x (FCP 4s→1.5s, LCP 5s→2s, TBT 1.5s→500ms, performance score 50%→75%) [internal]
+
+### Added
+
+- Nav hover prefetching — hovering a dashboard nav link preloads page data into TanStack Query cache with 150ms debounce [internal]
+- Per-page TanStack Query hydration — releases and earnings pages prefetch data server-side for instant SPA navigation [internal]
+- Cache tag constant usage in settings action — replaced string literals with CACHE_TAGS.DASHBOARD_DATA [internal]
+
+## [26.4.79] - 2026-03-26
+
+### Added
+
+- Pitch generation via Jovie chat — artists can ask "generate pitches for [release]" and get Spotify, Apple Music, Amazon Music, and General pitches inline
+- "Generate pitches" suggested prompt in chat (paid plans only, personalized with latest release title)
+- ChatPitchCard component with loading skeleton, success state (4 platforms with copy buttons and char counts), and error state
+- Shared `buildPitchInput()` service extracted from pitch API route (DRY)
+- Optional `instructions` parameter for pitch generation (e.g., "mention my tour")
+- Test-only `/api/admin/test-user/set-plan` endpoint for E2E paid-tier testing
+- E2E test suite for chat pitch generation with plan upgrade/downgrade coverage
+
+### Fixed
+
+- Free-tier plan limitations now list "pitch generation" as a blocked tool
+
+## [26.4.78] - 2026-03-25
+
+### Changed
+
+- Spotify import link discovery now runs in background — users see their catalog instantly instead of waiting 15-25s for cross-platform link lookup
+- Link discovery parallelized with concurrency limit of 5 (was sequential), reducing wall-clock time from ~25s to ~5s for large catalogs
+- Pre-save cron processes rows concurrently (grouped by refresh token to prevent OAuth races), reducing 500-row processing from ~50s to ~10s
+- Admin leads batch URL processing parallelized with input deduplication
+- HUD metrics polling no longer triggers redundant refetches on tab focus (staleTime increased from 0 to 15s)
+
+### Added
+
+- Admin releases table at `/app/admin/releases` showing all releases across the platform with server-side pagination, search, and sort
+- Data quality indicators (missing artwork, no providers, no UPC, zero tracks) as inline health pills in the Issues column
+- Non-ASCII-safe search preserving music titles with accented characters
+- Admin sidebar nav entry for Releases with Disc3 icon
+- [internal] `mapConcurrent` utility for concurrent async operations with configurable worker pool limit
+- [internal] Unit tests for `mapConcurrent` (7 test cases covering concurrency, ordering, errors, edge cases)
+
+## [26.4.77] - 2026-03-25
+
+### Changed
+
+- Track URLs are now nested under their parent release (`/{handle}/{release}/{track}`) instead of flat (`/{handle}/{track}`), matching MusicBrainz hierarchy
+- Track sidebar label changed from "Smart link" to "Track link" to distinguish from release-level smart links
+- Track slug "sounds" is now reserved to prevent collision with the "Use This Sound" route
+
+### Added
+
+- New public track deep link route at `/{handle}/{releaseSlug}/{trackSlug}` with MusicRecording structured data and "from [Release Name]" breadcrumb
+- Flat track URLs now 302-redirect to the nested format when a parent release is known
+- Artist profiles now capture all 30+ platforms discovered during enrichment (previously only 7 were saved)
+- Streaming platforms are automatically promoted to artist pages; other platforms stored for future features
+- [internal] Canonical `artist_identity_links` table with provenance tracking for MusicFetch, MusicBrainz, SERP enrichment sources
+- [internal] Structured enrichment logging shows returned/stored/published counts per MusicFetch call
+
+### Fixed
+
+- Verified badge no longer overlaps the avatar on artist profiles — badge now sits cleanly inline with the artist name
+
+## [26.4.76] - 2026-03-25
+
+### Changed
+
+- Settings pages now use a cleaner layout — flat section headers replace nested cards, eliminating redundant title bars
+- Arrow keys in admin tables now update the detail panel immediately without requiring a click
+
+### Fixed
+
+- Fixed sign-in across all environments by routing authentication through the correct Clerk endpoint
+- [internal] Replaced dead `clerk.jov.ie` with `distinct-giraffe-5.clerk.accounts.dev` everywhere: fetch() proxy in middleware, root + app vercel.json rewrites, CSP allowlists, preconnect hints; added Clerk architecture docs to AGENTS.md and CLAUDE.md
+
+### Removed
+
+- [internal] Removed 1,100+ lines of dead settings code (SettingsPolished, DashboardSettings, passthrough wrappers)
+
+## [26.4.75] - 2026-03-25
+
+### Fixed
+
+- Empty states no longer contradict themselves — removed "No Spotify or Apple Music" messages that appeared alongside connected DSP links
+- Tour dates empty state now says "No upcoming tour dates" instead of the generic "No tour dates found"
+- Product screenshots are now cleaner and more consistent by preventing development-only overlays from appearing
+- [internal] Screenshot workflow enables server-side `NEXT_PUBLIC_E2E_MODE` gating and adds an explicit selector for the Next.js dev build indicator
+
+## [26.4.74] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in on production — authentication requests no longer fail with "Invalid host"
+- [internal] Only intercept `/__clerk/*` in middleware for staging; production uses vercel.json rewrites which correctly set the Host header for Clerk's proxy domain validation
+
+## [26.4.73] - 2026-03-25
+
+### Fixed
+
+- Fixed sign-in reliability on staging environments so authentication requests stay in the correct environment
+- [internal] Route `/__clerk/*` and `/clerk/*` to the environment-specific Clerk FAPI host
+
+## [26.4.72] - 2026-03-25
+
+### Changed
+
+- Align sidebar tokens with Linear's exact color values — dark mode background elevated from `8 9 10` to `15 16 17`, light mode refined across all sidebar token channels
+- Remove `color-mix()` backgrounds from content surfaces, right drawer, and page shell — use flat `var(--linear-app-content-surface)` for cleaner rendering
+- Move right panel inside `<main>` content card so sidebar and content share one unified card (matches Linear layout)
+- Remove sidebar card chrome — no border, rounded corners, inset shadow, or backdrop-blur on `variant=sidebar`
+- Revert BrandLogo from inline SVG back to `next/image` with dark/light theme-aware variants
+- Restore JovieLogo and LogoIcon components (previously removed)
+- Simplify ChatWorkspaceSurface — strip ContentSurfaceCard wrapper with gradients/shadows
+- ProfileCompletionCard: use `border-subtle` token instead of custom color-mix border
+- ProfileSidebarHeader: remove "Profile workspace" sub-label
+- Empty state in JovieChat: position content near chat input instead of vertical center
+
+### Fixed
+
+- Remove duplicate "Recent actions" section from audience member sidebar — was showing the same data as "Activity" with a different layout
+- Cap activity feed to 10 most recent items to keep sidebar concise
+- [internal] Fix Clerk proxy test failures when Doppler sets `NEXT_PUBLIC_CLERK_PROXY_DISABLED=1` — explicitly clear disabled flag in tests that expect proxy active
+
+## [26.4.71] - 2026-03-25
+
+### Fixed
+
+- [internal] Remove redundant `force-dynamic` from audience, earnings, and insights dashboard pages — unblocks future PPR optimization
+- [internal] Add missing `dashboardLoadError` check to insights page
+- [internal] Replace direct `Sentry.captureException` with `captureError()` in earnings page
+- [internal] Fix hardcoded `/app/insights` and `/onboarding` redirect URLs to use route constants
+- [internal] Wrap presence page in Suspense boundary for instant skeleton streaming
+- [internal] Replace `logger.error` with `captureError` in audience and insights catch blocks
+- [internal] Show error state instead of fake empty state when DSP presence data fails to load
+
+## [26.4.70] - 2026-03-25
+
+### Added
+
+- [internal] Automated product screenshot generation CI workflow — regenerates homepage screenshots when UI code changes on main, opens auto-merge PR with updated images
+- [internal] Orphan screenshot cleanup — CI removes screenshots no longer referenced in source code
+- [internal] Exclude screenshot-only changes from triggering main CI pipeline
+
+### Changed
+
+- Convert BrandLogo from image-based rendering to inline SVG with `currentColor` — eliminates double HTTP requests for dark mode, enables CSS-controlled visual hierarchy
+- Standardize logo icon sizes: sidebar icons 13/18px → 16px, remove conflicting Tailwind size overrides
+- Standardize loading states: all use `tone='muted'` + `animate-pulse` + `animate-in fade-in` for consistent visual weight
+- Simplify ProfileNavButton from dual stacked logos to single element with conditional pulse
+- LogoLoader: size 64→32px, animation spin→pulse, always muted tone
+- [internal] Narrow TypeScript `include` from broad `**/*.ts` glob to explicit source directories, cutting ~1100 files from typecheck scope — cold typecheck drops from 58s to 24s CPU time (59% faster)
+- [internal] Add separate `tsconfig.test.json` for test/script file typechecking off the critical path
+- [internal] Add `typecheck:tests` script to `apps/web/package.json`
+
+### Fixed
+
+- FooterBranding: wordmark variant now correctly passes `tone='white'` when `isLinear=true` (was defaulting to `auto`)
+- SVG asset fill colors: black icon `#222326` → `#000000`, white icon `#F4F5F8` → `#FFFFFF` for maximum contrast at small sizes
+- AuthLayout logo animation: one-shot pulse with reduced-motion guard (was permanently looping)
+- BrandLogo wrapped in `<span>` to isolate from parent `[&>svg]` selector overrides in CircleIconButton/SidebarMenuButton
+- [internal] Tighten E2E error filters — replace 40+ broad substrings (`'clerk'`, `'404'`, `'database'`, `'image'`) with specific vendor patterns so real console errors surface instead of being silently swallowed
+- [internal] Add per-page console error monitoring to dashboard health tests with proper listener cleanup between pages
+- [internal] Add Clerk UI visibility assertion (`user-button-loaded` data-testid) to catch missing auth shell on desktop
+- [internal] Expand nightly E2E config to include dashboard health tests across all 5 browser projects
+- [internal] Replace manual `page.on()` listeners in admin health test with `setupPageMonitoring` for consistent error isolation
+- [internal] Add safety guards preventing silent test disablement when route matrices are empty
+
+### Removed
+
+- Dead components: JovieLogo, LogoIcon (zero production imports)
+- `animate-logo-spin` CSS keyframe (replaced by standard `animate-pulse`)
+
+## [26.4.69] - 2026-03-25
+
+### Changed
+
+- Phone mockup on homepage now matches the real product — Jovie logo top-left, social/action bar replaces dot indicators, mini release card replaces notification CTA, tip amounts corrected to $3/$5/$7, verified badge enabled
+
+### Fixed
+
+- [internal] Clear stale Turbopack cache during setup to prevent `@clerk/ui` module resolution failures in dev mode
+
+## [26.4.68] - 2026-03-25
+
+### Added
+
+- [internal] Add AI chat eval framework with 16 golden cases testing music industry knowledge accuracy, voice compliance, and prompt injection guards
+- [internal] Add 30+ unit tests for chat components (ChatInput, ChatMessage, ChatMarkdown, SuggestedPrompts, intent classification, knowledge retrieval, etc.)
+- [internal] Extract tool schemas into shared `tool-schemas.ts` for eval runner reuse without importing execute functions
+- [internal] Add shared test fixture factories (`chat-context.ts`) for artist context and release data
+- [internal] Exclude `tests/eval/` from CI vitest configs to prevent API cost on every push
+
+### Changed
+
+- [internal] Extract right drawer from content container into standalone card — drawer now sits beside main content as a sibling element with its own border, radius, and shadow
+- [internal] Apply `rounded-full` pill shape to SegmentControl, CloseButton, and all drawer interactive elements per DESIGN.md spec
+- [internal] Normalize drawer internal spacing from `gap-2` to `gap-1.5`
+
+## [26.4.67] - 2026-03-25
+
+### Fixed
+
+- [internal] Fix scroll-reveal cleanup leak — `reveal-js` class now removed on unmount even when no scroll elements exist
+- [internal] Add `aria-hidden` and `inert` to crossfaded homepage panels so screen readers only see the active panel
+- [internal] Use computed `phoneIndex` instead of duplicating the expression in CrossfadeBlock calls
+
+## [26.4.66] - 2026-03-25
+
+### Added
+
+- [internal] Add 27 middleware behavioral tests for proxy.ts covering cookie banner geo-detection, auth redirects, circuit breaker, bot detection, banned user handling, and domain redirect
+- [internal] Add content-positive assertions for top 5 dashboard routes (Chat, Audience, Releases, Earnings, Presence) — health checks now verify the right content loaded, not just absence of errors
+- [internal] Wire existing `assertFastPageLoad` performance budgets into dashboard health checks (CI-only)
+
+### Changed
+
+- Unified hero and sticky phone tour into one continuous scroll experience — phone persists from hero through all 4 mode transitions, then logo bar wipes it away
+- Hero content (headline, claim form) is now the first "slide" that crossfades into tour mode panels as you scroll
+- HeroCinematic is now mobile-only; desktop uses the unified sticky section
+
+### Fixed
+
+- [internal] Fix redirect loop test silently skipping when `E2E_CLERK_USER_PASSWORD` not set — test now runs unauthenticated as intended
+- [internal] Stop masking real failures with `test.skip()` on transient navigation errors in smoke tests
+- [internal] Use `smokeNavigateWithRetry` for protected route redirect test instead of raw `page.goto`
+- Fix scroll infrastructure: split body/html overflow rules so `overflow-x:clip` isn't promoted to `hidden` (which broke `position:sticky`)
+- Fix scroll-reveal system: `reveal-js` class was never added to document root, so entrance animations never activated
+- Fix MobileNav scroll lock cleanup: use `removeProperty` instead of empty string to prevent ghost inline styles
+
+## [26.4.65] - 2026-03-25
+
+### Changed
+
+- Redesigned audience table with sortable columns for easier fan management
+- Redesigned profile hero with larger artist image and cleaner layout
+- [internal] Revamp audience table to Linear layout — break composite cells into individual columns (User, Type, Location, Intent, Visits, LTV, Last Action), show sortable column headers, inline touring badge into user cell
+- [internal] Redesign v2 profile hero from cramped horizontal card to centered vertical layout with large artist image (160px mobile / 192px desktop), conditional shape (rounded-full for avatar, rounded-2xl for release artwork), and no card chrome
+- [internal] Strip avatar from sticky profile header — artist identity now lives prominently in the hero section
+- [internal] Lighten sticky header border opacity for a more minimal navigation feel
+- [internal] Automated keyword filtering for public changelog — vendor names, dev tooling, staging URLs, and infrastructure patterns are now auto-filtered even without the `[internal]` prefix
+- [internal] Cleaned up ~80 existing changelog entries: tagged internals, rewrote verbose entries to be benefit-led and concise
+
+### Removed
+
+- [internal] Remove redundant calendar date badge from profile hero card (eyebrow text already communicates timing)
+- [internal] Remove card container chrome (border, background, shadow, divider) from profile hero
+
+## [26.4.64] - 2026-03-25
+
+### Fixed
+
+- Add "Cookie Settings" button to site footer for GDPR-regulated regions so users can reopen cookie preferences after dismissing the banner
+- Load saved cookie preferences when reopening the cookie modal instead of always showing defaults
+- Sync tracking consent state (`jv_tracking_consent`) when users accept or reject cookies via the banner or modal
+- Add "Cookie Settings" action to the user profile menu for authenticated users
+- Add accessible dialog description to the cookie preferences modal
+- Fix Clerk proxy URL mismatch — align code to use `/__clerk` path matching Clerk Dashboard proxy configuration, restoring Google OAuth callbacks and Clerk JS loading on production
+- Remove double shell around releases table — table now fills edge-to-edge within the app shell frame, matching Linear's table route pattern
+
+## [26.4.63] - 2026-03-24
+
+### Changed
+
+- Redesigned homepage with a cleaner, more focused layout
+
+### Removed
+
+- [internal] Remove ValuePropsSection, PhoneProfileDemo, AiSection, PricingSection, TestimonialsSection, and FaqSection from homepage — pricing moves to nav, FAQ to /support
+
+## [26.4.62] - 2026-03-24
+
+### Changed
+
+- Redesigned pricing page with cleaner layout and easier plan comparison on mobile
+
+### Fixed
+
+- Fixed sign-in not loading on some environments
+- [internal] Fix auth not loading on production and staging by reverting Clerk proxy from SDK `frontendApiProxy` back to Vercel rewrite
+- [internal] Add locally bundled Clerk UI to dashboard provider for consistent auth rendering
+- [internal] Center logo relative to Clerk sign-in card by moving it inside the form wrapper container
+
+## [26.4.61] - 2026-03-24
+
+### Fixed
+
+- Sign-ups now go straight to onboarding — no more waitlist
+
+### Changed
+
+- Profile V2 layout is now the default for all artist profiles
+- [internal] Skip Statsig feature flag evaluation in dev mode to reduce request overhead — all flags return defaults, matching existing behavior when no server secret is configured
+
+## [26.4.60] - 2026-03-24
+
+### Fixed
+
+- [internal] Bump database connection pool from 10 to 20 for launch burst traffic capacity
+- [internal] Health check endpoint now uses lightweight query to reduce load
+- Notification emails now show native unsubscribe button in Gmail and Outlook
+- Fixed blank sign-in pages that could occur intermittently
+
+## [26.4.59] - 2026-03-24
+
+### Added
+
+- [internal] `/demo/audience` route — auth-free audience CRM demo page for screenshots and marketing
+
+### Changed
+
+- [internal] Product screenshots now captured from `/demo` pages instead of authenticated dashboard routes — eliminates login screen screenshots
+- [internal] Releases screenshot spec uses `/demo` route with graceful image loading fallbacks
+- [internal] Audience screenshot spec uses `/demo/audience` route
+
+### Removed
+
+- [internal] Insights screenshot spec — insights feature not currently shipping
+
+## [26.4.58] - 2026-03-24
+
+### Fixed
+
+- Fixed onboarding skipping steps (handle, avatar, Spotify connect) after waitlist approval
+- Fixed redirect loop between dashboard and onboarding
+- [internal] Waitlist approval was auto-completing onboarding, skipping handle selection, avatar upload, and Spotify connect
+- [internal] Profile completion redirect was enforcing avatar as a hard requirement, causing infinite redirect loops
+- [internal] Signup redirect sent new users to waitlist page instead of onboarding
+- [internal] Service worker toggle broken on Vercel preview deploys due to NODE_ENV always being 'production' — now uses NEXT_PUBLIC_VERCEL_ENV for accurate environment detection
+- [internal] Fixed a rare error when unregistering stale service workers
+
+### Changed
+
+- [internal] Removed `inviteToken` from waitlist API response — token-based claim flow replaced by direct approval
+- [internal] Service worker disabled by default in development with dev toolbar toggle to re-enable for PWA testing
+
+### Added
+
+- [internal] Service worker control utilities (`lib/service-worker/control.ts`) for shared SW registration/unregistration logic
+- [internal] Dev toolbar SW toggle button for explicit service worker opt-in during development
+
+## [26.4.57] - 2026-03-24
+
+### Fixed
+
+- Visual polish: fixed homepage background color, CTA button color, and profile typography
+
+### Added
+
+- [internal] Golden path E2E test coverage: onboarding completion, responsive layout, pro feature gates, payment flow
+- [internal] Shared Stripe test helpers for consistent payment E2E testing
+
+## [26.4.56] - 2026-03-24
+
+### Fixed
+
+- Fixed missing font on sign-in and sign-up pages
+- Fixed blank screen flash on sign-in page
+- Terms of Service and Privacy Policy links on sign-up are now easier to tap on mobile
+
+## [26.4.55] - 2026-03-24
+
+### Fixed
+
+- [internal] OAuth login on staging redirecting to `jov.ie/__clerk` instead of `staging.jov.ie/__clerk` — added runtime hostname-based Clerk key selection so staging uses its own Clerk instance
+- [internal] Dual Clerk middleware instances (production + staging) with lazy initialization
+- [internal] 8 dynamic layouts now resolve publishable key from request headers instead of build-time env var
+
+## [26.4.54] - 2026-03-24
+
+### Fixed
+
+- Fixed broken checkmarks on comparison page
+- Corrected AI assistant free tier limit display (25 msgs/day)
+- Fixed broken footer link
+- [internal] Missing H1 on /launch/pricing — promoted heading from h2 to h1 for SEO/accessibility
+- [internal] ProductScreenshot fallback showed developer-facing text on production — replaced with user-friendly "Preview coming soon"
+- [internal] /ai page exposed internal founder AI workflow publicly — redirected to investor portal with noindex
+
+## [26.4.53] - 2026-03-24
+
+### Changed
+
+- [internal] Disabled Sentry client SDK initialization in development — eliminates 20-80KB of unnecessary JS overhead during local dev
+
+### Fixed
+
+- [internal] Clerk "Failed to load script" error in local development — `frontendApiProxy` now only enabled in production/preview where the proxy target is reachable
+
+## [26.4.52] - 2026-03-24
+
+### Fixed
+
+- Fixed authentication not loading on some environments
+- [internal] Auth broken on both staging and production — migrated Clerk proxy from static `vercel.json` rewrites (hardcoded to `clerk.jov.ie`) to Clerk SDK's built-in `frontendApiProxy` middleware
+- [internal] Removed stale `NEXT_PUBLIC_CLERK_PROXY_URL` from Doppler prd/stg configs
+- [internal] Updated Clerk middleware bypass paths from `/clerk` to `/__clerk` (SDK default)
+- Fixed duplicate "Jovie" in page titles
+- [internal] Screenshot pipeline auth guard now allows `+clerk_test` emails without password
+- [internal] Clerk proxy disabled for screenshot dev server (avoids HTTPS requirement on localhost)
+- [internal] Profile screenshot locator no longer matches hidden dark-mode logo images
+
+### Added
+
+- Homepage product screenshots: audience CRM dashboard, artist profile (phone + desktop)
+- [internal] E2E authentication documentation in TESTING.md and CLAUDE.md
+
+### Removed
+
+- Founder quote from homepage testimonials section (Tim White quote card)
+
+## [26.4.51] - 2026-03-24
+
+### Fixed
+
+- Improved 404 page messaging
+- [internal] Marketing route 404s no longer render double header/footer (added `(marketing)/not-found.tsx`)
+- Changelog subscribe confirmation now more visible
+- [internal] ProductScreenshot fallback shows clean "Coming soon" instead of a developer-facing placeholder message
+
+## [26.3.51] - 2026-03-24
+
+### Fixed
+
+- [internal] Removed `merge=union` strategy from CHANGELOG.md that was silently creating duplicate and malformed entries on merge
+- [internal] Fixed CI deploy pipeline deploying directly to production before canary health checks — staging deploy now creates a preview deployment first
+
+## [26.3.50] - 2026-03-23
+
+### Changed
+
+- [internal] Made Clerk proxy URL environment-driven to support separate staging Clerk instance
+- [internal] Production uses `/clerk` Vercel rewrite; staging uses direct `https://clerk.staging.jov.ie`
+
+## [26.3.49] - 2026-03-23
+
+### Added
+
+- Redesigned blog with magazine-style layout, author pages, and category pages
+- [internal] Enhanced Article JSON-LD schema with author URL, keywords, word count, and date modified
+- [internal] Added `buildPersonSchema()` for author page structured data
+- [internal] Blog author and category pages included in sitemap with accurate `lastModified` dates
+- Blog posts now show tags and estimated reading time
+
+### Changed
+
+- [internal] Blog index replaced timeline layout with editorial magazine grid (featured + 2-column cards)
+- [internal] Blog post priority bumped from 0.6 to 0.7 in sitemap
+- [internal] `BlogMarkdownReader` semantic HTML: moved `<article>` wrapper to page level
+- [internal] Extended `ResolvedAuthor` with `bio` and `username` fields from Jovie profile data
+### Changed
+
+- [internal] Migrated investor portal from subdomain (`investors.jov.ie`) to path-based auth (`/investor-portal`)
+- [internal] Legacy subdomain now 301 redirects to `/investor-portal`, preserving token params
+- [internal] Replaced emoji-based deck navigation with Lucide icons (ChevronLeft/Right, Download, Maximize2)
+- [internal] Added touch swipe support and slide dot navigation to pitch deck viewer
+- [internal] Implemented mobile hamburger slide-out sheet navigation for investor portal
+- [internal] Improved responsive typography and padding across deck viewer and memo content
+- [internal] Added loading skeleton for investor memo pages
+- [internal] Token display in admin investor table now shows truncated token with copy-to-clipboard
+
+### Removed
+
+- [internal] Removed subdomain-based token validation from investor page components (now handled by middleware)
+- [internal] Removed duplicate `requireInvestorAccess` from layout (middleware is single source of truth)
+
+### Fixed
+
+- [internal] Added top padding on mobile to prevent content hiding behind fixed header
+- [internal] Added `dark` class to investor respond page containers for consistent theming
+- [internal] Fixed sticky bar button layout for proper mobile stacking
+
+## [26.4.48] - 2026-03-23
+
+### Fixed
+
+- Fixed cropped app icons on installed PWA
+- Improved PWA reliability
+
+### Added
+
+- Offline fallback page for installed PWA
+- Pinch-to-zoom now works on all pages
+### Changed
+
+- Expanded support page with documentation links and FAQ
+
+### Fixed
+
+- Fixed duplicate "Jovie" in support page title
+## [26.3.48] - 2026-03-23
+
+### Changed
+
+- [internal] Bumped all dependencies to latest compatible versions across monorepo
+- [internal] Updated Next.js 16.1.7 → 16.2.1, Sentry 10.39.0 → 10.45.0, Tailwind CSS 4.1.18 → 4.2.2
+- [internal] Upgraded Biome 2.3.11 → 2.4.8, Turbo 2.8.9 → 2.8.20, Vitest 4.0.18 → 4.1.1
+- [internal] Bumped Storybook 10.2.x → 10.3.3, AI SDK 6.0.116 → 6.0.137, Motion 12.29.0 → 12.38.0
+- [internal] Updated lucide-react 0.577.0 → 1.0.1 (replaced removed brand icons with generic equivalents)
+- [internal] Bumped pnpm overrides: vite ^6.4.1, rollup ^4.60.0, axios ^1.13.6
+- [internal] Excluded HTML files from Biome lint (new in 2.4, not previously linted)
+## [26.4.48] - 2026-03-24
+
+### Changed
+
+- Redesigned sign-in and sign-up pages with improved styling and polish
+- Improved verification code input with larger digits and visual feedback
+- [internal] Consolidated Clerk auth styling to CSS-primary architecture (theme.css single source of truth)
+- [internal] Primary button hover now uses accent-hover color instead of subtle opacity change
+- [internal] Social/primary button hover lift only on pointer devices (no fidget on touch)
+- [internal] All auth transitions use design system easing (--ease-interactive)
+- [internal] Divider "or" text increased to 12px for readability
+- [internal] Footer link hover uses accent color instead of barely-visible opacity
+- [internal] Softened auth card shadow for less aggressive depth
+
+### Fixed
+
+- [internal] Modal backdrop/content styles now correctly target portaled elements outside auth root
+- [internal] Input error state uses correct Clerk data attributes (data-feedback, aria-invalid)
+- [internal] Focus ring opacity normalized to 0.28 across all interactive elements
+- [internal] Warning text uses --linear-warning token instead of hardcoded oklch value
+
+### Added
+
+- [internal] Styling for 13 previously unstyled Clerk elements: forgot password link, back button, hint/warning/error text, step headers, alternative methods, verification status, phone input, selectors, badges, modals
+- Disabled and loading states for buttons and inputs
+- Accessible handle availability indicator on sign-up
+
+## [26.4.47] - 2026-03-23
+
+### Changed
+
+- Updated design system and color tokens to match Linear's March 2026 refresh
+- [internal] Rewrote DESIGN.md as complete design system spec (typography, colors, spacing, motion, component patterns)
+- [internal] Updated theme base hue 272→282, font weight book 400→450, light sidebar color corrected
+- [internal] Normalized all OKLCH hue references from 260/272 to 282 across token files
+
+### Fixed
+
+- Fixed oversized marketing headlines on wide screens
+- Improved text spacing consistency across navigation and UI elements
+- [internal] Marketing H1 capped at 64px (was 76px at >=1280px), H2 capped at 48px (was 56px at >=1440px)
+- [internal] H1 line-height corrected from 1.0 to 1.06; removed global letter-spacing from body
+
+## [26.3.48] - 2026-03-23
+
+### Fixed
+
+- [internal] Reduced Sentry error noise (~80% of monthly budget) by filtering known non-actionable errors
+- [internal] Replaced `captureWarning` with `console.warn` for expected build-info read failures in dev
+- [internal] Changed retryable DB errors to log as Sentry breadcrumbs instead of exceptions
+- [internal] Added CSP violation filtering (browser extension noise) to `scrubPii`
+- [internal] Added `ignoreErrors` patterns for build-info, FeaturedCreators timeout, daily budget, hooks mismatch
+
+### Removed
+
+- [internal] Removed Sentry example page and API route (dev-only test scaffolding)
+### Added
+
+- New /about page with founder story and FAQ
+- New comparison pages: Jovie vs Linktree, Jovie vs Linkfire
+- New alternatives pages for link-in-bio tools
+- [internal] Brand disambiguation in llms.txt and new llms-full.txt for AI engine optimization
+- [internal] FAQ section with FAQPage JSON-LD schema on homepage
+- [internal] Article and BreadcrumbList JSON-LD schemas on all blog posts
+- [internal] FAQ schema builder, Article schema builder, and Breadcrumb schema builder utilities
+- [internal] Entity IDs (@id) for consistent knowledge graph across Organization, WebSite, and SoftwareApplication schemas
+- [internal] knowsAbout, foundingDate, and additionalType fields on Organization schema
+- [internal] /about, /pricing, /support, /tips, /changelog added to sitemap
+
+### Fixed
+
+- [internal] Corrected sameAs schema links from non-existent @jovieapp accounts to real @meetjovie Instagram
+
+## [26.3.47] - 2026-03-23
+
+### Fixed
+
+- [internal] Secured audience opt-in endpoint with HMAC-signed tokens to prevent unauthenticated email manipulation
+- Fixed broken opt-in link in tip thank-you emails
+- [internal] Added rate limiting (30/hour per IP) to tip checkout session creation endpoint
+- [internal] Clamped admin list endpoints (creators, users) to max 100 pageSize to prevent unbounded queries
+
+### Added
+
+- [internal] Added `opt-in-token` module with HMAC token generation, verification, and URL building
+- [internal] Added `tipCheckout` rate limiter (30 sessions/hour per IP) for public checkout endpoint
+- [internal] Added unit tests for opt-in token roundtrip, rejection of tampered/malformed tokens, and URL generation
+### Changed
+
+- Redesigned settings with cleaner navigation and dedicated pages for each section
+
+### Fixed
+
+- [internal] Added feature gate to payments settings page (Stripe Connect flag)
+- [internal] Added admin guard to admin settings page (isAdmin check)
+- [internal] Fixed settings routes to use proper constants (SETTINGS_ACCOUNT, SETTINGS_DATA_PRIVACY, etc.)
+
+### Removed
+
+- [internal] Removed duplicate /account card-grid dashboard entry point (redirects to /app/settings/account)
+- [internal] Removed hash-based navigation in settings (fully route-based now)
+- [internal] Removed referral nav item from settings sidebar
+
+## [26.3.46] - 2026-03-23
+
+### Added
+
+- [internal] Shared Clerk appearance and availability helpers, a reusable auth-route prefetch helper, and an explicit auth-unavailable fallback card for auth routes
+- [internal] Focused unit coverage for auth layout fallback behavior, onboarding waitlist guarding, Clerk provider configuration, and the updated sign-in/sign-up Clerk props
+- [internal] Added shared standalone product shells, redirect surfaces, and loading-state primitives to align non-marketing product routes with the Linear-inspired app system
+- [internal] Added typed dashboard activity-feed normalization and regression tests so stale emoji payloads safely coerce to supported icons
+
+### Changed
+
+- Refreshed app design system for more consistent layout and visual polish
+- [internal] Aligned auth, billing, HUD, investor admin, public redirect, and utility product surfaces to the Linear-inspired product design system and shared page shells
+- [internal] Refreshed retargeting ad preview tooling, billing success celebration, and product-shell rhythm for more consistent product-side layout and feedback
+
+### Fixed
+
+- Sign-in and sign-up pages now match Jovie's dark theme
+- Fixed an issue where new users could briefly see the wrong page during sign-up
+- [internal] Theme Clerk's prebuilt auth UI to match Jovie dark mode and bundle the Core 3 UI assets through the auth provider instead of falling back to the stock dark styling
+- [internal] Route post-signup users through the canonical waitlist and onboarding gate so waitlist-state users no longer fall into onboarding and see the flow flip underneath them
+- [internal] Preserve redirect-aware auth navigation while hardening mock and misconfigured Clerk fallback handling, provider config, and related auth smoke coverage
+- [internal] Prevent delayed public-link redirects from firing after unmount and restore standalone billing success scrolling with accessible verification feedback
+- [internal] Fix Vercel preview builds by matching App Router function globs and keep PR smoke runs on the fast E2E iteration path
+- [internal] Normalize CalVer release metadata by syncing `version.json`, workspace package versions, and the changelog head
 
 ## [26.4.45] - 2026-03-23
 
@@ -17,8 +666,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Fixed
 
-- Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
-- Invited people on the waitlist can now be fully approved from the admin board
+- [internal] Fixed an issue where waitlist approvals in the admin board could appear successful without fully updating the user's account
+- [internal] Invited people on the waitlist can now be fully approved from the admin board
 - Fixed a rare routing issue where people still on the waitlist could briefly land on onboarding
 - Admin board now blocks invalid claimed→invited drag transitions until proper reversion support is added
 - Bulk approve action now includes invited entries, matching individual approval behavior
@@ -27,32 +676,34 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Document all 11 custom ESLint rules, 12 Claude hooks, canonical import paths, and file creation templates in AGENTS.md so agents stop failing on preventable mistakes
-- Fix duplicate guardrail numbering (#10/#11/#12 → #13/#14/#15) and incorrect cache preset references (`DYNAMIC_CACHE` → actual presets from `cache-strategies.ts`)
+- [internal] Document all 11 custom ESLint rules, 12 Claude hooks, canonical import paths, and file creation templates in AGENTS.md so agents stop failing on preventable mistakes
+- [internal] Fix duplicate guardrail numbering (#10/#11/#12 → #13/#14/#15) and incorrect cache preset references (`DYNAMIC_CACHE` → actual presets from `cache-strategies.ts`)
 ### Added
 
-- AES-256-GCM encryption for wrapped links with versioned envelope format (`v: 1`), replacing base64 obfuscation
-- Zod input validation schemas for `/api/wrap-link` (POST/PUT/DELETE) with SSRF-safe URL validation
-- Zod input validation for `/api/growth-access-request` replacing manual string checks
-- Migration script (`scripts/migrate-wrapped-links.ts`) to re-encrypt legacy base64 wrapped links to AES-GCM
-- Documented contact obfuscation threat model (intentional anti-scraping, not cryptographic protection)
-- 25 new tests: encryption round-trip, versioned envelope detection, legacy format fallback, schema validation
+- Improved security for contact link protection
+- [internal] AES-256-GCM encryption for wrapped links with versioned envelope format (`v: 1`), replacing base64 obfuscation
+- [internal] Zod input validation schemas for `/api/wrap-link` (POST/PUT/DELETE) with SSRF-safe URL validation
+- [internal] Zod input validation for `/api/growth-access-request` replacing manual string checks
+- [internal] Migration script (`scripts/migrate-wrapped-links.ts`) to re-encrypt legacy base64 wrapped links to AES-GCM
+- [internal] Documented contact obfuscation threat model (intentional anti-scraping, not cryptographic protection)
+- [internal] 25 new tests: encryption round-trip, versioned envelope detection, legacy format fallback, schema validation
 
 ### Changed
 
-- Link wrapping now stores encrypted URLs as versioned JSON envelopes instead of raw base64
-- Decrypt path auto-detects format: AES-GCM envelope (`v: 1`) or legacy base64 fallback
+- [internal] Link wrapping now stores encrypted URLs as versioned JSON envelopes instead of raw base64
+- [internal] Decrypt path auto-detects format: AES-GCM envelope (`v: 1`) or legacy base64 fallback
 
 ## [26.4.42] - 2026-03-22
 
 ### Fixed
 
-- Use Clerk's prebuilt auth components on `/signin` and `/signup` so sign-in, sign-up, and Google OAuth flows no longer depend on the fragile custom multi-step auth runtime
-- Update auth page and smoke tests to validate the rendered Clerk flows and canonical auth-route navigation instead of the removed custom stepper UI
+- Improved sign-in and sign-up reliability
+- [internal] Use Clerk's prebuilt auth components on `/signin` and `/signup` so sign-in, sign-up, and Google OAuth flows no longer depend on the fragile custom multi-step auth runtime
+- [internal] Update auth page and smoke tests to validate the rendered Clerk flows and canonical auth-route navigation instead of the removed custom stepper UI
 
 ### Changed
 
-- Update auth testing docs to explain the Clerk Playwright setup, signed-out auth-page coverage, and gstack `/browse` QA flow
+- [internal] Update auth testing docs to explain the Clerk Playwright setup, signed-out auth-page coverage, and gstack `/browse` QA flow
 
 ### Removed
 
@@ -60,40 +711,36 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Fix duplicate "Jovie" in public profile page title — browser tab showed "Tim White | Jovie | Jovie" instead of "Tim White | Jovie"
 ### Added
 
-- Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
-- Server-side `/api/dev/clear-session` endpoint with prefix-based Clerk cookie deletion (catches suffixed variants like `__session_<suffix>`) and production guard
-- Toolbar state (`__dev_toolbar` cookie and localStorage keys) preserved across session clear so the toolbar stays visible after reload
+- [internal] Dev toolbar "Clear" button to nuke all cookies, localStorage, and sessionStorage in one click — fixes environment cross-contamination when testing dev and production in the same browser
+- [internal] Server-side `/api/dev/clear-session` endpoint with prefix-based Clerk cookie deletion (catches suffixed variants like `__session_<suffix>`) and production guard
+- [internal] Toolbar state (`__dev_toolbar` cookie and localStorage keys) preserved across session clear so the toolbar stays visible after reload
 
 ## [26.4.41] - 2026-03-22
 
 ### Added
 
 - Blog author sections now pull display name, avatar, and verified badge from the author's Jovie profile instead of hardcoded frontmatter
-- Batch profile query `getProfilesByUsernames` for efficient blog index rendering
-- `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
+- [internal] Batch profile query `getProfilesByUsernames` for efficient blog index rendering
+- [internal] `resolveAuthor` helper with graceful fallback to frontmatter when profile is not found
 ### Fixed
 
-- Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
-- Extract shared `FF_OVERRIDES_KEY` constant to prevent key drift between toolbar and provider
+- [internal] Fix feature flags not showing in dev toolbar — toolbar was outside the FeatureFlagsProvider tree so the flags panel never rendered
+- [internal] Extract shared `FF_OVERRIDES_KEY` constant to prevent key drift between toolbar and provider
 
 ## [26.4.40] - 2026-03-22
 
 ### Fixed
 
-- Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
-- Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
+- [internal] Fix deploy failure caused by out-of-order migration journal timestamps — Drizzle was silently skipping migration 0007 because its timestamp was earlier than an already-applied migration
+- [internal] Add monotonic timestamp validation to `validate-migrations.sh` CI guard to prevent future out-of-order journal entries
 ### Added
 
-- `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
-  - Auto-creates test user via Clerk API if not found
-  - Uses `+clerk_test` email suffix with magic OTP code `424242`
-  - Exports session cookies to `/tmp/browse-clerk-cookies.json` for import into browse
-  - Replicates `@clerk/testing/playwright` behavior with `context.route()` for reliable token injection
+- [internal] `scripts/browse-auth.ts` — Playwright script to authenticate Clerk test users for gstack `/browse` headless QA sessions
 
 ### Fixed
 
-- Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
-- Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
+- [internal] Handle both `UseSignInReturn` and `SignInSignalValue` types from Clerk v6 in auth hooks
+- [internal] Add type overlays for `SignInResource`/`SignUpResource` to match runtime Signal API
 
 ## [26.4.39] - 2026-03-21
 
@@ -512,8 +1159,8 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 ### Fixed
 
 - [internal] Retry counter bug: was counting JSONB status entries instead of actual retry attempts, causing infinite retries for persistently failing events
-- Updated cookie policy to reflect how tracking works
-- Refreshed landing page messaging to better explain what Jovie does
+- Updated cookie policy
+- Refreshed landing page messaging
 - [internal] Cookie policy updated to reflect server-side forwarding (no third-party scripts injected)
 - [internal] Hero section replaced 4-mode scroll carousel with dashboard reveal animation showing auto-generated smart links
 - [internal] AudienceCRM headline: "You're losing fans every day" with concrete fan-loss scenarios
@@ -632,8 +1279,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ### Changed
 
-- Cookie consent banner now only appears in regions where it's legally required (EU, UK, Brazil, South Korea, and US privacy states like California)
-- If we can't determine your location, the banner won't show unless required as a safety fallback
+- Cookie consent banner now only appears where legally required
 - [internal] Added state/province-level detection for US and Canada using Vercel `x-vercel-ip-country-region` header
 - [internal] When visitor geo cannot be determined, the banner no longer shows (previously showed as fail-safe)
 - [internal] US/Canada visitors with unknown region see the banner as a safe compliance fallback
@@ -784,7 +1430,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Homepage "See it in action" section now shows real creator profiles from the platform
 - [internal] Tim's profile (`jov.ie/tim`) pinned as first card, remaining slots filled from featured creators
-- [internal] Section visibility gated by Statsig `show_see_it_in_action` gate (off by default in production)
+- [internal] Section visibility gated by feature flag (off by default in production)
 - [internal] New `getCreatorByHandle()` cached function for single-profile lookup with timeout guards
 
 ### Changed

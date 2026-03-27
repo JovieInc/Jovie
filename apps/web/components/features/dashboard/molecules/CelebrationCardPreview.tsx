@@ -44,7 +44,7 @@ export function CelebrationCardPreview({
       a.download = `jovie-${username}-${selectedSize}.png`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
+      a.remove();
       URL.revokeObjectURL(url);
       track('celebration_card_downloaded', { username, size: selectedSize });
     } catch {
@@ -114,7 +114,7 @@ export function CelebrationCardPreview({
 
       {/* Card preview */}
       <div
-        className={`overflow-hidden rounded-xl border border-subtle shadow-lg ${
+        className={`overflow-hidden rounded-xl border border-subtle ${
           selectedSize === 'story' ? 'max-h-[320px]' : 'max-h-[240px]'
         }`}
       >

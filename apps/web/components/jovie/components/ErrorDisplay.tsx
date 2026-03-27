@@ -54,10 +54,10 @@ export function ErrorDisplay({
       role='alert'
       aria-live='assertive'
       aria-atomic='true'
-      className='rounded-[20px] border border-subtle bg-surface-1/95 p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.9)]'
+      className='rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-4'
     >
       <div className='flex items-start gap-3'>
-        <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-error/20 bg-error-subtle text-error'>
+        <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border border-error/20 bg-error-subtle text-error'>
           <ErrorIcon className='h-4.5 w-4.5' />
         </div>
         <div className='min-w-0 flex-1 space-y-3'>
@@ -74,8 +74,8 @@ export function ErrorDisplay({
           </div>
 
           {supportCode && (
-            <div className='flex flex-wrap items-center gap-2 rounded-2xl border border-subtle bg-surface-2/70 px-3 py-2 text-xs text-tertiary-token'>
-              <span className='text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+            <div className='flex flex-wrap items-center gap-2 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-xs text-tertiary-token'>
+              <span className='text-[10px] font-[510] tracking-[-0.01em] text-secondary-token'>
                 Reference
               </span>
               <span className='font-mono text-primary-token'>
@@ -86,7 +86,7 @@ export function ErrorDisplay({
                 variant='ghost'
                 size='sm'
                 onClick={handleCopySupportCode}
-                className='ml-auto h-7 gap-1 rounded-full px-2.5 text-[11px] font-medium uppercase tracking-[0.12em]'
+                className='ml-auto h-7 gap-1 rounded-[8px] px-2.5 text-[11px] font-[510] tracking-[-0.01em]'
                 aria-label='Copy support reference'
               >
                 <Copy className='h-3 w-3' />
@@ -102,7 +102,7 @@ export function ErrorDisplay({
               size='sm'
               onClick={onRetry}
               disabled={isLoading || isSubmitting}
-              className='h-9 gap-2 rounded-full px-4 text-[11px] font-medium uppercase tracking-[0.12em]'
+              className='h-9 gap-2 rounded-[10px] px-4 text-[11px] font-[510] tracking-[-0.01em]'
             >
               <RefreshCw className='h-3.5 w-3.5' />
               Retry message

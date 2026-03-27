@@ -3,14 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { TestimonialsSection } from '@/features/home/TestimonialsSection';
 
 describe('TestimonialsSection', () => {
-  it('renders testimonial quotes', () => {
+  it('renders the tagline section', () => {
     render(<TestimonialsSection />);
-    expect(screen.getByText('Maya Cole')).toBeInTheDocument();
-    expect(screen.getByText('DJ Luna')).toBeInTheDocument();
-  });
-
-  it('renders the tagline', () => {
-    render(<TestimonialsSection />);
-    expect(screen.getByText(/independent artists/i)).toBeInTheDocument();
+    // Check for the "independent artists" emphasis — structural, not copy-specific
+    const strong = screen.getByText('independent artists');
+    expect(strong.tagName).toBe('STRONG');
   });
 });

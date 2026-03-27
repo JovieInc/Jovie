@@ -51,7 +51,7 @@ export const CompletionBanner = memo(
           <p className='text-[14px] font-[590] leading-5 text-primary-token'>
             Your profile is ready
           </p>
-          <p className='text-[14px] leading-5 text-secondary-token'>
+          <p className='text-[13px] leading-5 text-secondary-token'>
             You&apos;ve completed all the essential setup steps.
           </p>
         </div>

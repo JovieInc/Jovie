@@ -27,6 +27,7 @@ import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 const TIP_AMOUNTS = [3, 5, 7];
 
@@ -47,6 +48,7 @@ export interface StaticArtistPageProps {
   readonly photoDownloadSizes?: AvatarSize[];
   /** Whether profile photo downloads are allowed */
   readonly allowPhotoDownloads?: boolean;
+  readonly pressPhotos?: PressPhoto[];
   /** Whether to show the two-step notification subscribe variant */
   readonly subscribeTwoStep?: boolean;
   /** Artist genres for the about section */
@@ -144,7 +146,12 @@ function renderContent({ viewModel, mergedDSPs }: RenderContentOptions) {
 
     case 'about':
       return (
-        <AboutSection artist={viewModel.artist} genres={viewModel.genres} />
+        <AboutSection
+          artist={viewModel.artist}
+          genres={viewModel.genres}
+          pressPhotos={viewModel.pressPhotos}
+          allowPhotoDownloads={viewModel.allowPhotoDownloads}
+        />
       );
 
     case 'tour':
@@ -185,6 +192,7 @@ export function StaticArtistPage({
   latestRelease,
   photoDownloadSizes = [],
   allowPhotoDownloads = false,
+  pressPhotos = [],
   subscribeTwoStep = false,
   genres,
   tourDates = [],
@@ -209,6 +217,7 @@ export function StaticArtistPage({
     latestRelease,
     photoDownloadSizes,
     allowPhotoDownloads,
+    pressPhotos,
     subscribeTwoStep,
     genres,
     tourDates,
@@ -228,10 +237,11 @@ export function StaticArtistPage({
         enableDynamicEngagement={enableDynamicEngagement}
         subscribeTwoStep={subscribeTwoStep}
         genres={genres}
+        pressPhotos={pressPhotos}
+        allowPhotoDownloads={allowPhotoDownloads}
+        photoDownloadSizes={photoDownloadSizes}
         tourDates={tourDates}
         visitTrackingToken={visitTrackingToken}
-        photoDownloadSizes={photoDownloadSizes}
-        allowPhotoDownloads={allowPhotoDownloads}
       />
     );
   }

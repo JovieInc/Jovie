@@ -1,9 +1,22 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { type RenderOptions, render, screen } from '@testing-library/react';
+import {
+  fireEvent,
+  type RenderOptions,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RightPanelProvider } from '@/contexts/RightPanelContext';
+import {
+  HeaderActionsProvider,
+  useOptionalHeaderActions,
+} from '@/contexts/HeaderActionsContext';
+import {
+  RightPanelProvider,
+  useRightPanel,
+} from '@/contexts/RightPanelContext';
 
 /**
  * ReleaseProviderMatrix Component Tests
@@ -14,13 +27,15 @@ import { RightPanelProvider } from '@/contexts/RightPanelContext';
  * Heavy children are mocked to avoid Vitest memory limits.
  */
 
+const mockRouterRefresh = vi.fn();
+
 // ── Mock dependencies ──
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
-    refresh: vi.fn(),
+    refresh: mockRouterRefresh,
     back: vi.fn(),
     forward: vi.fn(),
     prefetch: vi.fn(),
@@ -34,17 +49,6 @@ vi.mock('@/components/organisms/AuthShellWrapper', () => ({
     tableMeta: { rowCount: null, toggle: null, rightPanelWidth: null },
     setTableMeta: vi.fn(),
   }),
-}));
-
-vi.mock('@/contexts/HeaderActionsContext', () => ({
-  useSetHeaderActions: () => ({
-    setHeaderActions: vi.fn(),
-    setHeaderBadge: vi.fn(),
-  }),
-}));
-
-vi.mock('@/hooks/useRegisterRightPanel', () => ({
-  useRegisterRightPanel: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
@@ -106,6 +110,9 @@ vi.mock('@/lib/queries', () => ({
   usePlanGate: () => ({
     smartLinksLimit: null,
     isPro: true,
+    canCreateManualReleases: true,
+    canEditSmartLinks: true,
+    canAccessFutureReleases: true,
   }),
   QueryErrorBoundary: ({ children }: { children: React.ReactNode }) => (
     <>{children}</>
@@ -113,6 +120,28 @@ vi.mock('@/lib/queries', () => ({
 }));
 
 // Mock heavy children
+vi.mock('@/features/dashboard/atoms/DashboardHeaderActionButton', () => ({
+  DashboardHeaderActionButton: ({
+    label,
+    ariaLabel,
+    onClick,
+  }: {
+    label: string;
+    ariaLabel?: string;
+    onClick?: () => void;
+  }) => (
+    <button type='button' aria-label={ariaLabel} onClick={onClick}>
+      {label}
+    </button>
+  ),
+}));
+
+vi.mock('@/features/dashboard/atoms/DashboardHeaderActionGroup', () => ({
+  DashboardHeaderActionGroup: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+}));
+
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTable',
   () => ({
@@ -127,11 +156,28 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
-    ReleaseTableSubheader: () => {
+    ReleaseTableSubheader: ({
+      onCreateRelease,
+      canCreateManualReleases = true,
+    }: {
+      onCreateRelease?: () => void;
+      canCreateManualReleases?: boolean;
+    }) => {
       return (
-        <button type='button' data-testid='release-subheader'>
-          subheader
-        </button>
+        <div>
+          <button type='button' data-testid='release-subheader'>
+            subheader
+          </button>
+          {canCreateManualReleases ? (
+            <button
+              type='button'
+              aria-label='Create a new release'
+              onClick={onCreateRelease}
+            >
+              Create a new release
+            </button>
+          ) : null}
+        </div>
       );
     },
     DEFAULT_RELEASE_FILTERS: { releaseTypes: [], popularity: [], labels: [] },
@@ -207,7 +253,28 @@ vi.mock(
 );
 
 vi.mock('@/components/organisms/release-sidebar', () => ({
-  ReleaseSidebar: () => null,
+  ReleaseSidebar: ({
+    release,
+    onReleaseChange,
+  }: {
+    release: { title: string; id: string } | null;
+    onReleaseChange?: (release: { title: string; id: string }) => void;
+  }) =>
+    release ? (
+      <div>
+        <div data-testid='release-sidebar'>{`${release.id}:${release.title}`}</div>
+        <button
+          type='button'
+          data-testid='release-sidebar-update'
+          onClick={() =>
+            onReleaseChange?.({ ...release, title: 'Updated Release' })
+          }
+        >
+          update-release
+        </button>
+      </div>
+    ) : null,
+  TrackSidebar: () => null,
 }));
 
 interface QueryErrorBoundaryProps {
@@ -228,6 +295,59 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
   connectAppleMusicArtist: vi.fn(),
   revertReleaseArtwork: vi.fn(),
 }));
+
+vi.mock(
+  '@/features/dashboard/organisms/release-provider-matrix/AddReleaseSidebar',
+  () => ({
+    AddReleaseSidebar: ({
+      isOpen,
+      onCreated,
+      onArtworkUploaded,
+    }: {
+      isOpen: boolean;
+      onCreated: (
+        release: import('@/lib/discography/types').ReleaseViewModel
+      ) => void;
+      onArtworkUploaded?: (releaseId: string, artworkUrl: string) => void;
+    }) => (
+      <div>
+        {isOpen ? (
+          <button
+            type='button'
+            data-testid='mock-add-release-sidebar'
+            onClick={() =>
+              onCreated({
+                profileId: 'profile-1',
+                id: 'created-release',
+                title: 'Created Release',
+                slug: 'created-release',
+                smartLinkPath: '/artist/created-release',
+                providers: [],
+                releaseType: 'single',
+                isExplicit: false,
+                totalTracks: 1,
+              })
+            }
+          >
+            finish-create
+          </button>
+        ) : null}
+        <button
+          type='button'
+          data-testid='mock-add-release-artwork-uploaded'
+          onClick={() =>
+            onArtworkUploaded?.(
+              'created-release',
+              'https://cdn.example.com/cover.png'
+            )
+          }
+        >
+          finish-artwork-upload
+        </button>
+      </div>
+    ),
+  })
+);
 
 // ── Import after mocks ──
 const { ReleaseProviderMatrix } = await import(
@@ -255,12 +375,28 @@ function renderWithProviders(
     wrapper: ({ children }) => (
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <RightPanelProvider>{children}</RightPanelProvider>
+          <HeaderActionsProvider>
+            <RightPanelProvider>
+              {children}
+              <HeaderActionsProbe />
+              <RightPanelProbe />
+            </RightPanelProvider>
+          </HeaderActionsProvider>
         </TooltipProvider>
       </QueryClientProvider>
     ),
     ...options,
   });
+}
+
+function HeaderActionsProbe() {
+  const state = useOptionalHeaderActions();
+  return <div data-testid='header-actions-probe'>{state?.headerActions}</div>;
+}
+
+function RightPanelProbe() {
+  const panel = useRightPanel();
+  return <div data-testid='right-panel-probe'>{panel}</div>;
 }
 
 function makeRelease(id = 'release-1') {
@@ -356,6 +492,7 @@ describe('ReleaseProviderMatrix', () => {
       );
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
+      expect(screen.getByTestId('release-table-shell')).toBeInTheDocument();
     });
 
     it('renders table and subheader when releases exist', () => {
@@ -371,7 +508,7 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
 
-    it('keeps spotify import banner mounted and hidden when import is idle', () => {
+    it('does not render spotify import banner when import is idle', () => {
       renderWithProviders(
         <ReleaseProviderMatrix
           releases={[makeRelease()]}
@@ -382,9 +519,9 @@ describe('ReleaseProviderMatrix', () => {
         />
       );
 
-      const banner = screen.getByTestId('spotify-import-progress-banner');
-      expect(banner).toHaveAttribute('aria-hidden', 'true');
-      expect(banner).toHaveStyle({ visibility: 'hidden', opacity: '0' });
+      expect(
+        screen.queryByTestId('spotify-import-progress-banner')
+      ).not.toBeInTheDocument();
     });
 
     it('shows spotify import banner when import is active', () => {
@@ -450,6 +587,123 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-table')).toHaveTextContent(
         'ids:single-track,album-track'
       );
+    });
+
+    it('inserts a created release locally and opens the release drawer without router refresh', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create a new release' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-table')).toHaveTextContent(
+          'ids:created-release,existing-release'
+        );
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Created Release'
+        );
+      });
+      expect(mockRouterRefresh).not.toHaveBeenCalled();
+    });
+
+    it('updates the open release drawer when the release changes after it opens', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create a new release' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Created Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('release-sidebar-update'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
+    });
+
+    it('merges background artwork updates without overwriting newer drawer edits', async () => {
+      renderWithProviders(
+        <ReleaseProviderMatrix
+          releases={[makeRelease('existing-release')]}
+          providerConfig={providerConfig}
+          primaryProviders={primaryProviders}
+          spotifyConnected={true}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create a new release' })
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId('mock-add-release-sidebar')
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-sidebar'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Created Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('release-sidebar-update'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
+
+      fireEvent.click(screen.getByTestId('mock-add-release-artwork-uploaded'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('release-sidebar')).toHaveTextContent(
+          'created-release:Updated Release'
+        );
+      });
     });
   });
 });

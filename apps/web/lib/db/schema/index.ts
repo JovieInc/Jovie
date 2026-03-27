@@ -254,9 +254,12 @@ export {
   insightRunStatusEnum,
   insightStatusEnum,
   insightTypeEnum,
+  leadAttributionStatusEnum,
   leadDiscoverySourceEnum,
   leadOutreachRouteEnum,
   leadOutreachStatusEnum,
+  leadRampModeEnum,
+  leadSourcePlatformEnum,
   leadStatusEnum,
   linkTypeEnum,
   notificationChannelEnum,
@@ -299,6 +302,14 @@ export {
   type NewFeedbackItem,
   selectFeedbackItemSchema,
 } from './feedback';
+// Identity (Cross-platform artist identity links)
+export {
+  type ArtistIdentityLink,
+  artistIdentityLinks,
+  insertArtistIdentityLinkSchema,
+  type NewArtistIdentityLink,
+  selectArtistIdentityLinkSchema,
+} from './identity';
 // Inbox (Inbound emails, Threads, Outbound routing replies)
 export {
   type EmailThread,
@@ -317,6 +328,7 @@ export {
   selectInboundEmailSchema,
   selectOutboundReplySchema,
 } from './inbox';
+
 // Ingestion
 export {
   type IngestionJob,
@@ -363,18 +375,30 @@ export {
   type DiscoveryKeyword,
   discoveryKeywords,
   insertDiscoveryKeywordSchema,
+  insertLeadFunnelEventSchema,
   insertLeadPipelineSettingsSchema,
   insertLeadSchema,
+  insertLeadSearchResultSchema,
   type Lead,
+  type LeadFunnelEvent,
+  type LeadGuardrailThresholds,
   type LeadPipelineSettings,
+  type LeadSearchResult,
+  type LeadSignalSnapshot,
+  leadFunnelEvents,
   leadPipelineSettings,
+  leadSearchResults,
   leads,
   type NewDiscoveryKeyword,
   type NewLead,
+  type NewLeadFunnelEvent,
   type NewLeadPipelineSettings,
+  type NewLeadSearchResult,
   selectDiscoveryKeywordSchema,
+  selectLeadFunnelEventSchema,
   selectLeadPipelineSettingsSchema,
   selectLeadSchema,
+  selectLeadSearchResultSchema,
 } from './leads';
 // Links (Social, Wrapped, Signed)
 export {

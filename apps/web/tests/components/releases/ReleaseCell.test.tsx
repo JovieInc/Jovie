@@ -16,6 +16,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
   useTrackAudioPlayer: () => ({
     playbackState,
     toggleTrack,
+    seek: vi.fn(),
   }),
 }));
 
@@ -89,7 +90,10 @@ describe('ReleaseCell', () => {
     render(<ReleaseCell release={baseRelease} artistName='Jovie Artist' />);
 
     expect(screen.getByText('Skyline Dreams')).toBeInTheDocument();
-    expect(screen.getByText('Single')).toBeInTheDocument();
+    // Without a previewUrl the type renders as a colored dot with title, not text
+    const typeDot = screen.getByTitle('Single');
+    expect(typeDot).toBeInTheDocument();
+    expect(typeDot.className).toContain('shrink-0');
     expect(screen.getByText('Jovie Artist')).toBeInTheDocument();
   });
 
@@ -144,6 +148,6 @@ describe('ReleaseCell', () => {
     });
 
     expect(pauseButton).toHaveAttribute('aria-pressed', 'true');
-    expect(pauseButton.className).toContain('aria-[pressed=true]:opacity-100');
+    expect(pauseButton.className).toContain('opacity-100');
   });
 });

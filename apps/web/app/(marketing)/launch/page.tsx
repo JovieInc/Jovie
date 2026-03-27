@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { QueryProvider } from '@/components/providers/QueryProvider';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
-import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { LazyAuthRedirectHandler } from '@/features/home/LazyAuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
 import {
@@ -50,13 +51,13 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     keywords,
-    authors: [{ name: APP_NAME, url: APP_URL }],
+    authors: [{ name: APP_NAME, url: BASE_URL }],
     creator: APP_NAME,
     publisher: APP_NAME,
     category: 'Music',
     classification: 'Business',
     formatDetection: { email: false, address: false, telephone: false },
-    metadataBase: new URL(APP_URL),
+    metadataBase: new URL(BASE_URL),
     alternates: {
       canonical: APP_ROUTES.LAUNCH,
       languages: { 'en-US': APP_ROUTES.LAUNCH },
@@ -64,14 +65,14 @@ export async function generateMetadata(): Promise<Metadata> {
     openGraph: {
       type: 'website',
       locale: 'en_US',
-      url: `${APP_URL}${APP_ROUTES.LAUNCH}`,
+      url: `${BASE_URL}${APP_ROUTES.LAUNCH}`,
       title,
       description,
       siteName: APP_NAME,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
-          secureUrl: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
+          secureUrl: `${BASE_URL}/og/default.png`,
           width: 1200,
           height: 630,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
@@ -85,7 +86,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: [
         {
-          url: `${APP_URL}/og/default.png`,
+          url: `${BASE_URL}/og/default.png`,
           alt: `${APP_NAME} - Your Entire Music Career. One Intelligent Link.`,
           width: 1200,
           height: 630,
@@ -177,7 +178,7 @@ function Divider() {
 export default function LaunchPage() {
   return (
     <div className='relative min-h-screen'>
-      <AuthRedirectHandler />
+      <LazyAuthRedirectHandler />
 
       {/* Structured Data */}
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
@@ -217,7 +218,9 @@ export default function LaunchPage() {
           </p>
 
           <div className='mt-4 w-full max-w-[520px]'>
-            <HeroSpotifySearch />
+            <QueryProvider>
+              <HeroSpotifySearch />
+            </QueryProvider>
           </div>
 
           <a
@@ -1810,7 +1813,7 @@ export default function LaunchPage() {
                 'Adaptive CTA — subscribe or listen, per visitor',
                 'Smart links auto-created for every release',
                 'Fan notifications built in',
-                'AI assistant with 10 queries/mo',
+                'AI assistant (25 msgs/day)',
                 'Your brand, your domain potential',
                 '/tip, /tour, /contact, /listen deeplinks included',
               ].map(item => (
@@ -1819,7 +1822,7 @@ export default function LaunchPage() {
                   className='flex items-start gap-3 py-2.5 text-sm text-secondary-token border-b border-white/[0.04]'
                 >
                   <span className='shrink-0 mt-0.5 text-xs' aria-hidden='true'>
-                    &check;
+                    ✓
                   </span>
                   {item}
                 </li>

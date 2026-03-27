@@ -16,10 +16,6 @@ describe('HeroScrollSection', () => {
         name: 'The link your music deserves.',
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(
-        'Jovie release dashboard showing releases table with sidebar open'
-      )
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('hero-dashboard-screenshot')).toBeInTheDocument();
   });
 });

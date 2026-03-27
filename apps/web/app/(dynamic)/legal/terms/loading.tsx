@@ -1,6 +1,15 @@
 /**
  * Terms of service page loading skeleton
  */
+const TERMS_SECTION_KEYS = [
+  'agreement',
+  'accounts',
+  'payments',
+  'conduct',
+  'termination',
+  'updates',
+] as const;
+
 export default function TermsLoading() {
   return (
     <div className='prose prose-neutral dark:prose-invert max-w-none'>
@@ -11,8 +20,8 @@ export default function TermsLoading() {
 
       {/* Content skeleton */}
       <div className='space-y-6'>
-        {Array.from({ length: 6 }, (_, i) => (
-          <div key={`terms-section-${i + 1}`} className='space-y-2'>
+        {TERMS_SECTION_KEYS.map(sectionKey => (
+          <div key={sectionKey} className='space-y-2'>
             <div className='h-6 w-48 skeleton rounded-md mb-3' />
             <div className='h-4 w-full skeleton rounded-md' />
             <div className='h-4 w-11/12 skeleton rounded-md' />

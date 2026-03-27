@@ -19,6 +19,7 @@ export default function InvestorSettingsPage() {
   return (
     <PageShell>
       <PageContent>
+        <h1 className='sr-only'>Investor portal settings</h1>
         <ContentSurfaceCard className='overflow-hidden p-0'>
           <ContentSectionHeader
             title='Investor portal settings'
@@ -49,7 +50,7 @@ export default function InvestorSettingsPage() {
               </div>
             </ContentSurfaceCard>
             <ContentSurfaceCard surface='nested' className='space-y-3 p-4'>
-              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+              <div className='flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-0 text-secondary-token'>
                 <SlidersHorizontal className='h-4 w-4' aria-hidden='true' />
               </div>
               <div className='space-y-1'>

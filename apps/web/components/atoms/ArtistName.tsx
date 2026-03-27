@@ -45,10 +45,10 @@ export function ArtistName({
   as: Tag = 'h1',
 }: ArtistNameProps) {
   const content = (
-    <span className='inline-flex items-start justify-center gap-1.5'>
+    <span className='inline-flex items-center justify-center gap-1'>
       <span
         className={cn(
-          'font-semibold text-primary-token',
+          'text-primary-token',
           showLink &&
             'hover:text-secondary-token transition-colors cursor-pointer',
           className
@@ -57,16 +57,17 @@ export function ArtistName({
         {name}
       </span>
       {isVerified && (
-        <span className='relative -top-[0.5em] -left-[0.25em]'>
-          <VerifiedBadge size={badgeSizes[size]} className='text-accent' />
-        </span>
+        <VerifiedBadge
+          size={badgeSizes[size]}
+          className='text-accent shrink-0'
+        />
       )}
     </span>
   );
 
   if (showLink) {
     return (
-      <Tag className={cn(sizeClasses[size])} itemProp='name'>
+      <Tag className={cn(sizeClasses[size], 'font-[590]')} itemProp='name'>
         <Link href={`/${handle}`} className='inline-block'>
           {content}
         </Link>
@@ -75,7 +76,7 @@ export function ArtistName({
   }
 
   return (
-    <Tag className={cn(sizeClasses[size])} itemProp='name'>
+    <Tag className={cn(sizeClasses[size], 'font-[590]')} itemProp='name'>
       {content}
     </Tag>
   );

@@ -1,32 +1,25 @@
 import fs from 'node:fs';
-import path from 'node:path';
 import { Badge } from '@jovie/ui/atoms/badge';
 import type { Metadata } from 'next';
 import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { MarketingContainer, MarketingHero } from '@/components/marketing';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   type ChangelogRelease,
   type ChangelogSection,
   parseChangelog,
 } from '@/lib/changelog-parser';
+import { resolveMonorepoPath } from '@/lib/filesystem-paths';
 import { ChangelogEmailSignup } from './ChangelogEmailSignup';
 
 // ---------------------------------------------------------------------------
 // File resolution & caching
 // ---------------------------------------------------------------------------
 
-const CHANGELOG_CANDIDATE_PATHS = [
-  path.join(process.cwd(), 'CHANGELOG.md'),
-  path.join(process.cwd(), '..', '..', 'CHANGELOG.md'),
-];
-
 function resolveChangelogPath(): string | null {
-  for (const candidate of CHANGELOG_CANDIDATE_PATHS) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  return null;
+  const changelogPath = resolveMonorepoPath('CHANGELOG.md');
+  return fs.existsSync(changelogPath) ? changelogPath : null;
 }
 
 export const revalidate = false;
@@ -91,11 +84,11 @@ const SECTION_LABELS: Record<
 // ---------------------------------------------------------------------------
 
 export const metadata: Metadata = {
-  title: `What's New | ${APP_NAME}`,
+  title: "What's New",
   description: `Product updates and improvements to ${APP_NAME}. See what we've been shipping.`,
   alternates: {
-    canonical: `${APP_URL}/changelog`,
-    types: { 'application/atom+xml': `${APP_URL}/changelog/feed.xml` },
+    canonical: `${BASE_URL}/changelog`,
+    types: { 'application/atom+xml': `${BASE_URL}/changelog/feed.xml` },
   },
 };
 
@@ -130,7 +123,7 @@ export default async function ChangelogPage() {
         <div className='flex flex-wrap items-center gap-3'>
           {thisMonthCount > 0 && (
             <Badge variant='outline' className='text-xs'>
-              {thisMonthCount} update{thisMonthCount !== 1 ? 's' : ''} this
+              {thisMonthCount} update{thisMonthCount === 1 ? '' : 's'} this
               month
             </Badge>
           )}
@@ -198,6 +191,7 @@ export default async function ChangelogPage() {
                     ).map(([key, meta]) => {
                       const entries = release.sections[key];
                       if (!entries || entries.length === 0) return null;
+                      const seenEntryKeys = new Map<string, number>();
                       return (
                         <div key={key}>
                           <span
@@ -206,14 +200,25 @@ export default async function ChangelogPage() {
                             {meta.label}
                           </span>
                           <ul className='space-y-1.5'>
-                            {entries.map((entry, entryIdx) => (
-                              <li
-                                key={`${release.version}-${key}-${entryIdx}`}
-                                className='text-sm leading-relaxed opacity-75'
-                              >
-                                {entry}
-                              </li>
-                            ))}
+                            {entries.map(entry => {
+                              const entryBaseKey = `${release.version}-${key}-${entry}`;
+                              const seenCount =
+                                seenEntryKeys.get(entryBaseKey) ?? 0;
+                              seenEntryKeys.set(entryBaseKey, seenCount + 1);
+
+                              return (
+                                <li
+                                  key={
+                                    seenCount === 0
+                                      ? entryBaseKey
+                                      : `${entryBaseKey}-${seenCount + 1}`
+                                  }
+                                  className='text-sm leading-relaxed opacity-75'
+                                >
+                                  {entry}
+                                </li>
+                              );
+                            })}
                           </ul>
                         </div>
                       );

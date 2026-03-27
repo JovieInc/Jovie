@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Copyright } from '@/components/atoms/Copyright';
+import { CookieSettingsFooterButton } from '@/components/molecules/CookieSettingsFooterButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
 import { FooterNavigation } from '@/components/molecules/FooterNavigation';
 import { APP_ROUTES } from '@/constants/routes';
@@ -36,7 +37,7 @@ const FOOTER_COLUMNS = [
     id: 'features',
     heading: 'Features',
     links: [
-      { href: '/#analytics', label: 'Analytics' },
+      { href: '/#release', label: 'Analytics' },
       { href: '/#profile', label: 'Fan Capture' },
       { href: '/#profile', label: 'Tipping' },
       { href: '/#profile', label: 'Tour Dates' },
@@ -231,6 +232,10 @@ export function Footer({
                 >
                   Terms
                 </Link>
+                <CookieSettingsFooterButton
+                  className='text-[13px] tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-primary)] cursor-pointer'
+                  style={{ color: 'var(--linear-text-tertiary)' }}
+                />
               </div>
             </div>
           </div>
@@ -292,6 +297,10 @@ export function Footer({
                       {link.label}
                     </Link>
                   ))}
+                  <CookieSettingsFooterButton
+                    className='text-[13px] leading-[19.5px] font-normal tracking-[-0.01em] transition-colors duration-100 hover:[color:var(--linear-text-secondary)] cursor-pointer'
+                    style={{ color: 'var(--linear-text-tertiary)' }}
+                  />
                 </nav>
               )}
               {effectiveShowThemeToggle && (

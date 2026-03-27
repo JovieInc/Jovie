@@ -119,6 +119,18 @@ else
   MISSING+=("pnpm install")
 fi
 
+# ─── 4.5. Clear stale Turbopack cache ──────────────────────────────────────
+echo ""
+echo "── Turbopack cache ─────────────────────────────────────────────────"
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+NEXT_CACHE="$REPO_ROOT/apps/web/.next/cache"
+if [ -d "$NEXT_CACHE" ]; then
+  rm -rf "$NEXT_CACHE/pack" "$NEXT_CACHE/turbopack"
+  success "Cleared stale Turbopack cache"
+else
+  info "No Turbopack cache to clear"
+fi
+
 # ─── 5. Doppler auth / config check ─────────────────────────────────────────
 echo ""
 echo "── Doppler auth ────────────────────────────────────────────────────────"
@@ -162,6 +174,27 @@ else
       fi
     fi
   fi
+fi
+
+# ─── 6. Sync dev Clerk IDs ────────────────────────────────────────────────────
+# The dev Clerk instance assigns different user IDs than production.
+# If the shared DB has production Clerk IDs, local auth will fail with
+# USER_CREATION_FAILED. This step syncs them automatically.
+echo ""
+echo "── Dev Clerk ID sync ─────────────────────────────────────────────────"
+if command -v doppler &>/dev/null && doppler run -- echo "ok" &>/dev/null 2>&1; then
+  SYNC_SCRIPT="$REPO_ROOT/scripts/sync-dev-clerk-ids.ts"
+  if [[ -f "$SYNC_SCRIPT" ]]; then
+    if doppler run -p jovie-web -c dev -- pnpm tsx "$SYNC_SCRIPT" 2>/dev/null; then
+      success "Dev Clerk IDs synced"
+    else
+      warn "Clerk ID sync failed (non-blocking — app may prompt user creation)"
+    fi
+  else
+    info "No sync script found — skipping"
+  fi
+else
+  info "Skipping Clerk ID sync (Doppler not configured)"
 fi
 
 # ─── Final status ────────────────────────────────────────────────────────────

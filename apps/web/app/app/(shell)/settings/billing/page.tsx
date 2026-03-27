@@ -1,22 +1,16 @@
-import { redirect } from 'next/navigation';
-import { APP_ROUTES } from '@/constants/routes';
-import { DashboardSettings } from '@/features/dashboard/DashboardSettings';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getDashboardData } from '../../dashboard/actions';
+'use client';
 
-export const runtime = 'nodejs';
+import { SettingsBillingSection } from '@/features/dashboard/organisms/SettingsBillingSection';
+import { SettingsSection } from '@/features/dashboard/organisms/SettingsSection';
 
-export default async function SettingsBillingPage() {
-  const { userId } = await getCachedAuth();
-
-  if (!userId) {
-    redirect(`${APP_ROUTES.SIGNIN}?redirect_url=/app/settings/billing`);
-  }
-
-  const dashboardData = await getDashboardData();
-  if (dashboardData.needsOnboarding && !dashboardData.dashboardLoadError) {
-    redirect('/onboarding');
-  }
-
-  return <DashboardSettings focusSection='billing' />;
+export default function SettingsBillingPage() {
+  return (
+    <SettingsSection
+      id='billing'
+      title='Billing'
+      description='Manage your plan, payment methods, and invoices.'
+    >
+      <SettingsBillingSection />
+    </SettingsSection>
+  );
 }

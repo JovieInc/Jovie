@@ -94,6 +94,9 @@ export async function optimizeImageToAvif(file: File): Promise<{
 const AVATAR_DOWNLOAD_SIZES = [512, 256, 128] as const;
 const AVATAR_MAX_DIMENSION = 1536;
 const AVATAR_AVIF_QUALITY = 70;
+const PRESS_DOWNLOAD_SIZES = [1200, 800, 400] as const;
+const PRESS_MAX_DIMENSION = 2048;
+const PRESS_AVIF_QUALITY = 75;
 
 /**
  * Process an avatar image into multiple download sizes, mirroring
@@ -160,6 +163,77 @@ export async function processAvatarToSizes(
   }
 
   return results;
+}
+
+export async function processPressPhotoToSizes(
+  file: File
+): Promise<Record<string, Buffer>> {
+  const sharp = await getSharp();
+  const inputBuffer = await fileToBuffer(file);
+  const baseImage = sharp(inputBuffer, { failOnError: false })
+    .rotate()
+    .withMetadata({ orientation: undefined });
+
+  const metadata = await baseImage.metadata();
+  const originalWidth = metadata.width ?? PRESS_MAX_DIMENSION;
+  const originalHeight = metadata.height ?? PRESS_MAX_DIMENSION;
+  const results: Record<string, Buffer> = {};
+
+  const maxDim = Math.max(originalWidth, originalHeight);
+  const originalResize =
+    maxDim > PRESS_MAX_DIMENSION ? PRESS_MAX_DIMENSION : undefined;
+
+  let originalPipeline = baseImage.clone();
+  if (originalResize) {
+    originalPipeline = originalPipeline.resize({
+      width: originalResize,
+      height: originalResize,
+      fit: 'inside',
+      withoutEnlargement: true,
+    });
+  }
+
+  const { data: originalData } = await originalPipeline
+    .toColourspace('srgb')
+    .avif({ quality: PRESS_AVIF_QUALITY, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
+
+  results.original = originalData;
+
+  for (const size of PRESS_DOWNLOAD_SIZES) {
+    if (originalWidth < size && originalHeight < size) {
+      continue;
+    }
+
+    const { data } = await baseImage
+      .clone()
+      .resize({
+        width: size,
+        height: size,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .toColourspace('srgb')
+      .avif({ quality: PRESS_AVIF_QUALITY, effort: 4 })
+      .toBuffer({ resolveWithObject: true });
+
+    results[String(size)] = data;
+  }
+
+  return results;
+}
+
+export async function getImageBufferMetadata(buffer: Buffer): Promise<{
+  width: number | null;
+  height: number | null;
+}> {
+  const sharp = await getSharp();
+  const metadata = await sharp(buffer, { failOnError: false }).metadata();
+
+  return {
+    width: metadata.width ?? null,
+    height: metadata.height ?? null,
+  };
 }
 
 export async function withTimeout<T>(

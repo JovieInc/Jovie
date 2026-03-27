@@ -45,6 +45,40 @@ export function buildSmartLinkUrl(
 }
 
 /**
+ * Build a track deep link path nested under its parent release.
+ * Format: /{handle}/{releaseSlug}/{trackSlug}
+ *
+ * @param handle - The creator's username/handle
+ * @param releaseSlug - The parent release slug
+ * @param trackSlug - The track slug
+ * @param provider - Optional provider to redirect directly to
+ */
+export function buildTrackDeepLinkPath(
+  handle: string,
+  releaseSlug: string,
+  trackSlug: string,
+  provider?: ProviderKey
+): string {
+  const basePath = `/${handle}/${releaseSlug}/${trackSlug}`;
+  const query = provider ? `?dsp=${encodeURIComponent(provider)}` : '';
+  return `${basePath}${query}`;
+}
+
+/**
+ * Build full track deep link URL.
+ */
+export function buildTrackDeepLinkUrl(
+  baseUrl: string,
+  handle: string,
+  releaseSlug: string,
+  trackSlug: string,
+  provider?: ProviderKey
+): string {
+  const normalizedBase = normalizeBaseUrl(baseUrl);
+  return `${normalizedBase}${buildTrackDeepLinkPath(handle, releaseSlug, trackSlug, provider)}`;
+}
+
+/**
  * Build ISRC lookup path.
  * Format: /r/isrc/{isrc}
  *

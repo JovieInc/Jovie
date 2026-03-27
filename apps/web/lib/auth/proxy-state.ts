@@ -378,7 +378,7 @@ export async function getUserState(
     captureWarning(
       '[proxy-state] getUserState called with missing clerkUserId'
     );
-    return { ...DEFAULT_WAITLIST_STATE };
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 
   const cacheKey = `${USER_STATE_CACHE_KEY_PREFIX}${clerkUserId}`;
@@ -423,7 +423,7 @@ export async function getUserState(
       errorType: isTransient ? 'transient' : 'persistent',
     });
 
-    return { ...DEFAULT_WAITLIST_STATE };
+    return { ...NEEDS_ONBOARDING_STATE };
   }
 }
 

@@ -2,18 +2,23 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
-import { ProfileHeaderV2 } from '@/components/organisms/profile-header-v2/ProfileHeaderV2';
 import {
   ProfileNotificationsContext,
   useProfileShell,
 } from '@/components/organisms/profile-shell';
+import { ContactDrawer } from '@/features/profile/artist-contacts-button/ContactDrawer';
+import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import {
   type ProfileMode,
   SWIPEABLE_MODES,
   type SwipeableProfileMode,
 } from '@/features/profile/contracts';
 import { ListenDrawer } from '@/features/profile/ListenDrawer';
-import { ProfileHeroCard } from '@/features/profile/ProfileHeroCard';
+import { ArtistHero } from '@/features/profile/ProfileHeroCard';
+import { ProfileQuickActions } from '@/features/profile/ProfileQuickActions';
+import { ProfileViewportShell } from '@/features/profile/ProfileViewportShell';
+import { resolveProfileV2Presentation } from '@/features/profile/profile-v2-presentation';
+import { SubscribeDrawer } from '@/features/profile/SubscribeDrawer';
 import { SwipeableModeContainer } from '@/features/profile/SwipeableModeContainer';
 import { useSwipeMode } from '@/hooks/useSwipeMode';
 import { getCanonicalProfileDSPs } from '@/lib/profile-dsps';
@@ -24,6 +29,7 @@ import {
 } from '@/lib/utils/context-aware-links';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 interface PublicProfileTemplateV2Props {
   readonly mode: ProfileMode;
@@ -40,18 +46,26 @@ interface PublicProfileTemplateV2Props {
   readonly enableDynamicEngagement?: boolean;
   readonly subscribeTwoStep?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: readonly PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
+  readonly photoDownloadSizes?: AvatarSize[];
   readonly tourDates: TourDateViewModel[];
   readonly visitTrackingToken?: string;
-  readonly photoDownloadSizes?: AvatarSize[];
-  readonly allowPhotoDownloads?: boolean;
 }
 
-function normalizeInitialMode(mode: ProfileMode): SwipeableProfileMode {
-  if (SWIPEABLE_MODES.includes(mode as SwipeableProfileMode)) {
-    return mode as SwipeableProfileMode;
-  }
+function unwrapNextImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
 
-  return 'profile';
+  try {
+    const parsed = new URL(url, 'http://localhost');
+    if (parsed.pathname !== '/_next/image') {
+      return url;
+    }
+
+    return parsed.searchParams.get('url') ?? url;
+  } catch {
+    return url;
+  }
 }
 
 function buildModeHref(mode: SwipeableProfileMode): string {
@@ -63,7 +77,8 @@ function buildModeHref(mode: SwipeableProfileMode): string {
   }
 
   const search = url.searchParams.toString();
-  return `${url.pathname}${search ? `?${search}` : ''}`;
+  const suffix = search ? `?${search}` : '';
+  return `${url.pathname}${suffix}`;
 }
 
 function getModeFromLocation(): SwipeableProfileMode {
@@ -90,19 +105,32 @@ export function PublicProfileTemplateV2({
   enableDynamicEngagement = false,
   subscribeTwoStep = false,
   genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
+  photoDownloadSizes = [],
   tourDates,
   visitTrackingToken,
 }: PublicProfileTemplateV2Props) {
   const [listenDrawerOpen, setListenDrawerOpen] = useState(false);
+  const [subscribeDrawerOpen, setSubscribeDrawerOpen] = useState(false);
+  const [contactDrawerOpen, setContactDrawerOpen] = useState(false);
   const lastNavigationModeRef = useRef<SwipeableProfileMode | null>(null);
-  const initialMode = normalizeInitialMode(mode);
-  const initialIndex = SWIPEABLE_MODES.indexOf(initialMode);
+  const { initialPane } = resolveProfileV2Presentation(mode);
+  const initialIndex = SWIPEABLE_MODES.indexOf(initialPane);
   const mergedDSPs = useMemo(
     () => getCanonicalProfileDSPs(artist, socialLinks),
     [artist, socialLinks]
   );
+  const {
+    available,
+    primaryChannel,
+    isEnabled: hasContacts,
+  } = useArtistContacts({
+    contacts,
+    artistHandle: artist.handle,
+  });
   const initialSource = useMemo(() => {
-    if (typeof window === 'undefined') {
+    if (globalThis.window === undefined) {
       return null;
     }
 
@@ -122,6 +150,14 @@ export function PublicProfileTemplateV2({
   });
 
   const activeMode = SWIPEABLE_MODES[activeIndex] ?? 'profile';
+  const heroImageUrl = useMemo(() => {
+    return unwrapNextImageUrl(
+      photoDownloadSizes.find(size => size.key === 'large')?.url ??
+        photoDownloadSizes.find(size => size.key === 'original')?.url ??
+        artist.image_url ??
+        null
+    );
+  }, [artist.image_url, photoDownloadSizes]);
   const { notificationsContextValue } = useProfileShell({
     artist,
     socialLinks,
@@ -132,13 +168,22 @@ export function PublicProfileTemplateV2({
   });
 
   useEffect(() => {
-    const nextMode = normalizeInitialMode(mode);
-    const nextIndex = SWIPEABLE_MODES.indexOf(nextMode);
+    const presentation = resolveProfileV2Presentation(mode);
+    const nextIndex = SWIPEABLE_MODES.indexOf(presentation.initialPane);
     setActiveIndex(nextIndex);
-  }, [mode, setActiveIndex]);
+    if (presentation.initialOverlay === 'listen') {
+      setListenDrawerOpen(true);
+    }
+    if (presentation.initialOverlay === 'subscribe') {
+      setSubscribeDrawerOpen(true);
+    }
+    if (presentation.initialOverlay === 'contact' && hasContacts) {
+      setContactDrawerOpen(true);
+    }
+  }, [hasContacts, mode, setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     const handlePopState = () => {
       const nextMode = getModeFromLocation();
@@ -152,7 +197,7 @@ export function PublicProfileTemplateV2({
   }, [setActiveIndex]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (globalThis.window === undefined) return;
 
     const href = buildModeHref(activeMode);
     const currentHref = `${globalThis.location.pathname}${globalThis.location.search}`;
@@ -189,43 +234,45 @@ export function PublicProfileTemplateV2({
 
   const handlePlayClick = () => {
     if (mergedDSPs.length === 0) {
-      handleModeSelect('listen');
       return;
     }
 
     setListenDrawerOpen(true);
   };
 
+  const handleBellClick = () => {
+    setSubscribeDrawerOpen(true);
+  };
+
+  const handleBookClick = () => {
+    if (!hasContacts) return;
+    setContactDrawerOpen(true);
+  };
+
   return (
     <ProfileNotificationsContext.Provider value={notificationsContextValue}>
-      <div
-        className='relative h-[100dvh] overflow-hidden bg-base text-primary-token'
-        data-test='public-profile-root'
+      <ProfileViewportShell
+        ambientImageUrl={heroImageUrl}
+        artistName={artist.name}
       >
-        <div className='pointer-events-none absolute inset-0 overflow-hidden'>
-          <div className='absolute left-[-10%] top-10 h-48 w-48 rounded-full bg-surface-2/70 blur-3xl' />
-          <div className='absolute bottom-0 right-[-10%] h-56 w-56 rounded-full bg-surface-3/60 blur-3xl' />
-        </div>
-
-        <div className='relative mx-auto grid h-full w-full max-w-2xl grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden px-2 pt-[max(env(safe-area-inset-top),0.75rem)]'>
-          <ProfileHeaderV2
+        <div
+          className='relative grid h-full w-full grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden bg-base'
+          data-test='public-profile-root'
+        >
+          <ArtistHero
             artist={artist}
-            activeMode={activeMode}
-            activeIndex={activeIndex}
-            modes={SWIPEABLE_MODES}
+            heroImageUrl={heroImageUrl}
+            latestRelease={latestRelease}
             headerSocialLinks={headerSocialLinks}
-            onModeSelect={handleModeSelect}
             onPlayClick={handlePlayClick}
+            onBellClick={handleBellClick}
           />
 
-          <ProfileHeroCard
-            artist={artist}
-            socialLinks={socialLinks}
-            mergedDSPs={mergedDSPs}
-            latestRelease={latestRelease}
-            enableDynamicEngagement={enableDynamicEngagement}
-            subscribeTwoStep={subscribeTwoStep}
-            autoOpenCapture={mode === 'subscribe'}
+          <ProfileQuickActions
+            activeMode={activeMode}
+            onModeSelect={handleModeSelect}
+            onBookClick={handleBookClick}
+            bookingDisabled={!hasContacts}
           />
 
           <SwipeableModeContainer
@@ -235,7 +282,10 @@ export function PublicProfileTemplateV2({
             mergedDSPs={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
             genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
             tourDates={tourDates}
+            onSubscribeClick={handleBellClick}
             modes={SWIPEABLE_MODES}
             activeIndex={activeIndex}
             dragOffset={dragOffset}
@@ -244,7 +294,6 @@ export function PublicProfileTemplateV2({
             handlers={handlers}
           />
         </div>
-
         {mergedDSPs.length > 0 ? (
           <ListenDrawer
             open={listenDrawerOpen}
@@ -254,7 +303,23 @@ export function PublicProfileTemplateV2({
             enableDynamicEngagement={enableDynamicEngagement}
           />
         ) : null}
-      </div>
+        <SubscribeDrawer
+          open={subscribeDrawerOpen}
+          onOpenChange={setSubscribeDrawerOpen}
+          artist={artist}
+          subscribeTwoStep={subscribeTwoStep}
+        />
+        {hasContacts ? (
+          <ContactDrawer
+            open={contactDrawerOpen}
+            onOpenChange={setContactDrawerOpen}
+            artistName={artist.name}
+            artistHandle={artist.handle}
+            contacts={available}
+            primaryChannel={primaryChannel}
+          />
+        ) : null}
+      </ProfileViewportShell>
     </ProfileNotificationsContext.Provider>
   );
 }

@@ -12,22 +12,26 @@ const SETTINGS_ROW_ID = 1;
 // under 30 seconds. Explicitly invalidated on settings update.
 // ---------------------------------------------------------------------------
 let _gateEnabledCache: { value: boolean; expiresAt: number } | null = null;
-const GATE_CACHE_TTL_MS = 30_000; // 30s
+const _GATE_CACHE_TTL_MS = 30_000; // 30s — unused while gate is hardcoded off
 
 /**
- * Check if the waitlist gate is enabled (DB-backed, memory-cached).
- * Replaces the old WAITLIST_ENABLED env var with a runtime DB toggle.
+ * Check if the waitlist gate is enabled.
+ *
+ * Hardcoded to `false` — the waitlist gate is permanently disabled so all
+ * signups go straight to onboarding. The DB-backed toggle and surrounding
+ * infrastructure are preserved for future demand control (re-enable by
+ * restoring the DB-driven implementation below).
+ *
+ * Previous implementation (DB-backed, memory-cached):
+ *   if (_gateEnabledCache && Date.now() < _gateEnabledCache.expiresAt) {
+ *     return _gateEnabledCache.value;
+ *   }
+ *   const settings = await getWaitlistSettings();
+ *   _gateEnabledCache = { value: settings.gateEnabled, expiresAt: Date.now() + GATE_CACHE_TTL_MS };
+ *   return settings.gateEnabled;
  */
 export async function isWaitlistGateEnabled(): Promise<boolean> {
-  if (_gateEnabledCache && Date.now() < _gateEnabledCache.expiresAt) {
-    return _gateEnabledCache.value;
-  }
-  const settings = await getWaitlistSettings();
-  _gateEnabledCache = {
-    value: settings.gateEnabled,
-    expiresAt: Date.now() + GATE_CACHE_TTL_MS,
-  };
-  return settings.gateEnabled;
+  return false;
 }
 
 /**

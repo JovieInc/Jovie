@@ -21,6 +21,7 @@ import {
   EntitySidebarShell,
   StatTile,
 } from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import {
@@ -59,7 +60,7 @@ function MiniRankedList({
     <ul className='space-y-1'>
       {items.map((item, index) => (
         <li
-          key={`${item.key}-${index}`}
+          key={item.key}
           className='flex h-7 items-center justify-between rounded-md px-1.5'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
@@ -190,7 +191,7 @@ export function TourDateSidebar({
     );
   }, [tourDate]);
 
-  const footerContent = tourDate ? (
+  const actionRow = tourDate ? (
     <div className='flex items-center gap-2'>
       <Button
         onClick={handleSave}
@@ -201,7 +202,7 @@ export function TourDateSidebar({
           !formData.city ||
           !formData.country
         }
-        className='flex-1'
+        className='h-8 flex-1 rounded-full'
       >
         {updateMutation.isPending ? (
           <>
@@ -220,7 +221,7 @@ export function TourDateSidebar({
         variant='ghost'
         onClick={handleDeleteClick}
         disabled={isPending}
-        className='text-destructive hover:bg-destructive/10 hover:text-destructive'
+        className='h-8 rounded-full border border-destructive/15 px-2.5 text-destructive hover:bg-destructive/10 hover:text-destructive'
       >
         <Icon name='Trash2' className='h-4 w-4' />
       </Button>
@@ -234,264 +235,301 @@ export function TourDateSidebar({
         ariaLabel='Edit tour date'
         title='Edit Tour Date'
         onClose={onClose}
+        headerMode='minimal'
+        headerActions={
+          <DrawerHeaderActions
+            primaryActions={[]}
+            overflowActions={[]}
+            onClose={onClose}
+          />
+        }
         isEmpty={!tourDate}
         emptyMessage='Select a tour date to edit'
-        footer={footerContent}
         contextMenuItems={contextMenuItems}
+        entityHeader={
+          tourDate ? (
+            <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                  Tour date
+                </p>
+              </div>
+              <div className='space-y-3 p-3.5'>
+                <div className='space-y-1'>
+                  <p className='text-[15px] font-[590] tracking-[-0.016em] text-primary-token'>
+                    {tourDate.title?.trim() || tourDate.venueName}
+                  </p>
+                  <p className='text-[12px] leading-[16px] text-secondary-token'>
+                    {formatISODate(tourDate.startDate)} · {tourDate.city}
+                    {tourDate.region ? `, ${tourDate.region}` : ''} ·{' '}
+                    {tourDate.country}
+                  </p>
+                </div>
+                {tourDate.provider === 'bandsintown' ? (
+                  <div className='flex items-center gap-2 rounded-full border border-[color:color-mix(in_oklab,var(--color-success)_18%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-success)_10%,transparent)] px-3 py-1.5 text-[12px] text-[var(--color-success)]'>
+                    <Icon name='Link' className='h-3.5 w-3.5' />
+                    <span>Synced from Bandsintown</span>
+                  </div>
+                ) : null}
+              </div>
+              <div className='border-t border-(--linear-app-frame-seam) px-3.5 py-2'>
+                {actionRow}
+              </div>
+            </DrawerSurfaceCard>
+          ) : undefined
+        }
       >
         {tourDate && (
-          <div className='space-y-2'>
-            {/* Source indicator */}
-            {tourDate.provider === 'bandsintown' && (
-              <div className='flex items-center gap-2 rounded-md bg-teal-50 px-3 py-2 text-[13px] text-teal-700 dark:bg-teal-900/20 dark:text-teal-400'>
-                <Icon name='Link' className='h-4 w-4' />
-                <span>Synced from Bandsintown</span>
-              </div>
-            )}
-
-            {/* Title */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='title'>Event Title (optional)</Label>
-              <Input
-                id='title'
-                type='text'
-                placeholder='e.g., Summer Tour 2025'
-                value={formData.title}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, title: e.target.value }))
-                }
-                disabled={isPending}
-              />
-            </div>
-
-            {/* Date, Time, and Timezone */}
-            <div className='grid grid-cols-2 gap-2'>
+          <div className='space-y-3'>
+            <DrawerSurfaceCard variant='card' className='space-y-3.5 p-3.5'>
+              {/* Title */}
               <div className='space-y-1.5'>
-                <Label htmlFor='startDate'>Date</Label>
+                <Label htmlFor='title'>Event Title (optional)</Label>
                 <Input
-                  id='startDate'
-                  type='date'
-                  value={formData.startDate}
+                  id='title'
+                  type='text'
+                  placeholder='e.g., Summer Tour 2025'
+                  value={formData.title}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, title: e.target.value }))
+                  }
+                  disabled={isPending}
+                />
+              </div>
+
+              {/* Date, Time, and Timezone */}
+              <div className='grid grid-cols-2 gap-2'>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='startDate'>Date</Label>
+                  <Input
+                    id='startDate'
+                    type='date'
+                    value={formData.startDate}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        startDate: e.target.value,
+                      }))
+                    }
+                    disabled={isPending}
+                    required
+                  />
+                </div>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='startTime'>Time</Label>
+                  <Input
+                    id='startTime'
+                    type='text'
+                    placeholder='8:00 PM'
+                    value={formData.startTime}
+                    onChange={e =>
+                      setFormData(prev => ({
+                        ...prev,
+                        startTime: e.target.value,
+                      }))
+                    }
+                    disabled={isPending}
+                  />
+                </div>
+              </div>
+
+              {/* Timezone */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='timezone'>Timezone (optional)</Label>
+                <Input
+                  id='timezone'
+                  type='text'
+                  placeholder='e.g., America/New_York'
+                  value={formData.timezone}
+                  onChange={e =>
+                    setFormData(prev => ({ ...prev, timezone: e.target.value }))
+                  }
+                  disabled={isPending}
+                />
+              </div>
+
+              {/* Venue */}
+              <div className='space-y-1.5'>
+                <Label htmlFor='venueName'>Venue</Label>
+                <Input
+                  id='venueName'
+                  type='text'
+                  placeholder='Venue name'
+                  value={formData.venueName}
                   onChange={e =>
                     setFormData(prev => ({
                       ...prev,
-                      startDate: e.target.value,
+                      venueName: e.target.value,
                     }))
                   }
                   disabled={isPending}
                   required
                 />
               </div>
-              <div className='space-y-1.5'>
-                <Label htmlFor='startTime'>Time</Label>
-                <Input
-                  id='startTime'
-                  type='text'
-                  placeholder='8:00 PM'
-                  value={formData.startTime}
-                  onChange={e =>
-                    setFormData(prev => ({
-                      ...prev,
-                      startTime: e.target.value,
-                    }))
-                  }
-                  disabled={isPending}
-                />
+
+              {/* Location */}
+              <div className='grid grid-cols-2 gap-2'>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='city'>City</Label>
+                  <Input
+                    id='city'
+                    type='text'
+                    placeholder='City'
+                    value={formData.city}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, city: e.target.value }))
+                    }
+                    disabled={isPending}
+                    required
+                  />
+                </div>
+                <div className='space-y-1.5'>
+                  <Label htmlFor='region'>State/Region</Label>
+                  <Input
+                    id='region'
+                    type='text'
+                    placeholder='CA'
+                    value={formData.region}
+                    onChange={e =>
+                      setFormData(prev => ({ ...prev, region: e.target.value }))
+                    }
+                    disabled={isPending}
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Timezone */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='timezone'>Timezone (optional)</Label>
-              <Input
-                id='timezone'
-                type='text'
-                placeholder='e.g., America/New_York'
-                value={formData.timezone}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, timezone: e.target.value }))
-                }
-                disabled={isPending}
-              />
-            </div>
-
-            {/* Venue */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='venueName'>Venue</Label>
-              <Input
-                id='venueName'
-                type='text'
-                placeholder='Venue name'
-                value={formData.venueName}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, venueName: e.target.value }))
-                }
-                disabled={isPending}
-                required
-              />
-            </div>
-
-            {/* Location */}
-            <div className='grid grid-cols-2 gap-2'>
               <div className='space-y-1.5'>
-                <Label htmlFor='city'>City</Label>
+                <Label htmlFor='country'>Country</Label>
                 <Input
-                  id='city'
+                  id='country'
                   type='text'
-                  placeholder='City'
-                  value={formData.city}
+                  placeholder='USA'
+                  value={formData.country}
                   onChange={e =>
-                    setFormData(prev => ({ ...prev, city: e.target.value }))
+                    setFormData(prev => ({ ...prev, country: e.target.value }))
                   }
                   disabled={isPending}
                   required
                 />
               </div>
+
+              {/* Ticket URL */}
               <div className='space-y-1.5'>
-                <Label htmlFor='region'>State/Region</Label>
+                <Label htmlFor='ticketUrl'>Ticket URL</Label>
                 <Input
-                  id='region'
-                  type='text'
-                  placeholder='CA'
-                  value={formData.region}
+                  id='ticketUrl'
+                  type='url'
+                  placeholder='https://...'
+                  value={formData.ticketUrl}
                   onChange={e =>
-                    setFormData(prev => ({ ...prev, region: e.target.value }))
+                    setFormData(prev => ({
+                      ...prev,
+                      ticketUrl: e.target.value,
+                    }))
                   }
                   disabled={isPending}
                 />
               </div>
-            </div>
 
-            <div className='space-y-1.5'>
-              <Label htmlFor='country'>Country</Label>
-              <Input
-                id='country'
-                type='text'
-                placeholder='USA'
-                value={formData.country}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, country: e.target.value }))
-                }
-                disabled={isPending}
-                required
-              />
-            </div>
-
-            {/* Ticket URL */}
-            <div className='space-y-1.5'>
-              <Label htmlFor='ticketUrl'>Ticket URL</Label>
-              <Input
-                id='ticketUrl'
-                type='url'
-                placeholder='https://...'
-                value={formData.ticketUrl}
-                onChange={e =>
-                  setFormData(prev => ({ ...prev, ticketUrl: e.target.value }))
-                }
-                disabled={isPending}
-              />
-            </div>
-
-            {/* Status */}
-            <div className='space-y-1.5'>
-              <Label>Status</Label>
-              <div className='flex gap-2'>
-                {(['available', 'sold_out', 'cancelled'] as const).map(
-                  status => (
-                    <button
-                      key={status}
-                      type='button'
-                      onClick={() =>
-                        setFormData(prev => ({
-                          ...prev,
-                          ticketStatus: status,
-                        }))
-                      }
-                      disabled={isPending}
-                      className={cn(
-                        'flex-1 rounded-md border px-3 py-2 text-[13px] font-[510] transition-colors',
-                        formData.ticketStatus === status
-                          ? 'border-accent bg-accent/10 text-accent'
-                          : 'border-subtle bg-surface-1 text-secondary-token hover:bg-surface-2'
-                      )}
-                    >
-                      {status === 'available' && 'On Sale'}
-                      {status === 'sold_out' && 'Sold Out'}
-                      {status === 'cancelled' && 'Cancelled'}
-                    </button>
-                  )
-                )}
+              {/* Status */}
+              <div className='space-y-1.5'>
+                <Label>Status</Label>
+                <div className='flex gap-2'>
+                  {(['available', 'sold_out', 'cancelled'] as const).map(
+                    status => (
+                      <button
+                        key={status}
+                        type='button'
+                        onClick={() =>
+                          setFormData(prev => ({
+                            ...prev,
+                            ticketStatus: status,
+                          }))
+                        }
+                        disabled={isPending}
+                        className={cn(
+                          'flex-1 rounded-full border px-3 py-2 text-[12px] font-[510] transition-[background-color,border-color,color] duration-150',
+                          formData.ticketStatus === status
+                            ? 'border-accent/35 bg-accent/10 text-accent'
+                            : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1 hover:text-primary-token'
+                        )}
+                      >
+                        {status === 'available' && 'On Sale'}
+                        {status === 'sold_out' && 'Sold Out'}
+                        {status === 'cancelled' && 'Cancelled'}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
-            </div>
+            </DrawerSurfaceCard>
 
             {/* Analytics */}
-            <div className='border-t border-subtle pt-2'>
-              <DrawerSection title='Analytics'>
-                {analyticsLoading && (
-                  <DrawerSurfaceCard className='space-y-2 p-3'>
-                    <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
-                    <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
-                    <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
-                  </DrawerSurfaceCard>
-                )}
-                {!analyticsLoading && analyticsError && (
-                  <p className='text-[12px] text-tertiary-token'>
-                    Unable to load analytics data.
-                  </p>
-                )}
-                {!analyticsLoading && !analyticsError && (
-                  <div className='space-y-2'>
-                    <DrawerStatGrid>
-                      <StatTile
-                        label='Ticket Clicks'
-                        value={numberFormatter.format(
-                          analyticsData?.ticketClicks ?? 0
-                        )}
+            <DrawerSection title='Analytics' surface='card'>
+              {analyticsLoading && (
+                <DrawerSurfaceCard className='space-y-2 p-3'>
+                  <LoadingSkeleton height='h-5' width='w-20' rounded='sm' />
+                  <LoadingSkeleton height='h-3' width='w-32' rounded='sm' />
+                  <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
+                </DrawerSurfaceCard>
+              )}
+              {!analyticsLoading && analyticsError && (
+                <p className='text-[12px] text-tertiary-token'>
+                  Unable to load analytics data.
+                </p>
+              )}
+              {!analyticsLoading && !analyticsError && (
+                <div className='space-y-2'>
+                  <DrawerStatGrid>
+                    <StatTile
+                      label='Ticket Clicks'
+                      value={numberFormatter.format(
+                        analyticsData?.ticketClicks ?? 0
+                      )}
+                    />
+                    <StatTile
+                      label='Top Cities'
+                      value={String(analyticsData?.topCities?.length ?? 0)}
+                    />
+                  </DrawerStatGrid>
+
+                  {(analyticsData?.topCities?.length ?? 0) > 0 && (
+                    <DrawerSurfaceCard className='p-2'>
+                      <MiniRankedList
+                        icon={MapPin}
+                        items={(analyticsData?.topCities ?? []).map(c => ({
+                          key: c.city,
+                          label: c.city,
+                          value: numberFormatter.format(c.count),
+                        }))}
+                        emptyMessage='No city data yet'
                       />
-                      <StatTile
-                        label='Top Cities'
-                        value={String(analyticsData?.topCities?.length ?? 0)}
+                    </DrawerSurfaceCard>
+                  )}
+
+                  {(analyticsData?.topReferrers?.length ?? 0) > 0 && (
+                    <DrawerSurfaceCard className='p-2'>
+                      <MiniRankedList
+                        icon={Globe}
+                        items={(analyticsData?.topReferrers ?? []).map(r => ({
+                          key: r.referrer || 'direct',
+                          label: r.referrer || 'Direct',
+                          value: numberFormatter.format(r.count),
+                        }))}
+                        emptyMessage='No referrer data yet'
                       />
-                    </DrawerStatGrid>
+                    </DrawerSurfaceCard>
+                  )}
 
-                    {(analyticsData?.topCities?.length ?? 0) > 0 && (
-                      <DrawerSurfaceCard className='p-2'>
-                        <MiniRankedList
-                          icon={MapPin}
-                          items={(analyticsData?.topCities ?? []).map(c => ({
-                            key: c.city,
-                            label: c.city,
-                            value: numberFormatter.format(c.count),
-                          }))}
-                          emptyMessage='No city data yet'
-                        />
-                      </DrawerSurfaceCard>
-                    )}
-
-                    {(analyticsData?.topReferrers?.length ?? 0) > 0 && (
-                      <DrawerSurfaceCard className='p-2'>
-                        <MiniRankedList
-                          icon={Globe}
-                          items={(analyticsData?.topReferrers ?? []).map(r => ({
-                            key: r.referrer || 'direct',
-                            label: r.referrer || 'Direct',
-                            value: numberFormatter.format(r.count),
-                          }))}
-                          emptyMessage='No referrer data yet'
-                        />
-                      </DrawerSurfaceCard>
-                    )}
-
-                    {(analyticsData?.ticketClicks ?? 0) === 0 && (
-                      <p className='text-[12px] text-tertiary-token'>
-                        No ticket click data yet. Analytics will appear once
-                        fans click ticket links for this show.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </DrawerSection>
-            </div>
+                  {(analyticsData?.ticketClicks ?? 0) === 0 && (
+                    <p className='text-[12px] text-tertiary-token'>
+                      No ticket click data yet. Analytics will appear once fans
+                      click ticket links for this show.
+                    </p>
+                  )}
+                </div>
+              )}
+            </DrawerSection>
           </div>
         )}
       </EntitySidebarShell>

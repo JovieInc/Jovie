@@ -64,7 +64,6 @@ function setupDbSelectMock(row: ReturnType<typeof createMockSettings> | null) {
 
 describe('isWaitlistGateEnabled', () => {
   let isWaitlistGateEnabled: typeof import('@/lib/waitlist/settings').isWaitlistGateEnabled;
-  let invalidateWaitlistGateCache: typeof import('@/lib/waitlist/settings').invalidateWaitlistGateCache;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -74,52 +73,41 @@ describe('isWaitlistGateEnabled', () => {
 
     const mod = await import('@/lib/waitlist/settings');
     isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
-    invalidateWaitlistGateCache = mod.invalidateWaitlistGateCache;
-
-    // Always start with a clean cache
-    invalidateWaitlistGateCache();
   });
 
-  it('queries DB on cache miss and returns gateEnabled value', async () => {
+  it('always returns false (gate permanently disabled)', async () => {
+    // Even with DB mock returning gateEnabled: true, the function returns false
     setupDbSelectMock(createMockSettings({ gateEnabled: true }));
 
     const result = await isWaitlistGateEnabled();
 
-    expect(result).toBe(true);
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(result).toBe(false);
+    // No DB query should be made — function short-circuits
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
-  it('returns cached value on cache hit (no extra DB query)', async () => {
-    setupDbSelectMock(createMockSettings({ gateEnabled: false }));
-
+  it('returns false on repeated calls without hitting DB', async () => {
     const first = await isWaitlistGateEnabled();
     const second = await isWaitlistGateEnabled();
 
     expect(first).toBe(false);
     expect(second).toBe(false);
-    // Only 1 DB query — second call used cache
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
-  it('queries DB again after cache is invalidated', async () => {
-    setupDbSelectMock(createMockSettings({ gateEnabled: true }));
+  it('returns false regardless of cache invalidation', async () => {
+    const mod = await import('@/lib/waitlist/settings');
 
     await isWaitlistGateEnabled();
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
-
-    // Invalidate and change the mock to return false
-    invalidateWaitlistGateCache();
-    setupDbSelectMock(createMockSettings({ gateEnabled: false }));
+    mod.invalidateWaitlistGateCache();
 
     const result = await isWaitlistGateEnabled();
     expect(result).toBe(false);
-    // Second DB query after invalidation
-    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 });
 
 describe('updateWaitlistSettings invalidates cache', () => {
-  let isWaitlistGateEnabled: typeof import('@/lib/waitlist/settings').isWaitlistGateEnabled;
   let updateWaitlistSettings: typeof import('@/lib/waitlist/settings').updateWaitlistSettings;
   let invalidateWaitlistGateCache: typeof import('@/lib/waitlist/settings').invalidateWaitlistGateCache;
 
@@ -130,7 +118,6 @@ describe('updateWaitlistSettings invalidates cache', () => {
     mockDbUpdate.mockClear();
 
     const mod = await import('@/lib/waitlist/settings');
-    isWaitlistGateEnabled = mod.isWaitlistGateEnabled;
     updateWaitlistSettings = mod.updateWaitlistSettings;
     invalidateWaitlistGateCache = mod.invalidateWaitlistGateCache;
 
@@ -138,11 +125,6 @@ describe('updateWaitlistSettings invalidates cache', () => {
   });
 
   it('clears the gate cache after settings are updated', async () => {
-    // Populate cache with gateEnabled=true
-    setupDbSelectMock(createMockSettings({ gateEnabled: true }));
-    await isWaitlistGateEnabled();
-    expect(mockDbSelect).toHaveBeenCalledTimes(1);
-
     // Mock updateWaitlistSettings DB calls
     // ensureSettingsRow SELECT
     setupDbSelectMock(createMockSettings({ gateEnabled: true }));
@@ -162,9 +144,7 @@ describe('updateWaitlistSettings invalidates cache', () => {
       autoAcceptDailyLimit: 0,
     });
 
-    // Now re-query — cache should be cleared, so a fresh DB call happens
-    setupDbSelectMock(createMockSettings({ gateEnabled: false }));
-    const result = await isWaitlistGateEnabled();
-    expect(result).toBe(false);
+    // updateWaitlistSettings still works (admin tooling preserved)
+    expect(mockDbUpdate).toHaveBeenCalled();
   });
 });

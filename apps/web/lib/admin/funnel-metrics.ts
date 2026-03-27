@@ -3,10 +3,9 @@ import 'server-only';
 import { and, sql as drizzleSql, eq, gte } from 'drizzle-orm';
 
 import { db, doesTableExist } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import { discogReleases } from '@/lib/db/schema/content';
-import { emailEngagement } from '@/lib/db/schema/email-engagement';
-import { leads } from '@/lib/db/schema/leads';
+import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError, captureWarning } from '@/lib/error-tracking';
 import { getAdminStripeOverviewMetrics } from './stripe-metrics';
@@ -15,16 +14,36 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const BASELINE_BURN_USD = 5_000;
 
 function isMissingLeadsOutreachStatusColumnError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return message
-    .toLowerCase()
-    .includes('column leads.outreach_status does not exist');
+  const message = getDeepErrorMessage(error).toLowerCase();
+  return (
+    message.includes('does not exist') &&
+    (message.includes('column leads.outreach_status') ||
+      message.includes('column "outreach_status"'))
+  );
+}
+
+function isMissingLeadAttributionColumnError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  if (!message.includes('does not exist')) {
+    return false;
+  }
+
+  return [
+    'column leads.signup_at',
+    'column "signup_at"',
+    'column leads.signup_user_id',
+    'column "signup_user_id"',
+    'column leads.paid_at',
+    'column "paid_at"',
+    'column leads.paid_subscription_id',
+    'column "paid_subscription_id"',
+  ].some(pattern => message.includes(pattern));
 }
 
 export interface AdminFunnelMetrics {
-  /** Total outreach emails sent in the last 7 days */
+  /** Total attributable outbound contacts in the last 7 days (email queued + DM sent) */
   outreachSent7d: number;
-  /** Claim link clicks in the last 7 days */
+  /** Claim-page visits in the last 7 days from attributable outbound links */
   claimClicks7d: number;
   /** Claim rate: claimClicks / outreachSent (0-1) */
   claimRate: number | null;
@@ -78,11 +97,26 @@ export interface AdminFunnelMetrics {
 }
 
 /**
- * Count outreach emails sent in the last 7 days.
- * Uses leads table with outreach_status = 'sent' or 'dm_sent'.
+ * Count attributable outbound contacts in the last 7 days.
+ * Uses lead_funnel_events with event_type in ('email_queued', 'dm_sent').
  */
 async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
   try {
+    const hasEvents = await doesTableExist('lead_funnel_events');
+    if (hasEvents) {
+      const [row] = await db
+        .select({ count: drizzleSql<number>`count(*)::int` })
+        .from(leadFunnelEvents)
+        .where(
+          and(
+            drizzleSql`${leadFunnelEvents.eventType} in ('email_queued', 'dm_sent')`,
+            gte(leadFunnelEvents.occurredAt, sevenDaysAgo)
+          )
+        );
+
+      return Number(row?.count ?? 0);
+    }
+
     const hasLeads = await doesTableExist('leads');
     if (!hasLeads) return 0;
 
@@ -91,7 +125,7 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
       .from(leads)
       .where(
         and(
-          drizzleSql`${leads.outreachStatus}::text IN ('sent', 'dm_sent')`,
+          drizzleSql`${leads.outreachStatus}::text IN ('queued', 'dm_sent')`,
           gte(leads.updatedAt, sevenDaysAgo)
         )
       );
@@ -112,22 +146,20 @@ async function getOutreachSent7d(sevenDaysAgo: Date): Promise<number> {
 }
 
 /**
- * Count claim link clicks in the last 7 days.
- * Uses email_engagement table with event_type = 'click' and email_type = 'claim_invite'.
+ * Count attributable claim-page views in the last 7 days.
  */
 async function getClaimClicks7d(sevenDaysAgo: Date): Promise<number> {
   try {
-    const hasTable = await doesTableExist('email_engagement');
+    const hasTable = await doesTableExist('lead_funnel_events');
     if (!hasTable) return 0;
 
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(emailEngagement)
+      .from(leadFunnelEvents)
       .where(
         and(
-          eq(emailEngagement.eventType, 'click'),
-          eq(emailEngagement.emailType, 'claim_invite'),
-          gte(emailEngagement.createdAt, sevenDaysAgo)
+          eq(leadFunnelEvents.eventType, 'claim_page_viewed'),
+          gte(leadFunnelEvents.occurredAt, sevenDaysAgo)
         )
       );
 
@@ -139,47 +171,66 @@ async function getClaimClicks7d(sevenDaysAgo: Date): Promise<number> {
 }
 
 /**
- * Count completed signups in the last 7 days.
- * Uses users table, counting non-deleted users created in the window.
+ * Count attributable signups in the last 7 days.
  */
 async function getSignups7d(sevenDaysAgo: Date): Promise<number> {
   try {
+    const hasLeads = await doesTableExist('leads');
+    if (!hasLeads) return 0;
+
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(users)
+      .from(leads)
       .where(
         and(
-          gte(users.createdAt, sevenDaysAgo),
-          drizzleSql`${users.deletedAt} IS NULL`
+          gte(leads.signupAt, sevenDaysAgo),
+          drizzleSql`${leads.signupUserId} IS NOT NULL`
         )
       );
 
     return Number(row?.count ?? 0);
   } catch (error) {
+    if (isMissingLeadAttributionColumnError(error)) {
+      await captureWarning(
+        '[admin/funnel-metrics] lead attribution columns missing; returning 0 signups count',
+        error
+      );
+      return 0;
+    }
+
     captureError('Error fetching signups count', error);
     return 0;
   }
 }
 
 /**
- * Count paid conversions in the last 7 days.
- * Users with an active Stripe subscription created in the window.
+ * Count attributable paid conversions in the last 7 days.
  */
 async function getPaidConversions7d(sevenDaysAgo: Date): Promise<number> {
   try {
+    const hasLeads = await doesTableExist('leads');
+    if (!hasLeads) return 0;
+
     const [row] = await db
       .select({ count: drizzleSql<number>`count(*)::int` })
-      .from(users)
+      .from(leads)
       .where(
         and(
-          drizzleSql`${users.stripeSubscriptionId} IS NOT NULL`,
-          gte(users.billingUpdatedAt, sevenDaysAgo),
-          drizzleSql`${users.deletedAt} IS NULL`
+          drizzleSql`${leads.paidSubscriptionId} IS NOT NULL`,
+          gte(leads.paidAt, sevenDaysAgo)
         )
       );
 
     return Number(row?.count ?? 0);
   } catch (error) {
+    if (isMissingLeadAttributionColumnError(error)) {
+      await captureWarning(
+        '[admin/funnel-metrics] lead attribution columns missing; returning 0 paid conversions count',
+        error
+      );
+      return 0;
+    }
+
     captureError('Error fetching paid conversions count', error);
     return 0;
   }
@@ -236,9 +287,7 @@ async function getMagicMomentMetrics(): Promise<{
       string,
       string
     >;
-    const hasFailure = Object.values(enrichmentStatus).some(
-      s => s === 'failed'
-    );
+    const hasFailure = Object.values(enrichmentStatus).includes('failed');
     if (hasFailure) {
       enrichmentFailureCount++;
     }

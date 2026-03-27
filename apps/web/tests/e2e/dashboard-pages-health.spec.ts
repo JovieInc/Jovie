@@ -2,12 +2,18 @@ import { expect, Page, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   ensureSignedInUser,
+  getAdminCredentials,
+  hasAdminCredentials,
+  hasClerkCredentials,
   isProductionTarget,
   signInUser,
 } from '../helpers/clerk-auth';
+import { DASHBOARD_ROUTE_MATRIX } from './utils/dashboard-route-matrix';
+import { assertFastPageLoad } from './utils/performance-assertions';
 import {
   isTransientNavigationError,
   SMOKE_TIMEOUTS,
+  setupPageMonitoring,
   smokeNavigateWithRetry,
   waitForHydration,
   waitForNetworkIdle,
@@ -25,75 +31,6 @@ import {
  * Run with doppler:
  *   doppler run -- pnpm exec playwright test dashboard-pages-health --project=chromium
  */
-
-/**
- * Check if Clerk credentials are available for authenticated tests
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = username.includes('+clerk_test');
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail) &&
-    clerkSetupSuccess
-  );
-}
-
-/**
- * Check if admin Clerk credentials are available.
- * Falls back to regular credentials if admin-specific ones aren't set.
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function hasAdminCredentials(): boolean {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  // Use admin-specific credentials if available, otherwise fall back to regular user
-  // (assuming the regular test user might have admin access)
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return clerkSetupSuccess;
-  }
-
-  // Fall back to regular credentials
-  return hasClerkCredentials();
-}
-
-/**
- * Get admin credentials (admin-specific or fallback to regular)
- * Supports passwordless Clerk test emails (containing +clerk_test)
- */
-function getAdminCredentials(): { username: string; password: string } {
-  const adminUsername = process.env.E2E_CLERK_ADMIN_USERNAME ?? '';
-  const adminPassword = process.env.E2E_CLERK_ADMIN_PASSWORD ?? '';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = adminUsername.includes('+clerk_test');
-
-  if (
-    adminUsername.length > 0 &&
-    (adminPassword.length > 0 || isClerkTestEmail)
-  ) {
-    return { username: adminUsername, password: adminPassword };
-  }
-
-  return {
-    username: process.env.E2E_CLERK_USER_USERNAME ?? '',
-    password: process.env.E2E_CLERK_USER_PASSWORD ?? '',
-  };
-}
 
 /** Error text patterns that indicate a failed page */
 const ERROR_TEXT_PATTERNS = [
@@ -170,64 +107,19 @@ async function checkForErrorPage(page: Page): Promise<{
   return { hasError: false };
 }
 
-/**
- * Dashboard pages to test
- *
- * Note: Only include pages that render actual content.
- * Redirect-only pages are excluded from this list.
- *
- * Excluded redirect pages:
- * - /app/dashboard -> redirects to / (marketing homepage)
- * - /app/dashboard/overview -> redirects to /app/dashboard -> /
- * - /app/dashboard/links -> redirects to /app/dashboard/profile
- * - /app/dashboard/tipping -> redirects to /app/dashboard/earnings
- */
-const DASHBOARD_PAGES = [
-  { path: '/app/dashboard/audience', name: 'Audience' },
-  { path: APP_ROUTES.CHAT, name: 'Chat' },
-  { path: '/app/dashboard/earnings', name: 'Earnings' },
-  { path: '/app/dashboard/releases', name: 'Releases' },
-  { path: '/app/settings/contacts', name: 'Contacts' },
-  { path: '/app/settings/touring', name: 'Touring' },
-  { path: '/app/settings/billing', name: 'Settings Billing' },
-  { path: '/billing', name: 'Billing' },
-  { path: '/account', name: 'Account' },
-] as const;
-
-const FAST_DASHBOARD_PAGES = [
-  { path: '/app/dashboard/audience', name: 'Audience' },
-  { path: APP_ROUTES.CHAT, name: 'Chat' },
-  { path: '/app/dashboard/releases', name: 'Releases' },
-] as const;
-
-/**
- * Admin pages to test
- *
- * These pages require admin privileges. Tests will be skipped if:
- * - No admin credentials configured (E2E_CLERK_ADMIN_USERNAME/PASSWORD)
- * - Test user doesn't have admin access (404 response)
- */
-const ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/activity', name: 'Admin Activity' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-  { path: '/app/admin/creators', name: 'Admin Creators' },
-  { path: '/app/admin/users', name: 'Admin Users' },
-] as const;
-
-const FAST_ADMIN_PAGES = [
-  { path: '/app/admin', name: 'Admin Dashboard' },
-  { path: '/app/admin/campaigns', name: 'Admin Campaigns' },
-] as const;
-
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
-const ACTIVE_DASHBOARD_PAGES = FAST_ITERATION
-  ? FAST_DASHBOARD_PAGES
-  : DASHBOARD_PAGES;
-const ACTIVE_ADMIN_PAGES = FAST_ITERATION ? FAST_ADMIN_PAGES : ADMIN_PAGES;
+const SETTINGS_LANDING_PAGE = APP_ROUTES.SETTINGS_ACCOUNT;
+const ACTIVE_HEALTH_PAGES = FAST_ITERATION
+  ? DASHBOARD_ROUTE_MATRIX.health.fast
+  : DASHBOARD_ROUTE_MATRIX.health.full;
+const ACTIVE_ADMIN_PAGES = FAST_ITERATION
+  ? DASHBOARD_ROUTE_MATRIX.admin.fast
+  : DASHBOARD_ROUTE_MATRIX.admin.full;
 const HEALTH_NAVIGATION_TIMEOUT = FAST_ITERATION
   ? 90_000
   : SMOKE_TIMEOUTS.NAVIGATION;
+const DASHBOARD_ROUTING_TIMEOUT = FAST_ITERATION ? 180_000 : 300_000;
+const DASHBOARD_ROUTE_SWEEP_TIMEOUT = FAST_ITERATION ? 240_000 : 360_000;
 
 test.skip(
   FAST_ITERATION,
@@ -295,8 +187,13 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
 
     const results: PageHealthResult[] = [];
 
-    for (const pageConfig of ACTIVE_DASHBOARD_PAGES) {
+    // Safety guard: prevent silent test disablement if route matrix is emptied
+    expect(ACTIVE_HEALTH_PAGES.length).toBeGreaterThan(0);
+
+    for (const pageConfig of ACTIVE_HEALTH_PAGES) {
       const startTime = Date.now();
+      // Per-page monitoring: fresh listeners per page for clean error isolation
+      const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {
         // Navigate to the page
@@ -315,6 +212,36 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
         }
 
         const loadTimeMs = Date.now() - startTime;
+
+        // Check console errors + uncaught exceptions BEFORE redirect logic.
+        // Even redirected pages can generate real errors during navigation.
+        const monitorContext = getContext();
+        if (
+          monitorContext.criticalErrors.length > 0 ||
+          monitorContext.uncaughtExceptions.length > 0
+        ) {
+          // Attach diagnostics but don't fail yet — collect for summary
+          await testInfo.attach(`console-errors-${pageConfig.name}`, {
+            body: JSON.stringify(
+              {
+                criticalErrors: monitorContext.criticalErrors,
+                uncaughtExceptions: monitorContext.uncaughtExceptions,
+                networkDiagnostics: monitorContext.networkDiagnostics,
+              },
+              null,
+              2
+            ),
+            contentType: 'application/json',
+          });
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Console errors: ${[...monitorContext.criticalErrors, ...monitorContext.uncaughtExceptions].join('; ')}`,
+          });
+          continue;
+        }
 
         // Check if we were redirected
         const currentUrl = page.url();
@@ -415,12 +342,120 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
             error: errorText,
           });
         } else {
-          results.push({
-            path: pageConfig.path,
-            name: pageConfig.name,
-            status: 'pass',
-            loadTimeMs,
-          });
+          // Content-positive assertion: verify the right content loaded
+          if ('contentSelector' in pageConfig && pageConfig.contentSelector) {
+            const content = page.locator(pageConfig.contentSelector).first();
+            const hasContent = await content
+              .isVisible({ timeout: 10_000 })
+              .catch(() => false);
+
+            const hasFallback =
+              'contentFallbackSelector' in pageConfig &&
+              pageConfig.contentFallbackSelector
+                ? await page
+                    .locator(pageConfig.contentFallbackSelector)
+                    .first()
+                    .isVisible({ timeout: 2_000 })
+                    .catch(() => false)
+                : false;
+
+            if (!hasContent && !hasFallback) {
+              const screenshot = await page.screenshot().catch(() => null);
+              if (screenshot) {
+                await testInfo.attach(`no-content-${pageConfig.name}`, {
+                  body: screenshot,
+                  contentType: 'image/png',
+                });
+              }
+              results.push({
+                path: pageConfig.path,
+                name: pageConfig.name,
+                status: 'fail',
+                loadTimeMs,
+                error: `Content not visible: ${pageConfig.contentSelector}`,
+              });
+              continue;
+            }
+          }
+
+          // Verify Clerk UI loaded (UserButton is interactive, not stuck loading).
+          // Only check on desktop — mobile uses MobileProfileDrawer instead of UserButton
+          // in the sidebar, so data-testid="user-button-loaded" is not visible.
+          const viewportSize = page.viewportSize();
+          const isDesktopViewport = viewportSize && viewportSize.width >= 1024;
+          if (isDesktopViewport && pageConfig.requiresUserButton) {
+            let userButtonLoaded = false;
+            try {
+              await page
+                .locator('[data-testid="user-button-loaded"]')
+                .first()
+                .waitFor({ state: 'attached', timeout: 10_000 });
+              userButtonLoaded = true;
+            } catch {
+              userButtonLoaded = false;
+            }
+            if (!userButtonLoaded) {
+              const screenshot = await page.screenshot().catch(() => null);
+              if (screenshot) {
+                await testInfo.attach(`clerk-ui-missing-${pageConfig.name}`, {
+                  body: screenshot,
+                  contentType: 'image/png',
+                });
+              }
+              results.push({
+                path: pageConfig.path,
+                name: pageConfig.name,
+                status: 'fail',
+                loadTimeMs,
+                error: 'Clerk UI not loaded: user-button-loaded not visible',
+              });
+              continue;
+            }
+          }
+
+          // CI-only performance budget (dev/Turbopack timing is unreliable)
+          if (process.env.CI && loadTimeMs) {
+            const budget =
+              'performanceBudgetMs' in pageConfig &&
+              pageConfig.performanceBudgetMs
+                ? pageConfig.performanceBudgetMs
+                : 12_000;
+            await assertFastPageLoad(loadTimeMs, budget, testInfo);
+          }
+
+          // Re-read context to catch errors emitted during redirect/content/Clerk checks
+          const finalContext = getContext();
+          if (
+            finalContext.criticalErrors.length > 0 ||
+            finalContext.uncaughtExceptions.length > 0
+          ) {
+            await testInfo.attach(`console-errors-late-${pageConfig.name}`, {
+              body: JSON.stringify(
+                {
+                  criticalErrors: finalContext.criticalErrors,
+                  uncaughtExceptions: finalContext.uncaughtExceptions,
+                  networkDiagnostics: finalContext.networkDiagnostics,
+                },
+                null,
+                2
+              ),
+              contentType: 'application/json',
+            });
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'fail',
+              loadTimeMs,
+              error: `Late console errors: ${[...finalContext.criticalErrors, ...finalContext.uncaughtExceptions].join('; ')}`,
+            });
+          } else {
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'pass',
+              loadTimeMs,
+            });
+          }
         }
       } catch (error) {
         const isTransient = isTransientNavigationError(error);
@@ -431,6 +466,9 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
+      } finally {
+        // Always clean up listeners before next page to prevent cross-contamination
+        cleanup();
       }
     }
 
@@ -446,9 +484,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
     const redirected = results.filter(r => r.status === 'redirect');
 
     console.log('\n📊 Dashboard Health Summary:');
-    console.log(
-      `   ✅ Passed: ${passed.length}/${ACTIVE_DASHBOARD_PAGES.length}`
-    );
+    console.log(`   ✅ Passed: ${passed.length}/${ACTIVE_HEALTH_PAGES.length}`);
     if (failed.length > 0) {
       console.log(`   ❌ Failed: ${failed.length}`);
       failed.forEach(f => console.log(`      - ${f.name}: ${f.error}`));
@@ -480,7 +516,7 @@ test.describe('Dashboard Pages Health Check @smoke', () => {
    *
    * Run specific page: --grep "Profile"
    */
-  for (const pageConfig of ACTIVE_DASHBOARD_PAGES) {
+  for (const pageConfig of ACTIVE_HEALTH_PAGES) {
     test(`[Debug] ${pageConfig.name} page loads`, async ({
       page,
     }, testInfo) => {
@@ -580,24 +616,18 @@ test.describe('Admin Pages Health Check @smoke', () => {
    * admin access, the pages will return 404 and the test will skip.
    */
   test('All admin pages load without errors', async ({ page }, testInfo) => {
-    test.setTimeout(FAST_ITERATION ? 300_000 : 480_000);
-
-    // Capture browser console errors for debugging page failures
-    const consoleErrors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') {
-        consoleErrors.push(`[console.error] ${msg.text()}`);
-      }
-    });
-    page.on('pageerror', err => {
-      consoleErrors.push(`[pageerror] ${err.message}\n${err.stack ?? ''}`);
-    });
+    test.setTimeout(FAST_ITERATION ? 300_000 : 600_000);
 
     const results: PageHealthResult[] = [];
     let hasAdminAccess = true;
 
+    // Safety guard: prevent silent test disablement if route matrix is emptied
+    expect(ACTIVE_ADMIN_PAGES.length).toBeGreaterThan(0);
+
     for (const pageConfig of ACTIVE_ADMIN_PAGES) {
       const startTime = Date.now();
+      // Per-page monitoring: fresh listeners per page for clean error isolation
+      const { getContext, cleanup } = setupPageMonitoring(page);
 
       try {
         // Navigate to the page with increased timeout for admin pages
@@ -623,6 +653,34 @@ test.describe('Admin Pages Health Check @smoke', () => {
           );
           hasAdminAccess = false;
           break;
+        }
+
+        // Check console errors + uncaught exceptions BEFORE redirect logic
+        const monitorContext = getContext();
+        if (
+          monitorContext.criticalErrors.length > 0 ||
+          monitorContext.uncaughtExceptions.length > 0
+        ) {
+          await testInfo.attach(`console-errors-${pageConfig.name}`, {
+            body: JSON.stringify(
+              {
+                criticalErrors: monitorContext.criticalErrors,
+                uncaughtExceptions: monitorContext.uncaughtExceptions,
+                networkDiagnostics: monitorContext.networkDiagnostics,
+              },
+              null,
+              2
+            ),
+            contentType: 'application/json',
+          });
+          results.push({
+            path: pageConfig.path,
+            name: pageConfig.name,
+            status: 'fail',
+            loadTimeMs,
+            error: `Console errors: ${[...monitorContext.criticalErrors, ...monitorContext.uncaughtExceptions].join('; ')}`,
+          });
+          continue;
         }
 
         // Check for auth redirect (session expired)
@@ -719,17 +777,6 @@ test.describe('Admin Pages Health Check @smoke', () => {
             });
           }
 
-          // Log captured console errors for this page
-          if (consoleErrors.length > 0) {
-            console.log(
-              `\n🔍 Console errors on ${pageConfig.name}:\n${consoleErrors.join('\n')}`
-            );
-            await testInfo.attach(`console-errors-${pageConfig.name}`, {
-              body: consoleErrors.join('\n'),
-              contentType: 'text/plain',
-            });
-          }
-
           results.push({
             path: pageConfig.path,
             name: pageConfig.name,
@@ -738,15 +785,40 @@ test.describe('Admin Pages Health Check @smoke', () => {
             error: errorText,
           });
         } else {
-          results.push({
-            path: pageConfig.path,
-            name: pageConfig.name,
-            status: 'pass',
-            loadTimeMs,
-          });
+          // Re-read context to catch errors emitted during content/error page checks
+          const finalContext = getContext();
+          if (
+            finalContext.criticalErrors.length > 0 ||
+            finalContext.uncaughtExceptions.length > 0
+          ) {
+            await testInfo.attach(`console-errors-late-${pageConfig.name}`, {
+              body: JSON.stringify(
+                {
+                  criticalErrors: finalContext.criticalErrors,
+                  uncaughtExceptions: finalContext.uncaughtExceptions,
+                  networkDiagnostics: finalContext.networkDiagnostics,
+                },
+                null,
+                2
+              ),
+              contentType: 'application/json',
+            });
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'fail',
+              loadTimeMs,
+              error: `Late console errors: ${[...finalContext.criticalErrors, ...finalContext.uncaughtExceptions].join('; ')}`,
+            });
+          } else {
+            results.push({
+              path: pageConfig.path,
+              name: pageConfig.name,
+              status: 'pass',
+              loadTimeMs,
+            });
+          }
         }
-        // Clear console errors for next page
-        consoleErrors.length = 0;
       } catch (error) {
         results.push({
           path: pageConfig.path,
@@ -755,7 +827,8 @@ test.describe('Admin Pages Health Check @smoke', () => {
           loadTimeMs: Date.now() - startTime,
           error: error instanceof Error ? error.message : String(error),
         });
-        consoleErrors.length = 0;
+      } finally {
+        cleanup();
       }
     }
 
@@ -832,7 +905,7 @@ test.describe('Admin Pages Health Check @smoke', () => {
 // ============================================================================
 
 test.describe('Dashboard Routing', () => {
-  test.setTimeout(180_000);
+  test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
 
   test.beforeEach(async ({ page }) => {
     if (!hasClerkCredentials()) {
@@ -881,7 +954,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'History-navigation routing checks run in the slower dashboard-routing lane'
     );
-    test.setTimeout(180_000);
+    test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
 
     await smokeNavigateWithRetry(page, APP_ROUTES.CHAT, {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
@@ -889,11 +962,13 @@ test.describe('Dashboard Routing', () => {
     });
     await expect(page).toHaveURL(/\/app\/chat/);
 
-    await smokeNavigateWithRetry(page, APP_ROUTES.SETTINGS, {
+    // The settings root now server-redirects to /app/settings/account, so
+    // use the concrete landing page to avoid redirect-aborted navigations.
+    await smokeNavigateWithRetry(page, SETTINGS_LANDING_PAGE, {
       timeout: SMOKE_TIMEOUTS.NAVIGATION,
       retries: 2,
     });
-    await expect(page).toHaveURL(/\/app\/settings/);
+    await expect(page).toHaveURL(/\/app\/settings\/account/);
 
     await page.goBack({ waitUntil: 'domcontentloaded', timeout: 60_000 });
     await expect(page).toHaveURL(/\/app\/chat/, {
@@ -901,7 +976,9 @@ test.describe('Dashboard Routing', () => {
     });
 
     await page.goForward({ waitUntil: 'domcontentloaded', timeout: 60_000 });
-    await expect(page).toHaveURL(/\/app\/settings/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/app\/settings\/account/, {
+      timeout: 30_000,
+    });
   });
 
   test('all dashboard routes render content @smoke', async ({ page }) => {
@@ -909,7 +986,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'Route-by-route dashboard content checks duplicate faster dashboard health and content-gate coverage'
     );
-    test.setTimeout(240_000);
+    test.setTimeout(DASHBOARD_ROUTE_SWEEP_TIMEOUT);
     const routes = [
       { path: APP_ROUTES.CHAT, content: /new thread|chat/i },
       { path: '/app/dashboard/earnings', content: /earnings|tips|revenue/i },
@@ -953,7 +1030,7 @@ test.describe('Dashboard Routing', () => {
       FAST_ITERATION,
       'Lazy-hydration routing checks run in the slower dashboard-routing lane'
     );
-    test.setTimeout(180_000);
+    test.setTimeout(DASHBOARD_ROUTING_TIMEOUT);
     const hydrationErrors: string[] = [];
 
     page.on('console', msg => {

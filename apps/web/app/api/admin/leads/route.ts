@@ -23,6 +23,7 @@ import {
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { processLeadBatch } from '@/lib/leads/process-batch';
 import { seedLeadFromUrl } from '@/lib/leads/url-intake';
+import { mapConcurrent } from '@/lib/utils/map-concurrent';
 import {
   leadListQuerySchema,
   manualLeadSubmitSchema,
@@ -159,6 +160,7 @@ export async function GET(request: NextRequest) {
           linktreeUrl: leads.linktreeUrl,
           discoverySource: leads.discoverySource,
           discoveryQuery: leads.discoveryQuery,
+          sourcePlatform: leads.sourcePlatform,
           displayName: leads.displayName,
           bio: leads.bio,
           avatarUrl: leads.avatarUrl,
@@ -168,6 +170,8 @@ export async function GET(request: NextRequest) {
           spotifyUrl: leads.spotifyUrl,
           hasInstagram: leads.hasInstagram,
           instagramHandle: leads.instagramHandle,
+          hasTrackingPixels: leads.hasTrackingPixels,
+          trackingPixelPlatforms: leads.trackingPixelPlatforms,
           musicToolsDetected: leads.musicToolsDetected,
           allLinks: leads.allLinks,
           fitScore: leads.fitScore,
@@ -205,7 +209,7 @@ export async function GET(request: NextRequest) {
         })
         .from(leads)
         .where(where)
-        .orderBy(orderFn(orderColumn))
+        .orderBy(orderFn(orderColumn), orderFn(leads.id))
         .limit(query.pageSize)
         .offset((query.page - 1) * query.pageSize),
       db.select({ count: count() }).from(leads).where(where),
@@ -215,6 +219,8 @@ export async function GET(request: NextRequest) {
       ...item,
       hasSpotifyLink: item.hasSpotifyLink ?? false,
       hasInstagram: item.hasInstagram ?? false,
+      hasTrackingPixels: item.hasTrackingPixels ?? false,
+      trackingPixelPlatforms: item.trackingPixelPlatforms ?? [],
       musicToolsDetected: item.musicToolsDetected ?? [],
       spotifyPopularity: item.spotifyPopularity ?? null,
       spotifyFollowers: item.spotifyFollowers ?? null,
@@ -353,11 +359,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Deduplicate URLs to prevent TOCTOU race on parallel insert
+    const uniqueUrls = [...new Set(validated.data.urls)];
+    const urlResults = await mapConcurrent(uniqueUrls, 5, async url =>
+      processLeadUrl(url)
+    );
+
     const results: LeadProcessResult[] = [];
     const newLeadIds: string[] = [];
-
-    for (const url of validated.data.urls) {
-      const { result, leadId } = await processLeadUrl(url);
+    for (const { result, leadId } of urlResults) {
       results.push(result);
       if (leadId) newLeadIds.push(leadId);
     }

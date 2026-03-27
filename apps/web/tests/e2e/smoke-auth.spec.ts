@@ -173,25 +173,10 @@ test.describe('Dashboard Navigation @smoke', () => {
         APP_ROUTES.DASHBOARD_OVERVIEW,
         APP_ROUTES.ONBOARDING,
       ]) {
-        try {
-          await page.goto(route, {
-            waitUntil: 'domcontentloaded',
-            timeout: SMOKE_TIMEOUTS.NAVIGATION,
-          });
-        } catch (navError) {
-          const msg =
-            navError instanceof Error ? navError.message : String(navError);
-          if (
-            msg.includes('net::ERR_CONNECTION_REFUSED') ||
-            msg.includes('net::ERR_CONNECTION_RESET') ||
-            msg.includes('Timeout') ||
-            msg.includes('Target closed')
-          ) {
-            test.skip(true, `Transient nav error on ${route}`);
-            return;
-          }
-          throw navError;
-        }
+        await smokeNavigateWithRetry(page, route, {
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+          retries: 2,
+        });
 
         const url = page.url();
         const isAuthPage =
@@ -230,15 +215,8 @@ test.describe('Dashboard Navigation @smoke', () => {
         test.skip(true, `Clerk auth failed: ${error.message}`);
         return;
       }
-      const msg = error instanceof Error ? error.message : String(error);
-      if (
-        msg.includes('net::ERR_') ||
-        msg.includes('Timeout') ||
-        msg.includes('Target closed')
-      ) {
-        test.skip(true, 'Sign-in infra issue');
-        return;
-      }
+      // Don't silently skip on network errors — if sign-in fails after retries,
+      // that's a real problem. Only Clerk SDK issues (ClerkTestError) warrant skipping.
       throw error;
     }
 
@@ -289,15 +267,13 @@ test.describe('Dashboard Navigation @smoke', () => {
     ).toHaveLength(0);
   });
 
-  test('dashboard does not redirect-loop when data fails to load', async ({
+  test('dashboard does not redirect-loop for unauthenticated access', async ({
     browser,
   }) => {
-    const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-    const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-    if (!username || !password) {
-      test.skip(true, 'No E2E credentials for redirect loop test');
-      return;
-    }
+    // This test runs unauthenticated — it checks that hitting /app/dashboard
+    // without auth doesn't produce a redirect loop between /app and /signin.
+    // The authenticated data-failure redirect loop is covered by middleware
+    // circuit breaker tests and onboarding-completion.spec.ts.
 
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -318,11 +294,11 @@ test.describe('Dashboard Navigation @smoke', () => {
       await page.waitForTimeout(3_000);
 
       const appCount = redirectUrls.filter(u => u.startsWith('/app')).length;
-      const onboardingCount = redirectUrls.filter(
-        u => u === APP_ROUTES.ONBOARDING
+      const signinCount = redirectUrls.filter(
+        u => u === APP_ROUTES.SIGNIN || u === '/sign-in'
       ).length;
       const isLooping =
-        (appCount >= 2 && onboardingCount >= 2) || redirectUrls.length > 10;
+        (appCount >= 2 && signinCount >= 2) || redirectUrls.length > 10;
 
       expect(
         isLooping,

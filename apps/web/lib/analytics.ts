@@ -12,8 +12,8 @@ type AnalyticsWindow = Window & {
 };
 
 function getAnalyticsWindow(): AnalyticsWindow | null {
-  if (typeof window === 'undefined') return null;
-  return window as AnalyticsWindow;
+  if (globalThis.window === undefined) return null;
+  return globalThis.window as AnalyticsWindow;
 }
 
 function getEnvTag(host: string): 'dev' | 'prod' | 'preview' {
@@ -90,7 +90,7 @@ export function trackMagicMomentIfReady(params: {
   }
 
   const key = `magic_moment_achieved_${params.profileId}`;
-  if (typeof window !== 'undefined' && window.localStorage.getItem(key)) {
+  if (globalThis.window !== undefined && globalThis.localStorage.getItem(key)) {
     return false;
   }
 
@@ -103,8 +103,8 @@ export function trackMagicMomentIfReady(params: {
     enrichmentStatus: params.enrichmentStatus,
   });
 
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(key, String(Date.now()));
+  if (globalThis.window !== undefined) {
+    globalThis.localStorage.setItem(key, String(Date.now()));
   }
 
   return true;

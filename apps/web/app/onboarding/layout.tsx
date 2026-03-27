@@ -1,6 +1,8 @@
+import '../(auth)/auth-utilities.css';
+import Script from 'next/script';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { resolveUserState } from '@/lib/auth/gate';
-import { publicEnv } from '@/lib/env-public';
+import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 import { FeatureFlagsProvider } from '@/lib/feature-flags/client';
 import { getFeatureFlagsBootstrap } from '@/lib/feature-flags/server';
 
@@ -11,15 +13,16 @@ export default async function OnboardingLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = await resolvePublishableKeyFromHeaders();
   const authResult = await resolveUserState();
   const featureFlagsBootstrap = await getFeatureFlagsBootstrap(
     authResult.clerkUserId ?? null
   );
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+        <Script src='/theme-init.js' strategy='beforeInteractive' />
         {children}
       </FeatureFlagsProvider>
     </ClientProviders>

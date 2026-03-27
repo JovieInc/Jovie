@@ -10,6 +10,7 @@ import { ReleaseTaskRow } from './ReleaseTaskRow';
 interface ReleaseTaskPageProps {
   readonly releaseId: string;
   readonly releaseTitle: string;
+  readonly releaseDate?: Date | string | null;
 }
 
 function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
@@ -19,7 +20,7 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 
   // Sort by due date (nearest first), then by position (template order)
   return incomplete
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       // Tasks with due dates come first
       if (a.dueDate && !b.dueDate) return -1;
       if (!a.dueDate && b.dueDate) return 1;
@@ -35,6 +36,7 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
 export function ReleaseTaskPage({
   releaseId,
   releaseTitle,
+  releaseDate,
 }: ReleaseTaskPageProps) {
   const { data: tasks } = useReleaseTasksQuery(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -72,7 +74,7 @@ export function ReleaseTaskPage({
           <h3 className='px-4 text-[11px] font-medium uppercase tracking-wider text-tertiary-token mb-2'>
             Up Next
           </h3>
-          <div className='rounded-lg border border-subtle/45 bg-[var(--linear-bg-surface-card)]'>
+          <div className='rounded-lg border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)'>
             {upNextTasks.map(task => (
               <ReleaseTaskRow
                 key={task.id}
@@ -85,7 +87,11 @@ export function ReleaseTaskPage({
       )}
 
       {/* Main checklist */}
-      <ReleaseTaskChecklist releaseId={releaseId} variant='full' />
+      <ReleaseTaskChecklist
+        releaseId={releaseId}
+        variant='full'
+        releaseDate={releaseDate}
+      />
     </div>
   );
 }

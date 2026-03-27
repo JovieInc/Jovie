@@ -5,12 +5,16 @@ import { useMemo } from 'react';
 import type { TourDateViewModel } from '@/app/app/(shell)/dashboard/tour-dates/actions';
 import { AboutSection } from '@/features/profile/AboutSection';
 import type { SwipeableProfileMode } from '@/features/profile/contracts';
-import { LatestReleaseCard } from '@/features/profile/LatestReleaseCard';
-import { StaticListenInterface } from '@/features/profile/StaticListenInterface';
+import {
+  ProfileFeaturedCard,
+  resolveFeaturedContent,
+} from '@/features/profile/ProfileFeaturedCard';
+import { ProfilePrimaryCTA } from '@/features/profile/ProfilePrimaryCTA';
 import { extractVenmoUsername } from '@/features/profile/utils/venmo';
 import VenmoTipSelector from '@/features/profile/VenmoTipSelector';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 const TIP_AMOUNTS = [3, 5, 7];
 
@@ -27,7 +31,10 @@ interface SwipeableModeContainerProps {
   readonly mergedDSPs: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
   readonly genres?: string[] | null;
+  readonly pressPhotos?: readonly PressPhoto[];
+  readonly allowPhotoDownloads?: boolean;
   readonly tourDates: TourDateViewModel[];
+  readonly onSubscribeClick: () => void;
   readonly modes: readonly SwipeableProfileMode[];
   readonly activeIndex: number;
   readonly dragOffset: number;
@@ -42,35 +49,72 @@ interface SwipeableModeContainerProps {
 
 function ProfilePane({
   artist,
+  socialLinks,
   latestRelease,
+  tourDates,
   mergedDSPs,
   enableDynamicEngagement,
+  onSubscribeClick,
 }: {
   readonly artist: Artist;
+  readonly socialLinks: LegacySocialLink[];
   readonly latestRelease?: SwipeableModeContainerProps['latestRelease'];
+  readonly tourDates: TourDateViewModel[];
   readonly mergedDSPs: AvailableDSP[];
   readonly enableDynamicEngagement?: boolean;
+  readonly onSubscribeClick: () => void;
 }) {
-  if (!latestRelease) {
-    return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
-        New music and major updates will show up here first.
-      </div>
-    );
-  }
+  const featuredContent = resolveFeaturedContent(tourDates, latestRelease);
+  const shouldRenderLatestRelease =
+    latestRelease && featuredContent.kind !== 'release';
+  const shouldRenderFeaturedCard = featuredContent.kind !== 'fallback';
 
   return (
-    <div className='space-y-3'>
-      <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
-        Latest release
-      </p>
-      <LatestReleaseCard
-        release={latestRelease}
-        artistHandle={artist.handle}
-        artist={artist}
-        dsps={mergedDSPs}
-        enableDynamicEngagement={enableDynamicEngagement}
-      />
+    <div className='space-y-4'>
+      {shouldRenderFeaturedCard ? (
+        <ProfileFeaturedCard
+          artist={artist}
+          latestRelease={latestRelease}
+          tourDates={tourDates}
+          dsps={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+        />
+      ) : null}
+
+      <div className='mx-auto max-w-sm'>
+        <ProfilePrimaryCTA
+          artist={artist}
+          socialLinks={socialLinks}
+          mergedDSPs={mergedDSPs}
+          enableDynamicEngagement={enableDynamicEngagement}
+          showCapture={false}
+        />
+      </div>
+
+      {shouldRenderLatestRelease ? (
+        <div className='space-y-3'>
+          <p className='text-xs font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+            Latest release
+          </p>
+          <ProfileFeaturedCard
+            artist={artist}
+            latestRelease={latestRelease}
+            tourDates={[]}
+            dsps={mergedDSPs}
+            enableDynamicEngagement={enableDynamicEngagement}
+          />
+        </div>
+      ) : null}
+
+      <div className='pt-1'>
+        <button
+          type='button'
+          onClick={onSubscribeClick}
+          className='inline-flex h-11 w-full items-center justify-center rounded-xl border border-subtle bg-surface-1 text-sm font-semibold text-primary-token transition-[background-color,border-color,color] duration-150 hover:border-subtle hover:bg-surface-0'
+        >
+          Get notified
+        </button>
+      </div>
     </div>
   );
 }
@@ -93,7 +137,7 @@ function TourPane({
 
   if (sortedDates.length === 0) {
     return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
         No upcoming shows right now. Subscribe to hear about the next tour stop.
       </div>
     );
@@ -109,7 +153,7 @@ function TourPane({
         return (
           <div
             key={tourDate.id}
-            className='rounded-3xl border border-subtle bg-surface-1 p-4 shadow-sm'
+            className='rounded-2xl border border-subtle bg-surface-1 p-4 shadow-sm'
           >
             <div className='flex items-start justify-between gap-3'>
               <div className='min-w-0'>
@@ -161,7 +205,7 @@ function TipPane({
 
   if (!venmoLink) {
     return (
-      <div className='rounded-3xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
+      <div className='rounded-2xl border border-subtle bg-surface-1 p-5 text-sm text-secondary-token shadow-sm'>
         Tipping is not available for this artist yet.
       </div>
     );
@@ -183,7 +227,10 @@ export function SwipeableModeContainer({
   mergedDSPs,
   enableDynamicEngagement = false,
   genres,
+  pressPhotos = [],
+  allowPhotoDownloads = false,
   tourDates,
+  onSubscribeClick,
   modes,
   activeIndex,
   dragOffset,
@@ -196,7 +243,7 @@ export function SwipeableModeContainer({
   return (
     <div
       ref={containerRef}
-      className='relative h-full overflow-hidden'
+      className='relative -mt-3 h-full overflow-hidden rounded-t-2xl'
       {...handlers}
     >
       <div
@@ -215,32 +262,30 @@ export function SwipeableModeContainer({
             id={`profile-pane-${mode}`}
             role='tabpanel'
             aria-hidden={mode !== modes[activeIndex]}
-            className='h-full min-w-full overflow-y-auto px-3 pb-4'
+            className='h-full min-w-full overflow-y-auto px-3 pb-5 pt-4'
             style={{ contentVisibility: 'auto' }}
           >
             {mode === 'profile' ? (
               <ProfilePane
                 artist={artist}
+                socialLinks={socialLinks}
                 latestRelease={latestRelease}
+                tourDates={tourDates}
                 mergedDSPs={mergedDSPs}
                 enableDynamicEngagement={enableDynamicEngagement}
+                onSubscribeClick={onSubscribeClick}
               />
-            ) : null}
-            {mode === 'listen' ? (
-              <div className='rounded-3xl border border-subtle bg-surface-1 p-4 shadow-sm'>
-                <StaticListenInterface
-                  artist={artist}
-                  handle={artist.handle}
-                  dspsOverride={mergedDSPs}
-                  enableDynamicEngagement={enableDynamicEngagement}
-                />
-              </div>
             ) : null}
             {mode === 'tour' ? (
               <TourPane artistName={artist.name} tourDates={tourDates} />
             ) : null}
             {mode === 'about' ? (
-              <AboutSection artist={artist} genres={genres} />
+              <AboutSection
+                artist={artist}
+                genres={genres}
+                pressPhotos={pressPhotos}
+                allowPhotoDownloads={allowPhotoDownloads}
+              />
             ) : null}
             {mode === 'tip' ? <TipPane socialLinks={socialLinks} /> : null}
           </section>

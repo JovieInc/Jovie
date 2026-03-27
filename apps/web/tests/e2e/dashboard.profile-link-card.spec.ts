@@ -1,7 +1,7 @@
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from '@playwright/test';
-import { signInUser } from '../helpers/clerk-auth';
+import { hasClerkCredentials, signInUser } from '../helpers/clerk-auth';
 import { SMOKE_TIMEOUTS } from './utils/smoke-test-utils';
 
 const FAST_ITERATION = process.env.E2E_FAST_ITERATION === '1';
@@ -18,24 +18,6 @@ async function getProfileLinkCard(page: Page): Promise<Locator | null> {
     .catch(() => false);
   if (!isVisible) return null;
   return profileLinkCard.first();
-}
-
-/**
- * Check if Clerk credentials are available for authenticated tests
- */
-function hasClerkCredentials(): boolean {
-  const username = process.env.E2E_CLERK_USER_USERNAME ?? '';
-  const password = process.env.E2E_CLERK_USER_PASSWORD ?? '';
-  const clerkSetupSuccess = process.env.CLERK_TESTING_SETUP_SUCCESS === 'true';
-
-  // Allow passwordless auth for Clerk test emails
-  const isClerkTestEmail = username.includes('+clerk_test');
-
-  return (
-    username.length > 0 &&
-    (password.length > 0 || isClerkTestEmail) &&
-    clerkSetupSuccess
-  );
 }
 
 test.describe('ProfileLinkCard E2E Tests', () => {

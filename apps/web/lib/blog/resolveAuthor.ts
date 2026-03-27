@@ -7,6 +7,8 @@ export interface ResolvedAuthor {
   avatarUrl: string | null;
   profileUrl?: string;
   isVerified: boolean;
+  bio?: string;
+  username?: string;
 }
 
 export function resolveAuthor(
@@ -19,5 +21,7 @@ export function resolveAuthor(
     avatarUrl: profile?.avatarUrl ?? null,
     profileUrl: profile ? `/${profile.usernameNormalized}` : post.authorProfile,
     isVerified: profile?.isVerified ?? false,
+    bio: profile?.bio ?? undefined,
+    username: profile?.usernameNormalized ?? post.authorUsername,
   };
 }

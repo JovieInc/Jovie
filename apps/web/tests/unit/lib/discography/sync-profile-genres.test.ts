@@ -43,6 +43,8 @@ vi.mock('@/lib/db/schema/content', () => ({
     creatorProfileId: 'creatorProfileId',
     genres: 'genres',
   },
+  discogReleaseTracks: {},
+  discogRecordings: {},
   artists: {},
   discogTracks: {},
   providerLinks: {},

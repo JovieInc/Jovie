@@ -149,7 +149,6 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
   }
 
   const visibleLinks = filteredLinks.slice(0, maxLinks);
-  const useCollapsedMode = filteredLinks.length >= 2;
 
   return (
     <CompactLinkRail
@@ -198,11 +197,7 @@ export const SocialLinksCell = React.memo(function SocialLinksCell({
       summaryAriaLabel={`${filteredLinks.length} social links`}
       maxVisible={maxLinks}
       className={className}
-      railClassName={
-        useCollapsedMode
-          ? 'max-w-[148px] lg:max-w-[188px]'
-          : 'max-w-[176px] lg:max-w-[232px]'
-      }
+      railClassName='w-full'
     />
   );
 });

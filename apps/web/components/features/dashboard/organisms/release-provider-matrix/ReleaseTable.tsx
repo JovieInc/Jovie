@@ -142,7 +142,7 @@ export function ReleaseTable({
           'bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_60%,var(--linear-bg-surface-0))] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_66%,transparent)] hover:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_64%,var(--linear-bg-surface-0))] focus-within:bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_68%,var(--linear-bg-surface-0))]';
       } else {
         baseClassName =
-          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] transition-[background-color,box-shadow] duration-150 ease-out';
+          'bg-transparent hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)] hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)] focus-within:bg-[color-mix(in_oklab,var(--linear-row-hover)_84%,transparent)] focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_28%,transparent)] transition-[background-color,box-shadow,color] duration-150 ease-out [&:hover_span]:text-primary-token [&:hover_p]:text-primary-token';
       }
 
       const refreshClassName = isRefreshing
@@ -153,7 +153,7 @@ export function ReleaseTable({
         : '';
 
       return [
-        'rounded-none transition-[background-color,box-shadow] duration-150 ease-out',
+        'rounded-[10px] transition-[background-color,box-shadow] duration-150 ease-out',
         'focus-within:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_30%,transparent)]',
         'data-[state=selected]:bg-(--linear-row-selected)',
         baseClassName,
@@ -218,8 +218,8 @@ export function ReleaseTable({
         isSmartLinkLocked,
         getSmartLinkLockReason
       ),
-      size: 236,
-      minSize: 188,
+      size: 260,
+      minSize: 100,
       meta: { className: 'hidden pl-2 pr-4 sm:table-cell' },
     });
 

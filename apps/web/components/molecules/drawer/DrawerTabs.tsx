@@ -1,15 +1,26 @@
 'use client';
 
 import type { SegmentControlOption } from '@jovie/ui';
-import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+
+export const DRAWER_TABS_RAIL_CLASSNAME =
+  'inline-flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
+
+export const DRAWER_TABS_TRIGGER_CLASSNAME =
+  'inline-flex min-h-7 items-center justify-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-transparent px-2.5 py-1 text-[11.5px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
+
+export const DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME =
+  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
 
 export interface DrawerTabsProps<T extends string> {
   readonly value: T;
   readonly onValueChange: (value: T) => void;
   readonly options: readonly SegmentControlOption<T>[];
   readonly ariaLabel: string;
+  readonly actions?: ReactNode;
   readonly className?: string;
+  readonly actionsClassName?: string;
   readonly triggerClassName?: string;
 }
 
@@ -18,24 +29,46 @@ export function DrawerTabs<T extends string>({
   onValueChange,
   options,
   ariaLabel,
+  actions,
   className,
+  actionsClassName,
   triggerClassName,
 }: DrawerTabsProps<T>) {
   return (
-    <AppSegmentControl
-      value={value}
-      onValueChange={onValueChange}
-      options={options}
-      surface='ghost'
-      aria-label={ariaLabel}
-      className={cn(
-        'w-full rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] p-0.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-        className
-      )}
-      triggerClassName={cn(
-        'h-[27px] rounded-full px-3 text-[11px] font-[510] tracking-[-0.008em] text-tertiary-token data-[state=active]:bg-surface-0 data-[state=active]:text-primary-token',
-        triggerClassName
-      )}
-    />
+    <div className='flex w-full items-center justify-between gap-2'>
+      <div
+        role='tablist'
+        aria-label={ariaLabel}
+        className={cn(
+          DRAWER_TABS_RAIL_CLASSNAME,
+          'flex min-w-0 flex-1 flex-wrap',
+          className
+        )}
+      >
+        {options.map(option => (
+          <button
+            key={option.value}
+            type='button'
+            role='tab'
+            aria-selected={value === option.value}
+            onClick={() => onValueChange(option.value)}
+            className={cn(
+              DRAWER_TABS_TRIGGER_CLASSNAME,
+              value === option.value && DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
+              triggerClassName
+            )}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      {actions ? (
+        <div
+          className={cn('ml-auto flex shrink-0 items-center', actionsClassName)}
+        >
+          {actions}
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { APP_URL } from '@/constants/app';
+import { BASE_URL } from '@/constants/app';
 import {
   notifyVerificationRequest,
   sendVerificationApprovedEmail,
@@ -56,7 +56,7 @@ describe('verification notifications', () => {
     };
 
     expect(slackPayload.blocks?.[0]?.text?.text).toContain(
-      `<${APP_URL}/alex|Open profile>`
+      `<${BASE_URL}/alex|Open profile>`
     );
     expect(result).toEqual({ status: 'sent' });
   });

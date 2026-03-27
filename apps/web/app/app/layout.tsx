@@ -1,15 +1,18 @@
+import './app-utilities.css';
+import Script from 'next/script';
 import { ClientProviders } from '@/components/providers/ClientProviders';
-import { publicEnv } from '@/lib/env-public';
+import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
 
 export const dynamic = 'force-dynamic';
 
-export default function AppLayout({
+export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const publishableKey = await resolvePublishableKeyFromHeaders();
 
   return (
-    <ClientProviders publishableKey={publishableKey} skipCoreProviders>
+    <ClientProviders publishableKey={publishableKey}>
+      <Script src='/theme-init.js' strategy='beforeInteractive' />
       {children}
     </ClientProviders>
   );

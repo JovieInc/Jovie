@@ -5,6 +5,7 @@ author: Tim White
 authorUsername: tim
 authorTitle: Founder at Jovie
 category: Release Strategy
+tags: release strategy, momentum, content calendar, marketing
 ---
 
 # The Friday Problem
@@ -69,4 +70,4 @@ This is why I started working on Jovie. After spending 15 years building these s
 
 Musicians should be making music. Not learning how to be marketing coordinators.
 
-If you’re an artist dealing with this, or you’re doing marketing for artists and fighting this same fight, I’d love to chat. Hit me up at tim@jov.ie or DM me on social.
+If you’re an artist dealing with this, or you’re doing marketing for artists and fighting this same fight, I’d love to hear from you. Reach out at support@jov.ie or DM me on social.

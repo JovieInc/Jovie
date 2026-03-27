@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { EditableContact } from '@/features/dashboard/hooks/useContactsManager';
@@ -13,15 +14,18 @@ vi.mock('@/components/molecules/drawer', async importOriginal => {
     EntitySidebarShell: ({
       children,
       entityHeader,
+      tabs,
       title,
     }: {
       children: ReactNode;
       entityHeader?: ReactNode;
+      tabs?: ReactNode;
       title: ReactNode;
     }) => (
       <div>
         <div>{title}</div>
         {entityHeader}
+        {tabs}
         {children}
       </div>
     ),
@@ -50,7 +54,7 @@ const contact: EditableContact = {
 };
 
 describe('ContactDetailSidebar', () => {
-  it('renders the calm entity header and contact role context', () => {
+  it('renders the calm entity header and Info tab content by default', () => {
     render(
       <ContactDetailSidebar
         contact={contact}
@@ -65,6 +69,25 @@ describe('ContactDetailSidebar', () => {
     expect(screen.getAllByText('Alex Rivera').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Management').length).toBeGreaterThan(0);
     expect(screen.getByText('Contact Info')).toBeInTheDocument();
-    expect(screen.getByText('Territories')).toBeInTheDocument();
+    expect(screen.getByText('Role')).toBeInTheDocument();
+  });
+
+  it('shows Territories when the Territories tab is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ContactDetailSidebar
+        contact={contact}
+        isOpen
+        onClose={() => undefined}
+        onUpdate={() => undefined}
+        onSave={() => undefined}
+        onDelete={() => undefined}
+      />
+    );
+
+    await user.click(screen.getByRole('tab', { name: 'Territories' }));
+
+    expect(screen.getAllByText('Territories').length).toBeGreaterThan(0);
   });
 });

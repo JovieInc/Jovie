@@ -74,6 +74,7 @@ export default defineConfig({
     // Exclude slow test categories
     exclude: [
       'tests/e2e/**',
+      'tests/eval/**',
       'tests/audit/**',
       'tests/performance/**',
       'tests/integration/**',
@@ -103,7 +104,7 @@ export default defineConfig({
     coverage: {
       enabled: false,
       provider: 'v8',
-      reporter: ['text', 'json', 'lcov'],
+      reporter: ['text', 'json', 'html', 'lcov'],
       reportsDirectory: './coverage',
       exclude: [
         'node_modules/**',

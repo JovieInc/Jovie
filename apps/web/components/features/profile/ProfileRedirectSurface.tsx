@@ -23,7 +23,7 @@ export function ProfileRedirectSurface({
           subtitle={description}
         />
         <div className='flex flex-col items-center gap-4 px-5 py-5 text-center sm:px-6'>
-          <div className='flex h-12 w-12 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0'>
+          <div className='flex h-12 w-12 items-center justify-center rounded-full border border-subtle bg-surface-0'>
             <LoadingSpinner size='lg' tone='primary' />
           </div>
           <p className='text-[12px] text-tertiary-token'>{helperText}</p>

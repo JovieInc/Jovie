@@ -6,8 +6,10 @@
  */
 
 import type { CommonDropdownItem } from '@jovie/ui';
-import { Instagram, Link2, Mail, Music2, Share2, Twitter } from 'lucide-react';
+import { Link2, Mail, Music2, Share2 } from 'lucide-react';
+import React from 'react';
 import { toast } from 'sonner';
+import { SocialIcon } from '@/components/atoms/SocialIcon';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import type {
   ContextMenuAction,
@@ -17,17 +19,57 @@ import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
 
-const UTM_PRESET_ICONS = {
-  Instagram,
+const UTM_PRESET_LUCIDE_ICONS = {
   Music2,
-  Twitter,
   Mail,
 } as const;
 
+const UTM_PRESET_PLATFORM_ICONS: Record<string, string> = {
+  Instagram: 'instagram',
+  Twitter: 'twitter',
+  Youtube: 'youtube',
+  Facebook: 'facebook',
+  Linkedin: 'linkedin',
+  spotify: 'spotify',
+  apple_music: 'apple_music',
+  instagram: 'instagram',
+  twitter: 'twitter',
+  facebook: 'facebook',
+  youtube: 'youtube',
+  tiktok: 'tiktok',
+  linkedin: 'linkedin',
+  discord: 'discord',
+  reddit: 'reddit',
+  snapchat: 'snapchat',
+  threads: 'threads',
+  telegram: 'telegram',
+  line: 'line',
+  rumble: 'rumble',
+  soundcloud: 'soundcloud',
+  patreon: 'patreon',
+  onlyfans: 'onlyfans',
+  quora: 'quora',
+  viber: 'viber',
+};
+
 function resolvePresetIcon(preset: UTMPreset) {
-  return (
-    UTM_PRESET_ICONS[preset.icon as keyof typeof UTM_PRESET_ICONS] ?? Link2
-  );
+  const platformKey =
+    UTM_PRESET_PLATFORM_ICONS[preset.params.utm_source ?? ''] ??
+    UTM_PRESET_PLATFORM_ICONS[preset.icon as string];
+
+  if (platformKey) {
+    return React.createElement(SocialIcon, {
+      platform: platformKey,
+      className: 'h-4 w-4',
+    });
+  }
+
+  const LucideIcon =
+    UTM_PRESET_LUCIDE_ICONS[
+      preset.icon as keyof typeof UTM_PRESET_LUCIDE_ICONS
+    ] ?? Link2;
+
+  return React.createElement(LucideIcon, { className: 'h-4 w-4' });
 }
 
 /**
@@ -96,6 +138,7 @@ export function getUTMShareContextMenuItems(params: {
     const action: ContextMenuAction = {
       id: `utm-share-${preset.id}`,
       label: `Copy for ${preset.label}`,
+      icon: resolvePresetIcon(preset),
       onClick: () => {
         void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
           onCopied?.(preset.id);
@@ -126,6 +169,7 @@ export function getUTMShareActionMenuItems(params: {
   const children: TableActionMenuItem[] = quickPresets.map(preset => ({
     id: `utm-share-${preset.id}`,
     label: preset.label,
+    icon: resolvePresetIcon(preset),
     onClick: () => {
       void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
         onCopied?.(preset.id);

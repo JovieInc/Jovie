@@ -11,13 +11,19 @@ import {
 import type { ComponentType, SVGProps } from 'react';
 
 import { cn } from '@/lib/utils';
-
 import {
   type ChatSuggestion,
   DEFAULT_SUGGESTIONS,
   FEEDBACK_SUGGESTION,
   FIRST_SESSION_SUGGESTIONS,
+  PITCH_SUGGESTION,
 } from '../types';
+import {
+  CHAT_PROMPT_RAIL_CLASS,
+  CHAT_PROMPT_RAIL_MASK_STYLE,
+  CHAT_PROMPT_RAIL_SCROLL_CLASS,
+  getChatPromptPillClass,
+} from './chat-prompt-styles';
 
 /** Map icon name strings to lucide components */
 const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
@@ -29,14 +35,11 @@ const ICON_MAP: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
   Music,
 };
 
-/** All suggestion accents use the single accent color from the design system. */
-const ACCENT_TEXT_CLASS = 'text-accent';
-
 interface SuggestedPromptsProps {
   readonly onSelect: (prompt: string) => void;
   readonly isFirstSession?: boolean;
   readonly latestReleaseTitle?: string | null;
-  readonly suggestions?: readonly ChatSuggestion[];
+  readonly canUseAdvancedTools?: boolean;
 }
 
 function SuggestionPill({
@@ -53,22 +56,15 @@ function SuggestionPill({
       type='button'
       onClick={() => onSelect(suggestion.prompt)}
       className={cn(
-        'chat-pill flex items-start gap-2.5 rounded-[14px] border border-(--linear-app-frame-seam)',
-        'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
-        'hover:bg-surface-0',
-        'active:scale-[0.98]',
-        'focus:outline-none',
-        'cursor-pointer transition-[background-color,border-color] duration-fast'
+        'chat-pill cursor-pointer',
+        getChatPromptPillClass('default')
       )}
+      aria-label={suggestion.label}
     >
-      <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-(--linear-app-frame-seam) bg-surface-0'>
-        {IconComponent && (
-          <IconComponent
-            className={cn('h-3.5 w-3.5 shrink-0', ACCENT_TEXT_CLASS)}
-          />
-        )}
+      <span className='flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-colors duration-150 group-hover:text-primary-token'>
+        {IconComponent && <IconComponent className='h-3.5 w-3.5 shrink-0' />}
       </span>
-      <span className='pt-0.5 text-[13px] leading-snug text-secondary-token'>
+      <span className='min-w-0 flex-1 truncate pt-0.5 leading-none'>
         {suggestion.label}
       </span>
     </button>
@@ -79,11 +75,8 @@ export function SuggestedPrompts({
   onSelect,
   isFirstSession = false,
   latestReleaseTitle,
-  suggestions,
+  canUseAdvancedTools = false,
 }: SuggestedPromptsProps) {
-  const fallbackSuggestions = suggestions?.length
-    ? suggestions
-    : DEFAULT_SUGGESTIONS;
   const promptSuggestions = isFirstSession
     ? FIRST_SESSION_SUGGESTIONS.map(suggestion => {
         if (
@@ -101,18 +94,51 @@ export function SuggestedPrompts({
 
         return suggestion;
       })
-    : fallbackSuggestions;
+    : DEFAULT_SUGGESTIONS;
+
+  // Build the pitch suggestion (personalized if release title available)
+  const pitchSuggestion =
+    canUseAdvancedTools && !isFirstSession
+      ? (() => {
+          if (
+            typeof latestReleaseTitle === 'string' &&
+            latestReleaseTitle.trim().length > 0
+          ) {
+            const cleanTitle = latestReleaseTitle.trim();
+            return {
+              ...PITCH_SUGGESTION,
+              label: `Generate pitches for “${cleanTitle}”`,
+              prompt: `Generate playlist pitches for ${cleanTitle}.`,
+            };
+          }
+          return PITCH_SUGGESTION;
+        })()
+      : null;
 
   return (
-    <div className='grid w-full max-w-[46rem] gap-2.5 sm:grid-cols-2'>
-      {promptSuggestions.map(suggestion => (
-        <SuggestionPill
-          key={suggestion.label}
-          suggestion={suggestion}
-          onSelect={onSelect}
-        />
-      ))}
-      <SuggestionPill suggestion={FEEDBACK_SUGGESTION} onSelect={onSelect} />
+    <div className='w-full max-w-[46rem]'>
+      <div
+        className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
+        style={CHAT_PROMPT_RAIL_MASK_STYLE}
+        data-testid='suggested-prompts-rail'
+      >
+        <div className={CHAT_PROMPT_RAIL_CLASS}>
+          {promptSuggestions.map(suggestion => (
+            <SuggestionPill
+              key={suggestion.label}
+              suggestion={suggestion}
+              onSelect={onSelect}
+            />
+          ))}
+          {pitchSuggestion && (
+            <SuggestionPill suggestion={pitchSuggestion} onSelect={onSelect} />
+          )}
+          <SuggestionPill
+            suggestion={FEEDBACK_SUGGESTION}
+            onSelect={onSelect}
+          />
+        </div>
+      </div>
     </div>
   );
 }

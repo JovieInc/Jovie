@@ -169,6 +169,16 @@ export const ContactsTable = memo(function ContactsTable({
     onDelete(selectedContact);
   }, [selectedContact, onDelete]);
 
+  // Arrow keys update sidebar when it's already open
+  const handleFocusedRowChange = useCallback(
+    (index: number) => {
+      if (selectedContactId && contacts[index]) {
+        setSelectedContactId(contacts[index].id);
+      }
+    },
+    [selectedContactId, contacts]
+  );
+
   const getRowClassName = useCallback(
     (contact: EditableContact) => {
       // Selected row: solid bg (override base hover)
@@ -225,6 +235,7 @@ export const ContactsTable = memo(function ContactsTable({
               className='text-[13px]'
               getRowClassName={getRowClassName}
               onRowClick={handleRowClick}
+              onFocusedRowChange={handleFocusedRowChange}
               getContextMenuItems={getContextMenuItems}
             />
           )}

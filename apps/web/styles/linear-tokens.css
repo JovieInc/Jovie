@@ -37,30 +37,30 @@
   /* rgb(247,248,248) → primary text */
   /* Base chroma for Linear's neutral grays */
   --linear-chroma: 0.008;
-  --linear-hue: 260;
-  /* Slight blue-ish tint */
+  --linear-hue: 282;
+  /* Linear March 2026 refresh hue (shifted from 260→282) */
   /* ============================================
      TEXT COLORS — LIGHT MODE
      ============================================ */
-  --linear-text-primary: oklch(12% 0.005 260);
-  --linear-text-secondary: oklch(45% 0.012 260);
-  --linear-text-tertiary: oklch(55% 0.01 260);
-  --linear-text-quaternary: oklch(70% 0.008 260);
-  --linear-text-inverse: oklch(97% 0.005 260);
+  --linear-text-primary: oklch(12% 0.005 282);
+  --linear-text-secondary: oklch(45% 0.012 282);
+  --linear-text-tertiary: oklch(55% 0.01 282);
+  --linear-text-quaternary: oklch(70% 0.008 282);
+  --linear-text-inverse: oklch(97% 0.005 282);
   /* ============================================
      BACKGROUNDS — LIGHT MODE
      Clean, warm off-whites inspired by Linear's light UI
      ============================================ */
-  --linear-bg-page: oklch(98.5% 0.002 260);
-  --linear-bg-header: oklch(98.5% 0.002 260 / 0.85);
+  --linear-bg-page: oklch(98.5% 0.002 282);
+  --linear-bg-header: oklch(98.5% 0.002 282 / 0.85);
   --linear-bg-surface-0: oklch(100% 0 0);
   /* Pure white — elevated surfaces (menus, popovers, cards) */
-  --linear-bg-surface-1: oklch(97% 0.002 260);
+  --linear-bg-surface-1: oklch(97% 0.002 282);
   /* Item hover / secondary surface */
-  --linear-bg-surface-2: oklch(95% 0.003 260);
-  --linear-bg-button: oklch(92% 0.005 260);
-  --linear-bg-footer: oklch(98.5% 0.002 260);
-  --linear-border-footer: oklch(90% 0.005 260);
+  --linear-bg-surface-2: oklch(95% 0.003 282);
+  --linear-bg-button: oklch(92% 0.005 282);
+  --linear-bg-footer: oklch(98.5% 0.002 282);
+  --linear-border-footer: oklch(90% 0.005 282);
   --linear-bg-hover: rgba(0, 0, 0, 0.04);
   /* ============================================
      BORDERS — LIGHT MODE
@@ -73,14 +73,14 @@
      BUTTON COLORS — LIGHT MODE
      ============================================ */
   /* Primary button — dark on light */
-  --linear-btn-primary-bg: oklch(15% 0.005 260);
+  --linear-btn-primary-bg: oklch(15% 0.005 282);
   --linear-btn-primary-fg: oklch(98% 0 0);
-  --linear-btn-primary-hover: oklch(22% 0.005 260);
-  --linear-btn-primary-border: oklch(15% 0.005 260);
+  --linear-btn-primary-hover: oklch(22% 0.005 282);
+  --linear-btn-primary-border: oklch(15% 0.005 282);
   /* Secondary button — subtle gray */
-  --linear-btn-secondary-bg: oklch(94% 0.005 260);
-  --linear-btn-secondary-fg: oklch(20% 0.005 260);
-  --linear-btn-secondary-hover: oklch(90% 0.005 260);
+  --linear-btn-secondary-bg: oklch(94% 0.005 282);
+  --linear-btn-secondary-fg: oklch(20% 0.005 282);
+  --linear-btn-secondary-hover: oklch(90% 0.005 282);
   /* Accent button — purple (same in both modes, extracted 2026-03-16) */
   --linear-btn-accent-bg: #7170ff;
   --linear-btn-accent-fg: oklch(100% 0 0);
@@ -146,7 +146,8 @@
      ============================================ */
   --linear-h1-size: 64px;
   --linear-h1-weight: 510;
-  --linear-h1-leading: 64px;
+  --linear-h1-leading: 67.84px;
+  /* Linear renders 1.06 ratio: 64px × 1.06 = 67.84px (verified 2026-03-23) */
   --linear-h1-tracking: -1.408px;
   --linear-h2-size: 48px;
   --linear-h2-weight: 510;
@@ -209,6 +210,8 @@
   --linear-app-shell-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.045), 0 18px 42px rgba(0, 0, 0, 0.055);
   --linear-app-header-height: 40px;
+  /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
+  --linear-app-header-height-compact: 36px;
   --linear-app-header-padding-x: 12px;
   --linear-app-content-padding-x: 12px;
   --linear-app-content-padding-y: 8px;
@@ -217,10 +220,12 @@
   --linear-app-control-radius: 9999px;
   --linear-app-toolbar-gap: 4px;
   --linear-app-content-surface: var(--linear-bg-surface-0);
+  --linear-app-card-shadow:
+    0 3px 6px -2px rgba(0, 0, 0, 0.02), 0 1px 1px rgba(0, 0, 0, 0.04);
   --linear-app-drawer-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.035), 0 12px 28px rgba(0, 0, 0, 0.045);
-  --linear-row-hover: oklch(96.2% 0.003 260);
-  --linear-row-selected: oklch(94.8% 0.006 260);
+  --linear-row-hover: oklch(96.2% 0.003 282);
+  --linear-row-selected: oklch(94.8% 0.006 282);
   --linear-app-sidebar-width: 244px;
   --linear-app-sidebar-background-rgb: 247 248 248;
   --linear-app-sidebar-foreground-rgb: 18 18 20;
@@ -234,15 +239,37 @@
      COMPONENT-SCOPED TOKENS — marketing page effects
      ============================================ */
   /* Hero */
-  --linear-hero-backdrop: radial-gradient(
-    ellipse 80% 60% at 50% -10%,
-    oklch(20% 0.025 265 / 0.9) 0%,
-    oklch(15% 0.015 260 / 0.4) 50%,
-    transparent 75%
-  );
+  --linear-hero-backdrop:
+    radial-gradient(
+      ellipse 80% 60% at 50% -10%,
+      oklch(20% 0.025 265 / 0.9) 0%,
+      oklch(15% 0.015 260 / 0.4) 50%,
+      transparent 75%
+    ),
+    radial-gradient(
+      ellipse 40% 30% at 25% 15%,
+      oklch(18% 0.03 280 / 0.4),
+      transparent 60%
+    ),
+    radial-gradient(
+      ellipse 35% 25% at 75% 10%,
+      oklch(16% 0.02 250 / 0.25),
+      transparent 60%
+    );
   /* CTA section spacing */
   --linear-cta-section-pt: 7rem;
   --linear-cta-section-pb: 9rem;
+  /* Section glow backgrounds */
+  --linear-section-glow-primary: radial-gradient(
+    ellipse 70% 50% at 50% 30%,
+    oklch(16% 0.025 270 / 0.35),
+    transparent 70%
+  );
+  --linear-cta-glow: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    oklch(18% 0.03 265 / 0.45),
+    transparent 65%
+  );
   /* Pricing accent */
   --linear-pricing-accent: var(--linear-accent);
   --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
@@ -308,11 +335,11 @@
      ============================================ */
   --linear-h1-size-sm: 38px;
   --linear-h1-size-md: 56px;
-  --linear-h1-size-lg: 76px;
+  /* --linear-h1-size-lg removed: Linear caps H1 at 64px (--linear-h1-size), never 76px */
   --linear-h2-size-sm: 24px;
   --linear-h2-size-md: 36px;
   --linear-h2-size-xl: 48px;
-  --linear-h2-size-lg: 56px;
+  /* --linear-h2-size-lg removed: Linear caps H2 at 48px (--linear-h2-size), never 56px */
   --linear-body-lg-size-sm: 16px;
   --linear-body-lg-size-lg: 17px;
 }
@@ -332,7 +359,7 @@
   --linear-text-secondary: #d0d6e0;
   --linear-text-tertiary: #8a8f98;
   --linear-text-quaternary: #62666d;
-  --linear-text-inverse: oklch(5% 0.005 260);
+  --linear-text-inverse: oklch(5% 0.005 282);
   /* Backgrounds — extracted from linear.app computed styles (2026-03-10):
      --color-bg-primary: #08090a  body bg
      --color-bg-secondary: #1c1c1f  cards/panels
@@ -356,12 +383,12 @@
   --linear-border-subtle: rgba(255, 255, 255, 0.05);
   --linear-border-default: rgba(255, 255, 255, 0.08);
   --linear-border-strong: rgba(255, 255, 255, 0.14);
-  --linear-border-focus: oklch(60% 0.12 260);
-  /* Buttons — primary is light gray on dark (Linear pattern, extracted 2026-03-17) */
-  --linear-btn-primary-bg: #e6e6e6;
+  --linear-border-focus: oklch(60% 0.12 282);
+  /* Buttons — white primary on dark bg, matching Linear.app */
+  --linear-btn-primary-bg: #ffffff;
   --linear-btn-primary-fg: #08090a;
-  --linear-btn-primary-hover: #f0f0f0;
-  --linear-btn-primary-border: #e6e6e6;
+  --linear-btn-primary-hover: #e8e9ec;
+  --linear-btn-primary-border: #ffffff;
   --linear-btn-secondary-bg: #232326;
   --linear-btn-secondary-fg: #f7f8f8;
   --linear-btn-secondary-hover: #2a2a2e;
@@ -370,6 +397,17 @@
     ellipse 80% 60% at 50% 0%,
     oklch(20% 0.02 265 / 0.6),
     transparent 70%
+  );
+  /* Section glow backgrounds — dark mode */
+  --linear-section-glow-primary: radial-gradient(
+    ellipse 70% 50% at 50% 30%,
+    oklch(14% 0.03 270 / 0.5),
+    transparent 70%
+  );
+  --linear-cta-glow: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    oklch(16% 0.035 265 / 0.6),
+    transparent 65%
   );
   --linear-hero-gradient-from: #f7f8f8;
   --linear-hero-gradient-to: #8a8f98;
@@ -380,6 +418,8 @@
   --linear-shadow-card-elevated:
     0 0 0 1px rgba(255, 255, 255, 0.06), 0px 8px 40px rgba(0, 0, 0, 0.5);
   --linear-app-content-surface: var(--linear-bg-surface-1);
+  --linear-app-card-shadow:
+    0 4px 4px -1px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.08);
   --linear-app-shell-border: rgba(255, 255, 255, 0.05);
   --linear-app-shell-sidebar-seam: rgba(255, 255, 255, 0.05);
   --linear-app-frame-seam: rgba(255, 255, 255, 0.04);

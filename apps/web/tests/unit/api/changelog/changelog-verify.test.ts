@@ -21,7 +21,7 @@ vi.mock('@/lib/db/schema/product-update-subscribers', () => ({
 
 vi.mock('@/constants/app', () => ({
   APP_NAME: 'Jovie',
-  APP_URL: 'https://meetjovie.com',
+  BASE_URL: 'https://meetjovie.com',
 }));
 
 describe('/api/changelog/verify', () => {

@@ -1,17 +1,32 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import { Calendar, Home, type LucideIcon, MapPin, Plus, X } from 'lucide-react';
+import {
+  Calendar,
+  Home,
+  ImagePlus,
+  LoaderCircle,
+  type LucideIcon,
+  MapPin,
+  Plus,
+  X,
+} from 'lucide-react';
+import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { updateAllowProfilePhotoDownloads } from '@/app/app/(shell)/dashboard/actions/creator-profile';
 import { LINEAR_SURFACE } from '@/components/features/dashboard/tokens';
+import { useAvatarUpload } from '@/components/hooks/useAvatarUpload';
 import {
   DrawerAsyncToggle,
   DrawerSection,
+  DrawerSectionHeading,
 } from '@/components/molecules/drawer';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { LocationPicker } from '@/components/molecules/LocationPicker';
 import { cn } from '@/lib/utils';
+import type { PressPhoto } from '@/types/press-photos';
+
+const MAX_PRESS_PHOTOS = 6;
 
 interface ProfileAboutTabProps {
   readonly bio: string | null;
@@ -20,10 +35,13 @@ interface ProfileAboutTabProps {
   readonly hometown: string | null;
   readonly activeSinceYear: number | null;
   readonly allowPhotoDownloads: boolean;
+  readonly pressPhotos?: readonly PressPhoto[];
   readonly onBioChange?: (bio: string) => void;
   readonly onLocationChange?: (location: string | null) => void;
   readonly onHometownChange?: (hometown: string | null) => void;
   readonly onGenresChange?: (genres: string[]) => void;
+  readonly onPressPhotoUpload?: (file: File) => Promise<PressPhoto>;
+  readonly onPressPhotoDelete?: (photoId: string) => Promise<void>;
 }
 
 /** Inline-editable textarea for bio (click-to-edit pattern). */
@@ -168,6 +186,171 @@ function LocationField({
   return null;
 }
 
+function PressPhotosSection({
+  pressPhotos,
+  onUpload,
+  onDelete,
+}: {
+  readonly pressPhotos: readonly PressPhoto[];
+  readonly onUpload?: (file: File) => Promise<PressPhoto>;
+  readonly onDelete?: (photoId: string) => Promise<void>;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null);
+  const { handleFileUpload, isUploading, previewUrl, uploadProgress } =
+    useAvatarUpload({
+      onUpload: async file => {
+        if (!onUpload) {
+          return '';
+        }
+
+        const uploaded = await onUpload(file);
+        return uploaded.smallUrl ?? uploaded.blobUrl ?? '';
+      },
+      onError: message => setUploadError(message),
+      onSuccess: () => setUploadError(null),
+      analyticsPrefix: 'press_photo',
+    });
+
+  const canUpload = Boolean(onUpload) && pressPhotos.length < MAX_PRESS_PHOTOS;
+
+  const handleSelectFile = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      setUploadError(null);
+      await handleFileUpload(file);
+      event.target.value = '';
+    },
+    [handleFileUpload]
+  );
+
+  const handleDelete = useCallback(
+    async (photoId: string) => {
+      if (!onDelete) {
+        return;
+      }
+
+      setDeletingPhotoId(photoId);
+      try {
+        await onDelete(photoId);
+      } finally {
+        setDeletingPhotoId(current => (current === photoId ? null : current));
+      }
+    },
+    [onDelete]
+  );
+
+  return (
+    <DrawerSection className={cn(LINEAR_SURFACE.drawerCard, 'space-y-3 p-3')}>
+      <div className='flex items-center justify-between gap-3'>
+        <DrawerSectionHeading>Press Photos</DrawerSectionHeading>
+        <Badge variant='secondary' className='text-[10px] tabular-nums'>
+          {pressPhotos.length}/{MAX_PRESS_PHOTOS}
+        </Badge>
+      </div>
+
+      <div className='grid grid-cols-2 gap-2'>
+        {pressPhotos.map(photo => (
+          <div
+            key={photo.id}
+            className='group relative aspect-[4/5] overflow-hidden rounded-[14px] border border-(--linear-app-frame-seam) bg-surface-0'
+          >
+            <Image
+              src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
+              alt={photo.originalFilename ?? 'Press photo'}
+              fill
+              sizes='(max-width: 768px) 45vw, 160px'
+              className='object-cover'
+            />
+            {onDelete && (
+              <button
+                type='button'
+                onClick={() => {
+                  handleDelete(photo.id);
+                }}
+                disabled={deletingPhotoId === photo.id}
+                className='absolute top-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white transition hover:bg-black/70 disabled:cursor-wait disabled:opacity-70'
+                aria-label='Delete press photo'
+              >
+                {deletingPhotoId === photo.id ? (
+                  <LoaderCircle className='h-3.5 w-3.5 animate-spin' />
+                ) : (
+                  <X className='h-3.5 w-3.5' />
+                )}
+              </button>
+            )}
+          </div>
+        ))}
+
+        <button
+          type='button'
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!canUpload || isUploading}
+          className={cn(
+            'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
+            canUpload
+              ? 'hover:border-default hover:bg-surface-1'
+              : 'cursor-not-allowed opacity-60'
+          )}
+        >
+          {isUploading && previewUrl ? (
+            <>
+              <div
+                className='absolute inset-0 bg-cover bg-center opacity-70'
+                style={{ backgroundImage: `url(${previewUrl})` }}
+              />
+              <div className='absolute inset-0 bg-black/35' />
+              <div className='relative z-10 flex flex-col items-center gap-1 text-white'>
+                <LoaderCircle className='h-4 w-4 animate-spin' />
+                <span className='text-[11px] font-medium'>
+                  Uploading {uploadProgress}%
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token'>
+                <ImagePlus className='h-4 w-4' />
+              </div>
+              <div className='space-y-0.5'>
+                <p className='text-[12px] font-medium text-secondary-token'>
+                  Add photo
+                </p>
+                <p className='text-[11px] text-tertiary-token'>
+                  AVIF, JPG, PNG, HEIC
+                </p>
+              </div>
+            </>
+          )}
+        </button>
+      </div>
+
+      {!canUpload && pressPhotos.length >= MAX_PRESS_PHOTOS && (
+        <p className='text-[11px] text-tertiary-token'>
+          Remove a photo to upload another.
+        </p>
+      )}
+
+      {uploadError && <p className='text-[11px] text-danger'>{uploadError}</p>}
+
+      <input
+        ref={fileInputRef}
+        type='file'
+        accept='image/*,.heic,.heif'
+        className='sr-only'
+        onChange={event => {
+          handleSelectFile(event);
+        }}
+      />
+    </DrawerSection>
+  );
+}
+
 export function ProfileAboutTab({
   bio,
   genres,
@@ -175,10 +358,13 @@ export function ProfileAboutTab({
   hometown,
   activeSinceYear,
   allowPhotoDownloads,
+  pressPhotos = [],
   onBioChange,
   onLocationChange,
   onHometownChange,
   onGenresChange,
+  onPressPhotoUpload,
+  onPressPhotoDelete,
 }: ProfileAboutTabProps) {
   const hasGenres = genres && genres.length > 0;
   const hasMetadata =
@@ -303,6 +489,14 @@ export function ProfileAboutTab({
           </p>
         )}
       </DrawerSection>
+
+      {(pressPhotos.length > 0 || onPressPhotoUpload || onPressPhotoDelete) && (
+        <PressPhotosSection
+          pressPhotos={pressPhotos}
+          onUpload={onPressPhotoUpload}
+          onDelete={onPressPhotoDelete}
+        />
+      )}
 
       <DrawerSection
         title='Settings'

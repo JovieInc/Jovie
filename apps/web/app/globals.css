@@ -10,6 +10,8 @@
  * ⚠️  CHANGING THESE WILL BREAK ALL STYLING
  */
 
+@layer theme, base, clerk, components, utilities;
+
 @import "tailwindcss";
 @import "../styles/design-system.css";
 @import "../styles/theme.css";
@@ -32,13 +34,34 @@ body {
   overscroll-behavior: none;
 }
 
-/* Marketing pages use document scrolling rather than app-shell scroll panes. */
-html:has(.linear-marketing),
-body:has(.linear-marketing) {
+/* Marketing pages use document scrolling rather than app-shell scroll panes.
+   Only override html — setting overflow-y:auto on body promotes overflow-x:clip
+   to overflow-x:hidden, which creates a scroll container that breaks sticky. */
+html:has(.linear-marketing) {
   height: auto;
   min-height: 100%;
   overflow-y: auto;
   overscroll-behavior: auto;
+}
+body:has(.linear-marketing) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+  overscroll-behavior: auto;
+}
+
+/* PWA standalone mode polish — native-feel when installed */
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+
+  nav,
+  [data-testid="sidebar"],
+  [data-testid="mobile-tabs"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /* Prevent Chrome autofill from bleeding background onto sibling elements */
@@ -97,6 +120,10 @@ body {
   color: #0c0c0c;
 }
 
+.dark {
+  color-scheme: dark;
+}
+
 .dark body {
   background: var(--color-bg-base);
   color: var(--color-text-primary-token);
@@ -118,7 +145,9 @@ body {
       "ss03",
       "rlig" 1,
       "calt" 1;
-    letter-spacing: -0.011em;
+    /* letter-spacing: removed — Linear applies tracking per-element, not globally.
+       Nav items, buttons, and labels should have normal tracking.
+       Body text classes (.text-linear, .marketing-lead-linear) apply their own. */
     text-rendering: optimizelegibility;
   }
 }
@@ -395,8 +424,9 @@ body {
     line-height: var(--linear-leading-normal);
   }
   .marketing-h1-linear {
-    /* Discrete breakpoints matching Linear.app (measured 2026-03-21):
-       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px: 76px/1.0 */
+    /* Discrete breakpoints matching Linear.app (verified 2026-03-23):
+       375px: 38px/1.1  |  768px: 56px/1.08  |  1280px+: 64px/1.06
+       Linear caps at 64px — never goes to 76px at any viewport width */
     font-size: var(--linear-h1-size-sm);
     font-weight: 510;
     letter-spacing: -0.022em;
@@ -412,18 +442,17 @@ body {
   }
   @media (min-width: 1280px) {
     .marketing-h1-linear {
-      font-size: var(--linear-h1-size-lg);
-      line-height: 1;
+      font-size: var(--linear-h1-size);
+      line-height: 1.06;
     }
   }
   .marketing-h2-linear {
-    /* Exact Linear.app values:
-       font-size: 48px, weight: 510, letter-spacing: -1.056px, line-height: 48px */
-    /* Discrete breakpoints matching Linear.app (measured 2026-03-16):
-       375px: 24px/1.33  |  768px: 32px/1.125  |  1280px: 40px/1.1  |  1440px: 48px/1.0 */
+    /* Linear.app verified 2026-03-23:
+       Desktop max: 48px/510/-2.2%/1.0 — caps here, never goes to 56px
+       375px: 24px/1.33  |  768px: 36px/1.125  |  1280px+: 48px/1.0 */
     font-size: var(--linear-h2-size-sm);
     font-weight: 510;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.022em;
     line-height: 1.33;
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
@@ -437,13 +466,7 @@ body {
   }
   @media (min-width: 1280px) {
     .marketing-h2-linear {
-      font-size: var(--linear-h2-size-xl);
-      line-height: 1.1;
-    }
-  }
-  @media (min-width: 1440px) {
-    .marketing-h2-linear {
-      font-size: var(--linear-h2-size-lg);
+      font-size: var(--linear-h2-size);
       line-height: 1;
     }
   }
@@ -626,6 +649,31 @@ body {
   }
   .hero-stagger > *:nth-child(5) {
     animation-delay: 240ms;
+  }
+}
+
+/* ============================================
+   HERO PHONE FLOAT ANIMATION
+   Subtle float on the phone in HeroCinematic.
+   ============================================ */
+
+@keyframes hero-phone-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-hero-phone-float {
+  animation: hero-phone-float 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-hero-phone-float {
+    animation: none;
   }
 }
 
@@ -905,6 +953,216 @@ body {
       inset 0 1px 0 rgba(255, 255, 255, 0.04),
       0 0 0 1px rgba(255, 255, 255, 0.02),
       0 24px 60px rgba(0, 0, 0, 0.28);
+    transition:
+      transform 0.3s var(--linear-ease),
+      box-shadow 0.3s var(--linear-ease);
+  }
+  .homepage-surface-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 32px 80px rgba(0, 0, 0, 0.35);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .homepage-surface-card {
+      transition: none;
+    }
+    .homepage-surface-card:hover {
+      transform: none;
+    }
+  }
+
+  /* Section gradient divider — horizontal fade line between sections */
+  .section-gradient-divider {
+    height: 1px;
+    width: 100%;
+    max-width: var(--linear-content-max);
+    margin: 0 auto;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--linear-border-subtle) 20%,
+      var(--linear-border-subtle) 80%,
+      transparent
+    );
+  }
+
+  /* Marketing noise overlay — adds subtle grain texture */
+  .marketing-noise {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0.03;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+    background-repeat: repeat;
+    background-size: 300px 300px;
+  }
+  @media (prefers-contrast: more) {
+    .marketing-noise {
+      display: none;
+    }
+  }
+
+  /* Section glow background — radial gradient behind sections */
+  .section-glow {
+    position: relative;
+  }
+  .section-glow::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: var(--linear-section-glow-primary);
+  }
+  .section-glow-cta::before {
+    background: var(--linear-cta-glow);
+  }
+
+  /* Hero gradient text — subtle shimmer on headlines.
+     Uses hex (#aebde5) instead of oklch() to avoid Lightning CSS
+     generating @supports fallbacks that reset background-clip. */
+  .hero-gradient-text {
+    background-image: linear-gradient(
+      135deg,
+      var(--linear-text-primary) 0%,
+      var(--linear-text-primary) 35%,
+      #aebde5 50%,
+      var(--linear-text-primary) 65%,
+      var(--linear-text-primary) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    background-size: 200% 100%;
+    /* animation: hero-text-shimmer 8s ease-in-out infinite; */
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-gradient-text {
+      background-image: none;
+      -webkit-text-fill-color: var(--linear-text-primary);
+      color: var(--linear-text-primary);
+      animation: none;
+    }
+  }
+
+  /* Bento grid for feature showcase */
+  .bento-grid {
+    display: grid;
+    gap: var(--linear-gap-cards);
+    grid-template-columns: 1fr;
+    @media (min-width: 768px) {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  /* Bento card — glassmorphic feature card */
+  .bento-card {
+    position: relative;
+    border-radius: 1rem;
+    overflow: hidden;
+    border: 1px solid var(--linear-border-subtle);
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.04) 0%,
+        rgba(255, 255, 255, 0) 100%
+      ),
+      var(--linear-bg-surface-0);
+    @supports (background: color-mix(in oklab, red 1%, blue)) {
+      background:
+        linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.04) 0%,
+          rgba(255, 255, 255, 0) 100%
+        ),
+        color-mix(
+          in oklab,
+          var(--linear-bg-surface-0) 88%,
+          var(--linear-bg-page)
+        );
+    }
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.05),
+      0 0 0 1px rgba(255, 255, 255, 0.02),
+      0 24px 60px rgba(0, 0, 0, 0.3);
+    transition:
+      transform 0.3s var(--linear-ease),
+      box-shadow 0.3s var(--linear-ease);
+  }
+  .bento-card:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.07),
+      0 0 0 1px rgba(255, 255, 255, 0.04),
+      0 32px 80px rgba(0, 0, 0, 0.38);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bento-card {
+      transition: none;
+    }
+    .bento-card:hover {
+      transform: none;
+    }
+  }
+  /* Gradient border on bento cards via mask technique */
+  .bento-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.02) 50%,
+      rgba(255, 255, 255, 0.06) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+  /* Per-card accent glow */
+  .bento-card-glow {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    transition: opacity 0.3s var(--linear-ease);
+  }
+  .bento-card:hover .bento-card-glow {
+    opacity: 0.7;
+  }
+  .bento-card-glow--purple {
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 20%,
+      oklch(16% 0.03 270 / 0.4),
+      transparent 70%
+    );
+  }
+  .bento-card-glow--blue {
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 20%,
+      oklch(16% 0.03 240 / 0.4),
+      transparent 70%
+    );
+  }
+}
+
+@keyframes hero-text-shimmer {
+  0%,
+  100% {
+    background-position: 200% 0;
+  }
+  50% {
+    background-position: -200% 0;
   }
 }
 
@@ -1424,30 +1682,6 @@ body {
   html[data-doc-page="true"] * {
     box-shadow: none !important;
     text-shadow: none !important;
-  }
-}
-
-/* ============================================
-   AUTH LOGO ANIMATION
-   ============================================ */
-
-@layer components {
-  .animate-logo-spin {
-    animation: logo-spin 1.2s ease-in-out 0s 1 forwards;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .animate-logo-spin {
-      animation: none !important;
-    }
-  }
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
   }
 }
 

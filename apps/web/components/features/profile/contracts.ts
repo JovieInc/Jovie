@@ -3,6 +3,7 @@ import type { DiscogRelease } from '@/lib/db/schema/content';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
+import type { PressPhoto } from '@/types/press-photos';
 
 export const PROFILE_MODE_KEYS = [
   'profile',
@@ -16,19 +17,23 @@ export const PROFILE_MODE_KEYS = [
 
 export type ProfileMode = (typeof PROFILE_MODE_KEYS)[number];
 
-export const SWIPEABLE_MODES = [
-  'profile',
-  'listen',
-  'tour',
-  'about',
-  'tip',
-] as const;
+export const SWIPEABLE_MODES = ['profile', 'tour', 'tip', 'about'] as const;
 
 export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
 
 export function supportsProfileV2Mode(mode: ProfileMode): boolean {
-  return mode !== 'contact';
+  return true;
 }
+
+export const PROFILE_V2_OVERLAY_MODES = [
+  'listen',
+  'subscribe',
+  'contact',
+] as const;
+
+export type ProfileV2OverlayMode =
+  | (typeof PROFILE_V2_OVERLAY_MODES)[number]
+  | null;
 
 export interface ProfileModeShellConfig {
   readonly showBackButton: boolean;
@@ -63,6 +68,7 @@ export interface ProfilePublicViewModel {
   readonly latestRelease?: DiscogRelease | null;
   readonly photoDownloadSizes: AvatarSize[];
   readonly allowPhotoDownloads: boolean;
+  readonly pressPhotos: PressPhoto[];
   readonly subscribeTwoStep: boolean;
   readonly genres?: string[] | null;
   readonly tourDates: TourDateViewModel[];
@@ -81,6 +87,7 @@ export interface ProfileIdentityFields {
   readonly location: string;
   readonly hometown: string;
   readonly pitchContext: string;
+  readonly targetPlaylists: string;
   readonly profilePath: string;
 }
 

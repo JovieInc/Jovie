@@ -2,14 +2,17 @@
 
 import * as Switch from '@radix-ui/react-switch';
 import {
+  ArrowUpCircle,
   Check,
   ChevronDown,
   ChevronUp,
   Copy,
   ExternalLink,
+  Globe,
   Loader2,
   Monitor,
   Moon,
+  RefreshCw,
   Route,
   Search,
   Sun,
@@ -29,21 +32,24 @@ import {
   FEATURE_FLAGS,
   FF_OVERRIDES_KEY,
 } from '@/lib/feature-flags/shared';
+import {
+  registerServiceWorker,
+  SW_ENABLED_KEY,
+  unregisterServiceWorker,
+} from '@/lib/service-worker/control';
 
 function useLocalOverrides() {
-  const [overrides, setOverridesState] = useState<Record<string, boolean>>(
-    () => {
-      if (typeof window === 'undefined') return {};
-      try {
-        return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
-      } catch {
-        return {};
-      }
+  const [overrides, setOverrides] = useState<Record<string, boolean>>(() => {
+    if (globalThis.window === undefined) return {};
+    try {
+      return JSON.parse(localStorage.getItem(FF_OVERRIDES_KEY) ?? '{}');
+    } catch {
+      return {};
     }
-  );
+  });
 
   const setOverride = useCallback((key: string, value: boolean) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev, [key]: value };
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
       return next;
@@ -51,7 +57,7 @@ function useLocalOverrides() {
   }, []);
 
   const removeOverride = useCallback((key: string) => {
-    setOverridesState(prev => {
+    setOverrides(prev => {
       const next = { ...prev };
       delete next[key];
       localStorage.setItem(FF_OVERRIDES_KEY, JSON.stringify(next));
@@ -60,7 +66,7 @@ function useLocalOverrides() {
   }, []);
 
   const clearOverrides = useCallback(() => {
-    setOverridesState({});
+    setOverrides({});
     localStorage.removeItem(FF_OVERRIDES_KEY);
   }, []);
 
@@ -105,13 +111,13 @@ function useBreakpoint() {
   const [bp, setBp] = useState('xs');
   useEffect(() => {
     const update = () => {
-      const w = window.innerWidth;
+      const w = globalThis.innerWidth;
       const match = BREAKPOINTS.find(b => w >= b.min);
       setBp(match?.name ?? 'xs');
     };
     update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    globalThis.addEventListener('resize', update);
+    return () => globalThis.removeEventListener('resize', update);
   }, []);
   return bp;
 }
@@ -123,6 +129,103 @@ const ENV_COLORS: Record<string, string> = {
   production: 'bg-red-500/20 text-red-400 border-red-500/30',
   preview: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
 };
+
+type AsyncActionState = 'idle' | 'loading' | 'done' | 'error';
+
+const ASYNC_ACTION_LABELS: Record<string, Record<AsyncActionState, string>> = {
+  clear: {
+    idle: 'Clear',
+    loading: 'Clearing...',
+    done: 'Cleared!',
+    error: 'Failed',
+  },
+  unwaitlist: {
+    idle: 'Unwaitlist',
+    loading: 'Working...',
+    done: 'Done!',
+    error: 'Failed',
+  },
+};
+
+type PromoteState =
+  | 'idle'
+  | 'checking'
+  | 'ready'
+  | 'promoting'
+  | 'done'
+  | 'error';
+
+const PROMOTE_LABELS: Record<PromoteState, string> = {
+  idle: 'Promote',
+  checking: 'Promote',
+  ready: 'Promote',
+  promoting: 'Deploying...',
+  done: 'Deployed!',
+  error: 'Failed',
+};
+
+function getPromoteButtonColor(state: PromoteState): string {
+  if (state === 'done') return 'text-[var(--color-accent)]';
+  if (state === 'error') return 'text-red-400';
+  return 'text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10';
+}
+
+function AsyncActionIcon({
+  state,
+  idleIcon: IdleIcon,
+}: Readonly<{
+  state: AsyncActionState;
+  idleIcon: typeof Trash2;
+}>) {
+  if (state === 'loading')
+    return <Loader2 size={11} className='animate-spin' />;
+  if (state === 'done')
+    return <Check size={11} className='text-[var(--color-accent)]' />;
+  return <IdleIcon size={11} />;
+}
+
+function PromoteIcon({ state }: Readonly<{ state: PromoteState }>) {
+  if (state === 'promoting')
+    return <Loader2 size={11} className='animate-spin' />;
+  if (state === 'done') return <Check size={11} />;
+  return <ArrowUpCircle size={11} />;
+}
+
+function CopyFieldIcon({
+  copied,
+  icon: Icon,
+}: Readonly<{ copied: boolean; icon: typeof Copy }>) {
+  if (copied) return <Check size={11} className='text-[var(--color-accent)]' />;
+  return <Icon size={11} />;
+}
+
+function ExpandCollapseIcon({ open }: Readonly<{ open: boolean }>) {
+  if (open) return <ChevronDown size={13} />;
+  return <ChevronUp size={13} />;
+}
+
+function getSwButtonProps(enabled: boolean) {
+  return {
+    title: enabled
+      ? 'Service worker active — click to disable'
+      : 'Service worker disabled — click to enable',
+    className: `flex items-center gap-1 px-1.5 py-1 rounded transition-colors ${
+      enabled
+        ? 'text-[var(--color-accent)] bg-[var(--color-accent)]/10'
+        : 'text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)]'
+    }`,
+    'aria-label': enabled ? 'Disable service worker' : 'Enable service worker',
+  };
+}
+
+function getPromoteTitle(
+  promoteSha: { staging: string; prod: string } | null
+): string {
+  if (promoteSha) {
+    return `Promote ${promoteSha.staging} → prod (currently ${promoteSha.prod})`;
+  }
+  return 'Promote to production';
+}
 
 export function DevToolbar({
   env,
@@ -138,12 +241,23 @@ export function DevToolbar({
   const [mounted, setMounted] = useState(false);
   const [search, setSearch] = useState('');
   const [copiedField, setCopiedField] = useState<'sha' | 'route' | null>(null);
+  const [syncClerkState, setSyncClerkState] = useState<
+    'idle' | 'loading' | 'done' | 'noop' | 'error'
+  >('idle');
   const [unwaitlistState, setUnwaitlistState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
   const [clearSessionState, setClearSessionState] = useState<
     'idle' | 'loading' | 'done' | 'error'
   >('idle');
+  const [swEnabled, setSwEnabled] = useState(false);
+  const [promoteState, setPromoteState] = useState<
+    'idle' | 'checking' | 'ready' | 'promoting' | 'done' | 'error'
+  >('idle');
+  const [promoteSha, setPromoteSha] = useState<{
+    staging: string;
+    prod: string;
+  } | null>(null);
   const { theme, setTheme } = useTheme();
   const overridesCtx = useLocalOverrides();
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -155,20 +269,20 @@ export function DevToolbar({
     setMounted(true);
     setOpen(localStorage.getItem(TOOLBAR_STORAGE_KEY) === '1');
     setHidden(localStorage.getItem(TOOLBAR_HIDDEN_KEY) === '1');
+    setSwEnabled(localStorage.getItem(SW_ENABLED_KEY) === '1');
   }, []);
 
   // Keyboard shortcut: Cmd+Shift+D (Mac) / Ctrl+Shift+D (other)
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd') {
+      const isToggleShortcut =
+        e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'd';
+      if (isToggleShortcut) {
         e.preventDefault();
-        if (hidden) {
-          setHidden(false);
-          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '0');
-        } else {
-          setHidden(true);
-          localStorage.setItem(TOOLBAR_HIDDEN_KEY, '1');
-        }
+        const nextHidden = !hidden;
+        setHidden(nextHidden);
+        localStorage.setItem(TOOLBAR_HIDDEN_KEY, nextHidden ? '1' : '0');
+        return;
       }
       if (e.key === 'Escape' && open) {
         e.preventDefault();
@@ -197,6 +311,58 @@ export function DevToolbar({
       document.body.style.paddingBottom = '';
     };
   }, [open, hidden]);
+
+  // Poll deploy status for promote button (preview only, when toolbar visible)
+  useEffect(() => {
+    if (env !== 'preview' || hidden) return;
+    let active = true;
+
+    async function checkStatus() {
+      try {
+        setPromoteState(prev => (prev === 'idle' ? 'checking' : prev));
+        const res = await fetch('/api/deploy/status');
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        if (!active) return;
+        setPromoteSha({
+          staging: data.stagingSha,
+          prod: data.prodSha,
+        });
+        setPromoteState(prev => {
+          if (prev === 'promoting' || prev === 'done') return prev;
+          return data.needsPromote ? 'ready' : 'idle';
+        });
+      } catch {
+        // Silent fail — status is best-effort
+      }
+    }
+
+    checkStatus();
+    const interval = setInterval(checkStatus, 30_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [env, hidden]);
+
+  async function handlePromote() {
+    setPromoteState('promoting');
+    try {
+      const res = await fetch('/api/deploy/promote', { method: 'POST' });
+      if (res.ok) {
+        setPromoteState('done');
+        setTimeout(() => setPromoteState('idle'), 120_000);
+      } else if (res.status === 429) {
+        setPromoteState('ready');
+      } else {
+        setPromoteState('error');
+        setTimeout(() => setPromoteState('ready'), 3000);
+      }
+    } catch {
+      setPromoteState('error');
+      setTimeout(() => setPromoteState('ready'), 3000);
+    }
+  }
 
   function toggleOpen() {
     setOpen(prev => {
@@ -259,7 +425,7 @@ export function DevToolbar({
       const data = await res.json().catch(() => null);
       if (data?.success) {
         setUnwaitlistState('done');
-        setTimeout(() => window.location.reload(), 500);
+        setTimeout(() => globalThis.location.reload(), 500);
       } else {
         setUnwaitlistState('error');
         setTimeout(() => setUnwaitlistState('idle'), 3000);
@@ -267,6 +433,29 @@ export function DevToolbar({
     } catch {
       setUnwaitlistState('error');
       setTimeout(() => setUnwaitlistState('idle'), 3000);
+    }
+  }
+
+  async function handleSyncClerk() {
+    setSyncClerkState('loading');
+    try {
+      const res = await fetch('/api/dev/sync-clerk', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (data?.success) {
+        if (data.synced) {
+          setSyncClerkState('done');
+          setTimeout(() => window.location.reload(), 500);
+        } else {
+          setSyncClerkState('noop');
+          setTimeout(() => setSyncClerkState('idle'), 2000);
+        }
+      } else {
+        setSyncClerkState('error');
+        setTimeout(() => setSyncClerkState('idle'), 3000);
+      }
+    } catch {
+      setSyncClerkState('error');
+      setTimeout(() => setSyncClerkState('idle'), 3000);
     }
   }
 
@@ -296,7 +485,7 @@ export function DevToolbar({
         }
 
         setClearSessionState('done');
-        setTimeout(() => window.location.reload(), 500);
+        setTimeout(() => globalThis.location.reload(), 500);
       } else {
         setClearSessionState('error');
         setTimeout(() => setClearSessionState('idle'), 3000);
@@ -317,6 +506,7 @@ export function DevToolbar({
       <button
         type='button'
         onClick={show}
+        data-testid='dev-toolbar'
         className='fixed bottom-3 right-3 z-[9999] flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-surface-1)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-default)] shadow-md font-mono text-[10px] transition-colors'
         aria-label='Show dev toolbar'
         title='Show dev toolbar (⌘⇧D)'
@@ -330,6 +520,7 @@ export function DevToolbar({
   return (
     <div
       ref={toolbarRef}
+      data-testid='dev-toolbar'
       className='fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs'
     >
       {/* Expanded panel */}
@@ -517,27 +708,21 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
               aria-label='Copy SHA'
             >
-              {copiedField === 'sha' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Copy size={11} />
-              )}
+              <CopyFieldIcon copied={copiedField === 'sha'} icon={Copy} />
               <span className='hidden sm:inline text-[10px]'>SHA</span>
             </button>
           )}
 
           <button
             type='button'
-            onClick={() => copyToClipboard(window.location.pathname, 'route')}
-            title={`Copy route: ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
+            onClick={() =>
+              copyToClipboard(globalThis.location.pathname, 'route')
+            }
+            title={`Copy route: ${globalThis.window === undefined ? '' : globalThis.location.pathname}`}
             className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label='Copy route'
           >
-            {copiedField === 'route' ? (
-              <Check size={11} className='text-[var(--color-accent)]' />
-            ) : (
-              <Route size={11} />
-            )}
+            <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
             <span className='hidden sm:inline text-[10px]'>Route</span>
           </button>
 
@@ -562,21 +747,9 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Clear session'
             >
-              {clearSessionState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : clearSessionState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <Trash2 size={11} />
-              )}
+              <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
               <span className='hidden sm:inline text-[10px]'>
-                {clearSessionState === 'loading'
-                  ? 'Clearing...'
-                  : clearSessionState === 'done'
-                    ? 'Cleared!'
-                    : clearSessionState === 'error'
-                      ? 'Failed'
-                      : 'Clear'}
+                {ASYNC_ACTION_LABELS.clear[clearSessionState]}
               </span>
             </button>
           )}
@@ -592,24 +765,99 @@ export function DevToolbar({
               className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
               aria-label='Unwaitlist'
             >
-              {unwaitlistState === 'loading' ? (
-                <Loader2 size={11} className='animate-spin' />
-              ) : unwaitlistState === 'done' ? (
-                <Check size={11} className='text-[var(--color-accent)]' />
-              ) : (
-                <UserCheck size={11} />
-              )}
+              <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
               <span className='hidden sm:inline text-[10px]'>
-                {unwaitlistState === 'loading'
-                  ? 'Working...'
-                  : unwaitlistState === 'done'
-                    ? 'Done!'
-                    : unwaitlistState === 'error'
-                      ? 'Failed'
-                      : 'Unwaitlist'}
+                {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
               </span>
             </button>
           )}
+
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={handleSyncClerk}
+              disabled={
+                syncClerkState === 'loading' || syncClerkState === 'done'
+              }
+              title='Sync Clerk user ID to DB (fixes clerk_id mismatch between dev/prod)'
+              className='flex items-center gap-1 px-1.5 py-1 rounded text-[var(--color-text-quaternary-token)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
+              aria-label='Sync Clerk ID'
+            >
+              {syncClerkState === 'loading' ? (
+                <Loader2 size={11} className='animate-spin' />
+              ) : syncClerkState === 'done' ? (
+                <Check size={11} className='text-[var(--color-accent)]' />
+              ) : syncClerkState === 'noop' ? (
+                <Check
+                  size={11}
+                  className='text-[var(--color-text-quaternary-token)]'
+                />
+              ) : (
+                <RefreshCw size={11} />
+              )}
+              <span className='hidden sm:inline text-[10px]'>
+                {syncClerkState === 'loading'
+                  ? 'Syncing...'
+                  : syncClerkState === 'done'
+                    ? 'Synced!'
+                    : syncClerkState === 'noop'
+                      ? 'In sync'
+                      : syncClerkState === 'error'
+                        ? 'Failed'
+                        : 'Sync Clerk'}
+              </span>
+            </button>
+          )}
+
+          {env !== 'production' && (
+            <button
+              type='button'
+              onClick={async () => {
+                const next = !swEnabled;
+                setSwEnabled(next);
+                localStorage.setItem(SW_ENABLED_KEY, next ? '1' : '0');
+                if (next) {
+                  await registerServiceWorker();
+                } else {
+                  await unregisterServiceWorker();
+                }
+                globalThis.location.reload();
+              }}
+              {...getSwButtonProps(swEnabled)}
+            >
+              <Globe size={11} />
+              <span className='hidden sm:inline text-[10px]'>SW</span>
+            </button>
+          )}
+
+          {/* Promote to production — preview only */}
+          {env === 'preview' &&
+            promoteState !== 'idle' &&
+            promoteState !== 'checking' && (
+              <>
+                <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
+                <button
+                  type='button'
+                  onClick={handlePromote}
+                  disabled={
+                    promoteState === 'promoting' || promoteState === 'done'
+                  }
+                  title={getPromoteTitle(promoteSha)}
+                  className={`flex items-center gap-1 px-1.5 py-1 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${getPromoteButtonColor(promoteState)}`}
+                  aria-label='Promote to production'
+                >
+                  <PromoteIcon state={promoteState} />
+                  <span className='hidden sm:inline text-[10px]'>
+                    {PROMOTE_LABELS[promoteState]}
+                  </span>
+                  {promoteState === 'ready' && promoteSha && (
+                    <span className='hidden md:inline text-[9px] opacity-60'>
+                      {promoteSha.staging}→{promoteSha.prod}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
 
           <div className='w-px h-4 mx-1 bg-[var(--color-border-subtle)]' />
 
@@ -620,7 +868,7 @@ export function DevToolbar({
             className='flex items-center gap-1 px-2 py-1 rounded text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-surface-2)] transition-colors'
             aria-label={open ? 'Collapse dev toolbar' : 'Expand dev toolbar'}
           >
-            {open ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+            <ExpandCollapseIcon open={open} />
           </button>
           <button
             type='button'

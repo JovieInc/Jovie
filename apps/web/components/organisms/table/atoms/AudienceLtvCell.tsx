@@ -97,12 +97,7 @@ export function AudienceLtvCell({
   });
 
   const content = (
-    <div
-      className={cn(
-        'flex items-center justify-center w-8 text-[13px]',
-        className
-      )}
-    >
+    <div className={cn('flex items-center text-[13px]', className)}>
       <span className={cn('font-[510]', TIER_STYLES[breakdown.tier])}>
         {breakdown.label}
       </span>

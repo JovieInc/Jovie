@@ -11,6 +11,8 @@ import { publicEnv } from '@/lib/env-public';
 
 const growthPlanEnabled = publicEnv.NEXT_PUBLIC_FEATURE_GROWTH_PLAN === 'true';
 
+type PlanColumn = 'free' | 'pro' | 'growth';
+
 function CellValue({
   value,
   comingSoon,
@@ -27,6 +29,8 @@ function CellValue({
         {value}
         {comingSoon && (
           <span
+            role='img'
+            aria-label='Coming soon'
             className='ml-1.5 inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
             style={{
               backgroundColor: 'var(--linear-warning-subtle)',
@@ -42,6 +46,7 @@ function CellValue({
   if (value === true) {
     return (
       <Check
+        aria-label='Included'
         className='mx-auto'
         style={{
           width: '16px',
@@ -54,6 +59,8 @@ function CellValue({
   if (comingSoon) {
     return (
       <span
+        role='img'
+        aria-label='Coming soon'
         className='inline-block rounded-full px-1.5 py-px text-[10px] font-medium'
         style={{
           backgroundColor: 'var(--linear-warning-subtle)',
@@ -66,6 +73,7 @@ function CellValue({
   }
   return (
     <Minus
+      aria-label='Not included'
       className='mx-auto'
       style={{
         width: '14px',
@@ -76,7 +84,46 @@ function CellValue({
   );
 }
 
-function FeatureRow({ feature }: { readonly feature: ComparisonFeature }) {
+function MobileFeatureRow({
+  feature,
+  selectedPlan,
+}: {
+  readonly feature: ComparisonFeature;
+  readonly selectedPlan: PlanColumn;
+}) {
+  return (
+    <tr
+      className='border-b'
+      style={{ borderColor: 'var(--linear-border-subtle)' }}
+    >
+      <td
+        className='py-3 pr-4 text-[13px]'
+        style={{ color: 'var(--linear-text-secondary)' }}
+      >
+        {feature.name}
+      </td>
+      <td
+        className='py-3 text-center px-2'
+        style={
+          selectedPlan === 'pro'
+            ? { backgroundColor: 'var(--linear-bg-surface-1)' }
+            : undefined
+        }
+      >
+        <CellValue
+          value={feature[selectedPlan]}
+          comingSoon={feature.comingSoon && feature[selectedPlan] !== false}
+        />
+      </td>
+    </tr>
+  );
+}
+
+function DesktopFeatureRow({
+  feature,
+}: {
+  readonly feature: ComparisonFeature;
+}) {
   return (
     <tr
       className='border-b'
@@ -114,6 +161,7 @@ function FeatureRow({ feature }: { readonly feature: ComparisonFeature }) {
 
 export function PricingComparisonChart() {
   const [isAnnual, setIsAnnual] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
   const free = ENTITLEMENT_REGISTRY.free;
   const founding = ENTITLEMENT_REGISTRY.founding;
@@ -129,6 +177,20 @@ export function PricingComparisonChart() {
     isAnnual && growth.marketing.price?.yearly
       ? Math.round(growth.marketing.price.yearly / 12)
       : (growth.marketing.price?.monthly ?? 0);
+
+  const planOptions: { id: PlanColumn; name: string; price: string }[] = [
+    { id: 'free', name: free.marketing.displayName, price: '$0' },
+    { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
+    ...(growthPlanEnabled
+      ? [
+          {
+            id: 'growth' as PlanColumn,
+            name: growth.marketing.displayName,
+            price: `$${growthPrice}/mo`,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div className='mx-auto max-w-5xl'>
@@ -148,6 +210,7 @@ export function PricingComparisonChart() {
           type='button'
           role='switch'
           aria-checked={isAnnual}
+          aria-label='Toggle annual billing'
           onClick={() => setIsAnnual(v => !v)}
           className='relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200'
           style={{
@@ -187,16 +250,41 @@ export function PricingComparisonChart() {
         </span>
       </div>
 
-      {/* Comparison table */}
+      {/* Mobile plan selector */}
+      <div className='mb-4 md:hidden'>
+        <select
+          aria-label='Select plan to compare'
+          value={selectedPlan}
+          onChange={e => {
+            const val = e.target.value;
+            if (planOptions.some(o => o.id === val)) {
+              setSelectedPlan(val as PlanColumn);
+            }
+          }}
+          className='w-full rounded-lg px-4 py-2.5 text-[14px] font-medium appearance-none cursor-pointer'
+          style={{
+            backgroundColor: 'var(--linear-bg-surface-1)',
+            border: '1px solid var(--linear-border-default)',
+            color: 'var(--linear-text-primary)',
+          }}
+        >
+          {planOptions.map(opt => (
+            <option key={opt.id} value={opt.id}>
+              {opt.name} — {opt.price}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Desktop comparison table */}
       <div
-        className='overflow-x-auto rounded-lg'
+        className='hidden md:block overflow-x-auto rounded-lg'
         style={{
           border: '1px solid var(--linear-border-default)',
           backgroundColor: 'var(--linear-bg-surface-0)',
         }}
       >
         <table className='w-full border-collapse'>
-          {/* Plan headers */}
           <thead>
             <tr
               className='border-b'
@@ -218,7 +306,7 @@ export function PricingComparisonChart() {
                   $0
                 </div>
               </th>
-              {/* Pro (with Founding callout) */}
+              {/* Pro */}
               <th
                 className='p-4 text-center min-w-[160px]'
                 style={{ backgroundColor: 'var(--linear-bg-surface-1)' }}
@@ -309,7 +397,6 @@ export function PricingComparisonChart() {
           <tbody>
             {PRICING_COMPARISON.map(category => (
               <Fragment key={`cat-${category.category}`}>
-                {/* Category header */}
                 <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
                   <td
                     colSpan={growthPlanEnabled ? 4 : 3}
@@ -319,9 +406,75 @@ export function PricingComparisonChart() {
                     {category.category}
                   </td>
                 </tr>
-                {/* Feature rows */}
                 {category.features.map(feature => (
-                  <FeatureRow key={`feat-${feature.name}`} feature={feature} />
+                  <DesktopFeatureRow
+                    key={`feat-${feature.name}`}
+                    feature={feature}
+                  />
+                ))}
+              </Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile comparison table */}
+      <div
+        className='md:hidden overflow-x-auto rounded-lg'
+        style={{
+          border: '1px solid var(--linear-border-default)',
+          backgroundColor: 'var(--linear-bg-surface-0)',
+        }}
+      >
+        <table className='w-full border-collapse'>
+          <thead>
+            <tr
+              className='border-b'
+              style={{ borderColor: 'var(--linear-border-default)' }}
+            >
+              <th className='w-[60%] p-4 text-left' />
+              <th
+                className='p-4 text-center'
+                style={
+                  selectedPlan === 'pro'
+                    ? { backgroundColor: 'var(--linear-bg-surface-1)' }
+                    : undefined
+                }
+              >
+                <div
+                  className='text-[13px] font-medium'
+                  style={{ color: 'var(--linear-text-tertiary)' }}
+                >
+                  {planOptions.find(o => o.id === selectedPlan)?.name}
+                </div>
+                <div
+                  className='mt-1 text-xl font-semibold'
+                  style={{ color: 'var(--linear-text-primary)' }}
+                >
+                  {planOptions.find(o => o.id === selectedPlan)?.price}
+                </div>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {PRICING_COMPARISON.map(category => (
+              <Fragment key={`mcat-${category.category}`}>
+                <tr style={{ backgroundColor: 'var(--linear-bg-page)' }}>
+                  <td
+                    colSpan={2}
+                    className='px-4 py-2.5 text-[12px] font-semibold uppercase tracking-wider'
+                    style={{ color: 'var(--linear-text-tertiary)' }}
+                  >
+                    {category.category}
+                  </td>
+                </tr>
+                {category.features.map(feature => (
+                  <MobileFeatureRow
+                    key={`mfeat-${feature.name}`}
+                    feature={feature}
+                    selectedPlan={selectedPlan}
+                  />
                 ))}
               </Fragment>
             ))}

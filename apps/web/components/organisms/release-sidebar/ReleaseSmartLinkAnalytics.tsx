@@ -1,12 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { CommonDropdown } from '@jovie/ui';
+import { Copy, ExternalLink, Link2, Share2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   DrawerEmptyState,
+  DrawerInlineIconButton,
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { cn } from '@/lib/utils';
+import { getBaseUrl } from '@/lib/utils/platform-detection';
+import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
 import type { Release, ReleaseSidebarAnalytics } from './types';
 
 async function fetchReleaseAnalytics(
@@ -30,11 +36,109 @@ const numberFormatter = new Intl.NumberFormat();
 interface ReleaseSmartLinkAnalyticsProps {
   readonly release: Release;
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
+  readonly artistName?: string | null;
+}
+
+function ReleaseSmartLinkControl({
+  release,
+  artistName,
+  helperText,
+}: {
+  readonly release: Release;
+  readonly artistName?: string | null;
+  readonly helperText?: string;
+}) {
+  const smartLinkUrl = `${getBaseUrl()}${release.smartLinkPath}`;
+  const smartLinkLabel = smartLinkUrl.replace(/^https?:\/\//u, '');
+  const shareItems = useMemo(
+    () =>
+      getUTMShareDropdownItems({
+        smartLinkUrl,
+        context: buildUTMContext({
+          smartLinkUrl,
+          releaseSlug: release.slug,
+          releaseTitle: release.title,
+          artistName: artistName ?? release.artistNames?.[0],
+          releaseDate: release.releaseDate,
+        }),
+      }),
+    [
+      artistName,
+      release.artistNames,
+      release.releaseDate,
+      release.slug,
+      release.title,
+      smartLinkUrl,
+    ]
+  );
+
+  return (
+    <div className='space-y-1.5'>
+      <div
+        className='flex h-8 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5'
+        data-testid='release-smart-link-control'
+      >
+        <Link2
+          className='h-3 w-3 shrink-0 text-tertiary-token'
+          aria-hidden='true'
+        />
+        <span
+          className='min-w-0 flex-1 truncate font-mono text-[10.5px] leading-none tracking-[-0.01em] text-secondary-token'
+          title={smartLinkUrl}
+        >
+          {smartLinkLabel}
+        </span>
+        <DrawerInlineIconButton
+          onClick={event => {
+            event.stopPropagation();
+            navigator.clipboard.writeText(smartLinkUrl).then(
+              () => toast.success('Smart link copied'),
+              () => toast.error('Failed to copy link')
+            );
+          }}
+          title='Copy smart link'
+          className='h-5 w-5 rounded-full text-tertiary-token'
+        >
+          <Copy className='h-3 w-3' />
+        </DrawerInlineIconButton>
+        <DrawerInlineIconButton
+          onClick={event => {
+            event.stopPropagation();
+            globalThis.open(smartLinkUrl, '_blank', 'noopener,noreferrer');
+          }}
+          title='Open smart link'
+          className='h-5 w-5 rounded-full text-tertiary-token'
+        >
+          <ExternalLink className='h-3 w-3' />
+        </DrawerInlineIconButton>
+        <CommonDropdown
+          variant='dropdown'
+          size='compact'
+          align='end'
+          items={shareItems}
+          trigger={
+            <DrawerInlineIconButton
+              title='Share smart link'
+              className='h-5 w-5 rounded-full text-tertiary-token'
+            >
+              <Share2 className='h-3 w-3' />
+            </DrawerInlineIconButton>
+          }
+        />
+      </div>
+      {helperText ? (
+        <p className='px-2.5 text-[10px] leading-[14px] text-tertiary-token'>
+          {helperText}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function ReleaseSmartLinkAnalytics({
   release,
   analyticsOverride,
+  artistName,
 }: ReleaseSmartLinkAnalyticsProps) {
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
@@ -89,21 +193,16 @@ export function ReleaseSmartLinkAnalytics({
       className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
       testId='release-smart-link-analytics'
     >
-      <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
-        <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
-          Analytics
-        </p>
-      </div>
-
-      <div className='p-3'>
+      {/* Analytics metrics */}
+      <div className='px-3 pb-3 pt-3'>
         {showSkeleton && (
-          <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
-            <div className='space-y-1 pr-3'>
+          <div className='grid grid-cols-2 gap-3'>
+            <div className='space-y-1'>
               <div className='h-[9px] w-12 rounded skeleton' />
               <div className='h-4 w-8 rounded skeleton' />
               <div className='h-[9px] w-10 rounded skeleton' />
             </div>
-            <div className='space-y-1 pl-3'>
+            <div className='space-y-1'>
               <div className='h-[9px] w-12 rounded skeleton' />
               <div className='h-4 w-8 rounded skeleton' />
               <div className='h-[9px] w-10 rounded skeleton' />
@@ -121,34 +220,39 @@ export function ReleaseSmartLinkAnalytics({
         {!showSkeleton && !hasError && (
           <div
             className={cn(
-              'space-y-2 transition-opacity duration-100',
+              'space-y-3 transition-opacity duration-100',
               isSwitching && 'opacity-50'
             )}
           >
-            <div className='grid grid-cols-2 divide-x divide-(--linear-app-frame-seam)'>
+            <div className='grid grid-cols-2 gap-3'>
               <AnalyticsMetric
                 label='Total clicks'
                 value={numberFormatter.format(totalClicks)}
                 hint='All time'
-                className='pr-3'
               />
               <AnalyticsMetric
                 label='Last 7 days'
                 value={numberFormatter.format(last7DaysClicks)}
                 hint='Recent'
-                className='pl-3'
               />
             </div>
-
-            {showEmpty && (
-              <DrawerEmptyState
-                className='min-h-[32px] px-0 py-0'
-                message='Share your smart link to start tracking clicks.'
-              />
-            )}
           </div>
         )}
       </div>
+
+      {release.smartLinkPath && (
+        <div className='px-3 pb-3 pt-0'>
+          <ReleaseSmartLinkControl
+            release={release}
+            artistName={artistName}
+            helperText={
+              showEmpty
+                ? 'Share your smart link to start tracking clicks.'
+                : undefined
+            }
+          />
+        </div>
+      )}
     </DrawerSurfaceCard>
   );
 }

@@ -1,7 +1,6 @@
 'use client';
 
-import { CommonDropdown } from '@jovie/ui';
-import { ExternalLink, MoreHorizontal, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -11,14 +10,21 @@ import {
   usePreviewPanelState,
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
-import { DrawerTabs, EntitySidebarShell } from '@/components/molecules/drawer';
-import { DrawerPropertyRow } from '@/components/molecules/drawer/DrawerPropertyRow';
+import {
+  DrawerCardActionBar,
+  DrawerTabs,
+  EntitySidebarShell,
+} from '@/components/molecules/drawer';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import {
   useAvatarMutation,
+  useDeletePressPhotoMutation,
+  usePressPhotosQuery,
+  usePressPhotoUploadMutation,
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
@@ -29,7 +35,6 @@ import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { useProfileHeaderParts } from './ProfileSidebarHeader';
-import { buildProfileShareDropdownItems } from './profileLinkShareMenu';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
@@ -68,6 +73,26 @@ function createTempLinkId(): string {
   return `temp-${Date.now()}-${tempLinkIdCounter}`;
 }
 
+/** Persist a detected link to the server. Returns the server-assigned linkId. */
+async function confirmLinkOnServer(
+  profileId: string,
+  link: DetectedLink
+): Promise<string> {
+  const response = await fetch('/api/chat/confirm-link', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      profileId,
+      platform: link.platform.id,
+      url: link.originalUrl,
+      normalizedUrl: link.normalizedUrl,
+    }),
+  });
+  if (!response.ok) throw new Error('Failed to add link');
+  const { linkId } = (await response.json()) as { linkId: string };
+  return linkId;
+}
+
 export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
@@ -85,7 +110,16 @@ export function ProfileContactSidebar() {
   // Mutations for profile editing
   const profileMutation = useProfileSaveMutation();
   const avatarMutation = useAvatarMutation();
+  const pressPhotoUploadMutation = usePressPhotoUploadMutation(
+    selectedProfile?.id
+  );
+  const deletePressPhotoMutation = useDeletePressPhotoMutation(
+    selectedProfile?.id
+  );
   const removeLinkMutation = useRemoveSocialLinkMutation();
+  const { data: pressPhotos = [] } = usePressPhotosQuery(
+    selectedProfile?.id ?? ''
+  );
 
   // Add link state
   const [isAddingLink, setIsAddingLink] = useState(false);
@@ -160,6 +194,23 @@ export function ProfileContactSidebar() {
       return url;
     },
     [avatarMutation, previewData, setPreviewData]
+  );
+
+  const handlePressPhotoUpload = useCallback(
+    async (file: File) => {
+      const uploadedPhoto = await pressPhotoUploadMutation.mutateAsync(file);
+      toast.success('Press photo uploaded');
+      return uploadedPhoto;
+    },
+    [pressPhotoUploadMutation]
+  );
+
+  const handlePressPhotoDelete = useCallback(
+    async (photoId: string) => {
+      await deletePressPhotoMutation.mutateAsync(photoId);
+      toast.success('Press photo deleted');
+    },
+    [deletePressPhotoMutation]
   );
 
   // Handle bio change — save to server and instantly update sidebar
@@ -246,6 +297,59 @@ export function ProfileContactSidebar() {
     [previewData?.links]
   );
 
+  // Reconcile optimistic ID with server ID, or clean up if user deleted while pending
+  const reconcileAfterPersist = useCallback(
+    (
+      linkId: string,
+      optimisticId: string,
+      platformName: string,
+      profileId: string
+    ) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        if (linkId) {
+          removeLinkMutation.mutate(
+            { profileId, linkId },
+            { onError: () => {} }
+          );
+        }
+        return;
+      }
+      if (linkId) {
+        const current = previewDataRef.current;
+        if (current) {
+          setPreviewData({
+            ...current,
+            links: current.links.map(l =>
+              l.id === optimisticId ? { ...l, id: linkId } : l
+            ),
+          });
+        }
+      }
+      toast.success(`${platformName} link added`);
+    },
+    [removeLinkMutation, setPreviewData]
+  );
+
+  // Revert optimistic add on failure
+  const revertOptimisticAdd = useCallback(
+    (optimisticId: string) => {
+      if (deletedWhilePendingRef.current.has(optimisticId)) {
+        deletedWhilePendingRef.current.delete(optimisticId);
+        return;
+      }
+      const current = previewDataRef.current;
+      if (current) {
+        setPreviewData({
+          ...current,
+          links: current.links.filter(l => l.id !== optimisticId),
+        });
+      }
+      toast.error('Failed to add link');
+    },
+    [setPreviewData]
+  );
+
   // Handle adding a new link (opens smart input)
   const handleAddLink = useCallback((_category?: string) => {
     setIsAddingLink(true);
@@ -294,65 +398,15 @@ export function ProfileContactSidebar() {
       // Save to server via confirm-link endpoint
       pendingAddsRef.current.add(optimisticLink.id);
       try {
-        const response = await fetch('/api/chat/confirm-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: selectedProfile.id,
-            platform: link.platform.id,
-            url: link.originalUrl,
-            normalizedUrl: link.normalizedUrl,
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to add link');
-        }
-
-        const { linkId } = (await response.json()) as { linkId: string };
-        const wasDeletedWhilePending = deletedWhilePendingRef.current.has(
-          optimisticLink.id
+        const linkId = await confirmLinkOnServer(selectedProfile.id, link);
+        reconcileAfterPersist(
+          linkId,
+          optimisticLink.id,
+          link.platform.name,
+          selectedProfile.id
         );
-
-        if (wasDeletedWhilePending) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          if (linkId && selectedProfile) {
-            removeLinkMutation.mutate(
-              { profileId: selectedProfile.id, linkId },
-              { onError: () => {} }
-            );
-          }
-          return;
-        }
-
-        if (linkId) {
-          const current = previewDataRef.current;
-          if (current) {
-            setPreviewData({
-              ...current,
-              links: current.links.map(l =>
-                l.id === optimisticLink.id ? { ...l, id: linkId } : l
-              ),
-            });
-          }
-        }
-
-        toast.success(`${link.platform.name} link added`);
       } catch {
-        // If deleted while pending, the UI is already correct (link removed)
-        if (deletedWhilePendingRef.current.has(optimisticLink.id)) {
-          deletedWhilePendingRef.current.delete(optimisticLink.id);
-          return;
-        }
-        // Revert on failure
-        const current = previewDataRef.current;
-        if (current) {
-          setPreviewData({
-            ...current,
-            links: current.links.filter(l => l.id !== optimisticLink.id),
-          });
-        }
-        toast.error('Failed to add link');
+        revertOptimisticAdd(optimisticLink.id);
       } finally {
         pendingAddsRef.current.delete(optimisticLink.id);
       }
@@ -362,7 +416,8 @@ export function ProfileContactSidebar() {
       previewData,
       setPreviewData,
       resolvedCategory,
-      removeLinkMutation,
+      reconcileAfterPersist,
+      revertOptimisticAdd,
     ]
   );
 
@@ -418,12 +473,24 @@ export function ProfileContactSidebar() {
   );
 
   // Header parts hook needs to be called unconditionally
-  const { title: headerTitle, actions: headerActions } = useProfileHeaderParts({
+  const {
+    title: headerTitle,
+    primaryActions,
+    overflowActions,
+  } = useProfileHeaderParts({
     username: previewData?.username ?? '',
     displayName: previewData?.displayName ?? '',
     profilePath: previewData?.profilePath ?? '',
     onClose: close,
   });
+
+  const closeOnlyHeaderActions = (
+    <DrawerHeaderActions
+      primaryActions={[]}
+      overflowActions={[]}
+      onClose={close}
+    />
+  );
 
   // Show skeleton sidebar until preview data loads (prevents CLS)
   if (!previewData) {
@@ -433,6 +500,8 @@ export function ProfileContactSidebar() {
         ariaLabel='Profile Contact'
         title={<div className='h-4 w-24 rounded skeleton' />}
         onClose={close}
+        headerMode='minimal'
+        headerActions={closeOnlyHeaderActions}
         entityHeader={
           <div className='space-y-3'>
             <div
@@ -448,14 +517,14 @@ export function ProfileContactSidebar() {
               </div>
             </div>
             <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-              <div className='h-16 rounded-[10px] skeleton' />
-              <div className='h-10 rounded-[10px] skeleton' />
+              <div className='h-16 rounded-[8px] skeleton' />
+              <div className='h-10 rounded-[8px] skeleton' />
             </div>
           </div>
         }
         tabs={
           <div className='flex items-center gap-1'>
-            <div className='h-9 flex-1 rounded-[10px] skeleton' />
+            <div className='h-9 flex-1 rounded-[8px] skeleton' />
             <div className='h-[26px] w-[26px] rounded-[8px] skeleton' />
           </div>
         }
@@ -490,23 +559,6 @@ export function ProfileContactSidebar() {
   } = previewData;
 
   const profileUrl = `${BASE_URL}${profilePath}`;
-  const profileShareItems = buildProfileShareDropdownItems({
-    profileUrl,
-    campaignSlug: `${username}-profile`,
-    artistName: displayName,
-    onCopy: (url, presetLabel) => {
-      navigator.clipboard
-        .writeText(url)
-        .then(() => {
-          toast.success(`${presetLabel} link copied`, {
-            description: 'Profile URL includes UTM parameters.',
-          });
-        })
-        .catch(() => {
-          toast.error('Unable to copy UTM link');
-        });
-    },
-  });
 
   const allowPhotoDownloads =
     (selectedProfile?.settings as Record<string, unknown> | null)
@@ -517,13 +569,14 @@ export function ProfileContactSidebar() {
       isOpen={isOpen}
       ariaLabel='Profile Contact'
       title={headerTitle}
-      headerActions={headerActions}
+      headerActions={closeOnlyHeaderActions}
+      headerMode='minimal'
       entityHeader={
         <div className='space-y-3'>
           <div
             className={cn(
               LINEAR_SURFACE.sidebarCard,
-              'px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              'overflow-hidden px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             )}
           >
             <ProfileContactHeader
@@ -534,62 +587,25 @@ export function ProfileContactSidebar() {
               onDisplayNameChange={handleDisplayNameChange}
               onAvatarUpload={handleAvatarUpload}
             />
+            <DrawerCardActionBar
+              primaryActions={primaryActions}
+              overflowActions={overflowActions}
+              className='mx-[-14px] mt-3'
+            />
           </div>
 
-          <div className={cn(LINEAR_SURFACE.drawerCard, 'space-y-2.5 p-2.5')}>
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <ProfileAnalyticsSummary />
-            </div>
-
-            <div className={cn(LINEAR_SURFACE.drawerCardSm, 'p-2.5')}>
-              <DrawerPropertyRow
-                label='Profile link'
-                value={
-                  <div className='flex items-center gap-1.5'>
-                    <CopyLinkInput
-                      url={profileUrl}
-                      size='md'
-                      className='flex-1'
-                      inputClassName='h-8 rounded-[10px] border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-1.5 text-[11px]'
-                    />
-                    <button
-                      type='button'
-                      className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                      onClick={() =>
-                        globalThis.open(
-                          profileUrl,
-                          '_blank',
-                          'noopener,noreferrer'
-                        )
-                      }
-                      aria-label='Open public profile'
-                    >
-                      <ExternalLink className='h-3 w-3' aria-hidden='true' />
-                    </button>
-                    <CommonDropdown
-                      variant='dropdown'
-                      size='compact'
-                      align='end'
-                      side='bottom'
-                      items={profileShareItems}
-                      trigger={
-                        <button
-                          type='button'
-                          className='shrink-0 rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 p-1.5 text-tertiary-token transition-colors hover:border-default hover:bg-surface-1 hover:text-secondary-token'
-                          aria-label='Open profile share options'
-                        >
-                          <MoreHorizontal
-                            className='h-3 w-3'
-                            aria-hidden='true'
-                          />
-                        </button>
-                      }
-                    />
-                  </div>
-                }
-              />
-            </div>
+          {/* Smart link URL */}
+          <div className='px-0.5'>
+            <CopyLinkInput
+              url={profileUrl}
+              size='md'
+              className='w-full'
+              inputClassName='h-7 rounded-full border-(--linear-app-frame-seam) bg-surface-0 px-3 py-1 text-[11px]'
+            />
           </div>
+
+          {/* Analytics */}
+          <ProfileAnalyticsSummary />
         </div>
       }
       tabs={
@@ -608,7 +624,7 @@ export function ProfileContactSidebar() {
               <AppIconButton
                 type='button'
                 onClick={() => handleAddLink(resolvedCategory)}
-                className='h-[26px] w-[26px] rounded-[8px] border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token hover:border-default hover:bg-surface-1 hover:text-primary-token'
+                className='h-[26px] w-[26px] rounded-full border-0 bg-transparent text-tertiary-token shadow-none hover:bg-surface-0 hover:text-primary-token'
                 ariaLabel={`Add ${PROFILE_TAB_OPTIONS.find(t => t.value === resolvedCategory)?.label ?? ''} link`}
               >
                 <Plus className='h-3.5 w-3.5' />
@@ -626,10 +642,13 @@ export function ProfileContactSidebar() {
           hometown={hometown}
           activeSinceYear={activeSinceYear}
           allowPhotoDownloads={allowPhotoDownloads}
+          pressPhotos={pressPhotos}
           onBioChange={handleBioChange}
           onLocationChange={handleLocationChange}
           onHometownChange={handleHometownChange}
           onGenresChange={handleGenresChange}
+          onPressPhotoUpload={handlePressPhotoUpload}
+          onPressPhotoDelete={handlePressPhotoDelete}
         />
       ) : (
         <>

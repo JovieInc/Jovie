@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
@@ -109,12 +110,18 @@ function renderDashboardNav(
 ) {
   const value: DashboardData = { ...baseDashboardData, ...overrides };
 
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
   return fastRender(
-    <DashboardDataProvider value={value}>
-      <SidebarProvider {...sidebarProps}>
-        <DashboardNav />
-      </SidebarProvider>
-    </DashboardDataProvider>
+    <QueryClientProvider client={queryClient}>
+      <DashboardDataProvider value={value}>
+        <SidebarProvider {...sidebarProps}>
+          <DashboardNav />
+        </SidebarProvider>
+      </DashboardDataProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -179,5 +186,25 @@ describe('DashboardNav', () => {
 
     const audienceLink = getByRole('link', { name: 'Audience' });
     expect(audienceLink.getAttribute('aria-current')).toBe('page');
+  });
+
+  it('renders settings groups with the selected artist name', () => {
+    mockUsePathname.mockReturnValueOnce(APP_ROUTES.SETTINGS_ACCOUNT);
+
+    const { getAllByText, getByRole, queryByText } = renderDashboardNav({
+      selectedProfile: {
+        id: 'profile_123',
+        displayName: 'Tim White',
+        username: 'tim',
+        usernameNormalized: 'tim',
+      } as DashboardData['selectedProfile'],
+    });
+
+    expect(getAllByText('General').length).toBeGreaterThan(0);
+    expect(getAllByText('Tim White').length).toBeGreaterThan(0);
+    expect(
+      getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
+    ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);
+    expect(queryByText('Workspace')).toBeNull();
   });
 });

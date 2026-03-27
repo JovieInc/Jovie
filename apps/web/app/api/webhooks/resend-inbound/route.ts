@@ -29,6 +29,7 @@ import { db } from '@/lib/db';
 import { emailThreads, inboundEmails } from '@/lib/db/schema/inbox';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { classifyEmail } from '@/lib/inbox/classifier';
 import { normalizeSubject } from '@/lib/inbox/constants';
 import { findThread } from '@/lib/inbox/threading';
@@ -130,6 +131,46 @@ async function processInboundEmail(
   }
 }
 
+/** Verify webhook signature, returning an error response if verification fails. */
+function verifyWebhookSignature(
+  req: NextRequest,
+  rawBody: string
+): NextResponse | null {
+  const svixTimestamp = req.headers.get('svix-timestamp');
+  const svixSignature = req.headers.get('svix-signature');
+  const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
+
+  if (!webhookSecret && process.env.NODE_ENV === 'production') {
+    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured in production');
+    return NextResponse.json(
+      { error: 'Webhook not configured' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
+
+  if (webhookSecret) {
+    if (!svixSignature || !svixTimestamp) {
+      logger.warn('Inbound webhook missing required signature headers');
+      return NextResponse.json(
+        { error: 'Missing signature headers' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (
+      !verifySignature(rawBody, svixSignature, svixTimestamp, webhookSecret)
+    ) {
+      logger.warn('Inbound webhook signature verification failed');
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401, headers: NO_STORE_HEADERS }
+      );
+    }
+  }
+
+  return null;
+}
+
 /**
  * POST handler for Resend inbound email webhooks.
  */
@@ -145,34 +186,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify webhook signature
-  const svixTimestamp = req.headers.get('svix-timestamp');
-  const svixSignature = req.headers.get('svix-signature');
-
-  const webhookSecret = env.RESEND_INBOUND_WEBHOOK_SECRET;
-
-  if (!webhookSecret && process.env.NODE_ENV === 'production') {
-    logger.error('RESEND_INBOUND_WEBHOOK_SECRET not configured in production');
-    return NextResponse.json(
-      { error: 'Webhook not configured' },
-      { status: 500, headers: NO_STORE_HEADERS }
-    );
-  }
-
-  if (webhookSecret && svixSignature && svixTimestamp) {
-    const valid = verifySignature(
-      rawBody,
-      svixSignature,
-      svixTimestamp,
-      webhookSecret
-    );
-    if (!valid) {
-      logger.warn('Inbound webhook signature verification failed');
-      return NextResponse.json(
-        { error: 'Invalid signature' },
-        { status: 401, headers: NO_STORE_HEADERS }
-      );
-    }
-  }
+  const signatureError = verifyWebhookSignature(req, rawBody);
+  if (signatureError) return signatureError;
 
   let payload: ResendInboundEvent;
   try {
@@ -281,12 +296,28 @@ interface ResendFullEmail {
 async function fetchFullEmail(
   emailId: string
 ): Promise<ResendFullEmail | null> {
-  try {
-    const response = await fetch(`https://api.resend.com/emails/${emailId}`, {
-      headers: {
-        Authorization: `Bearer ${env.RESEND_API_KEY}`,
-      },
+  if (!env.RESEND_API_KEY) {
+    logger.warn('RESEND_API_KEY not configured for full email fetch', {
+      emailId,
     });
+    return null;
+  }
+
+  try {
+    const response = await serverFetch(
+      `https://api.resend.com/emails/${emailId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+        },
+        timeoutMs: 10_000,
+        context: 'Resend received email fetch',
+        retry: {
+          maxRetries: 1,
+          baseDelayMs: 300,
+        },
+      }
+    );
 
     if (!response.ok) {
       logger.warn('Failed to fetch full email from Resend', {
@@ -298,6 +329,14 @@ async function fetchFullEmail(
 
     return await response.json();
   } catch (error) {
+    if (error instanceof ServerFetchTimeoutError) {
+      logger.warn('Timed out fetching full email from Resend', {
+        emailId,
+        timeoutMs: error.timeoutMs,
+      });
+      return null;
+    }
+
     logger.warn('Error fetching full email from Resend', {
       emailId,
       error: error instanceof Error ? error.message : String(error),

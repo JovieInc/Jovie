@@ -15,7 +15,18 @@ import { cn } from '@/lib/utils';
 import type { PendingImage } from '../hooks/useChatImageAttachments';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { MAX_MESSAGE_LENGTH } from '../types';
+import {
+  CHAT_PROMPT_RAIL_CLASS,
+  CHAT_PROMPT_RAIL_MASK_STYLE,
+  CHAT_PROMPT_RAIL_SCROLL_CLASS,
+  getChatPromptPillClass,
+} from './chat-prompt-styles';
 import { ImagePreviewStrip } from './ImagePreviewStrip';
+
+interface ChatQuickAction {
+  readonly label: string;
+  readonly prompt: string;
+}
 
 interface SendButtonProps {
   readonly canSend: boolean;
@@ -39,10 +50,10 @@ function SendButton({
         onMouseDown={onMouseDown}
         disabled={!canSend}
         className={cn(
-          'flex shrink-0 items-center justify-center rounded-full transition-all duration-fast',
+          'flex shrink-0 items-center justify-center rounded-full border transition-all duration-fast',
           canSend
-            ? 'bg-accent text-accent-foreground hover:bg-accent/90'
-            : 'bg-surface-2 text-tertiary-token cursor-not-allowed',
+            ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-[0_1px_1px_rgba(0,0,0,0.06),0_6px_16px_-10px_rgba(0,0,0,0.24)] hover:bg-(--linear-btn-primary-hover)'
+            : 'cursor-not-allowed border-(--linear-app-frame-seam) bg-surface-0 text-tertiary-token',
           isCompact ? 'h-8 w-8' : 'h-9 w-9'
         )}
         aria-label='Send message'
@@ -92,8 +103,8 @@ function AttachDropdown({
           disabled={isImageProcessing || isLoading || isSubmitting}
           className={cn(
             'flex shrink-0 items-center justify-center rounded-full',
-            'bg-surface-2 text-secondary-token transition-colors',
-            'hover:bg-surface-3 hover:text-primary-token',
+            'border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token transition-[background-color,border-color,color,box-shadow]',
+            'hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             isCompact ? 'h-8 w-8' : 'h-9 w-9'
           )}
@@ -144,6 +155,10 @@ interface ChatInputProps {
   readonly onRemoveImage?: (id: string) => void;
   /** Handle paste events for image content */
   readonly onPaste?: (e: React.ClipboardEvent) => void;
+  /** Optional quick actions shown underneath the composer when expanded */
+  readonly quickActions?: readonly ChatQuickAction[];
+  /** Callback when a quick action is selected */
+  readonly onQuickActionSelect?: (prompt: string) => void;
 }
 
 export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
@@ -161,6 +176,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       pendingImages,
       onRemoveImage,
       onPaste,
+      quickActions,
+      onQuickActionSelect,
     },
     ref
   ) {
@@ -177,6 +194,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       !isImageProcessing;
 
     const [plusMenuOpen, setPlusMenuOpen] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
 
     // Snapshot of the input value at the moment dictation starts, so that the
     // in-session transcript is appended rather than replacing existing text.
@@ -239,21 +257,30 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     );
 
     const isCompact = variant === 'compact';
+    const isExpanded =
+      isFocused ||
+      plusMenuOpen ||
+      isListening ||
+      Boolean(value.trim()) ||
+      hasPendingImages;
+    const hasQuickActions =
+      Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
 
     return (
       <form onSubmit={handleFormSubmit}>
         <div
           className={cn(
-            'rounded-[24px] border transition-colors duration-fast',
-            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))]',
-            'shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+            'overflow-hidden rounded-[18px] border shadow-[var(--linear-app-card-shadow)] transition-[border-color,background-color,box-shadow] duration-200',
+            'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))]',
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
-              : 'border-(--linear-app-frame-seam) focus-within:border-default focus-within:ring-2 focus-within:ring-accent/20'
+              : isExpanded
+                ? 'border-default bg-surface-0 shadow-[0_1px_1px_rgba(0,0,0,0.04),0_14px_36px_-24px_rgba(15,23,42,0.45),var(--linear-app-card-shadow)]'
+                : 'border-(--linear-app-frame-seam)'
           )}
         >
           {hasPendingImages && onRemoveImage && (
-            <div className='px-4 pt-2'>
+            <div className='px-4 pt-3'>
               <ImagePreviewStrip
                 images={pendingImages ?? []}
                 onRemove={onRemoveImage}
@@ -261,8 +288,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             </div>
           )}
 
-          <div className='flex items-end gap-2 px-2.5 py-2'>
-            {/* Left: Circular plus button with attachment dropdown */}
+          <div
+            className={cn(
+              'flex items-end gap-2 px-3 py-3',
+              isExpanded && 'pb-2'
+            )}
+          >
             {hasAttachButton && onImageAttach && (
               <AttachDropdown
                 isCompact={isCompact}
@@ -287,11 +318,22 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                 'min-w-0 flex-1 resize-none bg-transparent',
                 'text-primary-token placeholder:text-tertiary-token',
                 'focus:outline-none',
-                isCompact ? 'py-1.5 max-h-32 text-sm' : 'py-2 max-h-48 text-sm'
+                isCompact
+                  ? 'max-h-32 py-1.5 text-[14px] leading-6'
+                  : 'max-h-48 py-2 text-[14px] leading-6',
+                isExpanded
+                  ? isCompact
+                    ? 'min-h-[64px]'
+                    : 'min-h-[88px]'
+                  : isCompact
+                    ? 'min-h-[28px]'
+                    : 'min-h-[36px]'
               )}
               onKeyDown={handleKeyDown}
               onInput={handleInput}
               onPaste={onPaste}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
               maxLength={MAX_MESSAGE_LENGTH + 100}
               aria-label='Chat message input'
               aria-describedby={isNearLimit ? 'char-limit-status' : undefined}
@@ -308,10 +350,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   onClick={handleMicToggle}
                   disabled={isLoading || isSubmitting}
                   className={cn(
-                    'flex shrink-0 items-center justify-center rounded-full transition-colors',
+                    'flex shrink-0 items-center justify-center rounded-full border transition-[background-color,border-color,color,box-shadow]',
                     isListening
-                      ? 'bg-error/10 text-error'
-                      : 'text-secondary-token hover:text-primary-token',
+                      ? 'border-error/20 bg-error/10 text-error'
+                      : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:border-default hover:bg-surface-1 hover:text-primary-token hover:shadow-[var(--linear-app-card-shadow)]',
                     'disabled:opacity-50 disabled:cursor-not-allowed',
                     isCompact ? 'h-8 w-8' : 'h-9 w-9'
                   )}
@@ -342,6 +384,46 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
               onMouseDown={handleMouseDown}
             />
           </div>
+
+          {isExpanded && (
+            <div className='border-t border-(--linear-app-frame-seam) px-3 pb-3 pt-2.5'>
+              <div className='flex items-center justify-between gap-3'>
+                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
+                  {isCompact ? 'Ask a follow-up' : 'Ask Jovie'}
+                </span>
+                <span className='text-[11px] text-tertiary-token'>
+                  Shift+Enter for newline
+                </span>
+              </div>
+
+              {hasQuickActions && quickActions ? (
+                <div className='mt-2'>
+                  <div
+                    className={CHAT_PROMPT_RAIL_SCROLL_CLASS}
+                    style={CHAT_PROMPT_RAIL_MASK_STYLE}
+                    data-testid='chat-input-quick-actions'
+                  >
+                    <div className={CHAT_PROMPT_RAIL_CLASS}>
+                      {quickActions.map(action => (
+                        <button
+                          key={action.label}
+                          type='button'
+                          onMouseDown={handleMouseDown}
+                          onClick={() => onQuickActionSelect?.(action.prompt)}
+                          className={cn(
+                            getChatPromptPillClass('compact'),
+                            'min-w-[154px] max-w-[220px] py-1.5'
+                          )}
+                        >
+                          <span className='truncate'>{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           {isNearLimit && (
             <output

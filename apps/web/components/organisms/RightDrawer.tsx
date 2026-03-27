@@ -95,8 +95,8 @@ export function RightDrawer({
         tabIndex={isOpen ? -1 : undefined}
         className={cn(
           'fixed inset-0 z-50 flex flex-col',
-          'overflow-hidden border-l border-(--linear-app-frame-seam)',
-          'bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))]',
+          'overflow-hidden',
+          'bg-(--linear-app-content-surface)',
           'shadow-[-16px_0_40px_rgba(0,0,0,0.16)]',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-300 ease-out',
@@ -119,12 +119,11 @@ export function RightDrawer({
       tabIndex={isOpen ? -1 : undefined}
       className={cn(
         'shrink-0 h-full flex flex-col',
-        'bg-transparent shadow-none',
         'transition-[width,opacity] duration-300 ease-out',
         'overflow-hidden',
         isOpen
-          ? 'opacity-100 visible'
-          : 'opacity-0 pointer-events-none invisible',
+          ? 'opacity-100 visible bg-(--linear-app-content-surface) shadow-none'
+          : 'opacity-0 pointer-events-none invisible bg-transparent',
         className
       )}
       style={{ width: isOpen ? width : 0, maxWidth: '100vw' }}

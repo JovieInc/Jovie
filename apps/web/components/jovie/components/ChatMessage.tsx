@@ -5,7 +5,8 @@ import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
+import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import {
@@ -13,17 +14,113 @@ import {
   isToolInvocationPart,
   type MessagePart,
   type SocialLinkToolResult,
+  type ToolInvocationPart,
 } from '../types';
 import { getMessageText } from '../utils';
 import { ChatAnalyticsCard } from './ChatAnalyticsCard';
 import { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 import { ChatLinkConfirmationCard } from './ChatLinkConfirmationCard';
 import { ChatLinkRemovalCard } from './ChatLinkRemovalCard';
+import { ChatPitchCard } from './ChatPitchCard';
 
 const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
+
+function renderToolCard(
+  toolInvocation: ToolInvocationPart,
+  profileId?: string
+): React.ReactNode {
+  if (
+    toolInvocation.toolName === 'proposeAvatarUpload' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success
+  ) {
+    return <ChatAvatarUploadCard />;
+  }
+
+  if (
+    toolInvocation.toolName === 'showTopInsights' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success
+  ) {
+    return (
+      <ChatAnalyticsCard
+        result={toolInvocation.result as unknown as ChatInsightsToolResult}
+      />
+    );
+  }
+
+  if (
+    toolInvocation.toolName === 'proposeSocialLink' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success &&
+    profileId
+  ) {
+    const result = toolInvocation.result as unknown as SocialLinkToolResult;
+    return (
+      <ChatLinkConfirmationCard
+        profileId={profileId}
+        platform={result.platform}
+        normalizedUrl={result.normalizedUrl}
+        originalUrl={result.originalUrl}
+      />
+    );
+  }
+
+  if (
+    toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
+    toolInvocation.state === 'result' &&
+    toolInvocation.result?.success &&
+    profileId
+  ) {
+    const result = toolInvocation.result as {
+      linkId: string;
+      platform: string;
+      url: string;
+    };
+    return (
+      <ChatLinkRemovalCard
+        profileId={profileId}
+        linkId={result.linkId}
+        platform={result.platform}
+        url={result.url}
+      />
+    );
+  }
+
+  if (toolInvocation.toolName === 'generateReleasePitch') {
+    if (toolInvocation.state === 'call') {
+      return <ChatPitchCard state='loading' />;
+    }
+
+    if (toolInvocation.state === 'result') {
+      const result = toolInvocation.result as {
+        success: boolean;
+        releaseTitle?: string;
+        pitches?: {
+          spotify: string;
+          appleMusic: string;
+          amazon: string;
+          generic: string;
+        };
+        error?: string;
+      };
+
+      return (
+        <ChatPitchCard
+          state={result.success ? 'success' : 'error'}
+          releaseTitle={result.releaseTitle}
+          pitches={result.pitches}
+          error={result.error}
+        />
+      );
+    }
+  }
+
+  return null;
+}
 
 interface ChatMessageProps {
   readonly id: string;
@@ -71,23 +168,36 @@ export function ChatMessage({
       transition={{ duration: 0.2, ease: 'easeOut' }}
     >
       {isUser ? (
-        <div className='max-w-[78%] rounded-2xl bg-accent/95 px-4 py-3.5 text-accent-foreground'>
+        <div className='max-w-[78%] rounded-[18px] border border-(--linear-app-frame-seam) bg-surface-2 px-4 py-3.5 text-primary-token shadow-none'>
           {fileParts.length > 0 && (
             <div className={cn('flex flex-wrap gap-2', messageText && 'mb-2')}>
-              {fileParts.map((file, index) => (
-                <div
-                  key={`${file.url}-${index}`}
-                  className='relative h-32 w-32 overflow-hidden rounded-lg'
-                >
-                  <Image
-                    src={file.url}
-                    alt='Attached image'
-                    fill
-                    className='object-cover'
-                    unoptimized
-                  />
-                </div>
-              ))}
+              {(() => {
+                const seenFileKeys = new Map<string, number>();
+
+                return fileParts.map(file => {
+                  const seenCount = seenFileKeys.get(file.url) ?? 0;
+                  seenFileKeys.set(file.url, seenCount + 1);
+
+                  return (
+                    <div
+                      key={
+                        seenCount === 0
+                          ? file.url
+                          : `${file.url}-${seenCount + 1}`
+                      }
+                      className='relative h-32 w-32 overflow-hidden rounded-lg'
+                    >
+                      <Image
+                        src={file.url}
+                        alt='Attached image'
+                        fill
+                        className='object-cover'
+                        unoptimized
+                      />
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
           {messageText && (
@@ -99,108 +209,41 @@ export function ChatMessage({
       ) : (
         <div className='flex max-w-[78%] flex-col'>
           {messageText && (
-            <div className='rounded-[20px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_95%,var(--linear-bg-surface-0))] px-5 py-4 text-primary-token shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-              <div className='mb-3 flex items-center gap-2'>
-                <span className='rounded-full border border-subtle bg-surface-2/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-secondary-token'>
+            <div className='space-y-2'>
+              <div className='flex items-center gap-2 pl-0.5'>
+                <span className='flex h-5.5 w-5.5 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+                  <BrandLogo size={10} tone='auto' rounded={false} />
+                </span>
+                <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
                   Jovie
                 </span>
                 <span className='text-[11px] text-tertiary-token'>
                   {isStreaming ? 'Writing reply…' : 'Reply'}
                 </span>
               </div>
-              <ChatMarkdown
-                content={messageText}
-                isStreaming={Boolean(isStreaming)}
-              />
+              <div className='rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-primary-token shadow-[var(--linear-app-card-shadow)]'>
+                <ChatMarkdown
+                  content={messageText}
+                  isStreaming={Boolean(isStreaming)}
+                />
+              </div>
             </div>
           )}
 
           {/* Interactive tool cards */}
           {toolInvocations.map(toolInvocation => {
-            if (
-              toolInvocation.toolName === 'proposeAvatarUpload' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success
-            ) {
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatAvatarUploadCard />
-                </div>
-              );
+            const card = renderToolCard(toolInvocation, profileId);
+            if (!card) {
+              return null;
             }
-
-            if (
-              toolInvocation.toolName === 'showTopInsights' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success
-            ) {
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatAnalyticsCard
-                    result={
-                      toolInvocation.result as unknown as ChatInsightsToolResult
-                    }
-                  />
-                </div>
-              );
-            }
-
-            if (
-              toolInvocation.toolName === 'proposeSocialLink' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success &&
-              profileId
-            ) {
-              const result =
-                toolInvocation.result as unknown as SocialLinkToolResult;
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatLinkConfirmationCard
-                    profileId={profileId}
-                    platform={result.platform}
-                    normalizedUrl={result.normalizedUrl}
-                    originalUrl={result.originalUrl}
-                  />
-                </div>
-              );
-            }
-
-            if (
-              toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
-              toolInvocation.state === 'result' &&
-              toolInvocation.result?.success &&
-              profileId
-            ) {
-              const result = toolInvocation.result as {
-                linkId: string;
-                platform: string;
-                url: string;
-              };
-              return (
-                <div
-                  key={toolInvocation.toolInvocationId}
-                  className={cn(messageText && 'mt-3')}
-                >
-                  <ChatLinkRemovalCard
-                    profileId={profileId}
-                    linkId={result.linkId}
-                    platform={result.platform}
-                    url={result.url}
-                  />
-                </div>
-              );
-            }
-
-            return null;
+            return (
+              <div
+                key={toolInvocation.toolInvocationId}
+                className={cn(messageText && 'mt-3')}
+              >
+                {card}
+              </div>
+            );
           })}
 
           {!isStreaming && messageText && (
@@ -212,7 +255,7 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-1 px-3 text-secondary-token transition-colors hover:bg-surface-2 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
+                  className='flex h-7 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-secondary-token transition-colors hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:bg-interactive-hover'
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

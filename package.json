@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.4.43",
+  "version": "26.3.49",
   "private": true,
   "config": {
     "commitizen": {
@@ -21,7 +21,7 @@
       "esbuild": ">=0.25.0",
       "cookie": ">=1.0.0",
       "tmp": ">=0.2.3",
-      "vite": "^6.3.5",
+      "vite": "^6.4.1",
       "drizzle-orm": "0.45.1",
       "jsdom": "26.1.0",
       "react": "19.2.4",
@@ -35,13 +35,14 @@
       "minimatch@^9.0.0": "^9.0.7",
       "minimatch@~3.1.0": "3.1.5",
       "serialize-javascript": "^7.0.3",
-      "rollup": "^4.59.0",
+      "rollup": "^4.60.0",
       "basic-ftp": "^5.2.0",
-      "axios": "^1.13.5",
+      "axios": "^1.13.6",
       "ajv@^8.0.0": "^8.18.0",
       "undici": "^6.23.0",
       "webpack": "5.105.0",
-      "qs": "6.15.0"
+      "qs": "6.15.0",
+      "@clerk/ui>@floating-ui/react": "0.27.19"
     },
     "patchedDependencies": {
       "eslint-plugin-react@7.37.5": "patches/eslint-plugin-react@7.37.5.patch"
@@ -77,21 +78,21 @@
     "changelog:send": "doppler run -- node scripts/send-changelog-email.mjs"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
-    "@biomejs/biome": "^2.3.11",
-    "@commitlint/cli": "^20.4.2",
-    "@commitlint/config-conventional": "^20.4.3",
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@biomejs/biome": "^2.4.8",
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
     "@playwright/test": "^1.58.2",
     "commitizen": "^4.3.1",
     "cz-conventional-changelog": "^3.3.0",
     "husky": "^9.1.7",
-    "knip": "^5.83.0",
-    "lint-staged": "^16.2.6",
+    "knip": "^6.0.4",
+    "lint-staged": "^16.4.0",
     "playwright": "^1.58.2",
-    "tsx": "^4.20.5",
-    "turbo": "^2.8.9",
-    "typescript": "^5",
-    "vitest": "^4.0.18"
+    "tsx": "^4.21.0",
+    "turbo": "^2.8.20",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.1"
   },
   "lint-staged": {
     "apps/web/drizzle/migrations/**/*.{sql,ts}": [

@@ -1,7 +1,7 @@
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
-import { ScrollRevealInit } from '@/features/home/ScrollRevealInit';
+import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
 
 export default async function MarketingLayout({
   children,
@@ -9,7 +9,7 @@ export default async function MarketingLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-surface-page text-primary-token'>
+    <div className='dark linear-marketing flex min-h-screen flex-col overflow-x-clip bg-black text-primary-token'>
       <SkipToContent />
       <MarketingHeader logoSize='xs' />
       <main
@@ -17,9 +17,10 @@ export default async function MarketingLayout({
         className='flex flex-1 flex-col pt-[var(--linear-header-height)]'
       >
         {children}
-        <ScrollRevealInit />
+        <MarketingEnhancements />
       </main>
       <MarketingFooter />
+      <div aria-hidden='true' className='marketing-noise' />
     </div>
   );
 }

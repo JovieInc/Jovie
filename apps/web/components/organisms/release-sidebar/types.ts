@@ -17,6 +17,7 @@ export type ReleaseSidebarTrack = Pick<
   TrackViewModel,
   | 'id'
   | 'releaseId'
+  | 'releaseSlug'
   | 'title'
   | 'slug'
   | 'smartLinkPath'

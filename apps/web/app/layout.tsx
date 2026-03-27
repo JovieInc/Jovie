@@ -1,18 +1,12 @@
-import * as Sentry from '@sentry/nextjs';
 import type { Metadata, Viewport } from 'next';
 import localFont from 'next/font/local';
-import Script from 'next/script';
 import React from 'react';
-import { DevToolbarGate } from '@/components/features/dev/DevToolbarGate';
-import { CoreProviders } from '@/components/providers/CoreProviders';
-import { APP_NAME, APP_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL } from '@/constants/app';
 // Feature flags removed - pre-launch
 // import { runStartupEnvironmentValidation } from '@/lib/startup/environment-validator'; // Moved to build-time for performance
 import './globals.css';
-import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
+import { CookieBannerMount } from '@/components/organisms/CookieBannerMount';
 import { publicEnv } from '@/lib/env-public';
-import { env } from '@/lib/env-server';
-import { logger } from '@/lib/utils/logger';
 
 // Configure Inter Variable font from local file (no external network requests)
 const inter = localFont({
@@ -54,21 +48,21 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL(APP_URL),
+  metadataBase: new URL(BASE_URL),
   alternates: {
     canonical: '/',
   },
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: APP_URL,
+    url: BASE_URL,
     title: APP_NAME,
     description:
       'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
     siteName: APP_NAME,
     images: [
       {
-        url: `${APP_URL}/og/default.png`,
+        url: `${BASE_URL}/og/default.png`,
         width: 1200,
         height: 630,
         alt: APP_NAME,
@@ -80,7 +74,7 @@ export const metadata: Metadata = {
     title: APP_NAME,
     description:
       'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-    images: [`${APP_URL}/og/default.png`],
+    images: [`${BASE_URL}/og/default.png`],
     creator: '@jovieapp',
     site: '@jovieapp',
   },
@@ -99,9 +93,6 @@ export const metadata: Metadata = {
     google: publicEnv.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
   },
   other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'black-translucent',
     'application-name': APP_NAME,
     'msapplication-TileColor': '#6366f1',
     'msapplication-TileImage': '/android-chrome-192x192.png',
@@ -141,6 +132,7 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 5,
 };
 
 export default async function RootLayout({
@@ -157,165 +149,28 @@ export default async function RootLayout({
   const devSha = (process.env.NEXT_PUBLIC_BUILD_SHA ?? '').slice(0, 7);
   const devVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? '';
 
-  const publishableKey = publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
-
   // CSP nonce is injected automatically by Next.js from the Content-Security-Policy
   // response header set by the middleware (proxy.ts). No need to read headers() here,
   // which would force all routes into dynamic rendering.
   // Cookie banner visibility is determined client-side by reading document.cookie.
+  let devToolbar: React.ReactNode = null;
 
-  const headContent = (
-    <head>
-      {isE2EClientRuntime ? null : (
-        // eslint-disable-next-line @next/next/no-sync-scripts -- blocking theme script prevents FOUC; nonce hydration mismatch requires native <script> with suppressHydrationWarning
-        <script src='/theme-init.js' suppressHydrationWarning />
-      )}
-      {/* Icons and manifest are now handled by Next.js metadata export */}
+  if (!(isE2EClientRuntime || devEnv === 'production')) {
+    const { DevToolbarGate } = await import(
+      '@/components/features/dev/DevToolbarGate'
+    );
 
-      {/* DNS Prefetch and Preconnect for critical external resources */}
-      {/* Spotify CDN - artist images */}
-      <link rel='dns-prefetch' href='https://i.scdn.co' />
-      <link rel='preconnect' href='https://i.scdn.co' crossOrigin='anonymous' />
-      {/* Note: Font preloading is handled automatically by Next.js localFont */}
-      {/* Spotify API */}
-      <link rel='dns-prefetch' href='https://api.spotify.com' />
-      {/* Vercel Blob Storage - avatar images */}
-      <link rel='dns-prefetch' href='https://public.blob.vercel-storage.com' />
-      <link
-        rel='preconnect'
-        href='https://public.blob.vercel-storage.com'
-        crossOrigin='anonymous'
+    devToolbar = (
+      <DevToolbarGate
+        disabled={false}
+        env={devEnv}
+        sha={devSha}
+        version={devVersion}
       />
-      {/* Clerk Auth - authentication */}
-      <link rel='dns-prefetch' href='https://clerk.jov.ie' />
-      <link
-        rel='preconnect'
-        href='https://clerk.jov.ie'
-        crossOrigin='anonymous'
-      />
-      <link rel='dns-prefetch' href='https://img.clerk.com' />
-      <link
-        rel='preconnect'
-        href='https://img.clerk.com'
-        crossOrigin='anonymous'
-      />
-      {/* Clerk Auth API */}
-      <link
-        rel='preconnect'
-        href='https://api.clerk.com'
-        crossOrigin='anonymous'
-      />
-      <link
-        rel='preconnect'
-        href='https://images.clerk.dev'
-        crossOrigin='anonymous'
-      />
-      {/* Unsplash - fallback images */}
-      <link rel='dns-prefetch' href='https://images.unsplash.com' />
-      <link
-        rel='preconnect'
-        href='https://images.unsplash.com'
-        crossOrigin='anonymous'
-      />
-
-      {/* Structured Data: WebSite + Organization (global, all pages) */}
-      {isE2EClientRuntime ? null : (
-        <>
-          <Script
-            id='website-schema'
-            type='application/ld+json'
-            strategy='afterInteractive'
-            suppressHydrationWarning
-          >
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'WebSite',
-              name: APP_NAME,
-              alternateName: ['Jovie', 'jov.ie', 'Jovie Link in Bio'],
-              url: APP_URL,
-              description:
-                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-              inLanguage: 'en-US',
-              publisher: {
-                '@type': 'Organization',
-                name: APP_NAME,
-                url: APP_URL,
-              },
-            })}
-          </Script>
-          <Script
-            id='organization-schema'
-            type='application/ld+json'
-            strategy='afterInteractive'
-            suppressHydrationWarning
-          >
-            {JSON.stringify({
-              '@context': 'https://schema.org',
-              '@type': 'Organization',
-              name: APP_NAME,
-              legalName: 'Jovie Technology Inc.',
-              url: APP_URL,
-              logo: `${APP_URL}/brand/Jovie-Logo-Icon.svg`,
-              description:
-                'One link to launch your music career. Smart links, fan notifications, and AI for independent musicians.',
-              sameAs: [
-                'https://x.com/jovieapp',
-                'https://instagram.com/jovieapp',
-              ],
-            })}
-          </Script>
-        </>
-      )}
-    </head>
-  );
-
-  const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
-
-  // Early return if no publishable key (only in production)
-  if (!publishableKey) {
-    if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') {
-      logger.debug('Bypassing Clerk authentication (no keys provided)');
-      // In test/dev mode, continue rendering without Clerk
-    } else {
-      // In production, report to Sentry and show configuration error
-      // This helps track intermittent cold start issues where env vars may be unavailable
-      Sentry.captureMessage('Clerk publishableKey missing in production', {
-        level: 'error',
-        tags: {
-          context: 'root_layout_clerk_key_missing',
-          vercel_env: env.VERCEL_ENV || 'unknown',
-          node_env: env.NODE_ENV,
-        },
-        extra: {
-          has_clerk_key_in_public_env:
-            !!publicEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY,
-          // VERCEL_REGION is not in the env schema; use process.env for diagnostic
-          vercel_region: process.env.VERCEL_REGION,
-        },
-      });
-
-      return (
-        <html lang='en' data-scroll-behavior='smooth' suppressHydrationWarning>
-          {headContent}
-          <body className={bodyClassName}>
-            <div className='flex min-h-screen items-center justify-center bg-page px-6 text-primary-token'>
-              <div className='max-w-sm rounded-[14px] border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] px-6 py-5 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'>
-                <h1 className='text-[18px] font-[560] tracking-[-0.018em]'>
-                  Configuration error
-                </h1>
-                <p className='mt-3 text-[13px] leading-5 text-secondary-token'>
-                  Clerk publishable key is not configured.
-                </p>
-              </div>
-            </div>
-          </body>
-        </html>
-      );
-    }
+    );
   }
 
-  // publishableKey may be undefined in test/dev mode
-  // CoreProviders handle base client providers; Clerk is mounted per route.
+  const bodyClassName = `${inter.variable} font-sans antialiased bg-base text-primary-token`;
   return (
     <html
       lang='en'
@@ -323,19 +178,11 @@ export default async function RootLayout({
       data-scroll-behavior='smooth'
       suppressHydrationWarning
     >
-      {headContent}
+      <head />
       <body className={bodyClassName}>
-        <CoreProviders>
-          {children}
-          <DevToolbarGate
-            disabled={isE2EClientRuntime}
-            env={devEnv}
-            sha={devSha}
-            version={devVersion}
-          />
-        </CoreProviders>
-
-        <CookieBannerSection />
+        {children}
+        {devToolbar}
+        <CookieBannerMount />
       </body>
     </html>
   );

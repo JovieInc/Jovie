@@ -27,6 +27,7 @@ module.exports = {
         { metric: 'largest-contentful-paint', budget: 2500 },
         { metric: 'cumulative-layout-shift', budget: 0.1 },
         { metric: 'first-input-delay', budget: 100 },
+        { metric: 'interactive-shell-ready', budget: 100 },
         // TTFB includes Playwright browser overhead, not just server response
         { metric: 'time-to-first-byte', budget: 1800 },
       ],

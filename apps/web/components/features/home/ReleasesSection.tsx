@@ -42,7 +42,7 @@ export function ReleasesSection() {
       sectionNumber='1.0'
       sectionTitle='Release'
       heading='Release day, automated.'
-      description='The moment a song drops, Jovie spins up the release page, matches every major platform, and starts the launch for you.'
+      description='Jovie launches the page, matches every platform, and starts fan outreach the moment your song drops.'
       subItems={SUB_ITEMS}
       className='relative overflow-hidden bg-page'
     >
@@ -81,6 +81,8 @@ export function ReleasesSection() {
                 width={2880}
                 height={1800}
                 title='Jovie - Release Flow'
+                priority
+                skipCheck
               />
             </div>
 

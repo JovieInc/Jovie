@@ -8,8 +8,8 @@ import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import { cn } from '@/lib/utils';
 
-const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
-  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_98%,var(--linear-bg-surface-0))] hover:bg-surface-0 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0';
+export const DRAWER_HEADER_ICON_BUTTON_CLASSNAME =
+  'h-7 w-7 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) shadow-none hover:bg-surface-0 focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 active:bg-surface-1';
 
 export interface DrawerHeaderAction {
   readonly id: string;
