@@ -3,6 +3,8 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PublicProfileTemplateV2 } from '@/components/features/profile/templates/PublicProfileTemplateV2';
 
+const mockMergedDSPs = [{ key: 'spotify' }];
+
 vi.mock('@/components/organisms/profile-shell', () => ({
   ProfileNotificationsContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
@@ -84,7 +86,7 @@ vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
 }));
 
 vi.mock('@/lib/profile-dsps', () => ({
-  getCanonicalProfileDSPs: () => [{ key: 'spotify' }],
+  getCanonicalProfileDSPs: () => mockMergedDSPs,
 }));
 
 vi.mock('@/lib/utils/context-aware-links', () => ({
@@ -225,5 +227,27 @@ describe('PublicProfileTemplateV2 history behavior', () => {
       expect(screen.getByTestId('mode-panel')).toHaveTextContent('profile');
       expect(screen.getByTestId('contact-drawer')).toHaveTextContent('open');
     });
+  });
+
+  it('opens the subscribe drawer when Play is tapped without DSP links', async () => {
+    mockMergedDSPs.length = 0;
+
+    render(
+      <PublicProfileTemplateV2
+        mode='profile'
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        tourDates={[]}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('subscribe-drawer')).toHaveTextContent('open');
+    });
+
+    mockMergedDSPs.push({ key: 'spotify' });
   });
 });

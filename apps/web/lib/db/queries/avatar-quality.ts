@@ -9,15 +9,24 @@ import {
 } from '@/lib/profile/avatar-quality';
 
 function isAvatarQualitySchemaUnavailableError(error: unknown): boolean {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const causeMessage =
-    error instanceof Error && error.cause instanceof Error
-      ? error.cause.message
-      : '';
+  const directCode =
+    error instanceof Error && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : null;
+  const causeCode =
+    error instanceof Error &&
+    error.cause &&
+    typeof error.cause === 'object' &&
+    'code' in error.cause &&
+    typeof error.cause.code === 'string'
+      ? error.cause.code
+      : null;
 
   return (
-    errorMessage.includes('does not exist') ||
-    causeMessage.includes('does not exist')
+    directCode === '42P01' ||
+    directCode === '42703' ||
+    causeCode === '42P01' ||
+    causeCode === '42703'
   );
 }
 

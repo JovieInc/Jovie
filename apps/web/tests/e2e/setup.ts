@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/rules-of-hooks */
 import { test as base } from '@playwright/test';
 import { isExpectedError, isExpectedWarning } from './utils/smoke-test-utils';
 
@@ -17,7 +16,7 @@ declare global {
 // Extend the base test with custom setup
 export const test = base.extend({
   // Override the page to handle React context issues and monitor console errors
-  page: async ({ page }, usePage) => {
+  page: async ({ page }, runPage) => {
     // Array to collect console errors
     const consoleErrors: string[] = [];
     const consoleWarnings: string[] = [];
@@ -59,7 +58,7 @@ export const test = base.extend({
     });
 
     // Use the page
-    await usePage(page);
+    await runPage(page);
 
     // After test completion, log console errors and warnings
     if (consoleErrors.length > 0) {
