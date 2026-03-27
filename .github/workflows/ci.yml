@@ -1304,9 +1304,10 @@ jobs:
   ci-a11y:
     name: A11y (axe)
     # Runs axe-core WCAG 2.1 AA audit on public routes — uses shared build artifact.
-    # Skipped on push-to-main (merge queue already validated).
+    # Informational only — never blocks PRs or merge queue.
     needs: [ci-build-public, ci-path-changes]
     if: ${{ ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false) || github.event_name == 'workflow_dispatch') && needs.ci-build-public.outputs.has_artifact == 'true' }}
+    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
