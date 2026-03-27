@@ -7,16 +7,13 @@ import { StandaloneProductPage } from '@/components/organisms/StandaloneProductP
 import { authorizeHud } from '@/lib/auth/hud';
 import { publicEnv } from '@/lib/env-public';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { HudDashboardClient } from './HudDashboardClient';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: { index: false, follow: false },
-  },
+  robots: NOINDEX_ROBOTS,
 };
 
 type SearchParams = Record<string, string | string[] | undefined>;

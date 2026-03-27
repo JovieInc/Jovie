@@ -84,6 +84,7 @@ export const APP_ROUTES = {
   LAUNCH: '/launch',
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
+  SUPPORT: '/support',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',
