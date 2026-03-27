@@ -66,6 +66,35 @@ interface SendStopButtonProps {
   readonly onStop?: () => void;
 }
 
+function getButtonIcon(
+  showStop: boolean,
+  isLoading: boolean,
+  isSubmitting: boolean,
+  isCompact: boolean
+): { key: string; icon: React.ReactNode } {
+  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  if (showStop) {
+    return {
+      key: 'stop',
+      icon: (
+        <span
+          className={cn(
+            'block rounded-[2px] bg-current',
+            isCompact ? 'h-2.5 w-2.5' : 'h-3 w-3'
+          )}
+        />
+      ),
+    };
+  }
+  if (isLoading || isSubmitting) {
+    return {
+      key: 'loading',
+      icon: <Loader2 className={cn('animate-spin', iconSize)} />,
+    };
+  }
+  return { key: 'send', icon: <ArrowUp className={iconSize} /> };
+}
+
 function SendStopButton({
   canSend,
   isStreaming,
@@ -77,7 +106,13 @@ function SendStopButton({
   onStop,
 }: SendStopButtonProps) {
   const showStop = isStreaming && onStop;
-  const iconSize = isCompact ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  const { key, icon } = getButtonIcon(
+    Boolean(showStop),
+    isLoading,
+    isSubmitting,
+    isCompact
+  );
+  const motionInit = reducedMotion ? undefined : { scale: 0.5, opacity: 0 };
 
   return (
     <SimpleTooltip content={showStop ? 'Stop generating' : 'Send message'}>
@@ -96,46 +131,16 @@ function SendStopButton({
         aria-label={showStop ? 'Stop generating' : 'Send message'}
       >
         <AnimatePresence mode='wait' initial={false}>
-          {showStop ? (
-            <motion.span
-              key='stop'
-              initial={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              transition={TRANSITION_FAST}
-              className='flex items-center justify-center'
-            >
-              {/* Filled rounded-rect stop icon */}
-              <span
-                className={cn(
-                  'block rounded-[2px] bg-current',
-                  isCompact ? 'h-2.5 w-2.5' : 'h-3 w-3'
-                )}
-              />
-            </motion.span>
-          ) : isLoading || isSubmitting ? (
-            <motion.span
-              key='loading'
-              initial={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              transition={TRANSITION_FAST}
-              className='flex items-center justify-center'
-            >
-              <Loader2 className={cn('animate-spin', iconSize)} />
-            </motion.span>
-          ) : (
-            <motion.span
-              key='send'
-              initial={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={reducedMotion ? undefined : { scale: 0.5, opacity: 0 }}
-              transition={TRANSITION_FAST}
-              className='flex items-center justify-center'
-            >
-              <ArrowUp className={iconSize} />
-            </motion.span>
-          )}
+          <motion.span
+            key={key}
+            initial={motionInit}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={motionInit}
+            transition={TRANSITION_FAST}
+            className='flex items-center justify-center'
+          >
+            {icon}
+          </motion.span>
         </AnimatePresence>
       </button>
     </SimpleTooltip>
@@ -343,31 +348,24 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const hasQuickActions =
       Boolean(onQuickActionSelect) && (quickActions?.length ?? 0) > 0;
 
-    // Border radius: pill resolves to containerHeight/2 which ≈ 24px at collapsed size
-    // So the transition is 24→24 (invisible) instead of 9999→24 (janky)
-    const borderRadius = isExpanded ? 24 : 24;
+    // Both collapsed and expanded resolve to 24px radius, avoiding
+    // the jarring 9999px→24px transition of the old rounded-full approach.
+    const borderRadius = 24;
 
     // Shadow states
-    const expandedShadow =
-      '0 1px 0 rgba(255,255,255,0.65), 0 18px 34px -28px rgba(15,23,42,0.45)';
-    const collapsedShadow =
+    let boxShadow =
       '0 1px 0 rgba(255,255,255,0.72), 0 10px 22px -20px rgba(15,23,42,0.42)';
+    if (isOverLimit) {
+      boxShadow = 'none';
+    } else if (isExpanded) {
+      boxShadow =
+        '0 1px 0 rgba(255,255,255,0.65), 0 18px 34px -28px rgba(15,23,42,0.45)';
+    }
 
     return (
       <form onSubmit={handleFormSubmit}>
         <motion.div
-          animate={
-            reducedMotion
-              ? undefined
-              : {
-                  borderRadius,
-                  boxShadow: isOverLimit
-                    ? 'none'
-                    : isExpanded
-                      ? expandedShadow
-                      : collapsedShadow,
-                }
-          }
+          animate={reducedMotion ? undefined : { borderRadius, boxShadow }}
           transition={
             reducedMotion
               ? undefined
