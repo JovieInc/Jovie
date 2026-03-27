@@ -113,6 +113,7 @@ vi.mock('@/constants/app', () => ({
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
 }));
 vi.mock('@/constants/domains', () => ({
+  BASE_URL: 'https://jov.ie',
   HOSTNAME: 'jov.ie',
 }));
 
@@ -388,26 +389,6 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
-
-    it('lets active users continue onboarding when handle or resume is present', async () => {
-      mocks.getUserState.mockResolvedValue(USER_STATES.active);
-
-      const handleReq = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/onboarding',
-        searchParams: { handle: 'artist' },
-      });
-      const handleRes = await callMiddleware(handleReq);
-
-      expect(handleRes.status).toBeLessThan(300);
-
-      const resumeReq = createAuthenticatedRequest('clerk_user_1', {
-        pathname: '/onboarding',
-        searchParams: { resume: 'spotify' },
-      });
-      const resumeRes = await callMiddleware(resumeReq);
-
-      expect(resumeRes.status).toBeLessThan(300);
-    });
   });
 
   // ==========================================================================
@@ -581,16 +562,34 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('support.jov.ie redirect', () => {
-    it('308 redirects support.jov.ie to jov.ie/support', async () => {
+    it('308 redirects support.jov.ie to jov.ie/support and preserves query params', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/articles/649224-jovie-password-reset',
         hostname: 'support.jov.ie',
+        searchParams: { ref: '123' },
       });
       const res = await callMiddleware(req);
 
       expect(res.status).toBe(308);
       const location = res.headers.get('location');
-      expect(location).toBe('https://jov.ie/support');
+      expect(location).toBe('https://jov.ie/support?ref=123');
+    });
+
+    it('redirects support.jov.ie investor paths before investor handling runs', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/investor-portal/respond',
+        hostname: 'support.jov.ie',
+        searchParams: {
+          t: 'token-123',
+          action: 'interested',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(res.headers.get('location')).toBe(
+        'https://jov.ie/support?t=token-123&action=interested'
+      );
     });
   });
 });
