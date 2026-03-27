@@ -1,6 +1,7 @@
 import { and, count, desc, sql as drizzleSql, eq, or } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { getSessionErrorResponse } from '@/app/api/chat/session-error-response';
+import { APP_ROUTES } from '@/constants/routes';
 import { getSessionContext, withDbSessionTx } from '@/lib/auth/session';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { discogReleases, discogReleaseTracks } from '@/lib/db/schema/content';
@@ -43,7 +44,7 @@ function buildWelcomeMessage({
 }
 
 function buildWelcomeChatRoute(conversationId: string): string {
-  return `/app/chat/${conversationId}?panel=profile&from=onboarding`;
+  return `${APP_ROUTES.CHAT}/${conversationId}?panel=profile&from=onboarding`;
 }
 
 export async function POST(request: Request) {
@@ -94,16 +95,33 @@ export async function POST(request: Request) {
 
         if (existingConversation) {
           if (initialReply) {
-            await tx.insert(chatMessages).values({
-              content: initialReply,
-              conversationId: existingConversation.id,
-              role: 'user',
-            });
+            const [lastMessage] = await tx
+              .select({
+                content: chatMessages.content,
+                role: chatMessages.role,
+              })
+              .from(chatMessages)
+              .where(eq(chatMessages.conversationId, existingConversation.id))
+              .orderBy(desc(chatMessages.createdAt))
+              .limit(1);
 
-            await tx
-              .update(chatConversations)
-              .set({ updatedAt: new Date() })
-              .where(eq(chatConversations.id, existingConversation.id));
+            const shouldAppendInitialReply = !(
+              lastMessage?.role === 'user' &&
+              lastMessage.content === initialReply
+            );
+
+            if (shouldAppendInitialReply) {
+              await tx.insert(chatMessages).values({
+                content: initialReply,
+                conversationId: existingConversation.id,
+                role: 'user',
+              });
+
+              await tx
+                .update(chatConversations)
+                .set({ updatedAt: new Date() })
+                .where(eq(chatConversations.id, existingConversation.id));
+            }
           }
 
           return {

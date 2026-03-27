@@ -61,8 +61,6 @@ const MAX_TRACKS_PER_RELEASE = 100;
 
 const ISRC_REGEX = /^[A-Z]{2}[A-Z0-9]{3}\d{7}$/;
 
-const AFTER_REQUEST_SCOPE_ERROR = '`after` was called outside a request scope';
-
 function sanitizeBoundedInteger(
   value: number | null | undefined,
   min: number,
@@ -109,37 +107,6 @@ export interface SpotifyImportOptions {
   discoverLinks?: boolean | 'sync' | 'background';
 }
 
-function scheduleBackgroundLinkDiscovery(
-  creatorProfileId: string,
-  market: string
-): void {
-  const discoveryTask = discoverLinksForReleases(
-    creatorProfileId,
-    market
-  ).catch(error => {
-    captureWarning('Background link discovery failed', error, {
-      source: 'spotify_import',
-      creatorProfileId,
-    });
-  });
-
-  try {
-    // Prefer after() in request lifecycles so the runtime keeps the task alive.
-    after(discoveryTask);
-  } catch (error) {
-    if (
-      !(error instanceof Error) ||
-      !error.message.includes(AFTER_REQUEST_SCOPE_ERROR)
-    ) {
-      throw error;
-    }
-
-    // Tests and background jobs do not have a request scope. The task is
-    // already running and its rejection is handled above, so allow it to
-    // continue without after().
-  }
-}
-
 /**
  * Discover cross-platform links for imported releases
  */
@@ -173,6 +140,24 @@ async function discoverLinksForReleases(
       });
     }
   });
+}
+
+function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
+  try {
+    after(task);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes('outside a request scope')
+    ) {
+      queueMicrotask(() => {
+        void task();
+      });
+      return;
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -427,7 +412,18 @@ export async function importReleasesFromSpotify(
           if (discoverLinksMode === 'sync') {
             await discoverLinksForReleases(creatorProfileId, market);
           } else {
-            scheduleBackgroundLinkDiscovery(creatorProfileId, market);
+            // Use after() in request scope, but fall back for tests and other
+            // non-request call sites that still need fire-and-forget behavior.
+            scheduleBackgroundDiscovery(() =>
+              discoverLinksForReleases(creatorProfileId, market).catch(
+                error => {
+                  captureWarning('Background link discovery failed', error, {
+                    source: 'spotify_import',
+                    creatorProfileId,
+                  });
+                }
+              )
+            );
           }
         }
 

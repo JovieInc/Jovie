@@ -41,10 +41,16 @@ interface ChatPageClientProps {
 
 const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
 
+type WelcomeChatBootstrapState =
+  | 'idle'
+  | 'pending'
+  | 'scheduled'
+  | 'done'
+  | 'failed';
+
 function shouldRetryWelcomeChatBootstrap(status: number | null): boolean {
   return (
     status === null ||
-    status === 404 ||
     status === 500 ||
     status === 502 ||
     status === 503 ||
@@ -89,13 +95,22 @@ export function ChatPageClient({
   const [initialQueryHandled, setInitialQueryHandled] = useState(false);
   const { setHeaderBadge, setHeaderActions } = useSetHeaderActions();
   const [autoRetryCount, setAutoRetryCount] = useState(0);
-  const [welcomeChatBootstrapState, setWelcomeChatBootstrapState] = useState<
-    'idle' | 'pending' | 'scheduled' | 'done' | 'failed'
-  >('idle');
+  const [, setWelcomeChatBootstrapState] =
+    useState<WelcomeChatBootstrapState>('idle');
+  const welcomeChatBootstrapStateRef =
+    useRef<WelcomeChatBootstrapState>('idle');
   const welcomeChatRetryCountRef = useRef(0);
   const welcomeChatRetryTimeoutRef = useRef<ReturnType<
     typeof globalThis.setTimeout
   > | null>(null);
+
+  const setWelcomeChatBootstrapStatus = useCallback(
+    (nextState: WelcomeChatBootstrapState) => {
+      welcomeChatBootstrapStateRef.current = nextState;
+      setWelcomeChatBootstrapState(nextState);
+    },
+    []
+  );
 
   const hasProfilesButNoSelection =
     creatorProfiles.length > 0 && !selectedProfile && !needsOnboarding;
@@ -309,47 +324,29 @@ export function ChatPageClient({
       !fromOnboarding ||
       conversationId ||
       !activeProfile ||
-      welcomeChatBootstrapState !== 'idle'
+      welcomeChatBootstrapStateRef.current !== 'idle'
     ) {
       return;
     }
 
-    const controller = new AbortController();
+    let isActive = true;
+    let controller: AbortController | null = null;
 
-    const scheduleRetry = (status: number | null) => {
-      if (
-        !shouldRetryWelcomeChatBootstrap(status) ||
-        welcomeChatRetryCountRef.current >=
-          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
-      ) {
-        setWelcomeChatBootstrapState('failed');
-        notifications.error(
-          'We could not start your onboarding chat. Refresh to try again.'
-        );
-        return;
-      }
-
-      const delay =
-        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
-          welcomeChatRetryCountRef.current
-        ] ??
-        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
-          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length - 1
-        ];
-
-      welcomeChatRetryCountRef.current += 1;
-      setWelcomeChatBootstrapState('scheduled');
+    const clearRetryTimeout = () => {
       if (welcomeChatRetryTimeoutRef.current !== null) {
         globalThis.clearTimeout(welcomeChatRetryTimeoutRef.current);
-      }
-      welcomeChatRetryTimeoutRef.current = globalThis.setTimeout(() => {
         welcomeChatRetryTimeoutRef.current = null;
-        setWelcomeChatBootstrapState('idle');
-      }, delay);
+      }
     };
 
     const bootstrapWelcomeChat = async () => {
-      setWelcomeChatBootstrapState('pending');
+      if (!isActive || welcomeChatBootstrapStateRef.current !== 'idle') {
+        return;
+      }
+
+      controller?.abort();
+      controller = new AbortController();
+      setWelcomeChatBootstrapStatus('pending');
 
       let initialReply = '';
       try {
@@ -368,7 +365,7 @@ export function ChatPageClient({
       });
 
       if (!response.ok) {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && isActive) {
           scheduleRetry(response.status);
         }
         return;
@@ -378,7 +375,7 @@ export function ChatPageClient({
         route?: string;
       };
       welcomeChatRetryCountRef.current = 0;
-      setWelcomeChatBootstrapState('done');
+      setWelcomeChatBootstrapStatus('done');
 
       try {
         globalThis.sessionStorage?.removeItem(ONBOARDING_WELCOME_REPLY_KEY);
@@ -387,20 +384,64 @@ export function ChatPageClient({
         // sessionStorage cleanup is non-critical
       }
 
-      if (!controller.signal.aborted && payload.route) {
+      if (isActive && !controller.signal.aborted && payload.route) {
         router.replace(payload.route, { scroll: false });
       }
     };
 
-    const bootstrapPromise = bootstrapWelcomeChat();
-    bootstrapPromise.catch(() => {
-      if (!controller.signal.aborted) {
+    const scheduleRetry = (status: number | null) => {
+      if (!isActive) {
+        return;
+      }
+
+      if (
+        !shouldRetryWelcomeChatBootstrap(status) ||
+        welcomeChatRetryCountRef.current >=
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length
+      ) {
+        setWelcomeChatBootstrapStatus('failed');
+        notifications.error(
+          'We could not start your onboarding chat. Refresh to try again.'
+        );
+        return;
+      }
+
+      const delay =
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          welcomeChatRetryCountRef.current
+        ] ??
+        WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS[
+          WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS.length - 1
+        ];
+
+      welcomeChatRetryCountRef.current += 1;
+      setWelcomeChatBootstrapStatus('scheduled');
+      clearRetryTimeout();
+      welcomeChatRetryTimeoutRef.current = globalThis.setTimeout(() => {
+        if (!isActive) {
+          return;
+        }
+
+        clearRetryTimeout();
+        setWelcomeChatBootstrapStatus('idle');
+        bootstrapWelcomeChat().catch(() => {
+          if (!controller?.signal.aborted && isActive) {
+            scheduleRetry(null);
+          }
+        });
+      }, delay);
+    };
+
+    bootstrapWelcomeChat().catch(() => {
+      if (!controller?.signal.aborted && isActive) {
         scheduleRetry(null);
       }
     });
 
     return () => {
-      controller.abort();
+      isActive = false;
+      controller?.abort();
+      clearRetryTimeout();
     };
   }, [
     activeProfile,
@@ -408,7 +449,7 @@ export function ChatPageClient({
     fromOnboarding,
     notifications,
     router,
-    welcomeChatBootstrapState,
+    setWelcomeChatBootstrapStatus,
   ]);
 
   // Profile unavailable — show actionable error instead of infinite spinner.

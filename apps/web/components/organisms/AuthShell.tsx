@@ -68,18 +68,18 @@ function AuthShellInner({
     <AppShellFrame
       sidebar={sidebar}
       header={
-        <DashboardHeader
-          breadcrumbs={breadcrumbs}
-          sidebarTrigger={sidebarTrigger}
-          breadcrumbSuffix={isInSettings ? undefined : headerBadge}
-          action={isInSettings ? undefined : headerAction}
-          mobileProfileSlot={
-            isInSettings ? undefined : (
+        isInSettings ? null : (
+          <DashboardHeader
+            breadcrumbs={breadcrumbs}
+            sidebarTrigger={sidebarTrigger}
+            breadcrumbSuffix={headerBadge}
+            action={headerAction}
+            mobileProfileSlot={
               <MobileProfileDrawer onOpen={previewPanelState.toggle} />
-            )
-          }
-          showDivider={isInSettings ? false : isTableRoute}
-        />
+            }
+            showDivider={isTableRoute}
+          />
+        )
       }
       main={children}
       rightPanel={rightPanel}

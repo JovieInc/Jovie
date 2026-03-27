@@ -97,6 +97,7 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerAsyncToggle: ({ label }: { label: string }) => (
     <div data-testid='async-toggle'>{label}</div>
   ),
+  DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
   DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
   DrawerSurfaceCard: ({
     children,
@@ -115,10 +116,12 @@ vi.mock('@/components/molecules/drawer', () => ({
     value,
     onValueChange,
     options,
+    actions,
   }: {
     value: string;
     onValueChange: (value: string) => void;
     options: Array<{ value: string; label: string }>;
+    actions?: React.ReactNode;
   }) => (
     <div>
       {options.map(option => (
@@ -132,13 +135,61 @@ vi.mock('@/components/molecules/drawer', () => ({
           {option.label}
         </button>
       ))}
+      {actions}
+    </div>
+  ),
+  DrawerSplitButton: ({
+    primaryAction,
+    menuItems,
+  }: {
+    primaryAction?: {
+      ariaLabel: string;
+      label?: string;
+      onClick: () => void;
+    };
+    menuItems?: Array<{ id: string; label?: string; onClick?: () => void }>;
+  }) =>
+    !primaryAction && (!menuItems || menuItems.length === 0) ? null : (
+      <div data-testid='drawer-split-button'>
+        {primaryAction ? (
+          <button
+            type='button'
+            aria-label={primaryAction.ariaLabel}
+            onClick={primaryAction.onClick}
+          >
+            {primaryAction.label ?? primaryAction.ariaLabel}
+          </button>
+        ) : null}
+        {menuItems?.map(item => (
+          <button key={item.id} type='button' onClick={item.onClick}>
+            {item.label}
+          </button>
+        ))}
+      </div>
+    ),
+  DrawerTabbedCard: ({
+    children,
+    tabs,
+    testId,
+  }: {
+    children?: React.ReactNode;
+    tabs?: React.ReactNode;
+    testId?: string;
+  }) => (
+    <div data-testid={testId}>
+      {tabs}
+      {children}
     </div>
   ),
 }));
 
 // Mock sub-components that are not under test — useReleaseHeaderParts hook
 vi.mock('@/components/organisms/release-sidebar/ReleaseSidebarHeader', () => ({
-  useReleaseHeaderParts: () => ({ title: 'Header', actions: null }),
+  useReleaseHeaderParts: () => ({
+    headerLabel: '',
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 
 vi.mock('next/image', () => ({
@@ -283,8 +334,8 @@ describe('ReleaseSidebar Links tab', () => {
     const user = userEvent.setup();
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
-    // Track list tab active by default — Tracks visible
-    expect(screen.getByTestId('tracklist')).toBeInTheDocument();
+    // Details tab active by default
+    expect(screen.getByTestId('metadata')).toBeInTheDocument();
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
@@ -305,7 +356,7 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
-    // Switch back to Track list
+    // Switch to Track list
     await user.click(screen.getByRole('tab', { name: /tracks/i }));
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
   });
@@ -330,10 +381,26 @@ describe('ReleaseSidebar Links tab', () => {
 
   it('Links tab renders DSP links section', async () => {
     const user = userEvent.setup();
-    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+    render(
+      <ReleaseSidebar
+        release={mockRelease}
+        {...defaultProps}
+        providerConfig={{
+          spotify: { label: 'Spotify', accent: '#1DB954' },
+        }}
+        onRescanIsrc={vi.fn()}
+      />
+    );
 
     await user.click(screen.getByRole('tab', { name: /platforms/i }));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Add platform link' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /refresh platforms/i })
+    ).toBeInTheDocument();
   });
 
   it('smart link analytics card renders when a release is selected', async () => {
@@ -343,11 +410,15 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
   });
 
-  it('renders the release drawer as stacked header, analytics, and tab cards', () => {
+  it('renders the release drawer as stacked header, analytics, standalone tabs, and detail cards', () => {
     render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
 
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
-    expect(screen.getByTestId('release-tab-panel-card')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /details/i })).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('release-tab-panel-card')
+    ).not.toBeInTheDocument();
   });
 });

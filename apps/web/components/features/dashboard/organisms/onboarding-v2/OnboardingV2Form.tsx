@@ -42,6 +42,7 @@ import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
 } from '@/lib/onboarding/session-keys';
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
@@ -139,6 +140,7 @@ interface LateArrival {
 
 interface OnboardingV2FormProps {
   readonly existingAvatarUrl?: string | null;
+  readonly existingAvatarQuality?: AvatarQuality | null;
   readonly existingBio?: string | null;
   readonly existingGenres?: string[] | null;
   readonly initialDisplayName?: string;
@@ -699,6 +701,7 @@ function PreviewPanel({
 
 export function OnboardingV2Form({
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
   initialDisplayName = '',
@@ -711,11 +714,14 @@ export function OnboardingV2Form({
   userId,
 }: Readonly<OnboardingV2FormProps>) {
   const router = useRouter();
+  void existingAvatarQuality;
   const searchParams = useSearchParams();
   const notifications = useNotifications();
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
   const initialStep =
-    initialProfileId != null ? normalizeResumeStep(initialResumeStep) : null;
+    initialProfileId !== null && initialProfileId !== undefined
+      ? normalizeResumeStep(initialResumeStep)
+      : null;
 
   const [profileHandle, setProfileHandle] = useState(normalizedInitialHandle);
   const [profileId, setProfileId] = useState<string | null>(initialProfileId);
@@ -916,7 +922,9 @@ export function OnboardingV2Form({
     }
 
     const controller = new AbortController();
-    void refreshDiscovery(controller.signal);
+    refreshDiscovery(controller.signal).catch(() => {
+      // refreshDiscovery is responsible for setting user-facing error state
+    });
 
     return () => {
       controller.abort();
@@ -1060,26 +1068,20 @@ export function OnboardingV2Form({
       setDiscoveryError(null);
 
       try {
-        const [connectResult] = await Promise.all([
-          connectOnboardingSpotifyArtist({
-            artistName: artist.name,
-            includeTracks: false,
-            profileId,
-            skipMusicFetchEnrichment: true,
-            spotifyArtistId: artist.id,
-            spotifyArtistUrl: artist.url,
-          }),
-          enrichProfileFromDsp(artist.id, artist.url),
-        ]);
+        const connectResult = await connectOnboardingSpotifyArtist({
+          artistName: artist.name,
+          includeTracks: false,
+          profileId,
+          skipMusicFetchEnrichment: true,
+          spotifyArtistId: artist.id,
+          spotifyArtistUrl: artist.url,
+        });
 
         if (!connectResult.success) {
           throw new Error(
             connectResult.message || 'Failed to connect your Spotify artist.'
           );
         }
-
-        setIsArtistConnectPending(false);
-        await refreshDiscovery();
       } catch (error) {
         setIsArtistConnectPending(false);
         setSelectedArtist(
@@ -1091,7 +1093,17 @@ export function OnboardingV2Form({
             ? error.message
             : 'Failed to connect your Spotify artist.'
         );
+        return;
       }
+
+      enrichProfileFromDsp(artist.id, artist.url).catch(() => {
+        // Best-effort enrichment should not block a successful connect flow.
+      });
+
+      setIsArtistConnectPending(false);
+      await refreshDiscovery().catch(() => {
+        // refreshDiscovery is responsible for setting user-facing error state
+      });
     },
     [clearArtistSearch, profileId, refreshDiscovery]
   );
@@ -1482,6 +1494,12 @@ export function OnboardingV2Form({
             title='Pick your Spotify artist'
             prompt='Search for your artist page or paste a Spotify artist URL. We will start importing as soon as you choose one.'
           >
+            {discoveryError ? (
+              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
+                {discoveryError}
+              </ContentSurfaceCard>
+            ) : null}
+
             <div className='relative'>
               <div className='flex items-center gap-3 rounded-[22px] border border-subtle bg-surface-1 px-4 py-3'>
                 <Music2 className='h-4 w-4 shrink-0 text-tertiary-token' />
