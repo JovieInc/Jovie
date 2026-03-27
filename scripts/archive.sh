@@ -26,7 +26,8 @@ echo "  Removed node_modules"
 
 # Remove agent worktrees (stale subagent git worktrees)
 if [ -d ".claude/worktrees" ]; then
-  rm -rf .claude/worktrees
+  rm -rf .claude/worktrees 2>/dev/null || true
+  git worktree prune 2>/dev/null || true
   echo "  Removed .claude/worktrees"
 fi
 
