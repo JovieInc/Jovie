@@ -12,9 +12,13 @@ import { seedTestData } from './seed-test-data';
 // Load environment variables in priority order (first-loaded wins with override: false)
 const webRoot = path.resolve(__dirname, '..');
 const repoRoot = path.resolve(webRoot, '../..');
+const bootstrapBaseUrl = process.env.BASE_URL;
+const shouldLoadRepoEnvLocal = !isExternalBaseUrl(bootstrapBaseUrl);
 
 config({ path: path.join(webRoot, '.env.development.local') }); // E2E creds
-config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+if (shouldLoadRepoEnvLocal) {
+  config({ path: path.join(repoRoot, '.env.local') }); // Real Clerk keys
+}
 config({ path: path.join(repoRoot, '.env.test') }); // Fallback defaults
 
 const isCI = !!process.env.CI;
@@ -24,6 +28,7 @@ const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 const isCuratedFastLane = process.env.E2E_FAST_CURATED === '1';
 const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const shouldSkipSeeding =
   isAuthRefreshOnly || isFastIteration || process.env.E2E_SKIP_SEED === '1';
 const shouldSkipWarmup =
@@ -121,7 +126,10 @@ async function globalSetup() {
     (testUsername.includes('+clerk_test') ||
       !!process.env.E2E_CLERK_USER_PASSWORD);
 
-  if (hasRealClerkKeys) {
+  if (useTestAuthBypass) {
+    process.env.CLERK_TESTING_SETUP_SUCCESS = 'true';
+    console.log('Test auth bypass enabled');
+  } else if (hasRealClerkKeys) {
     try {
       await clerkSetup({
         publishableKey: publishableKey!,
