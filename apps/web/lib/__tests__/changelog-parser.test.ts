@@ -366,4 +366,23 @@ describe('parseChangelog', () => {
       'Design tokens now support accent overrides',
     ]);
   });
+
+  it('does not treat lowercase common words as vendor leaks', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Added turbo mode for playlist cleanup
+- conductor notes now show in exported setlists
+- Reduced Sentry error noise
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Added turbo mode for playlist cleanup',
+      'conductor notes now show in exported setlists',
+    ]);
+    expect(releases[0].sections.changed).not.toContain(
+      'Reduced Sentry error noise'
+    );
+  });
 });

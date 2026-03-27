@@ -205,6 +205,25 @@ describe('parseChangelog', () => {
     ]);
   });
 
+  it('does not treat lowercase common words as vendor leaks', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Added turbo mode for playlist cleanup
+- conductor notes now show in exported setlists
+- Reduced Sentry error noise
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Added turbo mode for playlist cleanup',
+      'conductor notes now show in exported setlists',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Reduced Sentry error noise',
+    ]);
+  });
+
   it('treats suffix-tagged internal entries as internal', () => {
     const md = `## [1.0.0] - 2026-03-20
 

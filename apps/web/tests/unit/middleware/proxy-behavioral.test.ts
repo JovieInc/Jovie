@@ -111,6 +111,7 @@ vi.mock('@/constants/app', () => ({
   HOMEPAGE_REGION_COOKIE: 'homepage_region',
 }));
 vi.mock('@/constants/domains', () => ({
+  BASE_URL: 'https://jov.ie',
   HOSTNAME: 'jov.ie',
 }));
 
