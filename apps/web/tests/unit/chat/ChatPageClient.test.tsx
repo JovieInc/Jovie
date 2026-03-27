@@ -24,8 +24,7 @@ const { mockSentryAddBreadcrumb, mockSentryCaptureMessage } = vi.hoisted(
 
 let mockSearchParams = new URLSearchParams();
 
-// Mock next/dynamic to render components synchronously in tests
-// (dynamic with ssr:false doesn't render in jsdom)
+// Mock next/dynamic for ProfileContactSidebar (ssr:false doesn't render in jsdom)
 vi.mock('next/dynamic', () => ({
   default: (loader: () => Promise<{ default: React.ComponentType }>) => {
     let Component: React.ComponentType | null = null;
@@ -33,7 +32,6 @@ vi.mock('next/dynamic', () => ({
       Component = mod.default;
     });
     return function DynamicWrapper(props: Record<string, unknown>) {
-      // In vitest, the promise resolves synchronously with mocked modules
       if (Component) return React.createElement(Component, props);
       return null;
     };

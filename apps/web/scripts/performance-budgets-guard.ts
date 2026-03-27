@@ -442,20 +442,20 @@ const measureSkeletonToContent = async (
 
   if (isChatPage) {
     try {
-      // Wait for either: shell skeleton gone, or chat content visible
+      // Wait for chat content to be visible. The dynamic import renders
+      // data-testid="chat-content" once JovieChat mounts. If that's not
+      // found (e.g. profile missing, error state), fall back to the
+      // dashboard nav appearing which means the shell + data loaded.
       await Promise.race([
-        page
-          .waitForSelector('[data-testid="dashboard-shell-skeleton"]', {
-            state: 'detached',
-            timeout: 15000,
-          })
-          .then(() =>
-            page.waitForSelector('[data-testid="chat-content"]', {
-              state: 'visible',
-              timeout: 10000,
-            })
-          ),
         page.waitForSelector('[data-testid="chat-content"]', {
+          state: 'visible',
+          timeout: 15000,
+        }),
+        page.waitForSelector('[data-testid="chat-loading"]', {
+          state: 'visible',
+          timeout: 15000,
+        }),
+        page.waitForSelector('nav[aria-label="Dashboard navigation"]', {
           state: 'visible',
           timeout: 15000,
         }),

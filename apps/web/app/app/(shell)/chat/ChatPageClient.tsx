@@ -13,9 +13,8 @@ import {
 } from '@/app/app/(shell)/dashboard/PreviewPanelContext';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
-import { ChatMessageSkeleton } from '@/components/jovie/components/ChatMessageSkeleton';
+import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
 import { APP_ROUTES } from '@/constants/routes';
 import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
@@ -33,34 +32,8 @@ import { useDashboardSocialLinksQuery } from '@/lib/queries';
 import { addBreadcrumb, captureMessage } from '@/lib/sentry/client-lite';
 import { getHometownFromSettings } from '@/types/db';
 
-// Code-split heavy components — JovieChat pulls in Framer Motion, react-virtual,
-// and 13+ sub-components. ProfileContactSidebar loads mutation hooks and a tab system.
-// Both are interactive-only so SSR is unnecessary.
-const JovieChat = dynamic(
-  () =>
-    import('@/components/jovie/JovieChat').then(mod => ({
-      default: mod.JovieChat,
-    })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className='flex h-full flex-col' data-testid='chat-loading'>
-        <div className='flex-1'>
-          <ChatMessageSkeleton />
-        </div>
-        <div className='border-t border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 pb-4 pt-4 sm:px-5 sm:pb-6'>
-          <div className='mx-auto w-full max-w-2xl space-y-3'>
-            <LoadingSkeleton height='h-12' width='w-full' rounded='lg' />
-            <div className='flex justify-center'>
-              <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
-            </div>
-          </div>
-        </div>
-      </div>
-    ),
-  }
-);
-
+// Code-split ProfileContactSidebar — it's a sidebar panel with mutation hooks
+// and a tab system. Not on the critical path, doesn't need to load immediately.
 const ProfileContactSidebar = dynamic(
   () =>
     import('@/features/dashboard/organisms/profile-contact-sidebar').then(
