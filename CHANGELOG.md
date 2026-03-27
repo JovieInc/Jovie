@@ -22,12 +22,29 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 - Unskip avatar upload validation error tracking test (hook already implemented) [internal]
 - Document Linktree suppressed pixel ID methodology (no platform-owned pixel IDs detected) [internal]
 
-## [26.4.83] - 2026-03-27
+## [26.4.86] - 2026-03-27
 
 ### Changed
 
 - DSP Presence page converted from card grid to Linear-style table with sortable columns, external link icons, and keyboard navigation
 - Suggested DSP matches now sort first so actionable items appear at the top of the list
+
+### Fixed
+
+- Stale sidebar selection cleared when a DSP match disappears from data (e.g. after rejecting a suggestion)
+- Sidebar drawer toggle uses resolved item state instead of raw ID, preventing double-click required after data refresh
+- Shell table meta cleaned up on unmount, preventing stale right-panel reservations on page navigation
+- External link column now has accessible screen-reader header and artist name in aria-label for disambiguation
+- Keyboard navigation guard uses sidebar-open state instead of raw ID to prevent stale selection from reopening sidebar
+- Remove biome-ignore suppression from column type alias, let TypeScript infer mixed column union [internal]
+- Loading skeleton updated to match 6-column table layout (was 5 columns) [internal]
+- Test IDs use unique matchId instead of providerId for multi-match disambiguation [internal]
+- Text truncation in artist and platform cells now works reliably with min-w-0 flex constraints [internal]
+
+## [26.4.83] - 2026-03-27
+
+### Changed
+
 - Conductor workspace archive script now cleans up `.claude/worktrees` (stale agent worktrees) alongside node_modules and build artifacts [internal]
 
 ## [26.4.82] - 2026-03-26
