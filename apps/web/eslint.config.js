@@ -222,6 +222,21 @@ module.exports = [
   },
   // NOTE: Test file overrides for @typescript-eslint/no-explicit-any removed
   // - Biome already disables suspicious/noExplicitAny for test files
+  // Enforce type-only exports in admin types barrel file
+  {
+    files: ['lib/admin/types.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ExportNamedDeclaration:not([exportKind="type"])',
+          message:
+            'Only type exports allowed in types.ts. Use "export type { ... }" to prevent bundling server code into client.',
+        },
+      ],
+    },
+  },
+
   // Disable server/client boundary rules for server-only contexts
   {
     files: ['**/app/api/**', '**/actions.ts', '**/actions/*.ts'],

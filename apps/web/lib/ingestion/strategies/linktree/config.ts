@@ -90,14 +90,12 @@ export const LINKTREE_VERIFICATION_PATTERNS = [
  *   /shopify, /therock — all had null facebookPixelId/googleAnalyticsId/tiktokPixelId.
  * Linktree only injects fbq('init'), ttq.load(), gtag('config') with creator-
  * configured IDs. Platform-owned tracking uses separate systems (Datadog,
- * ingress endpoint, Google Ad Manager). The IDs below are platform-owned
- * identifiers that could be confused with creator pixels.
+ * ingress endpoint, Google Ad Manager). No platform-owned pixel IDs were found;
+ * Linktree's fb:app_id and GAM network code are not pixel IDs and are not
+ * detected by the pixel extractor, so they are not listed here.
  */
 export const SUPPRESSED_PIXEL_IDS = new Set<string>([
-  // Linktree's Facebook App ID (fb:app_id meta tag, not a pixel, but suppress defensively)
-  '211011856296014',
-  // Linktree's Google Ad Manager network code (platform display ads, not creator GA)
-  '23324369058',
+  // Add platform-owned pixel IDs here as they are discovered.
 ]);
 
 /**
