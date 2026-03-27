@@ -23,7 +23,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
+import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { LoadingSpinner } from '@/components/atoms/LoadingSpinner';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -192,9 +192,14 @@ function normalizeResumeStep(step: string | null | undefined): StepId | null {
 function getResumeQueryValue(step: StepId): string | null {
   switch (step) {
     case 'spotify':
+    case 'artist-confirm':
+    case 'upgrade':
+      return 'spotify';
     case 'dsp':
     case 'social':
     case 'releases':
+    case 'late-arrivals':
+      return 'releases';
     case 'profile-ready':
       return step;
     default:
@@ -976,16 +981,28 @@ export function OnboardingV2Form({
       setIsArtistConnectPending(true);
       setDiscoveryError(null);
 
-      await Promise.allSettled([
-        connectSpotifyArtist({
+      const [connectResult] = await Promise.allSettled([
+        connectOnboardingSpotifyArtist({
           artistName: artist.name,
           includeTracks: false,
+          profileId,
           skipMusicFetchEnrichment: true,
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
         }),
         enrichProfileFromDsp(artist.id, artist.url),
       ]);
+
+      if (connectResult.status === 'rejected' || !connectResult.value.success) {
+        setIsArtistConnectPending(false);
+        setCurrentStep('spotify');
+        setDiscoveryError(
+          connectResult.status === 'fulfilled'
+            ? connectResult.value.message
+            : 'Failed to connect your Spotify artist.'
+        );
+        return;
+      }
 
       setIsArtistConnectPending(false);
       await refreshDiscovery();

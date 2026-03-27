@@ -51,14 +51,19 @@ export default async function OnboardingPage({
     redirect(APP_ROUTES.WAITLIST);
   }
 
-  const hasExplicitResumeTarget = Boolean(resolvedSearchParams?.resume);
+  const hasOnboardingContinuationSignal = Boolean(
+    resolvedSearchParams?.handle || resolvedSearchParams?.resume
+  );
 
   // ACTIVE guard: break redirect loops caused by stale proxy cache or
   // direct navigation. V2 intentionally allows explicit resume targets
   // after handle completion, because step 0 activates the user record.
+  // The handle query is also treated as a continuation signal because
+  // completeOnboarding triggers a server rerender before the client can
+  // upgrade the URL to a resume target.
   if (
     authResult.state === CanonicalUserState.ACTIVE &&
-    !hasExplicitResumeTarget
+    !hasOnboardingContinuationSignal
   ) {
     redirect('/app');
   }

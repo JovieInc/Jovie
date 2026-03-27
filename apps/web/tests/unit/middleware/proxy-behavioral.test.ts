@@ -385,6 +385,26 @@ describe('proxy.ts middleware', () => {
       expect(res.status).toBeGreaterThanOrEqual(300);
       expect(isRedirectTo(res, '/app')).toBe(true);
     });
+
+    it('lets active users continue onboarding when handle or resume is present', async () => {
+      mocks.getUserState.mockResolvedValue(USER_STATES.active);
+
+      const handleReq = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding',
+        searchParams: { handle: 'artist' },
+      });
+      const handleRes = await callMiddleware(handleReq);
+
+      expect(handleRes.status).toBeLessThan(300);
+
+      const resumeReq = createAuthenticatedRequest('clerk_user_1', {
+        pathname: '/onboarding',
+        searchParams: { resume: 'spotify' },
+      });
+      const resumeRes = await callMiddleware(resumeReq);
+
+      expect(resumeRes.status).toBeLessThan(300);
+    });
   });
 
   // ==========================================================================

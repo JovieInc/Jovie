@@ -10,8 +10,8 @@ import {
   useRef,
   useState,
 } from 'react';
-import { connectSpotifyArtist } from '@/app/app/(shell)/dashboard/releases/actions';
 import { completeOnboarding } from '@/app/onboarding/actions';
+import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect-spotify';
 import {
   type EnrichedProfileData,
   enrichProfileFromDsp,
@@ -95,6 +95,7 @@ function tryAutoConnectSpotify(
   setIsEnriching: Dispatch<SetStateAction<boolean>>,
   setIsConnecting: Dispatch<SetStateAction<boolean>>,
   signal: AbortSignal,
+  profileId: string | null,
   userId: string,
   onAutoConnectStarted?: (selection: AutoConnectedArtistSelection) => void
 ): void {
@@ -114,6 +115,13 @@ function tryAutoConnectSpotify(
       return;
     }
 
+    if (!profileId) {
+      clearSignupClaimValue(SIGNUP_SPOTIFY_URL_KEY);
+      clearSignupClaimValue(SIGNUP_ARTIST_NAME_KEY);
+      clearSignupClaimValue(SIGNUP_SPOTIFY_EXPECTED_KEY);
+      return;
+    }
+
     track('onboarding_spotify_import_started', { user_id: userId });
     onAutoConnectStarted?.(selection);
 
@@ -129,7 +137,8 @@ function tryAutoConnectSpotify(
     // Connect Spotify artist in background — tracked so dashboard redirect
     // waits for the DB write to complete (fixes empty sidebar/DSPs).
     if (!signal.aborted) setIsConnecting(true);
-    void connectSpotifyArtist({
+    void connectOnboardingSpotifyArtist({
+      profileId,
       spotifyArtistId: selection.id,
       spotifyArtistUrl: selection.url,
       artistName: selection.name,
@@ -434,6 +443,7 @@ export function useOnboardingSubmit({
           setIsEnriching,
           setIsConnecting,
           controller.signal,
+          completion.profileId,
           userId,
           onAutoConnectStarted
         );
