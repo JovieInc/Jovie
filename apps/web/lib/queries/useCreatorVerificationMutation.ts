@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { APP_ROUTES } from '@/constants/routes';
+import { patchCachedCreator } from './creator-cache';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -76,6 +77,12 @@ export function useToggleVerificationMutation() {
 
   return useMutation({
     mutationFn: toggleVerification,
+    onSuccess: (data, variables) => {
+      patchCachedCreator(queryClient, variables.profileId, profile => ({
+        ...profile,
+        isVerified: data.isVerified ?? variables.nextVerified,
+      }));
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
     },

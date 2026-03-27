@@ -6,10 +6,11 @@
  * Handles bulk operations on selected creator profiles.
  */
 
-import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { useAdminBulkRefreshMutation } from '@/lib/queries';
+import { queryKeys, useAdminBulkRefreshMutation } from '@/lib/queries';
+import { markCachedCreatorsPending } from '@/lib/queries/creator-cache';
 import type { AdminCreatorProfileRow } from '../types';
 
 export interface BulkActionsParams {
@@ -94,9 +95,11 @@ export function useBulkActions({
   deleteCreatorOrUser,
   clearSelection,
 }: BulkActionsParams): BulkActions {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { mutateAsync: bulkRefresh } = useAdminBulkRefreshMutation();
-  const refresh = useCallback(() => router.refresh(), [router]);
+  const refresh = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
+  }, [queryClient]);
 
   const handleBulkVerify = useCallback(
     () =>
@@ -192,6 +195,7 @@ export function useBulkActions({
     }
 
     try {
+      markCachedCreatorsPending(queryClient, selectedProfileIds);
       const result = await bulkRefresh({ profileIds: selectedProfileIds });
       const queuedCount = Number(result.queuedCount ?? 0);
 
@@ -208,7 +212,14 @@ export function useBulkActions({
     } catch {
       // Error toast handled by mutation's onError callback
     }
-  }, [profiles, selectedIds, clearSelection, refresh, bulkRefresh]);
+  }, [
+    profiles,
+    selectedIds,
+    clearSelection,
+    refresh,
+    bulkRefresh,
+    queryClient,
+  ]);
 
   const handleBulkDelete = useCallback(async () => {
     const selectedProfiles = profiles.filter(p => selectedIds.has(p.id));

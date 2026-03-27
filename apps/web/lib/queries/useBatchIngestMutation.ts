@@ -1,7 +1,8 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createMutationFn } from './fetch';
+import { queryKeys } from './keys';
 import { handleMutationError, handleMutationSuccess } from './mutation-utils';
 
 export interface BatchResult {
@@ -40,6 +41,8 @@ const batchIngestFn = createMutationFn<
 export function useBatchIngestMutation(options?: {
   onSuccess?: (data: BatchIngestApiResponse) => void;
 }) {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: batchIngestFn,
     onSuccess: data => {
@@ -47,6 +50,9 @@ export function useBatchIngestMutation(options?: {
         `Batch complete: ${data.summary.success} created, ${data.summary.skipped} skipped, ${data.summary.error} errors.`
       );
       options?.onSuccess?.(data);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
     },
     onError: error => handleMutationError(error, 'Batch ingest failed.'),
   });

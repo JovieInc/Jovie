@@ -84,6 +84,21 @@ describe('Profile Cache Invalidation', () => {
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/chat');
       expect(mockRevalidatePath).toHaveBeenCalledWith('/app/settings');
     });
+
+    it('skips next cache revalidation when static generation context is missing', async () => {
+      mockRevalidateTag.mockImplementation(() => {
+        throw new Error(
+          'Invariant: static generation store missing in revalidateTag dashboard-data'
+        );
+      });
+
+      const { invalidateProfileCache } = await import('@/lib/cache/profile');
+
+      await expect(
+        invalidateProfileCache('testartist')
+      ).resolves.toBeUndefined();
+      expect(mockInvalidateProfileEdgeCache).toHaveBeenCalledWith('testartist');
+    });
   });
 
   describe('invalidateUsernameChange', () => {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useIngestRefreshMutation } from '@/lib/queries';
@@ -36,7 +35,6 @@ export function useIngestRefresh({
   selectedId,
   onRefreshComplete,
 }: UseIngestRefreshOptions): UseIngestRefreshReturn {
-  const router = useRouter();
   const notifications = useNotifications();
   const [ingestRefreshStatuses, setIngestRefreshStatuses] = useState<
     Record<string, IngestRefreshStatus>
@@ -64,7 +62,6 @@ export function useIngestRefresh({
               [profileId]: 'success',
             }));
             notifications.success('Ingestion refresh queued');
-            router.refresh();
 
             if (selectedId === profileId && onRefreshComplete) {
               onRefreshComplete(profileId);
@@ -88,7 +85,6 @@ export function useIngestRefresh({
       mutation,
       notifications,
       onRefreshComplete,
-      router,
       scheduleStatusReset,
       selectedId,
     ]

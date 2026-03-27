@@ -1,6 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { ListPlus, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
@@ -19,6 +20,7 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { BatchIngestModal } from '@/features/admin/BatchIngestModal';
 import { IngestProfileDropdown } from '@/features/admin/ingest-profile-dropdown';
 import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
+import { queryKeys } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { AdminCreatorProfilesUnified } from './AdminCreatorProfilesUnified';
 import type { AdminCreatorProfilesWithSidebarProps } from './types';
@@ -44,6 +46,7 @@ export function AdminCreatorsPageWrapper(
 ) {
   const router = useRouter();
   const { setHeaderActions } = useSetHeaderActions();
+  const queryClient = useQueryClient();
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const basePath = props.basePath ?? APP_ROUTES.ADMIN_CREATORS;
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -51,8 +54,8 @@ export function AdminCreatorsPageWrapper(
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleIngestPending = useCallback(() => {
-    router.refresh();
-  }, [router]);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
+  }, [queryClient]);
 
   const handleOpenBatchModal = useCallback(() => {
     setBatchModalOpen(true);
@@ -176,7 +179,11 @@ export function AdminCreatorsPageWrapper(
       <BatchIngestModal
         open={batchModalOpen}
         onOpenChange={setBatchModalOpen}
-        onComplete={() => router.refresh()}
+        onComplete={() => {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.creators.all,
+          });
+        }}
       />
     </>
   );

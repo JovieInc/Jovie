@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { APP_ROUTES } from '@/constants/routes';
+import { markCachedCreatorsPending } from './creator-cache';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -73,6 +74,9 @@ export function useIngestRefreshMutation() {
 
   return useMutation({
     mutationFn: refreshIngest,
+    onMutate: variables => {
+      markCachedCreatorsPending(queryClient, [variables.profileId]);
+    },
     onSettled: (_data, _error, variables) => {
       // Invalidate the social links query for this profile to refetch after ingest
       queryClient.invalidateQueries({

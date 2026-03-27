@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { APP_ROUTES } from '@/constants/routes';
+import { patchCachedCreator, removeCachedCreator } from './creator-cache';
 import { FetchError, fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 
@@ -117,6 +118,12 @@ export function useToggleFeaturedMutation() {
 
   return useMutation({
     mutationFn: toggleFeatured,
+    onSuccess: (data, variables) => {
+      patchCachedCreator(queryClient, variables.profileId, profile => ({
+        ...profile,
+        isFeatured: data.isFeatured ?? variables.nextFeatured,
+      }));
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
     },
@@ -142,6 +149,12 @@ export function useToggleMarketingMutation() {
 
   return useMutation({
     mutationFn: toggleMarketing,
+    onSuccess: (data, variables) => {
+      patchCachedCreator(queryClient, variables.profileId, profile => ({
+        ...profile,
+        marketingOptOut: data.marketingOptOut ?? variables.nextMarketingOptOut,
+      }));
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
     },
@@ -167,6 +180,9 @@ export function useDeleteCreatorMutation() {
 
   return useMutation({
     mutationFn: deleteCreator,
+    onSuccess: (_data, variables) => {
+      removeCachedCreator(queryClient, variables.profileId);
+    },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.creators.all });
     },

@@ -151,7 +151,6 @@ export function useIngestProfile({
       setIsSuccess(true);
       setInputValue('');
       artistSearchRef.current.clear();
-      router.refresh();
       setTimeout(() => {
         setOpen(false);
         setIsSuccess(false);

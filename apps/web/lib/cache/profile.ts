@@ -3,12 +3,50 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
+import { logger } from '@/lib/utils/logger';
 import {
   CACHE_TAGS,
   createAvatarTag,
   createProfileTag,
   createSocialLinksTag,
 } from './tags';
+
+function isMissingStaticGenerationStoreError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.message.toLowerCase().includes('static generation store missing')
+  );
+}
+
+function safeRevalidateTag(tag: string) {
+  try {
+    revalidateTag(tag, 'max');
+  } catch (error) {
+    if (!isMissingStaticGenerationStoreError(error)) {
+      throw error;
+    }
+
+    logger.warn('Skipping tag revalidation outside Next cache context', {
+      tag,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch (error) {
+    if (!isMissingStaticGenerationStoreError(error)) {
+      throw error;
+    }
+
+    logger.warn('Skipping path revalidation outside Next cache context', {
+      path,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 /**
  * Centralized cache invalidation for creator profiles.
@@ -22,31 +60,31 @@ export async function invalidateProfileCache(
   oldUsernameNormalized?: string | null
 ): Promise<void> {
   // Invalidate dashboard data cache
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
+  safeRevalidateTag(CACHE_TAGS.DASHBOARD_DATA);
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
-    revalidatePath(`/${usernameNormalized}`);
+    safeRevalidatePath(`/${usernameNormalized}`);
     // Invalidate Redis edge cache
     await invalidateProfileEdgeCache(usernameNormalized);
   }
 
   if (usernameNormalized) {
-    revalidateTag(createProfileTag(usernameNormalized), 'max');
+    safeRevalidateTag(createProfileTag(usernameNormalized));
   }
 
   // If username changed, also invalidate the old path
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
-    revalidateTag(createProfileTag(oldUsernameNormalized), 'max');
-    revalidatePath(`/${oldUsernameNormalized}`);
+    safeRevalidateTag(createProfileTag(oldUsernameNormalized));
+    safeRevalidatePath(`/${oldUsernameNormalized}`);
     // Invalidate Redis edge cache for old username
     await invalidateProfileEdgeCache(oldUsernameNormalized);
   }
 
   // Invalidate dashboard pages that display profile data
-  revalidatePath(APP_ROUTES.DASHBOARD);
-  revalidatePath(APP_ROUTES.CHAT);
-  revalidatePath(APP_ROUTES.SETTINGS);
+  safeRevalidatePath(APP_ROUTES.DASHBOARD);
+  safeRevalidatePath(APP_ROUTES.CHAT);
+  safeRevalidatePath(APP_ROUTES.SETTINGS);
 }
 
 /**
@@ -60,7 +98,7 @@ export async function invalidateUsernameChange(
   await invalidateProfileCache(newUsernameNormalized, oldUsernameNormalized);
 
   // Also invalidate homepage in case featured creators are affected
-  revalidatePath('/');
+  safeRevalidatePath('/');
 }
 
 /**
@@ -76,18 +114,18 @@ export async function invalidateSocialLinksCache(
 ): Promise<void> {
   // Invalidate the social links specific cache
   const socialLinksTag = createSocialLinksTag(profileId);
-  revalidateTag(socialLinksTag, 'max');
+  safeRevalidateTag(socialLinksTag);
 
   // Social links affect the public profile display
   if (usernameNormalized) {
-    revalidateTag(createProfileTag(usernameNormalized), 'max');
-    revalidatePath(`/${usernameNormalized}`);
+    safeRevalidateTag(createProfileTag(usernameNormalized));
+    safeRevalidatePath(`/${usernameNormalized}`);
   }
 
   // Also invalidate dashboard where links are managed
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD);
-  revalidatePath(APP_ROUTES.CHAT);
+  safeRevalidateTag(CACHE_TAGS.DASHBOARD_DATA);
+  safeRevalidatePath(APP_ROUTES.DASHBOARD);
+  safeRevalidatePath(APP_ROUTES.CHAT);
 }
 
 /**
@@ -103,17 +141,17 @@ export async function invalidateAvatarCache(
 ): Promise<void> {
   // Invalidate avatar-specific cache
   const avatarTag = createAvatarTag(userId);
-  revalidateTag(avatarTag, 'max');
+  safeRevalidateTag(avatarTag);
 
   // Avatar affects public profile display
   if (usernameNormalized) {
-    revalidateTag(createProfileTag(usernameNormalized), 'max');
-    revalidatePath(`/${usernameNormalized}`);
+    safeRevalidateTag(createProfileTag(usernameNormalized));
+    safeRevalidatePath(`/${usernameNormalized}`);
   }
 
   // Dashboard also shows avatar
-  revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
-  revalidatePath(APP_ROUTES.DASHBOARD);
-  revalidatePath(APP_ROUTES.CHAT);
-  revalidatePath(APP_ROUTES.SETTINGS);
+  safeRevalidateTag(CACHE_TAGS.DASHBOARD_DATA);
+  safeRevalidatePath(APP_ROUTES.DASHBOARD);
+  safeRevalidatePath(APP_ROUTES.CHAT);
+  safeRevalidatePath(APP_ROUTES.SETTINGS);
 }
