@@ -1,3 +1,5 @@
+import '../(auth)/auth-utilities.css';
+import Script from 'next/script';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { resolveUserState } from '@/lib/auth/gate';
 import { resolvePublishableKeyFromHeaders } from '@/lib/auth/staging-clerk-keys';
@@ -20,6 +22,7 @@ export default async function OnboardingLayout({
   return (
     <ClientProviders publishableKey={publishableKey}>
       <FeatureFlagsProvider bootstrap={featureFlagsBootstrap}>
+        <Script src='/theme-init.js' strategy='beforeInteractive' />
         {children}
       </FeatureFlagsProvider>
     </ClientProviders>
