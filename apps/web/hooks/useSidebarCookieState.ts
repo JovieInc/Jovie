@@ -58,12 +58,8 @@ export function useSidebarCookieState({
         typeof value === 'function' ? value(openRef.current) : value;
 
       persistSidebarCookie(nextOpen);
-
-      if (onOpenChange) {
-        onOpenChange(nextOpen);
-      } else {
-        setOpenInternal(nextOpen);
-      }
+      setOpenInternal(nextOpen);
+      onOpenChange?.(nextOpen);
     },
     [onOpenChange]
   );
