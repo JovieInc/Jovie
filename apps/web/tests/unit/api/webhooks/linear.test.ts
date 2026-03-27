@@ -186,4 +186,50 @@ describe('POST /api/webhooks/linear', () => {
       })
     );
   });
+
+  it('does not retry the GitHub dispatch POST', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+    mockServerFetch.mockResolvedValue(
+      new Response(null, {
+        status: 204,
+      })
+    );
+
+    const { POST } = await import('@/app/api/webhooks/linear/route');
+    const payload = {
+      type: 'Issue',
+      action: 'update',
+      createdAt: '2026-03-10T00:00:00.000Z',
+      updatedFrom: { stateId: 'old' },
+      data: {
+        id: 'issue_123',
+        updatedAt: '2026-03-10T00:00:01.000Z',
+        stateId: 'new',
+        state: { name: 'Todo' },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/linear', {
+      method: 'POST',
+      headers: {
+        'linear-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+
+    expect(response.status).toBe(200);
+    expect(mockServerFetch).toHaveBeenCalledWith(
+      'https://api.github.com/repos/TheBlackFuture/Jovie/dispatches',
+      expect.objectContaining({
+        method: 'POST',
+        timeoutMs: 10000,
+      })
+    );
+    expect(mockServerFetch.mock.calls[0]?.[1]).not.toHaveProperty('retry');
+  });
 });
