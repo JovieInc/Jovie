@@ -26,6 +26,8 @@ const mockGetDashboardData = vi.fn().mockResolvedValue({
 });
 vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   getDashboardData: (...args: unknown[]) => mockGetDashboardData(...args),
+  getDashboardDataEssential: (...args: unknown[]) =>
+    mockGetDashboardData(...args),
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
