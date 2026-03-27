@@ -4,6 +4,7 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError, getSafeErrorMessage } from '@/lib/error-tracking';
+import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -33,23 +34,43 @@ export async function PATCH(
   try {
     const { id } = await params;
     const now = new Date();
+    const [existingLead] = await db
+      .select({
+        id: leads.id,
+        firstContactedAt: leads.firstContactedAt,
+      })
+      .from(leads)
+      .where(eq(leads.id, id))
+      .limit(1);
+
+    if (!existingLead) {
+      return NextResponse.json(
+        { error: 'Lead not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const [updated] = await db
       .update(leads)
       .set({
         dmSentAt: now,
         outreachStatus: 'dm_sent',
+        firstContactedAt: existingLead.firstContactedAt ?? now,
+        lastContactedAt: now,
         updatedAt: now,
       })
       .where(eq(leads.id, id))
       .returning();
 
-    if (!updated) {
-      return NextResponse.json(
-        { error: 'Lead not found' },
-        { status: 404, headers: NO_STORE_HEADERS }
-      );
-    }
+    await recordLeadFunnelEvent(
+      {
+        leadId: id,
+        eventType: 'dm_sent',
+        channel: 'dm',
+        campaignKey: 'claim_invite',
+      },
+      { idempotent: true }
+    );
 
     return NextResponse.json(updated, {
       status: 200,

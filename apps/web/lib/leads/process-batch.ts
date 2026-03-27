@@ -6,6 +6,7 @@ import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
 } from './constants';
+import { recordLeadFunnelEvent } from './funnel-events';
 import { pipelineLog, pipelineWarn } from './pipeline-logger';
 import { qualifyLead } from './qualify';
 
@@ -57,7 +58,10 @@ async function processOneLead(
 ): Promise<'qualified' | 'disqualified' | 'error'> {
   try {
     const [lead] = await db
-      .select({ linktreeUrl: leads.linktreeUrl })
+      .select({
+        linktreeUrl: leads.linktreeUrl,
+        discoveryQuery: leads.discoveryQuery,
+      })
       .from(leads)
       .where(eq(leads.id, leadId))
       .limit(1);
@@ -74,6 +78,7 @@ async function processOneLead(
       .update(leads)
       .set({
         status: qualification.status,
+        sourcePlatform: qualification.sourcePlatform,
         displayName: qualification.displayName,
         bio: qualification.bio,
         avatarUrl: qualification.avatarUrl,
@@ -85,7 +90,21 @@ async function processOneLead(
         hasInstagram: qualification.hasInstagram,
         instagramHandle: qualification.instagramHandle,
         musicToolsDetected: qualification.musicToolsDetected,
+        hasTrackingPixels: qualification.hasTrackingPixels,
+        trackingPixelPlatforms: qualification.trackingPixelPlatforms,
         allLinks: qualification.allLinks,
+        signalSnapshot: {
+          verified: qualification.isLinktreeVerified,
+          hasPaidTier: qualification.hasPaidTier,
+          hasSpotifyLink: qualification.hasSpotifyLink,
+          hasInstagram: qualification.hasInstagram,
+          musicToolsDetected: qualification.musicToolsDetected,
+          allLinks: qualification.allLinks,
+          hasTrackingPixels: qualification.hasTrackingPixels,
+          trackingPixelPlatforms: qualification.trackingPixelPlatforms,
+          discoveryQuery: lead.discoveryQuery,
+          sourcePlatform: qualification.sourcePlatform,
+        },
         fitScore: qualification.fitScore,
         fitScoreBreakdown: qualification.fitScoreBreakdown,
         disqualificationReason: qualification.disqualificationReason,
@@ -96,6 +115,22 @@ async function processOneLead(
         updatedAt: now,
       })
       .where(eq(leads.id, leadId));
+
+    await recordLeadFunnelEvent(
+      {
+        leadId,
+        eventType:
+          qualification.status === 'qualified' ? 'qualified' : 'disqualified',
+        metadata: {
+          disqualificationReason: qualification.disqualificationReason,
+          fitScore: qualification.fitScore,
+          hasTrackingPixels: qualification.hasTrackingPixels,
+          trackingPixelPlatforms: qualification.trackingPixelPlatforms,
+          musicToolsDetected: qualification.musicToolsDetected,
+        },
+      },
+      { idempotent: true }
+    );
 
     return qualification.status;
   } catch (error) {
@@ -129,6 +164,16 @@ async function processOneLead(
             updatedAt: new Date(),
           })
           .where(eq(leads.id, leadId));
+        await recordLeadFunnelEvent(
+          {
+            leadId,
+            eventType: 'disqualified',
+            metadata: {
+              disqualificationReason: 'scrape_failed',
+            },
+          },
+          { idempotent: true }
+        );
         pipelineWarn('qualify', 'Lead disqualified after max scrape attempts', {
           leadId,
           attempts: updated.scrapeAttempts,
