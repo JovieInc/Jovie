@@ -1,28 +1,28 @@
 import type { ReactNode } from 'react';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { PageToolbar } from '@/components/organisms/table';
 import { cn } from '@/lib/utils';
+import { PageToolbar } from './PageToolbar';
 
-interface AdminTableHeaderProps {
+interface TableSurfaceHeaderProps {
   readonly title: string;
   readonly subtitle: string;
   readonly actions?: ReactNode;
   readonly className?: string;
 }
 
-interface AdminTableSubheaderProps {
+interface TableSurfaceToolbarProps {
   readonly children?: ReactNode;
   readonly start?: ReactNode;
   readonly end?: ReactNode;
   readonly className?: string;
 }
 
-export function AdminTableHeader({
+export function TableSurfaceHeader({
   title,
   subtitle,
   actions,
   className,
-}: Readonly<AdminTableHeaderProps>) {
+}: Readonly<TableSurfaceHeaderProps>) {
   return (
     <ContentSectionHeader
       title={title}
@@ -36,12 +36,12 @@ export function AdminTableHeader({
   );
 }
 
-export function AdminTableSubheader({
+export function TableSurfaceToolbar({
   children,
   start,
   end,
   className,
-}: Readonly<AdminTableSubheaderProps>) {
+}: Readonly<TableSurfaceToolbarProps>) {
   const hasToolbar = start !== undefined || end !== undefined;
   const toolbarContent = hasToolbar ? (
     <PageToolbar start={start ?? null} end={end} />

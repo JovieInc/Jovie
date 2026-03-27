@@ -170,11 +170,17 @@ export type {
   TableStandardToolbarProps,
 } from './molecules/TableStandardToolbar';
 export { TableStandardToolbar } from './molecules/TableStandardToolbar';
+export {
+  TableSurfaceHeader,
+  TableSurfaceToolbar,
+} from './molecules/TableSurfaceHeader';
 
 // =============================================================================
 // Organisms
 // =============================================================================
 
+export type { TableShellProps } from './organisms/TableShell';
+export { TableShell } from './organisms/TableShell';
 export type { UnifiedTableProps } from './organisms/UnifiedTable';
 export { UnifiedTable } from './organisms/UnifiedTable';
 
