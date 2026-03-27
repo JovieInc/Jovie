@@ -3,10 +3,9 @@
 import { Input } from '@jovie/ui';
 import { AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { BASE_URL } from '@/constants/app';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -16,7 +15,7 @@ import type { SettingsProfileSectionProps } from './types';
 import { useSettingsProfile } from './useSettingsProfile';
 
 const PROFILE_INPUT_CLASS =
-  'block w-full rounded-md border border-subtle bg-surface-1 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
+  'block w-full rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2 text-[13px] text-primary-token placeholder:text-tertiary-token transition-[background-color,border-color,box-shadow] duration-150 focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/20';
 
 export function SettingsProfileSection({
   artist,
@@ -68,19 +67,12 @@ export function SettingsProfileSection({
   };
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
+    <SettingsPanel
+      title='Profile'
+      description='Display name, username, image, and place details fans see.'
+      actions={<SettingsStatusPill status={profileSaveStatus} />}
     >
-      <ContentSectionHeader
-        title='Profile identity'
-        subtitle='Control the display name, username, image, and place details fans see.'
-        className='min-h-0'
-        actions={<SettingsStatusPill status={profileSaveStatus} />}
-        actionsClassName='w-auto shrink-0'
-      />
-      <div className='space-y-1 px-4 py-3'>
+      <div className='space-y-1 px-4 py-4 sm:px-5'>
         <div className='flex items-center justify-between gap-4 py-2'>
           <span className='text-[13px] text-primary-token'>
             Profile picture
@@ -145,7 +137,7 @@ export function SettingsProfileSection({
             </p>
           </div>
           <div className='flex w-full rounded-md sm:max-w-[280px]'>
-            <span className='inline-flex select-none items-center rounded-l-md border border-r-0 border-subtle bg-surface-1 px-3 text-[13px] text-secondary-token'>
+            <span className='inline-flex select-none items-center rounded-l-[10px] border border-r-0 border-(--linear-app-frame-seam) bg-surface-0 px-3 text-[13px] text-secondary-token'>
               {profileDomain}/
             </span>
             <Input
@@ -158,7 +150,7 @@ export function SettingsProfileSection({
               onChange={e => handleFieldChange('username', e.target.value)}
               onBlur={() => flushSave()}
               placeholder='yourname'
-              className={`min-w-0 flex-1 rounded-none rounded-r-md border-l-0 ${PROFILE_INPUT_CLASS}`}
+              className={`min-w-0 flex-1 rounded-none rounded-r-[10px] border-l-0 ${PROFILE_INPUT_CLASS}`}
             />
           </div>
         </div>
@@ -269,6 +261,6 @@ export function SettingsProfileSection({
           />
         </div>
       </div>
-    </DashboardCard>
+    </SettingsPanel>
   );
 }

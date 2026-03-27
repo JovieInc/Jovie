@@ -2,37 +2,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const openSpy = vi.fn();
-
-vi.stubGlobal('open', openSpy);
-
-vi.mock('@/components/molecules/drawer-header/DrawerHeaderActions', () => ({
-  DrawerHeaderActions: ({
-    primaryActions,
-    overflowActions,
-  }: {
-    primaryActions: { id: string; label: string; onClick: () => void }[];
-    overflowActions: { id: string; label: string; onClick: () => void }[];
-  }) => (
-    <div>
-      {primaryActions.map(
-        (a: { id: string; label: string; onClick: () => void }) => (
-          <button key={a.id} type='button' onClick={a.onClick}>
-            {a.label}
-          </button>
-        )
-      )}
-      {overflowActions.map(
-        (a: { id: string; label: string; onClick: () => void }) => (
-          <button key={a.id} type='button' onClick={a.onClick}>
-            {a.label}
-          </button>
-        )
-      )}
-    </div>
-  ),
-}));
-
 const { useReleaseHeaderParts } = await import(
   '@/components/organisms/release-sidebar/ReleaseSidebarHeader'
 );
@@ -56,15 +25,29 @@ const release = {
   primaryIsrc: 'USRC17607839',
   genres: ['Indie Pop'],
   canvasStatus: 'not_set' as const,
+  hasVideoLinks: false,
+  generatedPitches: [],
 };
 
-/** Test wrapper that renders the hook output */
 function TestHarness(props: Parameters<typeof useReleaseHeaderParts>[0]) {
-  const { title, actions } = useReleaseHeaderParts(props);
+  const { headerLabel, primaryActions, overflowActions } =
+    useReleaseHeaderParts(props);
+
   return (
     <div>
-      <div data-testid='title'>{title}</div>
-      <div data-testid='actions'>{actions}</div>
+      <div data-testid='header-label'>{headerLabel || 'none'}</div>
+      <div>
+        {primaryActions.map(action => (
+          <button key={action.id} type='button' onClick={action.onClick}>
+            {action.label}
+          </button>
+        ))}
+        {overflowActions.map(action => (
+          <button key={action.id} type='button' onClick={action.onClick}>
+            {action.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -74,44 +57,27 @@ describe('useReleaseHeaderParts', () => {
     vi.clearAllMocks();
   });
 
-  it('shows open smart link action and opens in new tab', async () => {
+  it('omits duplicate visible header copy and smart-link primary actions', () => {
+    render(<TestHarness release={release} hasRelease />);
+
+    expect(screen.getByTestId('header-label')).toHaveTextContent('none');
+    expect(
+      screen.queryByRole('button', { name: /copy smart link/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /open smart link/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps release utilities in overflow actions', async () => {
+    const refreshSpy = vi.fn();
     const user = userEvent.setup();
+    render(<TestHarness release={release} hasRelease onRefresh={refreshSpy} />);
 
-    render(
-      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
-    );
-
-    const openButton = screen.getByRole('button', {
-      name: /open smart link/i,
-    });
-    await user.click(openButton);
-
-    expect(openSpy).toHaveBeenCalledWith(
-      '/r/test-release--profile_1',
-      '_blank',
-      'noopener,noreferrer'
-    );
-  });
-
-  it('displays primary ISRC in header', () => {
-    render(
-      <TestHarness release={release} hasRelease onCopySmartLink={vi.fn()} />
-    );
-
-    expect(screen.getByText('USRC17607839')).toBeInTheDocument();
-  });
-
-  it('falls back to release title when no ISRC', () => {
-    const releaseNoIsrc = { ...release, primaryIsrc: undefined };
-    render(
-      <TestHarness
-        release={releaseNoIsrc}
-        hasRelease
-        artistName='Test Artist'
-        onCopySmartLink={vi.fn()}
-      />
-    );
-
-    expect(screen.getByText('Test Release')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /refresh release/i }));
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(
+      screen.getByRole('button', { name: /copy release id/i })
+    ).toBeInTheDocument();
   });
 });

@@ -1,21 +1,24 @@
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 
 export function WaitlistSkeleton() {
   return (
-    <div className='min-h-screen flex flex-col items-center bg-base px-4 pt-[18vh] sm:pt-[20vh] pb-24'>
+    <div className='min-h-screen flex flex-col items-center bg-page px-4 pt-[18vh] sm:pt-[20vh] pb-24'>
       {/* Logo placeholder */}
       <div className='mb-6 h-12 w-12' aria-hidden='true' />
 
       {/* Form skeleton */}
-      <div className={`w-full ${AUTH_FORM_MAX_WIDTH_CLASS} space-y-4`}>
+      <ContentSurfaceCard
+        className={`w-full ${AUTH_FORM_MAX_WIDTH_CLASS} space-y-4 p-5`}
+      >
         <LoadingSkeleton height='h-12' />
         <LoadingSkeleton height='h-12' />
         <LoadingSkeleton height='h-12' />
         <LoadingSkeleton height='h-12' />
         <LoadingSkeleton height='h-12' />
         <LoadingSkeleton height='h-12' />
-      </div>
+      </ContentSurfaceCard>
 
       {/* Progress indicator */}
       <div
