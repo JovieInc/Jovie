@@ -86,5 +86,19 @@ test.describe('Product Screenshots – Releases Dashboard', () => {
       path: `${OUTPUT_DIR}/release-sidebar-detail.png`,
     });
     console.log('📸 Saved: release-sidebar-detail.png');
+
+    await page.getByRole('tab', { name: 'Platforms' }).click();
+    await waitForSettle(page);
+    await sidebar.screenshot({
+      path: `${OUTPUT_DIR}/release-sidebar-platforms.png`,
+    });
+    console.log('📸 Saved: release-sidebar-platforms.png');
+
+    await page.getByRole('tab', { name: 'Tasks' }).click();
+    await waitForSettle(page);
+    await sidebar.screenshot({
+      path: `${OUTPUT_DIR}/release-sidebar-tasks.png`,
+    });
+    console.log('📸 Saved: release-sidebar-tasks.png');
   });
 });

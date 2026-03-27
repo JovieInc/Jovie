@@ -7,6 +7,7 @@ import {
 } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
 import { toDateOnlySafe } from '@/lib/utils/date';
 import { ReleaseTaskCategoryGroup } from './ReleaseTaskCategoryGroup';
 import { ReleaseTaskCompactRow } from './ReleaseTaskCompactRow';
@@ -65,6 +66,7 @@ export function ReleaseTaskChecklist({
   onNavigateToTask,
   onNavigateToFullPage,
 }: ReleaseTaskChecklistProps) {
+  const isCompact = variant === 'compact';
   const { data: tasks, isLoading } = useReleaseTasksQuery(releaseId);
   const instantiate = useInstantiateTasksMutation(releaseId);
   const toggle = useTaskToggleMutation(releaseId);
@@ -126,9 +128,14 @@ export function ReleaseTaskChecklist({
   }
 
   return (
-    <div className='space-y-1'>
+    <div
+      className={cn(
+        'space-y-1',
+        isCompact && 'flex h-full min-h-0 flex-col space-y-0'
+      )}
+    >
       {/* Progress bar + optional link to full page */}
-      <div className='flex items-center gap-2 px-4 py-2'>
+      <div className='flex shrink-0 items-center gap-2 px-4 py-2'>
         <ReleaseTaskProgressBar
           done={totalDone}
           total={totalTasks}
@@ -147,7 +154,12 @@ export function ReleaseTaskChecklist({
       </div>
 
       {/* Category groups */}
-      <div className='space-y-3'>
+      <div
+        className={cn('space-y-3', isCompact && 'min-h-0 overflow-y-auto')}
+        data-testid={
+          isCompact ? 'release-task-checklist-scroll-region' : undefined
+        }
+      >
         {Array.from(groups.entries()).map(([category, group]) => (
           <ReleaseTaskCategoryGroup
             key={category}

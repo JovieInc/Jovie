@@ -183,7 +183,7 @@ const fetchProfileAndLinks = async (
     // Use truthy check (not strict equality) for isPublic because the neon-http
     // driver may return boolean columns as non-boolean truthy values (e.g., 1, "t")
     // in edge cases — same class of issue as dates-as-strings (see JOVIE-WEB-6X).
-    if (!result || !result.isPublic) {
+    if (!result?.isPublic) {
       // Expected 404 — profile not found or not public. No Sentry capture needed;
       // these are normal from typos, crawlers, and enumeration traffic (JOV-1321).
       return {
@@ -595,7 +595,7 @@ async function renderListenMode(
 
 const getLightweightProfile = cache(async (username: string) => {
   const result = await getCreatorProfileWithUser(username.toLowerCase());
-  if (!result || !result.isPublic) {
+  if (!result?.isPublic) {
     return null;
   }
 

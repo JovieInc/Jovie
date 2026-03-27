@@ -41,6 +41,7 @@ export interface SidebarLinkRowProps {
   readonly isVisible?: boolean;
   readonly onCopySuccess?: () => void;
   readonly onCopyError?: () => void;
+  readonly surfaceVariant?: 'default' | 'track';
 }
 
 export function SidebarLinkRow({
@@ -58,6 +59,7 @@ export function SidebarLinkRow({
   isVisible = true,
   onCopySuccess,
   onCopyError,
+  surfaceVariant = 'default',
 }: SidebarLinkRowProps) {
   const [copied, setCopied] = useState(false);
   const hasUrl = url.trim().length > 0;
@@ -99,6 +101,7 @@ export function SidebarLinkRow({
 
   const hasRemove = isEditable && onRemove;
   const swipeActionsWidth = hasRemove ? 132 : 88;
+  const isTrackVariant = surfaceVariant === 'track';
 
   const swipeActions = (
     <>
@@ -156,10 +159,11 @@ export function SidebarLinkRow({
     >
       <div
         className={cn(
-          'group flex min-h-[32px] items-center justify-between rounded-[6px]',
-          'bg-transparent px-2 py-1 lg:px-2 lg:py-1',
-          'active:bg-surface-1 lg:hover:bg-surface-1',
-          'transition-[background-color,box-shadow,border-color] duration-150 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
+          'group flex min-h-[32px] items-center justify-between bg-transparent',
+          isTrackVariant
+            ? 'rounded-[10px] border border-transparent px-2 py-1.5 shadow-none active:bg-surface-0 lg:hover:bg-surface-0 focus-within:bg-surface-0'
+            : 'rounded-[6px] px-2 py-1 lg:px-2 lg:py-1 active:bg-surface-1 lg:hover:bg-surface-1 focus-within:border-(--linear-border-focus) focus-within:bg-surface-1 focus-within:shadow-inset-ring-focus',
+          'transition-[background-color,box-shadow,border-color] duration-150',
           !isVisible && 'opacity-60',
           className
         )}

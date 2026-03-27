@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, MoreVertical, X } from 'lucide-react';
 import Link from 'next/link';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu';
@@ -14,6 +14,9 @@ export interface DrawerCardActionBarProps {
   readonly primaryActions: readonly DrawerHeaderAction[];
   readonly overflowActions?: readonly DrawerHeaderAction[];
   readonly className?: string;
+  readonly onClose?: () => void;
+  readonly overflowTriggerPlacement?: 'inline' | 'card-top-right';
+  readonly overflowTriggerIcon?: 'horizontal' | 'vertical';
 }
 
 export const DRAWER_CARD_ACTION_BUTTON_CLASSNAME = cn(
@@ -42,22 +45,64 @@ export function DrawerCardActionBar({
   primaryActions,
   overflowActions = [],
   className,
+  onClose,
+  overflowTriggerPlacement = 'inline',
+  overflowTriggerIcon,
 }: DrawerCardActionBarProps) {
   const displayActions = primaryActions.slice(0, 3);
-  const menuItems = toMenuItems(overflowActions);
+  const baseMenuItems = toMenuItems(overflowActions);
+  const menuItems = onClose
+    ? [
+        ...baseMenuItems,
+        ...(baseMenuItems.length > 0
+          ? [{ id: 'separator-close', label: '' }]
+          : []),
+        {
+          id: 'close-card',
+          label: 'Close',
+          icon: X,
+          onClick: onClose,
+        },
+      ]
+    : baseMenuItems;
+  const resolvedTriggerIcon =
+    overflowTriggerIcon ??
+    (overflowTriggerPlacement === 'card-top-right' ? 'vertical' : 'horizontal');
+  const TriggerIcon =
+    resolvedTriggerIcon === 'vertical' ? MoreVertical : MoreHorizontal;
 
   if (displayActions.length === 0 && menuItems.length === 0) {
     return null;
   }
 
+  const overflowTrigger =
+    menuItems.length > 0 ? (
+      <TableActionMenu items={menuItems} trigger='custom' align='end'>
+        <AppIconButton
+          ariaLabel='More actions'
+          className={cn(
+            DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
+            'text-tertiary-token'
+          )}
+          data-testid='drawer-card-overflow-trigger'
+        >
+          <TriggerIcon className='h-3.5 w-3.5' aria-hidden='true' />
+        </AppIconButton>
+      </TableActionMenu>
+    ) : null;
+
   return (
     <div
       className={cn(
         'flex flex-wrap items-center gap-1.5 border-t border-(--linear-app-frame-seam) px-2.5 py-2',
+        overflowTriggerPlacement === 'card-top-right' && 'pr-11',
         className
       )}
       data-testid='drawer-card-action-bar'
     >
+      {overflowTriggerPlacement === 'card-top-right' && overflowTrigger ? (
+        <div className='absolute right-3 top-3 z-10'>{overflowTrigger}</div>
+      ) : null}
       {displayActions.map(action => {
         const Icon =
           action.isActive && action.activeIcon
@@ -103,18 +148,8 @@ export function DrawerCardActionBar({
         );
       })}
 
-      {menuItems.length > 0 ? (
-        <TableActionMenu items={menuItems} trigger='custom' align='end'>
-          <AppIconButton
-            ariaLabel='More actions'
-            className={cn(
-              DRAWER_HEADER_ICON_BUTTON_CLASSNAME,
-              'ml-auto text-tertiary-token'
-            )}
-          >
-            <MoreHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
-          </AppIconButton>
-        </TableActionMenu>
+      {overflowTriggerPlacement === 'inline' && overflowTrigger ? (
+        <div className='ml-auto'>{overflowTrigger}</div>
       ) : null}
     </div>
   );

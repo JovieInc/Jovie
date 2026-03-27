@@ -45,6 +45,25 @@ describe('SidebarLinkRow interactions', () => {
     expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
   });
 
+  it('applies the track row surface variant when requested', () => {
+    render(
+      <SidebarLinkRow
+        testId='track-link-row'
+        icon={<span aria-hidden='true'>icon</span>}
+        label='Spotify'
+        url='https://open.spotify.com/track/test'
+        surfaceVariant='track'
+      />
+    );
+
+    expect(screen.getByTestId('track-link-row')).toHaveClass(
+      'rounded-[10px]',
+      'border',
+      'lg:hover:bg-surface-0',
+      'focus-within:bg-surface-0'
+    );
+  });
+
   it('supports copy and open actions for a valid URL', async () => {
     const user = userEvent.setup();
     const writeText = vi.fn().mockResolvedValue(undefined);
