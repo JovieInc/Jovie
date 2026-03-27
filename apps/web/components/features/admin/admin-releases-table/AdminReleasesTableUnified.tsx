@@ -21,7 +21,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { AdminTableSubheader } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
-import type { AdminReleaseRow } from '@/lib/admin/releases';
+import type { AdminReleaseRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import {
   type AdminReleasesSort,

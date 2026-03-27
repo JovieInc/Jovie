@@ -9,7 +9,7 @@ import {
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminReliabilitySummary } from '@/lib/admin/overview';
+import type { AdminReliabilitySummary } from '@/lib/admin/types';
 
 interface ReliabilityCardProps {
   readonly summary: AdminReliabilitySummary;

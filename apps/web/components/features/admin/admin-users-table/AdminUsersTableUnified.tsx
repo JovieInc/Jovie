@@ -36,7 +36,7 @@ import {
   USERS_CSV_FILENAME_PREFIX,
   usersCSVColumns,
 } from '@/lib/admin/csv-configs/users';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH, TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
 import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';

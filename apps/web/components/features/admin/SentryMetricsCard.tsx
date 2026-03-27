@@ -2,7 +2,7 @@ import { AlertOctagon, Bug, Flame, Users } from 'lucide-react';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminSentryMetrics } from '@/lib/admin/sentry-metrics';
+import type { AdminSentryMetrics } from '@/lib/admin/types';
 
 interface SentryMetricsCardProps {
   readonly metrics: AdminSentryMetrics;

@@ -11,7 +11,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 
 interface AdminUserDetailDrawerProps {
   readonly user: AdminUserRow | null;

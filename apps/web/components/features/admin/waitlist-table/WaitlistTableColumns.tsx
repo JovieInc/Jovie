@@ -8,7 +8,7 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import { useMemo } from 'react';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import {
   PLATFORM_LABELS,
   PRIMARY_GOAL_LABELS,

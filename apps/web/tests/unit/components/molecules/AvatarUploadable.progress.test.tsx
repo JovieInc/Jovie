@@ -168,10 +168,7 @@ describe('AvatarUploadable - Analytics Tracking', () => {
     });
   });
 
-  // TODO: Unskip once validation error tracking is wired into the upload hook.
-  // Currently skipped because the component validates via the browser's accept
-  // attribute rather than firing a JS-level validation error event.
-  it.skip('tracks validation errors', async () => {
+  it('tracks validation errors', async () => {
     render(
       <AvatarUploadable
         src='https://example.com/avatar.jpg'

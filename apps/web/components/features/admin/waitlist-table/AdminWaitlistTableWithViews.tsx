@@ -30,7 +30,7 @@ import {
   WAITLIST_CSV_FILENAME_PREFIX,
   waitlistCSVColumns,
 } from '@/lib/admin/csv-configs/waitlist';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
 import {
   QueryErrorBoundary,

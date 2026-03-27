@@ -67,7 +67,7 @@ interface RecalculateProfileRow {
   latestReleaseDate: Date | null;
   hasContactEmail: boolean | null;
   paidVerificationPlatforms: string[] | null;
-  hasTrackingPixels: boolean | null;
+  discoveredPixels: unknown;
 }
 
 /**
@@ -266,7 +266,7 @@ export async function calculateMissingFitScores(
       spotifyPopularity: creatorProfiles.spotifyPopularity,
       genres: creatorProfiles.genres,
       ingestionSourcePlatform: creatorProfiles.ingestionSourcePlatform,
-      hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
+      discoveredPixels: creatorProfiles.discoveredPixels,
       socialLinkPlatforms: drizzleSql<string[]>`
         coalesce(
           array_agg(distinct ${socialLinks.platform})
@@ -327,7 +327,9 @@ export async function calculateMissingFitScores(
       paidVerificationPlatforms: (
         profile.paidVerificationPlatforms ?? []
       ).filter((p): p is string => !!p),
-      hasTrackingPixels: !!profile.hasTrackingPixels,
+      hasTrackingPixels: hasCreatorOwnedPixels(
+        profile.discoveredPixels as DiscoveredPixels | null
+      ),
     };
 
     const { score, breakdown } = calculateFitScore(input);
@@ -407,7 +409,7 @@ export async function recalculateAllFitScores(
             '{}'
           ) FROM social_accounts sa WHERE sa.creator_profile_id = ${creatorProfiles.id})
         `,
-        hasTrackingPixels: drizzleSql<boolean>`${creatorProfiles.discoveredPixels} IS NOT NULL`,
+        discoveredPixels: creatorProfiles.discoveredPixels,
       })
       .from(creatorProfiles)
       .leftJoin(
@@ -460,7 +462,9 @@ export async function recalculateAllFitScores(
         paidVerificationPlatforms: (
           profile.paidVerificationPlatforms ?? []
         ).filter((p): p is string => !!p),
-        hasTrackingPixels: !!profile.hasTrackingPixels,
+        hasTrackingPixels: hasCreatorOwnedPixels(
+          profile.discoveredPixels as DiscoveredPixels | null
+        ),
       };
 
       const { score, breakdown } = calculateFitScore(input);

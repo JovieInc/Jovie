@@ -10,7 +10,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
+import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface OutreachPipelineCardProps {
   readonly metrics: AdminFunnelMetrics;

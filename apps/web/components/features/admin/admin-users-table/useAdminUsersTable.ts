@@ -9,7 +9,7 @@ import {
   type UserSortableColumnKey,
 } from '@/features/admin/users-sort-config';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/users';
+import type { AdminUserRow, AdminUsersSort } from '@/lib/admin/types';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import type { AdminUsersTableProps } from './types';
 
