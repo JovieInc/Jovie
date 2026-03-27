@@ -544,7 +544,7 @@ function PreviewPanel({
 
   return (
     <aside
-      className='hidden xl:block'
+      className='max-xl:hidden'
       style={{ width: `${PREVIEW_PANEL_WIDTH}px` }}
     >
       <div className='sticky top-8 space-y-4'>

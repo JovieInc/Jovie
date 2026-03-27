@@ -644,12 +644,12 @@ export function DevToolbar({
           {env}
         </span>
         {sha && (
-          <span className='hidden sm:inline text-[var(--color-text-quaternary-token)] truncate'>
+          <span className='max-sm:hidden sm:inline text-[var(--color-text-quaternary-token)] truncate'>
             {sha}
           </span>
         )}
         {version && (
-          <span className='hidden sm:inline text-[var(--color-text-quaternary-token)] shrink-0'>
+          <span className='max-sm:hidden sm:inline text-[var(--color-text-quaternary-token)] shrink-0'>
             v{version}
           </span>
         )}
@@ -668,7 +668,7 @@ export function DevToolbar({
           </button>
         )}
 
-        <span className='hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
+        <span className='max-md:hidden md:inline px-1.5 py-0.5 rounded text-[10px] text-[var(--color-text-quaternary-token)] bg-[var(--color-bg-surface-2)] shrink-0'>
           {breakpoint}
         </span>
 
@@ -709,7 +709,7 @@ export function DevToolbar({
               aria-label='Copy SHA'
             >
               <CopyFieldIcon copied={copiedField === 'sha'} icon={Copy} />
-              <span className='hidden sm:inline text-[10px]'>SHA</span>
+              <span className='max-sm:hidden sm:inline text-[10px]'>SHA</span>
             </button>
           )}
 
@@ -723,7 +723,7 @@ export function DevToolbar({
             aria-label='Copy route'
           >
             <CopyFieldIcon copied={copiedField === 'route'} icon={Route} />
-            <span className='hidden sm:inline text-[10px]'>Route</span>
+            <span className='max-sm:hidden sm:inline text-[10px]'>Route</span>
           </button>
 
           <Link
@@ -733,7 +733,7 @@ export function DevToolbar({
             aria-label='Admin panel'
           >
             <ExternalLink size={11} />
-            <span className='hidden sm:inline text-[10px]'>Admin</span>
+            <span className='max-sm:hidden sm:inline text-[10px]'>Admin</span>
           </Link>
 
           {env !== 'production' && (
@@ -748,7 +748,7 @@ export function DevToolbar({
               aria-label='Clear session'
             >
               <AsyncActionIcon state={clearSessionState} idleIcon={Trash2} />
-              <span className='hidden sm:inline text-[10px]'>
+              <span className='max-sm:hidden sm:inline text-[10px]'>
                 {ASYNC_ACTION_LABELS.clear[clearSessionState]}
               </span>
             </button>
@@ -766,7 +766,7 @@ export function DevToolbar({
               aria-label='Unwaitlist'
             >
               <AsyncActionIcon state={unwaitlistState} idleIcon={UserCheck} />
-              <span className='hidden sm:inline text-[10px]'>
+              <span className='max-sm:hidden sm:inline text-[10px]'>
                 {ASYNC_ACTION_LABELS.unwaitlist[unwaitlistState]}
               </span>
             </button>
@@ -795,7 +795,7 @@ export function DevToolbar({
               ) : (
                 <RefreshCw size={11} />
               )}
-              <span className='hidden sm:inline text-[10px]'>
+              <span className='max-sm:hidden sm:inline text-[10px]'>
                 {syncClerkState === 'loading'
                   ? 'Syncing...'
                   : syncClerkState === 'done'
@@ -826,7 +826,7 @@ export function DevToolbar({
               {...getSwButtonProps(swEnabled)}
             >
               <Globe size={11} />
-              <span className='hidden sm:inline text-[10px]'>SW</span>
+              <span className='max-sm:hidden sm:inline text-[10px]'>SW</span>
             </button>
           )}
 
@@ -847,11 +847,11 @@ export function DevToolbar({
                   aria-label='Promote to production'
                 >
                   <PromoteIcon state={promoteState} />
-                  <span className='hidden sm:inline text-[10px]'>
+                  <span className='max-sm:hidden sm:inline text-[10px]'>
                     {PROMOTE_LABELS[promoteState]}
                   </span>
                   {promoteState === 'ready' && promoteSha && (
-                    <span className='hidden md:inline text-[9px] opacity-60'>
+                    <span className='max-md:hidden md:inline text-[9px] opacity-60'>
                       {promoteSha.staging}→{promoteSha.prod}
                     </span>
                   )}

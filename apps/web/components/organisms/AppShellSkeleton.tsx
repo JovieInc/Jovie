@@ -20,7 +20,7 @@ export function AppShellSkeleton() {
   return (
     <AppShellFrame
       sidebar={
-        <div className='hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
+        <div className='max-lg:hidden bg-sidebar lg:flex lg:w-[232px] lg:shrink-0 lg:flex-col'>
           <div className='flex h-9 items-center gap-2 px-2 pt-2'>
             <div className='skeleton h-6 w-6 rounded-md' />
             <div className='skeleton h-4 w-24 rounded' />

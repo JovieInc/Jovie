@@ -75,7 +75,7 @@ function SidebarSuggestionItem({
       <span className='font-[510]'>{option.name}</span>
       <span className='text-xs text-tertiary-token'>{option.hint}</span>
       {active && (
-        <span className='ml-auto hidden text-xs text-tertiary-token sm:inline'>
+        <span className='ml-auto max-sm:hidden text-xs text-tertiary-token sm:inline'>
           Enter
         </span>
       )}

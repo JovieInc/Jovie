@@ -57,15 +57,17 @@ export function DashboardHeader({
         </div>
       </div>
       {/* Desktop: Standard header bar with breadcrumbs */}
-      <div className='relative hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-(--linear-app-header-padding-x) sm:flex'>
+      <div className='relative max-sm:hidden h-(--linear-app-header-height-compact) w-full items-center gap-2 px-(--linear-app-header-padding-x) sm:flex'>
         {leading ? <div className='flex items-center'>{leading}</div> : null}
         {/* Sidebar expand button (desktop only, when collapsed) */}
         {sidebarTrigger ? (
-          <div className='hidden items-center lg:flex'>{sidebarTrigger}</div>
+          <div className='max-lg:hidden items-center lg:flex'>
+            {sidebarTrigger}
+          </div>
         ) : null}
         {/* Conditional vertical separator between sidebar trigger and actions */}
         {showDivider && sidebarTrigger && action ? (
-          <div className='hidden lg:flex items-center'>
+          <div className='max-lg:hidden lg:flex items-center'>
             <VerticalDivider />
           </div>
         ) : null}

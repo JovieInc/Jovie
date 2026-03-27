@@ -93,7 +93,7 @@ export function AdminCreatorsTableHeader({
           </div>
         </th>
         <th
-          className={cn(headerCellClass, 'hidden lg:table-cell')}
+          className={cn(headerCellClass, 'max-lg:hidden lg:table-cell')}
           style={stickyStyle}
         >
           <span className='text-[13px] font-[510] tracking-normal text-secondary-token'>
@@ -103,7 +103,7 @@ export function AdminCreatorsTableHeader({
         <th
           className={cn(
             headerCellClass,
-            'cursor-pointer select-none hidden md:table-cell'
+            'cursor-pointer select-none max-md:hidden md:table-cell'
           )}
           style={stickyStyle}
         >

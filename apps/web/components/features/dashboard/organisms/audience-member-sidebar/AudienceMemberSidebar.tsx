@@ -10,11 +10,12 @@
 
 import { useState } from 'react';
 import {
-  DrawerTabbedCard,
+  DrawerSurfaceCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
+import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -57,35 +58,59 @@ export function AudienceMemberSidebar({
       headerMode='minimal'
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
-      entityHeader={
-        <AudienceMemberHeader
-          title={title}
-          subtitle={subtitle}
-          avatarName={avatarName}
-          avatarSrc={avatarSrc}
-        />
-      }
     >
       {member && (
-        <DrawerTabbedCard
-          testId='audience-member-tabbed-card'
-          tabs={
+        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
+          <AudienceMemberHeader
+            title={title}
+            subtitle={subtitle}
+            avatarName={avatarName}
+            avatarSrc={avatarSrc}
+          />
+
+          <div className='flex min-h-0 flex-1 flex-col gap-2.5'>
             <DrawerTabs
               value={activeTab}
               onValueChange={value => setActiveTab(value as AudienceTab)}
               options={AUDIENCE_TAB_OPTIONS}
               ariaLabel='Audience member tabs'
+              overflowMode='scroll'
             />
-          }
-        >
-          {activeTab === 'details' && <AudienceMemberDetails member={member} />}
-          {activeTab === 'activity' && (
-            <AudienceMemberActivityFeed member={member} />
-          )}
-          {activeTab === 'referrers' && (
-            <AudienceMemberReferrers member={member} />
-          )}
-        </DrawerTabbedCard>
+
+            <div className='min-h-0 flex-1'>
+              {activeTab === 'details' && (
+                <DrawerSurfaceCard
+                  className={LINEAR_SURFACE.drawerCardSm}
+                  testId='audience-details-card'
+                >
+                  <div className='p-2.5'>
+                    <AudienceMemberDetails member={member} />
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+              {activeTab === 'activity' && (
+                <DrawerSurfaceCard
+                  className={LINEAR_SURFACE.drawerCardSm}
+                  testId='audience-activity-card'
+                >
+                  <div className='p-2.5'>
+                    <AudienceMemberActivityFeed member={member} />
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+              {activeTab === 'referrers' && (
+                <DrawerSurfaceCard
+                  className={LINEAR_SURFACE.drawerCardSm}
+                  testId='audience-referrers-card'
+                >
+                  <div className='p-2.5'>
+                    <AudienceMemberReferrers member={member} />
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </EntitySidebarShell>
   );

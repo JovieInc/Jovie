@@ -25,7 +25,7 @@ export function AdminActivitySkeleton() {
                 <th className='px-4 py-3'>
                   <div className='h-3 w-14 rounded skeleton' />
                 </th>
-                <th className='hidden px-4 py-3 md:table-cell'>
+                <th className='max-md:hidden px-4 py-3 md:table-cell'>
                   <div className='h-3 w-20 rounded skeleton' />
                 </th>
                 <th className='px-4 py-3 text-right'>
@@ -45,7 +45,7 @@ export function AdminActivitySkeleton() {
                   <td className='px-4 py-3'>
                     <div className='h-4 w-64 max-w-[60vw] rounded skeleton' />
                   </td>
-                  <td className='hidden px-4 py-3 md:table-cell'>
+                  <td className='max-md:hidden px-4 py-3 md:table-cell'>
                     <div className='h-4 w-36 rounded skeleton' />
                   </td>
                   <td className='px-4 py-3'>

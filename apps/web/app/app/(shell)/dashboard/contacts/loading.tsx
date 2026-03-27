@@ -58,7 +58,7 @@ export default function ContactsLoading() {
       </div>
 
       {/* Desktop: table layout (hidden below sm) */}
-      <div className='hidden flex-1 min-h-0 overflow-auto sm:block'>
+      <div className='max-sm:hidden flex-1 min-h-0 overflow-auto'>
         <table className='w-full border-collapse text-[13px]'>
           <thead className='sticky top-0 z-10 bg-(--linear-app-content-surface) shadow-inset-divider'>
             <tr className='border-b border-subtle'>

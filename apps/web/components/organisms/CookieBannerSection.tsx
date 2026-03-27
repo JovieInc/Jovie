@@ -165,7 +165,7 @@ export function CookieBannerSection() {
 
           <div
             id='cookie-actions'
-            className={isMobileExpanded ? 'block' : 'hidden md:block'}
+            className={isMobileExpanded ? 'block' : 'max-md:hidden'}
           >
             <CookieActions
               onAcceptAll={acceptAll}

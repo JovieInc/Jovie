@@ -619,7 +619,7 @@ export const DashboardAudienceTableUnified = memo(
                     />
 
                     {/* Desktop table */}
-                    <div className='hidden md:block h-full'>
+                    <div className='max-md:hidden h-full'>
                       <UnifiedTable
                         data={rows}
                         columns={columns}
