@@ -51,17 +51,25 @@ export function SettingsAnalyticsSection({
   return (
     <SettingsPanel actions={<SettingsStatusPill status={saveStatus} />}>
       <div className='space-y-3 px-4 py-4 sm:px-5'>
-        <SettingsToggleRow
-          icon={<BarChart3 className='h-4 w-4' aria-hidden />}
-          title='Exclude your own visits'
-          description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
-          checked={excludeSelf}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-          ariaLabel='Exclude yourself from analytics'
-          gated={!isPro}
-          gateFeatureContext='Filter your own visits'
-        />
+        {isPro ? (
+          <SettingsToggleRow
+            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+            title='Exclude your own visits'
+            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
+            checked={excludeSelf}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Exclude yourself from analytics'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<BarChart3 className='h-4 w-4' aria-hidden />}
+            title='Exclude your own visits'
+            description='Keep your own profile views and link clicks out of analytics so the numbers reflect your audience, not your testing.'
+            gateFeatureContext='Filter your own visits'
+          />
+        )}
         {isPro && excludeSelf ? (
           <ContentSurfaceCard className='flex items-start gap-3 bg-surface-0 p-3.5'>
             <BarChart3 className='mt-0.5 h-4 w-4 shrink-0 text-secondary-token' />

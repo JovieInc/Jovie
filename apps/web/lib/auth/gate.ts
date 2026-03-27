@@ -137,7 +137,7 @@ async function tryAdoptExistingUser(
   const conflictDetail = unwrapPgError(insertError).detail ?? '';
   const conflictingEmail =
     /Key \(email\)=\((.+)\) already exists\./.exec(conflictDetail)?.[1] ??
-    email;
+    normalizeEmail(email);
 
   const [adopted] = await db
     .update(users)

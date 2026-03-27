@@ -1,9 +1,8 @@
 # The Problem
 
-Music creation is easier than ever. Attention and monetization are harder than ever.
+Artists quit before they learn what works.
 
-- ~99,000 tracks uploaded to streaming services per day (Luminate 2024)
-- 50,000+ fully AI-generated tracks per day on Deezer alone
-- Creators drive traffic to a static link-in-bio that treats every fan the same
-- Occasional email/SMS blasts quickly lose engagement
-- Result: low capture, weak conversion, no way to identify high-value fans
+- Every song is a test, but most artists only get 1-3 launches a year
+- The work around each release turns each song into a months-long project
+- Fewer releases means slower learning and weaker signal on what fans actually want
+- Artists run out of money, time, or motivation before they learn what works

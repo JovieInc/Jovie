@@ -10,6 +10,7 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
+import { copyToClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { getBaseUrl } from '@/lib/utils/platform-detection';
 import { buildUTMContext, getUTMShareDropdownItems } from '@/lib/utm';
@@ -75,7 +76,7 @@ function ReleaseSmartLinkControl({
   return (
     <div className='space-y-1.5'>
       <div
-        className='flex h-8 items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2.5'
+        className='flex h-8 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2.5'
         data-testid='release-smart-link-control'
       >
         <Link2
@@ -89,12 +90,14 @@ function ReleaseSmartLinkControl({
           {smartLinkLabel}
         </span>
         <DrawerInlineIconButton
-          onClick={event => {
+          onClick={async event => {
             event.stopPropagation();
-            navigator.clipboard.writeText(smartLinkUrl).then(
-              () => toast.success('Smart link copied'),
-              () => toast.error('Failed to copy link')
-            );
+            const copied = await copyToClipboard(smartLinkUrl);
+            if (copied) {
+              toast.success('Smart link copied');
+              return;
+            }
+            toast.error('Failed to copy link');
           }}
           title='Copy smart link'
           className='h-5 w-5 rounded-full text-tertiary-token'

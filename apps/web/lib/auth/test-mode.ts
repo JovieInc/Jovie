@@ -56,7 +56,6 @@ function isTrustedTestBypassRequest(headerReader: HeaderReader): boolean {
 
   return isLoopbackHost(hostname);
 }
-
 function getCookieValueFromHeader(
   headerReader: HeaderReader,
   cookieName: string
@@ -91,7 +90,6 @@ export function resolveTestBypassUserId(
   if (!isTestAuthBypassEnabled()) {
     return null;
   }
-
   const headerMode = normalizeHeaderValue(headerReader.get(TEST_MODE_HEADER));
   const cookieMode = normalizeHeaderValue(
     cookieReader?.get(TEST_MODE_COOKIE)?.value ??
@@ -112,7 +110,9 @@ export function resolveTestBypassUserId(
       cookieReader?.get(TEST_USER_ID_COOKIE)?.value ??
         getCookieValueFromHeader(headerReader, TEST_USER_ID_COOKIE)
     ) ??
-    normalizeHeaderValue(process.env.E2E_CLERK_USER_ID ?? null) ??
+    normalizeHeaderValue(
+      process.env.E2E_CLERK_USER_ID ?? process.env.TEST_CLERK_USER_ID ?? null
+    ) ??
     'user_test'
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { AuthTextInput } from '@/features/auth';
+import { AuthTextInput } from '@/components/atoms/AuthTextInput';
 import type { FormErrors } from './types';
 import { WaitlistSpotifySearch } from './WaitlistSpotifySearch';
 

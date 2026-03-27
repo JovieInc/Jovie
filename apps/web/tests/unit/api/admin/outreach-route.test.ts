@@ -15,6 +15,7 @@ const mockCount = vi.hoisted(() => vi.fn(() => 'count-clause'));
 const mockIsNotNull = vi.hoisted(() => vi.fn(() => 'not-null-clause'));
 const mockIsNull = vi.hoisted(() => vi.fn(() => 'is-null-clause'));
 const mockLt = vi.hoisted(() => vi.fn(() => 'lt-clause'));
+const mockNe = vi.hoisted(() => vi.fn(() => 'ne-clause'));
 const mockOr = vi.hoisted(() => vi.fn(() => 'or-clause'));
 const mockSql = vi.hoisted(() => vi.fn(() => 'sql-clause'));
 
@@ -60,6 +61,7 @@ vi.mock('drizzle-orm', () => ({
   isNotNull: mockIsNotNull,
   isNull: mockIsNull,
   lt: mockLt,
+  ne: mockNe,
   or: mockOr,
   sql: mockSql,
 }));
@@ -150,6 +152,11 @@ describe('GET /api/admin/outreach', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSelect.mockReset();
+    mockSelect.mockImplementation(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn().mockResolvedValue([{ total: 0 }]),
+      })),
+    }));
     mockExecute.mockReset();
     mockInsert.mockReset();
     mockUpdate.mockReset();
@@ -291,12 +298,18 @@ describe('GET /api/admin/outreach', () => {
       }))
       .mockImplementationOnce(() => ({
         from: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn().mockResolvedValue([]),
+          })),
+        })),
+      }))
+      .mockImplementationOnce(() => ({
+        from: vi.fn(() => ({
           where: vi.fn().mockResolvedValue([{ total: 0 }]),
         })),
       }));
 
     mockPushLeadToInstantly.mockResolvedValue('instantly-123');
-    mockExecute.mockResolvedValue({ rows: [] });
 
     const response = await POST(
       new Request('http://localhost/api/admin/outreach', {
@@ -375,7 +388,6 @@ describe('GET /api/admin/outreach', () => {
       }));
 
     mockUpdateReturning.mockResolvedValueOnce([]);
-    mockExecute.mockResolvedValue({ rows: [] });
 
     const response = await POST(
       new Request('http://localhost/api/admin/outreach', {

@@ -158,7 +158,7 @@ vi.mock(
   () => ({
     ReleaseTableSubheader: ({
       onCreateRelease,
-      canCreateManualReleases = true,
+      canCreateManualReleases = false,
     }: {
       onCreateRelease?: () => void;
       canCreateManualReleases?: boolean;
@@ -168,7 +168,7 @@ vi.mock(
           <button type='button' data-testid='release-subheader'>
             subheader
           </button>
-          {canCreateManualReleases ? (
+          {canCreateManualReleases && onCreateRelease ? (
             <button
               type='button'
               aria-label='Create a new release'

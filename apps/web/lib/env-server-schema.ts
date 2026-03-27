@@ -74,6 +74,7 @@ export const ServerEnvSchema = z.object({
   INGESTION_CRON_SECRET: z.string().optional(),
 
   // URL encryption (required in production/preview)
+  LEAD_ATTRIBUTION_SECRET: z.string().optional(),
   URL_ENCRYPTION_KEY: z.string().optional(),
 
   // Cron job authentication
@@ -207,6 +208,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'INGESTION_CRON_SECRET',
+  'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
   'METADATA_HASH_KEY',

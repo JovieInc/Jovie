@@ -418,12 +418,10 @@ export function SettingsAdPixelsSection({
       >
         <div className='px-4 py-4 sm:px-5'>
           <SettingsToggleRow
+            gated
             title='Pixel tracking'
             description='Integrate Facebook, Google, and TikTok conversion tracking pixels.'
-            checked={false}
-            onCheckedChange={() => {}}
-            ariaLabel='Pixel tracking'
-            gated
+            gateFeatureContext='Pixel tracking'
           />
         </div>
       </SettingsPanel>

@@ -40,8 +40,9 @@ describe('ReleaseMetadata canvas status', () => {
   it('renders metadata as a single divider-free grid', () => {
     renderReleaseMetadata(buildRelease());
 
-    expect(screen.getByTestId('release-metadata-grid').className).not.toContain(
-      'divide-y'
+    expect(screen.getByTestId('release-metadata-grid')).toHaveAttribute(
+      'data-dividers',
+      'false'
     );
   });
 

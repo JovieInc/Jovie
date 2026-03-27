@@ -3,14 +3,24 @@
 import { Button, Input } from '@jovie/ui';
 import { Hash, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import {
   useWaitlistSettingsMutation,
   useWaitlistSettingsQuery,
   type WaitlistSettingsResponse,
 } from '@/lib/queries';
+
+const MAX_AUTO_ACCEPT_DAILY_LIMIT = 10_000;
+
+function clampDailyLimit(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(MAX_AUTO_ACCEPT_DAILY_LIMIT, Math.max(0, Math.trunc(value)));
+}
 
 export function WaitlistSettingsPanel() {
   const {
@@ -39,7 +49,7 @@ export function WaitlistSettingsPanel() {
     save({
       gateEnabled: settings.gateEnabled,
       autoAcceptEnabled: settings.autoAcceptEnabled,
-      autoAcceptDailyLimit: settings.autoAcceptDailyLimit,
+      autoAcceptDailyLimit: clampDailyLimit(settings.autoAcceptDailyLimit),
     });
   };
 
@@ -130,7 +140,7 @@ export function WaitlistSettingsPanel() {
               <Input
                 type='number'
                 min={0}
-                max={10000}
+                max={MAX_AUTO_ACCEPT_DAILY_LIMIT}
                 value={settings.autoAcceptDailyLimit}
                 onChange={event => {
                   const next = Number.parseInt(event.target.value, 10);
@@ -138,9 +148,7 @@ export function WaitlistSettingsPanel() {
                     current
                       ? {
                           ...current,
-                          autoAcceptDailyLimit: Number.isFinite(next)
-                            ? next
-                            : 0,
+                          autoAcceptDailyLimit: clampDailyLimit(next),
                         }
                       : current
                   );

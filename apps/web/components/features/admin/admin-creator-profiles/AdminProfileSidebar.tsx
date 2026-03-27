@@ -9,7 +9,7 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { ProfileAboutTab } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileAboutTab';
@@ -18,7 +18,6 @@ import {
   type CategoryOption,
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
-import { useProfileHeaderParts } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileSidebarHeader';
 import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import type { Contact } from '@/types';
 
@@ -69,14 +68,6 @@ export function AdminProfileSidebar({
     profilePath: profile?.username ? `/${profile.username}` : '',
   });
 
-  const closeOnlyHeaderActions = (
-    <DrawerHeaderActions
-      primaryActions={[]}
-      overflowActions={[]}
-      onClose={onClose}
-    />
-  );
-
   if (!profile || !contact) {
     return (
       <EntitySidebarShell
@@ -85,7 +76,6 @@ export function AdminProfileSidebar({
         title='Creator profile'
         onClose={onClose}
         headerMode='minimal'
-        headerActions={closeOnlyHeaderActions}
         contextMenuItems={contextMenuItems}
         isEmpty
         emptyMessage='Select a creator profile to view details.'
@@ -103,10 +93,9 @@ export function AdminProfileSidebar({
       title='Creator profile'
       onClose={onClose}
       headerMode='minimal'
-      headerActions={closeOnlyHeaderActions}
       entityHeader={
         <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+          <div className='border-b border-subtle px-3 py-2'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
               Creator profile
             </p>
@@ -134,7 +123,6 @@ export function AdminProfileSidebar({
           <DrawerCardActionBar
             primaryActions={primaryActions}
             overflowActions={overflowActions}
-            className='mx-[-14px]'
           />
         </DrawerSurfaceCard>
       }

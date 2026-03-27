@@ -6,8 +6,6 @@ import { getLeadFunnelReport } from '@/lib/leads/reporting';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-export const runtime = 'nodejs';
-
 const filterSchema = z.object({
   start: z.coerce.date().optional(),
   end: z.coerce.date().optional(),

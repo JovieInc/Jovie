@@ -4,6 +4,17 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
+function assertDocumentOrder(elements: HTMLElement[]) {
+  for (let index = 1; index < elements.length; index += 1) {
+    const previous = elements[index - 1];
+    const current = elements[index];
+    expect(
+      previous.compareDocumentPosition(current) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  }
+}
+
 const drawerToggleButtonMock = vi.fn((props: Record<string, unknown>) => (
   <button type='button' data-testid='drawer-toggle-button'>
     {String(props.tooltipLabel ?? '')}
@@ -73,12 +84,18 @@ vi.mock('@/components/organisms/table', () => ({
     start,
     end,
     className,
+    topDivider,
   }: {
     start: ReactNode;
     end: ReactNode;
     className?: string;
+    topDivider?: boolean;
   }) => (
-    <div data-testid='page-toolbar' className={className}>
+    <div
+      data-testid='page-toolbar'
+      data-top-divider={topDivider ? 'true' : undefined}
+      className={className}
+    >
       <div>{start}</div>
       <div>{end}</div>
     </div>
@@ -127,9 +144,10 @@ describe('ReleaseTableSubheader', () => {
       />
     );
 
-    const toolbar = screen.getByTestId('page-toolbar');
-    expect(toolbar.className).toContain('border-t');
-    expect(toolbar.className).toContain('border-b-0');
+    expect(screen.getByTestId('page-toolbar')).toHaveAttribute(
+      'data-top-divider',
+      'true'
+    );
   });
 
   it('orders toolbar controls as search, filters, display, export, preview, and create', async () => {
@@ -160,15 +178,7 @@ describe('ReleaseTableSubheader', () => {
       screen.getByRole('button', { name: 'New Release' }),
     ];
 
-    controls.reduce((previous, current) => {
-      if (previous) {
-        expect(
-          previous.compareDocumentPosition(current) &
-            Node.DOCUMENT_POSITION_FOLLOWING
-        ).toBeTruthy();
-      }
-      return current;
-    });
+    assertDocumentOrder(controls);
 
     await user.click(screen.getByRole('button', { name: 'New Release' }));
     expect(onCreateRelease).toHaveBeenCalledTimes(1);

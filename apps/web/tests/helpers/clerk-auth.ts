@@ -101,7 +101,6 @@ async function waitForShellReadyAfterAuth(page: Page): Promise<void> {
     await expect.poll(isShellReady, { timeout: 5000 }).toBe(true);
   }).toPass({ timeout: 120_000, intervals: [3000, 5000, 10000, 15000] });
 }
-
 /**
  * Check if the test target is a production deployment (jov.ie).
  * Used to gate heavy test suites that should only run against testing environments.

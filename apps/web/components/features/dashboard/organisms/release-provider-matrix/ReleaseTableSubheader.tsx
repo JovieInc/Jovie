@@ -233,10 +233,10 @@ function LinearStyleDisplayMenu({
       </TooltipShortcut>
       <PopoverContent
         align='end'
-        className='w-[248px] rounded-[12px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
+        className='w-[248px] rounded-[12px] border border-subtle bg-surface-1 p-0 shadow-[0_10px_20px_rgba(0,0,0,0.06)]'
       >
         {/* Header */}
-        <div className='flex items-center justify-between border-b border-(--linear-app-frame-seam) px-3 py-2'>
+        <div className='flex items-center justify-between border-b border-subtle px-3 py-2'>
           <span className='text-[13px] font-[510] text-primary-token'>
             Display
           </span>
@@ -253,7 +253,7 @@ function LinearStyleDisplayMenu({
 
         {/* Release view toggle */}
         {onReleaseViewChange && (
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+          <div className='border-b border-subtle px-3 py-2'>
             <ReleaseViewSegmentedControl
               value={releaseView ?? 'releases'}
               onChange={onReleaseViewChange}
@@ -263,7 +263,7 @@ function LinearStyleDisplayMenu({
 
         {/* List options */}
         {onGroupByYearChange && (
-          <div className='border-b border-(--linear-app-frame-seam) px-3 py-1.5'>
+          <div className='border-b border-subtle px-3 py-1.5'>
             <p className='px-1 pb-1 text-[13px] font-[510] tracking-normal text-secondary-token'>
               List options
             </p>
@@ -301,10 +301,8 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
 
   return (
     <PageToolbar
-      className={cn(
-        LINEAR_SURFACE.toolbar,
-        'min-h-[32px] border-b-0 border-t border-(--linear-app-frame-seam)'
-      )}
+      topDivider
+      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px]')}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons

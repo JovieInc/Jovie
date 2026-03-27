@@ -24,7 +24,9 @@ import { logger } from '@/lib/utils/logger';
 import { artistSearchQuerySchema } from '@/lib/validation/schemas/spotify';
 import {
   annotateClaimedStatus,
+  annotateClaimedStatusWithMeta,
   applyVipBoost,
+  applyVipBoostWithMeta,
   boostClaimedArtists,
   parseLimit,
 } from './helpers';
@@ -39,6 +41,17 @@ const MAX_QUERY_LENGTH = 60;
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 10;
 const SEARCH_CACHE_TTL_SECONDS = 300; // 5 minutes
+// NOTE: claimed-artist status is cached here for 60s on top of the 30s
+// unstable_cache inside getCachedClaimedSpotifyIds, so effective max staleness
+// for claimed badges is about 90 seconds.
+const SEARCH_RESPONSE_CACHE_TTL_SECONDS = 60; // 1 minute
+
+class SearchEnrichmentFallbackError extends Error {
+  constructor(readonly results: SpotifyArtistResult[]) {
+    super('Spotify search enrichment fell back to a degraded payload');
+    this.name = 'SearchEnrichmentFallbackError';
+  }
+}
 
 function validateSearchQuery(q: string | undefined): NextResponse | null {
   if (!isSpotifyAvailable()) {
@@ -107,6 +120,7 @@ export async function GET(request: NextRequest) {
 
   // Parse and clamp limit
   const limit = parseLimit(limitParam, DEFAULT_LIMIT, MAX_LIMIT);
+  const normalizedQuery = q.toLowerCase();
 
   // Rate limiting with headers for client visibility
   const identifier = userId ? `user:${userId}` : `ip:${getClientIP(request)}`;
@@ -132,41 +146,67 @@ export async function GET(request: NextRequest) {
     if (alphabetResults && alphabetResults.length > 0) {
       const filtered = filterBlacklistedResults(alphabetResults);
       const annotated = await annotateClaimedStatus(filtered);
-      return NextResponse.json(annotated, { headers: rateLimitHeaders });
+      const claimedBoosted = boostClaimedArtists(annotated);
+      const vipBoosted = await applyVipBoost(claimedBoosted, q, limit);
+      return NextResponse.json(vipBoosted, { headers: rateLimitHeaders });
     }
     // No cached results — return empty rather than hitting Spotify with a 1-char query
     return NextResponse.json([], { headers: rateLimitHeaders });
   }
 
   try {
-    // Multi-layer cache (in-memory LRU + Redis) wrapping Spotify API
-    const cacheKey = `spotify:search:${q.toLowerCase()}:${limit}`;
-    const cachedResults = await cacheQuery<SpotifyArtistResult[]>(
-      cacheKey,
-      async () => {
-        // Use the hardened Spotify client with circuit breaker and retry
-        const artists = await spotifyClient.searchArtists(q, limit);
+    const responseCacheKey = `spotify:search:response:${normalizedQuery}:${limit}`;
+    const rawCacheKey = `spotify:search:${normalizedQuery}:${limit}`;
+    const loadRawResults = () =>
+      cacheQuery<SpotifyArtistResult[]>(
+        rawCacheKey,
+        async () => {
+          // Use the hardened Spotify client with circuit breaker and retry
+          const artists = await spotifyClient.searchArtists(q, limit);
 
-        // Normalize response shape (data already sanitized by client)
-        return artists.map(artist => ({
-          id: artist.spotifyId,
-          name: artist.name,
-          url: buildSpotifyArtistUrl(artist.spotifyId),
-          imageUrl: artist.imageUrl ?? undefined,
-          followers: artist.followerCount,
-          popularity: artist.popularity,
-          // Spotify doesn't expose verified status via search API
-          verified: undefined,
-        }));
-      },
-      { ttlSeconds: SEARCH_CACHE_TTL_SECONDS, useRedis: true }
-    );
+          // Normalize response shape (data already sanitized by client)
+          return artists.map(artist => ({
+            id: artist.spotifyId,
+            name: artist.name,
+            url: buildSpotifyArtistUrl(artist.spotifyId),
+            imageUrl: artist.imageUrl ?? undefined,
+            followers: artist.followerCount,
+            popularity: artist.popularity,
+            // Spotify doesn't expose verified status via search API
+            verified: undefined,
+          }));
+        },
+        { ttlSeconds: SEARCH_CACHE_TTL_SECONDS, useRedis: true }
+      );
+    const buildEnrichedResults = async (
+      cachedResults: SpotifyArtistResult[]
+    ) => {
+      const safeResults = filterBlacklistedResults(cachedResults);
+      const annotated = await annotateClaimedStatusWithMeta(safeResults);
+      const claimedBoosted = boostClaimedArtists(annotated.results);
+      const vipBoosted = await applyVipBoostWithMeta(claimedBoosted, q, limit);
 
-    // Post-cache pipeline: blacklist filter → annotate claimed → boost claimed → VIP boost (VIP always wins)
-    const safeResults = filterBlacklistedResults(cachedResults);
-    const annotated = await annotateClaimedStatus(safeResults);
-    const claimedBoosted = boostClaimedArtists(annotated);
-    const results = await applyVipBoost(claimedBoosted, q, limit);
+      const results = vipBoosted.results;
+      if (annotated.degraded || vipBoosted.degraded) {
+        throw new SearchEnrichmentFallbackError(results);
+      }
+      return results;
+    };
+
+    let results: SpotifyArtistResult[];
+    try {
+      results = await cacheQuery<SpotifyArtistResult[]>(
+        responseCacheKey,
+        async () => buildEnrichedResults(await loadRawResults()),
+        { ttlSeconds: SEARCH_RESPONSE_CACHE_TTL_SECONDS, useRedis: true }
+      );
+    } catch (error) {
+      if (error instanceof SearchEnrichmentFallbackError) {
+        results = error.results;
+      } else {
+        throw error;
+      }
+    }
 
     return NextResponse.json(results, { headers: rateLimitHeaders });
   } catch (error) {

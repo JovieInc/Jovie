@@ -12,6 +12,7 @@ import {
 describe('test-mode auth bypass', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    delete process.env.TEST_CLERK_USER_ID;
   });
 
   it('enables the bypass when the explicit E2E flag is set', () => {
@@ -23,7 +24,6 @@ describe('test-mode auth bypass', () => {
     vi.stubEnv('NODE_ENV', 'test');
     expect(isTestAuthBypassEnabled()).toBe(false);
   });
-
   it('returns null when bypass mode is absent', () => {
     expect(
       resolveTestBypassUserId({ get: () => null }, { get: () => undefined })
@@ -90,6 +90,9 @@ describe('test-mode auth bypass', () => {
       resolveTestBypassUserId(
         {
           get: (name: string) => {
+            if (name === 'host') {
+              return 'localhost:3100';
+            }
             if (name === 'host') {
               return 'localhost:3100';
             }
