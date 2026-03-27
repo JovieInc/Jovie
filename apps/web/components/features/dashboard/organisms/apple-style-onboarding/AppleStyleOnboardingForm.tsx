@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthBackButton } from '@/features/auth';
 import { ProfileLiveCelebration } from '@/features/dashboard/molecules/ProfileLiveCelebration';
@@ -38,6 +39,7 @@ export function AppleStyleOnboardingForm({
   shouldAutoSubmitHandle = false,
   initialStepIndex = 0,
   existingAvatarUrl = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
 }: Readonly<AppleStyleOnboardingFormProps>) {
@@ -323,6 +325,7 @@ export function AppleStyleOnboardingForm({
               isDspEnriching || isAutoConnectEnriching || isConnecting
             }
             existingAvatarUrl={existingAvatarUrl}
+            avatarQuality={existingAvatarQuality}
             existingBio={existingBio}
             existingGenres={existingGenres}
             isStepResume={initialStepIndex > 0}
@@ -347,7 +350,7 @@ export function AppleStyleOnboardingForm({
 
         <Link
           href='#main-content'
-          className='sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 px-4 py-2 rounded-md z-50 btn btn-primary btn-sm'
+          className={`sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 focus-visible:z-50 ${APP_CONTROL_BUTTON_CLASS}`}
         >
           Skip to main content
         </Link>

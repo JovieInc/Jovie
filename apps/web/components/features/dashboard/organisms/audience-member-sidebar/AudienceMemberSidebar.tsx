@@ -10,13 +10,11 @@
 
 import { useState } from 'react';
 import {
-  DrawerSurfaceCard,
+  DrawerTabbedCard,
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { AudienceMemberHeader } from '@/features/dashboard/atoms/AudienceMemberHeader';
-import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
-import { cn } from '@/lib/utils';
 import { AudienceMemberActivityFeed } from './AudienceMemberActivityFeed';
 import { AudienceMemberDetails } from './AudienceMemberDetails';
 import { AudienceMemberReferrers } from './AudienceMemberReferrers';
@@ -54,35 +52,32 @@ export function AudienceMemberSidebar({
       ariaLabel='Audience member details'
       contextMenuItems={contextMenuItems}
       data-testid='audience-member-sidebar'
-      title={title || 'Audience'}
+      title='Audience member details'
       onClose={onClose}
+      headerMode='minimal'
       isEmpty={!member}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
-        <DrawerSurfaceCard
-          className={cn(LINEAR_SURFACE.sidebarCard, 'overflow-hidden')}
-        >
-          <div className='p-2.5'>
-            <AudienceMemberHeader
-              title={title}
-              subtitle={subtitle}
-              avatarName={avatarName}
-              avatarSrc={avatarSrc}
-            />
-          </div>
-        </DrawerSurfaceCard>
-      }
-      tabs={
-        <DrawerTabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as AudienceTab)}
-          options={AUDIENCE_TAB_OPTIONS}
-          ariaLabel='Audience member tabs'
+        <AudienceMemberHeader
+          title={title}
+          subtitle={subtitle}
+          avatarName={avatarName}
+          avatarSrc={avatarSrc}
         />
       }
     >
       {member && (
-        <>
+        <DrawerTabbedCard
+          testId='audience-member-tabbed-card'
+          tabs={
+            <DrawerTabs
+              value={activeTab}
+              onValueChange={value => setActiveTab(value as AudienceTab)}
+              options={AUDIENCE_TAB_OPTIONS}
+              ariaLabel='Audience member tabs'
+            />
+          }
+        >
           {activeTab === 'details' && <AudienceMemberDetails member={member} />}
           {activeTab === 'activity' && (
             <AudienceMemberActivityFeed member={member} />
@@ -90,7 +85,7 @@ export function AudienceMemberSidebar({
           {activeTab === 'referrers' && (
             <AudienceMemberReferrers member={member} />
           )}
-        </>
+        </DrawerTabbedCard>
       )}
     </EntitySidebarShell>
   );

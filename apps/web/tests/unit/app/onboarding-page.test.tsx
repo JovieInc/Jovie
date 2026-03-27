@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 
@@ -23,24 +22,9 @@ vi.mock('@/app/app/(shell)/dashboard/actions', () => ({
   }),
 }));
 
-vi.mock('@/features/auth', () => ({
-  AuthLayout: ({ children }: { children: ReactNode }) => children,
-}));
-
 vi.mock('@/features/dashboard/organisms/OnboardingFormWrapper', () => ({
   OnboardingFormWrapper: () => <div data-testid='onboarding-form' />,
 }));
-
-vi.mock('@/features/dashboard/organisms/apple-style-onboarding/types', () => ({
-  PROFILE_REVIEW_STEP_INDEX: 3,
-}));
-
-vi.mock(
-  '@/features/dashboard/organisms/onboarding/profile-review-guards',
-  () => ({
-    resolveInitialStep: vi.fn().mockReturnValue(0),
-  })
-);
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: vi.fn().mockResolvedValue(null),
@@ -109,5 +93,119 @@ describe('onboarding page', () => {
     ).rejects.toThrow(`REDIRECT:${APP_ROUTES.WAITLIST}`);
 
     expect(redirectMock).toHaveBeenCalledWith(APP_ROUTES.WAITLIST);
+  });
+
+  it('allows active users to resume onboarding when a resume target is present', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    vi.mocked(getDashboardData).mockResolvedValueOnce({
+      selectedProfile: {
+        id: 'profile_123',
+        username: 'artist',
+        displayName: 'Artist',
+        avatarUrl: null,
+        bio: null,
+        genres: null,
+      },
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({ resume: 'dsp' }),
+    });
+
+    expect(page).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+  });
+
+  it('allows active users to stay in onboarding on the spotify resume path', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    vi.mocked(getDashboardData).mockResolvedValueOnce({
+      selectedProfile: {
+        id: 'profile_123',
+        username: 'artist',
+        displayName: 'Artist',
+        avatarUrl: null,
+        bio: null,
+        genres: null,
+      },
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({ resume: 'spotify' }),
+    });
+
+    expect(page).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
+  });
+
+  it('allows active users to continue onboarding when the handle query is still present', async () => {
+    const { resolveUserState } = await import('@/lib/auth/gate');
+    const { getDashboardData } = await import(
+      '@/app/app/(shell)/dashboard/actions'
+    );
+
+    vi.mocked(resolveUserState).mockResolvedValueOnce({
+      state: 'ACTIVE',
+      clerkUserId: 'clerk_123',
+      dbUserId: 'db_123',
+      profileId: 'profile_123',
+      redirectTo: APP_ROUTES.DASHBOARD,
+      context: {
+        isAdmin: false,
+        isPro: false,
+        email: 'artist@example.com',
+      },
+    });
+
+    vi.mocked(getDashboardData).mockResolvedValueOnce({
+      selectedProfile: {
+        id: 'profile_123',
+        username: 'artist',
+        displayName: 'Artist',
+        avatarUrl: null,
+        bio: null,
+        genres: null,
+      },
+    });
+
+    const page = await OnboardingPage({
+      searchParams: Promise.resolve({ handle: 'artist' }),
+    });
+
+    expect(page).toBeTruthy();
+    expect(redirectMock).not.toHaveBeenCalledWith(APP_ROUTES.DASHBOARD);
   });
 });
