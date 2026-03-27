@@ -20,6 +20,7 @@ import {
   TableEmptyState,
   UnifiedTable,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   type AdminLead,
   type AdminLeadsSortBy,
@@ -27,6 +28,7 @@ import {
   useLeadsInfiniteQuery,
   useUpdateLeadStatusMutation,
 } from '@/lib/queries';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },
@@ -37,6 +39,8 @@ const STATUS_OPTIONS = [
   { value: 'ingested', label: 'Ingested' },
   { value: 'rejected', label: 'Rejected' },
 ] as const;
+
+const LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS = 300;
 
 const STATUS_VARIANT: Record<
   string,
@@ -54,6 +58,8 @@ const columnHelper = createColumnHelper<AdminLead>();
 
 interface LeadTableProps {
   readonly refreshKey?: number;
+  readonly initialSearch?: string;
+  readonly basePath?: string;
 }
 
 interface ActioningState {
@@ -234,10 +240,14 @@ function buildLeadColumns(deps: {
   ];
 }
 
-export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
+export function LeadTable({
+  refreshKey = 0,
+  initialSearch = '',
+  basePath = APP_ROUTES.ADMIN_LEADS,
+}: Readonly<LeadTableProps>) {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const sortBy: AdminLeadsSortBy = 'createdAt';
   const [actioning, setActioning] = useState<ActioningState | null>(null);
   const actioningRef = useRef<ActioningState | null>(null);
@@ -270,6 +280,33 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
       return true;
     });
   }, [data]);
+
+  useEffect(() => {
+    setSearch(initialSearch);
+  }, [initialSearch]);
+
+  useEffect(() => {
+    const nextSearch = search.trim() || null;
+    const currentSearch = initialSearch.trim() || null;
+
+    if (nextSearch === currentSearch) {
+      return;
+    }
+
+    const timeout = globalThis.setTimeout(() => {
+      globalThis.history.replaceState(
+        null,
+        '',
+        mergeHrefSearchParams(basePath, {
+          q: nextSearch,
+        })
+      );
+    }, LEADS_SEARCH_NAVIGATION_DEBOUNCE_MS);
+
+    return () => {
+      globalThis.clearTimeout(timeout);
+    };
+  }, [basePath, initialSearch, search]);
 
   useEffect(() => {
     if (refreshKey > 0) {

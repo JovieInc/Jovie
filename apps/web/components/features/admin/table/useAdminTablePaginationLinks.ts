@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
+import { mergeHrefSearchParams } from '@/lib/utils/merge-href-search-params';
 
 type SearchParamValue = string | number | boolean | null | undefined;
 
@@ -76,8 +77,7 @@ export function useAdminTablePaginationLinks<SortType>(
         appendSearchParams(params, overrides.extraParams);
       }
 
-      const query = params.toString();
-      return query.length > 0 ? `${basePath}?${query}` : basePath;
+      return mergeHrefSearchParams(basePath, Object.fromEntries(params));
     },
     [basePath, page, pageSize, search, sort]
   );

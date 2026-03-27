@@ -1,10 +1,7 @@
 import { PageContent, PageShell } from '@/components/organisms/PageShell';
 import {
-  AdminBraggingRightsSectionSkeleton,
   AdminKpiSectionSkeleton,
   AdminOutreachSectionSkeleton,
-  AdminPlatformStatsSectionSkeleton,
-  AdminSentrySectionSkeleton,
   AdminUsageSectionSkeleton,
 } from './_components';
 
@@ -16,17 +13,17 @@ export default function AdminLoading() {
     <PageShell>
       <PageContent>
         <div className='flex h-full flex-col gap-4'>
-          <AdminBraggingRightsSectionSkeleton />
-          <AdminKpiSectionSkeleton />
-          <div className='overflow-hidden rounded-xl border border-subtle bg-surface-1 p-0'>
-            <div className='border-b border-subtle px-(--linear-app-header-padding-x) py-3'>
-              <div className='h-4 w-40 rounded skeleton' />
-              <div className='mt-2 h-3 w-56 rounded skeleton' />
-            </div>
-            <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
-              <AdminPlatformStatsSectionSkeleton />
-            </div>
+          <div className='grid gap-4 lg:grid-cols-2 xl:grid-cols-4'>
+            {Array.from({ length: 4 }, (_, index) => `overview-${index}`).map(
+              key => (
+                <div
+                  key={key}
+                  className='h-[172px] rounded-xl border border-subtle bg-surface-1 skeleton'
+                />
+              )
+            )}
           </div>
+          <AdminKpiSectionSkeleton />
           <div className='grid min-h-0 flex-1 gap-4 lg:grid-cols-3'>
             <div className='lg:col-span-2'>
               <AdminOutreachSectionSkeleton />
@@ -35,7 +32,6 @@ export default function AdminLoading() {
               <AdminUsageSectionSkeleton />
             </div>
           </div>
-          <AdminSentrySectionSkeleton />
         </div>
       </PageContent>
     </PageShell>
