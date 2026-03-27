@@ -28,6 +28,7 @@ const isFastIteration = process.env.E2E_FAST_ITERATION === '1';
 const isCuratedFastLane = process.env.E2E_FAST_CURATED === '1';
 const isAuthRefreshOnly = process.env.E2E_AUTH_REFRESH_ONLY === '1';
 const useStoredAuth = process.env.E2E_USE_STORED_AUTH === '1';
+const useTestAuthBypass = process.env.E2E_USE_TEST_AUTH_BYPASS === '1';
 const shouldSkipSeeding =
   isAuthRefreshOnly || isFastIteration || process.env.E2E_SKIP_SEED === '1';
 const shouldSkipWarmup =
@@ -125,7 +126,10 @@ async function globalSetup() {
     (testUsername.includes('+clerk_test') ||
       !!process.env.E2E_CLERK_USER_PASSWORD);
 
-  if (hasRealClerkKeys) {
+  if (useTestAuthBypass) {
+    process.env.CLERK_TESTING_SETUP_SUCCESS = 'true';
+    console.log('Test auth bypass enabled');
+  } else if (hasRealClerkKeys) {
     try {
       await clerkSetup({
         publishableKey: publishableKey!,
