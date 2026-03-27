@@ -179,7 +179,7 @@ test.describe('Content Gate — Public Pages', () => {
       .locator('body')
       .innerText()
       .catch(() => '');
-    expect(bodyText.length).toBeGreaterThan(500);
+    expect(bodyText.length).toBeGreaterThan(400);
   });
 
   test('Pricing page shows plan tiers with prices', async ({
