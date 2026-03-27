@@ -12,6 +12,7 @@ export interface DrawerSurfaceCardProps {
   readonly variant?: 'card' | 'flat';
   readonly id?: string;
   readonly hidden?: boolean;
+  readonly 'aria-busy'?: boolean;
 }
 
 export function DrawerSurfaceCard({
@@ -22,11 +23,13 @@ export function DrawerSurfaceCard({
   variant = 'flat',
   id,
   hidden,
+  'aria-busy': ariaBusy,
 }: DrawerSurfaceCardProps) {
   return (
     <Component
       id={id}
       hidden={hidden}
+      aria-busy={ariaBusy}
       data-testid={testId}
       className={cn(
         variant === 'card'

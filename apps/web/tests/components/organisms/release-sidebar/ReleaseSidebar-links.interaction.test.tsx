@@ -129,6 +129,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {options.map(option => (
         <button
           key={option.value}
+          data-testid={`drawer-tab-${option.value}`}
           type='button'
           aria-selected={value === option.value}
           role='tab'
@@ -148,8 +149,13 @@ vi.mock('@/components/molecules/drawer', () => ({
       ariaLabel: string;
       label?: string;
       onClick: () => void;
+      testId?: string;
     };
-    menuItems?: Array<{ id: string; label?: string; onClick?: () => void }>;
+    menuItems?: Array<{
+      id: string;
+      label?: string;
+      onClick?: () => void;
+    }>;
   }) =>
     !primaryAction && (!menuItems || menuItems.length === 0) ? null : (
       <div data-testid='drawer-split-button'>
@@ -158,12 +164,18 @@ vi.mock('@/components/molecules/drawer', () => ({
             type='button'
             aria-label={primaryAction.ariaLabel}
             onClick={primaryAction.onClick}
+            data-testid={primaryAction.testId}
           >
             {primaryAction.label ?? primaryAction.ariaLabel}
           </button>
         ) : null}
         {menuItems?.map(item => (
-          <button key={item.id} type='button' onClick={item.onClick}>
+          <button
+            key={item.id}
+            type='button'
+            onClick={item.onClick}
+            data-testid={`drawer-split-menu-item-${item.id}`}
+          >
             {item.label}
           </button>
         ))}
@@ -341,12 +353,12 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.queryByTestId('tracklist')).not.toBeInTheDocument();
 
     // Switch to Details tab
-    await user.click(screen.getByRole('tab', { name: /details/i }));
+    await user.click(screen.getByTestId('drawer-tab-details'));
     expect(screen.getAllByText('Metadata').length).toBeGreaterThan(0);
     expect(screen.getByTestId('metadata')).toBeInTheDocument();
     expect(screen.getByTestId('async-toggle')).toBeInTheDocument();
@@ -354,16 +366,16 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.queryByTestId('dsp-links')).not.toBeInTheDocument();
 
     // Switch to Lyrics tab
-    await user.click(screen.getByRole('tab', { name: /lyrics/i }));
+    await user.click(screen.getByTestId('drawer-tab-lyrics'));
     expect(screen.getByTestId('lyrics')).toBeInTheDocument();
     expect(screen.queryByTestId('metadata')).not.toBeInTheDocument();
 
     // Switch to Track list
-    await user.click(screen.getByRole('tab', { name: /tracks/i }));
+    await user.click(screen.getByTestId('drawer-tab-tracklist'));
     expect(screen.getByTestId('tracklist')).toBeInTheDocument();
 
     // Switch to Tasks
-    await user.click(screen.getByRole('tab', { name: /tasks/i }));
+    await user.click(screen.getByTestId('drawer-tab-tasks'));
     expect(screen.getByTestId('task-checklist')).toBeInTheDocument();
   });
 
@@ -374,7 +386,7 @@ describe('ReleaseSidebar Links tab', () => {
     );
 
     // Switch to Links tab
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
 
     // Change release
@@ -398,14 +410,14 @@ describe('ReleaseSidebar Links tab', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: /platforms/i }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('dsp-links')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Add platform link' })
+      screen.getByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /refresh platforms/i })
+      screen.getByTestId('drawer-split-menu-item-refresh-platform-links')
     ).toBeInTheDocument();
   });
 
@@ -422,7 +434,7 @@ describe('ReleaseSidebar Links tab', () => {
     expect(screen.getByTestId('release-header-card')).toBeInTheDocument();
     expect(screen.getByTestId('drawer-card-action-bar')).toBeInTheDocument();
     expect(screen.getByTestId('analytics')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /details/i })).toBeInTheDocument();
+    expect(screen.getByTestId('drawer-tab-details')).toBeInTheDocument();
     expect(
       screen.queryByTestId('release-tab-panel-card')
     ).not.toBeInTheDocument();

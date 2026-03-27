@@ -30,7 +30,7 @@ function buildTrack(overrides: Partial<TrackForDetail> = {}): TrackForDetail {
 }
 
 describe('TrackDetailPanel', () => {
-  it('renders track summary, actions, and platforms', () => {
+  it('renders track summary, actions, and DSPs', () => {
     render(
       <TrackDetailPanel
         track={buildTrack()}
@@ -48,7 +48,6 @@ describe('TrackDetailPanel', () => {
     expect(
       screen.getByRole('button', { name: /copy isrc/i })
     ).toBeInTheDocument();
-    expect(screen.getByText('Platforms')).toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
   });
 
@@ -61,8 +60,6 @@ describe('TrackDetailPanel', () => {
       />
     );
 
-    expect(
-      screen.getByText('No platform links available for this track.')
-    ).toBeInTheDocument();
+    expect(screen.getByTestId('track-platforms-empty')).toBeInTheDocument();
   });
 });

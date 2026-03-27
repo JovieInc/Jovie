@@ -5,13 +5,13 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export const DRAWER_TABS_RAIL_CLASSNAME =
-  'inline-flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
+  'flex min-w-0 items-center gap-1 rounded-full border-0 bg-transparent p-0';
 
 export const DRAWER_TABS_TRIGGER_CLASSNAME =
-  'inline-flex min-h-7 items-center justify-center gap-1 rounded-full border border-(--linear-app-frame-seam) bg-transparent px-2.5 py-1 text-[11.5px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
+  'inline-flex min-h-7 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-full border border-subtle bg-transparent px-2.5 py-1 text-[11.5px] font-[510] tracking-[-0.01em] text-tertiary-token transition-[background-color,color,border-color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token';
 
 export const DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME =
-  'border-(--linear-app-frame-seam) bg-surface-0 text-primary-token';
+  'border-subtle bg-surface-0 text-primary-token';
 
 export interface DrawerTabsProps<T extends string> {
   readonly value: T;
@@ -34,7 +34,7 @@ export function DrawerTabs<T extends string>({
   className,
   actionsClassName,
   triggerClassName,
-  overflowMode = 'wrap',
+  overflowMode = 'scroll',
 }: DrawerTabsProps<T>) {
   const isScrollMode = overflowMode === 'scroll';
 
@@ -44,9 +44,9 @@ export function DrawerTabs<T extends string>({
       aria-label={ariaLabel}
       className={cn(
         DRAWER_TABS_RAIL_CLASSNAME,
-        isScrollMode
-          ? 'min-w-max flex-nowrap'
-          : 'flex min-w-0 flex-1 flex-wrap',
+        isScrollMode ? 'min-w-max flex-nowrap' : 'w-full flex-wrap',
+        isScrollMode &&
+          'scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className
       )}
     >
@@ -58,6 +58,7 @@ export function DrawerTabs<T extends string>({
           data-testid={`drawer-tab-${option.value}`}
           aria-selected={value === option.value}
           onClick={() => onValueChange(option.value)}
+          data-testid={`drawer-tab-${option.value}`}
           className={cn(
             DRAWER_TABS_TRIGGER_CLASSNAME,
             value === option.value && DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
@@ -71,7 +72,11 @@ export function DrawerTabs<T extends string>({
   );
 
   return (
-    <div className='flex w-full items-center justify-between gap-2'>
+    <div
+      className='flex w-full items-start gap-2'
+      data-overflow-mode={overflowMode}
+      data-testid='drawer-tabs'
+    >
       {isScrollMode ? (
         <div
           className='min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
@@ -84,7 +89,10 @@ export function DrawerTabs<T extends string>({
       )}
       {actions ? (
         <div
-          className={cn('ml-auto flex shrink-0 items-center', actionsClassName)}
+          className={cn(
+            'ml-auto flex shrink-0 items-center self-start',
+            actionsClassName
+          )}
         >
           {actions}
         </div>

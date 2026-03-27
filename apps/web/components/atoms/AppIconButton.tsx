@@ -5,7 +5,7 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export const APP_CONTROL_BUTTON_CLASS =
-  'inline-flex h-app-control-sm items-center justify-center gap-1.5 rounded-pill border border-subtle bg-app-control px-app-control-x text-[12px] font-[510] tracking-[-0.012em] text-secondary-token shadow-app-control transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-app-control-hover focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-app-control-active disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none';
+  'inline-flex h-app-control-sm items-center justify-center gap-1.5 rounded-pill border border-subtle bg-surface-1 px-app-control-x text-[12px] font-[510] tracking-[-0.012em] text-secondary-token shadow-[0_1px_1px_rgba(0,0,0,0.04),0_3px_6px_-4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.04)] transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-[0_1px_1px_rgba(0,0,0,0.05),0_6px_12px_-8px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.04)] focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-[0_1px_1px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.04)] disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none';
 
 export const APP_ICON_BUTTON_CLASS = cn(
   APP_CONTROL_BUTTON_CLASS,

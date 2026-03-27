@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import React, { useMemo } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
@@ -258,7 +259,10 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-app-control px-2.5 text-secondary-token shadow-app-control transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-app-control-hover focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-app-control-active'
+                  className={cn(
+                    APP_CONTROL_BUTTON_CLASS,
+                    'h-7 px-2.5 text-secondary-token'
+                  )}
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }
