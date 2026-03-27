@@ -19,8 +19,10 @@ import { getProfileModePath } from '@/features/profile/registry';
 import { downloadBlob } from '@/lib/utils/download';
 
 interface UseProfileHeaderResult {
-  title: ReactNode;
-  actions: ReactNode;
+  readonly title: ReactNode;
+  readonly actions: ReactNode;
+  readonly primaryActions: DrawerHeaderAction[];
+  readonly overflowActions: DrawerHeaderAction[];
 }
 
 interface UseProfileHeaderPartsProps {
@@ -174,5 +176,5 @@ export function useProfileHeaderParts({
     />
   );
 
-  return { title, actions };
+  return { title, actions, primaryActions, overflowActions };
 }

@@ -23,17 +23,19 @@ import type {
   UseReleaseProviderMatrixReturn,
 } from './types';
 
-/**
- * Extract provider URL from release, defaulting to empty string.
- * Extracted to reduce nesting depth in handleReset.
- */
 function getProviderUrl(
   release: ReleaseViewModel,
   provider: ProviderKey
 ): string {
   return release.providers.find(item => item.key === provider)?.url ?? '';
 }
-
+function buildDrafts(release: ReleaseViewModel): DraftState {
+  const nextDrafts: DraftState = {};
+  release.providers.forEach(provider => {
+    nextDrafts[provider.key] = provider.url ?? '';
+  });
+  return nextDrafts;
+}
 export function useReleaseProviderMatrix({
   releases,
   providerConfig,
@@ -96,11 +98,7 @@ export function useReleaseProviderMatrix({
         setDrafts({});
         return null;
       }
-      const nextDrafts: DraftState = {};
-      release.providers.forEach(provider => {
-        nextDrafts[provider.key] = provider.url ?? '';
-      });
-      setDrafts(nextDrafts);
+      setDrafts(buildDrafts(release));
       return release;
     });
   }, []);
@@ -118,6 +116,50 @@ export function useReleaseProviderMatrix({
       current?.id === updated.id ? { ...updated } : current
     );
   }, []);
+
+  const patchRow = useCallback(
+    (releaseId: string, patch: Partial<ReleaseViewModel>) => {
+      setRawRows(prev =>
+        prev.map(row =>
+          row.id === releaseId ? { ...row, ...patch, id: row.id } : row
+        )
+      );
+      setEditingRelease(current =>
+        current?.id === releaseId
+          ? { ...current, ...patch, id: current.id }
+          : current
+      );
+    },
+    []
+  );
+
+  const handleReleaseCreated = useCallback(
+    (createdRelease: ReleaseViewModel) => {
+      setRawRows(currentRows => {
+        const existingIndex = currentRows.findIndex(
+          release => release.id === createdRelease.id
+        );
+
+        if (existingIndex === -1) {
+          return [createdRelease, ...currentRows];
+        }
+
+        return currentRows.map(release =>
+          release.id === createdRelease.id ? createdRelease : release
+        );
+      });
+      setDrafts(buildDrafts(createdRelease));
+      setEditingRelease(createdRelease);
+    },
+    []
+  );
+
+  const handleReleaseArtworkUploaded = useCallback(
+    (releaseId: string, artworkUrl: string) => {
+      patchRow(releaseId, { artworkUrl });
+    },
+    [patchRow]
+  );
 
   const handleCopy = useCallback(
     async (path: string, label: string, testId: string) => {
@@ -434,6 +476,10 @@ export function useReleaseProviderMatrix({
     totalOverrides,
     openEditor,
     closeEditor,
+    handleReleaseCreated,
+    updateRow,
+    patchRow,
+    handleReleaseArtworkUploaded,
     handleCopy,
     handleSave,
     handleReset,

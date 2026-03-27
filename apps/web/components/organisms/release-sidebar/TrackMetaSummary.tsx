@@ -17,6 +17,7 @@ export interface TrackMetaSummaryProps {
   readonly artwork?: ReactNode;
   readonly variant?: TrackMetaSummaryVariant;
   readonly className?: string;
+  readonly showIsrc?: boolean;
 }
 
 const VARIANT_STYLES: Record<
@@ -52,6 +53,7 @@ export function TrackMetaSummary({
   artwork,
   variant = 'compact',
   className,
+  showIsrc = true,
 }: TrackMetaSummaryProps) {
   const styles = VARIANT_STYLES[variant];
   const trackLabel =
@@ -89,7 +91,7 @@ export function TrackMetaSummary({
           ) : null}
         </div>
 
-        {durationMs != null || isrc ? (
+        {durationMs != null || (isrc && showIsrc) ? (
           <div
             className={cn(
               'flex items-center gap-2 text-secondary-token',
@@ -99,7 +101,7 @@ export function TrackMetaSummary({
             {durationMs != null && (
               <span className='tabular-nums'>{formatDuration(durationMs)}</span>
             )}
-            {isrc ? (
+            {isrc && showIsrc ? (
               <span className='font-mono text-[9.5px] tracking-[0.02em] text-tertiary-token'>
                 {isrc}
               </span>

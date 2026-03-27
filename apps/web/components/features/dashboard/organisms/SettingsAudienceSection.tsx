@@ -1,7 +1,7 @@
 'use client';
 
-import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
-import { DashboardCard } from '@/features/dashboard/atoms/DashboardCard';
+import { ShieldCheck } from 'lucide-react';
+import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
 import { useOptimisticToggle } from '@/features/dashboard/hooks/useOptimisticToggle';
 import { SettingsStatusPill } from '@/features/dashboard/molecules/SettingsStatusPill';
 import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
@@ -23,28 +23,22 @@ export function SettingsAudienceSection() {
   });
 
   return (
-    <DashboardCard
-      variant='settings'
-      padding='none'
-      className='overflow-hidden'
+    <SettingsPanel
+      title='Audience verification'
+      description='Control whether new fans must confirm their email before receiving updates.'
+      actions={<SettingsStatusPill status={saveStatus} />}
     >
-      <ContentSectionHeader
-        title='Audience verification'
-        subtitle='Control whether new fans must confirm their email before receiving updates.'
-        className='min-h-0 px-4 py-3'
-        actions={<SettingsStatusPill status={saveStatus} />}
-        actionsClassName='w-auto shrink-0'
-      />
-      <div className='px-4 py-3'>
+      <div className='px-4 py-4 sm:px-5'>
         <SettingsToggleRow
-          title='Require Email Verification'
-          description='New fans must confirm their email before receiving notifications.'
+          icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+          title='Require email verification'
+          description='New fans confirm their email before they start receiving updates, which keeps your list cleaner and protects deliverability.'
           checked={doubleOptIn}
           onCheckedChange={handleToggle}
           disabled={isPending}
           ariaLabel='Toggle email verification requirement'
         />
       </div>
-    </DashboardCard>
+    </SettingsPanel>
   );
 }

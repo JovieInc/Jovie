@@ -8,6 +8,7 @@ export { ChatPitchCard } from './ChatPitchCard';
 export { ErrorDisplay } from './ErrorDisplay';
 export { FeedbackForm } from './FeedbackForm';
 export { ImagePreviewStrip } from './ImagePreviewStrip';
+export { JovieGreeting } from './JovieGreeting';
 export { ScrollToBottom } from './ScrollToBottom';
 export { SuggestedProfilesCarousel } from './SuggestedProfilesCarousel';
 export { SuggestedPrompts } from './SuggestedPrompts';

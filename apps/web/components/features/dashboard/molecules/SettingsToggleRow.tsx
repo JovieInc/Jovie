@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 export interface SettingsToggleRowProps {
   readonly id?: string;
+  readonly icon?: React.ReactNode;
   readonly title: string;
   readonly description?: string;
   readonly checked: boolean;
@@ -22,6 +23,7 @@ export interface SettingsToggleRowProps {
 
 export function SettingsToggleRow({
   id,
+  icon,
   title,
   description,
   checked,
@@ -45,27 +47,35 @@ export function SettingsToggleRow({
         className
       )}
     >
-      <div className='min-w-0'>
-        <h3
-          id={titleId}
-          className={cn(
-            'text-[13px] font-[510]',
-            gated ? 'text-tertiary-token' : 'text-primary-token'
-          )}
-        >
-          {title}
-        </h3>
-        {description ? (
-          <p
-            id={descriptionId}
+      <div className='flex min-w-0 items-start gap-3'>
+        {icon ? (
+          <div className='mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token'>
+            {icon}
+          </div>
+        ) : null}
+
+        <div className='min-w-0'>
+          <h3
+            id={titleId}
             className={cn(
-              'mt-0.5 text-[13px] leading-normal',
-              gated ? 'text-quaternary-token' : 'text-tertiary-token'
+              'text-[13px] font-[560] tracking-[-0.02em]',
+              gated ? 'text-tertiary-token' : 'text-primary-token'
             )}
           >
-            {description}
-          </p>
-        ) : null}
+            {title}
+          </h3>
+          {description ? (
+            <p
+              id={descriptionId}
+              className={cn(
+                'mt-1 text-[13px] leading-[18px]',
+                gated ? 'text-quaternary-token' : 'text-secondary-token'
+              )}
+            >
+              {description}
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <div className='flex min-h-8 items-center justify-end'>

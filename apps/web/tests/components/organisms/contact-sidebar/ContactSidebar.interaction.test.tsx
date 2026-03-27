@@ -99,6 +99,10 @@ vi.mock('@/components/molecules/drawer', () => ({
   DrawerSection: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
+  DrawerSurfaceCard: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  DrawerCardActionBar: () => null,
   DrawerLinkSectionSkeleton: () => null,
   DrawerTabs: ({
     value,
@@ -127,7 +131,12 @@ vi.mock('@/components/molecules/drawer', () => ({
 
 // Mock ContactSidebarHeader — useContactHeaderParts hook
 vi.mock('@/components/organisms/contact-sidebar/ContactSidebarHeader', () => ({
-  useContactHeaderParts: () => ({ title: 'Contact', actions: null }),
+  useContactHeaderParts: () => ({
+    title: 'Contact',
+    actions: null,
+    primaryActions: [],
+    overflowActions: [],
+  }),
 }));
 
 // Mock ContactAvatar — simple stub

@@ -16,6 +16,7 @@ import { CopyableUrlRow } from '@/components/molecules/CopyableUrlRow';
 import {
   DrawerActionRow,
   DrawerBackButton,
+  DrawerCardActionBar,
   DrawerMediaThumb,
   DrawerSurfaceCard,
   DrawerTabs,
@@ -263,14 +264,14 @@ export function TrackSidebar({
       data-testid='track-sidebar'
       title={track?.title ?? 'No track selected'}
       onClose={onClose}
+      headerMode='minimal'
       headerActions={
         <DrawerHeaderActions
-          primaryActions={primaryActions}
-          overflowActions={overflowActions}
+          primaryActions={[]}
+          overflowActions={[]}
           onClose={onClose}
         />
       }
-      actionsInEntityHeader
       isEmpty={!track}
       emptyMessage='Select a track to view its details.'
       entityHeader={
@@ -330,6 +331,64 @@ export function TrackSidebar({
               )}
             </div>
           )}
+          {activeTab === 'details' && (
+            <DrawerSurfaceCard
+              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+            >
+              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                  Track link
+                </p>
+              </div>
+              <div className='space-y-2.5 p-2.5'>
+                <CopyableUrlRow
+                  url={smartLinkUrl}
+                  size='md'
+                  className='rounded-[8px]'
+                  surface='boxed'
+                  copyButtonTitle='Copy track link'
+                  openButtonTitle='Open track link'
+                  onCopySuccess={() => {
+                    showSmartLinkCopied();
+                  }}
+                  onCopyError={() => {
+                    toast.error('Failed to copy link');
+                  }}
+                />
+              </div>
+            </DrawerSurfaceCard>
+          )}
+
+          {activeTab === 'details' && trackHeaderCard ? (
+            <DrawerSurfaceCard
+              className={cn(LINEAR_SURFACE.drawerCard, 'overflow-hidden')}
+            >
+              <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+                <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
+                  Actions
+                </p>
+              </div>
+              <DrawerCardActionBar
+                primaryActions={primaryActions}
+                overflowActions={overflowActions}
+                className='border-t-0 px-2.5 py-2'
+              />
+              {track.isrc ? (
+                <div className='border-t border-(--linear-app-frame-seam) p-2.5'>
+                  <DrawerActionRow
+                    onClick={handleCopyIsrc}
+                    icon={<Hash className='h-3.5 w-3.5' />}
+                    label='Copy ISRC'
+                    trailing={
+                      <span className='font-mono text-[10px] text-tertiary-token'>
+                        {track.isrc}
+                      </span>
+                    }
+                  />
+                </div>
+              ) : null}
+            </DrawerSurfaceCard>
+          ) : null}
 
           {activeTab === 'platforms' && (
             <TrackPlatformLinksSection providers={streamingProviders} />

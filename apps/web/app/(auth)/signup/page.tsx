@@ -179,8 +179,17 @@ function SignUpOauthErrorBanner() {
 }
 
 function SignUpPageContent() {
+  const [isMounted, setIsMounted] = useState(false);
   const searchParams = useSearchParams();
   const signInUrl = buildAuthRouteUrl(APP_ROUTES.SIGNIN, searchParams);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <AuthFormSkeleton />;
+  }
 
   return (
     <>
