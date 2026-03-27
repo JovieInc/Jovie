@@ -16,9 +16,10 @@ const PUBLIC_PROFILE_TEMPLATE_V2_SOURCE = readFileSync(
 describe('PublicProfileTemplateV2 history handling', () => {
   it('pushes a new history entry for mode changes', () => {
     expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('history.pushState');
-    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).not.toContain(
-      'history.replaceState'
-    );
+  });
+
+  it('replaces history for the initial overlay navigation', () => {
+    expect(PUBLIC_PROFILE_TEMPLATE_V2_SOURCE).toContain('history.replaceState');
   });
 
   it('syncs active mode from browser back/forward navigation', () => {

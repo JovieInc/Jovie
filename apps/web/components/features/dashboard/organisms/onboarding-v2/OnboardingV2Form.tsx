@@ -727,7 +727,7 @@ function PreviewPanel({
 
 export function OnboardingV2Form({
   existingAvatarUrl = null,
-  existingAvatarQuality: _existingAvatarQuality = null,
+  existingAvatarQuality = null,
   existingBio = null,
   existingGenres = null,
   initialDisplayName = '',
