@@ -20,7 +20,7 @@ export interface DrawerCardActionBarProps {
 }
 
 export const DRAWER_CARD_ACTION_BUTTON_CLASSNAME = cn(
-  'inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-2.5 text-[11.5px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 active:border-default active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
+  'inline-flex h-7 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-subtle bg-surface-1 px-2.5 text-[11.5px] font-[510] text-secondary-token transition-[background-color,border-color,color] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 [&_svg]:h-3.5 [&_svg]:w-3.5'
 );
 
 function toMenuItems(
@@ -94,7 +94,7 @@ export function DrawerCardActionBar({
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center gap-1.5 border-t border-(--linear-app-frame-seam) px-2.5 py-2',
+        'flex min-w-0 flex-nowrap items-center gap-1.5 overflow-x-auto overflow-y-hidden border-t border-subtle px-2.5 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         overflowTriggerPlacement === 'card-top-right' && 'pr-11',
         className
       )}

@@ -215,7 +215,7 @@ describe('ReleaseDspLinks interactions', () => {
     );
 
     expect(
-      screen.queryByRole('button', { name: 'Add platform link' })
+      screen.queryByRole('button', { name: 'Add DSP link' })
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add' }));
     expect(onAddLink).toHaveBeenCalledTimes(1);

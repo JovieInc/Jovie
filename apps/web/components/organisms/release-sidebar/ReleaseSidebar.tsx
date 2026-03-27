@@ -74,7 +74,7 @@ type SidebarTab = 'tracklist' | 'links' | 'details' | 'lyrics' | 'tasks';
 /** Options for sidebar tab segment control */
 const SIDEBAR_TAB_OPTIONS = [
   { value: 'tracklist' as const, label: 'Tracks' },
-  { value: 'links' as const, label: 'Platforms' },
+  { value: 'links' as const, label: 'DSPs' },
   { value: 'details' as const, label: 'Details' },
   { value: 'lyrics' as const, label: 'Lyrics' },
   { value: 'tasks' as const, label: 'Tasks' },
@@ -100,14 +100,14 @@ function getPlatformRescanLabel(params: {
   remainingMs: number;
 }): string {
   if (params.isRescanning) {
-    return 'Refreshing platforms…';
+    return 'Refreshing DSPs…';
   }
 
   if (params.isCoolingDown) {
     return `Refresh again in ${formatCooldown(params.remainingMs)}`;
   }
 
-  return 'Refresh platforms';
+  return 'Refresh DSPs';
 }
 
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
@@ -647,14 +647,15 @@ export function ReleaseSidebar({
         primaryAction={
           availablePlatformProviders.length > 0
             ? {
-                ariaLabel: 'Add platform link',
+                ariaLabel: 'Add DSP link',
+                testId: 'release-sidebar-add-dsp-link',
                 icon: <Plus className='h-3.5 w-3.5' aria-hidden='true' />,
                 onClick: handleOpenPlatformAddForm,
               }
             : undefined
         }
         menuItems={menuItems}
-        menuAriaLabel='Platform actions'
+        menuAriaLabel='DSP actions'
       />
     );
   }, [

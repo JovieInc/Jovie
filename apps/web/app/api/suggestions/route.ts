@@ -16,7 +16,6 @@
  * Authentication: Required (creator must own the profile)
  */
 
-import { auth } from '@clerk/nextjs/server';
 import {
   and,
   count,
@@ -30,6 +29,7 @@ import {
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
+import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { chatConversations } from '@/lib/db/schema/chat';
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
   oneYearAgo.setDate(oneYearAgo.getDate() - 365);
 
   try {
-    const { userId } = await auth();
+    const { userId } = await getCachedAuth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

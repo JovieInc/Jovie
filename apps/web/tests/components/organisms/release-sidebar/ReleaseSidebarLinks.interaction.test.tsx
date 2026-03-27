@@ -221,6 +221,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       {options.map(option => (
         <button
           key={option.value}
+          data-testid={`drawer-tab-${option.value}`}
           type='button'
           aria-selected={value === option.value}
           role='tab'
@@ -240,6 +241,7 @@ vi.mock('@/components/molecules/drawer', () => ({
       ariaLabel: string;
       label?: string;
       onClick: () => void;
+      testId?: string;
     };
     menuItems?: Array<{ id: string; label?: string; onClick?: () => void }>;
   }) =>
@@ -250,12 +252,18 @@ vi.mock('@/components/molecules/drawer', () => ({
             type='button'
             aria-label={primaryAction.ariaLabel}
             onClick={primaryAction.onClick}
+            data-testid={primaryAction.testId}
           >
             {primaryAction.label ?? primaryAction.ariaLabel}
           </button>
         ) : null}
         {menuItems?.map(item => (
-          <button key={item.id} type='button' onClick={item.onClick}>
+          <button
+            key={item.id}
+            type='button'
+            onClick={item.onClick}
+            data-testid={`drawer-split-menu-item-${item.id}`}
+          >
             {item.label}
           </button>
         ))}
@@ -392,9 +400,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(screen.getByTestId('drawer-split-button')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Apple Music' }));
 
     const urlInput = screen.getByPlaceholderText(
@@ -427,8 +435,8 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    await user.click(screen.getByRole('button', { name: 'Add platform link' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
+    await user.click(screen.getByTestId('release-sidebar-add-dsp-link'));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(
       screen.getByPlaceholderText('https://open.spotify.com/...'),
@@ -460,9 +468,9 @@ describe('ReleaseSidebar links tab interactions', () => {
       />
     );
 
-    await user.click(screen.getByRole('tab', { name: 'Platforms' }));
+    await user.click(screen.getByTestId('drawer-tab-links'));
     expect(
-      screen.queryByRole('button', { name: 'Add platform link' })
+      screen.queryByTestId('release-sidebar-add-dsp-link')
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Spotify' }));
 

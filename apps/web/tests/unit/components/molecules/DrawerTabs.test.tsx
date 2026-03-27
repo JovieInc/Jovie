@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DrawerTabs } from '@/components/molecules/drawer/DrawerTabs';
 
 describe('DrawerTabs', () => {
-  it('renders the tab rail as a borderless wrapper inside the parent card', () => {
+  it('renders the tab rail as a horizontal scroller by default', () => {
     render(
       <DrawerTabs
         value='details'
@@ -16,7 +16,12 @@ describe('DrawerTabs', () => {
       />
     );
 
+    const drawerTabs = screen.getByTestId('drawer-tabs');
+    const scroller = screen.getByTestId('drawer-tabs-scroll');
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
+
+    expect(drawerTabs).toHaveAttribute('data-overflow-mode', 'scroll');
+    expect(scroller).toContainElement(tablist);
     expect(tablist).toBeInTheDocument();
     expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
   });
@@ -60,6 +65,9 @@ describe('DrawerTabs', () => {
       />
     );
 
+    expect(screen.getByTestId('drawer-tabs-scroll')).not.toContainElement(
+      screen.getByRole('button', { name: 'Add platform' })
+    );
     expect(
       screen.getByRole('button', { name: 'Add platform' })
     ).toBeInTheDocument();
@@ -68,7 +76,36 @@ describe('DrawerTabs', () => {
     ).toContainElement(screen.getByRole('tab', { name: 'Details' }));
   });
 
-  it('renders a dedicated horizontal scroller in scroll mode while keeping actions outside it', () => {
+  it('keeps tabs on a single horizontal rail when labels are long', () => {
+    render(
+      <DrawerTabs
+        value='details'
+        onValueChange={vi.fn()}
+        options={[
+          { value: 'tracks', label: 'Tracks' },
+          { value: 'links', label: 'DSPs' },
+          { value: 'details', label: 'Details' },
+          { value: 'lyrics', label: 'Lyrics' },
+          { value: 'tasks', label: 'Tasks' },
+        ]}
+        ariaLabel='Release drawer tabs'
+        actions={<button type='button'>Add platform</button>}
+      />
+    );
+
+    const scroller = screen.getByTestId('drawer-tabs-scroll');
+    const tablist = screen.getByRole('tablist', {
+      name: 'Release drawer tabs',
+    });
+    const actionsButton = screen.getByRole('button', { name: 'Add platform' });
+    const tasksTab = screen.getByTestId('drawer-tab-tasks');
+
+    expect(scroller).toContainElement(tablist);
+    expect(scroller).not.toContainElement(actionsButton);
+    expect(tasksTab).toHaveAttribute('aria-selected', 'false');
+  });
+
+  it('supports wrap mode for consumers that opt out of horizontal scrolling', () => {
     render(
       <DrawerTabs
         value='details'
@@ -76,19 +113,16 @@ describe('DrawerTabs', () => {
         options={[
           { value: 'details', label: 'Details' },
           { value: 'activity', label: 'Activity' },
-          { value: 'tasks', label: 'Tasks' },
         ]}
-        ariaLabel='Drawer tabs'
-        overflowMode='scroll'
-        actions={<button type='button'>Add platform</button>}
+        ariaLabel='Wrapped drawer tabs'
+        overflowMode='wrap'
       />
     );
 
-    const scroller = screen.getByTestId('drawer-tabs-scroll');
-    const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
-    const actionsButton = screen.getByRole('button', { name: 'Add platform' });
-
-    expect(scroller).toContainElement(tablist);
-    expect(scroller).not.toContainElement(actionsButton);
+    expect(screen.getByTestId('drawer-tabs')).toHaveAttribute(
+      'data-overflow-mode',
+      'wrap'
+    );
+    expect(screen.queryByTestId('drawer-tabs-scroll')).not.toBeInTheDocument();
   });
 });

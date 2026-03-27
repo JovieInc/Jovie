@@ -21,7 +21,14 @@ export const SWIPEABLE_MODES = ['profile', 'tour', 'tip', 'about'] as const;
 
 export type SwipeableProfileMode = (typeof SWIPEABLE_MODES)[number];
 
-export function supportsProfileV2Mode(mode: ProfileMode): boolean {
+export function supportsProfileV2Mode(
+  mode: ProfileMode,
+  hasContacts = false
+): boolean {
+  if (mode === 'contact') {
+    return hasContacts;
+  }
+
   return true;
 }
 

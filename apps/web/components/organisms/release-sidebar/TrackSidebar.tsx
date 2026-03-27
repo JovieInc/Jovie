@@ -36,7 +36,7 @@ type TrackSidebarTab = 'details' | 'platforms';
 
 const TRACK_SIDEBAR_TAB_OPTIONS = [
   { value: 'details' as const, label: 'Details' },
-  { value: 'platforms' as const, label: 'Platforms' },
+  { value: 'platforms' as const, label: 'DSPs' },
 ];
 
 export interface TrackSidebarData {

@@ -21,11 +21,11 @@ interface TrackPlatformLinksSectionProps {
 
 export function TrackPlatformLinksSection({
   providers,
-  emptyMessage = 'No platform links available for this track.',
+  emptyMessage = 'No DSP links available for this track.',
 }: TrackPlatformLinksSectionProps) {
   return (
     <DrawerLinkSection
-      title='Platforms'
+      title='DSPs'
       isEmpty={providers.length === 0}
       emptyMessage={emptyMessage}
       emptyStateTestId='track-platforms-empty'

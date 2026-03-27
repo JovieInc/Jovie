@@ -111,11 +111,11 @@ export function PublicProfileTemplateV2({
   tourDates,
   visitTrackingToken,
 }: PublicProfileTemplateV2Props) {
-  const [listenDrawerOpen, setListenDrawerOpen] = useState(false);
-  const [subscribeDrawerOpen, setSubscribeDrawerOpen] = useState(false);
-  const [contactDrawerOpen, setContactDrawerOpen] = useState(false);
+  const [activeOverlay, setActiveOverlay] = useState<
+    'listen' | 'subscribe' | 'contact' | null
+  >(null);
   const lastNavigationModeRef = useRef<SwipeableProfileMode | null>(null);
-  const { initialPane } = resolveProfileV2Presentation(mode);
+  const { initialPane, initialOverlay } = resolveProfileV2Presentation(mode);
   const initialIndex = SWIPEABLE_MODES.indexOf(initialPane);
   const mergedDSPs = useMemo(
     () => getCanonicalProfileDSPs(artist, socialLinks),
@@ -171,15 +171,11 @@ export function PublicProfileTemplateV2({
     const presentation = resolveProfileV2Presentation(mode);
     const nextIndex = SWIPEABLE_MODES.indexOf(presentation.initialPane);
     setActiveIndex(nextIndex);
-    if (presentation.initialOverlay === 'listen') {
-      setListenDrawerOpen(true);
-    }
-    if (presentation.initialOverlay === 'subscribe') {
-      setSubscribeDrawerOpen(true);
-    }
-    if (presentation.initialOverlay === 'contact' && hasContacts) {
-      setContactDrawerOpen(true);
-    }
+    setActiveOverlay(
+      presentation.initialOverlay === 'contact' && !hasContacts
+        ? null
+        : presentation.initialOverlay
+    );
   }, [hasContacts, mode, setActiveIndex]);
 
   useEffect(() => {
@@ -211,9 +207,17 @@ export function PublicProfileTemplateV2({
       return;
     }
 
-    globalThis.history.pushState(globalThis.history.state, '', href);
+    if (
+      lastNavigationModeRef.current === null &&
+      initialOverlay !== null &&
+      currentHref !== href
+    ) {
+      globalThis.history.replaceState(globalThis.history.state, '', href);
+    } else {
+      globalThis.history.pushState(globalThis.history.state, '', href);
+    }
     lastNavigationModeRef.current = activeMode;
-  }, [activeMode]);
+  }, [activeMode, initialOverlay]);
 
   const headerSocialLinks = useMemo(() => {
     if (typeof document === 'undefined') {
@@ -234,19 +238,20 @@ export function PublicProfileTemplateV2({
 
   const handlePlayClick = () => {
     if (mergedDSPs.length === 0) {
+      setActiveOverlay('subscribe');
       return;
     }
 
-    setListenDrawerOpen(true);
+    setActiveOverlay('listen');
   };
 
   const handleBellClick = () => {
-    setSubscribeDrawerOpen(true);
+    setActiveOverlay('subscribe');
   };
 
   const handleBookClick = () => {
     if (!hasContacts) return;
-    setContactDrawerOpen(true);
+    setActiveOverlay('contact');
   };
 
   return (
@@ -296,23 +301,23 @@ export function PublicProfileTemplateV2({
         </div>
         {mergedDSPs.length > 0 ? (
           <ListenDrawer
-            open={listenDrawerOpen}
-            onOpenChange={setListenDrawerOpen}
+            open={activeOverlay === 'listen'}
+            onOpenChange={open => setActiveOverlay(open ? 'listen' : null)}
             artist={artist}
             dsps={mergedDSPs}
             enableDynamicEngagement={enableDynamicEngagement}
           />
         ) : null}
         <SubscribeDrawer
-          open={subscribeDrawerOpen}
-          onOpenChange={setSubscribeDrawerOpen}
+          open={activeOverlay === 'subscribe'}
+          onOpenChange={open => setActiveOverlay(open ? 'subscribe' : null)}
           artist={artist}
           subscribeTwoStep={subscribeTwoStep}
         />
         {hasContacts ? (
           <ContactDrawer
-            open={contactDrawerOpen}
-            onOpenChange={setContactDrawerOpen}
+            open={activeOverlay === 'contact'}
+            onOpenChange={open => setActiveOverlay(open ? 'contact' : null)}
             artistName={artist.name}
             artistHandle={artist.handle}
             contacts={available}

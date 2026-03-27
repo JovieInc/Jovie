@@ -7,6 +7,11 @@ export {
   type DrawerActionRowProps,
 } from './DrawerActionRow';
 export {
+  DrawerAnalyticsSummaryCard,
+  type DrawerAnalyticsSummaryCardProps,
+  type DrawerAnalyticsSummaryMetric,
+} from './DrawerAnalyticsSummaryCard';
+export {
   DrawerAsyncToggle,
   type DrawerAsyncToggleProps,
 } from './DrawerAsyncToggle';

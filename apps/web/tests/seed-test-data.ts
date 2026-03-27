@@ -40,6 +40,28 @@ interface SeedTestDataOptions {
   readonly publicProfilesOnly?: boolean;
 }
 
+async function withSeedOperationTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeoutPromise]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 function isMissingActiveProfileIdColumn(error: unknown): boolean {
   const message = (
     error instanceof Error ? error.message : String(error)
@@ -811,27 +833,34 @@ async function seedTourDatesForProfile(
 ) {
   console.log('    Seeding tour dates...');
 
-  for (const td of TEST_TOUR_DATES) {
-    await db
-      .insert(tourDates)
-      .values({
-        profileId,
-        externalId: td.externalId,
-        title: td.title,
-        venueName: td.venueName,
-        city: td.city,
-        region: td.region,
-        country: td.country,
-        provider: td.provider,
-        ticketStatus: td.ticketStatus,
-        ticketUrl: td.ticketUrl,
-        latitude: td.latitude,
-        longitude: td.longitude,
-        timezone: td.timezone,
-        startDate: dateMonthsFromNow(td.monthsFromNow),
-        startTime: td.startTime,
-      })
-      .onConflictDoNothing();
+  const values = TEST_TOUR_DATES.map(td => ({
+    profileId,
+    externalId: td.externalId,
+    title: td.title,
+    venueName: td.venueName,
+    city: td.city,
+    region: td.region,
+    country: td.country,
+    provider: td.provider,
+    ticketStatus: td.ticketStatus,
+    ticketUrl: td.ticketUrl,
+    latitude: td.latitude,
+    longitude: td.longitude,
+    timezone: td.timezone,
+    startDate: dateMonthsFromNow(td.monthsFromNow),
+    startTime: td.startTime,
+  }));
+
+  try {
+    await withSeedOperationTimeout(
+      db.insert(tourDates).values(values).onConflictDoNothing(),
+      15_000,
+      'Tour date seed'
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`    ⚠ Failed to seed tour dates: ${message}`);
+    return;
   }
 
   console.log(`    ✓ Ensured ${TEST_TOUR_DATES.length} tour dates`);
@@ -1118,6 +1147,12 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
         ? await resolveSeedUserClerkId(E2E_EMAIL, configuredE2EClerkUserId)
         : null;
 
+      if (E2E_CLERK_USER_ID) {
+        // Keep the Playwright auth-bypass path aligned with the Clerk user ID
+        // actually seeded into the database for this run.
+        process.env.E2E_CLERK_USER_ID = E2E_CLERK_USER_ID;
+      }
+
       if (!isAllowlistedE2EEmail) {
         console.warn(
           `  ⚠ Refusing to seed privileged E2E user for non-allowlisted email ${E2E_EMAIL}`
@@ -1196,11 +1231,13 @@ export async function seedTestData(options: SeedTestDataOptions = {}) {
               let deletedCount = 0;
               for (const clerkId of clerkIdsToInvalidate) {
                 const proxyStateCacheKey = `proxy:user-state:${clerkId}`;
+                const adminRoleCacheKey = `admin:role:${clerkId}`;
                 deletedCount += await redis.del(proxyStateCacheKey);
+                deletedCount += await redis.del(adminRoleCacheKey);
               }
 
               console.log(
-                `    ✓ Invalidated proxy state cache for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
+                `    ✓ Invalidated proxy/admin caches for E2E user (${deletedCount} key(s) across ${clerkIdsToInvalidate.length} Clerk ID(s))`
               );
             } catch (error) {
               console.warn(

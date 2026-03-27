@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import React, { useMemo } from 'react';
+import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,7 @@ import {
   type ChatInsightsToolResult,
   isToolInvocationPart,
   type MessagePart,
+  type SocialLinkRemovalToolResult,
   type SocialLinkToolResult,
   type ToolInvocationPart,
 } from '../types';
@@ -27,6 +29,32 @@ const ChatMarkdown = dynamic(
   () => import('./ChatMarkdown').then(m => ({ default: m.ChatMarkdown })),
   { ssr: false }
 );
+
+function isInsightsResult(result: unknown): result is ChatInsightsToolResult {
+  return typeof result === 'object' && result !== null && 'success' in result;
+}
+
+function isSocialLinkResult(result: unknown): result is SocialLinkToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'platform' in result &&
+    'normalizedUrl' in result &&
+    'originalUrl' in result
+  );
+}
+
+function isSocialLinkRemovalResult(
+  result: unknown
+): result is SocialLinkRemovalToolResult {
+  return (
+    typeof result === 'object' &&
+    result !== null &&
+    'linkId' in result &&
+    'platform' in result &&
+    'url' in result
+  );
+}
 
 function renderToolCard(
   toolInvocation: ToolInvocationPart,
@@ -43,22 +71,18 @@ function renderToolCard(
   if (
     toolInvocation.toolName === 'showTopInsights' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success
+    isInsightsResult(toolInvocation.result)
   ) {
-    return (
-      <ChatAnalyticsCard
-        result={toolInvocation.result as unknown as ChatInsightsToolResult}
-      />
-    );
+    return <ChatAnalyticsCard result={toolInvocation.result} />;
   }
 
   if (
     toolInvocation.toolName === 'proposeSocialLink' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success &&
+    isSocialLinkResult(toolInvocation.result) &&
     profileId
   ) {
-    const result = toolInvocation.result as unknown as SocialLinkToolResult;
+    const result = toolInvocation.result;
     return (
       <ChatLinkConfirmationCard
         profileId={profileId}
@@ -72,14 +96,10 @@ function renderToolCard(
   if (
     toolInvocation.toolName === 'proposeSocialLinkRemoval' &&
     toolInvocation.state === 'result' &&
-    toolInvocation.result?.success &&
+    isSocialLinkRemovalResult(toolInvocation.result) &&
     profileId
   ) {
-    const result = toolInvocation.result as {
-      linkId: string;
-      platform: string;
-      url: string;
-    };
+    const result = toolInvocation.result;
     return (
       <ChatLinkRemovalCard
         profileId={profileId}
@@ -258,7 +278,10 @@ export function ChatMessage({
                 <button
                   type='button'
                   onClick={() => copy(messageText)}
-                  className='flex h-7 items-center gap-1.5 rounded-full border border-subtle bg-app-control px-2.5 text-secondary-token shadow-app-control transition-[background-color,color,border-color,box-shadow] duration-150 hover:border-default hover:bg-surface-0 hover:text-primary-token hover:shadow-app-control-hover focus-visible:border-focus focus-visible:bg-surface-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/16 active:border-default active:bg-surface-1 active:shadow-app-control-active'
+                  className={cn(
+                    APP_CONTROL_BUTTON_CLASS,
+                    'h-7 px-2.5 text-secondary-token'
+                  )}
                   aria-label={
                     isSuccess ? 'Copied to clipboard' : 'Copy message'
                   }

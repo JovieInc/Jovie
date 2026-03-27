@@ -231,6 +231,49 @@ describe('StaticArtistPage', () => {
     expect(screen.getByTestId('notifications-cta')).toBeDefined();
   });
 
+  it('keeps contact mode on the legacy template when no contacts exist', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[]}
+        subtitle='Contact'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(
+      screen.queryByTestId('public-profile-template-v2')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
+  });
+
+  it('renders V2 contact mode when contacts exist', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[
+          {
+            id: 'contact-1',
+            type: 'email',
+            value: 'bookings@example.com',
+          } as never,
+        ]}
+        subtitle='Contact'
+        showTipButton={false}
+        showBackButton={true}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+  });
+
   it('renders latest release card when in profile mode with release', () => {
     const mockRelease = {
       id: 'release-1',
@@ -326,7 +369,6 @@ describe('StaticArtistPage', () => {
     'profile',
     'listen',
     'subscribe',
-    'contact',
     'tour',
     'tip',
     'about',
@@ -340,6 +382,29 @@ describe('StaticArtistPage', () => {
         subtitle='Artist'
         showTipButton={mode === 'tip'}
         showBackButton={mode !== 'profile'}
+        profileV2Enabled
+      />
+    );
+
+    expect(screen.getByTestId('public-profile-template-v2')).toBeDefined();
+  });
+
+  it('routes contact mode through the V2 template when contacts exist', () => {
+    render(
+      <StaticArtistPage
+        mode='contact'
+        artist={mockArtist}
+        socialLinks={mockSocialLinks}
+        contacts={[
+          {
+            id: 'contact-2',
+            type: 'email',
+            value: 'booking@example.com',
+          } as never,
+        ]}
+        subtitle='Artist'
+        showTipButton={false}
+        showBackButton
         profileV2Enabled
       />
     );

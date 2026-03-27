@@ -218,7 +218,7 @@ export const LINEAR_SURFACE = {
   drawerCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
 
   /** Smaller drawer section card — inline property groups. */
-  drawerCardSm: `rounded-[8px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
+  drawerCardSm: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,
 
   /** Primary sidebar card — header/analytics cards in sidebars. */
   sidebarCard: `rounded-[10px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) ${elevatedSidebarCardShadow}`,

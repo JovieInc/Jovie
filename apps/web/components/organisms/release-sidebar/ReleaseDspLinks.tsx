@@ -77,10 +77,10 @@ export function ReleaseDspLinks({
 
   return (
     <DrawerLinkSection
-      title='Platforms'
+      title='DSPs'
       showHeading={showHeading}
       isEmpty={release.providers.length === 0 && !isAddingLink}
-      emptyMessage='No platform links yet.'
+      emptyMessage='No DSP links yet.'
     >
       {/* Providers list */}
       {release.providers.length > 0 && (

@@ -45,7 +45,7 @@ export const AppShellFrame = memo(function AppShellFrame({
 
       <main
         id='main-content'
-        className='flex flex-1 min-h-0 overflow-hidden bg-surface-0 lg:mt-[8px] lg:mr-[8px] lg:ml-px lg:rounded-t-[12px] lg:border lg:border-b-0 lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-tl-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-tl-[12px]'
+        className='flex min-h-0 min-w-0 flex-1 overflow-hidden bg-surface-0 lg:mt-[8px] lg:mr-[8px] lg:ml-px lg:rounded-t-[12px] lg:border lg:border-b-0 lg:border-(--linear-app-shell-border) lg:border-l-(--linear-app-shell-sidebar-seam) lg:bg-(--linear-app-content-surface) lg:shadow-[var(--linear-app-shell-shadow)] lg:peer-data-[state=open]:ml-0 lg:peer-data-[state=open]:rounded-tl-[10px] lg:peer-data-[state=open]:border-l-0 lg:peer-data-[state=open]:shadow-[-1px_0_0_0_var(--linear-app-frame-seam)_inset,var(--linear-app-shell-shadow)] lg:peer-data-[state=closed]:rounded-tl-[12px]'
       >
         <div className='flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden'>
           {header}

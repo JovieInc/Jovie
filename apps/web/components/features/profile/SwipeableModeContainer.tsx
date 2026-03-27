@@ -262,6 +262,7 @@ export function SwipeableModeContainer({
             id={`profile-pane-${mode}`}
             role='tabpanel'
             aria-hidden={mode !== modes[activeIndex]}
+            inert={mode !== modes[activeIndex]}
             className='h-full min-w-full overflow-y-auto px-3 pb-5 pt-4'
             style={{ contentVisibility: 'auto' }}
           >
