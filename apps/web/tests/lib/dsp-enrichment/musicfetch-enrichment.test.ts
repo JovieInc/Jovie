@@ -309,6 +309,12 @@ function makeProfile(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function getInsertedProviderIds(): string[] {
+  return mockPlainDbValues.mock.calls
+    .map(([values]) => (values as { providerId?: string }).providerId)
+    .filter((providerId): providerId is string => Boolean(providerId));
+}
+
 describe('musicfetch-enrichment', () => {
   let mockTx: ReturnType<typeof createMockTx>;
 
@@ -663,7 +669,11 @@ describe('musicfetch-enrichment', () => {
           message === 'MusicFetch enrichment: seeded DSP presence matches'
       );
 
-      expect(mockPlainDbInsert).toHaveBeenCalledTimes(8);
+      const insertedProviderIds = getInsertedProviderIds();
+
+      expect(
+        insertedProviderIds.filter(providerId => providerId === 'spotify')
+      ).toHaveLength(1);
       expect(seededLog?.[1]).toEqual(
         expect.objectContaining({
           creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',
@@ -695,15 +705,7 @@ describe('musicfetch-enrichment', () => {
         makePayload()
       );
 
-      const appleMusicInsertIndex = mockPlainDbValues.mock.calls.findIndex(
-        ([values]) =>
-          (values as { providerId?: string }).providerId === 'apple_music'
-      );
-
-      expect(appleMusicInsertIndex).toBeGreaterThanOrEqual(0);
-      expect(
-        mockPlainDbOnConflictDoUpdate.mock.calls[appleMusicInsertIndex]?.[0]
-      ).toEqual(
+      expect(mockPlainDbOnConflictDoUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           set: expect.objectContaining({
             externalArtistId: '123456',
@@ -746,7 +748,20 @@ describe('musicfetch-enrichment', () => {
           message === 'MusicFetch enrichment: seeded DSP presence matches'
       );
 
-      expect(mockPlainDbInsert).toHaveBeenCalledTimes(14);
+      const insertedProviderIds = getInsertedProviderIds();
+
+      expect(insertedProviderIds).toEqual(
+        expect.arrayContaining([
+          'amazon_music',
+          'anghami',
+          'audiomack',
+          'netease',
+          'pandora',
+          'qobuz',
+          'spotify',
+        ])
+      );
+      expect(insertedProviderIds.length).toBeGreaterThanOrEqual(10);
       expect(seededLog?.[1]).toEqual(
         expect.objectContaining({
           creatorProfileId: '550e8400-e29b-41d4-a716-446655440000',

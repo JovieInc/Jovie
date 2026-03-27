@@ -85,7 +85,12 @@ export function isMusicFetchAvailable(): boolean {
 /**
  * Look up an artist by their Spotify URL via MusicFetch.io.
  *
- * Returns cross-platform DSP links and social profiles, or null on failure.
+ * Returns cross-platform DSP links and social profiles, or null for
+ * non-retryable lookup failures.
+ *
+ * @throws {MusicfetchRequestError} When MusicFetch rejects the configured
+ * service list with an invalid-services 400 detected by
+ * isMusicfetchInvalidServicesError().
  */
 export async function fetchArtistBySpotifyUrl(
   spotifyUrl: string

@@ -220,16 +220,19 @@ describe('extractMusicFetchLinks', () => {
       services: {
         soundcloud: { url: 'https://soundcloud.com/testartist' },
         netease: { url: 'https://music.163.com/artist?id=123' },
+        soundCloud: { url: 'https://soundcloud.com/legacy-testartist' },
+        netEase: { url: 'https://music.163.com/artist?id=999' },
       },
     });
 
     const links = extractMusicFetchLinks(artistData, SPOTIFY_URL, SIGNAL);
-    const platformIds = links.map(link => link.platformId);
+    const platformIds = links
+      .map(link => link.platformId)
+      .filter(
+        platformId => platformId === 'soundcloud' || platformId === 'netease'
+      );
 
-    expect(platformIds).toContain('soundcloud');
-    expect(platformIds).toContain('netease');
-    expect(platformIds).not.toContain('soundCloud');
-    expect(platformIds).not.toContain('netEase');
+    expect(platformIds).toEqual(['soundcloud', 'netease']);
   });
 
   it('deduplicates links when the same URL appears twice', () => {
