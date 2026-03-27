@@ -51,7 +51,7 @@ function renderToolbar(
 describe('DevToolbar', () => {
   beforeEach(() => {
     localStorage.clear();
-    document.body.style.paddingBottom = '';
+    document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     mockSetTheme.mockClear();
 
     // Mock clipboard API
@@ -64,7 +64,7 @@ describe('DevToolbar', () => {
 
   afterEach(() => {
     cleanup();
-    document.body.style.paddingBottom = '';
+    document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
   });
 
   // ─── Show/Hide ───────────────────────────────────────────────
@@ -126,10 +126,12 @@ describe('DevToolbar', () => {
       ).toBeInTheDocument();
     });
 
-    it('clears body paddingBottom when toolbar is hidden', () => {
+    it('resets --dev-toolbar-height CSS variable when toolbar is hidden', () => {
       renderToolbar();
       fireEvent.click(screen.getByRole('button', { name: 'Hide dev toolbar' }));
-      expect(document.body.style.paddingBottom).toBe('');
+      expect(
+        document.documentElement.style.getPropertyValue('--dev-toolbar-height')
+      ).toBe('0px');
     });
   });
 

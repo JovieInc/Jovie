@@ -294,21 +294,25 @@ export function DevToolbar({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [hidden, open]);
 
-  // Add bottom padding to body so the toolbar doesn't cover content
+  // Expose toolbar height as a CSS variable so scrollable content areas can
+  // add their own bottom padding without shrinking the full-viewport app shell.
   useEffect(() => {
     if (hidden) {
-      document.body.style.paddingBottom = '';
+      document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
       return;
     }
-    const updatePadding = () => {
+    const updateVar = () => {
       const h = toolbarRef.current?.offsetHeight ?? 0;
-      document.body.style.paddingBottom = h > 0 ? `${h}px` : '';
+      document.documentElement.style.setProperty(
+        '--dev-toolbar-height',
+        h > 0 ? `${h}px` : '0px'
+      );
     };
-    updatePadding();
-    const timer = setTimeout(updatePadding, 220);
+    updateVar();
+    const timer = setTimeout(updateVar, 220);
     return () => {
       clearTimeout(timer);
-      document.body.style.paddingBottom = '';
+      document.documentElement.style.setProperty('--dev-toolbar-height', '0px');
     };
   }, [open, hidden]);
 
