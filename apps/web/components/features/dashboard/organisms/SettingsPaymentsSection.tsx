@@ -4,8 +4,8 @@ import { Button } from '@jovie/ui';
 import { AlertTriangle, CheckCircle2, CreditCard, Unlink } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
 
 interface StripeConnectStatus {
   connected: boolean;
@@ -24,7 +24,7 @@ export function SettingsPaymentsSection() {
     <SettingsPanel>
       <div className='px-4 py-4 sm:px-5'>{children}</div>
       {footer ? (
-        <div className='border-t border-(--linear-app-frame-seam) px-4 py-3.5 sm:px-5'>
+        <div className='border-t border-subtle px-4 py-3.5 sm:px-5'>
           {footer}
         </div>
       ) : null}

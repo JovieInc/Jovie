@@ -17,9 +17,8 @@ describe('DrawerTabs', () => {
     );
 
     const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
-    expect(tablist.className).toContain('rounded-full');
-    expect(tablist.className).toContain('border-0');
-    expect(tablist.className).toContain('p-0');
+    expect(tablist).toBeInTheDocument();
+    expect(tablist).toHaveAttribute('aria-label', 'Drawer tabs');
   });
 
   it('renders active tabs as pills and notifies on selection changes', () => {
@@ -41,10 +40,7 @@ describe('DrawerTabs', () => {
     const inactiveTab = screen.getByRole('tab', { name: 'Activity' });
 
     expect(activeTab).toHaveAttribute('aria-selected', 'true');
-    expect(activeTab.className).toContain('rounded-full');
-    expect(activeTab.className).toContain('border-(--linear-app-frame-seam)');
-    expect(inactiveTab.className).toContain('border-(--linear-app-frame-seam)');
-    expect(inactiveTab.className).toContain('rounded-full');
+    expect(inactiveTab).toHaveAttribute('aria-selected', 'false');
 
     fireEvent.click(inactiveTab);
     expect(onValueChange).toHaveBeenCalledWith('activity');

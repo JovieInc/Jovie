@@ -56,7 +56,7 @@ const METADATA_LABEL_CLASSNAME =
 const METADATA_VALUE_CLASSNAME =
   'text-[12px] leading-[16px] text-primary-token';
 const METADATA_BADGE_CLASSNAME =
-  'h-5 rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
+  'h-5 rounded-full border border-subtle bg-surface-0 px-2 text-[9.5px] font-[510] tracking-[-0.01em] shadow-none';
 const METADATA_ROW_CLASSNAME = 'rounded-none px-0 py-1 first:pt-0 last:pb-0';
 const METADATA_STACK_CLASSNAME = 'space-y-0.5';
 const METADATA_COPY_CELL_CLASSNAME =
@@ -154,6 +154,7 @@ export function ReleaseMetadata({
         <div
           className={METADATA_STACK_CLASSNAME}
           data-testid='release-metadata-grid'
+          data-dividers='false'
         >
           <DrawerPropertyRow
             {...METADATA_ROW_PROPS}
@@ -285,7 +286,7 @@ export function ReleaseMetadata({
                     <DrawerButton
                       tone='secondary'
                       size='sm'
-                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-(--linear-app-frame-seam) bg-surface-0 px-2 text-[10.5px] font-[510] leading-none text-secondary-token shadow-none hover:bg-surface-0'
+                      className='-mx-0.5 h-5.5 gap-1 rounded-full border-subtle bg-surface-0 px-2 text-[10.5px] font-[510] leading-none text-secondary-token shadow-none hover:bg-surface-0'
                     >
                       <span>{canvasStatusDisplayLabel}</span>
                       <ChevronDown
@@ -391,7 +392,7 @@ export function ReleaseMetadata({
                     <Badge
                       key={genre}
                       variant='secondary'
-                      className='rounded-full border border-(--linear-app-frame-seam) bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-[-0.01em] text-secondary-token shadow-none'
+                      className='rounded-full border border-subtle bg-surface-0 px-2 py-0 text-[9.5px] font-[510] tracking-[-0.01em] text-secondary-token shadow-none'
                     >
                       {genre}
                     </Badge>

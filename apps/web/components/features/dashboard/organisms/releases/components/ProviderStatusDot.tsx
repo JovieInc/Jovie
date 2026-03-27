@@ -7,40 +7,49 @@ interface ProviderStatusDotProps {
   readonly accent: string;
 }
 
+function getProviderStatusConfig(
+  status: ProviderStatusDotProps['status'],
+  accent: string
+): {
+  label: string;
+  icon: ReactNode;
+  className: string;
+  style?: React.CSSProperties;
+} {
+  switch (status) {
+    case 'available':
+      return {
+        label: 'Auto-synced provider link',
+        icon: <Check className='h-2.5 w-2.5' aria-hidden='true' />,
+        className: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+        style: {
+          backgroundColor: `color-mix(in oklab, ${accent} 12%, transparent)`,
+          borderColor: `color-mix(in oklab, ${accent} 28%, var(--linear-app-frame-seam))`,
+          color: accent,
+        },
+      };
+    case 'manual':
+      return {
+        label: 'Manually added provider link',
+        icon: <TriangleAlert className='h-2.5 w-2.5' aria-hidden='true' />,
+        className:
+          'border-[color:color-mix(in_oklab,var(--color-warning)_28%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-[var(--color-warning)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+      };
+    default:
+      return {
+        label: 'Missing provider link',
+        icon: <Dot className='h-2.5 w-2.5' aria-hidden='true' />,
+        className:
+          'border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-tertiary-token',
+      };
+  }
+}
+
 export const ProviderStatusDot = memo(function ProviderStatusDot({
   status,
   accent,
 }: Readonly<ProviderStatusDotProps>) {
-  const config: {
-    label: string;
-    icon: ReactNode;
-    className: string;
-    style?: React.CSSProperties;
-  } =
-    status === 'available'
-      ? {
-          label: 'Auto-synced provider link',
-          icon: <Check className='h-2.5 w-2.5' aria-hidden='true' />,
-          className: 'shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
-          style: {
-            backgroundColor: `color-mix(in oklab, ${accent} 12%, transparent)`,
-            borderColor: `color-mix(in oklab, ${accent} 28%, var(--linear-app-frame-seam))`,
-            color: accent,
-          },
-        }
-      : status === 'manual'
-        ? {
-            label: 'Manually added provider link',
-            icon: <TriangleAlert className='h-2.5 w-2.5' aria-hidden='true' />,
-            className:
-              'border-[color:color-mix(in_oklab,var(--color-warning)_28%,var(--linear-app-frame-seam))] bg-[color:color-mix(in_oklab,var(--color-warning)_12%,transparent)] text-[var(--color-warning)] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
-          }
-        : {
-            label: 'Missing provider link',
-            icon: <Dot className='h-2.5 w-2.5' aria-hidden='true' />,
-            className:
-              'border-subtle bg-[color-mix(in_oklab,var(--linear-bg-surface-1)_82%,var(--linear-bg-surface-0))] text-tertiary-token',
-          };
+  const config = getProviderStatusConfig(status, accent);
 
   return (
     <span

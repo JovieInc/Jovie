@@ -22,6 +22,7 @@ export interface DrawerHeaderAction {
   readonly onClick?: () => void;
   readonly asChild?: boolean;
   readonly href?: string;
+  readonly disabled?: boolean;
 }
 
 export interface DrawerHeaderActionsProps {
@@ -49,6 +50,7 @@ export function DrawerHeaderActions({
       id: action.id,
       label: action.label,
       icon: action.icon,
+      disabled: action.disabled,
       onClick:
         action.onClick ||
         (action.href
@@ -104,6 +106,7 @@ export function DrawerHeaderActions({
         return (
           <AppIconButton
             key={action.id}
+            disabled={action.disabled}
             onClick={action.onClick}
             className={cn(
               DRAWER_HEADER_ICON_BUTTON_CLASSNAME,

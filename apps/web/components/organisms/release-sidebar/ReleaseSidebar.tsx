@@ -93,6 +93,22 @@ function formatCooldown(remainingMs: number): string {
   return `${minutes}m`;
 }
 
+function getPlatformRescanLabel(params: {
+  isRescanning: boolean;
+  isCoolingDown: boolean;
+  remainingMs: number;
+}): string {
+  if (params.isRescanning) {
+    return 'Refreshing platforms…';
+  }
+
+  if (params.isCoolingDown) {
+    return `Refresh again in ${formatCooldown(params.remainingMs)}`;
+  }
+
+  return 'Refresh platforms';
+}
+
 function getPreviewAriaLabel(hasPreview: boolean, isPlaying: boolean): string {
   if (!hasPreview) return 'No preview available';
   return isPlaying ? 'Pause preview' : 'Play preview';
@@ -425,7 +441,9 @@ export function ReleaseSidebar({
   const [activeTab, setActiveTab] = useState<SidebarTab>('details');
   const [platformRescanCooldownEnd, setPlatformRescanCooldownEnd] = useState(0);
   const [platformRescanRemainingMs, setPlatformRescanRemainingMs] = useState(0);
-  const platformRescanTimerRef = useRef<ReturnType<typeof setInterval>>(null);
+  const platformRescanTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
   const wasRescanningPlatformsRef = useRef(false);
 
   // Track detail panel state — track shape comes from the sidebar route handler
@@ -607,13 +625,11 @@ export function ReleaseSidebar({
           {
             type: 'action',
             id: 'refresh-platform-links',
-            label: isRescanningIsrc
-              ? 'Refreshing platforms…'
-              : isPlatformRescanCoolingDown
-                ? `Refresh again in ${formatCooldown(
-                    platformRescanRemainingMs
-                  )}`
-                : 'Refresh platforms',
+            label: getPlatformRescanLabel({
+              isRescanning: isRescanningIsrc,
+              isCoolingDown: isPlatformRescanCoolingDown,
+              remainingMs: platformRescanRemainingMs,
+            }),
             icon: (
               <RefreshCw
                 className={cn('h-4 w-4', isRescanningIsrc && 'animate-spin')}

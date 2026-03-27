@@ -15,6 +15,8 @@ import type {
   ContextMenuAction,
   ContextMenuItemType,
 } from '@/components/organisms/table';
+import { copyToClipboard } from '@/hooks/useClipboard';
+import { captureError } from '@/lib/error-tracking';
 import { buildUTMUrl } from './build-url';
 import { getDefaultQuickPresets } from './presets';
 import type { UTMContext, UTMPreset } from './types';
@@ -25,11 +27,6 @@ const UTM_PRESET_LUCIDE_ICONS = {
 } as const;
 
 const UTM_PRESET_PLATFORM_ICONS: Record<string, string> = {
-  Instagram: 'instagram',
-  Twitter: 'twitter',
-  Youtube: 'youtube',
-  Facebook: 'facebook',
-  Linkedin: 'linkedin',
   spotify: 'spotify',
   apple_music: 'apple_music',
   instagram: 'instagram',
@@ -53,9 +50,11 @@ const UTM_PRESET_PLATFORM_ICONS: Record<string, string> = {
 };
 
 function resolvePresetIcon(preset: UTMPreset) {
+  const source = preset.params.utm_source?.trim().toLowerCase() ?? '';
+  const iconKey =
+    typeof preset.icon === 'string' ? preset.icon.trim().toLowerCase() : '';
   const platformKey =
-    UTM_PRESET_PLATFORM_ICONS[preset.params.utm_source ?? ''] ??
-    UTM_PRESET_PLATFORM_ICONS[preset.icon as string];
+    UTM_PRESET_PLATFORM_ICONS[source] ?? UTM_PRESET_PLATFORM_ICONS[iconKey];
 
   if (platformKey) {
     return React.createElement(SocialIcon, {
@@ -79,23 +78,33 @@ async function copyUTMUrl(params: {
   url: string;
   preset: UTMPreset;
   context: UTMContext;
-}) {
+}): Promise<boolean> {
   const result = buildUTMUrl({
     url: params.url,
     params: params.preset.params,
     context: params.context,
   });
-  try {
-    await navigator.clipboard.writeText(result.url);
+  const copied = await copyToClipboard(result.url);
+
+  if (copied) {
     toast.success(`Copied with ${params.preset.label} UTM`, {
       description: 'Link includes tracking parameters',
     });
-  } catch (error) {
-    console.error('Failed to copy UTM link', error);
-    toast.error('Could not copy UTM link', {
-      description: 'Please try again or copy manually.',
-    });
+    return true;
   }
+
+  captureError(
+    'Failed to copy UTM link',
+    new Error('UTM clipboard copy failed'),
+    {
+      presetId: params.preset.id,
+      utmSource: params.preset.params.utm_source ?? '',
+    }
+  );
+  toast.error('Could not copy UTM link', {
+    description: 'Please try again or copy manually.',
+  });
+  return false;
 }
 
 /**
@@ -139,10 +148,11 @@ export function getUTMShareContextMenuItems(params: {
       id: `utm-share-${preset.id}`,
       label: `Copy for ${preset.label}`,
       icon: resolvePresetIcon(preset),
-      onClick: () => {
-        void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+      onClick: async () => {
+        const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+        if (copied) {
           onCopied?.(preset.id);
-        });
+        }
       },
     };
     items.push(action);
@@ -170,10 +180,11 @@ export function getUTMShareActionMenuItems(params: {
     id: `utm-share-${preset.id}`,
     label: preset.label,
     icon: resolvePresetIcon(preset),
-    onClick: () => {
-      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+    onClick: async () => {
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
         onCopied?.(preset.id);
-      });
+      }
     },
   }));
 
@@ -211,10 +222,11 @@ export function getUTMShareDropdownItems(params: {
     id: `utm-share-${preset.id}`,
     label: preset.label,
     icon: resolvePresetIcon(preset),
-    onClick: () => {
-      void copyUTMUrl({ url: smartLinkUrl, preset, context }).then(() => {
+    onClick: async () => {
+      const copied = await copyUTMUrl({ url: smartLinkUrl, preset, context });
+      if (copied) {
         onCopied?.(preset.id);
-      });
+      }
     },
   }));
 
