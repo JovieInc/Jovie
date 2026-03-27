@@ -5,13 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
-## [26.4.85] - 2026-03-27
+## [26.4.86] - 2026-03-27
 
 ### Added
 
-- Performance budget for `/app` dashboard page with Gmail-rule thresholds (TTFB < 500ms, skeleton-to-content < 2s)
-- `getDashboardDataEssential()` fast-path fetch: 3 single-row queries instead of 6 sequential queries for shell rendering
-- Suspense streaming shell: `DashboardShellSkeleton` renders at first byte while data loads
+- Performance budget for `/app` dashboard page (FCP 1500ms, LCP 3000ms, TTFB 1500ms, skeleton-to-content 2000ms)
+- Suspense streaming shell: `DashboardShellSkeleton` renders at first byte while `getDashboardData()` resolves
+- `getDashboardDataEssential()` fast-path fetch for future use (3 queries vs 6, not used in shell provider to preserve context correctness)
+- `fetchDashboardBaseWithSession()` shared helper eliminates duplication between full and essential data fetches
 - Pre-warm request in performance budget guard for consistent warm-cache measurements
 - `data-testid="chat-content"` marker on JovieChat for skeleton-to-content measurement
 
@@ -19,9 +20,14 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - Dashboard shell layout uses Suspense boundary with streaming fallback instead of blocking on full data fetch
 - Code-split `ProfileContactSidebar` via `next/dynamic` (sidebar panel, not critical path)
-- `generateMetadata()` on `/app` reuses `getDashboardDataEssential()` instead of separate DB call
-- Shared `dashboardResourceBudgets` const used by both `/app` and `/app/dashboard/releases` budgets
-- Performance budget guard supports `/app` skeleton-to-content measurement with chat-aware selectors
+- `generateMetadata()` on `/app` reuses deduplicated `getDashboardData()` instead of separate `getSessionContext()` DB call
+- Feature flag bootstrap hardened with `.catch()` fallback to prevent shell crash on transient failures
+- Separate resource budgets per page: `chatResourceBudgets` (2750KB) and `releasesResourceBudgets` (2200KB, preserving original limit)
+- Performance budget guard skeleton-to-content measurement uses only `chat-content` testid (removed false-positive nav selector)
+
+### Fixed
+
+- Extracted nested ternary in `DashboardShellSkeleton` to `navLabelWidths` lookup (SonarCloud)
 
 ## [26.4.84] - 2026-03-27
 
