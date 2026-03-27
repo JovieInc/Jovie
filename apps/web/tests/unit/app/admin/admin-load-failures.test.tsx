@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import AdminOutreachPage from '@/app/app/(shell)/admin/outreach/page';
+import AdminGrowthPage from '@/app/app/(shell)/admin/growth/page';
 import { LeadTable } from '@/features/admin/leads/LeadTable';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
@@ -54,7 +54,10 @@ describe('admin load failures', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { toast } = await import('sonner');
-    renderWithQueryClient(<AdminOutreachPage />);
+    const page = await AdminGrowthPage({
+      searchParams: Promise.resolve({ view: 'outreach' }),
+    });
+    renderWithQueryClient(page);
 
     await waitFor(() => {
       expect(

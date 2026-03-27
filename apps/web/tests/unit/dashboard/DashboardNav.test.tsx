@@ -168,14 +168,14 @@ describe('DashboardNav', () => {
   it('renders full admin navigation for admin users', () => {
     const { getByRole } = renderDashboardNav({ isAdmin: true });
 
-    expect(getByRole('link', { name: 'Leads' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_LEADS
+    expect(getByRole('link', { name: 'People' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_PEOPLE
     );
-    expect(getByRole('link', { name: 'Outreach' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_OUTREACH
+    expect(getByRole('link', { name: 'Growth' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_GROWTH
     );
-    expect(getByRole('link', { name: 'Ingest' }).getAttribute('href')).toBe(
-      APP_ROUTES.ADMIN_INGEST
+    expect(getByRole('link', { name: 'Activity' }).getAttribute('href')).toBe(
+      APP_ROUTES.ADMIN_ACTIVITY
     );
   });
 
