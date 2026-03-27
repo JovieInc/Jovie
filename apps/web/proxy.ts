@@ -50,6 +50,7 @@ import { createBotResponse } from '@/lib/utils/bot-detection';
 // ============================================================================
 // - jov.ie: Everything (marketing, auth, profiles, dashboard at /app/*)
 // - meetjovie.com: 301 redirects to jov.ie (legacy redirect domain)
+// - support.jov.ie: 308 redirects to jov.ie/support (retired help center)
 // ============================================================================
 
 // Pre-compiled regex for bot detection (O(1) vs O(n) array iteration)
@@ -156,6 +157,7 @@ interface HostInfo {
   isMainHost: boolean;
   isDevOrPreview: boolean;
   isMeetJovie: boolean;
+  isSupportHost: boolean;
   isInvestorPortal: boolean;
 }
 
@@ -179,10 +181,17 @@ function analyzeHost(hostname: string): HostInfo {
 
   const isMeetJovie =
     hostname === 'meetjovie.com' || hostname === 'www.meetjovie.com';
+  const isSupportHost = hostname === `support.${HOSTNAME}`;
 
   const isInvestorPortal = INVESTOR_HOSTNAMES.has(hostname);
 
-  return { isMainHost, isDevOrPreview, isMeetJovie, isInvestorPortal };
+  return {
+    isMainHost,
+    isDevOrPreview,
+    isMeetJovie,
+    isSupportHost,
+    isInvestorPortal,
+  };
 }
 
 /** Dashboard is always at /app in single-domain architecture */
@@ -488,6 +497,13 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       const targetUrl = new URL(pathname, 'https://jov.ie');
       targetUrl.search = req.nextUrl.search;
       return NextResponse.redirect(targetUrl, 301);
+    }
+
+    // 308 redirect retired support subdomain to the main support page
+    if (hostInfo.isSupportHost) {
+      const targetUrl = new URL('/support', 'https://jov.ie');
+      targetUrl.search = req.nextUrl.search;
+      return NextResponse.redirect(targetUrl, 308);
     }
 
     // ========================================================================

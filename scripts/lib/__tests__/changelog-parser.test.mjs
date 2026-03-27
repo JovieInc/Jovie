@@ -204,6 +204,39 @@ describe('parseChangelog', () => {
       'Tips now process correctly',
     ]);
   });
+
+  it('treats suffix-tagged internal entries as internal', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+### Changed
+
+- Public launch checklist refresh
+- Shared cron auth helper with timing-safe bearer verification [INTERNAL]
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].sections.changed).toEqual([
+      'Public launch checklist refresh',
+    ]);
+    expect(result.releases[0].internalSections.changed).toEqual([
+      'Shared cron auth helper with timing-safe bearer verification [INTERNAL]',
+    ]);
+  });
+
+  it('drops internal summaries from public output', () => {
+    const md = `## [1.0.0] - 2026-03-20
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+
+### Fixed
+
+- Tips now process correctly
+`;
+    const result = parseChangelog(md);
+    expect(result.releases[0].summary).toBe('');
+    expect(result.releases[0].sections.fixed).toEqual([
+      'Tips now process correctly',
+    ]);
+  });
 });
 
 describe('getLatestRelease', () => {
