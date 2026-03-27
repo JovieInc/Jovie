@@ -1,8 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { OnboardingCheckoutClient } from '@/app/onboarding/checkout/OnboardingCheckoutClient';
 import { OnboardingV2Form } from '@/features/dashboard/organisms/onboarding-v2/OnboardingV2Form';
-import { OnboardingCheckoutClient } from '../../../../app/onboarding/checkout/OnboardingCheckoutClient';
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
