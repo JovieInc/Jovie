@@ -24,4 +24,10 @@ echo "  Removed .turbo caches"
 find . -name "node_modules" -type d -prune -exec rm -rf {} + 2>/dev/null || true
 echo "  Removed node_modules"
 
+# Remove agent worktrees (stale subagent git worktrees)
+if [ -d ".claude/worktrees" ]; then
+  rm -rf .claude/worktrees
+  echo "  Removed .claude/worktrees"
+fi
+
 echo "Archive cleanup complete."
