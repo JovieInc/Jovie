@@ -67,4 +67,28 @@ describe('DrawerTabs', () => {
       screen.getByRole('tablist', { name: 'Drawer tabs' })
     ).toContainElement(screen.getByRole('tab', { name: 'Details' }));
   });
+
+  it('renders a dedicated horizontal scroller in scroll mode while keeping actions outside it', () => {
+    render(
+      <DrawerTabs
+        value='details'
+        onValueChange={vi.fn()}
+        options={[
+          { value: 'details', label: 'Details' },
+          { value: 'activity', label: 'Activity' },
+          { value: 'tasks', label: 'Tasks' },
+        ]}
+        ariaLabel='Drawer tabs'
+        overflowMode='scroll'
+        actions={<button type='button'>Add platform</button>}
+      />
+    );
+
+    const scroller = screen.getByTestId('drawer-tabs-scroll');
+    const tablist = screen.getByRole('tablist', { name: 'Drawer tabs' });
+    const actionsButton = screen.getByRole('button', { name: 'Add platform' });
+
+    expect(scroller).toContainElement(tablist);
+    expect(scroller).not.toContainElement(actionsButton);
+  });
 });

@@ -146,13 +146,16 @@ export const ContactSidebar = memo(function ContactSidebar({
       contextMenuItems={contextMenuItems}
       data-testid='contact-sidebar'
       title={headerTitle}
-      onClose={onClose}
+      onClose={contact ? undefined : onClose}
       headerMode='minimal'
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
         contact ? (
-          <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+          <DrawerSurfaceCard
+            variant='card'
+            className='relative overflow-hidden'
+          >
             <div className='border-b border-subtle px-3 py-2'>
               <div className='min-w-0'>{headerTitle}</div>
             </div>
@@ -171,6 +174,8 @@ export const ContactSidebar = memo(function ContactSidebar({
             <DrawerCardActionBar
               primaryActions={primaryActions}
               overflowActions={overflowActions}
+              onClose={onClose}
+              overflowTriggerPlacement='card-top-right'
             />
           </DrawerSurfaceCard>
         ) : undefined

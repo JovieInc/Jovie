@@ -1,5 +1,3 @@
-const ARTIST_COUNT = 47;
-
 export function SocialProofSection() {
   return (
     <section className='py-[var(--linear-section-pt-sm)] px-5 sm:px-6'>
@@ -18,13 +16,13 @@ export function SocialProofSection() {
           </p>
         </div>
 
-        {/* Artist counter */}
+        {/* Launch-stage positioning */}
         <div className='flex flex-col items-center gap-1'>
-          <p className='text-3xl font-semibold tabular-nums text-primary-token sm:text-4xl'>
-            {ARTIST_COUNT}+
+          <p className='text-sm font-medium text-primary-token'>
+            Built for independent artists
           </p>
           <p className='text-sm text-tertiary-token'>
-            artists already on Jovie
+            Be early. Claim your handle before your next release.
           </p>
         </div>
       </div>

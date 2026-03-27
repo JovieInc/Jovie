@@ -690,7 +690,7 @@ export function ReleaseSidebar({
         />
       )}
       {!(selectedTrack && release) && release && (
-        <>
+        <div className='flex min-h-full flex-col gap-2.5 pt-0.5'>
           <ReleaseEntityHeader
             headerLabel={headerLabel}
             release={release}
@@ -707,6 +707,7 @@ export function ReleaseSidebar({
               <DrawerCardActionBar
                 primaryActions={[]}
                 overflowActions={cardOverflowActions}
+                overflowTriggerIcon='vertical'
                 className='border-0 bg-transparent px-0 py-0'
               />
             }
@@ -718,112 +719,118 @@ export function ReleaseSidebar({
             artistName={artistName}
           />
 
-          <div className='space-y-2.5 pt-0.5'>
+          <div className='flex min-h-0 flex-1 flex-col gap-2.5'>
             <DrawerTabs
               value={activeTab}
               onValueChange={value => setActiveTab(value as SidebarTab)}
               options={SIDEBAR_TAB_OPTIONS}
               ariaLabel='Release sidebar view'
               actions={tabActions}
+              overflowMode='scroll'
             />
 
-            {activeTab === 'tracklist' && (
-              <DrawerSurfaceCard
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-                testId='release-tracks-card'
-              >
-                <div className='p-2.5'>
-                  <ReleaseTrackList
+            <div className='min-h-0 flex-1'>
+              {activeTab === 'tracklist' && (
+                <DrawerSurfaceCard
+                  className={LINEAR_SURFACE.drawerCardSm}
+                  testId='release-tracks-card'
+                >
+                  <div className='p-2.5'>
+                    <ReleaseTrackList
+                      release={release}
+                      onTrackClick={handleTrackClick}
+                      tracksOverride={tracksOverride}
+                      showHeading={false}
+                    />
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+
+              {activeTab === 'links' && (
+                <DrawerSurfaceCard
+                  className={LINEAR_SURFACE.drawerCardSm}
+                  testId='release-platforms-card'
+                >
+                  <div className='p-2.5'>
+                    <ReleaseDspLinks
+                      release={release}
+                      providerConfig={providerConfig}
+                      isEditable={isEditable}
+                      isAddingLink={isAddingLink}
+                      newLinkUrl={newLinkUrl}
+                      selectedProvider={selectedProvider}
+                      isAddingDspLink={isAddingDspLink}
+                      isRemovingDspLink={isRemovingDspLink}
+                      onSetIsAddingLink={setIsAddingLink}
+                      onSetNewLinkUrl={setNewLinkUrl}
+                      onSetSelectedProvider={setSelectedProvider}
+                      onAddLink={handleAddLink}
+                      onRemoveLink={handleRemoveLink}
+                      onNewLinkKeyDown={handleNewLinkKeyDown}
+                      showHeading={false}
+                    />
+                  </div>
+                </DrawerSurfaceCard>
+              )}
+
+              {activeTab === 'details' && (
+                <div
+                  className='space-y-2.5'
+                  data-testid='release-details-card-stack'
+                >
+                  <ReleaseMetadata
                     release={release}
-                    onTrackClick={handleTrackClick}
-                    tracksOverride={tracksOverride}
-                    showHeading={false}
+                    onCanvasStatusChange={
+                      canEditCanvasStatus ? handleCanvasStatusChange : undefined
+                    }
                   />
+                  {isEditable && (
+                    <ReleaseSettingsCard
+                      allowDownloads={allowDownloads}
+                      onToggleArtworkDownloads={onToggleArtworkDownloads}
+                    />
+                  )}
+                  {!readOnly && (
+                    <ReleasePitchSection
+                      releaseId={release.id}
+                      existingPitches={release.generatedPitches}
+                    />
+                  )}
                 </div>
-              </DrawerSurfaceCard>
-            )}
+              )}
 
-            {activeTab === 'links' && (
-              <DrawerSurfaceCard
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-                testId='release-platforms-card'
-              >
-                <div className='p-2.5'>
-                  <ReleaseDspLinks
-                    release={release}
-                    providerConfig={providerConfig}
-                    isEditable={isEditable}
-                    isAddingLink={isAddingLink}
-                    newLinkUrl={newLinkUrl}
-                    selectedProvider={selectedProvider}
-                    isAddingDspLink={isAddingDspLink}
-                    isRemovingDspLink={isRemovingDspLink}
-                    onSetIsAddingLink={setIsAddingLink}
-                    onSetNewLinkUrl={setNewLinkUrl}
-                    onSetSelectedProvider={setSelectedProvider}
-                    onAddLink={handleAddLink}
-                    onRemoveLink={handleRemoveLink}
-                    onNewLinkKeyDown={handleNewLinkKeyDown}
-                    showHeading={false}
-                  />
-                </div>
-              </DrawerSurfaceCard>
-            )}
-
-            {activeTab === 'details' && (
-              <div
-                className='space-y-2.5'
-                data-testid='release-details-card-stack'
-              >
-                <ReleaseMetadata
-                  release={release}
-                  onCanvasStatusChange={
-                    canEditCanvasStatus ? handleCanvasStatusChange : undefined
-                  }
-                />
-                {isEditable && (
-                  <ReleaseSettingsCard
-                    allowDownloads={allowDownloads}
-                    onToggleArtworkDownloads={onToggleArtworkDownloads}
-                  />
-                )}
-                {!readOnly && (
-                  <ReleasePitchSection
-                    releaseId={release.id}
-                    existingPitches={release.generatedPitches}
-                  />
-                )}
-              </div>
-            )}
-
-            {activeTab === 'lyrics' && (
-              <ReleaseLyricsSection
-                releaseId={release.id}
-                lyrics={release.lyrics}
-                isEditable={isEditable}
-                isSaving={isLyricsSaving}
-                onSaveLyrics={onSaveLyrics}
-                onFormatLyrics={onFormatLyrics}
-              />
-            )}
-
-            {activeTab === 'tasks' && (
-              <DrawerSurfaceCard
-                className={cn(LINEAR_SURFACE.drawerCardSm, 'overflow-hidden')}
-                testId='release-tasks-card'
-              >
-                <ReleaseTaskChecklist
+              {activeTab === 'lyrics' && (
+                <ReleaseLyricsSection
                   releaseId={release.id}
-                  variant='compact'
-                  releaseDate={release.releaseDate}
-                  onNavigateToFullPage={() => {
-                    globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
-                  }}
+                  lyrics={release.lyrics}
+                  isEditable={isEditable}
+                  isSaving={isLyricsSaving}
+                  onSaveLyrics={onSaveLyrics}
+                  onFormatLyrics={onFormatLyrics}
                 />
-              </DrawerSurfaceCard>
-            )}
+              )}
+
+              {activeTab === 'tasks' && (
+                <DrawerSurfaceCard
+                  className={cn(
+                    LINEAR_SURFACE.drawerCardSm,
+                    'flex h-full min-h-0 flex-col overflow-hidden'
+                  )}
+                  testId='release-tasks-card'
+                >
+                  <ReleaseTaskChecklist
+                    releaseId={release.id}
+                    variant='compact'
+                    releaseDate={release.releaseDate}
+                    onNavigateToFullPage={() => {
+                      globalThis.location.href = `${APP_ROUTES.DASHBOARD_RELEASES}/${release.id}/tasks`;
+                    }}
+                  />
+                </DrawerSurfaceCard>
+              )}
+            </div>
           </div>
-        </>
+        </div>
       )}
     </EntitySidebarShell>
   );

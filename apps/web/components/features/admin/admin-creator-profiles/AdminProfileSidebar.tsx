@@ -91,10 +91,9 @@ export function AdminProfileSidebar({
       isOpen={isOpen}
       ariaLabel='Creator profile'
       title='Creator profile'
-      onClose={onClose}
       headerMode='minimal'
       entityHeader={
-        <DrawerSurfaceCard variant='card' className='overflow-hidden'>
+        <DrawerSurfaceCard variant='card' className='relative overflow-hidden'>
           <div className='border-b border-subtle px-3 py-2'>
             <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
               Creator profile
@@ -123,6 +122,8 @@ export function AdminProfileSidebar({
           <DrawerCardActionBar
             primaryActions={primaryActions}
             overflowActions={overflowActions}
+            onClose={onClose}
+            overflowTriggerPlacement='card-top-right'
           />
         </DrawerSurfaceCard>
       }

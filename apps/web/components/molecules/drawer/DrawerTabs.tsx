@@ -22,6 +22,7 @@ export interface DrawerTabsProps<T extends string> {
   readonly className?: string;
   readonly actionsClassName?: string;
   readonly triggerClassName?: string;
+  readonly overflowMode?: 'wrap' | 'scroll';
 }
 
 export function DrawerTabs<T extends string>({
@@ -33,35 +34,53 @@ export function DrawerTabs<T extends string>({
   className,
   actionsClassName,
   triggerClassName,
+  overflowMode = 'wrap',
 }: DrawerTabsProps<T>) {
+  const isScrollMode = overflowMode === 'scroll';
+
+  const tabs = (
+    <div
+      role='tablist'
+      aria-label={ariaLabel}
+      className={cn(
+        DRAWER_TABS_RAIL_CLASSNAME,
+        isScrollMode
+          ? 'min-w-max flex-nowrap'
+          : 'flex min-w-0 flex-1 flex-wrap',
+        className
+      )}
+    >
+      {options.map(option => (
+        <button
+          key={option.value}
+          type='button'
+          role='tab'
+          aria-selected={value === option.value}
+          onClick={() => onValueChange(option.value)}
+          className={cn(
+            DRAWER_TABS_TRIGGER_CLASSNAME,
+            value === option.value && DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
+            triggerClassName
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className='flex w-full items-center justify-between gap-2'>
-      <div
-        role='tablist'
-        aria-label={ariaLabel}
-        className={cn(
-          DRAWER_TABS_RAIL_CLASSNAME,
-          'flex min-w-0 flex-1 flex-wrap',
-          className
-        )}
-      >
-        {options.map(option => (
-          <button
-            key={option.value}
-            type='button'
-            role='tab'
-            aria-selected={value === option.value}
-            onClick={() => onValueChange(option.value)}
-            className={cn(
-              DRAWER_TABS_TRIGGER_CLASSNAME,
-              value === option.value && DRAWER_TABS_TRIGGER_ACTIVE_CLASSNAME,
-              triggerClassName
-            )}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {isScrollMode ? (
+        <div
+          className='min-w-0 flex-1 overflow-x-auto overflow-y-hidden pb-px [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          data-testid='drawer-tabs-scroll'
+        >
+          {tabs}
+        </div>
+      ) : (
+        tabs
+      )}
       {actions ? (
         <div
           className={cn('ml-auto flex shrink-0 items-center', actionsClassName)}

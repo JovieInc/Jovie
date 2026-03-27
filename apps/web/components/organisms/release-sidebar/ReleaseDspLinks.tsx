@@ -106,6 +106,7 @@ export function ReleaseDspLinks({
                 isEditable={isEditable}
                 isRemoving={isRemovingDspLink === provider.key}
                 onRemove={() => void onRemoveLink(provider.key)}
+                surfaceVariant='track'
               />
             );
           })}
