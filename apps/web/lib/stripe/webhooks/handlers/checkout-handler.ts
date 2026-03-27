@@ -30,6 +30,22 @@ import type {
 import { getUserIdFromStripeCustomer, invalidateBillingCache } from '../utils';
 
 /**
+ * Best-effort referral activation — logs but does not throw on failure.
+ */
+async function tryActivateReferral(clerkUserId: string): Promise<void> {
+  try {
+    const internalId = await getInternalUserId(clerkUserId);
+    if (internalId) {
+      await activateReferral(internalId);
+    }
+  } catch (error) {
+    logger.warn('Failed to activate referral on checkout', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+}
+
+/**
  * Handler for checkout.session.completed events.
  *
  * When a customer completes checkout, this handler:
@@ -121,17 +137,7 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
 
     // Activate referral if this user was referred.
     // Awaited so failures are surfaced instead of silently dropped.
-    try {
-      const internalId = await getInternalUserId(userId);
-      if (internalId) {
-        await activateReferral(internalId);
-      }
-    } catch (error) {
-      // Log but don't fail the webhook — referral activation is secondary
-      logger.warn('Failed to activate referral on checkout', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-    }
+    await tryActivateReferral(userId);
 
     // Invalidate client cache
     await invalidateBillingCache(userId);
