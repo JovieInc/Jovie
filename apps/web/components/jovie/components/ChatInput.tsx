@@ -276,8 +276,8 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
             isOverLimit
               ? 'border-error focus-within:border-error focus-within:ring-2 focus-within:ring-error/20'
               : isExpanded
-                ? 'border-black/8 bg-surface-0 shadow-[0_1px_0_rgba(255,255,255,0.65),0_18px_34px_-28px_rgba(15,23,42,0.45)] dark:border-white/10'
-                : 'border-black/6 shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8'
+                ? 'border-black/8 bg-surface-0 shadow-[0_1px_0_rgba(255,255,255,0.65),0_18px_34px_-28px_rgba(15,23,42,0.45)] dark:border-white/10 dark:shadow-[0_1px_0_rgba(255,255,255,0.08),0_18px_34px_-28px_rgba(0,0,0,0.7)]'
+                : 'border-black/6 shadow-[0_1px_0_rgba(255,255,255,0.72),0_10px_22px_-20px_rgba(15,23,42,0.42)] dark:border-white/8 dark:shadow-[0_1px_0_rgba(255,255,255,0.06),0_10px_22px_-20px_rgba(0,0,0,0.68)]'
           )}
         >
           {hasPendingImages && onRemoveImage && (
