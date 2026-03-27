@@ -29,18 +29,26 @@ export function SettingsNotificationsSection({
       description='Choose how email confirmation works before fan notifications begin.'
     >
       <div className='px-4 py-4 sm:px-5'>
-        <SettingsToggleRow
-          icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
-          title='Double opt-in verification'
-          description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
-          checked={checked}
-          onCheckedChange={handleToggle}
-          disabled={isPending || !isGrowth}
-          ariaLabel='Toggle double opt-in email confirmation'
-          gated={!isGrowth}
-          gatePlanName='Growth'
-          gateFeatureContext='Double opt-in confirmation'
-        />
+        {isGrowth ? (
+          <SettingsToggleRow
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            checked={checked}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Toggle double opt-in email confirmation'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<ShieldCheck className='h-4 w-4' aria-hidden />}
+            title='Double opt-in verification'
+            description='New fans verify their email before notifications begin. This prevents spam signups and protects your deliverability. On Growth, you can disable this.'
+            gatePlanName='Growth'
+            gateFeatureContext='Double opt-in confirmation'
+          />
+        )}
       </div>
     </SettingsPanel>
   );

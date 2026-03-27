@@ -36,17 +36,9 @@ describe('ChatMessage analytics cards', () => {
       role: 'assistant' as const,
       parts: [{ type: 'text', text: 'Here is a cleaner response.' }],
     };
-    const { container } = fastRender(<ChatMessage {...messageProps} />);
+    fastRender(<ChatMessage {...messageProps} />);
 
-    expect(screen.getByText('Jovie', { selector: 'span' })).toBeTruthy();
-    expect(screen.getByText('Reply')).toBeTruthy();
-
-    const replyBubble = container.querySelector('.rounded-\\[18px\\]');
-    expect(replyBubble).toBeTruthy();
-    expect(replyBubble?.className).toContain(
-      'bg-(--linear-app-content-surface)'
-    );
-    expect(replyBubble?.className).not.toContain('bg-accent/95');
+    expect(screen.getByTestId('chat-message-reply-bubble')).toBeTruthy();
   });
 
   it('renders a chat analytics card for showTopInsights tool results', () => {

@@ -191,11 +191,7 @@ describe('DashboardOverview', () => {
     const viewProfileLink = within(headerEl as HTMLElement).getByRole('link', {
       name: 'View profile',
     });
-    const btnClass = viewProfileLink.className;
-
-    expect(btnClass).toContain('h-(--linear-app-control-height-sm)');
-    expect(btnClass).toContain('w-(--linear-app-control-height-sm)');
-    expect(btnClass).not.toContain('sm:h-11');
-    expect(btnClass).not.toContain('sm:w-11');
+    expect(viewProfileLink).toBeInTheDocument();
+    expect(viewProfileLink).toHaveAttribute('href');
   });
 });

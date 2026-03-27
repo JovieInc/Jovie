@@ -37,6 +37,7 @@ import {
   useOnboardingSubmit,
 } from '@/features/dashboard/organisms/apple-style-onboarding/useOnboardingSubmit';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
+import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
   ONBOARDING_PREVIEW_SNAPSHOT_KEY,
   ONBOARDING_WELCOME_REPLY_KEY,
@@ -45,9 +46,9 @@ import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { type SpotifyArtistResult, useArtistSearchQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 
-const DISCOVERY_POLL_INTERVAL_MS = 2000;
-const DISCOVERY_STAGE_TIMEOUT_MS = 15000;
-const DISCOVERY_AUTO_ADVANCE_MS = 1500;
+const DISCOVERY_POLL_INTERVAL_MS = 1200;
+const DISCOVERY_STAGE_TIMEOUT_MS = 10000;
+const DISCOVERY_AUTO_ADVANCE_MS = 800;
 
 type StepId =
   | 'handle'
@@ -178,12 +179,18 @@ function normalizeResumeStep(step: string | null | undefined): StepId | null {
       return 'handle';
     case 'spotify':
       return 'spotify';
+    case 'artist-confirm':
+      return 'artist-confirm';
+    case 'upgrade':
+      return 'upgrade';
     case 'dsp':
       return 'dsp';
     case 'social':
       return 'social';
     case 'releases':
       return 'releases';
+    case 'late-arrivals':
+      return 'late-arrivals';
     case 'profile-ready':
       return 'profile-ready';
     default:
@@ -210,12 +217,12 @@ function getResumeQueryValue(step: StepId): string | null {
 }
 
 function hasBlockingDspItems(snapshot: DiscoverySnapshot | null): boolean {
-  if (!snapshot) return false;
+  if (!snapshot) return true;
   return snapshot.dspItems.some(item => item.status === 'suggested');
 }
 
 function hasBlockingSocialItems(snapshot: DiscoverySnapshot | null): boolean {
-  if (!snapshot) return false;
+  if (!snapshot) return true;
 
   return snapshot.socialItems.some(item => {
     if (item.kind === 'suggestion') return item.state === 'pending';
@@ -715,8 +722,12 @@ export function OnboardingV2Form({
   const router = useRouter();
   void existingAvatarQuality;
   const searchParams = useSearchParams();
+  const notifications = useNotifications();
   const normalizedInitialHandle = initialHandle.trim().toLowerCase();
-  const initialStep = normalizeResumeStep(initialResumeStep);
+  const initialStep =
+    initialProfileId !== null && initialProfileId !== undefined
+      ? normalizeResumeStep(initialResumeStep)
+      : null;
 
   const [profileHandle, setProfileHandle] = useState(normalizedInitialHandle);
   const [profileId, setProfileId] = useState<string | null>(initialProfileId);
@@ -739,8 +750,10 @@ export function OnboardingV2Form({
   const selectedArtistRef = useRef<SelectedArtist | null>(selectedArtist);
   const currentStepRef = useRef<StepId>(currentStep);
   const discoverySnapshotRef = useRef<DiscoverySnapshot | null>(null);
+  const discoveryRequestSeqRef = useRef(0);
   const lateArrivalIdsRef = useRef<Set<string>>(new Set());
   const didResolveInitialResumeRef = useRef(false);
+  const handledUpgradeStatusRef = useRef<string | null>(null);
   const predictedAutoConnectSelectionRef = useRef<SelectedArtist | null>(
     normalizeSelectedArtist(extractSignupClaimArtistSelection())
   );
@@ -831,6 +844,23 @@ export function OnboardingV2Form({
       setSelectedArtist(normalizeSelectedArtist(selection));
       setCurrentStep('artist-confirm');
     },
+    onAutoConnectFailed: message => {
+      const currentStepAtFailure = currentStepRef.current;
+
+      if (
+        currentStepAtFailure !== 'spotify' &&
+        currentStepAtFailure !== 'artist-confirm'
+      ) {
+        setDiscoveryError(message);
+        return;
+      }
+
+      setSelectedArtist(
+        discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
+      );
+      setCurrentStep('spotify');
+      setDiscoveryError(message);
+    },
     onCompleted: result => {
       setProfileId(result.profileId);
     },
@@ -845,11 +875,17 @@ export function OnboardingV2Form({
     async (signal?: AbortSignal) => {
       if (!profileId) return;
 
+      const requestSeq = discoveryRequestSeqRef.current + 1;
+      discoveryRequestSeqRef.current = requestSeq;
       setIsDiscoveryLoading(true);
       setDiscoveryError(null);
 
       try {
         const nextSnapshot = await fetchDiscoverySnapshot(profileId, signal);
+        if (signal?.aborted || requestSeq !== discoveryRequestSeqRef.current) {
+          return;
+        }
+
         const previousSnapshot = discoverySnapshotRef.current;
         discoverySnapshotRef.current = nextSnapshot;
         setDiscoverySnapshot(nextSnapshot);
@@ -877,13 +913,39 @@ export function OnboardingV2Form({
           return;
         }
 
+        if (requestSeq !== discoveryRequestSeqRef.current) {
+          return;
+        }
+
         setDiscoveryError(getDiscoveryErrorMessage(error));
       } finally {
-        setIsDiscoveryLoading(false);
+        if (!signal?.aborted && requestSeq === discoveryRequestSeqRef.current) {
+          setIsDiscoveryLoading(false);
+        }
       }
     },
     [profileId]
   );
+
+  useEffect(() => {
+    if (
+      !profileId ||
+      currentStep !== 'spotify' ||
+      initialStep ||
+      didResolveInitialResumeRef.current
+    ) {
+      return;
+    }
+
+    const controller = new AbortController();
+    refreshDiscovery(controller.signal).catch(() => {
+      // refreshDiscovery is responsible for setting user-facing error state
+    });
+
+    return () => {
+      controller.abort();
+    };
+  }, [currentStep, initialStep, profileId, refreshDiscovery]);
 
   useEffect(() => {
     if (!profileId) return;
@@ -925,16 +987,23 @@ export function OnboardingV2Form({
   useEffect(() => {
     if (didResolveInitialResumeRef.current) return;
     if (!profileId) {
+      setCurrentStep('handle');
       didResolveInitialResumeRef.current = true;
       return;
     }
+    if (initialStep) {
+      didResolveInitialResumeRef.current = true;
+      return;
+    }
+
+    if (currentStep !== 'spotify') {
+      didResolveInitialResumeRef.current = true;
+      return;
+    }
+
     if (!discoverySnapshot) return;
 
     didResolveInitialResumeRef.current = true;
-
-    if (initialStep) {
-      return;
-    }
 
     if (discoverySnapshot.selectedSpotifyProfile) {
       setCurrentStep('dsp');
@@ -942,16 +1011,45 @@ export function OnboardingV2Form({
     }
 
     setCurrentStep('spotify');
-  }, [discoverySnapshot, initialStep, profileId]);
+  }, [currentStep, discoverySnapshot, initialStep, profileId]);
 
   useEffect(() => {
     stageStartedAtRef.current = Date.now();
   }, [currentStep]);
 
   useEffect(() => {
+    const upgradeStatus = searchParams.get('upgrade');
+    if (!upgradeStatus || handledUpgradeStatusRef.current === upgradeStatus) {
+      return;
+    }
+
+    handledUpgradeStatusRef.current = upgradeStatus;
+
+    if (upgradeStatus === 'cancel') {
+      notifications.info('Checkout cancelled. You can keep going for free.');
+    } else if (upgradeStatus === 'success') {
+      notifications.success('Upgrade complete.');
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('upgrade');
+
+    const nextQueryString = params.toString();
+    startTransition(() => {
+      router.replace(
+        nextQueryString
+          ? `${APP_ROUTES.ONBOARDING}?${nextQueryString}`
+          : APP_ROUTES.ONBOARDING,
+        { scroll: false }
+      );
+    });
+  }, [notifications, router, searchParams]);
+
+  useEffect(() => {
     const currentQueryString = searchParams.toString();
     const resumeValue = getResumeQueryValue(currentStep);
     const params = new URLSearchParams(currentQueryString);
+    params.delete('upgrade');
 
     if (resumeValue) {
       params.set('resume', resumeValue);
@@ -985,31 +1083,43 @@ export function OnboardingV2Form({
       setIsArtistConnectPending(true);
       setDiscoveryError(null);
 
-      const [connectResult] = await Promise.allSettled([
-        connectOnboardingSpotifyArtist({
+      try {
+        const connectResult = await connectOnboardingSpotifyArtist({
           artistName: artist.name,
           includeTracks: false,
           profileId,
           skipMusicFetchEnrichment: true,
           spotifyArtistId: artist.id,
           spotifyArtistUrl: artist.url,
-        }),
-        enrichProfileFromDsp(artist.id, artist.url),
-      ]);
+        });
 
-      if (connectResult.status === 'rejected' || !connectResult.value.success) {
+        if (!connectResult.success) {
+          throw new Error(
+            connectResult.message || 'Failed to connect your Spotify artist.'
+          );
+        }
+      } catch (error) {
         setIsArtistConnectPending(false);
+        setSelectedArtist(
+          discoverySnapshotRef.current?.selectedSpotifyProfile ?? null
+        );
         setCurrentStep('spotify');
         setDiscoveryError(
-          connectResult.status === 'fulfilled'
-            ? connectResult.value.message
+          error instanceof Error
+            ? error.message
             : 'Failed to connect your Spotify artist.'
         );
         return;
       }
 
+      enrichProfileFromDsp(artist.id, artist.url).catch(() => {
+        // Best-effort enrichment should not block a successful connect flow.
+      });
+
       setIsArtistConnectPending(false);
-      await refreshDiscovery();
+      await refreshDiscovery().catch(() => {
+        // refreshDiscovery is responsible for setting user-facing error state
+      });
     },
     [clearArtistSearch, profileId, refreshDiscovery]
   );
@@ -1083,15 +1193,20 @@ export function OnboardingV2Form({
       return () => globalThis.clearTimeout(timeoutId);
     }
 
-    if (currentStep === 'dsp' || currentStep === 'social') {
-      const timeoutId = globalThis.setTimeout(() => {
-        advanceFromStep();
-      }, DISCOVERY_STAGE_TIMEOUT_MS);
-      return () => globalThis.clearTimeout(timeoutId);
-    }
-
     return undefined;
   }, [advanceFromStep, currentStep, discoverySnapshot]);
+
+  useEffect(() => {
+    if (currentStep !== 'dsp' && currentStep !== 'social') {
+      return;
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      advanceFromStep();
+    }, DISCOVERY_STAGE_TIMEOUT_MS);
+
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [advanceFromStep, currentStep]);
 
   const runDiscoveryMutation = useCallback(
     async ({
@@ -1395,6 +1510,12 @@ export function OnboardingV2Form({
             title='Pick your Spotify artist'
             prompt='Search for your artist page or paste a Spotify artist URL. We will start importing as soon as you choose one.'
           >
+            {discoveryError ? (
+              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
+                {discoveryError}
+              </ContentSurfaceCard>
+            ) : null}
+
             <div className='relative'>
               <div className='flex items-center gap-3 rounded-[22px] border border-subtle bg-surface-1 px-4 py-3'>
                 <Music2 className='h-4 w-4 shrink-0 text-tertiary-token' />
@@ -1597,6 +1718,12 @@ export function OnboardingV2Form({
               </Button>
             }
           >
+            {discoveryError ? (
+              <ContentSurfaceCard className='border-error/50 p-4 text-sm text-secondary-token'>
+                {discoveryError}
+              </ContentSurfaceCard>
+            ) : null}
+
             {(discoverySnapshot?.socialItems.length ?? 0) > 0 ? (
               discoverySnapshot?.socialItems.map(item => {
                 const isPending =

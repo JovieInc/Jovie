@@ -1,10 +1,10 @@
 # Roadmap
 
-Three phases from deterministic personalization to full automation.
+Three phases from release infrastructure to orchestration.
 
-- **Phase 1:** Deterministic personalization + identification
-  - Subscribe/Capture vs Listen CTA, platform preferences, dashboards
-- **Phase 2:** Retargeting + offers (Meta-first)
-  - City relevance, propensity rules, audience building, A/B tests
-- **Phase 3:** Automation + learning
-  - Multi-step journeys, preference capture, dynamic creative, ads optimization
+- **Phase 1:** Release infrastructure wedge
+  - Spotify import, smart links, CRM, release notifications, AI playlist pitches
+- **Phase 2:** Context layer
+  - Release history, audience intelligence, collaborator graph, learning loops
+- **Phase 3:** Orchestration layer
+  - Release workflow, task routing, human/agent roles, team from day one

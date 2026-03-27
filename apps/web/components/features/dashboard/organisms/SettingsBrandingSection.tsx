@@ -55,17 +55,25 @@ export function SettingsBrandingSection({
       actions={<SettingsStatusPill status={saveStatus} />}
     >
       <div className='space-y-3 px-4 py-4 sm:px-5'>
-        <SettingsToggleRow
-          icon={<Sparkles className='h-4 w-4' aria-hidden />}
-          title='Hide Jovie branding'
-          description='Remove Jovie branding from your public profile for a more custom presentation.'
-          checked={hideBranding}
-          onCheckedChange={handleToggle}
-          disabled={isPending}
-          ariaLabel='Hide Jovie branding'
-          gated={!isPro}
-          gateFeatureContext='Remove branding'
-        />
+        {isPro ? (
+          <SettingsToggleRow
+            icon={<Sparkles className='h-4 w-4' aria-hidden />}
+            title='Hide Jovie branding'
+            description='Remove Jovie branding from your public profile for a more custom presentation.'
+            checked={hideBranding}
+            onCheckedChange={handleToggle}
+            disabled={isPending}
+            ariaLabel='Hide Jovie branding'
+          />
+        ) : (
+          <SettingsToggleRow
+            gated
+            icon={<Sparkles className='h-4 w-4' aria-hidden />}
+            title='Hide Jovie branding'
+            description='Remove Jovie branding from your public profile for a more custom presentation.'
+            gateFeatureContext='Remove branding'
+          />
+        )}
         {isPro && hideBranding ? (
           <ContentSurfaceCard className='flex items-center gap-3 bg-surface-0 p-3.5'>
             <Sparkles

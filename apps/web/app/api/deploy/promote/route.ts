@@ -64,10 +64,6 @@ export async function POST() {
       method: 'POST',
       timeoutMs: 30_000,
       context: 'Vercel production deploy hook',
-      retry: {
-        maxRetries: 1,
-        baseDelayMs: 500,
-      },
     });
 
     if (!response.ok) {

@@ -3,8 +3,8 @@
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from '@jovie/ui';
 import { Check, Laptop, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { SettingsPanel } from '@/components/features/dashboard/molecules/SettingsPanel';
-import { SettingsToggleRow } from '@/features/dashboard/molecules/SettingsToggleRow';
+import { SettingsPanel } from '@/components/molecules/settings/SettingsPanel';
+import { SettingsToggleRow } from '@/components/molecules/settings/SettingsToggleRow';
 import { useHighContrast } from '@/lib/hooks/useHighContrast';
 import { useHighContrastMutation, useThemeMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
@@ -79,7 +79,7 @@ export function SettingsAppearanceSection() {
                   'focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:ring-offset-0',
                   isSelected
                     ? 'border-accent/45 bg-accent/6 text-primary-token'
-                    : 'border-(--linear-app-frame-seam) bg-surface-0 text-secondary-token hover:bg-surface-1'
+                    : 'border-subtle bg-surface-0 text-secondary-token hover:bg-surface-1'
                 )}
                 aria-pressed={isSelected}
                 data-testid={`theme-option-${option.value}`}
@@ -120,7 +120,7 @@ export function SettingsAppearanceSection() {
           })}
         </div>
 
-        <div className='border-t border-(--linear-app-frame-seam) pt-4'>
+        <div className='border-t border-subtle pt-4'>
           <SettingsToggleRow
             title='High contrast'
             description='Increase contrast for text, borders, and surfaces.'

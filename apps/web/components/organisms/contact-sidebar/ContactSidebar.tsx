@@ -10,7 +10,6 @@ import {
   DrawerTabs,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import {
   type ContextMenuItemType,
   convertToCommonDropdownItems,
@@ -149,19 +148,12 @@ export const ContactSidebar = memo(function ContactSidebar({
       title={headerTitle}
       onClose={onClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={onClose}
-        />
-      }
       isEmpty={!contact}
       emptyMessage='Select a row in the table to view contact details.'
       entityHeader={
         contact ? (
           <DrawerSurfaceCard variant='card' className='overflow-hidden'>
-            <div className='border-b border-(--linear-app-frame-seam) px-3 py-2'>
+            <div className='border-b border-subtle px-3 py-2'>
               <div className='min-w-0'>{headerTitle}</div>
             </div>
             <div className='p-3.5'>
@@ -179,7 +171,6 @@ export const ContactSidebar = memo(function ContactSidebar({
             <DrawerCardActionBar
               primaryActions={primaryActions}
               overflowActions={overflowActions}
-              className='mx-[-14px]'
             />
           </DrawerSurfaceCard>
         ) : undefined

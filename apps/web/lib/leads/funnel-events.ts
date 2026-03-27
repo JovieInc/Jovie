@@ -41,9 +41,11 @@ export interface RecordLeadFunnelEventInput {
 }
 
 function getLeadAttributionSecret(): string {
-  const secret = env.URL_ENCRYPTION_KEY || env.RESEND_API_KEY;
+  const secret = env.LEAD_ATTRIBUTION_SECRET ?? env.URL_ENCRYPTION_KEY;
   if (!secret) {
-    throw new Error('Lead attribution secret is not configured');
+    throw new Error(
+      'LEAD_ATTRIBUTION_SECRET or URL_ENCRYPTION_KEY must be configured for lead attribution'
+    );
   }
 
   return crypto
@@ -146,25 +148,7 @@ export async function recordLeadFunnelEvent(
     if (typeof db.insert !== 'function') {
       return;
     }
-
-    if (options?.idempotent && typeof db.select === 'function') {
-      const [existing] = await db
-        .select({ id: leadFunnelEvents.id })
-        .from(leadFunnelEvents)
-        .where(
-          and(
-            eq(leadFunnelEvents.leadId, input.leadId),
-            eq(leadFunnelEvents.eventType, input.eventType)
-          )
-        )
-        .limit(1);
-
-      if (existing) {
-        return;
-      }
-    }
-
-    await db.insert(leadFunnelEvents).values({
+    const insertQuery = db.insert(leadFunnelEvents).values({
       leadId: input.leadId,
       eventType: input.eventType,
       channel: input.channel ?? null,
@@ -174,6 +158,15 @@ export async function recordLeadFunnelEvent(
       metadata: input.metadata,
       occurredAt: input.occurredAt ?? new Date(),
     });
+
+    if (options?.idempotent) {
+      await insertQuery.onConflictDoNothing({
+        target: [leadFunnelEvents.leadId, leadFunnelEvents.eventType],
+      });
+      return;
+    }
+
+    await insertQuery;
   } catch (error) {
     await captureError('Failed to record lead funnel event', error, {
       route: 'lib/leads/funnel-events',

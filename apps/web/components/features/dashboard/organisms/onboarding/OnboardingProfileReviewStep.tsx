@@ -431,11 +431,11 @@ export function OnboardingProfileReviewStep({
                         type='button'
                         onClick={startEditingName}
                         className='group cursor-pointer'
-                        aria-label='Click to edit display name'
+                        aria-label='Edit display name'
                       >
-                        <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
+                        <span className='text-[16px] font-[590] text-primary-token transition-colors group-hover:text-accent'>
                           {editableDisplayName}
-                        </p>
+                        </span>
                       </button>
                       <button
                         type='button'

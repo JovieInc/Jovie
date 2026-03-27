@@ -16,6 +16,7 @@ import {
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
 import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
+import { useProfileHeaderParts } from '@/components/organisms/profile-sidebar/ProfileSidebarHeader';
 import { BASE_URL } from '@/constants/domains';
 import { CopyLinkInput } from '@/features/dashboard/atoms/CopyLinkInput';
 import { getPlatformCategory } from '@/features/dashboard/organisms/links/utils/platform-category';
@@ -34,7 +35,6 @@ import { ProfileAboutTab } from './ProfileAboutTab';
 import { ProfileAnalyticsSummary } from './ProfileAnalyticsSummary';
 import { ProfileContactHeader } from './ProfileContactHeader';
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
-import { useProfileHeaderParts } from './ProfileSidebarHeader';
 import { SidebarLinkInput } from './SidebarLinkInput';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */

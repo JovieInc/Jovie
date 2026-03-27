@@ -9,6 +9,7 @@ import {
   isNotNull,
   isNull,
   lt,
+  ne,
   or,
 } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
@@ -99,37 +100,57 @@ async function getSendCapacity(now: Date): Promise<{
       dailyRemaining: Math.max(0, dailySendCap - Number(dayRow?.total ?? 0)),
       hourlyRemaining: Math.max(0, maxPerHour - Number(hourRow?.total ?? 0)),
     };
-  } catch {
+  } catch (error) {
+    await captureError('Failed to compute outreach send capacity', error, {
+      route: '/api/admin/outreach',
+    });
     return {
-      dailyRemaining: 10,
-      hourlyRemaining: 5,
+      dailyRemaining: 0,
+      hourlyRemaining: 0,
     };
   }
 }
 
-async function hasQueuedEmailDuplicate(
+async function hasCompetingQueuedEmailLead(
   email: string,
-  leadId: string
+  leadId: string,
+  claimedAt: Date
 ): Promise<boolean> {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    const duplicateResult = await db.execute<{ id: string }>(drizzleSql`
-      select id
-      from ${leads}
-      where lower(${leads.contactEmail}) = ${normalizedEmail}
-        and ${leads.id} <> ${leadId}
-        and (
-          ${leads.outreachQueuedAt} is not null
-          or ${leads.dmSentAt} is not null
-          or ${leads.outreachStatus}::text in ('queued', 'sent', 'dm_sent')
+    const [duplicate] = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(
+        and(
+          drizzleSql`lower(${leads.contactEmail}) = ${normalizedEmail}`,
+          ne(leads.id, leadId),
+          or(
+            isNotNull(leads.dmSentAt),
+            eq(leads.outreachStatus, 'queued'),
+            eq(leads.outreachStatus, 'sent'),
+            eq(leads.outreachStatus, 'dm_sent'),
+            and(
+              eq(leads.outreachStatus, 'pending'),
+              isNotNull(leads.outreachQueuedAt),
+              or(
+                lt(leads.outreachQueuedAt, claimedAt),
+                drizzleSql`(${leads.outreachQueuedAt} = ${claimedAt} and ${leads.id}::text < ${leadId})`
+              )
+            )
+          )
         )
-      limit 1
-    `);
+      )
+      .limit(1);
 
-    return Boolean(duplicateResult.rows[0]?.id);
-  } catch {
-    return false;
+    return Boolean(duplicate?.id);
+  } catch (error) {
+    await captureError('Failed to evaluate outreach email dedupe', error, {
+      route: '/api/admin/outreach',
+      contextData: { leadId },
+    });
+    return true;
   }
 }
 
@@ -453,9 +474,10 @@ export async function POST(request: NextRequest) {
       attempted++;
 
       try {
-        const hasDuplicate = await hasQueuedEmailDuplicate(
+        const hasDuplicate = await hasCompetingQueuedEmailLead(
           lead.contactEmail!,
-          lead.id
+          lead.id,
+          claimedAt
         );
         if (hasDuplicate) {
           failed++;

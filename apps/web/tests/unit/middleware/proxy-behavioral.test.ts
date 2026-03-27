@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   }),
   isStagingHost: vi.fn().mockReturnValue(false),
   shouldBypassClerkForRequest: vi.fn().mockReturnValue(true),
+  isTestAuthBypassEnabled: vi.fn().mockReturnValue(true),
   resolveTestBypassUserId: vi.fn().mockReturnValue(null),
   createBotResponse: vi.fn(),
   clerkMiddleware: vi.fn(),
@@ -87,6 +88,7 @@ vi.mock('@/lib/auth/clerk-middleware-bypass', () => ({
   shouldBypassClerkForRequest: mocks.shouldBypassClerkForRequest,
 }));
 vi.mock('@/lib/auth/test-mode', () => ({
+  isTestAuthBypassEnabled: mocks.isTestAuthBypassEnabled,
   TEST_AUTH_BYPASS_MODE: 'test-auth-bypass',
   TEST_MODE_HEADER: 'x-test-mode',
   resolveTestBypassUserId: mocks.resolveTestBypassUserId,
@@ -143,6 +145,7 @@ function createUnauthenticatedRequest(
   options: Parameters<typeof createTestRequest>[0] = {}
 ) {
   mocks.resolveTestBypassUserId.mockReturnValue(null);
+  mocks.isTestAuthBypassEnabled.mockReturnValue(true);
   return createTestRequest(options);
 }
 
