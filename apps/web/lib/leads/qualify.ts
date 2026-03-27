@@ -69,7 +69,7 @@ export async function qualifyLead(
   ) as string[];
   const trackingPixelPlatforms = Object.keys(
     extraction.discoveredPixels ?? {}
-  ).sort();
+  ).sort((left, right) => left.localeCompare(right));
 
   const fitResult = calculateFitScore({
     ingestionSourcePlatform: 'linktree',

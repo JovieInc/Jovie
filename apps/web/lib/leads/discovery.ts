@@ -198,7 +198,11 @@ function normalizeSearchResultUrl(rawUrl: string): string | null {
     const parsed = new URL(rawUrl);
     parsed.hash = '';
     parsed.search = '';
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '') || '/';
+    let normalizedPath = parsed.pathname;
+    while (normalizedPath.length > 1 && normalizedPath.endsWith('/')) {
+      normalizedPath = normalizedPath.slice(0, -1);
+    }
+    parsed.pathname = normalizedPath || '/';
     return parsed.toString();
   } catch {
     return null;
