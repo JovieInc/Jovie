@@ -3,6 +3,11 @@ import 'server-only';
 import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import {
+  getDeepErrorMessage,
+  isUniqueViolation,
+  unwrapPgError,
+} from '@/lib/db/errors';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -106,17 +111,12 @@ function determineUserStatus(
  * the clerk_id adoption path in createUserWithRetry.
  */
 function isPermanentError(error: Error): boolean {
-  const msg = error.message ?? '';
-  const constraint = (error as { constraint?: string })?.constraint;
-
   // Email uniqueness conflicts are recoverable via clerk_id adoption
-  if (
-    constraint === 'users_email_unique' ||
-    msg.includes('users_email_unique')
-  ) {
+  if (isUniqueViolation(error, 'users_email_unique')) {
     return false;
   }
 
+  const msg = getDeepErrorMessage(error);
   return msg.includes('duplicate key') || msg.includes('constraint');
 }
 
@@ -132,14 +132,7 @@ async function tryAdoptExistingUser(
   userStatus: UserLifecycleStatus
 ): Promise<string | null> {
   if (!email) return null;
-
-  const constraint = (insertError as { constraint?: string })?.constraint;
-  const isEmailConflict =
-    constraint === 'users_email_unique' ||
-    (insertError instanceof Error &&
-      insertError.message?.includes('users_email_unique'));
-
-  if (!isEmailConflict) return null;
+  if (!isUniqueViolation(insertError, 'users_email_unique')) return null;
 
   const [adopted] = await db
     .update(users)
@@ -148,7 +141,7 @@ async function tryAdoptExistingUser(
       userStatus,
       updatedAt: new Date(),
     })
-    .where(eq(users.email, email))
+    .where(eq(users.email, normalizeEmail(email)))
     .returning({ id: users.id });
 
   return adopted?.id ?? null;
@@ -163,11 +156,12 @@ function buildErrorSummary(error: unknown): {
 } {
   const normalizedError =
     error instanceof Error ? error : new Error('Unknown error');
-  const dbErrorCode = (error as { code?: string })?.code;
-  const dbConstraint = (error as { constraint?: string })?.constraint;
-  const dbDetail = (error as { detail?: string })?.detail;
+  const pgError = unwrapPgError(error);
+  const dbErrorCode = pgError.code ?? undefined;
+  const dbConstraint = pgError.constraint ?? undefined;
+  const dbDetail = pgError.detail ?? undefined;
   const summary = [
-    normalizedError.message,
+    getDeepErrorMessage(error) || normalizedError.message,
     dbErrorCode && `code=${dbErrorCode}`,
     dbConstraint && `constraint=${dbConstraint}`,
     dbDetail && `detail=${dbDetail}`,
