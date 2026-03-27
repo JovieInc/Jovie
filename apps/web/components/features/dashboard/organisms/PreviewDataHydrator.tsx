@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useEffect, useMemo } from 'react';
 import type { ProfileSocialLink } from '@/app/app/(shell)/dashboard/actions/social-links';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
@@ -26,6 +27,13 @@ function toValidPlatformType(
 ): PreviewPanelLink['platformType'] {
   if (raw && VALID_PLATFORM_TYPES.has(raw))
     return raw as PreviewPanelLink['platformType'];
+  if (raw) {
+    Sentry.addBreadcrumb({
+      category: 'links',
+      message: `Unknown platformType sanitized: ${raw}`,
+      level: 'warning',
+    });
+  }
   return undefined;
 }
 
