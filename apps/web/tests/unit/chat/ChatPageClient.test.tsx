@@ -1,6 +1,10 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatPageClient } from '@/app/app/(shell)/chat/ChatPageClient';
+import {
+  ChatPageClient,
+  resetWelcomeChatBootstrapState,
+  shouldRetryWelcomeChatBootstrap,
+} from '@/app/app/(shell)/chat/ChatPageClient';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { fastRender } from '@/tests/utils/fast-render';
@@ -25,6 +29,7 @@ vi.mock('next/navigation', () => ({
     push: vi.fn(),
     replace: mockReplace,
     back: vi.fn(),
+    refresh: vi.fn(),
   }),
   useSearchParams: () => mockSearchParams,
   usePathname: () => '/app/chat',
@@ -158,10 +163,13 @@ function renderChatPage(conversationId?: string, isFirstSession?: boolean) {
 describe('ChatPageClient', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
     mockSearchParams = new URLSearchParams();
     capturedOnTitleChange = undefined;
     mockSuccessNotification.mockReset();
     mockErrorNotification.mockReset();
+    globalThis.sessionStorage.clear();
   });
 
   it('renders JovieChat with profileId from selected profile', () => {
@@ -318,5 +326,19 @@ describe('ChatPageClient', () => {
       'Chat selectedProfile missing due to dashboard load failure',
       expect.any(Object)
     );
+  });
+
+  it('treats onboarding profile-missing 404s as retryable', () => {
+    expect(shouldRetryWelcomeChatBootstrap(404)).toBe(true);
+  });
+
+  it('resets scheduled bootstrap state during cleanup', () => {
+    const stateRef = { current: 'scheduled' as const };
+    const retryCountRef = { current: 2 };
+
+    resetWelcomeChatBootstrapState(stateRef, retryCountRef);
+
+    expect(stateRef.current).toBe('idle');
+    expect(retryCountRef.current).toBe(0);
   });
 });

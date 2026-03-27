@@ -1,6 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { and, count, desc, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -25,6 +26,8 @@ const PROVIDER_LABELS: Record<string, string> = {
   tidal: 'Tidal',
   youtube_music: 'YouTube Music',
 };
+
+const profileIdSchema = z.string().uuid();
 
 function parseConfidenceScore(
   value: number | string | null | undefined
@@ -55,6 +58,16 @@ export async function GET(request: Request) {
       );
     }
 
+    const parsedProfileId = profileIdSchema.safeParse(profileId);
+    if (!parsedProfileId.success) {
+      return NextResponse.json(
+        { error: 'profileId must be a valid UUID' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    const validatedProfileId = parsedProfileId.data;
+
     const [profile] = await db
       .select({
         id: creatorProfiles.id,
@@ -74,7 +87,7 @@ export async function GET(request: Request) {
       })
       .from(creatorProfiles)
       .innerJoin(users, eq(users.id, creatorProfiles.userId))
-      .where(eq(creatorProfiles.id, profileId))
+      .where(eq(creatorProfiles.id, validatedProfileId))
       .limit(1);
 
     if (!profile) {
@@ -113,7 +126,7 @@ export async function GET(request: Request) {
           updatedAt: dspArtistMatches.updatedAt,
         })
         .from(dspArtistMatches)
-        .where(eq(dspArtistMatches.creatorProfileId, profileId))
+        .where(eq(dspArtistMatches.creatorProfileId, validatedProfileId))
         .orderBy(desc(dspArtistMatches.updatedAt)),
       db
         .select({
@@ -130,7 +143,7 @@ export async function GET(request: Request) {
         .from(socialLinks)
         .where(
           and(
-            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.creatorProfileId, validatedProfileId),
             ne(socialLinks.state, 'rejected')
           )
         )
@@ -149,7 +162,7 @@ export async function GET(request: Request) {
         .from(socialLinkSuggestions)
         .where(
           and(
-            eq(socialLinkSuggestions.creatorProfileId, profileId),
+            eq(socialLinkSuggestions.creatorProfileId, validatedProfileId),
             eq(socialLinkSuggestions.status, 'pending')
           )
         )
@@ -163,7 +176,7 @@ export async function GET(request: Request) {
           spotifyPopularity: discogReleases.spotifyPopularity,
         })
         .from(discogReleases)
-        .where(eq(discogReleases.creatorProfileId, profileId))
+        .where(eq(discogReleases.creatorProfileId, validatedProfileId))
         .orderBy(
           drizzleSql`COALESCE(${discogReleases.spotifyPopularity}, -1) DESC`,
           drizzleSql`COALESCE(${discogReleases.releaseDate}, ${discogReleases.createdAt}) DESC`,
@@ -173,13 +186,13 @@ export async function GET(request: Request) {
       db
         .select({ value: count() })
         .from(discogReleases)
-        .where(eq(discogReleases.creatorProfileId, profileId)),
+        .where(eq(discogReleases.creatorProfileId, validatedProfileId)),
       db
         .select({ value: count() })
         .from(socialLinks)
         .where(
           and(
-            eq(socialLinks.creatorProfileId, profileId),
+            eq(socialLinks.creatorProfileId, validatedProfileId),
             eq(socialLinks.state, 'active')
           )
         ),
@@ -192,7 +205,7 @@ export async function GET(request: Request) {
         .where(
           and(
             eq(ingestionJobs.jobType, 'dsp_artist_discovery'),
-            drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${profileId}`
+            drizzleSql`${ingestionJobs.payload} ->> 'creatorProfileId' = ${validatedProfileId}`
           )
         )
         .orderBy(desc(ingestionJobs.createdAt))
