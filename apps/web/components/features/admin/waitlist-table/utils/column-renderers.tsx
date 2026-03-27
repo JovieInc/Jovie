@@ -14,7 +14,7 @@ import {
   TableCheckboxCell,
 } from '@/components/organisms/table';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { PLATFORM_LABELS, PRIMARY_GOAL_LABELS } from '../constants';
 
 /**

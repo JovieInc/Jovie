@@ -25,7 +25,7 @@ import { CreatorActionsMenu } from '@/features/admin/creator-actions-menu';
 import { CreatorActionsMenuContent } from '@/features/admin/creator-actions-menu/CreatorActionsMenuContent';
 import { TableRowActions } from '@/features/admin/table/TableRowActions';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 import { getBaseUrl } from '@/lib/utils/platform-detection';

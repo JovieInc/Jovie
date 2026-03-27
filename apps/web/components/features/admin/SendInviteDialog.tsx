@@ -12,7 +12,7 @@ import {
   DrawerSurfaceCard,
 } from '@/components/molecules/drawer';
 import { Dialog, DialogBody, DialogTitle } from '@/components/organisms/Dialog';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { useCreateInviteMutation } from '@/lib/queries';
 import { normalizeEmail } from '@/lib/utils/email';
 

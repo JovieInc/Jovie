@@ -15,7 +15,7 @@ import {
   SORTABLE_COLUMNS,
   SortableColumnKey,
 } from '@/features/admin/creator-sort-config';
-import type { AdminCreatorProfilesSort } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfilesSort } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 
 export interface AdminCreatorsTableHeaderProps {

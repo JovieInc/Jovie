@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 
 /** Map platform ID to display name */
 const PLATFORM_LABELS: Record<string, string> = {
