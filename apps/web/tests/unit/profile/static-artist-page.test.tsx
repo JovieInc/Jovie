@@ -248,6 +248,7 @@ describe('StaticArtistPage', () => {
     expect(
       screen.queryByTestId('public-profile-template-v2')
     ).not.toBeInTheDocument();
+    expect(screen.getByTestId('artist-page-shell')).toBeDefined();
   });
 
   it('renders V2 contact mode when contacts exist', () => {
