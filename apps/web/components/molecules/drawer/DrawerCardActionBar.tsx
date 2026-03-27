@@ -29,6 +29,7 @@ function toMenuItems(
       id: action.id,
       label: action.label,
       icon: action.icon,
+      disabled: action.disabled,
       onClick:
         action.onClick ||
         (action.href
@@ -88,6 +89,7 @@ export function DrawerCardActionBar({
             variant='ghost'
             size='sm'
             onClick={action.onClick}
+            disabled={action.disabled}
             className={cn(
               DRAWER_CARD_ACTION_BUTTON_CLASSNAME,
               action.isActive

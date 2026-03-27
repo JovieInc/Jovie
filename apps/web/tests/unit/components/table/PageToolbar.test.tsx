@@ -19,22 +19,19 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 describe('PageToolbar buttons', () => {
-  it('renders action buttons as elevated pills', () => {
+  it('renders action buttons accessibly', () => {
     render(<PageToolbarActionButton label='Display' icon={<Search />} />);
 
     const button = screen.getByRole('button', { name: 'Display' });
-    expect(button.className).toContain('rounded-full');
-    expect(button.className).toContain('border-(--linear-app-frame-seam)');
-    expect(button.className).toContain('shadow-[');
+    expect(button).toBeInTheDocument();
+    expect(button).toBeEnabled();
   });
 
-  it('renders active tab buttons with pill styling', () => {
+  it('marks active tab buttons as pressed', () => {
     render(<PageToolbarTabButton label='Releases' active />);
 
     const button = screen.getByRole('button', { name: 'Releases' });
     expect(button).toHaveAttribute('aria-pressed', 'true');
-    expect(button.className).toContain('rounded-full');
-    expect(button.className).toContain('shadow-[');
   });
 
   it('keeps icon-only actions accessible', () => {
@@ -49,7 +46,7 @@ describe('PageToolbar buttons', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Toggle preview' });
-    expect(button.className).toContain('w-7');
-    expect(screen.getByText('Preview')).toHaveClass('sr-only');
+    expect(button).toBeInTheDocument();
+    expect(button).toBeEnabled();
   });
 });

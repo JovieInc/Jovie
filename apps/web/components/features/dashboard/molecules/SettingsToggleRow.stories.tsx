@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import * as React from 'react';
+import type { InteractiveSettingsToggleRowProps } from './SettingsToggleRow';
 import { SettingsToggleRow } from './SettingsToggleRow';
 
 const meta: Meta<typeof SettingsToggleRow> = {
@@ -30,9 +31,7 @@ export default meta;
 
 type Story = StoryObj<typeof SettingsToggleRow>;
 
-function ControlledSettingsToggleRow(
-  args: React.ComponentProps<typeof SettingsToggleRow>
-) {
+function ControlledSettingsToggleRow(args: InteractiveSettingsToggleRowProps) {
   const [checked, setChecked] = React.useState<boolean>(args.checked ?? false);
 
   return (
@@ -63,5 +62,16 @@ export const WithoutDescription: Story = {
 export const Disabled: Story = {
   args: {
     disabled: true,
+  },
+};
+
+export const Gated: Story = {
+  args: {
+    title: 'Enable notifications',
+    description:
+      'Send me updates about activity and important account changes.',
+    gated: true,
+    gatePlanName: 'Pro',
+    gateFeatureContext: 'Notification controls',
   },
 };

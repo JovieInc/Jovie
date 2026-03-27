@@ -428,7 +428,6 @@ describe('ReleaseSidebar links tab interactions', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: 'Platforms' }));
-    expect(screen.queryByText('Add platform link')).not.toBeNull();
     await user.click(screen.getByRole('button', { name: 'Add platform link' }));
     await user.click(screen.getByRole('button', { name: 'Spotify' }));
     await user.type(

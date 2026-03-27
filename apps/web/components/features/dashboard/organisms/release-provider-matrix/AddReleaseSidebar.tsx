@@ -21,7 +21,6 @@ import {
   EntityHeaderCard,
   EntitySidebarShell,
 } from '@/components/molecules/drawer';
-import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { GenrePicker } from '@/components/molecules/GenrePicker';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { ReleaseFields } from '@/components/organisms/release-sidebar/ReleaseFields';
@@ -217,13 +216,6 @@ export function AddReleaseSidebar({
       title='New Release'
       onClose={handleClose}
       headerMode='minimal'
-      headerActions={
-        <DrawerHeaderActions
-          primaryActions={[]}
-          overflowActions={[]}
-          onClose={handleClose}
-        />
-      }
       entityHeader={
         <DrawerSurfaceCard
           className={ADD_RELEASE_CARD_CLASSNAME}
@@ -260,7 +252,7 @@ export function AddReleaseSidebar({
               data-testid='entity-header-card'
             />
           </div>
-          <div className='border-t border-(--linear-app-frame-seam) px-3.5 py-2'>
+          <div className='border-t border-subtle px-3.5 py-2'>
             <DrawerButton
               tone='primary'
               className='h-8 w-full'
@@ -281,7 +273,7 @@ export function AddReleaseSidebar({
       }
     >
       <DrawerSurfaceCard className={ADD_RELEASE_CARD_CLASSNAME}>
-        <div className='border-b border-(--linear-app-frame-seam) px-3.5 py-2'>
+        <div className='border-b border-subtle px-3.5 py-2'>
           <p className='text-[11px] font-[510] leading-none text-tertiary-token'>
             Details
           </p>
