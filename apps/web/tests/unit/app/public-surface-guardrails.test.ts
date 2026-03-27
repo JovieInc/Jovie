@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 describe('public surface guardrails', () => {
-  it('blocks utility and investor routes in production robots.txt', async () => {
+  it('keeps production robots disallows scoped to safe namespaces', async () => {
     vi.resetModules();
     vi.doMock('@/constants/app', () => ({
       BASE_URL: 'https://jov.ie',
@@ -18,6 +18,9 @@ describe('public surface guardrails', () => {
     const wildcardRule = rules.find(rule => rule.userAgent === '*');
 
     expect(wildcardRule?.disallow).toEqual(
+      expect.arrayContaining(['/app/', '/api/', '/out/', '/investors/'])
+    );
+    expect(wildcardRule?.disallow).not.toEqual(
       expect.arrayContaining([
         '/investor-portal',
         '/demo',
@@ -30,13 +33,19 @@ describe('public surface guardrails', () => {
     );
   });
 
-  it('marks utility routes as noindex', async () => {
+  it('marks sensitive utility and investor routes as noindex', async () => {
     const modules = await Promise.all([
       import('../../../app/demo/layout'),
       import('../../../app/ui/layout'),
       import('../../../app/sandbox/page'),
       import('../../../app/spinner-test/page'),
       import('../../../app/sentry-example-page/layout'),
+      import('../../../app/hud/page'),
+      import('../../../app/investor-portal/layout'),
+      import('../../../app/investor-portal/page'),
+      import('../../../app/investor-portal/respond/page'),
+      import('../../../app/(marketing)/ai/page'),
+      import('../../../app/(marketing)/investors/page'),
     ]);
 
     for (const routeModule of modules) {

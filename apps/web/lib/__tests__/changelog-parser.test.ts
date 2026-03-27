@@ -321,6 +321,20 @@ describe('parseChangelog', () => {
     expect(releases[0].sections.fixed).toEqual(['Sign-in page loads faster']);
   });
 
+  it('does not promote a later blockquote when the first summary is internal', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+> Hardened webhook dispatch with Redis-backed dedupe [internal]
+> Customer-facing summary that should stay hidden
+
+### Fixed
+
+- Sign-in page loads faster
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].summary).toBe('');
+  });
+
   it('filters internal cost and budget disclosures', () => {
     const md = `## [1.0.0] - 2026-01-01
 
@@ -333,6 +347,23 @@ describe('parseChangelog', () => {
     const releases = parseChangelog(md);
     expect(releases[0].sections.changed).toEqual([
       'Lowered checkout friction for fans',
+    ]);
+  });
+
+  it('keeps public admin-role and token entries visible', () => {
+    const md = `## [1.0.0] - 2026-01-01
+
+### Changed
+
+- Team admins can now manage subscription billing
+- Users can now revoke personal API tokens
+- Design tokens now support accent overrides
+`;
+    const releases = parseChangelog(md);
+    expect(releases[0].sections.changed).toEqual([
+      'Team admins can now manage subscription billing',
+      'Users can now revoke personal API tokens',
+      'Design tokens now support accent overrides',
     ]);
   });
 });

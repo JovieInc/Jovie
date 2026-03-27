@@ -558,16 +558,34 @@ describe('proxy.ts middleware', () => {
   });
 
   describe('support.jov.ie redirect', () => {
-    it('308 redirects support.jov.ie to jov.ie/support', async () => {
+    it('308 redirects support.jov.ie to jov.ie/support and preserves query params', async () => {
       const req = createUnauthenticatedRequest({
         pathname: '/articles/649224-jovie-password-reset',
         hostname: 'support.jov.ie',
+        searchParams: { ref: '123' },
       });
       const res = await callMiddleware(req);
 
       expect(res.status).toBe(308);
       const location = res.headers.get('location');
-      expect(location).toBe('https://jov.ie/support');
+      expect(location).toBe('https://jov.ie/support?ref=123');
+    });
+
+    it('redirects support.jov.ie investor paths before investor handling runs', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/investor-portal/respond',
+        hostname: 'support.jov.ie',
+        searchParams: {
+          t: 'token-123',
+          action: 'interested',
+        },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(308);
+      expect(res.headers.get('location')).toBe(
+        'https://jov.ie/support?t=token-123&action=interested'
+      );
     });
   });
 });

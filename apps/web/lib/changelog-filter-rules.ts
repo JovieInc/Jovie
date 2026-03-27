@@ -82,7 +82,6 @@ const INTERNAL_PATTERNS = [
   /\badmin panel\b/i,
   /\badmin table\b/i,
   /\badmin guard\b/i,
-  /\badmin\b/i,
   /\/app\/admin(?:\/|$)/i,
   /\/api\/admin(?:\/|$)/i,
   /\/api\/cron(?:\/|$)/i,
@@ -113,7 +112,7 @@ const INTERNAL_PATTERNS = [
   /\bcron control\b/i,
   /\bdeploy promotion\b/i,
   /\bserverfetch\(\)\b/i,
-  /\btoken\b/i,
+  /\b(?:bearer|verification|access|refresh)\s+token\b/i,
   /\bverification token\b/i,
   /\btrusted origin\b/i,
 ];

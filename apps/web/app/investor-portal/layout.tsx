@@ -4,16 +4,13 @@ import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
 import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
 import { getInvestorManifest } from '@/lib/investors/manifest';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { InvestorNav } from './_components/InvestorNav';
 import { InvestorStickyBar } from './_components/InvestorStickyBar';
 
 export const metadata: Metadata = {
   title: 'Jovie — Investors',
-  robots: {
-    index: false,
-    follow: false,
-    googleBot: { index: false, follow: false },
-  },
+  robots: NOINDEX_ROBOTS,
 };
 
 /**

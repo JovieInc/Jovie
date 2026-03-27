@@ -499,13 +499,6 @@ async function handleRequest(req: NextRequest, userId: string | null) {
       return NextResponse.redirect(targetUrl, 301);
     }
 
-    // 308 redirect retired support subdomain to the main support page
-    if (hostInfo.isSupportHost) {
-      const targetUrl = new URL('/support', 'https://jov.ie');
-      targetUrl.search = req.nextUrl.search;
-      return NextResponse.redirect(targetUrl, 308);
-    }
-
     // ========================================================================
     // Unauthenticated user handling (no getUserState call needed)
     // ========================================================================
@@ -932,6 +925,13 @@ export default async function middleware(
   req: NextRequest,
   event: NextFetchEvent
 ) {
+  const hostInfo = analyzeHost(req.nextUrl.hostname);
+  if (hostInfo.isSupportHost) {
+    const targetUrl = new URL('/support', 'https://jov.ie');
+    targetUrl.search = req.nextUrl.search;
+    return NextResponse.redirect(targetUrl, 308);
+  }
+
   // ========================================================================
   // Investor portal: handle before Clerk (no auth needed)
   // /investor-portal uses token-based access, not Clerk sessions
