@@ -17,6 +17,10 @@ const {
   mockGetPlanFromPriceId,
   mockCaptureCriticalError,
   mockLogFallback,
+  mockAttributeLeadPaidConversionByClerkUserId,
+  mockActivateReferral,
+  mockGetInternalUserId,
+  mockLoggerWarn,
 } = vi.hoisted(() => ({
   mockStripeSubscriptionsRetrieve: vi.fn(),
   mockGetUserIdFromStripeCustomer: vi.fn(),
@@ -25,6 +29,10 @@ const {
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
+  mockAttributeLeadPaidConversionByClerkUserId: vi.fn(),
+  mockActivateReferral: vi.fn(),
+  mockGetInternalUserId: vi.fn(),
+  mockLoggerWarn: vi.fn(),
 }));
 
 vi.mock('@/lib/stripe/client', () => ({
@@ -60,6 +68,22 @@ vi.mock('@/lib/error-tracking', () => ({
   logFallback: mockLogFallback,
 }));
 
+vi.mock('@/lib/leads/funnel-events', () => ({
+  attributeLeadPaidConversionByClerkUserId:
+    mockAttributeLeadPaidConversionByClerkUserId,
+}));
+
+vi.mock('@/lib/referrals/service', () => ({
+  activateReferral: mockActivateReferral,
+  getInternalUserId: mockGetInternalUserId,
+}));
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: {
+    warn: mockLoggerWarn,
+  },
+}));
+
 // Import after mocks are set up
 import {
   CheckoutSessionHandler,
@@ -78,6 +102,9 @@ describe('@critical CheckoutSessionHandler', () => {
     mockGetPlanFromPriceId.mockReturnValue('standard');
     mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
+    mockAttributeLeadPaidConversionByClerkUserId.mockResolvedValue(undefined);
+    mockActivateReferral.mockResolvedValue(undefined);
+    mockGetInternalUserId.mockResolvedValue(null);
   });
 
   describe('eventTypes', () => {

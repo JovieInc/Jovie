@@ -169,6 +169,11 @@ function renderSignalsCell({ row }: { row: { original: AdminLead } }) {
           Email
         </Badge>
       )}
+      {lead.hasTrackingPixels && (
+        <Badge variant='secondary' className='text-2xs'>
+          Pixel
+        </Badge>
+      )}
     </div>
   );
 }
@@ -253,10 +258,18 @@ export function LeadTable({ refreshKey = 0 }: LeadTableProps) {
 
   const updateLeadStatusMutation = useUpdateLeadStatusMutation();
 
-  const leads = useMemo(
-    () => data?.pages.flatMap(page => page.rows) ?? [],
-    [data]
-  );
+  const leads = useMemo(() => {
+    const rows = data?.pages.flatMap(page => page.rows) ?? [];
+    const seen = new Set<string>();
+
+    return rows.filter(row => {
+      if (seen.has(row.id)) {
+        return false;
+      }
+      seen.add(row.id);
+      return true;
+    });
+  }, [data]);
 
   useEffect(() => {
     if (refreshKey > 0) {

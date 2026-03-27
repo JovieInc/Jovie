@@ -3,6 +3,7 @@ import 'server-only';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 
 import { db, doesTableExist, TABLE_NAMES } from '@/lib/db';
+import { getDeepErrorMessage } from '@/lib/db/errors';
 import {
   clickEvents,
   dailyProfileViews,
@@ -10,7 +11,7 @@ import {
 } from '@/lib/db/schema/analytics';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { captureError } from '@/lib/error-tracking';
+import { captureError, captureWarning } from '@/lib/error-tracking';
 
 export interface AdminBraggingRights {
   /** Unique record labels sorted by frequency (most common first) */
@@ -23,6 +24,16 @@ export interface AdminBraggingRights {
   totalDspClicks: number;
   /** Total active notification subscriptions (email + SMS, not unsubscribed) */
   totalContactsCaptured: number;
+}
+
+function isMissingDailyProfileViewsSchemaError(error: unknown): boolean {
+  const message = getDeepErrorMessage(error).toLowerCase();
+  return (
+    message.includes('does not exist') &&
+    (message.includes('daily_profile_views') ||
+      message.includes('column "view_count"') ||
+      message.includes('column daily_profile_views.view_count'))
+  );
 }
 
 async function getTopLabels(): Promise<string[]> {
@@ -106,6 +117,14 @@ async function getTotalProfileViews(): Promise<number> {
       .from(dailyProfileViews);
     return Number(row?.total ?? 0);
   } catch (error) {
+    if (isMissingDailyProfileViewsSchemaError(error)) {
+      await captureWarning(
+        '[admin/bragging-rights] daily_profile_views schema missing; returning 0 total profile views',
+        error
+      );
+      return 0;
+    }
+
     captureError(
       'Error fetching total profile views for bragging rights',
       error

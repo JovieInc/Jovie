@@ -1,7 +1,16 @@
 import { and, eq } from 'drizzle-orm';
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { db } from '@/lib/db';
 import { investorLinks, investorSettings } from '@/lib/db/schema/investors';
+
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: { index: false, follow: false },
+  },
+};
 
 interface RespondPageProps {
   readonly searchParams: Promise<{ t?: string; action?: string }>;

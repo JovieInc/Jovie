@@ -2,7 +2,7 @@
 
 import { SignIn } from '@clerk/nextjs';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { AuthFormSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout, AuthRoutePrefetch } from '@/features/auth';
@@ -45,12 +45,21 @@ function isValidEmail(value: string): boolean {
 }
 
 function SignInPageContent() {
+  const [isMounted, setIsMounted] = useState(false);
   const searchParams = useSearchParams();
   const email = searchParams.get('email')?.trim() ?? '';
   const initialValues = isValidEmail(email)
     ? { emailAddress: email }
     : undefined;
   const signUpUrl = buildAuthRouteUrl(APP_ROUTES.SIGNUP, searchParams);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <AuthFormSkeleton />;
+  }
 
   return (
     <>

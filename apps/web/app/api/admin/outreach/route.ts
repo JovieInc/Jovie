@@ -3,7 +3,9 @@ import {
   asc,
   count,
   desc,
+  sql as drizzleSql,
   eq,
+  gte,
   isNotNull,
   isNull,
   lt,
@@ -15,7 +17,7 @@ import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { getDeepErrorMessage } from '@/lib/db/errors';
 import { campaignSettings } from '@/lib/db/schema/admin';
-import { leads } from '@/lib/db/schema/leads';
+import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   captureError,
@@ -23,6 +25,7 @@ import {
   getSafeErrorMessage,
 } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { recordLeadFunnelEvent } from '@/lib/leads/funnel-events';
 import { pushLeadToInstantly } from '@/lib/leads/instantly';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
@@ -35,6 +38,100 @@ const queueOutreachBodySchema = z.object({
 });
 
 const OUTREACH_QUEUE_CLAIM_TTL_MS = 5 * 60 * 1000;
+
+function getStartOfDay(now: Date): Date {
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+}
+
+function getStartOfHour(now: Date): Date {
+  const date = new Date(now);
+  date.setUTCMinutes(0, 0, 0);
+  return date;
+}
+
+async function getSendCapacity(now: Date): Promise<{
+  dailyRemaining: number;
+  hourlyRemaining: number;
+}> {
+  if (!leadPipelineSettings?.id) {
+    return {
+      dailyRemaining: 10,
+      hourlyRemaining: 5,
+    };
+  }
+
+  try {
+    const [settings] = await db
+      .select()
+      .from(leadPipelineSettings)
+      .where(eq(leadPipelineSettings.id, 1))
+      .limit(1);
+
+    const dailySendCap = settings?.dailySendCap ?? 10;
+    const maxPerHour = settings?.maxPerHour ?? 5;
+    const startOfDay = getStartOfDay(now);
+    const startOfHour = getStartOfHour(now);
+
+    const [[dayRow], [hourRow]] = await Promise.all([
+      db
+        .select({ total: count() })
+        .from(leads)
+        .where(
+          or(
+            gte(leads.outreachQueuedAt, startOfDay),
+            gte(leads.dmSentAt, startOfDay)
+          )
+        ),
+      db
+        .select({ total: count() })
+        .from(leads)
+        .where(
+          or(
+            gte(leads.outreachQueuedAt, startOfHour),
+            gte(leads.dmSentAt, startOfHour)
+          )
+        ),
+    ]);
+
+    return {
+      dailyRemaining: Math.max(0, dailySendCap - Number(dayRow?.total ?? 0)),
+      hourlyRemaining: Math.max(0, maxPerHour - Number(hourRow?.total ?? 0)),
+    };
+  } catch {
+    return {
+      dailyRemaining: 10,
+      hourlyRemaining: 5,
+    };
+  }
+}
+
+async function hasQueuedEmailDuplicate(
+  email: string,
+  leadId: string
+): Promise<boolean> {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  try {
+    const duplicateResult = await db.execute<{ id: string }>(drizzleSql`
+      select id
+      from ${leads}
+      where lower(${leads.contactEmail}) = ${normalizedEmail}
+        and ${leads.id} <> ${leadId}
+        and (
+          ${leads.outreachQueuedAt} is not null
+          or ${leads.dmSentAt} is not null
+          or ${leads.outreachStatus}::text in ('queued', 'sent', 'dm_sent')
+        )
+      limit 1
+    `);
+
+    return Boolean(duplicateResult.rows[0]?.id);
+  } catch {
+    return false;
+  }
+}
 
 function jsonError(message: string, status: number) {
   return NextResponse.json(
@@ -90,7 +187,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   );
 }
 
-function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
+function isMissingLeadSchemaColumnError(error: unknown): boolean {
   // Use getDeepErrorMessage to unwrap Drizzle's error wrapping —
   // the actual PG "column X does not exist" lives on .cause, not the outer error.
   const normalized = getDeepErrorMessage(error).toLowerCase();
@@ -102,7 +199,21 @@ function isMissingLeadEnrichmentColumnError(error: unknown): boolean {
     normalized.includes('column "latest_release_date" does not exist') ||
     normalized.includes('column "priority_score" does not exist') ||
     normalized.includes('column "is_linktree_verified" does not exist') ||
-    normalized.includes('column "music_tools_detected" does not exist')
+    normalized.includes('column "music_tools_detected" does not exist') ||
+    normalized.includes('column "source_platform" does not exist') ||
+    normalized.includes('column "source_handle" does not exist') ||
+    normalized.includes('column "source_url" does not exist') ||
+    normalized.includes('column "has_tracking_pixels" does not exist') ||
+    normalized.includes('column "tracking_pixel_platforms" does not exist') ||
+    normalized.includes('column "signal_snapshot" does not exist') ||
+    normalized.includes('column "first_contacted_at" does not exist') ||
+    normalized.includes('column "last_contacted_at" does not exist') ||
+    normalized.includes('column "signup_user_id" does not exist') ||
+    normalized.includes('column "signup_at" does not exist') ||
+    normalized.includes('column "paid_at" does not exist') ||
+    normalized.includes('column "paid_subscription_id" does not exist') ||
+    normalized.includes('column "attribution_status" does not exist') ||
+    normalized.includes('column "scrape_attempts" does not exist')
   );
 }
 
@@ -161,12 +272,12 @@ export async function GET(request: NextRequest) {
         db.select({ total: count() }).from(leads).where(pendingWhereClause),
       ]);
     } catch (error) {
-      if (!isMissingLeadEnrichmentColumnError(error)) {
+      if (!isMissingLeadSchemaColumnError(error)) {
         throw error;
       }
 
       await captureWarning(
-        '[admin/outreach] leads enrichment columns missing; falling back to legacy select',
+        '[admin/outreach] leads schema columns missing; falling back to legacy select',
         error,
         { route: '/api/admin/outreach' }
       );
@@ -278,6 +389,24 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const claimCutoff = new Date(now.getTime() - OUTREACH_QUEUE_CLAIM_TTL_MS);
     const pendingEmailWhereClause = getPendingEmailWhereClause(now);
+    const sendCapacity = await getSendCapacity(now);
+    const effectiveLimit = Math.max(
+      0,
+      Math.min(limit, sendCapacity.dailyRemaining, sendCapacity.hourlyRemaining)
+    );
+
+    if (effectiveLimit === 0) {
+      return NextResponse.json(
+        {
+          ok: true,
+          attempted: 0,
+          queued: 0,
+          failed: 0,
+          remainingPending: 0,
+        },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
 
     const pendingEmailLeads = await db
       .select({
@@ -291,7 +420,7 @@ export async function POST(request: NextRequest) {
       .from(leads)
       .where(pendingEmailWhereClause)
       .orderBy(desc(leads.priorityScore), desc(leads.createdAt))
-      .limit(limit);
+      .limit(effectiveLimit);
 
     let attempted = 0;
     let queued = 0;
@@ -324,6 +453,23 @@ export async function POST(request: NextRequest) {
       attempted++;
 
       try {
+        const hasDuplicate = await hasQueuedEmailDuplicate(
+          lead.contactEmail!,
+          lead.id
+        );
+        if (hasDuplicate) {
+          failed++;
+          await db
+            .update(leads)
+            .set({
+              outreachQueuedAt: null,
+              outreachStatus: 'dismissed',
+              updatedAt: new Date(),
+            })
+            .where(eq(leads.id, lead.id));
+          continue;
+        }
+
         const instantlyLeadId = await pushLeadToInstantly({
           email: lead.contactEmail!,
           firstName: lead.displayName ?? lead.linktreeHandle,
@@ -337,9 +483,26 @@ export async function POST(request: NextRequest) {
           .set({
             instantlyLeadId,
             outreachStatus: 'queued',
+            firstContactedAt: claimedAt,
+            lastContactedAt: claimedAt,
             updatedAt: claimedAt,
           })
           .where(eq(leads.id, lead.id));
+
+        await recordLeadFunnelEvent(
+          {
+            leadId: lead.id,
+            eventType: 'email_queued',
+            channel: 'email',
+            provider: 'instantly',
+            campaignKey: 'claim_invite',
+            metadata: {
+              instantlyLeadId,
+              claimToken: lead.claimToken,
+            },
+          },
+          { idempotent: true }
+        );
 
         queued++;
       } catch (error) {
