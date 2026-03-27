@@ -12,7 +12,7 @@ import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
-import type { AdminFunnelMetrics } from '@/lib/admin/funnel-metrics';
+import type { AdminFunnelMetrics } from '@/lib/admin/types';
 
 interface FunnelMetricsStripProps {
   readonly metrics: AdminFunnelMetrics;

@@ -7,7 +7,7 @@ import {
   extractUsernameFromUrl,
   formatUsername,
 } from '@/components/organisms/contact-sidebar/utils';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 
 export interface CreatorProfileSocialLinksProps {
   readonly socialLinks: AdminCreatorProfileRow['socialLinks'];

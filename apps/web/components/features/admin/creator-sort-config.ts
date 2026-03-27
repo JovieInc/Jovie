@@ -1,4 +1,4 @@
-import type { AdminCreatorProfilesSort } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfilesSort } from '@/lib/admin/types';
 
 export const SORTABLE_COLUMNS = {
   created: {

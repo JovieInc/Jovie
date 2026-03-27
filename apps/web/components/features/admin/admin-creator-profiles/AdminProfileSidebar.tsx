@@ -18,7 +18,7 @@ import {
   type CategoryOption,
   ProfileLinkList,
 } from '@/features/dashboard/organisms/profile-contact-sidebar/ProfileLinkList';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import type { Contact } from '@/types';
 
 const PROFILE_TAB_OPTIONS = [

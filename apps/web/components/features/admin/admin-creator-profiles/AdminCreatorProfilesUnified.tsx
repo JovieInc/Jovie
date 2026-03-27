@@ -31,11 +31,11 @@ import { useAdminTableKeyboardNavigation } from '@/features/admin/table/useAdmin
 import { useCreatorActions } from '@/features/admin/useCreatorActions';
 import { useCreatorVerification } from '@/features/admin/useCreatorVerification';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
 import {
   CREATORS_CSV_FILENAME_PREFIX,
   creatorsCSVColumns,
 } from '@/lib/admin/csv-configs/creators';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
 import { useAdminCreatorsInfiniteQuery } from '@/lib/queries';
 import { cn } from '@/lib/utils';

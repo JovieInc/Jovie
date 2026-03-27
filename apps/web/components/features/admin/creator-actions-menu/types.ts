@@ -1,5 +1,5 @@
 import type { CreatorActionStatus } from '@/features/admin/useCreatorActions';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 
 export interface CreatorActionsMenuProps {
   readonly profile: AdminCreatorProfileRow;
