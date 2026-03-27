@@ -28,6 +28,17 @@ interface MusicfetchRequestOptions {
   timeoutMs: number;
 }
 
+interface MusicfetchErrorBody {
+  error?: {
+    message?: string;
+    status?: number;
+  };
+  message?: string;
+  messages?: Array<{
+    message?: string;
+  }>;
+}
+
 function parseRetryAfterSeconds(value: string | null): number | undefined {
   if (!value) return undefined;
 
@@ -124,6 +135,23 @@ function wrapUnknownError(error: unknown): MusicfetchRequestError {
   );
 }
 
+function extractMusicfetchErrorDetail(bodyText: string): string | undefined {
+  const trimmed = bodyText.trim();
+  if (!trimmed) return undefined;
+
+  try {
+    const parsed = JSON.parse(trimmed) as MusicfetchErrorBody;
+    const detail =
+      parsed.error?.message ??
+      parsed.message ??
+      parsed.messages?.find(message => typeof message.message === 'string')
+        ?.message;
+    return detail?.trim() || trimmed.slice(0, 500);
+  } catch {
+    return trimmed.slice(0, 500);
+  }
+}
+
 async function handleHttpResponse<T>(
   response: Response,
   attempt: number
@@ -141,10 +169,16 @@ async function handleHttpResponse<T>(
     return { shouldRetry: true };
   }
 
+  const errorBody = await response.text().catch(() => '');
+  const details = extractMusicfetchErrorDetail(errorBody);
+
   throw new MusicfetchRequestError(
-    `MusicFetch API error: ${response.status}`,
+    details
+      ? `MusicFetch API error: ${response.status} - ${details}`
+      : `MusicFetch API error: ${response.status}`,
     response.status,
-    retryAfterSeconds
+    retryAfterSeconds,
+    details
   );
 }
 
@@ -211,6 +245,7 @@ async function requestWithRetries<T>(
 }
 
 export {
+  isMusicfetchInvalidServicesError,
   MusicfetchBudgetExceededError,
   MusicfetchRequestError,
 } from './errors';

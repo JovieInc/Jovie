@@ -97,8 +97,8 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 - **One-line:** Create releases manually for content not yet on streaming platforms.
 - **Plan:** Free+
 - **Problem it solves:** Pre-release music or non-DSP content needs a home before it hits streaming platforms.
-- **How it works:** Artists can manually enter release details (title, date, artwork, track listing) and add custom links.
-- **Key benefits:** Covers content gaps before DSP availability, supports non-music content
+- **How it works:** Artists create a release by entering core metadata first (title, date, artwork, genres, explicit flag), then land in the release drawer to add and manage platform links.
+- **Key benefits:** Covers content gaps before DSP availability, supports non-music content, keeps link editing in the same drawer used after creation
 - **Dashboard route:** /app/dashboard/releases
 - **Docs page:** /docs/features/releases
 

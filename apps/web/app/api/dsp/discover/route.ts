@@ -114,7 +114,11 @@ export async function POST(request: Request) {
     const jobId = await enqueueDspArtistDiscoveryJob({
       creatorProfileId: profileId,
       spotifyArtistId,
-      targetProviders: targetProviders ?? ['apple_music'],
+      targetProviders: targetProviders ?? [
+        'apple_music',
+        'deezer',
+        'musicbrainz',
+      ],
     });
 
     if (!jobId) {
@@ -127,7 +131,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       jobId,
-      targetProviders: targetProviders ?? ['apple_music'],
+      targetProviders: targetProviders ?? [
+        'apple_music',
+        'deezer',
+        'musicbrainz',
+      ],
       message: 'Discovery job enqueued successfully',
     });
   } catch (error) {

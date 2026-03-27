@@ -9,7 +9,6 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { SUPPORTED_IMAGE_MIME_TYPES } from '@/lib/images/config';
-import { buildInsightPrompt } from '@/lib/insights/chat-presentation';
 import { useInsightsSummaryQuery, usePlanGate } from '@/lib/queries';
 
 import {
@@ -17,6 +16,7 @@ import {
   ChatMessage,
   ChatMessageSkeleton,
   ErrorDisplay,
+  JovieGreeting,
   ScrollToBottom,
   SuggestedProfilesCarousel,
   SuggestedPrompts,
@@ -27,7 +27,7 @@ import {
   useJovieChat,
   useSuggestedProfiles,
 } from './hooks';
-import type { ChatSuggestion, JovieChatProps, MessagePart } from './types';
+import type { JovieChatProps, MessagePart } from './types';
 import { TOOL_LABELS } from './types';
 
 /** Scroll distance (px) from bottom before showing the scroll-to-bottom button. */
@@ -102,7 +102,7 @@ export function JovieChat({
   isFirstSession: isFirstSessionProp = false,
   latestReleaseTitle: latestReleaseTitleProp = null,
 }: JovieChatProps) {
-  const { profileCompletion } = useDashboardData();
+  const { profileCompletion, tippingStats } = useDashboardData();
   const { aiCanUseTools } = usePlanGate();
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const initialQuerySubmitted = useRef(false);
@@ -134,19 +134,6 @@ export function JovieChat({
   const insightsSummary = useInsightsSummaryQuery({
     enabled: shouldLoadInsightSuggestions,
   });
-  const insightSuggestions = useMemo<readonly ChatSuggestion[]>(() => {
-    const insights = insightsSummary.data?.insights ?? [];
-    if (insights.length === 0) {
-      return [];
-    }
-
-    return insights.map(insight => ({
-      icon: 'MessageSquare',
-      label: insight.title,
-      prompt: buildInsightPrompt(insight),
-      accent: 'blue',
-    }));
-  }, [insightsSummary.data?.insights]);
 
   const {
     input,
@@ -173,6 +160,24 @@ export function JovieChat({
     onConversationCreate,
     username,
   });
+
+  const followUpQuickActions = useMemo(
+    () => [
+      {
+        label: 'Summarize this thread',
+        prompt: 'Summarize this thread in three concise bullets.',
+      },
+      {
+        label: 'What should I do next?',
+        prompt: 'Based on this conversation, what should I do next?',
+      },
+      {
+        label: 'Turn it into a checklist',
+        prompt: 'Turn this conversation into a short checklist I can follow.',
+      },
+    ],
+    []
+  );
 
   // Image attachments for chat messages
   const {
@@ -414,16 +419,24 @@ export function JovieChat({
             {/* Loading indicator — rendered outside virtualizer since it's not a real message */}
             {isLoading && messages[messages.length - 1]?.role === 'user' && (
               <div className='mx-auto max-w-[44rem] pb-7'>
-                <div className='flex gap-3'>
-                  <div
-                    data-testid='chat-loading-avatar'
-                    className='flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-surface-1'
-                  >
-                    <BrandLogo size={16} tone='auto' />
+                <div className='max-w-[78%] space-y-2'>
+                  <div className='flex items-center gap-2 pl-0.5'>
+                    <div
+                      data-testid='chat-loading-avatar'
+                      className='flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-0'
+                    >
+                      <BrandLogo size={10} tone='auto' rounded={false} />
+                    </div>
+                    <span className='text-[11px] font-[560] tracking-[-0.01em] text-secondary-token'>
+                      Jovie
+                    </span>
+                    <span className='text-[11px] text-tertiary-token'>
+                      {activeToolLabel ?? 'Writing reply…'}
+                    </span>
                   </div>
                   <div
                     data-testid='chat-loading-bubble'
-                    className='rounded-[16px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3'
+                    className='rounded-[18px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 shadow-[var(--linear-app-card-shadow)]'
                   >
                     <div className='flex items-center gap-1.5'>
                       <span
@@ -434,11 +447,6 @@ export function JovieChat({
                         <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce [animation-delay:-0.15s] motion-reduce:animate-none' />
                         <span className='h-1.5 w-1.5 rounded-full bg-tertiary-token animate-bounce motion-reduce:animate-none' />
                       </span>
-                      {activeToolLabel && (
-                        <span className='ml-2 text-xs font-medium tracking-wide text-tertiary-token'>
-                          {activeToolLabel}
-                        </span>
-                      )}
                     </div>
                   </div>
                   <span className='sr-only' aria-live='polite'>
@@ -488,6 +496,8 @@ export function JovieChat({
                 {...chatInputProps}
                 placeholder='Ask a follow-up...'
                 variant='compact'
+                quickActions={followUpQuickActions}
+                onQuickActionSelect={handleSuggestedPrompt}
               />
             </div>
           </div>
@@ -527,40 +537,18 @@ export function JovieChat({
               {!hasCarouselItems &&
                 (profileCompletion?.percentage ?? 0) >= 100 && (
                   <>
-                    <div className='rounded-[14px] border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) px-4 py-3.5 text-center'>
-                      <p className='text-[11px] font-[560] tracking-normal text-tertiary-token'>
-                        {isFirstSession ? 'Artist ready' : 'Ask Jovie'}
-                      </p>
-                      {isFirstSession ? (
-                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
-                          Welcome, {displayName ?? 'there'}. Your profile is
-                          live at{' '}
-                          <a
-                            href={
-                              username
-                                ? `https://jov.ie/${username}`
-                                : 'https://jov.ie'
-                            }
-                            target='_blank'
-                            rel='noreferrer'
-                            className='font-medium text-primary-token underline-offset-2 hover:underline'
-                          >
-                            {username ? `jov.ie/${username}` : 'jov.ie'}
-                          </a>
-                          {'.'}
-                        </p>
-                      ) : (
-                        <p className='mt-2 text-[15px] leading-6 text-secondary-token'>
-                          What can I help you with today?
-                        </p>
-                      )}
-                    </div>
+                    <JovieGreeting
+                      displayName={displayName}
+                      username={username}
+                      isFirstSession={isFirstSession}
+                      insights={insightsSummary.data?.insights ?? []}
+                      tippingStats={tippingStats}
+                    />
 
                     <SuggestedPrompts
                       onSelect={handleSuggestedPrompt}
                       isFirstSession={isFirstSession}
                       latestReleaseTitle={latestReleaseTitle}
-                      suggestions={insightSuggestions}
                       canUseAdvancedTools={aiCanUseTools}
                     />
                   </>

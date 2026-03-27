@@ -92,10 +92,18 @@ describe('dashboard clerk-safe rendering', () => {
   it('renders AccountSettingsSection without a Clerk provider', () => {
     render(<AccountSettingsSection />);
 
-    expect(screen.getByText('Appearance')).toBeInTheDocument();
-    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.getByTestId('account-settings-section')).toBeInTheDocument();
     expect(screen.getByText('Appearance section')).toBeInTheDocument();
     expect(screen.getByText('Notifications section')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('connected-accounts-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('email-management-card')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('session-management-card')
+    ).not.toBeInTheDocument();
   });
 
   it('defaults profile form entitlements safely without a Clerk provider', () => {

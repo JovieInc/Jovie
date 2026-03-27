@@ -1,5 +1,6 @@
 'use client';
 
+import { AlertCircle } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { EnrichedProfileData } from '@/app/onboarding/actions/enrich-profile';
 import {
@@ -10,8 +11,10 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { AvatarUploadable } from '@/components/organisms/AvatarUploadable';
 import { AuthButton } from '@/features/auth';
 import { track } from '@/lib/analytics';
-import { FORM_LAYOUT } from '@/lib/auth/constants';
+import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
+import type { AvatarQuality } from '@/lib/profile/avatar-quality';
 import { useUserAvatarMutation } from '@/lib/queries/useUserAvatarMutation';
+import { cn } from '@/lib/utils';
 import {
   canProceedFromProfileReview,
   validateDisplayName as validateDisplayNameGuard,
@@ -25,6 +28,7 @@ interface OnboardingProfileReviewStepProps {
   readonly handle: string;
   readonly onGoToDashboard: () => void;
   readonly isEnriching: boolean;
+  readonly avatarQuality?: AvatarQuality | null;
   /** Existing avatar URL from a prior onboarding (step-resume users) */
   readonly existingAvatarUrl?: string | null;
   /** Existing bio from a prior onboarding (step-resume users) */
@@ -71,6 +75,7 @@ export function OnboardingProfileReviewStep({
   handle,
   onGoToDashboard,
   isEnriching,
+  avatarQuality = null,
   existingAvatarUrl = null,
   existingBio = null,
   existingGenres = null,
@@ -375,42 +380,75 @@ export function OnboardingProfileReviewStep({
                       Tap to add a profile photo
                     </p>
                   )}
+                  {avatarQuality?.status === 'low' ? (
+                    <div className='mt-2 flex max-w-[320px] items-start gap-2 rounded-[10px] border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-left text-[12px] text-secondary-token'>
+                      <AlertCircle
+                        className='mt-0.5 h-4 w-4 shrink-0 text-amber-600'
+                        aria-hidden='true'
+                      />
+                      <p>
+                        This photo is only {avatarQuality.width}x
+                        {avatarQuality.height}. Jovie profiles look best at
+                        512x512 or higher, so swap in a sharper image if you
+                        have one.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Editable Name + Handle */}
                 <div className='text-center w-full'>
                   {isEditingName ? (
-                    <div className='flex flex-col items-center gap-1'>
-                      <input
-                        ref={nameInputRef}
-                        type='text'
-                        value={editableDisplayName}
-                        onChange={e => setEditableDisplayName(e.target.value)}
-                        onBlur={handleNameBlur}
-                        onKeyDown={handleNameKeyDown}
-                        maxLength={50}
-                        className='text-[16px] font-[590] text-primary-token text-center bg-transparent border-b border-accent outline-none w-full max-w-[280px] pb-0.5'
-                        aria-label='Edit display name'
-                      />
+                    <div className='flex w-full flex-col items-center gap-1.5'>
+                      <div
+                        className={cn(
+                          AUTH_SURFACE.fieldShell,
+                          'mx-auto max-w-[280px] justify-center px-3 py-2.5'
+                        )}
+                      >
+                        <input
+                          ref={nameInputRef}
+                          type='text'
+                          value={editableDisplayName}
+                          onChange={e => setEditableDisplayName(e.target.value)}
+                          onBlur={handleNameBlur}
+                          onKeyDown={handleNameKeyDown}
+                          maxLength={50}
+                          className={cn(
+                            AUTH_SURFACE.fieldInput,
+                            'text-center text-[15px] font-[590]'
+                          )}
+                          aria-label='Edit display name'
+                        />
+                      </div>
                       {nameError && (
                         <p className='text-[11px] text-red-500'>{nameError}</p>
                       )}
                     </div>
                   ) : (
-                    <button
-                      type='button'
-                      onClick={startEditingName}
-                      className='group cursor-pointer'
-                      aria-label='Click to edit display name'
-                    >
-                      <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
-                        {editableDisplayName}
-                      </p>
-                    </button>
+                    <div className='flex flex-col items-center gap-2'>
+                      <button
+                        type='button'
+                        onClick={startEditingName}
+                        className='group cursor-pointer'
+                        aria-label='Click to edit display name'
+                      >
+                        <p className='text-[16px] font-[590] text-primary-token group-hover:text-accent transition-colors'>
+                          {editableDisplayName}
+                        </p>
+                      </button>
+                      <button
+                        type='button'
+                        onClick={startEditingName}
+                        className={AUTH_SURFACE.inlineAction}
+                      >
+                        Edit name
+                      </button>
+                    </div>
                   )}
-                  <p className='text-[13px] text-tertiary-token mt-1'>
-                    @{handle}
-                  </p>
+                  <div className='mt-2'>
+                    <span className={AUTH_SURFACE.subtlePill}>@{handle}</span>
+                  </div>
                 </div>
 
                 {/* Bio */}
@@ -424,10 +462,7 @@ export function OnboardingProfileReviewStep({
                 {genres.length > 0 && (
                   <div className='flex flex-wrap justify-center gap-1.5'>
                     {genres.slice(0, 3).map(genre => (
-                      <span
-                        key={genre}
-                        className='rounded-full bg-surface-1 px-2.5 py-0.5 text-[11px] font-[510] text-secondary-token capitalize'
-                      >
+                      <span key={genre} className={AUTH_SURFACE.subtlePill}>
                         {genre}
                       </span>
                     ))}

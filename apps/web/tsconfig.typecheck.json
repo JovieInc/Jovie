@@ -1,0 +1,29 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "components/**/*.ts",
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "types/**/*.ts",
+    "types/**/*.d.ts",
+    "constants/**/*.ts",
+    "content/**/*.ts",
+    "contexts/**/*.ts",
+    "contexts/**/*.tsx",
+    "hooks/**/*.ts",
+    "hooks/**/*.tsx",
+    "styles/**/*.ts",
+    "next-env.d.ts",
+    ".next/types/**/*.ts",
+    "tests/types/**/*.d.ts",
+    "instrumentation.ts",
+    "instrumentation-client.ts",
+    "sentry.server.config.ts",
+    "sentry.edge.config.ts",
+    "proxy.ts"
+  ],
+  "exclude": ["node_modules", ".next/types/validator.ts", "**/*.stories.*"]
+}
