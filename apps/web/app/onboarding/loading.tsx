@@ -1,9 +1,11 @@
 /**
  * Loading skeleton for the onboarding page.
  */
+import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+
 export default function OnboardingLoading() {
   return (
-    <div className='flex min-h-screen items-center justify-center p-4'>
+    <div className='flex min-h-screen items-center justify-center bg-page p-4'>
       <div className='w-full max-w-xl space-y-8'>
         {/* Progress bar skeleton */}
         <div className='h-2 w-full skeleton rounded-full' />
@@ -15,7 +17,7 @@ export default function OnboardingLoading() {
         </div>
 
         {/* Content card skeleton */}
-        <div className='rounded-xl border border-subtle bg-surface-1 p-8 space-y-6'>
+        <ContentSurfaceCard className='space-y-6 p-8'>
           {/* Avatar upload area skeleton */}
           <div className='flex justify-center'>
             <div className='h-24 w-24 skeleton rounded-full' />
@@ -36,7 +38,7 @@ export default function OnboardingLoading() {
               <div className='h-24 w-full skeleton rounded-md' />
             </div>
           </div>
-        </div>
+        </ContentSurfaceCard>
 
         {/* Button skeleton */}
         <div className='h-12 w-full skeleton rounded-lg' />

@@ -156,11 +156,28 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseTableSubheader',
   () => ({
-    ReleaseTableSubheader: () => {
+    ReleaseTableSubheader: ({
+      onCreateRelease,
+      canCreateManualReleases = true,
+    }: {
+      onCreateRelease?: () => void;
+      canCreateManualReleases?: boolean;
+    }) => {
       return (
-        <button type='button' data-testid='release-subheader'>
-          subheader
-        </button>
+        <div>
+          <button type='button' data-testid='release-subheader'>
+            subheader
+          </button>
+          {canCreateManualReleases ? (
+            <button
+              type='button'
+              aria-label='Create a new release'
+              onClick={onCreateRelease}
+            >
+              Create a new release
+            </button>
+          ) : null}
+        </div>
       );
     },
     DEFAULT_RELEASE_FILTERS: { releaseTypes: [], popularity: [], labels: [] },

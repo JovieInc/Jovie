@@ -13,6 +13,7 @@ import { memo, useState } from 'react';
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import { Icon } from '@/components/atoms/Icon';
+import { HeaderSearchAction } from '@/components/molecules/HeaderSearchAction';
 import {
   ExportCSVButton,
   PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -22,7 +23,9 @@ import {
   PAGE_TOOLBAR_ICON_CLASS,
   PAGE_TOOLBAR_ICON_STROKE_WIDTH,
   PageToolbar,
+  PageToolbarActionButton,
 } from '@/components/organisms/table';
+import { DrawerToggleButton } from '@/features/dashboard/atoms/DrawerToggleButton';
 import { LINEAR_SURFACE } from '@/features/dashboard/tokens';
 import type { ReleaseType, ReleaseViewModel } from '@/lib/discography/types';
 import { GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
@@ -71,6 +74,14 @@ interface ReleaseTableSubheaderProps {
   readonly releaseView?: ReleaseView;
   /** Callback when release view changes */
   readonly onReleaseViewChange?: (view: ReleaseView) => void;
+  /** Current table search query */
+  readonly searchQuery: string;
+  /** Callback when search query changes */
+  readonly onSearchQueryChange: (value: string) => void;
+  /** Callback to create a release */
+  readonly onCreateRelease?: () => void;
+  /** Whether create release is available */
+  readonly canCreateManualReleases?: boolean;
 }
 
 /** Options for release view segmented control */
@@ -204,7 +215,7 @@ function LinearStyleDisplayMenu({
             size='sm'
             className={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3',
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3',
               compact && PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS,
               compact && 'w-7',
               isOpen && PAGE_TOOLBAR_ACTION_ACTIVE_CLASS,
@@ -280,13 +291,20 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
   onGroupByYearChange,
   releaseView = 'releases',
   onReleaseViewChange,
+  searchQuery,
+  onSearchQueryChange,
+  onCreateRelease,
+  canCreateManualReleases = false,
 }: ReleaseTableSubheaderProps) {
   // Compute filter counts for displaying badges
   const counts = useReleaseFilterCounts(releases);
 
   return (
     <PageToolbar
-      className={cn(LINEAR_SURFACE.toolbar, 'min-h-[32px]')}
+      className={cn(
+        LINEAR_SURFACE.toolbar,
+        'min-h-[32px] border-b-0 border-t border-(--linear-app-frame-seam)'
+      )}
       start={
         onReleaseViewChange ? (
           <ReleaseViewButtons
@@ -298,13 +316,31 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
       }
       end={
         <div className={PAGE_TOOLBAR_END_GROUP_CLASS}>
+          <HeaderSearchAction
+            searchValue={searchQuery}
+            onSearchValueChange={onSearchQueryChange}
+            onClearAction={() => onSearchQueryChange('')}
+            onApply={() => undefined}
+            placeholder='Search releases'
+            ariaLabel='Search releases'
+            submitAriaLabel='Search releases'
+            submitIcon={
+              <Icon
+                name='Search'
+                className={PAGE_TOOLBAR_ICON_CLASS}
+                strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+              />
+            }
+            tooltipLabel='Search'
+            className='h-7 text-[12px] text-tertiary-token hover:text-primary-token'
+          />
           <ReleaseFilterDropdown
             filters={filters}
             onFiltersChange={onFiltersChange}
             counts={counts}
             buttonClassName={cn(
               PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
-              'h-7 rounded-[6px] px-1.5 [&_svg]:h-3 [&_svg]:w-3'
+              'h-7 rounded-full px-1.5 [&_svg]:h-3 [&_svg]:w-3'
             )}
             iconOnly
           />
@@ -326,8 +362,28 @@ export const ReleaseTableSubheader = memo(function ReleaseTableSubheader({
             chrome='page-toolbar'
             iconOnly
             tooltipLabel='Export'
-            className='h-7 w-7 rounded-[6px] px-0 [&_svg]:h-3 [&_svg]:w-3'
+            className='h-7 w-7 rounded-full px-0 [&_svg]:h-3 [&_svg]:w-3'
           />
+          <DrawerToggleButton
+            chrome='page-toolbar'
+            ariaLabel='Toggle release preview'
+            label='Preview'
+            tooltipLabel='Preview'
+            className='h-7 w-7 text-tertiary-token hover:text-primary-token'
+          />
+          {canCreateManualReleases && onCreateRelease ? (
+            <PageToolbarActionButton
+              ariaLabel='Create a new release'
+              onClick={onCreateRelease}
+              label='New Release'
+              icon={
+                <Icon name='Plus' className='h-3.5 w-3.5' strokeWidth={2} />
+              }
+              iconOnly
+              tooltipLabel='New Release'
+              className='h-7 w-7 text-tertiary-token hover:text-primary-token'
+            />
+          ) : null}
         </div>
       }
     />
