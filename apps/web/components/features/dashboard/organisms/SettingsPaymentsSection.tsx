@@ -79,6 +79,8 @@ export function SettingsPaymentsSection() {
       }
       if (typeof result.data.url === 'string') {
         globalThis.location.href = result.data.url;
+      } else {
+        setError('Failed to start onboarding');
       }
     } catch {
       setError('Failed to start Stripe onboarding');
