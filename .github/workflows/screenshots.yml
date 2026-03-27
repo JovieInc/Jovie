@@ -126,7 +126,6 @@ jobs:
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
-              --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}." \
-              --label "screenshots")
+              --body "Auto-generated screenshot update triggered by ${GITHUB_SHA::8}.")
             gh pr merge --auto --squash "$PR_URL" || true
           fi
