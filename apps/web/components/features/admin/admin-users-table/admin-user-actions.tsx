@@ -2,7 +2,7 @@
 
 import { Copy, ExternalLink } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import type { AdminUserRow } from '@/lib/admin/users';
+import type { AdminUserRow } from '@/lib/admin/types';
 
 // Module-level icon constants — allocated once, reused across all rows and renders.
 const ICON_COPY = <Copy className='h-3.5 w-3.5' />;

@@ -4,7 +4,7 @@ import { Button } from '@jovie/ui';
 import { Check, X } from 'lucide-react';
 import { useCallback } from 'react';
 import type { CreatorVerificationStatus } from '@/features/admin/useCreatorVerification';
-import type { AdminCreatorProfileRow } from '@/lib/admin/creator-profiles';
+import type { AdminCreatorProfileRow } from '@/lib/admin/types';
 import { cn } from '@/lib/utils';
 
 interface CreatorVerificationToggleButtonProps

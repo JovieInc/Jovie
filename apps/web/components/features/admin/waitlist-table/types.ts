@@ -1,4 +1,4 @@
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 
 export interface Column<T> {
   id: string;

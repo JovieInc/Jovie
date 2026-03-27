@@ -10,7 +10,7 @@ import {
   useRowSelection,
 } from '@/components/organisms/table';
 import { copyToClipboard } from '@/hooks/useClipboard';
-import type { WaitlistEntryRow } from '@/lib/admin/waitlist';
+import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
